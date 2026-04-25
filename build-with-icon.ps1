@@ -71,9 +71,9 @@ if (Test-Path $nsisPath) {
 }
 
 Write-Host "=== Done ==="
-Write-Host "Installer: $projectDir\build\installer\UsageMonitor-Setup-1.0.0.exe"
-if (Test-Path "$projectDir\build\installer\UsageMonitor-Setup-1.0.0.exe") {
-    $size = (Get-Item "$projectDir\build\installer\UsageMonitor-Setup-1.0.0.exe").Length / 1MB
+Write-Host "Installer: $projectDir\build\installer\UsageMonitor-Setup-1.0.1.exe"
+if (Test-Path "$projectDir\build\installer\UsageMonitor-Setup-1.0.1.exe") {
+    $size = (Get-Item "$projectDir\build\installer\UsageMonitor-Setup-1.0.1.exe").Length / 1MB
     Write-Host "Size: $([math]::Round($size, 2)) MB"
 }
 
