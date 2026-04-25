@@ -79,7 +79,7 @@ Section "Usage Monitor" SEC_APP
 
     SetOutPath "$INSTDIR"
     SetDetailsPrint none
-    File /r "..\..\build\installer\files\Usage Monitor\*.*"
+    File /r "..\..\build\installer\files\*.*"
     SetDetailsPrint both
 
     ; Write registry for uninstaller (user-level)
