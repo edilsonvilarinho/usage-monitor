@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.russhwolf.settings.PreferencesSettings
@@ -20,7 +22,9 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.util.prefs.Preferences
+import javax.imageio.ImageIO
 
 fun main() = application {
 
@@ -60,13 +64,21 @@ fun main() = application {
         enabledApis = enabledApis
     )
 
+    val iconFile = File("src/desktopMain/resources/icons/app_icon.png")
+    val iconImage = if (iconFile.exists()) {
+        runCatching { ImageIO.read(iconFile).toPainter() }.getOrNull()
+    } else {
+        null
+    }
+
     Window(
         onCloseRequest = {
             viewModel.onDestroy()
             httpClient.close()
             exitApplication()
         },
-        title = "Usage Monitor"
+        title = "Usage Monitor",
+        icon = iconImage
     ) {
         DashboardScreen(viewModel = viewModel, settings = settings, enabledApis = enabledApis)
     }
