@@ -41,6 +41,8 @@ class LocalCredentialDataSource(private val httpClient: HttpClient) : Credential
             return try {
                 refreshToken(credentialsFile, creds)
             } catch (e: Exception) {
+                println("[LocalCredentialDataSource] Token refresh failed: ${e.message}")
+                e.printStackTrace()
                 // Fallback: usa token existente mesmo expirado (a API pode ainda aceitar)
                 creds.claudeAiOauth.accessToken
             }
@@ -50,10 +52,13 @@ class LocalCredentialDataSource(private val httpClient: HttpClient) : Credential
     }
 
     private suspend fun refreshToken(credentialsFile: File, creds: CredentialsFileDto): String {
+        println("[LocalCredentialDataSource] Attempting token refresh...")
         val response = httpClient.post(OAUTH_REFRESH_URL) {
             contentType(ContentType.Application.Json)
             setBody(TokenRefreshRequest("refresh_token", creds.claudeAiOauth.refreshToken))
         }.body<TokenRefreshResponse>()
+
+        println("[LocalCredentialDataSource] Refresh response: accessToken=${response.accessToken != null}, refreshToken=${response.refreshToken != null}, expiresIn=${response.expiresIn}")
 
         val newAccessToken = response.accessToken
             ?: throw IllegalStateException("Token refresh retornou sem access_token")

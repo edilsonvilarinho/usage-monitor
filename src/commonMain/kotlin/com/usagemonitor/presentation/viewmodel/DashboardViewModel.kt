@@ -61,6 +61,9 @@ class DashboardViewModel(
             .onSuccess { stats.add(it) }
             .onFailure { errors.add("MiniMax: ${it.message ?: "erro desconhecido"}") }
 
+        println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
+        errors.forEach { e -> println("[fetchUsage] ERROR: $e") }
+
         _uiState.value = if (stats.isNotEmpty()) {
             UiState.Success(stats, errors)
         } else {
