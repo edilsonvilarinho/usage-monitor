@@ -38,13 +38,21 @@ fun main() = application {
 
     val settings = PreferencesSettings(Preferences.userRoot().node("com.usagemonitor"))
 
+    val persistedApis = settings.getStringOrNull("enabledApis")
+        ?.split(",")
+        ?.filter { it.isNotBlank() }
+        ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
+        ?.toSet()
+        ?.ifEmpty { setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX) }
+        ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+
+    val enabledApis = MutableStateFlow(persistedApis)
+
     val credentialDataSource = LocalCredentialDataSource(httpClient)
     val remoteApiDataSource = RemoteApiDataSource(httpClient)
 
     val anthropicRepository = AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
     val minimaxRepository = MiniMaxRepositoryImpl(remoteApiDataSource)
-
-    val enabledApis = MutableStateFlow<Set<ApiSource>>(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX))
 
     val viewModel = DashboardViewModel(
         getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),

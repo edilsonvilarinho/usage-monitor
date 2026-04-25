@@ -18,6 +18,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +46,7 @@ import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +60,8 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
+    val snackbarHostState = SnackbarHostState()
 
     val enabledApisValue = enabledApis?.value ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
     val flow: MutableStateFlow<Set<ApiSource>> = enabledApis ?: MutableStateFlow(enabledApisValue)
@@ -79,6 +86,26 @@ fun DashboardScreen(
             enabledApis.emit(localEnabledApis)
         }
         settings?.putString("enabledApis", localEnabledApis.joinToString(",") { it.name })
+    }
+
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let { key ->
+            val msg = when {
+                key == "RATE_LIMIT:ANTHROPIC" -> if (language == AppLanguage.PT) "Anthropic rate limited — tentando novamente..." else "Anthropic rate limited — retrying..."
+                key.startsWith("ERROR:ANTHROPIC:") -> {
+                    val apiMsg = key.removePrefix("ERROR:ANTHROPIC:").replace("_", ":")
+                    if (language == AppLanguage.PT) "Anthropic: $apiMsg" else "Anthropic: $apiMsg"
+                }
+                key == "RATE_LIMIT:MINIMAX" -> if (language == AppLanguage.PT) "MiniMax rate limited — tentando novamente..." else "MiniMax rate limited — retrying..."
+                key.startsWith("ERROR:MINIMAX:") -> {
+                    val apiMsg = key.removePrefix("ERROR:MINIMAX:").replace("_", ":")
+                    if (language == AppLanguage.PT) "MiniMax: $apiMsg" else "MiniMax: $apiMsg"
+                }
+                else -> key
+            }
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+            viewModel.clearToast()
+        }
     }
 
     AppTheme(isDark = isDark) {
@@ -109,6 +136,11 @@ fun DashboardScreen(
                     onToggle = { api, checked ->
                         localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
                     }
+                )
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)

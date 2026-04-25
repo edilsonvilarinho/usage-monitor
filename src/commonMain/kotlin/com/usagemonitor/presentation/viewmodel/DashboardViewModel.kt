@@ -28,6 +28,9 @@ class DashboardViewModel(
     private val _secondsUntilRefresh = MutableStateFlow(POLL_INTERVAL_SECONDS)
     val secondsUntilRefresh: StateFlow<Int> = _secondsUntilRefresh.asStateFlow()
 
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
@@ -61,9 +64,11 @@ class DashboardViewModel(
                 .onSuccess { stats.add(it) }
                 .onFailure { err ->
                     if (err.message?.contains("429") == true) {
-                        println("[fetchUsage] Anthropic rate limited, skipping error for this cycle")
+                        _toastMessage.value = "RATE_LIMIT:ANTHROPIC"
                     } else {
-                        errors.add("Anthropic: ${err.message ?: "erro desconhecido"}")
+                        val msg = err.message ?: "erro desconhecido"
+                        _toastMessage.value = "ERROR:ANTHROPIC:${msg.replace(":", "_")}"
+                        errors.add("Anthropic: $msg")
                     }
                 }
         }
@@ -71,17 +76,28 @@ class DashboardViewModel(
         if (ApiSource.MINIMAX in enabled) {
             getMiniMaxUsage()
                 .onSuccess { stats.add(it) }
-                .onFailure { err -> errors.add("MiniMax: ${err.message ?: "erro desconhecido"}") }
+                .onFailure { err ->
+                    if (err.message?.contains("429") == true) {
+                        _toastMessage.value = "RATE_LIMIT:MINIMAX"
+                    } else {
+                        val msg = err.message ?: "erro desconhecido"
+                        _toastMessage.value = "ERROR:MINIMAX:${msg.replace(":", "_")}"
+                        errors.add("MiniMax: $msg")
+                    }
+                }
         }
 
         println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
-        errors.forEach { e -> println("[fetchUsage] ERROR: $e") }
 
         _uiState.value = if (stats.isNotEmpty()) {
             UiState.Success(stats, errors)
         } else {
             UiState.Error(errors.joinToString("\n"))
         }
+    }
+
+    fun clearToast() {
+        _toastMessage.value = null
     }
 
     fun refresh() {
