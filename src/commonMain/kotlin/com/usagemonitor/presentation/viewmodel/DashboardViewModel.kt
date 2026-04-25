@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
@@ -18,7 +19,8 @@ private const val POLL_INTERVAL_SECONDS = 600
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
-    private val getMiniMaxUsage: GetMiniMaxUsageUseCase
+    private val getMiniMaxUsage: GetMiniMaxUsageUseCase,
+    private val enabledApis: StateFlow<Set<ApiSource>>
 ) {
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -52,20 +54,25 @@ class DashboardViewModel(
     private suspend fun fetchUsage() {
         val stats = mutableListOf<ApiUsageStats>()
         val errors = mutableListOf<String>()
+        val enabled = enabledApis.value
 
-        getAnthropicUsage()
-            .onSuccess { stats.add(it) }
-            .onFailure { err ->
-                if (err.message?.contains("429") == true) {
-                    println("[fetchUsage] Anthropic rate limited, skipping error for this cycle")
-                } else {
-                    errors.add("Anthropic: ${err.message ?: "erro desconhecido"}")
+        if (ApiSource.ANTHROPIC in enabled) {
+            getAnthropicUsage()
+                .onSuccess { stats.add(it) }
+                .onFailure { err ->
+                    if (err.message?.contains("429") == true) {
+                        println("[fetchUsage] Anthropic rate limited, skipping error for this cycle")
+                    } else {
+                        errors.add("Anthropic: ${err.message ?: "erro desconhecido"}")
+                    }
                 }
-            }
+        }
 
-        getMiniMaxUsage()
-            .onSuccess { stats.add(it) }
-            .onFailure { err -> errors.add("MiniMax: ${err.message ?: "erro desconhecido"}") }
+        if (ApiSource.MINIMAX in enabled) {
+            getMiniMaxUsage()
+                .onSuccess { stats.add(it) }
+                .onFailure { err -> errors.add("MiniMax: ${err.message ?: "erro desconhecido"}") }
+        }
 
         println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
         errors.forEach { e -> println("[fetchUsage] ERROR: $e") }

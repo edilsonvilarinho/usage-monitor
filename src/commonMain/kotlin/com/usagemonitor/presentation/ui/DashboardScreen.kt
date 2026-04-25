@@ -41,19 +41,25 @@ import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     settings: Settings? = null,
+    enabledApis: MutableStateFlow<Set<ApiSource>>? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
 
-    // Preferências carregadas do storage e persistidas em cada mudança
+    val enabledApisValue = enabledApis?.value ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+    val flow: MutableStateFlow<Set<ApiSource>> = enabledApis ?: MutableStateFlow(enabledApisValue)
+    val enabledApisState by flow.collectAsState()
+
     var isDark by remember { mutableStateOf(settings?.getBoolean("isDark", true) ?: true) }
     var language by remember {
         mutableStateOf(
@@ -62,16 +68,17 @@ fun DashboardScreen(
                 ?: AppLanguage.PT
         )
     }
-    var enabledApis by remember {
-        mutableStateOf(
-            settings?.getStringOrNull("enabledApis")
-                ?.split(",")
-                ?.filter { it.isNotBlank() }
-                ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
-                ?.toSet()
-                ?.ifEmpty { setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX) }
-                ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
-        )
+    var localEnabledApis by remember { mutableStateOf(enabledApisValue) }
+
+    LaunchedEffect(enabledApisState) {
+        localEnabledApis = enabledApisState
+    }
+
+    LaunchedEffect(localEnabledApis) {
+        if (enabledApis != null) {
+            enabledApis.emit(localEnabledApis)
+        }
+        settings?.putString("enabledApis", localEnabledApis.joinToString(",") { it.name })
     }
 
     AppTheme(isDark = isDark) {
@@ -98,10 +105,9 @@ fun DashboardScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 ApiSelector(
-                    enabledApis = enabledApis,
+                    enabledApis = localEnabledApis,
                     onToggle = { api, checked ->
-                        enabledApis = if (checked) enabledApis + api else enabledApis - api
-                        settings?.putString("enabledApis", enabledApis.joinToString(",") { it.name })
+                        localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
                     }
                 )
 
@@ -119,7 +125,7 @@ fun DashboardScreen(
                     is UiState.Success -> SuccessContent(
                         apiStatsList = state.data,
                         partialErrors = state.errors,
-                        enabledApis = enabledApis,
+                        enabledApis = localEnabledApis,
                         language = language,
                         modifier = Modifier.weight(1f)
                     )

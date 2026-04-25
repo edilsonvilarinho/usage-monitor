@@ -7,6 +7,7 @@ import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.presentation.ui.DashboardScreen
@@ -17,6 +18,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import java.util.prefs.Preferences
 
@@ -42,9 +44,12 @@ fun main() = application {
     val anthropicRepository = AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
     val minimaxRepository = MiniMaxRepositoryImpl(remoteApiDataSource)
 
+    val enabledApis = MutableStateFlow<Set<ApiSource>>(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX))
+
     val viewModel = DashboardViewModel(
         getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
-        getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository)
+        getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
+        enabledApis = enabledApis
     )
 
     Window(
@@ -55,6 +60,6 @@ fun main() = application {
         },
         title = "Usage Monitor"
     ) {
-        DashboardScreen(viewModel = viewModel, settings = settings)
+        DashboardScreen(viewModel = viewModel, settings = settings, enabledApis = enabledApis)
     }
 }
