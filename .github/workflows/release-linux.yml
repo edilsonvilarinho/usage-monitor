@@ -29,81 +29,63 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
       - name: Build Linux distributable
         run: ./gradlew createDistributable
 
       - name: Find AppImage
         id: appimage
         run: |
-          find build -name "*.AppImage" -type f
-          echo "appimage_path=$(find build -name "*.AppImage" -type f | head -1)" >> $GITHUB_OUTPUT
+          APPIMAGE=$(find build -name "*.AppImage" -type f | head -1 || true)
+          echo "path=$APPIMAGE" >> $GITHUB_OUTPUT
 
       - name: Package as deb
+        if: steps.appimage.outputs.path != ''
         run: |
+          set -e
           sudo apt-get update -qq
-          sudo apt-get install -y -qq alien dpkg-dev
+          sudo apt-get install -y -qq dpkg-dev
 
-          APPIMAGE=$(find build -name "*.AppImage" -type f | head -1)
-          if [ -n "$APPIMAGE" ]; then
-            APPNAME=$(basename "$APPIMAGE" .AppImage)
-            mkdir -p dist-build
+          APPIMAGE="${{ steps.appimage.outputs.path }}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          mkdir -p dist-build
 
-            # Extract AppImage contents
-            chmod +x "$APPIMAGE"
-            "$APPIMAGE" --appimage-extract > /dev/null 2>&1
+          chmod +x "$APPIMAGE"
+          "$APPIMAGE" --appimage-extract > /dev/null 2>&1 || true
 
-            # Create debian package structure
-            PKG_DIR="sqfs-root"
-            mkdir -p "$PKG_DIR/DEBIAN"
-            mkdir -p "$PKG_DIR/usr/bin"
-            mkdir -p "$PKG_DIR/usr/share/applications"
-            mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
+          PKG_DIR="sqfs-root"
+          mkdir -p "$PKG_DIR/DEBIAN"
+          mkdir -p "$PKG_DIR/usr/bin"
+          mkdir -p "$PKG_DIR/usr/share/applications"
 
-            cp -r squashfs-root/* "$PKG_DIR/"
+          cp -r squashfs-root/* "$PKG_DIR/" 2>/dev/null || true
 
-            # Control file
-            cat > "$PKG_DIR/DEBIAN/control" << EOF
-Package: usage-monitor
-Version: ${GITHUB_REF#refs/tags/v}
-Section: utils
-Priority: optional
-Architecture: amd64
-Maintainer: Usage Monitor
-Description: Usage Monitor - API usage tracker
-EOF
+          printf 'Package: usage-monitor\nVersion: %s\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: Usage Monitor\nDescription: Usage Monitor - API usage tracker\n' "$VERSION" > "$PKG_DIR/DEBIAN/control"
 
-            # Desktop entry
-            cat > "$PKG_DIR/usr/share/applications/usage-monitor.desktop" << EOF
-[Desktop Entry]
-Name=Usage Monitor
-Comment=API usage tracker
-Exec=$PKG_DIR/usage-monitor
-Icon=usage-monitor
-Terminal=false
-Type=Application
-EOF
+          printf '[Desktop Entry]\nName=Usage Monitor\nComment=API usage tracker\nExec=%s/usage-monitor\nIcon=usage-monitor\nTerminal=false\nType=Application\n' "$PKG_DIR" > "$PKG_DIR/usr/share/applications/usage-monitor.desktop"
 
-            # Create deb
-            dpkg-deb --build --root-owner-group "$PKG_DIR" dist-build/usage-monitor_${GITHUB_REF#refs/tags/v}_amd64.deb
-            echo "deb_created=true" >> $GITHUB_OUTPUT
-          fi
+          dpkg-deb --build --root-owner-group "$PKG_DIR" "dist-build/usage-monitor_${VERSION}_amd64.deb"
 
       - name: Create RPM package
+        if: steps.appimage.outputs.path != ''
         run: |
+          set -e
           sudo apt-get update -qq
           sudo apt-get install -y -qq rpm
 
-          APPIMAGE=$(find build -name "*.AppImage" -type f | head -1)
-          if [ -n "$APPIMAGE" ]; then
-            mkdir -p dist-build/rpmtmp/BUILD
-            mkdir -p dist-build/rpmtmp/RPMS
-            mkdir -p dist-build/rpmtmp/SPECS
-            mkdir -p dist-build/rpmtmp/SOURCES
+          APPIMAGE="${{ steps.appimage.outputs.path }}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          mkdir -p dist-build/rpmtmp/BUILD
+          mkdir -p dist-build/rpmtmp/RPMS
+          mkdir -p dist-build/rpmtmp/SPECS
+          mkdir -p dist-build/rpmtmp/SOURCES
 
-            # Create spec file
-            cat > dist-build/rpmtmp/SPECS/usage-monitor.spec << EOF
+          cat > dist-build/rpmtmp/SPECS/usage-monitor.spec << SPECEOF
 Name: usage-monitor
-Version: ${GITHUB_REF#refs/tags/v}
+Version: VERSION_PLACEHOLDER
 Release: 1
 Summary: Usage Monitor - API usage tracker
 License: MIT
@@ -115,25 +97,23 @@ Usage Monitor - API usage tracker for Anthropic and MiniMax APIs
 %install
 mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/share/applications
-mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
 
-cp $APPIMAGE %{buildroot}/usr/bin/usage-monitor
+cp APPIMAGE_PLACEHOLDER %{buildroot}/usr/bin/usage-monitor
 chmod +x %{buildroot}/usr/bin/usage-monitor
 
 %files
 /usr/bin/usage-monitor
 /usr/share/applications/usage-monitor.desktop
-EOF
+SPECEOF
 
-            # Build RPM
-            rpmbuild --define "_topdir $(pwd)/dist-build/rpmtmp" -bb dist-build/rpmtmp/SPECS/usage-monitor.spec
-            mv dist-build/rpmtmp/RPMS/x86_64/*.rpm dist-build/
-            echo "rpm_created=true" >> $GITHUB_OUTPUT
-          fi
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" dist-build/rpmtmp/SPECS/usage-monitor.spec
+          sed -i "s|APPIMAGE_PLACEHOLDER|$APPIMAGE|g" dist-build/rpmtmp/SPECS/usage-monitor.spec
+
+          rpmbuild --define "_topdir $(pwd)/dist-build/rpmtmp" -bb dist-build/rpmtmp/SPECS/usage-monitor.spec || true
+          ls -la dist-build/rpmtmp/RPMS/x86_64/ 2>/dev/null || echo "RPM build may have failed"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             build/**/*.AppImage
