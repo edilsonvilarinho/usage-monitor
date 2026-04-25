@@ -11,8 +11,8 @@ import kotlin.test.assertEquals
 class AnthropicMapperTest {
 
     private val sampleResponse = AnthropicUsageResponse(
-        fiveHour = AnthropicUsageWindow(utilization = 0.15, resetsAt = "2025-01-01T05:00:00Z"),
-        sevenDay = AnthropicUsageWindow(utilization = 0.05, resetsAt = "2025-01-07T00:00:00Z"),
+        fiveHour = AnthropicUsageWindow(utilization = 15.0, resetsAt = "2025-01-01T05:00:00Z"),
+        sevenDay = AnthropicUsageWindow(utilization = 5.0, resetsAt = "2025-01-07T00:00:00Z"),
     )
 
     @Test
@@ -31,9 +31,11 @@ class AnthropicMapperTest {
         val quota = AnthropicMapper.toUsageStats(sampleResponse).quotas[0]
         assertEquals("Claude 5h", quota.label)
         assertEquals(PeriodType.INTERVAL, quota.periodType)
-        assertEquals(15L, quota.used)   // 0.15 * 100
+        assertEquals(15L, quota.used)
         assertEquals(100L, quota.total)
-        assertEquals(UsageUnit.PERCENTAGE, quota.unit)
+        assertEquals(UsageUnit.TOKENS, quota.unit)
+        assertEquals(675L, quota.rawUsed)
+        assertEquals(4500L, quota.rawTotal)
     }
 
     @Test
@@ -41,9 +43,11 @@ class AnthropicMapperTest {
         val quota = AnthropicMapper.toUsageStats(sampleResponse).quotas[1]
         assertEquals("Claude 7d", quota.label)
         assertEquals(PeriodType.WEEKLY, quota.periodType)
-        assertEquals(5L, quota.used)    // 0.05 * 100
+        assertEquals(5L, quota.used)
         assertEquals(100L, quota.total)
-        assertEquals(UsageUnit.PERCENTAGE, quota.unit)
+        assertEquals(UsageUnit.TOKENS, quota.unit)
+        assertEquals(2250L, quota.rawUsed)
+        assertEquals(45000L, quota.rawTotal)
     }
 
     @Test
@@ -68,10 +72,11 @@ class AnthropicMapperTest {
     }
 
     @Test
-    fun `utilization 1 maps to used 100`() {
+    fun `utilization 1 maps to used 1`() {
         val response = sampleResponse.copy(
             fiveHour = AnthropicUsageWindow(utilization = 1.0, resetsAt = "2025-01-01T05:00:00Z")
         )
-        assertEquals(100L, AnthropicMapper.toUsageStats(response).quotas[0].used)
+        assertEquals(1L, AnthropicMapper.toUsageStats(response).quotas[0].used)
+        assertEquals(45L, AnthropicMapper.toUsageStats(response).quotas[0].rawUsed)
     }
 }

@@ -14,23 +14,14 @@ import kotlinx.datetime.Instant
  * ou qualquer biblioteca externa. Apenas tipos puros e kotlinx.datetime.
  */
 data class QuotaInfo(
-    // Identificador legível: nome do modelo ou "Tokens"
     val label: String,
-
-    // Quantidade consumida no período
     val used: Long,
-
-    // Limite total do período (0 = sem limite definido)
     val total: Long,
-
-    // Quando esta cota reseta
     val periodEndAt: Instant,
-
-    // Tipo de período: intervalo curto (5h) ou semanal
     val periodType: PeriodType = PeriodType.INTERVAL,
-
-    // Unidade de medida: tokens (Anthropic) ou requisições (MiniMax)
-    val unit: UsageUnit
+    val unit: UsageUnit,
+    val rawUsed: Long = 0L,
+    val rawTotal: Long = 0L
 ) {
     /**
      * Percentual de uso no período atual (valor entre 0.0 e 1.0).

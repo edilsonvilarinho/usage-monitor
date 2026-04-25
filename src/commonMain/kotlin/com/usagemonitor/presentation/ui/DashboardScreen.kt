@@ -337,14 +337,16 @@ private fun QuotaCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = formatUsage(quota.used, quota.total, quota.unit),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
+            if (apiName != "Anthropic") {
+                Text(
+                    text = formatUsage(quota.used, quota.total, quota.unit, quota.rawUsed, quota.rawTotal),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
 
             if (quota.periodType == PeriodType.WEEKLY) {
                 Text(
@@ -363,11 +365,15 @@ private fun QuotaCard(
     }
 }
 
-private fun formatUsage(used: Long, total: Long, unit: com.usagemonitor.domain.entity.UsageUnit): String {
+private fun formatUsage(used: Long, total: Long, unit: com.usagemonitor.domain.entity.UsageUnit, rawUsed: Long = 0L, rawTotal: Long = 0L): String {
     return when (unit) {
         com.usagemonitor.domain.entity.UsageUnit.PERCENTAGE -> "${used}%"
-        com.usagemonitor.domain.entity.UsageUnit.TOKENS     -> "${abbreviate(used)}/${abbreviate(total)} tok"
-        com.usagemonitor.domain.entity.UsageUnit.REQUESTS   -> "${abbreviate(used)}/${abbreviate(total)} req"
+        com.usagemonitor.domain.entity.UsageUnit.TOKENS -> {
+            val displayUsed = if (rawUsed > 0L) rawUsed else used
+            val displayTotal = if (rawTotal > 0L) rawTotal else total
+            "${abbreviate(displayUsed)}/${abbreviate(displayTotal)} tok"
+        }
+        com.usagemonitor.domain.entity.UsageUnit.REQUESTS -> "${abbreviate(used)}/${abbreviate(total)} req"
     }
 }
 

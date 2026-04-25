@@ -6,19 +6,23 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.Instant
+import kotlin.math.roundToLong
 
 object AnthropicMapper {
 
-    // Escala de 0-100 para representar utilização (0.0-1.0) como inteiro
+    private const val MAX_CAPACITY_5H = 4500L
+    private const val MAX_CAPACITY_7D = 45000L
     private const val SCALE = 100L
 
     fun toUsageStats(response: AnthropicUsageResponse): ApiUsageStats {
         val fiveHourEnd = Instant.parse(response.fiveHour.resetsAt)
         val sevenDayEnd = Instant.parse(response.sevenDay.resetsAt)
 
-        // Converte utilização para inteiro 0-100 para uso no arco
-        val fiveHourUsed = (response.fiveHour.utilization * SCALE).toLong().coerceIn(0L, SCALE)
-        val sevenDayUsed = (response.sevenDay.utilization * SCALE).toLong().coerceIn(0L, SCALE)
+        val fiveHourUsed = response.fiveHour.utilization.toLong().coerceIn(0L, 100L)
+        val sevenDayUsed = response.sevenDay.utilization.toLong().coerceIn(0L, 100L)
+
+        val fiveHourRaw = (response.fiveHour.utilization * MAX_CAPACITY_5H / 100).roundToLong()
+        val sevenDayRaw = (response.sevenDay.utilization * MAX_CAPACITY_7D / 100).roundToLong()
 
         return ApiUsageStats(
             apiName = "Anthropic",
@@ -29,7 +33,9 @@ object AnthropicMapper {
                     total = SCALE,
                     periodEndAt = fiveHourEnd,
                     periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.PERCENTAGE
+                    unit = UsageUnit.TOKENS,
+                    rawUsed = fiveHourRaw,
+                    rawTotal = MAX_CAPACITY_5H
                 ),
                 QuotaInfo(
                     label = "Claude 7d",
@@ -37,7 +43,9 @@ object AnthropicMapper {
                     total = SCALE,
                     periodEndAt = sevenDayEnd,
                     periodType = PeriodType.WEEKLY,
-                    unit = UsageUnit.PERCENTAGE
+                    unit = UsageUnit.TOKENS,
+                    rawUsed = sevenDayRaw,
+                    rawTotal = MAX_CAPACITY_7D
                 )
             )
         )

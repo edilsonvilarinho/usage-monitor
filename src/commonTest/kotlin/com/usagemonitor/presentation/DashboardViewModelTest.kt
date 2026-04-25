@@ -34,7 +34,9 @@ class DashboardViewModelTest {
                 used = 50000L,
                 total = 200000L,
                 periodEndAt = fixedInstant,
-                unit = UsageUnit.TOKENS
+                unit = UsageUnit.TOKENS,
+                rawUsed = 50000L,
+                rawTotal = 200000L
             )
         )
     )
@@ -47,7 +49,9 @@ class DashboardViewModelTest {
                 used = 2223L,
                 total = 4500L,
                 periodEndAt = fixedInstant,
-                unit = UsageUnit.REQUESTS
+                unit = UsageUnit.REQUESTS,
+                rawUsed = 2223L,
+                rawTotal = 4500L
             )
         )
     )

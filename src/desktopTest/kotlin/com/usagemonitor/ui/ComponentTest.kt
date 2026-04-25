@@ -41,13 +41,11 @@ class ComponentTest {
                 UsageArcChart(
                     used = 500L,
                     total = 1000L,
-                    label = "MiniMax-M*",
                     unit = UsageUnit.REQUESTS
                 )
             }
         }
 
-        // 500/1000 = 50%
         onNodeWithText("50%").assertIsDisplayed()
     }
 
@@ -58,7 +56,6 @@ class ComponentTest {
                 UsageArcChart(
                     used = 0L,
                     total = 0L,
-                    label = "Tokens",
                     unit = UsageUnit.TOKENS
                 )
             }
