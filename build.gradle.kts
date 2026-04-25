@@ -83,7 +83,21 @@ kotlin {
 // Configuração da aplicação Desktop
 compose.desktop {
     application {
-        // Classe com o fun main() de entrada
         mainClass = "com.usagemonitor.MainKt"
+
+        nativeDistributions {
+            packageName = "Usage Monitor"
+            packageVersion = "1.0.0"
+
+            windows {
+                iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.ico"))
+            }
+            linux {
+                iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.png"))
+            }
+            macOS {
+                iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.icns"))
+            }
+        }
     }
 }
