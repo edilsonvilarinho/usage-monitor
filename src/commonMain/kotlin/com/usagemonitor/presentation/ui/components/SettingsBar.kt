@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ButtonDefaults
@@ -22,8 +23,10 @@ fun SettingsBar(
     currentTheme: AppTheme,
     currentLanguage: AppLanguage,
     secondsUntilRefresh: Int,
+    autoStartEnabled: Boolean,
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
+    onAutoStartChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -34,11 +37,21 @@ fun SettingsBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ThemeToggle(
-            isDark = currentTheme == AppTheme.DARK,
-            language = currentLanguage,
-            onToggle = onThemeToggle
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ThemeToggle(
+                isDark = currentTheme == AppTheme.DARK,
+                language = currentLanguage,
+                onToggle = onThemeToggle
+            )
+
+            Spacer(modifier = Modifier.padding(horizontal = 8.dp))
+
+            AutoStartToggle(
+                enabled = autoStartEnabled,
+                language = currentLanguage,
+                onToggle = { enabled -> onAutoStartChange(enabled) }
+            )
+        }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             RefreshControl(
@@ -81,6 +94,31 @@ fun ThemeToggle(
         Switch(
             checked = isDark,
             onCheckedChange = { onToggle() }
+        )
+    }
+}
+
+@Composable
+fun AutoStartToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val label = if (language == AppLanguage.PT) "Iniciar com Windows" else "Start with Windows"
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 4.dp)
+        )
+        Switch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) }
         )
     }
 }

@@ -1,0 +1,17 @@
+!insertmacro LANGFILE_SECTION "PortugueseBR" "Portugues (Brasil)"
+
+!insertmacro LANGFILE_SECTION_OFF "Portuguese" "Portugues"
+
+!insertmacro LANGFILE_STRING "ProductName" "Usage Monitor"
+!insertmacro LANGFILE_STRING "WelcomePage.Text" "Bem-vindo ao Assistente de Instalação do $(^Name).$\r$\n$\r$\nIsso permitirá que você instale o $(^Name) no seu computador.$\r$\n$\r$\nClique em 'Avançar' para continuar."
+!insertmacro LANGFILE_STRING "LicensePage.Text" "Por favor, leia a seguinte informação de licença.$(^FontHeight)$\r$\n$(^FontBold)MIT License$\r$\n$\r$\nCopyright (c) 2024 Usage Monitor$\r$\n$\r$\nPermissão é concedida, gratuitamente, a qualquer pessoa que obtenha uma cópia deste software."
+!insertmacro LANGFILE_STRING "DirectoryPage.Text" "Escolha a pasta de instalação."
+!insertmacro LANGFILE_STRING "ComponentsPage.Text" "Selecione os componentes que deseja instalar."
+!insertmacro LANGFILE_STRING "FinishedPage.Text" "O $(^Name) foi instalado no seu computador.$(^FontHeight)$\r$\n$\r$\nClique em 'Concluir' para fechar o assistente."
+!insertmacro LANGFILE_STRING "UninstallPage.Text" "Você tem certeza de que deseja remover o $(^Name) do seu computador?"
+!insertmacro LANGFILE_STRING "FileError" "Não foi possível gravar no arquivo:$\r$\n$\r$\n$0"
+!insertmacro LANGFILE_STRING "FileWriteError" "Erro ao gravar arquivo: $0"
+!insertmacro LANGFILE_STRING "InstallAborted" "Instalação cancelada!"
+!insertmacro LANGFILE_STRING "UninstallAborted" "Desinstalação cancelada!"
+!insertmacro LANGFILE_STRING "ExitSetupTitle" "Sair da Instalação"
+!insertmacro LANGFILE_STRING "ExitSetupText" "Tem certeza de que deseja sair da instalação?"

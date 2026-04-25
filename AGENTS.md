@@ -56,3 +56,24 @@ Three layers with unidirectional deps: `presentation → domain ← data`
 Commits in my name and email: **minimax <minimax@opencode.ai>**.
 
 **Never run `git commit` or `git push` unless the user explicitly asks.**
+
+## NSIS Installer - Debugging Lessons
+
+**Problema**: Installer travava em 99% e na tela de finish
+
+**Causas raiz**:
+1. **LZMA compression** → thread deadlock (NSIS Bug #248)
+2. **ExecWait** → bloqueia installer esperando app fechar
+
+**Soluções**:
+1. `SetCompressor zlib` no topo do .nsi (evita deadlock LZMA)
+2. `Exec` ao invés de `ExecWait` em `.onInstSuccess` (não bloqueia)
+
+**Sintomas**:
+- 99% freeze = problema de compressão LZMA
+- Tela de finish freeze = ExecWait bloqueando
+
+**Diagnóstico correto**:
+- Analisar imagens com atenção (freeze era NO FINAL, não na extração)
+- Pesquisar ANTES de chutar soluções
+- Perguntar "onde exatamente trava?" antes de propor fixes
