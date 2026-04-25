@@ -66,6 +66,7 @@ fun DashboardScreen(
         mutableStateOf(
             settings?.getStringOrNull("enabledApis")
                 ?.split(",")
+                ?.filter { it.isNotBlank() }
                 ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
                 ?.toSet()
                 ?.ifEmpty { setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX) }
