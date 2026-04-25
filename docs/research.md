@@ -129,18 +129,53 @@ curl --location 'https://www.minimax.io/v1/token_plan/remains' \
   --header 'Content-Type: application/json'
 ```
 
-**Campos prováveis baseados em padrões da API MiniMax** (a confirmar):
+**Schema confirmado (resposta real do endpoint):**
 
 ```json
 {
-  "total_tokens": 1000000,
-  "remaining_tokens": 750000,
-  "used_tokens": 250000,
-  "expires_at": "2025-12-31T23:59:59Z"
+  "model_remains": [
+    {
+      "start_time": 1777075200000,
+      "end_time": 1777093200000,
+      "remains_time": 10320279,
+      "current_interval_total_count": 4500,
+      "current_interval_usage_count": 0,
+      "model_name": "MiniMax-M*",
+      "current_weekly_total_count": 45000,
+      "current_weekly_usage_count": 2223,
+      "weekly_start_time": 1776643200000,
+      "weekly_end_time": 1777248000000,
+      "weekly_remains_time": 165120279
+    }
+  ],
+  "base_resp": {
+    "status_code": 0,
+    "status_msg": "success"
+  }
 }
 ```
 
-Os DTOs e Mappers da camada `data` só serão criados após confirmação do schema real.
+**Descrição dos campos:**
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `start_time` | Long (epoch ms) | Início do intervalo atual |
+| `end_time` | Long (epoch ms) | Fim do intervalo atual |
+| `remains_time` | Long (ms) | Milissegundos restantes no intervalo |
+| `current_interval_total_count` | Long | Total de requisições permitidas no intervalo |
+| `current_interval_usage_count` | Long | Requisições usadas no intervalo |
+| `model_name` | String | Nome do modelo (ex: "MiniMax-M*", "speech-hd") |
+| `current_weekly_total_count` | Long | Total semanal permitido |
+| `current_weekly_usage_count` | Long | Total semanal usado |
+| `weekly_start_time` | Long (epoch ms) | Início da semana |
+| `weekly_end_time` | Long (epoch ms) | Fim da semana |
+| `weekly_remains_time` | Long (ms) | Milissegundos restantes na semana |
+
+**Observações importantes:**
+- A unidade de quota é **requisições** (request count), não tokens
+- A resposta retorna múltiplos modelos (text, speech, video, music, image)
+- `base_resp.status_code == 0` significa sucesso
+- Timestamps em **milissegundos** (epoch), não segundos
 
 ---
 
