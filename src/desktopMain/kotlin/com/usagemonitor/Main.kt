@@ -25,8 +25,14 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.prefs.Preferences
 import javax.imageio.ImageIO
+import kotlin.system.exitProcess
 
 fun main() = application {
+
+    val singleInstance = java.util.concurrent.Semaphore(1)
+    if (!singleInstance.tryAcquire()) {
+        exitApplication()
+    }
 
     val httpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {
@@ -64,6 +70,11 @@ fun main() = application {
         enabledApis = enabledApis
     )
 
+    Runtime.getRuntime().addShutdownHook(Thread {
+        viewModel.onDestroy()
+        httpClient.close()
+    })
+
     val iconFile = File("src/desktopMain/resources/icons/app_icon.png")
     val iconImage = if (iconFile.exists()) {
         runCatching { ImageIO.read(iconFile).toPainter() }.getOrNull()
@@ -75,7 +86,7 @@ fun main() = application {
         onCloseRequest = {
             viewModel.onDestroy()
             httpClient.close()
-            exitApplication()
+            exitProcess(0)
         },
         title = "Usage Monitor",
         icon = iconImage
