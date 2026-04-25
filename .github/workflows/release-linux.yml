@@ -1,0 +1,141 @@
+name: Release Linux Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle_version: 8.6
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build Linux distributable
+        run: ./gradlew createDistributable
+
+      - name: Find AppImage
+        id: appimage
+        run: |
+          find build -name "*.AppImage" -type f
+          echo "appimage_path=$(find build -name "*.AppImage" -type f | head -1)" >> $GITHUB_OUTPUT
+
+      - name: Package as deb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq alien dpkg-dev
+
+          APPIMAGE=$(find build -name "*.AppImage" -type f | head -1)
+          if [ -n "$APPIMAGE" ]; then
+            APPNAME=$(basename "$APPIMAGE" .AppImage)
+            mkdir -p dist-build
+
+            # Extract AppImage contents
+            chmod +x "$APPIMAGE"
+            "$APPIMAGE" --appimage-extract > /dev/null 2>&1
+
+            # Create debian package structure
+            PKG_DIR="sqfs-root"
+            mkdir -p "$PKG_DIR/DEBIAN"
+            mkdir -p "$PKG_DIR/usr/bin"
+            mkdir -p "$PKG_DIR/usr/share/applications"
+            mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
+
+            cp -r squashfs-root/* "$PKG_DIR/"
+
+            # Control file
+            cat > "$PKG_DIR/DEBIAN/control" << EOF
+Package: usage-monitor
+Version: ${GITHUB_REF#refs/tags/v}
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Usage Monitor
+Description: Usage Monitor - API usage tracker
+EOF
+
+            # Desktop entry
+            cat > "$PKG_DIR/usr/share/applications/usage-monitor.desktop" << EOF
+[Desktop Entry]
+Name=Usage Monitor
+Comment=API usage tracker
+Exec=$PKG_DIR/usage-monitor
+Icon=usage-monitor
+Terminal=false
+Type=Application
+EOF
+
+            # Create deb
+            dpkg-deb --build --root-owner-group "$PKG_DIR" dist-build/usage-monitor_${GITHUB_REF#refs/tags/v}_amd64.deb
+            echo "deb_created=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create RPM package
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rpm
+
+          APPIMAGE=$(find build -name "*.AppImage" -type f | head -1)
+          if [ -n "$APPIMAGE" ]; then
+            mkdir -p dist-build/rpmtmp/BUILD
+            mkdir -p dist-build/rpmtmp/RPMS
+            mkdir -p dist-build/rpmtmp/SPECS
+            mkdir -p dist-build/rpmtmp/SOURCES
+
+            # Create spec file
+            cat > dist-build/rpmtmp/SPECS/usage-monitor.spec << EOF
+Name: usage-monitor
+Version: ${GITHUB_REF#refs/tags/v}
+Release: 1
+Summary: Usage Monitor - API usage tracker
+License: MIT
+BuildArch: x86_64
+
+%description
+Usage Monitor - API usage tracker for Anthropic and MiniMax APIs
+
+%install
+mkdir -p %{buildroot}/usr/bin
+mkdir -p %{buildroot}/usr/share/applications
+mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
+
+cp $APPIMAGE %{buildroot}/usr/bin/usage-monitor
+chmod +x %{buildroot}/usr/bin/usage-monitor
+
+%files
+/usr/bin/usage-monitor
+/usr/share/applications/usage-monitor.desktop
+EOF
+
+            # Build RPM
+            rpmbuild --define "_topdir $(pwd)/dist-build/rpmtmp" -bb dist-build/rpmtmp/SPECS/usage-monitor.spec
+            mv dist-build/rpmtmp/RPMS/x86_64/*.rpm dist-build/
+            echo "rpm_created=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build/**/*.AppImage
+            dist-build/*.deb
+            dist-build/*.rpm
