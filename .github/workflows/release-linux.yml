@@ -83,31 +83,7 @@ jobs:
           mkdir -p dist-build/rpmtmp/SPECS
           mkdir -p dist-build/rpmtmp/SOURCES
 
-          cat > dist-build/rpmtmp/SPECS/usage-monitor.spec << 'SPECEOF'
-Name: usage-monitor
-Version: VERSION_PLACEHOLDER
-Release: 1
-Summary: Usage Monitor - API usage tracker
-License: MIT
-BuildArch: x86_64
-
- %description
-Usage Monitor - API usage tracker for Anthropic and MiniMax APIs
-
- %install
-mkdir -p %{buildroot}/usr/bin
-mkdir -p %{buildroot}/usr/share/applications
-
-cp APPIMAGE_PLACEHOLDER %{buildroot}/usr/bin/usage-monitor
-chmod +x %{buildroot}/usr/bin/usage-monitor
-
- %files
-/usr/bin/usage-monitor
-/usr/share/applications/usage-monitor.desktop
-SPECEOF
-
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" dist-build/rpmtmp/SPECS/usage-monitor.spec
-          sed -i "s|APPIMAGE_PLACEHOLDER|$APPIMAGE|g" dist-build/rpmtmp/SPECS/usage-monitor.spec
+          printf 'Name: usage-monitor\nVersion: %s\nRelease: 1\nSummary: Usage Monitor - API usage tracker\nLicense: MIT\nBuildArch: x86_64\n\n%%%%description\nUsage Monitor - API usage tracker\n\n%%%%install\nmkdir -p %%{buildroot}/usr/bin\nmkdir -p %%{buildroot}/usr/share/applications\n\ncp %s %%{buildroot}/usr/bin/usage-monitor\nchmod +x %%{buildroot}/usr/bin/usage-monitor\n\n%%%%files\n/usr/bin/usage-monitor\n/usr/share/applications/usage-monitor.desktop\n' "$VERSION" "$APPIMAGE" > dist-build/rpmtmp/SPECS/usage-monitor.spec
 
           rpmbuild --define "_topdir $(pwd)/dist-build/rpmtmp" -bb dist-build/rpmtmp/SPECS/usage-monitor.spec || true
           ls -la dist-build/rpmtmp/RPMS/x86_64/ 2>/dev/null || echo "RPM build may have failed"
