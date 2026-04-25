@@ -61,7 +61,6 @@ done:
 FunctionEnd
 
 Function .onInstSuccess
-    Exec '"$INSTDIR\Usage Monitor.exe"'
 FunctionEnd
 
 ; -----------------------------------------------
@@ -134,6 +133,15 @@ SectionEnd
 ; Uninstaller Section
 ; -----------------------------------------------
 Section "Uninstall"
+    ; Kill application processes BEFORE removing files
+    DetailPrint "Stopping application processes..."
+    ExecWait 'taskkill /F /IM "Usage Monitor.exe"' $0
+    DetailPrint "Usage Monitor killed (exit code: $0)"
+    Sleep 500
+    ExecWait 'taskkill /F /IM java.exe' $0
+    DetailPrint "Java processes killed (exit code: $0)"
+    Sleep 1000
+
     ; Remove registry keys
     DetailPrint "Removing registry entries..."
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"

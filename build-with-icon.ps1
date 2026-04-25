@@ -76,3 +76,26 @@ if (Test-Path "$projectDir\build\installer\UsageMonitor-Setup-1.0.0.exe") {
     $size = (Get-Item "$projectDir\build\installer\UsageMonitor-Setup-1.0.0.exe").Length / 1MB
     Write-Host "Size: $([math]::Round($size, 2)) MB"
 }
+
+Write-Host "=== Step 6: Cleanup processes ==="
+# Stop Gradle daemons
+& .\gradlew.bat --stop 2>$null | Out-Null
+Write-Host "Gradle daemons stopped"
+
+# Kill any remaining Usage Monitor processes (ignore if not found)
+try {
+    Get-Process "Usage Monitor" -ErrorAction Stop | Stop-Process -Force -ErrorAction Stop
+    Write-Host "Usage Monitor processes killed"
+} catch {
+    Write-Host "No Usage Monitor processes running"
+}
+
+# Kill Java processes (build residue)
+try {
+    Get-Process java -ErrorAction Stop | Stop-Process -Force -ErrorAction Stop
+    Write-Host "Java processes killed"
+} catch {
+    Write-Host "No Java processes running"
+}
+
+Write-Host "=== Cleanup complete ==="
