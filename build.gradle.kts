@@ -101,3 +101,56 @@ compose.desktop {
         }
     }
 }
+
+// Adicionar manifest ao desktopJar para torná-lo executável
+tasks.named<Jar>("desktopJar") {
+    manifest {
+        attributes(
+            "Main-Class" to "com.usagemonitor.MainKt",
+            "Manifest-Version" to "1.0",
+            "Created-By" to "Kotlin Multiplatform"
+        )
+    }
+}
+
+// Tarefa para gerar o instalador NSIS
+val installerDir = file("build/installer")
+val installerFilesDir = file("build/installer/files")
+
+tasks.register<Copy>("prepareInstallerFiles") {
+    dependsOn("createDistributable")
+
+    from(file("build/compose/binaries/main/app/Usage Monitor"))
+    into(installerFilesDir)
+}
+
+tasks.register<Exec>("buildNsisInstaller") {
+    dependsOn("prepareInstallerFiles")
+
+    onlyIf { file("src/installer/UsageMonitor.nsi").exists() }
+
+    val nsisPath = listOf(
+        "C:/Program Files/NSIS/makensis.exe",
+        "C:/Program Files (x86)/NSIS/makensis.exe",
+        "makensis"
+    ).firstOrNull { file(it).exists() }
+
+    if (nsisPath != null) {
+        workingDir(file("src/installer"))
+        commandLine(nsisPath, "UsageMonitor.nsi")
+    } else {
+        logger.warn("NSIS not found. Skipping installer generation.")
+        logger.warn("Install NSIS from https://nsis.sourceforge.io/ to enable installer build.")
+    }
+}
+
+tasks.register("packageInstaller") {
+    dependsOn("buildNsisInstaller")
+
+    doLast {
+        val installer = file("build/installer/UsageMonitor-Setup-1.0.0.exe")
+        if (installer.exists()) {
+            logger.lifecycle("Installer created: ${installer.absolutePath}")
+        }
+    }
+}

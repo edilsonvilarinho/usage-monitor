@@ -64,6 +64,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     settings: Settings? = null,
     enabledApis: MutableStateFlow<Set<ApiSource>>? = null,
+    onAutoStartChange: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -84,6 +85,7 @@ fun DashboardScreen(
         )
     }
     var localEnabledApis by remember { mutableStateOf(enabledApisValue) }
+    var autoStartEnabled by remember { mutableStateOf(settings?.getBoolean("autoStart", false) ?: false) }
 
     LaunchedEffect(enabledApisState) {
         localEnabledApis = enabledApisState
@@ -129,6 +131,7 @@ fun DashboardScreen(
                                 currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
                                 currentLanguage = language,
                                 secondsUntilRefresh = secondsUntilRefresh,
+                                autoStartEnabled = autoStartEnabled,
                                 onThemeToggle = {
                                     isDark = !isDark
                                     settings?.putBoolean("isDark", isDark)
@@ -136,6 +139,11 @@ fun DashboardScreen(
                                 onLanguageChange = { lang ->
                                     language = lang
                                     settings?.putString("language", lang.name)
+                                },
+                                onAutoStartChange = { enabled ->
+                                    autoStartEnabled = enabled
+                                    settings?.putBoolean("autoStart", enabled)
+                                    onAutoStartChange?.invoke(enabled)
                                 },
                                 onRefresh = { viewModel.refresh() }
                             )

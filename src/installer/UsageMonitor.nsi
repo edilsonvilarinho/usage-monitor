@@ -1,0 +1,159 @@
+!include "MUI2.nsh"
+!include "LogicLib.nsh"
+!include "FileFunc.nsh"
+
+SetCompressor zlib
+
+; -----------------------------------------------
+; General
+; -----------------------------------------------
+!define PRODUCT_NAME "Usage Monitor"
+!define PRODUCT_VERSION "1.0.0"
+!define PRODUCT_PUBLISHER "Usage Monitor"
+!define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
+!define LOG_FILE "$INSTDIR\install.log"
+
+; -----------------------------------------------
+; Installer attributes
+; -----------------------------------------------
+Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
+OutFile "..\..\build\installer\UsageMonitor-Setup-${PRODUCT_VERSION}.exe"
+InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
+InstallDirRegKey HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation"
+RequestExecutionLevel user
+
+; -----------------------------------------------
+; Pages
+; -----------------------------------------------
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "license.txt"
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_COMPONENTS
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+
+; -----------------------------------------------
+; Languages
+; -----------------------------------------------
+!insertmacro MUI_LANGUAGE "PortugueseBR"
+!insertmacro MUI_LANGUAGE "English"
+
+; -----------------------------------------------
+; Installer Functions
+; -----------------------------------------------
+Function .onInit
+    ; Check if already installed
+    ReadRegStr $0 HKCU "${PRODUCT_UNINST_KEY}" "UninstallString"
+    StrCmp $0 "" done notdone
+
+notdone:
+    MessageBox MB_YESNO|MB_ICONQUESTION "${PRODUCT_NAME} ja esta instalado. Deseja remover a versao anterior?" IDYES uninst IDNO done
+
+uninst:
+    ExecWait '"$0" /S'
+    DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+    RMDir /r "$INSTDIR"
+
+done:
+    !insertmacro MUI_LANGDLL_DISPLAY
+FunctionEnd
+
+Function .onInstSuccess
+    Exec '"$INSTDIR\Usage Monitor.exe"'
+FunctionEnd
+
+; -----------------------------------------------
+; Installer Sections
+; -----------------------------------------------
+Section "Usage Monitor" SEC_APP
+    SectionIn RO
+
+    ; Create log file
+    DetailPrint "Initializing installation..."
+    FileOpen $0 "${LOG_FILE}" w
+    FileWrite $0 "Installation started$\r$\n"
+    FileWrite $0 "Install dir: $INSTDIR$\r$\n"
+    FileClose $0
+
+    SetOutPath "$INSTDIR"
+    SetDetailsPrint none
+    File /r "..\..\build\installer\files\Usage Monitor\*.*"
+    SetDetailsPrint both
+
+    ; Write registry for uninstaller (user-level)
+    DetailPrint "Writing registry entries..."
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" /S'
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\Usage Monitor.exe"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "NoModify" "1"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" "1"
+
+    ; Create uninstaller
+    DetailPrint "Creating uninstaller..."
+    WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+    ; Create Start Menu shortcuts
+    DetailPrint "Creating Start Menu shortcuts..."
+    CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Remover.lnk" "$INSTDIR\Uninstall.exe"
+
+    ; Finalize log
+    FileOpen $0 "${LOG_FILE}" a
+    FileWrite $0 "Installation completed successfully!$\r$\n"
+    FileClose $0
+
+    DetailPrint "Installation complete!"
+SectionEnd
+
+Section "Desktop Shortcut" SEC_DESKTOP
+    DetailPrint "Creating desktop shortcut..."
+    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe"
+SectionEnd
+
+Section "Start with Windows" SEC_AUTO_START
+    DetailPrint "Configuring auto-start..."
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\Usage Monitor.exe"'
+SectionEnd
+
+; -----------------------------------------------
+; Section descriptions
+; -----------------------------------------------
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_APP} "Usage Monitor Application"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP} "Create desktop shortcut"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_AUTO_START} "Start application with Windows"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
+; -----------------------------------------------
+; Uninstaller Section
+; -----------------------------------------------
+Section "Uninstall"
+    ; Remove registry keys
+    DetailPrint "Removing registry entries..."
+    DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+
+    ; Remove files and directories
+    DetailPrint "Removing application files..."
+    RMDir /r "$INSTDIR"
+
+    ; Remove shortcuts
+    DetailPrint "Removing shortcuts..."
+    Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
+    RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
+
+    DetailPrint "Uninstallation complete!"
+SectionEnd
+
+; -----------------------------------------------
+; Uninstaller Functions
+; -----------------------------------------------
+Function un.onInit
+    !insertmacro MUI_UNGETLANGUAGE
+FunctionEnd

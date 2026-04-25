@@ -80,6 +80,13 @@ fun main() = application {
         title = "Usage Monitor",
         icon = iconImage
     ) {
-        DashboardScreen(viewModel = viewModel, settings = settings, enabledApis = enabledApis)
+        DashboardScreen(
+            viewModel = viewModel,
+            settings = settings,
+            enabledApis = enabledApis,
+            onAutoStartChange = { enabled ->
+                AutoStartManager.setAutoStart(enabled)
+            }
+        )
     }
 }
