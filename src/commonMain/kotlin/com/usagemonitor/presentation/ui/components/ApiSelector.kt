@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -30,15 +31,10 @@ fun ApiSelector(
     onToggle: (ApiSource, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.padding(8.dp)) {
-        Text(
-            text = "APIs Monitoradas",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-
-        // Renderiza um checkbox para cada API suportada
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         ApiSource.entries.forEach { api ->
             ApiCheckboxRow(
                 api = api,

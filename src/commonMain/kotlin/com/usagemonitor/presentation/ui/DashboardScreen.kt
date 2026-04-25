@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,19 +13,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.russhwolf.settings.Settings
 import com.usagemonitor.domain.entity.ApiSource
@@ -39,6 +46,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.SettingsBar
 import com.usagemonitor.presentation.ui.components.UsageArcChart
@@ -46,12 +54,11 @@ import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import androidx.compose.runtime.LaunchedEffect
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
@@ -114,54 +121,68 @@ fun DashboardScreen(
             modifier = modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                SettingsBar(
-                    currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
-                    currentLanguage = language,
-                    secondsUntilRefresh = secondsUntilRefresh,
-                    onThemeToggle = {
-                        isDark = !isDark
-                        settings?.putBoolean("isDark", isDark)
-                    },
-                    onLanguageChange = { lang ->
-                        language = lang
-                        settings?.putString("language", lang.name)
-                    },
-                    onRefresh = { viewModel.refresh() }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-                ApiSelector(
-                    enabledApis = localEnabledApis,
-                    onToggle = { api, checked ->
-                        localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            SettingsBar(
+                                currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
+                                currentLanguage = language,
+                                secondsUntilRefresh = secondsUntilRefresh,
+                                onThemeToggle = {
+                                    isDark = !isDark
+                                    settings?.putBoolean("isDark", isDark)
+                                },
+                                onLanguageChange = { lang ->
+                                    language = lang
+                                    settings?.putString("language", lang.name)
+                                },
+                                onRefresh = { viewModel.refresh() }
+                            )
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.background
+            ) { scaffoldPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(scaffoldPadding)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        ApiSelector(
+                            enabledApis = localEnabledApis,
+                            onToggle = { api, checked ->
+                                localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
+                            }
+                        )
                     }
-                )
 
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                when (val state = uiState) {
-                    is UiState.Loading -> LoadingContent(language = language)
-                    is UiState.Error -> ErrorContent(
-                        message = state.message,
-                        language = language,
-                        onRetry = { viewModel.refresh() }
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )
-                    is UiState.Success -> SuccessContent(
-                        apiStatsList = state.data,
-                        partialErrors = state.errors,
-                        enabledApis = localEnabledApis,
-                        language = language,
-                        modifier = Modifier.weight(1f)
-                    )
+
+                    when (val state = uiState) {
+                        is UiState.Loading -> LoadingContent(language = language)
+                        is UiState.Error -> ErrorContent(
+                            message = state.message,
+                            language = language,
+                            onRetry = { viewModel.refresh() }
+                        )
+                        is UiState.Success -> SuccessContent(
+                            apiStatsList = state.data,
+                            partialErrors = state.errors,
+                            enabledApis = localEnabledApis,
+                            language = language,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
@@ -251,11 +272,11 @@ private fun SuccessContent(
             }
 
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 160.dp),
-            contentPadding = PaddingValues(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.weight(1f).fillMaxSize()
+            columns = GridCells.Adaptive(minSize = 260.dp),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = modifier.weight(1f).fillMaxSize()
         ) {
             items(items) { (apiName, quota) ->
                 QuotaCard(apiName = apiName, quota = quota, language = language)
@@ -288,20 +309,21 @@ private fun QuotaCard(
         "Reset: $dayFormatted ${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')} BRT"
     }
 
-    Card(
+    ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = apiName,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
 
@@ -310,17 +332,18 @@ private fun QuotaCard(
             UsageArcChart(
                 used = quota.used,
                 total = quota.total,
-                label = quota.label,
                 unit = quota.unit
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = quota.label,
+                text = formatUsage(quota.used, quota.total, quota.unit),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
             )
 
             if (quota.periodType == PeriodType.WEEKLY) {
@@ -339,6 +362,24 @@ private fun QuotaCard(
         }
     }
 }
+
+private fun formatUsage(used: Long, total: Long, unit: com.usagemonitor.domain.entity.UsageUnit): String {
+    return when (unit) {
+        com.usagemonitor.domain.entity.UsageUnit.PERCENTAGE -> "${used}%"
+        com.usagemonitor.domain.entity.UsageUnit.TOKENS     -> "${abbreviate(used)}/${abbreviate(total)} tok"
+        com.usagemonitor.domain.entity.UsageUnit.REQUESTS   -> "${abbreviate(used)}/${abbreviate(total)} req"
+    }
+}
+
+private fun abbreviate(n: Long): String {
+    return when {
+        n >= 1_000_000L -> "${removeDecimal("%.1f".format(n / 1_000_000f))}M"
+        n >= 1_000L     -> "${removeDecimal("%.1f".format(n / 1_000f))}K"
+        else            -> n.toString()
+    }
+}
+
+private fun removeDecimal(s: String): String = s.replace(",0", "").replace(".0", "")
 
 @Composable
 private fun ApiSelector(

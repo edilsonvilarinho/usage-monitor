@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,9 +13,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageUnit
@@ -41,20 +41,17 @@ import com.usagemonitor.domain.entity.UsageUnit
 fun UsageArcChart(
     used: Long,
     total: Long,
-    label: String,
     unit: UsageUnit,
     modifier: Modifier = Modifier,
-    size: Dp = 120.dp,
+    size: Dp = 80.dp,
     strokeWidth: Dp = 12.dp
 ) {
-    // Calcula o percentual (0.0 a 1.0)
     val percentage = if (total > 0L) {
         (used.toFloat() / total.toFloat()).coerceIn(0f, 1f)
     } else {
         0f
     }
 
-    // Animação suave ao carregar ou atualizar os dados
     val animatedPercentage by animateFloatAsState(
         targetValue = percentage,
         animationSpec = tween(durationMillis = 800),
@@ -63,8 +60,6 @@ fun UsageArcChart(
 
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val usedColor = arcColor(percentage)
-    val textStyle = MaterialTheme.typography.bodySmall
-    val labelStyle = MaterialTheme.typography.labelSmall
 
     Box(
         contentAlignment = Alignment.Center,
@@ -76,7 +71,6 @@ fun UsageArcChart(
             val topLeft = Offset(strokePx / 2f, strokePx / 2f)
             val arcSize = Size(diameter, diameter)
 
-            // Trilha de fundo (arco completo)
             drawArc(
                 color = trackColor,
                 startAngle = 135f,
@@ -87,7 +81,6 @@ fun UsageArcChart(
                 style = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
 
-            // Arco de progresso
             if (animatedPercentage > 0f) {
                 drawArc(
                     color = usedColor,
@@ -101,28 +94,22 @@ fun UsageArcChart(
             }
         }
 
-        // Texto central: percentual e label
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "${(percentage * 100).toInt()}%",
-                style = textStyle,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = formatUsage(used, total, unit),
-                style = labelStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = "${(percentage * 100).toInt()}%",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
-/** Cor do arco muda conforme o nível de uso: verde → amarelo → vermelho. */
-private fun arcColor(percentage: Float): Color {
+/** Cor do arco com base no nível de uso: tertiary (baixo) → primary (médio) → error (alto). */
+private fun arcColor(percentage: Float): androidx.compose.ui.graphics.Color {
     return when {
-        percentage < 0.6f -> Color(0xFF4CAF50)  // verde
-        percentage < 0.85f -> Color(0xFFFFC107) // amarelo
-        else -> Color(0xFFF44336)               // vermelho
+        percentage >= 0.9f -> androidx.compose.ui.graphics.Color(0xFFF44336)
+        percentage >= 0.75f -> androidx.compose.ui.graphics.Color(0xFFFFC107)
+        else -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
     }
 }
 
@@ -135,11 +122,13 @@ private fun formatUsage(used: Long, total: Long, unit: UsageUnit): String {
     }
 }
 
-/** Abrevia números grandes: 1500 → "1.5K", 1200000 → "1.2M". */
+/** Abrevia números grandes: 2700 → "2.7K", 45000 → "45K", 1200000 → "1.2M". */
 private fun abbreviate(n: Long): String {
     return when {
-        n >= 1_000_000L -> "${"%.1f".format(n / 1_000_000f)}M"
-        n >= 1_000L     -> "${"%.1f".format(n / 1_000f)}K"
+        n >= 1_000_000L -> "${removeDecimal("%.1f".format(n / 1_000_000f))}M"
+        n >= 1_000L     -> "${removeDecimal("%.1f".format(n / 1_000f))}K"
         else            -> n.toString()
     }
 }
+
+private fun removeDecimal(s: String): String = s.replace(",0", "").replace(".0", "")
