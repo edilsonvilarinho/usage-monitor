@@ -83,7 +83,7 @@ jobs:
           mkdir -p dist-build/rpmtmp/SPECS
           mkdir -p dist-build/rpmtmp/SOURCES
 
-          cat > dist-build/rpmtmp/SPECS/usage-monitor.spec << SPECEOF
+          cat > dist-build/rpmtmp/SPECS/usage-monitor.spec << 'SPECEOF'
 Name: usage-monitor
 Version: VERSION_PLACEHOLDER
 Release: 1
