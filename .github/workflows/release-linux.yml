@@ -91,17 +91,17 @@ Summary: Usage Monitor - API usage tracker
 License: MIT
 BuildArch: x86_64
 
-%description
+ %description
 Usage Monitor - API usage tracker for Anthropic and MiniMax APIs
 
-%install
+ %install
 mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/share/applications
 
 cp APPIMAGE_PLACEHOLDER %{buildroot}/usr/bin/usage-monitor
 chmod +x %{buildroot}/usr/bin/usage-monitor
 
-%files
+ %files
 /usr/bin/usage-monitor
 /usr/share/applications/usage-monitor.desktop
 SPECEOF
