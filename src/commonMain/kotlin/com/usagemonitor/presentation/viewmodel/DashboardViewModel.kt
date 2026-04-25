@@ -55,11 +55,17 @@ class DashboardViewModel(
 
         getAnthropicUsage()
             .onSuccess { stats.add(it) }
-            .onFailure { errors.add("Anthropic: ${it.message ?: "erro desconhecido"}") }
+            .onFailure { err ->
+                if (err.message?.contains("429") == true) {
+                    println("[fetchUsage] Anthropic rate limited, skipping error for this cycle")
+                } else {
+                    errors.add("Anthropic: ${err.message ?: "erro desconhecido"}")
+                }
+            }
 
         getMiniMaxUsage()
             .onSuccess { stats.add(it) }
-            .onFailure { errors.add("MiniMax: ${it.message ?: "erro desconhecido"}") }
+            .onFailure { err -> errors.add("MiniMax: ${err.message ?: "erro desconhecido"}") }
 
         println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
         errors.forEach { e -> println("[fetchUsage] ERROR: $e") }
