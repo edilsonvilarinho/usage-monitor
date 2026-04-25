@@ -51,7 +51,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val minutesUntilRefresh by viewModel.minutesUntilRefresh.collectAsState()
+    val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
 
     // Preferências carregadas do storage e persistidas em cada mudança
     var isDark by remember { mutableStateOf(settings?.getBoolean("isDark", true) ?: true) }
@@ -82,7 +82,7 @@ fun DashboardScreen(
                 SettingsBar(
                     currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
                     currentLanguage = language,
-                    minutesUntilRefresh = minutesUntilRefresh,
+                    secondsUntilRefresh = secondsUntilRefresh,
                     onThemeToggle = {
                         isDark = !isDark
                         settings?.putBoolean("isDark", isDark)

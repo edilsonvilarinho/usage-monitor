@@ -21,7 +21,7 @@ import com.usagemonitor.domain.entity.AppTheme
 fun SettingsBar(
     currentTheme: AppTheme,
     currentLanguage: AppLanguage,
-    minutesUntilRefresh: Int,
+    secondsUntilRefresh: Int,
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onRefresh: () -> Unit,
@@ -42,7 +42,7 @@ fun SettingsBar(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             RefreshControl(
-                minutesUntilRefresh = minutesUntilRefresh,
+                secondsUntilRefresh = secondsUntilRefresh,
                 language = currentLanguage,
                 onRefresh = onRefresh
             )
@@ -87,15 +87,17 @@ fun ThemeToggle(
 
 @Composable
 fun RefreshControl(
-    minutesUntilRefresh: Int,
+    secondsUntilRefresh: Int,
     language: AppLanguage,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val countdownText = when {
-        minutesUntilRefresh <= 0 -> if (language == AppLanguage.PT) "Atualizando..." else "Refreshing..."
-        language == AppLanguage.PT -> "Próximo: ${minutesUntilRefresh}m"
-        else -> "Next: ${minutesUntilRefresh}m"
+    val minutes = secondsUntilRefresh / 60
+    val seconds = secondsUntilRefresh % 60
+    val countdownText = if (language == AppLanguage.PT) {
+        String.format("Próximo: %02d:%02d", minutes, seconds)
+    } else {
+        String.format("Next: %02d:%02d", minutes, seconds)
     }
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
