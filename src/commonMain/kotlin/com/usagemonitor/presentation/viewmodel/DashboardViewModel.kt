@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-private const val POLL_INTERVAL_MINUTES = 10
+private const val POLL_INTERVAL_SECONDS = 600
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
@@ -23,26 +23,28 @@ class DashboardViewModel(
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private val _minutesUntilRefresh = MutableStateFlow(0)
-    val minutesUntilRefresh: StateFlow<Int> = _minutesUntilRefresh.asStateFlow()
+    private val _secondsUntilRefresh = MutableStateFlow(POLL_INTERVAL_SECONDS)
+    val secondsUntilRefresh: StateFlow<Int> = _secondsUntilRefresh.asStateFlow()
 
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var pollingJob: Job? = null
+    private var countdownJob: Job? = null
+    private var initFetchJob: Job? = null
 
     init {
-        startPolling()
+        initFetchJob = viewModelScope.launch { fetchUsage() }
+        startCountdown()
     }
 
-    private fun startPolling() {
-        pollingJob?.cancel()
-        pollingJob = viewModelScope.launch {
+    private fun startCountdown() {
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
             while (true) {
-                _minutesUntilRefresh.value = 0
-                fetchUsage()
-                for (minutesLeft in POLL_INTERVAL_MINUTES downTo 1) {
-                    _minutesUntilRefresh.value = minutesLeft
-                    delay(60 * 1_000L)
+                _secondsUntilRefresh.value = POLL_INTERVAL_SECONDS
+                for (secondsLeft in POLL_INTERVAL_SECONDS downTo 1) {
+                    _secondsUntilRefresh.value = secondsLeft
+                    delay(1_000L)
                 }
+                viewModelScope.launch { fetchUsage() }
             }
         }
     }
@@ -66,13 +68,21 @@ class DashboardViewModel(
         }
     }
 
-    // Cancela o ciclo atual e reinicia imediatamente
     fun refresh() {
-        _uiState.value = UiState.Loading
-        startPolling()
+        _secondsUntilRefresh.value = POLL_INTERVAL_SECONDS
+        viewModelScope.launch { fetchUsage() }
+    }
+
+    fun cancelCountdown() {
+        countdownJob?.cancel()
+    }
+
+    fun cancelInitFetch() {
+        initFetchJob?.cancel()
     }
 
     fun onDestroy() {
+        cancelCountdown()
         viewModelScope.cancel()
     }
 }
