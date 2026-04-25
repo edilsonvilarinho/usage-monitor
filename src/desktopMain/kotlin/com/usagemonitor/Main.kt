@@ -36,7 +36,7 @@ fun main() = application {
 
     val settings = PreferencesSettings(Preferences.userRoot().node("com.usagemonitor"))
 
-    val credentialDataSource = LocalCredentialDataSource()
+    val credentialDataSource = LocalCredentialDataSource(httpClient)
     val remoteApiDataSource = RemoteApiDataSource(httpClient)
 
     val anthropicRepository = AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)

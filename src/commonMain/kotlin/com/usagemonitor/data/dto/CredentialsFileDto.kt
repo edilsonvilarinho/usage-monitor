@@ -17,12 +17,12 @@ data class CredentialsFileDto(
 @Serializable
 data class OAuthCredentialsDto(
     val accessToken: String,
-    val refreshToken: String,
+    val refreshToken: String = "",
 
     // Timestamp de expiração em milissegundos (epoch ms)
-    val expiresAt: Long,
+    val expiresAt: Long = Long.MAX_VALUE,
 
-    val scopes: List<String>,
-    val subscriptionType: String,
-    val rateLimitTier: String
+    val scopes: List<String> = emptyList(),
+    val subscriptionType: String = "",
+    val rateLimitTier: String = ""
 )

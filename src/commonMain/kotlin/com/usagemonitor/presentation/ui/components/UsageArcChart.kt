@@ -126,10 +126,13 @@ private fun arcColor(percentage: Float): Color {
     }
 }
 
-/** Formata o texto de uso abreviado (ex: "50K/200K tokens" ou "22/45 req"). */
+/** Formata o texto de uso abreviado (ex: "50K/200K tok", "22/45 req", "15%"). */
 private fun formatUsage(used: Long, total: Long, unit: UsageUnit): String {
-    val unitLabel = if (unit == UsageUnit.TOKENS) "tok" else "req"
-    return "${abbreviate(used)}/${abbreviate(total)} $unitLabel"
+    return when (unit) {
+        UsageUnit.PERCENTAGE -> "${used}%"
+        UsageUnit.TOKENS     -> "${abbreviate(used)}/${abbreviate(total)} tok"
+        UsageUnit.REQUESTS   -> "${abbreviate(used)}/${abbreviate(total)} req"
+    }
 }
 
 /** Abrevia números grandes: 1500 → "1.5K", 1200000 → "1.2M". */

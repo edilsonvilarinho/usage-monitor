@@ -1,50 +1,86 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CredentialsFileDto
-import kotlinx.datetime.Clock
+import com.usagemonitor.data.dto.OAuthCredentialsDto
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 
-/**
- * Implementação JVM da interface CredentialDataSource.
- *
- * Fica no desktopMain porque usa java.io.File, que é específico da JVM.
- * O commonMain só conhece a interface — nunca esta classe diretamente.
- *
- * Resolve o caminho do ficheiro dinamicamente:
- *   Linux/Mac: /home/usuario/.claude/.credentials.json
- *   Windows:   C:\Users\usuario\.claude\.credentials.json
- */
-class LocalCredentialDataSource : CredentialDataSource {
+private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L  // renova se expira em menos de 5 min
+private const val OAUTH_REFRESH_URL = "https://console.anthropic.com/v1/oauth/token"
 
-    // Json leniente: ignora campos desconhecidos (o ficheiro pode ter campos extras)
-    private val json = Json { ignoreUnknownKeys = true }
+class LocalCredentialDataSource(private val httpClient: HttpClient) : CredentialDataSource {
 
-    override fun loadAnthropicAccessToken(): String {
+    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+
+    override suspend fun loadAnthropicAccessToken(): String {
         val homeDir = System.getProperty("user.home")
-            ?: throw IllegalStateException("Propriedade 'user.home' não disponível no sistema")
+            ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
 
         val credentialsFile = File("$homeDir/.claude/.credentials.json")
 
         if (!credentialsFile.exists()) {
             throw IllegalStateException(
-                "Ficheiro de credenciais não encontrado: ${credentialsFile.absolutePath}\n" +
-                "Execute o Claude Code CLI para gerar as credenciais."
+                "Credenciais não encontradas: ${credentialsFile.absolutePath}. " +
+                "Execute o Claude Code CLI para autenticar."
             )
         }
 
-        val fileContent = credentialsFile.readText()
-        val credentials = json.decodeFromString<CredentialsFileDto>(fileContent)
+        val creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
 
-        // Verifica se o token ainda é válido
-        val nowMs = Clock.System.now().toEpochMilliseconds()
-        if (nowMs > credentials.claudeAiOauth.expiresAt) {
-            throw IllegalStateException(
-                "Token OAuth do Claude.ai expirado. " +
-                "Execute `claude` no terminal para renovar as credenciais."
-            )
+        val needsRefresh = creds.claudeAiOauth.expiresAt - System.currentTimeMillis() < REFRESH_MARGIN_MS
+
+        if (needsRefresh && creds.claudeAiOauth.refreshToken.isNotEmpty()) {
+            return try {
+                refreshToken(credentialsFile, creds)
+            } catch (e: Exception) {
+                // Fallback: usa token existente mesmo expirado (a API pode ainda aceitar)
+                creds.claudeAiOauth.accessToken
+            }
         }
 
-        return credentials.claudeAiOauth.accessToken
+        return creds.claudeAiOauth.accessToken
     }
+
+    private suspend fun refreshToken(credentialsFile: File, creds: CredentialsFileDto): String {
+        val response = httpClient.post(OAUTH_REFRESH_URL) {
+            contentType(ContentType.Application.Json)
+            setBody(TokenRefreshRequest("refresh_token", creds.claudeAiOauth.refreshToken))
+        }.body<TokenRefreshResponse>()
+
+        val newAccessToken = response.accessToken
+            ?: throw IllegalStateException("Token refresh retornou sem access_token")
+
+        val updated = creds.copy(
+            claudeAiOauth = creds.claudeAiOauth.copy(
+                accessToken = newAccessToken,
+                refreshToken = response.refreshToken ?: creds.claudeAiOauth.refreshToken,
+                expiresAt = if (response.expiresIn != null)
+                    System.currentTimeMillis() + response.expiresIn * 1000
+                else creds.claudeAiOauth.expiresAt
+            )
+        )
+        credentialsFile.writeText(json.encodeToString(CredentialsFileDto.serializer(), updated))
+        return newAccessToken
+    }
+
+    @Serializable
+    private data class TokenRefreshRequest(
+        val grant_type: String,
+        val refresh_token: String,
+    )
+
+    @Serializable
+    private data class TokenRefreshResponse(
+        @SerialName("access_token") val accessToken: String? = null,
+        @SerialName("refresh_token") val refreshToken: String? = null,
+        @SerialName("expires_in") val expiresIn: Long? = null,
+    )
 }

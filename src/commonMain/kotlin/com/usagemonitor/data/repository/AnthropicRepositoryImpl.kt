@@ -23,7 +23,7 @@ class AnthropicRepositoryImpl(
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
             val token = credentialDataSource.loadAnthropicAccessToken()
-            val dto = apiDataSource.fetchAnthropicRateLimit(token)
+            val dto = apiDataSource.fetchAnthropicUsage(token)
             AnthropicMapper.toUsageStats(dto)
         }
     }

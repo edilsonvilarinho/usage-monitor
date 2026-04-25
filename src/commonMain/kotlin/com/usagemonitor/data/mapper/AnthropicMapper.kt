@@ -1,32 +1,43 @@
 package com.usagemonitor.data.mapper
 
-import com.usagemonitor.data.dto.AnthropicRateLimitDto
+import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.Instant
 
-/**
- * Mapper: converte o DTO dos headers Anthropic para a entidade do domain.
- */
 object AnthropicMapper {
 
-    fun toUsageStats(dto: AnthropicRateLimitDto): ApiUsageStats {
-        // O campo tokensReset vem como ISO 8601: "2025-01-01T00:01:00Z"
-        val resetInstant = Instant.parse(dto.tokensReset)
+    // Escala de 0-100 para representar utilização (0.0-1.0) como inteiro
+    private const val SCALE = 100L
 
-        // `used` não é retornado diretamente — calculamos como (limite - restante)
-        val tokensUsed = (dto.tokensLimit - dto.tokensRemaining).coerceAtLeast(0L)
+    fun toUsageStats(response: AnthropicUsageResponse): ApiUsageStats {
+        val fiveHourEnd = Instant.parse(response.fiveHour.resetsAt)
+        val sevenDayEnd = Instant.parse(response.sevenDay.resetsAt)
+
+        // Converte utilização para inteiro 0-100 para uso no arco
+        val fiveHourUsed = (response.fiveHour.utilization * SCALE).toLong().coerceIn(0L, SCALE)
+        val sevenDayUsed = (response.sevenDay.utilization * SCALE).toLong().coerceIn(0L, SCALE)
 
         return ApiUsageStats(
             apiName = "Anthropic",
             quotas = listOf(
                 QuotaInfo(
-                    label = "Tokens",
-                    used = tokensUsed,
-                    total = dto.tokensLimit,
-                    periodEndAt = resetInstant,
-                    unit = UsageUnit.TOKENS
+                    label = "Claude 5h",
+                    used = fiveHourUsed,
+                    total = SCALE,
+                    periodEndAt = fiveHourEnd,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE
+                ),
+                QuotaInfo(
+                    label = "Claude 7d",
+                    used = sevenDayUsed,
+                    total = SCALE,
+                    periodEndAt = sevenDayEnd,
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.PERCENTAGE
                 )
             )
         )

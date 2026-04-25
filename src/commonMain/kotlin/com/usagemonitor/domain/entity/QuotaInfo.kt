@@ -55,7 +55,8 @@ data class QuotaInfo(
  */
 enum class UsageUnit {
     TOKENS,
-    REQUESTS
+    REQUESTS,
+    PERCENTAGE  // quando só utilization está disponível (ex: Anthropic OAuth usage endpoint)
 }
 
 /** Tipo de janela temporal da cota. */

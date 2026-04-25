@@ -1,75 +1,77 @@
 package com.usagemonitor.data
 
-import com.usagemonitor.data.dto.AnthropicRateLimitDto
+import com.usagemonitor.data.dto.AnthropicUsageResponse
+import com.usagemonitor.data.dto.AnthropicUsageWindow
 import com.usagemonitor.data.mapper.AnthropicMapper
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class AnthropicMapperTest {
 
+    private val sampleResponse = AnthropicUsageResponse(
+        fiveHour = AnthropicUsageWindow(utilization = 0.15, resetsAt = "2025-01-01T05:00:00Z"),
+        sevenDay = AnthropicUsageWindow(utilization = 0.05, resetsAt = "2025-01-07T00:00:00Z"),
+    )
+
     @Test
     fun `maps apiName to Anthropic`() {
-        val dto = AnthropicRateLimitDto(
-            tokensLimit = 200000L,
-            tokensRemaining = 150000L,
-            tokensReset = "2025-01-01T00:01:00Z"
-        )
-        val result = AnthropicMapper.toUsageStats(dto)
-        assertEquals("Anthropic", result.apiName)
+        assertEquals("Anthropic", AnthropicMapper.toUsageStats(sampleResponse).apiName)
     }
 
     @Test
-    fun `calculates used tokens as limit minus remaining`() {
-        val dto = AnthropicRateLimitDto(
-            tokensLimit = 200000L,
-            tokensRemaining = 150000L,
-            tokensReset = "2025-01-01T00:01:00Z"
-        )
-        val result = AnthropicMapper.toUsageStats(dto)
-        val quota = result.quotas[0]
-
-        // used = 200000 - 150000 = 50000
-        assertEquals(50000L, quota.used)
-        assertEquals(200000L, quota.total)
+    fun `produces two quotas for five_hour and seven_day`() {
+        val result = AnthropicMapper.toUsageStats(sampleResponse)
+        assertEquals(2, result.quotas.size)
     }
 
     @Test
-    fun `used is never negative when remaining exceeds limit`() {
-        // Cenário defensivo: API retorna remaining > limit (edge case)
-        val dto = AnthropicRateLimitDto(
-            tokensLimit = 1000L,
-            tokensRemaining = 1200L,
-            tokensReset = "2025-01-01T00:01:00Z"
-        )
-        val result = AnthropicMapper.toUsageStats(dto)
-        assertEquals(0L, result.quotas[0].used)
+    fun `five_hour maps to INTERVAL with correct values`() {
+        val quota = AnthropicMapper.toUsageStats(sampleResponse).quotas[0]
+        assertEquals("Claude 5h", quota.label)
+        assertEquals(PeriodType.INTERVAL, quota.periodType)
+        assertEquals(15L, quota.used)   // 0.15 * 100
+        assertEquals(100L, quota.total)
+        assertEquals(UsageUnit.PERCENTAGE, quota.unit)
     }
 
     @Test
-    fun `unit is TOKENS`() {
-        val dto = AnthropicRateLimitDto(
-            tokensLimit = 200000L,
-            tokensRemaining = 100000L,
-            tokensReset = "2025-01-01T00:01:00Z"
-        )
-        val result = AnthropicMapper.toUsageStats(dto)
-        assertEquals(UsageUnit.TOKENS, result.quotas[0].unit)
+    fun `seven_day maps to WEEKLY with correct values`() {
+        val quota = AnthropicMapper.toUsageStats(sampleResponse).quotas[1]
+        assertEquals("Claude 7d", quota.label)
+        assertEquals(PeriodType.WEEKLY, quota.periodType)
+        assertEquals(5L, quota.used)    // 0.05 * 100
+        assertEquals(100L, quota.total)
+        assertEquals(UsageUnit.PERCENTAGE, quota.unit)
     }
 
     @Test
-    fun `parses ISO 8601 reset timestamp`() {
-        val resetString = "2025-06-15T12:30:00Z"
-        val dto = AnthropicRateLimitDto(
-            tokensLimit = 200000L,
-            tokensRemaining = 200000L,
-            tokensReset = resetString
-        )
-        val result = AnthropicMapper.toUsageStats(dto)
-        // Verifica que o parse não lançou exceção e retornou o instante correto
+    fun `parses ISO 8601 resets_at to Instant`() {
+        val result = AnthropicMapper.toUsageStats(sampleResponse)
         assertEquals(
-            resetString,
+            "2025-01-01T05:00:00Z",
             result.quotas[0].periodEndAt.toString()
         )
+        assertEquals(
+            "2025-01-07T00:00:00Z",
+            result.quotas[1].periodEndAt.toString()
+        )
+    }
+
+    @Test
+    fun `utilization 0 maps to used 0`() {
+        val response = sampleResponse.copy(
+            fiveHour = AnthropicUsageWindow(utilization = 0.0, resetsAt = "2025-01-01T05:00:00Z")
+        )
+        assertEquals(0L, AnthropicMapper.toUsageStats(response).quotas[0].used)
+    }
+
+    @Test
+    fun `utilization 1 maps to used 100`() {
+        val response = sampleResponse.copy(
+            fiveHour = AnthropicUsageWindow(utilization = 1.0, resetsAt = "2025-01-01T05:00:00Z")
+        )
+        assertEquals(100L, AnthropicMapper.toUsageStats(response).quotas[0].used)
     }
 }

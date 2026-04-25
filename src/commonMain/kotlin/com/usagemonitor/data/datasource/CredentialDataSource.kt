@@ -14,5 +14,5 @@ interface CredentialDataSource {
      * Lê e retorna o accessToken OAuth do Claude.ai.
      * Lança exceção se o ficheiro não existir ou o token estiver expirado.
      */
-    fun loadAnthropicAccessToken(): String
+    suspend fun loadAnthropicAccessToken(): String
 }
