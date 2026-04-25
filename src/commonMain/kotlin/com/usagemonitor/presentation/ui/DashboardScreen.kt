@@ -18,6 +18,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,19 +45,28 @@ import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     settings: Settings? = null,
+    enabledApis: MutableStateFlow<Set<ApiSource>>? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
+    val snackbarHostState = SnackbarHostState()
 
-    // Preferências carregadas do storage e persistidas em cada mudança
+    val enabledApisValue = enabledApis?.value ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+    val flow: MutableStateFlow<Set<ApiSource>> = enabledApis ?: MutableStateFlow(enabledApisValue)
+    val enabledApisState by flow.collectAsState()
+
     var isDark by remember { mutableStateOf(settings?.getBoolean("isDark", true) ?: true) }
     var language by remember {
         mutableStateOf(
@@ -62,16 +75,37 @@ fun DashboardScreen(
                 ?: AppLanguage.PT
         )
     }
-    var enabledApis by remember {
-        mutableStateOf(
-            settings?.getStringOrNull("enabledApis")
-                ?.split(",")
-                ?.filter { it.isNotBlank() }
-                ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
-                ?.toSet()
-                ?.ifEmpty { setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX) }
-                ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
-        )
+    var localEnabledApis by remember { mutableStateOf(enabledApisValue) }
+
+    LaunchedEffect(enabledApisState) {
+        localEnabledApis = enabledApisState
+    }
+
+    LaunchedEffect(localEnabledApis) {
+        if (enabledApis != null) {
+            enabledApis.emit(localEnabledApis)
+        }
+        settings?.putString("enabledApis", localEnabledApis.joinToString(",") { it.name })
+    }
+
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let { key ->
+            val msg = when {
+                key == "RATE_LIMIT:ANTHROPIC" -> if (language == AppLanguage.PT) "Anthropic rate limited — tentando novamente..." else "Anthropic rate limited — retrying..."
+                key.startsWith("ERROR:ANTHROPIC:") -> {
+                    val apiMsg = key.removePrefix("ERROR:ANTHROPIC:").replace("_", ":")
+                    if (language == AppLanguage.PT) "Anthropic: $apiMsg" else "Anthropic: $apiMsg"
+                }
+                key == "RATE_LIMIT:MINIMAX" -> if (language == AppLanguage.PT) "MiniMax rate limited — tentando novamente..." else "MiniMax rate limited — retrying..."
+                key.startsWith("ERROR:MINIMAX:") -> {
+                    val apiMsg = key.removePrefix("ERROR:MINIMAX:").replace("_", ":")
+                    if (language == AppLanguage.PT) "MiniMax: $apiMsg" else "MiniMax: $apiMsg"
+                }
+                else -> key
+            }
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+            viewModel.clearToast()
+        }
     }
 
     AppTheme(isDark = isDark) {
@@ -98,11 +132,15 @@ fun DashboardScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 ApiSelector(
-                    enabledApis = enabledApis,
+                    enabledApis = localEnabledApis,
                     onToggle = { api, checked ->
-                        enabledApis = if (checked) enabledApis + api else enabledApis - api
-                        settings?.putString("enabledApis", enabledApis.joinToString(",") { it.name })
+                        localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
                     }
+                )
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -119,7 +157,7 @@ fun DashboardScreen(
                     is UiState.Success -> SuccessContent(
                         apiStatsList = state.data,
                         partialErrors = state.errors,
-                        enabledApis = enabledApis,
+                        enabledApis = localEnabledApis,
                         language = language,
                         modifier = Modifier.weight(1f)
                     )

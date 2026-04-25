@@ -38,12 +38,7 @@ class LocalCredentialDataSource(private val httpClient: HttpClient) : Credential
         val needsRefresh = creds.claudeAiOauth.expiresAt - System.currentTimeMillis() < REFRESH_MARGIN_MS
 
         if (needsRefresh && creds.claudeAiOauth.refreshToken.isNotEmpty()) {
-            return try {
-                refreshToken(credentialsFile, creds)
-            } catch (e: Exception) {
-                // Fallback: usa token existente mesmo expirado (a API pode ainda aceitar)
-                creds.claudeAiOauth.accessToken
-            }
+            return refreshToken(credentialsFile, creds)
         }
 
         return creds.claudeAiOauth.accessToken

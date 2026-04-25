@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
@@ -18,13 +19,17 @@ private const val POLL_INTERVAL_SECONDS = 600
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
-    private val getMiniMaxUsage: GetMiniMaxUsageUseCase
+    private val getMiniMaxUsage: GetMiniMaxUsageUseCase,
+    private val enabledApis: StateFlow<Set<ApiSource>>
 ) {
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private val _secondsUntilRefresh = MutableStateFlow(POLL_INTERVAL_SECONDS)
     val secondsUntilRefresh: StateFlow<Int> = _secondsUntilRefresh.asStateFlow()
+
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var countdownJob: Job? = null
@@ -52,14 +57,37 @@ class DashboardViewModel(
     private suspend fun fetchUsage() {
         val stats = mutableListOf<ApiUsageStats>()
         val errors = mutableListOf<String>()
+        val enabled = enabledApis.value
 
-        getAnthropicUsage()
-            .onSuccess { stats.add(it) }
-            .onFailure { errors.add("Anthropic: ${it.message ?: "erro desconhecido"}") }
+        if (ApiSource.ANTHROPIC in enabled) {
+            getAnthropicUsage()
+                .onSuccess { stats.add(it) }
+                .onFailure { err ->
+                    if (err.message?.contains("429") == true) {
+                        _toastMessage.value = "RATE_LIMIT:ANTHROPIC"
+                    } else {
+                        val msg = err.message ?: "erro desconhecido"
+                        _toastMessage.value = "ERROR:ANTHROPIC:${msg.replace(":", "_")}"
+                        errors.add("Anthropic: $msg")
+                    }
+                }
+        }
 
-        getMiniMaxUsage()
-            .onSuccess { stats.add(it) }
-            .onFailure { errors.add("MiniMax: ${it.message ?: "erro desconhecido"}") }
+        if (ApiSource.MINIMAX in enabled) {
+            getMiniMaxUsage()
+                .onSuccess { stats.add(it) }
+                .onFailure { err ->
+                    if (err.message?.contains("429") == true) {
+                        _toastMessage.value = "RATE_LIMIT:MINIMAX"
+                    } else {
+                        val msg = err.message ?: "erro desconhecido"
+                        _toastMessage.value = "ERROR:MINIMAX:${msg.replace(":", "_")}"
+                        errors.add("MiniMax: $msg")
+                    }
+                }
+        }
+
+        println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
 
         _uiState.value = if (stats.isNotEmpty()) {
             UiState.Success(stats, errors)
@@ -68,8 +96,12 @@ class DashboardViewModel(
         }
     }
 
+    fun clearToast() {
+        _toastMessage.value = null
+    }
+
     fun refresh() {
-        _secondsUntilRefresh.value = POLL_INTERVAL_SECONDS
+        startCountdown()
         viewModelScope.launch { fetchUsage() }
     }
 

@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
@@ -9,6 +10,7 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +21,8 @@ import kotlin.test.assertIs
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModelTest {
+
+    private val defaultEnabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX))
 
     private val fixedInstant = Instant.parse("2025-01-01T12:00:00Z")
 
@@ -57,7 +61,8 @@ class DashboardViewModelTest {
         }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(minimaxRepo)
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            defaultEnabledApis
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
@@ -77,7 +82,8 @@ class DashboardViewModelTest {
         }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(minimaxRepo)
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            defaultEnabledApis
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
@@ -95,7 +101,8 @@ class DashboardViewModelTest {
         }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(minimaxRepo)
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            defaultEnabledApis
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
