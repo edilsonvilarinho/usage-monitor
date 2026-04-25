@@ -2,6 +2,7 @@ package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.Instant
@@ -17,22 +18,33 @@ import kotlinx.datetime.Instant
 object MiniMaxMapper {
 
     fun toUsageStats(response: MiniMaxTokenPlanResponse): ApiUsageStats {
-        // Converte cada modelo (ModelRemainDto) para uma QuotaInfo
-        val quotas = response.modelRemains.map { dto ->
-            // Epoch milissegundos → Instant (tipo do kotlinx-datetime)
+        // Cada modelo pode gerar 1 (só intervalo) ou 2 (intervalo + semanal) QuotaInfo
+        val quotas = response.modelRemains.flatMap { dto ->
             val periodEnd = Instant.fromEpochMilliseconds(dto.endTime)
-            val weeklyEnd = Instant.fromEpochMilliseconds(dto.weeklyEndTime)
 
-            QuotaInfo(
+            val intervalQuota = QuotaInfo(
                 label = dto.modelName,
                 used = dto.currentIntervalUsageCount,
                 total = dto.currentIntervalTotalCount,
                 periodEndAt = periodEnd,
-                weeklyUsed = dto.currentWeeklyUsageCount,
-                weeklyTotal = dto.currentWeeklyTotalCount,
-                weeklyEndAt = weeklyEnd,
+                periodType = PeriodType.INTERVAL,
                 unit = UsageUnit.REQUESTS
             )
+
+            if (dto.modelName == "MiniMax-M*" && dto.currentWeeklyTotalCount > 0L) {
+                val weeklyEnd = Instant.fromEpochMilliseconds(dto.weeklyEndTime)
+                val weeklyQuota = QuotaInfo(
+                    label = dto.modelName,
+                    used = dto.currentWeeklyUsageCount,
+                    total = dto.currentWeeklyTotalCount,
+                    periodEndAt = weeklyEnd,
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.REQUESTS
+                )
+                listOf(intervalQuota, weeklyQuota)
+            } else {
+                listOf(intervalQuota)
+            }
         }
 
         return ApiUsageStats(

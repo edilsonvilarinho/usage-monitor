@@ -87,8 +87,8 @@ class QuotaInfoTest {
     }
 
     @Test
-    fun `weekly fields default to 0 when not provided`() {
-        // Anthropic não usa dimensão semanal — deve funcionar sem esses campos
+    fun `periodType defaults to INTERVAL when not provided`() {
+        // Anthropic não usa dimensão semanal — deve defaultar para INTERVAL
         val quota = QuotaInfo(
             label = "Tokens",
             used = 100L,
@@ -97,7 +97,6 @@ class QuotaInfoTest {
             unit = UsageUnit.TOKENS
         )
 
-        assertEquals(0L, quota.weeklyUsed)
-        assertEquals(0L, quota.weeklyTotal)
+        assertEquals(com.usagemonitor.domain.entity.PeriodType.INTERVAL, quota.periodType)
     }
 }

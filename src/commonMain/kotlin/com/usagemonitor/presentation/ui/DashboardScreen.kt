@@ -16,7 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,85 +29,107 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.russhwolf.settings.Settings
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.SettingsBar
 import com.usagemonitor.presentation.ui.components.UsageArcChart
+import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
-/**
- * Ecrã principal do Dashboard.
- *
- * Este é o único componente STATEFUL — observa o ViewModel e distribui
- * dados para os componentes filhos (todos stateless).
- *
- * Em Vue.js seria o componente de página que usa `useStore()` ou `pinia`.
- */
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
+    settings: Settings? = null,
     modifier: Modifier = Modifier
 ) {
-    // `collectAsState()` conecta o StateFlow ao sistema reativo do Compose.
-    // Cada vez que uiState muda, este componente re-renderiza automaticamente.
     val uiState by viewModel.uiState.collectAsState()
+    val minutesUntilRefresh by viewModel.minutesUntilRefresh.collectAsState()
 
-    // Estado local de preferências (tema e idioma)
-    var isDark by remember { mutableStateOf(true) }
-    var language by remember { mutableStateOf(AppLanguage.PT) }
-    var enabledApis by remember { mutableStateOf(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)) }
+    // Preferências carregadas do storage e persistidas em cada mudança
+    var isDark by remember { mutableStateOf(settings?.getBoolean("isDark", true) ?: true) }
+    var language by remember {
+        mutableStateOf(
+            settings?.getStringOrNull("language")
+                ?.let { runCatching { AppLanguage.valueOf(it) }.getOrNull() }
+                ?: AppLanguage.PT
+        )
+    }
+    var enabledApis by remember {
+        mutableStateOf(
+            settings?.getStringOrNull("enabledApis")
+                ?.split(",")
+                ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
+                ?.toSet()
+                ?.ifEmpty { setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX) }
+                ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+        )
+    }
 
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Barra de configurações no topo
-            SettingsBar(
-                currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
-                currentLanguage = language,
-                onThemeToggle = { isDark = !isDark },
-                onLanguageChange = { language = it }
-            )
-
-            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            // Seletor de APIs logo abaixo
-            ApiSelector(enabledApis = enabledApis, onToggle = { api, checked ->
-                enabledApis = if (checked) enabledApis + api else enabledApis - api
-            })
-
-            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Conteúdo central: muda conforme o estado da UI
-            when (val state = uiState) {
-                is UiState.Loading -> LoadingContent()
-                is UiState.Error -> ErrorContent(
-                    message = state.message,
-                    onRetry = { viewModel.refresh() }
+    AppTheme(isDark = isDark) {
+        Surface(
+            modifier = modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                SettingsBar(
+                    currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
+                    currentLanguage = language,
+                    minutesUntilRefresh = minutesUntilRefresh,
+                    onThemeToggle = {
+                        isDark = !isDark
+                        settings?.putBoolean("isDark", isDark)
+                    },
+                    onLanguageChange = { lang ->
+                        language = lang
+                        settings?.putString("language", lang.name)
+                    },
+                    onRefresh = { viewModel.refresh() }
                 )
-                is UiState.Success -> SuccessContent(
-                    apiStatsList = state.data,
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                ApiSelector(
                     enabledApis = enabledApis,
-                    language = language,
-                    modifier = Modifier.weight(1f)
+                    onToggle = { api, checked ->
+                        enabledApis = if (checked) enabledApis + api else enabledApis - api
+                        settings?.putString("enabledApis", enabledApis.joinToString(",") { it.name })
+                    }
                 )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                when (val state = uiState) {
+                    is UiState.Loading -> LoadingContent(language = language)
+                    is UiState.Error -> ErrorContent(
+                        message = state.message,
+                        language = language,
+                        onRetry = { viewModel.refresh() }
+                    )
+                    is UiState.Success -> SuccessContent(
+                        apiStatsList = state.data,
+                        partialErrors = state.errors,
+                        enabledApis = enabledApis,
+                        language = language,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
 }
 
-/** Indicador de carregamento centralizado. */
 @Composable
-private fun LoadingContent() {
+private fun LoadingContent(language: AppLanguage) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -116,7 +138,7 @@ private fun LoadingContent() {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Carregando dados das APIs...",
+                text = if (language == AppLanguage.PT) "Carregando dados das APIs..." else "Loading API data...",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -124,9 +146,8 @@ private fun LoadingContent() {
     }
 }
 
-/** Mensagem de erro com botão de retry. */
 @Composable
-private fun ErrorContent(message: String, onRetry: () -> Unit) {
+private fun ErrorContent(message: String, language: AppLanguage, onRetry: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -136,7 +157,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
             modifier = Modifier.padding(24.dp)
         ) {
             Text(
-                text = "Erro ao carregar dados",
+                text = if (language == AppLanguage.PT) "Erro ao carregar dados" else "Failed to load data",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.error
             )
@@ -148,48 +169,61 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onRetry) {
-                Text("Tentar novamente")
+                Text(if (language == AppLanguage.PT) "Tentar novamente" else "Retry")
             }
         }
     }
 }
 
-/**
- * Grid responsivo de cards de uso.
- * Cada modelo MiniMax e a cota Anthropic aparecem como cards separados.
- */
 @Composable
 private fun SuccessContent(
     apiStatsList: List<com.usagemonitor.domain.entity.ApiUsageStats>,
+    partialErrors: List<String>,
     enabledApis: Set<ApiSource>,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
-    // Achata todas as cotas em uma lista única de pares (apiName, QuotaInfo)
-    val items = apiStatsList
-        .filter { stats ->
-            // Filtra apenas as APIs que o utilizador ativou
-            val apiSource = if (stats.apiName == "Anthropic") ApiSource.ANTHROPIC else ApiSource.MINIMAX
-            apiSource in enabledApis
-        }
-        .flatMap { stats ->
-            stats.quotas.map { quota -> Pair(stats.apiName, quota) }
+    Column(modifier = modifier.fillMaxSize()) {
+        if (partialErrors.isNotEmpty()) {
+            partialErrors.forEach { error ->
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⚠ $error",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 160.dp),
-        contentPadding = PaddingValues(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier.fillMaxSize()
-    ) {
-        items(items) { (apiName, quota) ->
-            QuotaCard(apiName = apiName, quota = quota, language = language)
+        val items = apiStatsList
+            .filter { stats ->
+                val apiSource = if (stats.apiName == "Anthropic") ApiSource.ANTHROPIC else ApiSource.MINIMAX
+                apiSource in enabledApis
+            }
+            .flatMap { stats ->
+                stats.quotas.map { quota -> Pair(stats.apiName, quota) }
+            }
+
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 160.dp),
+            contentPadding = PaddingValues(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.weight(1f).fillMaxSize()
+        ) {
+            items(items) { (apiName, quota) ->
+                QuotaCard(apiName = apiName, quota = quota, language = language)
+            }
         }
     }
 }
 
-/** Card individual para uma cota — stateless. */
 @Composable
 private fun QuotaCard(
     apiName: String,
@@ -197,7 +231,6 @@ private fun QuotaCard(
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
-    // Timezone de São Paulo para exibição do reset
     val saoPauloTz = TimeZone.of("America/Sao_Paulo")
     val resetLocal = quota.periodEndAt.toLocalDateTime(saoPauloTz)
     val resetLabel = if (language == AppLanguage.PT) {
@@ -217,7 +250,6 @@ private fun QuotaCard(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Nome da API
             Text(
                 text = apiName,
                 style = MaterialTheme.typography.labelSmall,
@@ -226,7 +258,6 @@ private fun QuotaCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Gráfico em arco
             UsageArcChart(
                 used = quota.used,
                 total = quota.total,
@@ -236,7 +267,6 @@ private fun QuotaCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Nome do modelo/recurso
             Text(
                 text = quota.label,
                 style = MaterialTheme.typography.bodySmall,
@@ -244,7 +274,14 @@ private fun QuotaCard(
                 maxLines = 1
             )
 
-            // Timestamp de reset
+            if (quota.periodType == PeriodType.WEEKLY) {
+                Text(
+                    text = if (language == AppLanguage.PT) "Semanal" else "Weekly",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
             Text(
                 text = resetLabel,
                 style = MaterialTheme.typography.labelSmall,
@@ -254,7 +291,6 @@ private fun QuotaCard(
     }
 }
 
-// Componente auxiliar para importar ApiSelector inline no DashboardScreen
 @Composable
 private fun ApiSelector(
     enabledApis: Set<ApiSource>,

@@ -4,6 +4,7 @@ import com.usagemonitor.data.dto.BaseRespDto
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import com.usagemonitor.data.dto.ModelRemainDto
 import com.usagemonitor.data.mapper.MiniMaxMapper
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,7 +15,8 @@ import kotlin.test.assertEquals
  */
 class MiniMaxMapperTest {
 
-    // Resposta real simplificada (apenas 2 modelos para testar mapeamento)
+    // MiniMax-M*: tem cota por intervalo (4500 req / 5h) e semanal (45000 req)
+    // image-01: tem cota por intervalo (50 req) e semanal (350 req)
     private val sampleResponse = MiniMaxTokenPlanResponse(
         modelRemains = listOf(
             ModelRemainDto(
@@ -54,27 +56,45 @@ class MiniMaxMapperTest {
     }
 
     @Test
-    fun `maps all model_remains entries`() {
+    fun `emits two quotas only for MiniMax-M star model`() {
+        // MiniMax-M*: intervalo + semanal = 2; image-01: só intervalo = 1
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        assertEquals(2, result.quotas.size)
+        assertEquals(3, result.quotas.size)
     }
 
     @Test
-    fun `maps model_name to label`() {
+    fun `interval quota comes before weekly quota for MiniMax-M star`() {
+        val result = MiniMaxMapper.toUsageStats(sampleResponse)
+        assertEquals(PeriodType.INTERVAL, result.quotas[0].periodType)
+        assertEquals(PeriodType.WEEKLY, result.quotas[1].periodType)
+        // image-01 só tem intervalo
+        assertEquals(PeriodType.INTERVAL, result.quotas[2].periodType)
+    }
+
+    @Test
+    fun `maps model_name to label for both period types`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
         assertEquals("MiniMax-M*", result.quotas[0].label)
-        assertEquals("image-01", result.quotas[1].label)
+        assertEquals("MiniMax-M*", result.quotas[1].label)
+        assertEquals("image-01", result.quotas[2].label)
     }
 
     @Test
-    fun `maps usage counts correctly`() {
+    fun `maps interval usage counts correctly`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        val miniMaxModel = result.quotas[0]
+        val intervalQuota = result.quotas[0]  // MiniMax-M* intervalo
 
-        assertEquals(0L, miniMaxModel.used)
-        assertEquals(4500L, miniMaxModel.total)
-        assertEquals(2223L, miniMaxModel.weeklyUsed)
-        assertEquals(45000L, miniMaxModel.weeklyTotal)
+        assertEquals(0L, intervalQuota.used)
+        assertEquals(4500L, intervalQuota.total)
+    }
+
+    @Test
+    fun `maps weekly usage counts correctly`() {
+        val result = MiniMaxMapper.toUsageStats(sampleResponse)
+        val weeklyQuota = result.quotas[1]  // MiniMax-M* semanal
+
+        assertEquals(2223L, weeklyQuota.used)
+        assertEquals(45000L, weeklyQuota.total)
     }
 
     @Test
@@ -86,10 +106,16 @@ class MiniMaxMapperTest {
     }
 
     @Test
-    fun `epoch milliseconds are converted to Instant correctly`() {
+    fun `epoch milliseconds are converted to Instant correctly for interval`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        // 1777093200000 ms = 2026-04-23T05:00:00Z (verifica conversão)
-        val periodEnd = result.quotas[0].periodEndAt
+        val periodEnd = result.quotas[0].periodEndAt  // MiniMax-M* intervalo
         assertEquals(1777093200000L, periodEnd.toEpochMilliseconds())
+    }
+
+    @Test
+    fun `epoch milliseconds are converted to Instant correctly for weekly`() {
+        val result = MiniMaxMapper.toUsageStats(sampleResponse)
+        val weeklyEnd = result.quotas[1].periodEndAt  // MiniMax-M* semanal
+        assertEquals(1777248000000L, weeklyEnd.toEpochMilliseconds())
     }
 }

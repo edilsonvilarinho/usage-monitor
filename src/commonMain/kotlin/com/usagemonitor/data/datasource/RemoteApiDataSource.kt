@@ -9,8 +9,10 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 
 /**
  * Realiza todas as chamadas HTTP às APIs externas (Anthropic e MiniMax).
@@ -41,6 +43,12 @@ class RemoteApiDataSource(private val httpClient: HttpClient) {
             )
         }
 
+        // Falha rápida com mensagem útil em caso de erro HTTP
+        if (!response.status.isSuccess()) {
+            val body = response.bodyAsText()
+            throw IllegalStateException("Anthropic HTTP ${response.status.value}: $body")
+        }
+
         // Extrai os headers de rate limit da resposta HTTP
         val tokensLimit = response.headers["anthropic-ratelimit-tokens-limit"]
             ?.toLongOrNull() ?: 0L
@@ -49,7 +57,7 @@ class RemoteApiDataSource(private val httpClient: HttpClient) {
             ?.toLongOrNull() ?: 0L
 
         val tokensReset = response.headers["anthropic-ratelimit-tokens-reset"]
-            ?: throw IllegalStateException("Header anthropic-ratelimit-tokens-reset ausente na resposta")
+            ?: throw IllegalStateException("Header anthropic-ratelimit-tokens-reset ausente")
 
         return AnthropicRateLimitDto(
             tokensLimit = tokensLimit,

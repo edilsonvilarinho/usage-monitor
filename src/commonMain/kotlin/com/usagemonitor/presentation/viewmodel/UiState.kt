@@ -25,9 +25,9 @@ sealed interface UiState {
 
     /**
      * Dados disponíveis (pelo menos uma API retornou com sucesso).
-     * A lista pode ter 1 ou 2 itens se uma API falhar silenciosamente.
+     * `errors` lista APIs que falharam parcialmente (visíveis na UI).
      */
-    data class Success(val data: List<ApiUsageStats>) : UiState
+    data class Success(val data: List<ApiUsageStats>, val errors: List<String> = emptyList()) : UiState
 
     /** Todas as APIs falharam. Mostra mensagem de erro ao utilizador. */
     data class Error(val message: String) : UiState

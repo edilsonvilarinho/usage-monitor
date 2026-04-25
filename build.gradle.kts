@@ -67,6 +67,16 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
+
+        // ── desktopTest ───────────────────────────────────────────────────
+        // Testes de componente Compose para Desktop
+        val desktopTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+                implementation(compose.uiTest)
+            }
+        }
     }
 }
 

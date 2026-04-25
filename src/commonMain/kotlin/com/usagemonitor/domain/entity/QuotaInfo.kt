@@ -17,23 +17,17 @@ data class QuotaInfo(
     // Identificador legível: nome do modelo ou "Tokens"
     val label: String,
 
-    // Quantidade consumida no período atual
+    // Quantidade consumida no período
     val used: Long,
 
     // Limite total do período (0 = sem limite definido)
     val total: Long,
 
-    // Quando esta cota reseta (ex: fim da janela de 1h ou fim do dia)
+    // Quando esta cota reseta
     val periodEndAt: Instant,
 
-    // Uso acumulado na semana (MiniMax tem esta dimensão adicional)
-    val weeklyUsed: Long = 0L,
-
-    // Limite semanal (0 = sem limite)
-    val weeklyTotal: Long = 0L,
-
-    // Fim da semana corrente
-    val weeklyEndAt: Instant = Instant.DISTANT_FUTURE,
+    // Tipo de período: intervalo curto (5h) ou semanal
+    val periodType: PeriodType = PeriodType.INTERVAL,
 
     // Unidade de medida: tokens (Anthropic) ou requisições (MiniMax)
     val unit: UsageUnit
@@ -62,4 +56,10 @@ data class QuotaInfo(
 enum class UsageUnit {
     TOKENS,
     REQUESTS
+}
+
+/** Tipo de janela temporal da cota. */
+enum class PeriodType {
+    INTERVAL,  // janela curta (ex: 5 horas no MiniMax)
+    WEEKLY     // janela semanal
 }
