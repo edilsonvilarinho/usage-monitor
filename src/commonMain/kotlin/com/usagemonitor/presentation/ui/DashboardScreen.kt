@@ -47,6 +47,7 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import androidx.compose.runtime.LaunchedEffect
@@ -272,10 +273,19 @@ private fun QuotaCard(
 ) {
     val saoPauloTz = TimeZone.of("America/Sao_Paulo")
     val resetLocal = quota.periodEndAt.toLocalDateTime(saoPauloTz)
+    val dayFormatted = when (resetLocal.dayOfWeek) {
+        DayOfWeek.MONDAY -> if (language == AppLanguage.PT) "Seg" else "Mon"
+        DayOfWeek.TUESDAY -> if (language == AppLanguage.PT) "Ter" else "Tue"
+        DayOfWeek.WEDNESDAY -> if (language == AppLanguage.PT) "Qua" else "Wed"
+        DayOfWeek.THURSDAY -> if (language == AppLanguage.PT) "Qui" else "Thu"
+        DayOfWeek.FRIDAY -> if (language == AppLanguage.PT) "Sex" else "Fri"
+        DayOfWeek.SATURDAY -> if (language == AppLanguage.PT) "Sáb" else "Sat"
+        DayOfWeek.SUNDAY -> if (language == AppLanguage.PT) "Dom" else "Sun"
+    }
     val resetLabel = if (language == AppLanguage.PT) {
-        "Reset: ${resetLocal.hour}h${resetLocal.minute.toString().padStart(2, '0')} BRT"
+        "Reinício: $dayFormatted ${resetLocal.hour}h${resetLocal.minute.toString().padStart(2, '0')} BRT"
     } else {
-        "Reset: ${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')} BRT"
+        "Reset: $dayFormatted ${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')} BRT"
     }
 
     Card(
