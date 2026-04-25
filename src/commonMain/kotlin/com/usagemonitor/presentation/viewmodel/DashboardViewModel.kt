@@ -85,7 +85,7 @@ class DashboardViewModel(
     }
 
     fun refresh() {
-        _secondsUntilRefresh.value = POLL_INTERVAL_SECONDS
+        startCountdown()
         viewModelScope.launch { fetchUsage() }
     }
 
