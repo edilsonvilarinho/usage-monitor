@@ -18,8 +18,9 @@ import kotlinx.datetime.Instant
 object MiniMaxMapper {
 
     fun toUsageStats(response: MiniMaxTokenPlanResponse): ApiUsageStats {
-        // Cada modelo pode gerar 1 (só intervalo) ou 2 (intervalo + semanal) QuotaInfo
-        val quotas = response.modelRemains.flatMap { dto ->
+        val quotas = response.modelRemains
+            .filter { it.modelName == "MiniMax-M*" }
+            .flatMap { dto ->
             val periodEnd = Instant.fromEpochMilliseconds(dto.endTime)
 
             val intervalQuota = QuotaInfo(
@@ -31,7 +32,7 @@ object MiniMaxMapper {
                 unit = UsageUnit.REQUESTS
             )
 
-            if (dto.modelName == "MiniMax-M*" && dto.currentWeeklyTotalCount > 0L) {
+            if (dto.currentWeeklyTotalCount > 0L) {
                 val weeklyEnd = Instant.fromEpochMilliseconds(dto.weeklyEndTime)
                 val weeklyQuota = QuotaInfo(
                     label = dto.modelName,

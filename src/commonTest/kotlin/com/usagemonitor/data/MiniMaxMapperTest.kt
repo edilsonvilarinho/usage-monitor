@@ -15,8 +15,6 @@ import kotlin.test.assertEquals
  */
 class MiniMaxMapperTest {
 
-    // MiniMax-M*: tem cota por intervalo (4500 req / 5h) e semanal (45000 req)
-    // image-01: tem cota por intervalo (50 req) e semanal (350 req)
     private val sampleResponse = MiniMaxTokenPlanResponse(
         modelRemains = listOf(
             ModelRemainDto(
@@ -56,19 +54,19 @@ class MiniMaxMapperTest {
     }
 
     @Test
-    fun `emits two quotas only for MiniMax-M star model`() {
-        // MiniMax-M*: intervalo + semanal = 2; image-01: só intervalo = 1
+    fun `emits only MiniMax-M star quotas`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        assertEquals(3, result.quotas.size)
+        assertEquals(2, result.quotas.size)
+        result.quotas.forEach { quota ->
+            assertEquals("MiniMax-M*", quota.label)
+        }
     }
 
     @Test
-    fun `interval quota comes before weekly quota for MiniMax-M star`() {
+    fun `interval quota comes before weekly quota`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
         assertEquals(PeriodType.INTERVAL, result.quotas[0].periodType)
         assertEquals(PeriodType.WEEKLY, result.quotas[1].periodType)
-        // image-01 só tem intervalo
-        assertEquals(PeriodType.INTERVAL, result.quotas[2].periodType)
     }
 
     @Test
@@ -76,14 +74,12 @@ class MiniMaxMapperTest {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
         assertEquals("MiniMax-M*", result.quotas[0].label)
         assertEquals("MiniMax-M*", result.quotas[1].label)
-        assertEquals("image-01", result.quotas[2].label)
     }
 
     @Test
     fun `maps interval usage counts correctly`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        val intervalQuota = result.quotas[0]  // MiniMax-M* intervalo
-
+        val intervalQuota = result.quotas[0]
         assertEquals(0L, intervalQuota.used)
         assertEquals(4500L, intervalQuota.total)
     }
@@ -91,8 +87,7 @@ class MiniMaxMapperTest {
     @Test
     fun `maps weekly usage counts correctly`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        val weeklyQuota = result.quotas[1]  // MiniMax-M* semanal
-
+        val weeklyQuota = result.quotas[1]
         assertEquals(2223L, weeklyQuota.used)
         assertEquals(45000L, weeklyQuota.total)
     }
@@ -108,14 +103,53 @@ class MiniMaxMapperTest {
     @Test
     fun `epoch milliseconds are converted to Instant correctly for interval`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        val periodEnd = result.quotas[0].periodEndAt  // MiniMax-M* intervalo
+        val periodEnd = result.quotas[0].periodEndAt
         assertEquals(1777093200000L, periodEnd.toEpochMilliseconds())
     }
 
     @Test
     fun `epoch milliseconds are converted to Instant correctly for weekly`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
-        val weeklyEnd = result.quotas[1].periodEndAt  // MiniMax-M* semanal
+        val weeklyEnd = result.quotas[1].periodEndAt
         assertEquals(1777248000000L, weeklyEnd.toEpochMilliseconds())
+    }
+
+    @Test
+    fun `non-M* models are excluded`() {
+        val responseWithOtherModels = MiniMaxTokenPlanResponse(
+            modelRemains = listOf(
+                ModelRemainDto(
+                    startTime = 1777075200000L,
+                    endTime = 1777093200000L,
+                    remainsTime = 10320279L,
+                    currentIntervalTotalCount = 4500L,
+                    currentIntervalUsageCount = 0L,
+                    modelName = "MiniMax-M*",
+                    currentWeeklyTotalCount = 45000L,
+                    currentWeeklyUsageCount = 2223L,
+                    weeklyStartTime = 1776643200000L,
+                    weeklyEndTime = 1777248000000L,
+                    weeklyRemainsTime = 165120279L
+                ),
+                ModelRemainDto(
+                    startTime = 1777075200000L,
+                    endTime = 1777161600000L,
+                    remainsTime = 78720279L,
+                    currentIntervalTotalCount = 50L,
+                    currentIntervalUsageCount = 0L,
+                    modelName = "speech-hd",
+                    currentWeeklyTotalCount = 0L,
+                    currentWeeklyUsageCount = 0L,
+                    weeklyStartTime = 0L,
+                    weeklyEndTime = 0L,
+                    weeklyRemainsTime = 0L
+                )
+            ),
+            baseResp = BaseRespDto(statusCode = 0, statusMsg = "success")
+        )
+        val result = MiniMaxMapper.toUsageStats(responseWithOtherModels)
+        assertEquals(2, result.quotas.size)
+        assertEquals("MiniMax-M*", result.quotas[0].label)
+        assertEquals("MiniMax-M*", result.quotas[1].label)
     }
 }
