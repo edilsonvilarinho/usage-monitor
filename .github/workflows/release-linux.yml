@@ -7,7 +7,11 @@ on:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    # Pin the Linux packaging host to Ubuntu 22.04.
+    # Newer runners such as Ubuntu 24.04 generate .deb dependencies with
+    # t64 package names (for example libasound2t64/libpng16-16t64), which
+    # breaks installation on older Debian/Ubuntu-based distros.
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
