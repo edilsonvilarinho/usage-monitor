@@ -127,7 +127,7 @@ fi
 #   * --module-path (only if needed)
 #   * DEFAULT_JVM_OPTS, JAVA_OPTS, and GRADLE_OPTS environment variables.
 
-APP_HOME=$( cd "${0%/*}/.." && pwd -P ) || exit
+APP_HOME=$( cd "${0%/*}" && pwd -P ) || exit
 
 set -- \
         "-Dorg.gradle.appname=$APP_BASE_NAME" \

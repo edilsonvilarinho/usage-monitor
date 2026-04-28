@@ -24,7 +24,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
         with:
-          gradle_version: 8.6
+          gradle-version: 8.6
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -33,65 +33,33 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Build Linux distributable
-        run: ./gradlew createDistributable
-
-      - name: Find AppImage
-        id: appimage
+      - name: Install Linux packaging dependencies
         run: |
-          APPIMAGE=$(find build -name "*.AppImage" -type f | head -1 || true)
-          echo "path=$APPIMAGE" >> $GITHUB_OUTPUT
-
-      - name: Package as deb
-        if: steps.appimage.outputs.path != ''
-        run: |
-          set -e
           sudo apt-get update -qq
-          sudo apt-get install -y -qq dpkg-dev
+          sudo apt-get install -y -qq fakeroot rpm
 
-          APPIMAGE="${{ steps.appimage.outputs.path }}"
+      - name: Build Linux release artifacts
+        run: |
+          set -euo pipefail
+          ./gradlew createReleaseDistributable packageReleaseDistributionForCurrentOS
+
           VERSION="${{ steps.version.outputs.VERSION }}"
+          APP_ROOT="build/compose/binaries/main-release/app"
+          APP_DIR="$APP_ROOT/Usage Monitor"
           mkdir -p dist-build
 
-          chmod +x "$APPIMAGE"
-          "$APPIMAGE" --appimage-extract > /dev/null 2>&1 || true
+          if [ ! -d "$APP_DIR" ]; then
+            echo "Expected distributable directory not found: $APP_DIR" >&2
+            exit 1
+          fi
 
-          PKG_DIR="sqfs-root"
-          mkdir -p "$PKG_DIR/DEBIAN"
-          mkdir -p "$PKG_DIR/usr/bin"
-          mkdir -p "$PKG_DIR/usr/share/applications"
-
-          cp -r squashfs-root/* "$PKG_DIR/" 2>/dev/null || true
-
-          printf 'Package: usage-monitor\nVersion: %s\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: Usage Monitor\nDescription: Usage Monitor - API usage tracker\n' "$VERSION" > "$PKG_DIR/DEBIAN/control"
-
-          printf '[Desktop Entry]\nName=Usage Monitor\nComment=API usage tracker\nExec=%s/usage-monitor\nIcon=usage-monitor\nTerminal=false\nType=Application\n' "$PKG_DIR" > "$PKG_DIR/usr/share/applications/usage-monitor.desktop"
-
-          dpkg-deb --build --root-owner-group "$PKG_DIR" "dist-build/usage-monitor_${VERSION}_amd64.deb"
-
-      - name: Create RPM package
-        if: steps.appimage.outputs.path != ''
-        run: |
-          set -e
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq rpm
-
-          APPIMAGE="${{ steps.appimage.outputs.path }}"
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          mkdir -p dist-build/rpmtmp/BUILD
-          mkdir -p dist-build/rpmtmp/RPMS
-          mkdir -p dist-build/rpmtmp/SPECS
-          mkdir -p dist-build/rpmtmp/SOURCES
-
-          printf 'Name: usage-monitor\nVersion: %s\nRelease: 1\nSummary: Usage Monitor - API usage tracker\nLicense: MIT\nBuildArch: x86_64\n\n%%%%description\nUsage Monitor - API usage tracker\n\n%%%%install\nmkdir -p %%{buildroot}/usr/bin\nmkdir -p %%{buildroot}/usr/share/applications\n\ncp %s %%{buildroot}/usr/bin/usage-monitor\nchmod +x %%{buildroot}/usr/bin/usage-monitor\n\n%%%%files\n/usr/bin/usage-monitor\n/usr/share/applications/usage-monitor.desktop\n' "$VERSION" "$APPIMAGE" > dist-build/rpmtmp/SPECS/usage-monitor.spec
-
-          rpmbuild --define "_topdir $(pwd)/dist-build/rpmtmp" -bb dist-build/rpmtmp/SPECS/usage-monitor.spec || true
-          ls -la dist-build/rpmtmp/RPMS/x86_64/ 2>/dev/null || echo "RPM build may have failed"
+          tar -C "$APP_ROOT" -czf "dist-build/usage-monitor_${VERSION}_linux_x64.tar.gz" "Usage Monitor"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          fail_on_unmatched_files: true
           files: |
-            build/**/*.AppImage
-            dist-build/*.deb
-            dist-build/*.rpm
+            dist-build/*.tar.gz
+            build/compose/binaries/**/*.deb
+            build/compose/binaries/**/*.rpm
