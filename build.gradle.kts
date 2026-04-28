@@ -5,6 +5,11 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+version = "1.1.0"
+
+val appVersion = version.toString()
+val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
+
 kotlin {
     // Único alvo: Desktop JVM.
     // O nome "desktop" define o source set desktopMain/desktopTest.
@@ -47,6 +52,7 @@ kotlin {
         // - leitura de ficheiros com java.io.File
         // - entry point da janela Compose
         val desktopMain by getting {
+            kotlin.srcDir(generatedAppVersionDir)
             dependencies {
                 // Compose Desktop: inclui janela nativa para o SO atual
                 implementation(compose.desktop.currentOs)
@@ -87,7 +93,7 @@ compose.desktop {
 
         nativeDistributions {
             packageName = "Usage Monitor"
-            packageVersion = "1.1.0"
+            packageVersion = appVersion
 
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.ico"))
@@ -100,6 +106,28 @@ compose.desktop {
             }
         }
     }
+}
+
+val generateAppVersionSource by tasks.registering {
+    outputs.dir(generatedAppVersionDir)
+
+    doLast {
+        val packageDir = generatedAppVersionDir.get().dir("com/usagemonitor").asFile
+        val outputFile = packageDir.resolve("AppVersion.kt")
+
+        packageDir.mkdirs()
+        outputFile.writeText(
+            """
+            package com.usagemonitor
+
+            const val CURRENT_APP_VERSION = "$appVersion"
+            """.trimIndent()
+        )
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    dependsOn(generateAppVersionSource)
 }
 
 // Adicionar manifest ao desktopJar para torná-lo executável
@@ -148,7 +176,7 @@ tasks.register("packageInstaller") {
     dependsOn("buildNsisInstaller")
 
     doLast {
-        val installer = file("build/installer/UsageMonitor-Setup-1.0.0.exe")
+        val installer = file("build/installer/UsageMonitor-Setup-$appVersion.exe")
         if (installer.exists()) {
             logger.lifecycle("Installer created: ${installer.absolutePath}")
         }

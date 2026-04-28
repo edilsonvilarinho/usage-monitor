@@ -9,10 +9,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.AppTheme
+import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.LanguageSelector
+import com.usagemonitor.presentation.ui.components.SettingsBar
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -137,6 +138,52 @@ class ComponentTest {
 
         onNodeWithText("🌙 Escuro").performClick()
         assertEquals(true, toggled)
+    }
+
+    // ── SettingsBar ──────────────────────────────────────────────────────
+
+    @Test
+    fun `SettingsBar displays localized version and next update in PT`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsBar(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.PT,
+                    appVersion = "1.1.0",
+                    secondsUntilRefresh = 125,
+                    autoStartEnabled = false,
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Versão: v1.1.0").assertIsDisplayed()
+        onNodeWithText("Próxima atualização: 02:05").assertIsDisplayed()
+    }
+
+    @Test
+    fun `SettingsBar displays localized version and next update in EN`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsBar(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.EN,
+                    appVersion = "1.1.0",
+                    secondsUntilRefresh = 125,
+                    autoStartEnabled = false,
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Version: v1.1.0").assertIsDisplayed()
+        onNodeWithText("Next update: 02:05").assertIsDisplayed()
     }
 
     // ── LanguageSelector ─────────────────────────────────────────────────

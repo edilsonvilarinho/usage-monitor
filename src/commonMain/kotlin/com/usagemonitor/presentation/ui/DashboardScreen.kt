@@ -62,6 +62,7 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
+    appVersion: String,
     settings: Settings? = null,
     enabledApis: MutableStateFlow<Set<ApiSource>>? = null,
     onAutoStartChange: ((Boolean) -> Unit)? = null,
@@ -136,6 +137,7 @@ fun DashboardScreen(
                             SettingsBar(
                                 currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
                                 currentLanguage = language,
+                                appVersion = appVersion,
                                 secondsUntilRefresh = secondsUntilRefresh,
                                 autoStartEnabled = autoStartEnabled,
                                 onThemeToggle = {

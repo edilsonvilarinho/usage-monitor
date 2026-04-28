@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
@@ -24,6 +25,7 @@ import com.usagemonitor.domain.entity.AppTheme
 fun SettingsBar(
     currentTheme: AppTheme,
     currentLanguage: AppLanguage,
+    appVersion: String,
     secondsUntilRefresh: Int,
     autoStartEnabled: Boolean,
     onThemeToggle: () -> Unit,
@@ -56,6 +58,13 @@ fun SettingsBar(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
+            CurrentVersionLabel(
+                appVersion = appVersion,
+                language = currentLanguage
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
             RefreshControl(
                 secondsUntilRefresh = secondsUntilRefresh,
                 language = currentLanguage,
@@ -68,6 +77,26 @@ fun SettingsBar(
             )
         }
     }
+}
+
+@Composable
+fun CurrentVersionLabel(
+    appVersion: String,
+    language: AppLanguage,
+    modifier: Modifier = Modifier
+) {
+    val label = if (language == AppLanguage.PT) {
+        "Versão: v$appVersion"
+    } else {
+        "Version: v$appVersion"
+    }
+
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -139,9 +168,9 @@ fun RefreshControl(
     val minutes = secondsUntilRefresh / 60
     val seconds = secondsUntilRefresh % 60
     val countdownText = if (language == AppLanguage.PT) {
-        String.format("Próximo: %02d:%02d", minutes, seconds)
+        String.format("Próxima atualização: %02d:%02d", minutes, seconds)
     } else {
-        String.format("Next: %02d:%02d", minutes, seconds)
+        String.format("Next update: %02d:%02d", minutes, seconds)
     }
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {

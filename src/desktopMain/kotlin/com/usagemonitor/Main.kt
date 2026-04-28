@@ -101,6 +101,7 @@ fun main() = application {
     ) {
         DashboardScreen(
             viewModel = viewModel,
+            appVersion = CURRENT_APP_VERSION,
             settings = settings,
             enabledApis = enabledApis,
             onAutoStartChange = { enabled ->
