@@ -54,12 +54,10 @@ jobs:
           fi
 
           tar -C "$APP_ROOT" -czf "dist-build/usage-monitor_${VERSION}_linux_x64.tar.gz" "Usage Monitor"
+          find build/compose/binaries -type f \( -name "*.deb" -o -name "*.rpm" \) -exec cp {} dist-build/ \;
+          ls -la dist-build
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          fail_on_unmatched_files: true
-          files: |
-            dist-build/*.tar.gz
-            build/compose/binaries/**/*.deb
-            build/compose/binaries/**/*.rpm
+          files: dist-build/*
