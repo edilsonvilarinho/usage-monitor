@@ -41,10 +41,10 @@ jobs:
       - name: Build Linux release artifacts
         run: |
           set -euo pipefail
-          ./gradlew createReleaseDistributable packageReleaseDistributionForCurrentOS
+          ./gradlew createDistributable packageDistributionForCurrentOS
 
           VERSION="${{ steps.version.outputs.VERSION }}"
-          APP_ROOT="build/compose/binaries/main-release/app"
+          APP_ROOT="build/compose/binaries/main/app"
           APP_DIR="$APP_ROOT/Usage Monitor"
           mkdir -p dist-build
 
