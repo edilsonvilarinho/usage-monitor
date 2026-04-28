@@ -1,3 +1,5 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
@@ -5,7 +7,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-version = "2.0.3"
+version = "2.0.4"
 
 val appVersion = version.toString()
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
@@ -92,6 +94,12 @@ compose.desktop {
         mainClass = "com.usagemonitor.MainKt"
 
         nativeDistributions {
+            targetFormats(
+                TargetFormat.Exe,
+                TargetFormat.Msi,
+                TargetFormat.Deb,
+                TargetFormat.Rpm
+            )
             packageName = "Usage Monitor"
             packageVersion = appVersion
 
