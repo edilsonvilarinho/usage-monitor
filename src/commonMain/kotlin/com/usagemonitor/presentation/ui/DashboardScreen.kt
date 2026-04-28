@@ -67,12 +67,13 @@ fun DashboardScreen(
     onAutoStartChange: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val defaultEnabledApis = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
     val uiState by viewModel.uiState.collectAsState()
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val snackbarHostState = SnackbarHostState()
 
-    val enabledApisValue = enabledApis?.value ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+    val enabledApisValue = enabledApis?.value ?: defaultEnabledApis
     val flow: MutableStateFlow<Set<ApiSource>> = enabledApis ?: MutableStateFlow(enabledApisValue)
     val enabledApisState by flow.collectAsState()
 
@@ -110,6 +111,11 @@ fun DashboardScreen(
                 key.startsWith("ERROR:MINIMAX:") -> {
                     val apiMsg = key.removePrefix("ERROR:MINIMAX:").replace("_", ":")
                     if (language == AppLanguage.PT) "MiniMax: $apiMsg" else "MiniMax: $apiMsg"
+                }
+                key == "RATE_LIMIT:CODEX" -> if (language == AppLanguage.PT) "Codex rate limited — tentando novamente..." else "Codex rate limited — retrying..."
+                key.startsWith("ERROR:CODEX:") -> {
+                    val apiMsg = key.removePrefix("ERROR:CODEX:").replace("_", ":")
+                    if (language == AppLanguage.PT) "Codex: $apiMsg" else "Codex: $apiMsg"
                 }
                 else -> key
             }
@@ -271,10 +277,7 @@ private fun SuccessContent(
         }
 
         val items = apiStatsList
-            .filter { stats ->
-                val apiSource = if (stats.apiName == "Anthropic") ApiSource.ANTHROPIC else ApiSource.MINIMAX
-                apiSource in enabledApis
-            }
+            .filter { stats -> stats.source in enabledApis }
             .flatMap { stats ->
                 stats.quotas.map { quota -> Pair(stats.apiName, quota) }
             }
@@ -345,7 +348,7 @@ private fun QuotaCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (apiName != "Anthropic") {
+            if (quota.unit != UsageUnit.PERCENTAGE) {
                 Text(
                     text = formatUsage(quota.used, quota.total, quota.unit, quota.rawUsed, quota.rawTotal),
                     style = MaterialTheme.typography.bodySmall,

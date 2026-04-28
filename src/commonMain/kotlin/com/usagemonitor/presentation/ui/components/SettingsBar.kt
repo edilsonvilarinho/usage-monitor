@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +15,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
@@ -83,7 +85,11 @@ fun ThemeToggle(
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
+        modifier = modifier.toggleable(
+            value = isDark,
+            role = Role.Switch,
+            onValueChange = { onToggle() }
+        )
     ) {
         Text(
             text = label,
@@ -93,7 +99,7 @@ fun ThemeToggle(
         )
         Switch(
             checked = isDark,
-            onCheckedChange = { onToggle() }
+            onCheckedChange = null
         )
     }
 }

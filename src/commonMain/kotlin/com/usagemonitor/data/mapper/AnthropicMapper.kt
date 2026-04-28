@@ -1,6 +1,7 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.dto.AnthropicUsageResponse
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -25,6 +26,7 @@ object AnthropicMapper {
         val sevenDayRaw = (response.sevenDay.utilization * MAX_CAPACITY_7D / 100).roundToLong()
 
         return ApiUsageStats(
+            source = ApiSource.ANTHROPIC,
             apiName = "Anthropic",
             quotas = listOf(
                 QuotaInfo(

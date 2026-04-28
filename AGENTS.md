@@ -53,7 +53,17 @@ Three layers with unidirectional deps: `presentation → domain ← data`
 
 ## Commit convention
 
-Commits in my name and email: **minimax <minimax@opencode.ai>**.
+Before committing:
+```bash
+git config user.name "codex"
+git config user.email "codex@openai.com"
+```
+
+After committing, restore:
+```bash
+git config user.name "edilsonvilarinho"
+git config user.email "edilson.vilarinho.messias@gmail.com"
+```
 
 **Never run `git commit` or `git push` unless the user explicitly asks.**
 

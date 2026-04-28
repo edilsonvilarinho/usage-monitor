@@ -6,11 +6,14 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
+import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
+import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
+import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -26,6 +29,8 @@ import java.io.File
 import java.util.prefs.Preferences
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
+
+private val DEFAULT_ENABLED_APIS = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
 
 fun main() = application {
 
@@ -53,20 +58,23 @@ fun main() = application {
         ?.filter { it.isNotBlank() }
         ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
         ?.toSet()
-        ?.ifEmpty { setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX) }
-        ?: setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+        ?.ifEmpty { DEFAULT_ENABLED_APIS }
+        ?: DEFAULT_ENABLED_APIS
 
     val enabledApis = MutableStateFlow(persistedApis)
 
     val credentialDataSource = LocalCredentialDataSource(httpClient)
+    val codexAuthDataSource = LocalCodexAuthDataSource()
     val remoteApiDataSource = RemoteApiDataSource(httpClient)
 
     val anthropicRepository = AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
     val minimaxRepository = MiniMaxRepositoryImpl(remoteApiDataSource)
+    val codexRepository = CodexRepositoryImpl(codexAuthDataSource, remoteApiDataSource)
 
     val viewModel = DashboardViewModel(
         getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
         getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
+        getCodexUsage = GetCodexUsageUseCase(codexRepository),
         enabledApis = enabledApis
     )
 

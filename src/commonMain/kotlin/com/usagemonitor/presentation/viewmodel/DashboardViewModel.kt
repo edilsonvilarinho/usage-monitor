@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
+import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,7 @@ private const val POLL_INTERVAL_SECONDS = 600
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
     private val getMiniMaxUsage: GetMiniMaxUsageUseCase,
+    private val getCodexUsage: GetCodexUsageUseCase,
     private val enabledApis: StateFlow<Set<ApiSource>>
 ) {
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -83,6 +85,20 @@ class DashboardViewModel(
                         val msg = err.message ?: "erro desconhecido"
                         _toastMessage.value = "ERROR:MINIMAX:${msg.replace(":", "_")}"
                         errors.add("MiniMax: $msg")
+                    }
+                }
+        }
+
+        if (ApiSource.CODEX in enabled) {
+            getCodexUsage()
+                .onSuccess { stats.add(it) }
+                .onFailure { err ->
+                    if (err.message?.contains("429") == true) {
+                        _toastMessage.value = "RATE_LIMIT:CODEX"
+                    } else {
+                        val msg = err.message ?: "erro desconhecido"
+                        _toastMessage.value = "ERROR:CODEX:${msg.replace(":", "_")}"
+                        errors.add("Codex: $msg")
                     }
                 }
         }

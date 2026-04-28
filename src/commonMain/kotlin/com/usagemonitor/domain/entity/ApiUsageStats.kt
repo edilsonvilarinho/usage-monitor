@@ -7,6 +7,9 @@ package com.usagemonitor.domain.entity
  * MiniMax   → múltiplas QuotaInfo, uma por modelo
  */
 data class ApiUsageStats(
+    // Identificador estável da fonte para filtros e lógica da UI.
+    val source: ApiSource,
+
     // Nome da API: "Anthropic" ou "MiniMax"
     val apiName: String,
 

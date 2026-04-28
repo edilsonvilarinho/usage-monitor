@@ -4,6 +4,7 @@ import com.usagemonitor.data.dto.BaseRespDto
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import com.usagemonitor.data.dto.ModelRemainDto
 import com.usagemonitor.data.mapper.MiniMaxMapper
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.test.Test
@@ -51,6 +52,12 @@ class MiniMaxMapperTest {
     fun `maps apiName to MiniMax`() {
         val result = MiniMaxMapper.toUsageStats(sampleResponse)
         assertEquals("MiniMax", result.apiName)
+    }
+
+    @Test
+    fun `maps source to MiniMax`() {
+        val result = MiniMaxMapper.toUsageStats(sampleResponse)
+        assertEquals(ApiSource.MINIMAX, result.source)
     }
 
     @Test

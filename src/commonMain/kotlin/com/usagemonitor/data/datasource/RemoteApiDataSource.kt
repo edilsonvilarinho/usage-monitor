@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import io.ktor.client.HttpClient
@@ -44,5 +45,22 @@ class RemoteApiDataSource(private val httpClient: HttpClient) {
             header("Authorization", "Bearer $apiKey")
             contentType(ContentType.Application.Json)
         }.body()
+    }
+
+    suspend fun fetchCodexUsage(session: CodexSession): CodexUsageResponse {
+        val response = httpClient.get("https://chatgpt.com/backend-api/codex/usage") {
+            header("Authorization", "Bearer ${session.accessToken}")
+            header("Cookie", "cap_sid=${session.capSid}")
+            header("Accept", "application/json")
+            header("User-Agent", "Codex/0.125.0")
+            contentType(ContentType.Application.Json)
+        }
+
+        if (!response.status.isSuccess()) {
+            val body = response.bodyAsText()
+            throw IllegalStateException("Codex HTTP ${response.status.value}: $body")
+        }
+
+        return response.body()
     }
 }

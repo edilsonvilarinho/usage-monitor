@@ -5,11 +5,14 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.AnthropicRepository
+import com.usagemonitor.domain.repository.CodexRepository
 import com.usagemonitor.domain.repository.MiniMaxRepository
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
+import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -27,6 +30,7 @@ class DashboardViewModelTest {
     private val fixedInstant = Instant.parse("2025-01-01T12:00:00Z")
 
     private val sampleAnthropicStats = ApiUsageStats(
+        source = ApiSource.ANTHROPIC,
         apiName = "Anthropic",
         quotas = listOf(
             QuotaInfo(
@@ -42,6 +46,7 @@ class DashboardViewModelTest {
     )
 
     private val sampleMiniMaxStats = ApiUsageStats(
+        source = ApiSource.MINIMAX,
         apiName = "MiniMax",
         quotas = listOf(
             QuotaInfo(
@@ -63,9 +68,13 @@ class DashboardViewModelTest {
         val minimaxRepo = object : MiniMaxRepository {
             override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
         }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis
         )
         vm.cancelInitFetch()
@@ -84,9 +93,15 @@ class DashboardViewModelTest {
                 Exception("API Key não configurada")
             )
         }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                Exception("Sessão do Codex inválida")
+            )
+        }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis
         )
         vm.cancelInitFetch()
@@ -103,9 +118,13 @@ class DashboardViewModelTest {
         val minimaxRepo = object : MiniMaxRepository {
             override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
         }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis
         )
         vm.cancelInitFetch()
@@ -113,18 +132,29 @@ class DashboardViewModelTest {
         return vm
     }
 
+    private suspend fun awaitSettledState(viewModel: DashboardViewModel): UiState {
+        repeat(50) {
+            val state = viewModel.uiState.value
+            if (state !is UiState.Loading) {
+                return state
+            }
+            delay(20)
+        }
+        return viewModel.uiState.value
+    }
+
     @Test
     fun `initial state is Loading`() {
         val viewModel = successViewModel()
-        assertIs<UiState>(viewModel.uiState.value)
+        assertIs<UiState.Loading>(viewModel.uiState.value)
         viewModel.onDestroy()
     }
 
     @Test
     fun `transitions to Success when both APIs succeed`() = runTest {
         val viewModel = successViewModel()
-        advanceUntilIdle()
-        val state = viewModel.uiState.value
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel)
         assertIs<UiState.Success>(state)
         assertEquals(2, state.data.size)
         viewModel.onDestroy()
@@ -133,8 +163,8 @@ class DashboardViewModelTest {
     @Test
     fun `transitions to Error when all APIs fail`() = runTest {
         val viewModel = failureViewModel()
-        advanceUntilIdle()
-        val state = viewModel.uiState.value
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel)
         assertIs<UiState.Error>(state)
         assert(state.message.contains("Anthropic"))
         assert(state.message.contains("MiniMax"))
@@ -144,8 +174,8 @@ class DashboardViewModelTest {
     @Test
     fun `shows partial Success when only one API fails`() = runTest {
         val viewModel = partialSuccessViewModel()
-        advanceUntilIdle()
-        val state = viewModel.uiState.value
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel)
         assertIs<UiState.Success>(state)
         assertEquals(1, state.data.size)
         assertEquals("MiniMax", state.data[0].apiName)
@@ -155,8 +185,8 @@ class DashboardViewModelTest {
     @Test
     fun `Success state contains correct API data`() = runTest {
         val viewModel = successViewModel()
-        advanceUntilIdle()
-        val state = viewModel.uiState.value as UiState.Success
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel) as UiState.Success
         val anthropicData = state.data.first { it.apiName == "Anthropic" }
         val minimaxData = state.data.first { it.apiName == "MiniMax" }
         assertEquals(50000L, anthropicData.quotas[0].used)

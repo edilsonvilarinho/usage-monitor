@@ -1,6 +1,7 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -49,6 +50,7 @@ object MiniMaxMapper {
         }
 
         return ApiUsageStats(
+            source = ApiSource.MINIMAX,
             apiName = "MiniMax",
             quotas = quotas
         )

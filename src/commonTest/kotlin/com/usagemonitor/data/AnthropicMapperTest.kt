@@ -3,6 +3,7 @@ package com.usagemonitor.data
 import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.AnthropicUsageWindow
 import com.usagemonitor.data.mapper.AnthropicMapper
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.test.Test
@@ -18,6 +19,11 @@ class AnthropicMapperTest {
     @Test
     fun `maps apiName to Anthropic`() {
         assertEquals("Anthropic", AnthropicMapper.toUsageStats(sampleResponse).apiName)
+    }
+
+    @Test
+    fun `maps source to Anthropic`() {
+        assertEquals(ApiSource.ANTHROPIC, AnthropicMapper.toUsageStats(sampleResponse).source)
     }
 
     @Test
