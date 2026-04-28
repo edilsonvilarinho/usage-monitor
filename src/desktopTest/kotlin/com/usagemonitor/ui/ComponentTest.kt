@@ -237,6 +237,7 @@ class ComponentTest {
 
         onNodeWithText("Versão: v1.1.0").assertIsDisplayed()
         onNodeWithText("Próxima atualização: 02:05").assertIsDisplayed()
+        onNodeWithText("Inicialização com Sistema").assertIsDisplayed()
     }
 
     @Test
@@ -259,6 +260,7 @@ class ComponentTest {
 
         onNodeWithText("Version: v1.1.0").assertIsDisplayed()
         onNodeWithText("Next update: 02:05").assertIsDisplayed()
+        onNodeWithText("System Startup").assertIsDisplayed()
     }
 
     // ── LanguageSelector ─────────────────────────────────────────────────

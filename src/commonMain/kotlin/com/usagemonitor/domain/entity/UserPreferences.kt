@@ -7,7 +7,7 @@ package com.usagemonitor.domain.entity
 data class UserPreferences(
     val theme: AppTheme = AppTheme.DARK,
     val language: AppLanguage = AppLanguage.PT,
-    val enabledApis: Set<ApiSource> = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+    val enabledApis: Set<ApiSource> = emptySet()
 )
 
 /** Tema visual da aplicação. */

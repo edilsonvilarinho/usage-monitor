@@ -1,11 +1,16 @@
 package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
@@ -17,10 +22,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsBar(
     currentTheme: AppTheme,
@@ -34,48 +41,117 @@ fun SettingsBar(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ThemeToggle(
-                isDark = currentTheme == AppTheme.DARK,
-                language = currentLanguage,
-                onToggle = onThemeToggle
-            )
+        val compact = maxWidth < 760.dp
 
-            Spacer(modifier = Modifier.padding(horizontal = 8.dp))
-
-            AutoStartToggle(
-                enabled = autoStartEnabled,
-                language = currentLanguage,
-                onToggle = { enabled -> onAutoStartChange(enabled) }
-            )
+        if (compact) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SettingsPrimaryGroup(
+                    currentTheme = currentTheme,
+                    currentLanguage = currentLanguage,
+                    autoStartEnabled = autoStartEnabled,
+                    onThemeToggle = onThemeToggle,
+                    onAutoStartChange = onAutoStartChange
+                )
+                SettingsSecondaryGroup(
+                    currentLanguage = currentLanguage,
+                    appVersion = appVersion,
+                    secondsUntilRefresh = secondsUntilRefresh,
+                    onRefresh = onRefresh,
+                    onLanguageChange = onLanguageChange
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingsPrimaryGroup(
+                    currentTheme = currentTheme,
+                    currentLanguage = currentLanguage,
+                    autoStartEnabled = autoStartEnabled,
+                    onThemeToggle = onThemeToggle,
+                    onAutoStartChange = onAutoStartChange,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                SettingsSecondaryGroup(
+                    currentLanguage = currentLanguage,
+                    appVersion = appVersion,
+                    secondsUntilRefresh = secondsUntilRefresh,
+                    onRefresh = onRefresh,
+                    onLanguageChange = onLanguageChange,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
+    }
+}
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CurrentVersionLabel(
-                appVersion = appVersion,
-                language = currentLanguage
-            )
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingsPrimaryGroup(
+    currentTheme: AppTheme,
+    currentLanguage: AppLanguage,
+    autoStartEnabled: Boolean,
+    onThemeToggle: () -> Unit,
+    onAutoStartChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ThemeToggle(
+            isDark = currentTheme == AppTheme.DARK,
+            language = currentLanguage,
+            onToggle = onThemeToggle
+        )
 
-            Spacer(modifier = Modifier.width(8.dp))
+        AutoStartToggle(
+            enabled = autoStartEnabled,
+            language = currentLanguage,
+            onToggle = onAutoStartChange
+        )
+    }
+}
 
-            RefreshControl(
-                secondsUntilRefresh = secondsUntilRefresh,
-                language = currentLanguage,
-                onRefresh = onRefresh
-            )
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingsSecondaryGroup(
+    currentLanguage: AppLanguage,
+    appVersion: String,
+    secondsUntilRefresh: Int,
+    onRefresh: () -> Unit,
+    onLanguageChange: (AppLanguage) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        CurrentVersionLabel(
+            appVersion = appVersion,
+            language = currentLanguage
+        )
 
-            LanguageSelector(
-                currentLanguage = currentLanguage,
-                onLanguageChange = onLanguageChange
-            )
-        }
+        RefreshControl(
+            secondsUntilRefresh = secondsUntilRefresh,
+            language = currentLanguage,
+            onRefresh = onRefresh
+        )
+
+        LanguageSelector(
+            currentLanguage = currentLanguage,
+            onLanguageChange = onLanguageChange
+        )
     }
 }
 
@@ -140,7 +216,7 @@ fun AutoStartToggle(
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val label = if (language == AppLanguage.PT) "Iniciar com Windows" else "Start with Windows"
+    val label = if (language == AppLanguage.PT) "Inicialização com Sistema" else "System Startup"
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
@@ -178,7 +254,10 @@ fun RefreshControl(
             text = countdownText,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 4.dp)
+            textAlign = TextAlign.Start,
+            modifier = Modifier
+                .widthIn(max = 128.dp)
+                .padding(end = 4.dp)
         )
         IconButton(onClick = onRefresh) {
             Text(

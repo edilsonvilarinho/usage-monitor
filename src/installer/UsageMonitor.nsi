@@ -7,11 +7,15 @@ SetCompressor zlib
 ; -----------------------------------------------
 ; General
 ; -----------------------------------------------
-!define PRODUCT_NAME "Usage Monitor"
+!ifndef PRODUCT_VERSION
 !define PRODUCT_VERSION "2.0.5"
+!endif
+
+!define PRODUCT_NAME "Usage Monitor"
 !define PRODUCT_PUBLISHER "Usage Monitor"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define LOG_FILE "$INSTDIR\install.log"
+!define APP_ICON "..\desktopMain\resources\icons\app_icon.ico"
 
 ; -----------------------------------------------
 ; Installer attributes
@@ -21,6 +25,10 @@ OutFile "..\..\build\installer\UsageMonitor-Setup-${PRODUCT_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
 InstallDirRegKey HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation"
 RequestExecutionLevel user
+Icon "${APP_ICON}"
+UninstallIcon "${APP_ICON}"
+!define MUI_ICON "${APP_ICON}"
+!define MUI_UNICON "${APP_ICON}"
 
 ; -----------------------------------------------
 ; Pages
@@ -89,8 +97,8 @@ Section "Usage Monitor" SEC_APP
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
-    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "NoModify" "1"
-    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" "1"
+    WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
+    WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
 
     ; Create uninstaller
     DetailPrint "Creating uninstaller..."
@@ -99,8 +107,8 @@ Section "Usage Monitor" SEC_APP
     ; Create Start Menu shortcuts
     DetailPrint "Creating Start Menu shortcuts..."
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Remover.lnk" "$INSTDIR\Uninstall.exe"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe" "" "$INSTDIR\Usage Monitor.exe" 0 SW_SHOWNORMAL "" "${PRODUCT_NAME}"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Remover.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWNORMAL "" "Remover ${PRODUCT_NAME}"
 
     ; Finalize log
     FileOpen $0 "${LOG_FILE}" a
@@ -112,7 +120,7 @@ SectionEnd
 
 Section "Desktop Shortcut" SEC_DESKTOP
     DetailPrint "Creating desktop shortcut..."
-    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe"
+    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe" "" "$INSTDIR\Usage Monitor.exe" 0 SW_SHOWNORMAL "" "${PRODUCT_NAME}"
 SectionEnd
 
 Section "Start with Windows" SEC_AUTO_START

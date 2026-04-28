@@ -173,7 +173,11 @@ tasks.register<Exec>("buildNsisInstaller") {
 
     if (nsisPath != null) {
         workingDir(file("src/installer"))
-        commandLine(nsisPath, "UsageMonitor.nsi")
+        commandLine(
+            nsisPath,
+            "/DPRODUCT_VERSION=$appVersion",
+            "UsageMonitor.nsi"
+        )
     } else {
         logger.warn("NSIS not found. Skipping installer generation.")
         logger.warn("Install NSIS from https://nsis.sourceforge.io/ to enable installer build.")

@@ -1,21 +1,25 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -23,8 +27,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,25 +41,26 @@ import com.russhwolf.settings.Settings
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
-import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
+import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.SettingsBar
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     appVersion: String,
     settings: Settings? = null,
     enabledApis: MutableStateFlow<Set<ApiSource>>? = null,
+    initialAutoStartEnabled: Boolean = false,
     onAutoStartChange: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val defaultEnabledApis = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+    val defaultEnabledApis = emptySet<ApiSource>()
     val uiState by viewModel.uiState.collectAsState()
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
@@ -76,7 +79,7 @@ fun DashboardScreen(
         )
     }
     var localEnabledApis by remember { mutableStateOf(enabledApisValue) }
-    var autoStartEnabled by remember { mutableStateOf(settings?.getBoolean("autoStart", false) ?: false) }
+    var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
 
     LaunchedEffect(enabledApisState) {
         localEnabledApis = enabledApisState
@@ -121,34 +124,29 @@ fun DashboardScreen(
         ) {
             Scaffold(
                 topBar = {
-                    TopAppBar(
-                        title = {
-                            SettingsBar(
-                                currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
-                                currentLanguage = language,
-                                appVersion = appVersion,
-                                secondsUntilRefresh = secondsUntilRefresh,
-                                autoStartEnabled = autoStartEnabled,
-                                onThemeToggle = {
-                                    isDark = !isDark
-                                    settings?.putBoolean("isDark", isDark)
-                                },
-                                onLanguageChange = { lang ->
-                                    language = lang
-                                    settings?.putString("language", lang.name)
-                                },
-                                onAutoStartChange = { enabled ->
-                                    autoStartEnabled = enabled
-                                    settings?.putBoolean("autoStart", enabled)
-                                    onAutoStartChange?.invoke(enabled)
-                                },
-                                onRefresh = { viewModel.refresh() }
-                            )
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface
+                    Surface(color = MaterialTheme.colorScheme.surface) {
+                        SettingsBar(
+                            currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
+                            currentLanguage = language,
+                            appVersion = appVersion,
+                            secondsUntilRefresh = secondsUntilRefresh,
+                            autoStartEnabled = autoStartEnabled,
+                            onThemeToggle = {
+                                isDark = !isDark
+                                settings?.putBoolean("isDark", isDark)
+                            },
+                            onLanguageChange = { lang ->
+                                language = lang
+                                settings?.putString("language", lang.name)
+                            },
+                            onAutoStartChange = { enabled ->
+                                autoStartEnabled = enabled
+                                settings?.putBoolean("autoStart", enabled)
+                                onAutoStartChange?.invoke(enabled)
+                            },
+                            onRefresh = { viewModel.refresh() }
                         )
-                    )
+                    }
                 },
                 containerColor = MaterialTheme.colorScheme.background
             ) { scaffoldPadding ->
@@ -157,16 +155,13 @@ fun DashboardScreen(
                         .fillMaxSize()
                         .padding(scaffoldPadding)
                 ) {
-                    Row(
+                    ApiSelector(
+                        enabledApis = localEnabledApis,
+                        onToggle = { api, checked ->
+                            localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
+                        },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        ApiSelector(
-                            enabledApis = localEnabledApis,
-                            onToggle = { api, checked ->
-                                localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
-                            }
-                        )
-                    }
+                    )
 
                     SnackbarHost(
                         hostState = snackbarHostState,
@@ -241,6 +236,7 @@ private fun ErrorContent(message: String, language: AppLanguage, onRetry: () -> 
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SuccessContent(
     apiStatsList: List<com.usagemonitor.domain.entity.ApiUsageStats>,
@@ -249,53 +245,80 @@ private fun SuccessContent(
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        if (partialErrors.isNotEmpty()) {
-            partialErrors.forEach { error ->
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+    val items = apiStatsList.filter { stats -> stats.source in enabledApis }
+    val scrollState = rememberScrollState()
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(end = 12.dp)
+        ) {
+            if (partialErrors.isNotEmpty()) {
+                partialErrors.forEach { error ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "⚠ $error",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                val compact = maxWidth < 720.dp
+                val cardMaxWidth = if (compact) maxWidth else (maxWidth - 16.dp) / 2
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    maxItemsInEachRow = if (compact) 1 else 2,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "⚠ $error",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    items.forEach { stats ->
+                        ApiUsageCard(
+                            apiName = stats.apiName,
+                            quotas = stats.quotas,
+                            showUsageDetails = stats.source != ApiSource.ANTHROPIC,
+                            language = language,
+                            modifier = Modifier.widthIn(max = cardMaxWidth)
+                        )
+                    }
                 }
             }
         }
 
-        val items = apiStatsList
-            .filter { stats -> stats.source in enabledApis }
-
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 340.dp),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = modifier.weight(1f).fillMaxSize()
-        ) {
-            items(items) { stats ->
-                ApiUsageCard(
-                    apiName = stats.apiName,
-                    quotas = stats.quotas,
-                    showUsageDetails = stats.source != ApiSource.ANTHROPIC,
-                    language = language
-                )
-            }
-        }
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+        )
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ApiSelector(
     enabledApis: Set<ApiSource>,
-    onToggle: (ApiSource, Boolean) -> Unit
+    onToggle: (ApiSource, Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    androidx.compose.foundation.layout.Row(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         ApiSource.entries.forEach { api ->
             ApiCheckboxRow(

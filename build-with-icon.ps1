@@ -3,11 +3,22 @@
 
 $ErrorActionPreference = "Stop"
 $projectDir = "C:\Users\edils\workspace\usage-monitor"
+$buildFile = Join-Path $projectDir "build.gradle.kts"
+$buildFileContent = Get-Content $buildFile -Raw
+$versionMatch = [regex]::Match($buildFileContent, 'version\s*=\s*"([^"]+)"')
+
+if (-not $versionMatch.Success) {
+    Write-Host "ERROR: could not detect project version in build.gradle.kts"
+    exit 1
+}
+
+$appVersion = $versionMatch.Groups[1].Value
 $distDir = "$projectDir\build\compose\binaries\main\app\Usage Monitor"
 $exePath = "$distDir\Usage Monitor.exe"
 $icoPath = "$projectDir\src\desktopMain\resources\icons\app_icon.ico"
 $rceditPath = "C:\Users\edils\AppData\Roaming\npm\node_modules\rcedit\bin\rcedit.exe"
 $installerFilesDir = "$projectDir\build\installer\files"
+$installerPath = "$projectDir\build\installer\UsageMonitor-Setup-$appVersion.exe"
 
 Write-Host "=== Step 1: Clean old builds ==="
 if (Test-Path "$projectDir\build") {
@@ -71,9 +82,9 @@ if (Test-Path $nsisPath) {
 }
 
 Write-Host "=== Done ==="
-Write-Host "Installer: $projectDir\build\installer\UsageMonitor-Setup-1.0.1.exe"
-if (Test-Path "$projectDir\build\installer\UsageMonitor-Setup-1.0.1.exe") {
-    $size = (Get-Item "$projectDir\build\installer\UsageMonitor-Setup-1.0.1.exe").Length / 1MB
+Write-Host "Installer: $installerPath"
+if (Test-Path $installerPath) {
+    $size = (Get-Item $installerPath).Length / 1MB
     Write-Host "Size: $([math]::Round($size, 2)) MB"
 }
 

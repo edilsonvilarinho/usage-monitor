@@ -25,12 +25,19 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
-import java.io.File
 import java.util.prefs.Preferences
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
 
-private val DEFAULT_ENABLED_APIS = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
+private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+
+private fun loadWindowIcon() = runCatching {
+    val stream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH) ?: return@runCatching null
+    stream.use { resourceStream ->
+        ImageIO.read(resourceStream).toPainter()
+    }
+}.getOrNull()
 
 fun main() = application {
 
@@ -58,8 +65,18 @@ fun main() = application {
         ?.filter { it.isNotBlank() }
         ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
         ?.toSet()
-        ?.ifEmpty { DEFAULT_ENABLED_APIS }
         ?: DEFAULT_ENABLED_APIS
+
+    val storedAutoStartPreference = settings.getBoolean("autoStart", false)
+    val initialAutoStartEnabled = if (AutoStartManager.isAutoStartSupported()) {
+        AutoStartManager.isAutoStartEnabled()
+    } else {
+        storedAutoStartPreference
+    }
+
+    if (storedAutoStartPreference != initialAutoStartEnabled) {
+        settings.putBoolean("autoStart", initialAutoStartEnabled)
+    }
 
     val enabledApis = MutableStateFlow(persistedApis)
 
@@ -83,12 +100,7 @@ fun main() = application {
         httpClient.close()
     })
 
-    val iconFile = File("src/desktopMain/resources/icons/app_icon.png")
-    val iconImage = if (iconFile.exists()) {
-        runCatching { ImageIO.read(iconFile).toPainter() }.getOrNull()
-    } else {
-        null
-    }
+    val iconImage = loadWindowIcon()
 
     Window(
         onCloseRequest = {
@@ -104,6 +116,7 @@ fun main() = application {
             appVersion = CURRENT_APP_VERSION,
             settings = settings,
             enabledApis = enabledApis,
+            initialAutoStartEnabled = initialAutoStartEnabled,
             onAutoStartChange = { enabled ->
                 AutoStartManager.setAutoStart(enabled)
             }
