@@ -87,7 +87,7 @@ compose.desktop {
 
         nativeDistributions {
             packageName = "Usage Monitor"
-            packageVersion = "1.0.1"
+            packageVersion = "1.1.0"
 
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.ico"))
