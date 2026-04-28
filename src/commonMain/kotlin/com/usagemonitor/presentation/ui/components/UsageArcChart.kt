@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -44,7 +45,8 @@ fun UsageArcChart(
     unit: UsageUnit,
     modifier: Modifier = Modifier,
     size: Dp = 80.dp,
-    strokeWidth: Dp = 12.dp
+    strokeWidth: Dp = 12.dp,
+    percentageTextStyle: TextStyle? = null
 ) {
     val percentage = if (total > 0L) {
         (used.toFloat() / total.toFloat()).coerceIn(0f, 1f)
@@ -60,6 +62,7 @@ fun UsageArcChart(
 
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val usedColor = arcColor(percentage)
+    val resolvedTextStyle = percentageTextStyle ?: MaterialTheme.typography.headlineMedium
 
     Box(
         contentAlignment = Alignment.Center,
@@ -96,7 +99,7 @@ fun UsageArcChart(
 
         Text(
             text = "${(percentage * 100).toInt()}%",
-            style = MaterialTheme.typography.headlineMedium,
+            style = resolvedTextStyle,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
@@ -112,23 +115,3 @@ private fun arcColor(percentage: Float): androidx.compose.ui.graphics.Color {
         else -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
     }
 }
-
-/** Formata o texto de uso abreviado (ex: "50K/200K tok", "22/45 req", "15%"). */
-private fun formatUsage(used: Long, total: Long, unit: UsageUnit): String {
-    return when (unit) {
-        UsageUnit.PERCENTAGE -> "${used}%"
-        UsageUnit.TOKENS     -> "${abbreviate(used)}/${abbreviate(total)} tok"
-        UsageUnit.REQUESTS   -> "${abbreviate(used)}/${abbreviate(total)} req"
-    }
-}
-
-/** Abrevia números grandes: 2700 → "2.7K", 45000 → "45K", 1200000 → "1.2M". */
-private fun abbreviate(n: Long): String {
-    return when {
-        n >= 1_000_000L -> "${removeDecimal("%.1f".format(n / 1_000_000f))}M"
-        n >= 1_000L     -> "${removeDecimal("%.1f".format(n / 1_000f))}K"
-        else            -> n.toString()
-    }
-}
-
-private fun removeDecimal(s: String): String = s.replace(",0", "").replace(".0", "")

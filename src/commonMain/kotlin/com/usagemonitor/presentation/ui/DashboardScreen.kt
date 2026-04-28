@@ -13,11 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -37,26 +34,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.russhwolf.settings.Settings
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
-import com.usagemonitor.domain.entity.PeriodType
-import com.usagemonitor.domain.entity.QuotaInfo
-import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.SettingsBar
-import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -280,125 +269,25 @@ private fun SuccessContent(
 
         val items = apiStatsList
             .filter { stats -> stats.source in enabledApis }
-            .flatMap { stats ->
-                stats.quotas.map { quota -> Pair(stats.apiName, quota) }
-            }
 
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 260.dp),
+            columns = GridCells.Adaptive(minSize = 340.dp),
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = modifier.weight(1f).fillMaxSize()
         ) {
-            items(items) { (apiName, quota) ->
-                QuotaCard(apiName = apiName, quota = quota, language = language)
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuotaCard(
-    apiName: String,
-    quota: QuotaInfo,
-    language: AppLanguage,
-    modifier: Modifier = Modifier
-) {
-    val saoPauloTz = TimeZone.of("America/Sao_Paulo")
-    val resetLocal = quota.periodEndAt.toLocalDateTime(saoPauloTz)
-    val dayFormatted = when (resetLocal.dayOfWeek) {
-        DayOfWeek.MONDAY -> if (language == AppLanguage.PT) "Seg" else "Mon"
-        DayOfWeek.TUESDAY -> if (language == AppLanguage.PT) "Ter" else "Tue"
-        DayOfWeek.WEDNESDAY -> if (language == AppLanguage.PT) "Qua" else "Wed"
-        DayOfWeek.THURSDAY -> if (language == AppLanguage.PT) "Qui" else "Thu"
-        DayOfWeek.FRIDAY -> if (language == AppLanguage.PT) "Sex" else "Fri"
-        DayOfWeek.SATURDAY -> if (language == AppLanguage.PT) "Sáb" else "Sat"
-        DayOfWeek.SUNDAY -> if (language == AppLanguage.PT) "Dom" else "Sun"
-    }
-    val resetLabel = if (language == AppLanguage.PT) {
-        "Reinício: $dayFormatted ${resetLocal.hour}h${resetLocal.minute.toString().padStart(2, '0')} BRT"
-    } else {
-        "Reset: $dayFormatted ${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')} BRT"
-    }
-
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = apiName,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            UsageArcChart(
-                used = quota.used,
-                total = quota.total,
-                unit = quota.unit
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (quota.unit != UsageUnit.PERCENTAGE) {
-                Text(
-                    text = formatUsage(quota.used, quota.total, quota.unit, quota.rawUsed, quota.rawTotal),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
+            items(items) { stats ->
+                ApiUsageCard(
+                    apiName = stats.apiName,
+                    quotas = stats.quotas,
+                    showUsageDetails = stats.source != ApiSource.ANTHROPIC,
+                    language = language
                 )
             }
-
-            if (quota.periodType == PeriodType.WEEKLY) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Semanal" else "Weekly",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Text(
-                text = resetLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
-
-private fun formatUsage(used: Long, total: Long, unit: com.usagemonitor.domain.entity.UsageUnit, rawUsed: Long = 0L, rawTotal: Long = 0L): String {
-    return when (unit) {
-        com.usagemonitor.domain.entity.UsageUnit.PERCENTAGE -> "${used}%"
-        com.usagemonitor.domain.entity.UsageUnit.TOKENS -> {
-            val displayUsed = if (rawUsed > 0L) rawUsed else used
-            val displayTotal = if (rawTotal > 0L) rawTotal else total
-            "${abbreviate(displayUsed)}/${abbreviate(displayTotal)} tok"
-        }
-        com.usagemonitor.domain.entity.UsageUnit.REQUESTS -> "${abbreviate(used)}/${abbreviate(total)} req"
-    }
-}
-
-private fun abbreviate(n: Long): String {
-    return when {
-        n >= 1_000_000L -> "${removeDecimal("%.1f".format(n / 1_000_000f))}M"
-        n >= 1_000L     -> "${removeDecimal("%.1f".format(n / 1_000f))}K"
-        else            -> n.toString()
-    }
-}
-
-private fun removeDecimal(s: String): String = s.replace(",0", "").replace(".0", "")
 
 @Composable
 private fun ApiSelector(

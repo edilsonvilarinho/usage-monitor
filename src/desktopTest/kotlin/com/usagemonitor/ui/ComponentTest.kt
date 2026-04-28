@@ -1,22 +1,28 @@
 package com.usagemonitor.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.SettingsBar
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -63,6 +69,75 @@ class ComponentTest {
         }
 
         onNodeWithText("0%").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard shows interval and weekly quotas in the same card`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 0L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS,
+                            rawUsed = 0L,
+                            rawTotal = 4000L
+                        ),
+                        QuotaInfo(
+                            label = "Claude 7d",
+                            used = 98L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.TOKENS,
+                            rawUsed = 39000L,
+                            rawTotal = 40000L
+                        )
+                    ),
+                    showUsageDetails = false,
+                    language = AppLanguage.PT
+                )
+            }
+        }
+
+        onNodeWithText("Anthropic").assertIsDisplayed()
+        onNodeWithText("0%").assertIsDisplayed()
+        onNodeWithText("98%").assertIsDisplayed()
+        onAllNodesWithText("0/4K tok").assertCountEquals(0)
+        onAllNodesWithText("39K/40K tok").assertCountEquals(0)
+        onNodeWithText("Semanal").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard keeps a single quota centered when weekly data is absent`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    apiName = "MiniMax",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "MiniMax-M*",
+                            used = 12L,
+                            total = 45L,
+                            periodEndAt = Instant.parse("2026-04-28T15:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.REQUESTS
+                        )
+                    ),
+                    showUsageDetails = true,
+                    language = AppLanguage.PT
+                )
+            }
+        }
+
+        onNodeWithText("MiniMax").assertIsDisplayed()
+        onNodeWithText("26%").assertIsDisplayed()
+        onNodeWithText("12/45 req").assertIsDisplayed()
     }
 
     // ── ApiCheckboxRow ────────────────────────────────────────────────────
