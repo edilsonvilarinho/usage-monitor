@@ -18,6 +18,7 @@ data class QuotaInfo(
     val used: Long,
     val total: Long,
     val periodEndAt: Instant,
+    val hasKnownResetAt: Boolean = true,
     val periodType: PeriodType = PeriodType.INTERVAL,
     val unit: UsageUnit,
     val rawUsed: Long = 0L,

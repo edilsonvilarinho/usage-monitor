@@ -9,7 +9,6 @@ import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class AnthropicMapperTest {
 
@@ -105,31 +104,28 @@ class AnthropicMapperTest {
     }
 
     @Test
-    fun `skips five_hour quota when resets_at is null`() {
+    fun `keeps five_hour quota when resets_at is null`() {
         val response = sampleResponse.copy(
             fiveHour = AnthropicUsageWindow(utilization = 0.0, resetsAt = null)
         )
 
         val result = AnthropicMapper.toUsageStats(response)
 
-        assertEquals(1, result.quotas.size)
-        assertEquals("Claude 7d", result.quotas.single().label)
+        assertEquals(2, result.quotas.size)
+        assertEquals("Claude 5h", result.quotas.first().label)
+        assertEquals(false, result.quotas.first().hasKnownResetAt)
     }
 
     @Test
-    fun `fails with friendly message when no reset window is available`() {
+    fun `keeps quotas even when no reset window is available`() {
         val response = AnthropicUsageResponse(
             fiveHour = AnthropicUsageWindow(utilization = 0.0, resetsAt = null),
             sevenDay = AnthropicUsageWindow(utilization = 0.0, resetsAt = null)
         )
 
-        val error = assertFailsWith<IllegalStateException> {
-            AnthropicMapper.toUsageStats(response)
-        }
+        val result = AnthropicMapper.toUsageStats(response)
 
-        assertEquals(
-            "Anthropic returned usage data without active reset windows. Open Claude Code CLI and authenticate again if the problem persists.",
-            error.message
-        )
+        assertEquals(2, result.quotas.size)
+        assertEquals(false, result.quotas.all { quota -> quota.hasKnownResetAt })
     }
 }

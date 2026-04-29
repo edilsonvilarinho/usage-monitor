@@ -450,35 +450,57 @@ private fun ResponsiveDashboardCardGrid(
         val columns = if (constraints.maxWidth < compactThresholdPx) 1 else 2
         val totalSpacing = spacingPx * (columns - 1)
         val itemWidth = ((constraints.maxWidth - totalSpacing).coerceAtLeast(0)) / columns
-        val childConstraints = constraints.copy(
+        val defaultChildConstraints = constraints.copy(
             minWidth = itemWidth,
             maxWidth = itemWidth,
             minHeight = 0
         )
-        val placeables = measurables.map { measurable -> measurable.measure(childConstraints) }
-        val rowHeights = placeables
-            .chunked(columns)
-            .map { row -> row.maxOf { placeable -> placeable.height } }
+        val fullRowConstraints = constraints.copy(
+            minWidth = constraints.maxWidth,
+            maxWidth = constraints.maxWidth,
+            minHeight = 0
+        )
+        val rows = buildList {
+            var index = 0
+
+            while (index < measurables.size) {
+                val remainingItems = measurables.size - index
+                val isTrailingSingleCardRow = columns > 1 && remainingItems == 1
+                val rowItemCount = if (isTrailingSingleCardRow) 1 else minOf(columns, remainingItems)
+                val rowConstraints = if (isTrailingSingleCardRow) {
+                    fullRowConstraints
+                } else {
+                    defaultChildConstraints
+                }
+                val rowPlaceables = List(rowItemCount) { rowIndex ->
+                    measurables[index + rowIndex].measure(rowConstraints)
+                }
+
+                add(CardGridRow(placeables = rowPlaceables))
+                index += rowItemCount
+            }
+        }
+        val rowHeights = rows.map { row -> row.height }
         val layoutHeight = rowHeights.sum() + spacingPx * (rowHeights.size - 1).coerceAtLeast(0)
 
         layout(width = constraints.maxWidth, height = layoutHeight) {
             var yPosition = 0
-            var itemIndex = 0
 
-            rowHeights.forEach { rowHeight ->
-                for (columnIndex in 0 until columns) {
-                    if (itemIndex >= placeables.size) {
-                        break
+            rows.forEach { row ->
+                row.placeables.forEachIndexed { columnIndex, placeable ->
+                    val xPosition = if (row.placeables.size == 1 && columns > 1) {
+                        0
+                    } else {
+                        columnIndex * (itemWidth + spacingPx)
                     }
 
-                    placeables[itemIndex].placeRelative(
-                        x = columnIndex * (itemWidth + spacingPx),
+                    placeable.placeRelative(
+                        x = xPosition,
                         y = yPosition
                     )
-                    itemIndex++
                 }
 
-                yPosition += rowHeight + spacingPx
+                yPosition += row.height + spacingPx
             }
         }
     }
@@ -499,6 +521,13 @@ private data class CardGridBounds(
             x = topLeft.x + width / 2f,
             y = topLeft.y + height / 2f
         )
+}
+
+private data class CardGridRow(
+    val placeables: List<androidx.compose.ui.layout.Placeable>
+) {
+    val height: Int
+        get() = placeables.maxOf { placeable -> placeable.height }
 }
 
 private fun warningActionFor(

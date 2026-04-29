@@ -15,29 +15,23 @@ object AnthropicMapper {
     private const val MAX_CAPACITY_5H = 4500L
     private const val MAX_CAPACITY_7D = 45000L
     private const val SCALE = 100L
+    private val UNKNOWN_RESET_AT = Instant.parse("2100-01-01T00:00:00Z")
 
     fun toUsageStats(response: AnthropicUsageResponse): ApiUsageStats {
         val quotas = buildList {
-            createQuota(
+            add(createQuota(
                 label = "Claude 5h",
                 periodType = PeriodType.INTERVAL,
                 window = response.fiveHour,
                 maxCapacity = MAX_CAPACITY_5H
-            )?.let(::add)
+            ))
 
-            createQuota(
+            add(createQuota(
                 label = "Claude 7d",
                 periodType = PeriodType.WEEKLY,
                 window = response.sevenDay,
                 maxCapacity = MAX_CAPACITY_7D
-            )?.let(::add)
-        }
-
-        if (quotas.isEmpty()) {
-            throw IllegalStateException(
-                "Anthropic returned usage data without active reset windows. " +
-                    "Open Claude Code CLI and authenticate again if the problem persists."
-            )
+            ))
         }
 
         return ApiUsageStats(
@@ -52,9 +46,13 @@ object AnthropicMapper {
         periodType: PeriodType,
         window: AnthropicUsageWindow,
         maxCapacity: Long
-    ): QuotaInfo? {
-        val resetsAt = window.resetsAt ?: return null
-        val periodEndAt = Instant.parse(resetsAt)
+    ): QuotaInfo {
+        val resetsAt = window.resetsAt
+        val periodEndAt = if (resetsAt != null) {
+            Instant.parse(resetsAt)
+        } else {
+            UNKNOWN_RESET_AT
+        }
         val used = window.utilization.toLong().coerceIn(0L, 100L)
         val rawUsed = (window.utilization * maxCapacity / 100).roundToLong()
 
@@ -63,6 +61,7 @@ object AnthropicMapper {
             used = used,
             total = SCALE,
             periodEndAt = periodEndAt,
+            hasKnownResetAt = resetsAt != null,
             periodType = periodType,
             unit = UsageUnit.TOKENS,
             rawUsed = rawUsed,

@@ -26,7 +26,9 @@ class LocalUsageHistoryDataSource(
                 connection.autoCommit = false
                 try {
                     connection.prepareStatement(INSERT_SQL).use { statement ->
-                        stats.quotas.forEach { quota ->
+                        stats.quotas
+                            .filter { quota -> quota.hasKnownResetAt }
+                            .forEach { quota ->
                             statement.setString(1, stats.source.name)
                             statement.setString(2, quota.label)
                             statement.setString(3, quota.periodType.name)

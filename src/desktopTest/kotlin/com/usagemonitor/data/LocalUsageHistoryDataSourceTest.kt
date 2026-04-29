@@ -64,6 +64,53 @@ class LocalUsageHistoryDataSourceTest {
         tempDir.deleteRecursively()
     }
 
+    @Test
+    fun `snapshots skip quotas with unknown reset window`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val databaseFile = File(tempDir, "history.db")
+        val dataSource = LocalUsageHistoryDataSource(databaseFile)
+
+        dataSource.insertSnapshot(
+            ApiUsageStats(
+                source = ApiSource.ANTHROPIC,
+                apiName = "Anthropic",
+                quotas = listOf(
+                    QuotaInfo(
+                        label = "Claude 5h",
+                        used = 0L,
+                        total = 100L,
+                        periodEndAt = Instant.parse("2100-01-01T00:00:00Z"),
+                        hasKnownResetAt = false,
+                        periodType = PeriodType.INTERVAL,
+                        unit = UsageUnit.TOKENS,
+                        rawUsed = 0L,
+                        rawTotal = 4500L
+                    ),
+                    QuotaInfo(
+                        label = "Claude 7d",
+                        used = 98L,
+                        total = 100L,
+                        periodEndAt = Instant.parse("2026-05-01T12:00:00Z"),
+                        periodType = PeriodType.WEEKLY,
+                        unit = UsageUnit.TOKENS,
+                        rawUsed = 44100L,
+                        rawTotal = 45000L
+                    )
+                )
+            ),
+            Instant.parse("2026-04-29T12:00:00Z")
+        )
+
+        val records = dataSource.readSnapshots(
+            source = ApiSource.ANTHROPIC,
+            since = Instant.parse("2026-04-29T00:00:00Z")
+        )
+
+        assertEquals(1, records.size)
+        assertEquals("Claude 7d", records.single().quotaLabel)
+        tempDir.deleteRecursively()
+    }
+
     private fun sampleStats(): ApiUsageStats {
         return ApiUsageStats(
             source = ApiSource.CODEX,

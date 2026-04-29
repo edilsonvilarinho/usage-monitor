@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +17,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,7 +36,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -56,10 +66,31 @@ fun FooterBar(
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             val compact = maxWidth < 500.dp
+            val dense = maxWidth < 360.dp
 
-            if (compact) {
+            if (dense) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FooterCompactStatusGroup(
+                        appVersion = appVersion,
+                        language = language,
+                        secondsUntilRefresh = secondsUntilRefresh,
+                        dense = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    FooterActionGroup(
+                        language = language,
+                        onRefresh = onRefresh,
+                        onOpenSettings = onOpenSettings,
+                        iconOnly = true
+                    )
+                }
+            } else if (compact) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FooterStatusGroup(
+                    FooterCompactStatusGroup(
                         appVersion = appVersion,
                         language = language,
                         secondsUntilRefresh = secondsUntilRefresh
@@ -67,7 +98,8 @@ fun FooterBar(
                     FooterActionGroup(
                         language = language,
                         onRefresh = onRefresh,
-                        onOpenSettings = onOpenSettings
+                        onOpenSettings = onOpenSettings,
+                        compact = true
                     )
                 }
             } else {
@@ -91,6 +123,55 @@ fun FooterBar(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FooterCompactStatusGroup(
+    appVersion: String,
+    language: AppLanguage,
+    secondsUntilRefresh: Int,
+    dense: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val countdown = formatRefreshCountdown(secondsUntilRefresh)
+    val refreshLabel = if (dense) {
+        countdown
+    } else if (language == AppLanguage.PT) {
+        "Próx. $countdown"
+    } else {
+        "Next $countdown"
+    }
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        FooterCompactBadge(text = "v$appVersion")
+        FooterCompactBadge(text = refreshLabel)
+    }
+}
+
+@Composable
+private fun FooterCompactBadge(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+        )
     }
 }
 
@@ -146,6 +227,8 @@ private fun FooterActionGroup(
     language: AppLanguage,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
+    compact: Boolean = false,
+    iconOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -153,20 +236,62 @@ private fun FooterActionGroup(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onRefresh) {
-            Text(
-                text = "↻",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+        FooterIconActionButton(
+            label = if (language == AppLanguage.PT) "Atualizar agora" else "Refresh now",
+            onClick = onRefresh
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Refresh,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
 
-        TextButton(onClick = onOpenSettings) {
-            Text(
-                text = if (language == AppLanguage.PT) "Configurações" else "Settings",
-                style = MaterialTheme.typography.labelLarge
-            )
+        if (iconOnly) {
+            FooterIconActionButton(
+                label = if (language == AppLanguage.PT) "Abrir configurações" else "Open settings",
+                onClick = onOpenSettings
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        } else {
+            TextButton(
+                onClick = onOpenSettings,
+                contentPadding = if (compact) {
+                    PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                } else {
+                    PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                }
+            ) {
+                Text(
+                    text = if (language == AppLanguage.PT) "Configurações" else "Settings",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun FooterIconActionButton(
+    label: String,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .height(34.dp)
+            .width(34.dp)
+            .semantics {
+                contentDescription = label
+            }
+    ) {
+        content()
     }
 }
 

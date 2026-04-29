@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +75,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+
+private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 
 @Composable
 fun ApiUsageCard(
@@ -372,6 +376,24 @@ private fun CompactQuotaSummary(
     showUsageDetails: Boolean,
     modifier: Modifier = Modifier
 ) {
+    if (quotas.size == 1) {
+        BoxWithConstraints(
+            modifier = modifier.fillMaxWidth(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            val badgeWidthFraction = if (maxWidth < 360.dp) 0.76f else 0.5f
+
+            CompactQuotaBadge(
+                source = source,
+                quota = quotas.first(),
+                showUsageDetails = showUsageDetails,
+                modifier = Modifier.fillMaxWidth(badgeWidthFraction)
+            )
+        }
+
+        return
+    }
+
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -402,6 +424,7 @@ private fun CompactQuotaBadge(
 ) {
     Column(
         modifier = modifier
+            .testTag(COMPACT_QUOTA_BADGE_TAG)
             .clip(RoundedCornerShape(18.dp))
             .background(accentColorFor(source = source).copy(alpha = 0.12f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -568,6 +591,14 @@ private fun historyActionLabel(language: AppLanguage): String {
 }
 
 private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
+    if (!quota.hasKnownResetAt) {
+        return if (language == AppLanguage.PT) {
+            "Janela de reset ainda não disponível"
+        } else {
+            "Reset window not available yet"
+        }
+    }
+
     val saoPauloTz = TimeZone.of("America/Sao_Paulo")
     val resetLocal = quota.periodEndAt.toLocalDateTime(saoPauloTz)
     val dayFormatted = when (resetLocal.dayOfWeek) {

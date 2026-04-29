@@ -1,5 +1,9 @@
 package com.usagemonitor.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -7,6 +11,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -33,8 +38,10 @@ import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Instant
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Testes de componente Compose para Desktop.
@@ -238,6 +245,48 @@ class ComponentTest {
     }
 
     @Test
+    fun `ApiUsageCard keeps a single compact quota narrower than the card`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(
+                    modifier = Modifier
+                        .width(640.dp)
+                        .testTag("cardHost")
+                ) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(
+                            QuotaInfo(
+                                label = "Claude 7d",
+                                used = 80L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                                periodType = PeriodType.WEEKLY,
+                                unit = UsageUnit.TOKENS,
+                                rawUsed = 32000L,
+                                rawTotal = 40000L
+                            )
+                        ),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        isMinimized = true,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {}
+                    )
+                }
+            }
+        }
+
+        val badgeWidth = onNodeWithTag("compactQuotaBadge").fetchSemanticsNode().boundsInRoot.width
+        val hostWidth = onNodeWithTag("cardHost").fetchSemanticsNode().boundsInRoot.width
+
+        assertTrue(badgeWidth < hostWidth * 0.7f)
+        onNodeWithText("Claude 7d").assertIsDisplayed()
+    }
+
+    @Test
     fun `PersistentApiWarningBanner shows title description and action`() = runDesktopComposeUiTest {
         var actionClicked = false
 
@@ -339,13 +388,15 @@ class ComponentTest {
     fun `FooterBar displays localized version and next update in PT`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                FooterBar(
-                    appVersion = "1.1.0",
-                    language = AppLanguage.PT,
-                    secondsUntilRefresh = 125,
-                    onRefresh = {},
-                    onOpenSettings = {}
-                )
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        secondsUntilRefresh = 125,
+                        onRefresh = {},
+                        onOpenSettings = {}
+                    )
+                }
             }
         }
 
@@ -363,17 +414,43 @@ class ComponentTest {
 
         setContent {
             AppTheme(isDark = true) {
-                FooterBar(
-                    appVersion = "1.1.0",
-                    language = AppLanguage.PT,
-                    secondsUntilRefresh = 125,
-                    onRefresh = {},
-                    onOpenSettings = { opened = true }
-                )
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        secondsUntilRefresh = 125,
+                        onRefresh = {},
+                        onOpenSettings = { opened = true }
+                    )
+                }
             }
         }
 
         onNodeWithText("Configurações").performClick()
+        assertEquals(true, opened)
+    }
+
+    @Test
+    fun `FooterBar keeps controls accessible in narrow width`() = runDesktopComposeUiTest {
+        var opened = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(320.dp)) {
+                    FooterBar(
+                        appVersion = "6.0.0",
+                        language = AppLanguage.PT,
+                        secondsUntilRefresh = 433,
+                        onRefresh = {},
+                        onOpenSettings = { opened = true }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("v6.0.0").assertIsDisplayed()
+        onNodeWithText("07:13").assertIsDisplayed()
+        onNodeWithContentDescription("Abrir configurações").performClick()
         assertEquals(true, opened)
     }
 
