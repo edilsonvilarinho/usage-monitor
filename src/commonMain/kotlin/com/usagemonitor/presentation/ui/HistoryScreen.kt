@@ -44,9 +44,17 @@ fun HistoryScreen(
     viewModel: HistoryViewModel,
     language: AppLanguage,
     onBack: () -> Unit,
+    focusedSource: ApiSource? = null,
+    showSourceSelector: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val selectedSourceForHeader = when (val current = state) {
+        is HistoryUiState.Empty -> current.selectedSource
+        is HistoryUiState.Error -> current.selectedSource
+        is HistoryUiState.Success -> current.selectedSource
+        HistoryUiState.Loading -> focusedSource
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -61,6 +69,8 @@ fun HistoryScreen(
         ) {
             HistoryHeader(
                 language = language,
+                selectedSource = selectedSourceForHeader,
+                showSourceSelector = showSourceSelector,
                 onBack = onBack
             )
 
@@ -103,6 +113,7 @@ fun HistoryScreen(
                         availableSources = current.availableSources,
                         selectedSource = current.selectedSource,
                         selectedRange = current.selectedRange,
+                        showSourceSelector = showSourceSelector,
                         language = language,
                         onSelectSource = viewModel::selectSource,
                         onSelectRange = viewModel::selectRange
@@ -141,6 +152,8 @@ fun HistoryScreen(
 @Composable
 private fun HistoryHeader(
     language: AppLanguage,
+    selectedSource: ApiSource?,
+    showSourceSelector: Boolean,
     onBack: () -> Unit
 ) {
     Row(
@@ -150,7 +163,11 @@ private fun HistoryHeader(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = if (language == AppLanguage.PT) "Histórico de uso" else "Usage history",
+                text = historyTitle(
+                    selectedSource = selectedSource,
+                    showSourceSelector = showSourceSelector,
+                    language = language
+                ),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold
@@ -167,7 +184,13 @@ private fun HistoryHeader(
         }
 
         TextButton(onClick = onBack) {
-            Text(if (language == AppLanguage.PT) "Voltar" else "Back")
+            Text(
+                if (showSourceSelector) {
+                    if (language == AppLanguage.PT) "Voltar" else "Back"
+                } else {
+                    if (language == AppLanguage.PT) "Fechar" else "Close"
+                }
+            )
         }
     }
 }
@@ -178,27 +201,30 @@ private fun HistoryControls(
     availableSources: List<ApiSource>,
     selectedSource: ApiSource,
     selectedRange: HistoryRange,
+    showSourceSelector: Boolean,
     language: AppLanguage,
     onSelectSource: (ApiSource) -> Unit,
     onSelectRange: (HistoryRange) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = if (language == AppLanguage.PT) "API" else "API",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                availableSources.forEach { source ->
-                    RangeChip(
-                        label = sourceLabel(source),
-                        selected = source == selectedSource,
-                        onClick = { onSelectSource(source) }
-                    )
+        if (showSourceSelector) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = if (language == AppLanguage.PT) "API" else "API",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableSources.forEach { source ->
+                        RangeChip(
+                            label = sourceLabel(source),
+                            selected = source == selectedSource,
+                            onClick = { onSelectSource(source) }
+                        )
+                    }
                 }
             }
         }
@@ -339,6 +365,22 @@ private fun sourceLabel(source: ApiSource): String {
         ApiSource.MINIMAX -> "MiniMax"
         ApiSource.CODEX -> "Codex"
     }
+}
+
+private fun historyTitle(
+    selectedSource: ApiSource?,
+    showSourceSelector: Boolean,
+    language: AppLanguage
+): String {
+    if (!showSourceSelector && selectedSource != null) {
+        return if (language == AppLanguage.PT) {
+            "Histórico do ${sourceLabel(selectedSource)}"
+        } else {
+            "${sourceLabel(selectedSource)} history"
+        }
+    }
+
+    return if (language == AppLanguage.PT) "Histórico de uso" else "Usage history"
 }
 
 private fun lastUpdatedLabel(lastUpdatedAt: Instant?, language: AppLanguage): String {

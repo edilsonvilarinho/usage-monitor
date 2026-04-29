@@ -34,6 +34,11 @@ class HistoryViewModel(
         }
     }
 
+    fun openForSource(source: ApiSource) {
+        selectedSource = source
+        refresh()
+    }
+
     fun selectSource(source: ApiSource) {
         if (source == selectedSource) {
             return
@@ -61,11 +66,7 @@ class HistoryViewModel(
 
         val enabledSources = enabledApis.value.sortedBy { it.ordinal }
         try {
-            val sourcesWithHistory = enabledSources.filter { source ->
-                !getUsageHistory(source, HistoryRange.LAST_30_DAYS).isEmpty
-            }
-
-            if (sourcesWithHistory.isEmpty()) {
+            if (enabledSources.isEmpty()) {
                 selectedSource = null
                 _uiState.value = HistoryUiState.Empty(
                     availableSources = emptyList(),
@@ -75,17 +76,17 @@ class HistoryViewModel(
                 return
             }
 
-            val resolvedSource = if (selectedSource in sourcesWithHistory) {
+            val resolvedSource = if (selectedSource in enabledSources) {
                 selectedSource
             } else {
-                sourcesWithHistory.first()
+                enabledSources.first()
             }
 
             selectedSource = resolvedSource
             val report = getUsageHistory(resolvedSource!!, selectedRange)
 
             _uiState.value = HistoryUiState.Success(
-                availableSources = sourcesWithHistory,
+                availableSources = enabledSources,
                 selectedSource = resolvedSource,
                 selectedRange = selectedRange,
                 report = report

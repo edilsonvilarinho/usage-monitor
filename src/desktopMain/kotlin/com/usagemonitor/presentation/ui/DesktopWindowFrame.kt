@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerMoveFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -77,11 +82,43 @@ fun WindowScope.DesktopDialogFrame(
     onCloseRequest: () -> Unit,
     content: @Composable () -> Unit
 ) {
+    var entered by remember(title) { mutableStateOf(false) }
+
+    LaunchedEffect(title) {
+        entered = false
+        entered = true
+    }
+
+    val frameAlpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(durationMillis = 220),
+        label = "dialogFrameAlpha"
+    )
+    val frameScale by animateFloatAsState(
+        targetValue = if (entered) 1f else 0.965f,
+        animationSpec = tween(durationMillis = 260),
+        label = "dialogFrameScale"
+    )
+    val frameOffsetY by animateDpAsState(
+        targetValue = if (entered) 0.dp else 18.dp,
+        animationSpec = tween(durationMillis = 260),
+        label = "dialogFrameOffsetY"
+    )
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = frameAlpha
+                    scaleX = frameScale
+                    scaleY = frameScale
+                    translationY = frameOffsetY.toPx()
+                }
+        ) {
             DesktopDialogTitleBar(
                 title = title,
                 iconPainter = iconPainter,

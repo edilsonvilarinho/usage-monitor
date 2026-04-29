@@ -159,6 +159,39 @@ class ComponentTest {
     }
 
     @Test
+    fun `ApiUsageCard opens history action`() = runDesktopComposeUiTest {
+        var opened = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex 5h",
+                            used = 57L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.REQUESTS
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    onOpenHistory = { opened = true }
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Abrir histórico").performClick()
+        assertEquals(true, opened)
+    }
+
+    @Test
     fun `ApiUsageCard shows compact quota labels when minimized`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
@@ -200,6 +233,7 @@ class ComponentTest {
         onNodeWithText("Claude 5h").assertIsDisplayed()
         onNodeWithText("Claude 7d").assertIsDisplayed()
         onNodeWithContentDescription("Atualizar").assertIsDisplayed()
+        onNodeWithContentDescription("Abrir histórico").assertIsDisplayed()
         onNodeWithContentDescription("Expandir card").assertIsDisplayed()
     }
 
@@ -310,7 +344,6 @@ class ComponentTest {
                     language = AppLanguage.PT,
                     secondsUntilRefresh = 125,
                     onRefresh = {},
-                    onOpenHistory = {},
                     onOpenSettings = {}
                 )
             }
@@ -321,6 +354,7 @@ class ComponentTest {
         onNodeWithText("Próxima atualização:").assertIsDisplayed()
         onNodeWithText("02:05").assertIsDisplayed()
         onNodeWithText("Configurações").assertIsDisplayed()
+        onAllNodesWithText("Histórico").assertCountEquals(0)
     }
 
     @Test
@@ -334,34 +368,12 @@ class ComponentTest {
                     language = AppLanguage.PT,
                     secondsUntilRefresh = 125,
                     onRefresh = {},
-                    onOpenHistory = {},
                     onOpenSettings = { opened = true }
                 )
             }
         }
 
         onNodeWithText("Configurações").performClick()
-        assertEquals(true, opened)
-    }
-
-    @Test
-    fun `FooterBar opens history action`() = runDesktopComposeUiTest {
-        var opened = false
-
-        setContent {
-            AppTheme(isDark = true) {
-                FooterBar(
-                    appVersion = "1.1.0",
-                    language = AppLanguage.PT,
-                    secondsUntilRefresh = 125,
-                    onRefresh = {},
-                    onOpenHistory = { opened = true },
-                    onOpenSettings = {}
-                )
-            }
-        }
-
-        onNodeWithText("Histórico").performClick()
         assertEquals(true, opened)
     }
 
@@ -498,7 +510,9 @@ class ComponentTest {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
-                    onBack = {}
+                    onBack = {},
+                    focusedSource = ApiSource.CODEX,
+                    showSourceSelector = false
                 )
             }
         }
@@ -510,8 +524,10 @@ class ComponentTest {
             }.getOrDefault(false)
         }
 
-        onNodeWithText("Histórico de uso").assertIsDisplayed()
+        onNodeWithText("Histórico do Codex").assertIsDisplayed()
         onNodeWithText("Codex 5h").assertIsDisplayed()
+        onAllNodesWithText("API").assertCountEquals(0)
+        onNodeWithText("Intervalo").assertIsDisplayed()
         onNodeWithText("Uso atual").assertIsDisplayed()
         onNodeWithText("50 / 100 req").assertIsDisplayed()
         viewModel.onDestroy()

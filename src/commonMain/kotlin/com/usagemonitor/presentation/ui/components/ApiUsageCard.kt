@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.CardDefaults
@@ -86,6 +87,7 @@ fun ApiUsageCard(
     language: AppLanguage,
     animationDelayMillis: Int,
     onRefresh: () -> Unit,
+    onOpenHistory: () -> Unit = {},
     onToggleMinimized: () -> Unit = {},
     onDragStart: () -> Unit = {},
     onDrag: (Offset) -> Unit = {},
@@ -270,6 +272,18 @@ fun ApiUsageCard(
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
+                        }
+
+                        CardIconActionButton(
+                            label = historyActionLabel(language = language),
+                            onClick = onOpenHistory
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.History,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
 
                         CardIconActionButton(
@@ -547,6 +561,10 @@ private fun minimizeActionLabel(isMinimized: Boolean, language: AppLanguage): St
     }
 
     return if (language == AppLanguage.PT) "Minimizar card" else "Minimize card"
+}
+
+private fun historyActionLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Abrir histórico" else "Open history"
 }
 
 private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {

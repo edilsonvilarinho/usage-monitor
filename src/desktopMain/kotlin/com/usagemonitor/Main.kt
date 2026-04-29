@@ -61,11 +61,6 @@ private const val AUTO_START_KEY = "autoStart"
 private const val CARD_ORDER_KEY = "cardOrder"
 private const val MINIMIZED_CARDS_KEY = "minimizedCards"
 
-private enum class AppScreen {
-    DASHBOARD,
-    HISTORY
-}
-
 private fun loadWindowIcon() = runCatching {
     val stream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH) ?: return@runCatching null
     stream.use { resourceStream ->
@@ -204,7 +199,7 @@ fun main() = application {
     }
     var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
-    var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
+    var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
 
     Window(
         onCloseRequest = {
@@ -230,44 +225,63 @@ fun main() = application {
                     exitProcess(0)
                 }
             ) {
-                when (currentScreen) {
-                    AppScreen.DASHBOARD -> DashboardScreen(
-                        viewModel = viewModel,
-                        appVersion = CURRENT_APP_VERSION,
-                        language = language,
-                        enabledApis = enabledApis,
-                        cardOrder = cardOrder,
-                        minimizedCards = minimizedCards,
-                        onMoveCardToIndex = { source, targetIndex ->
-                            val updatedOrder = moveVisibleCardToIndex(
-                                currentOrder = cardOrder,
-                                visibleSources = enabledApisState,
-                                source = source,
-                                targetIndex = targetIndex
-                            )
-                            cardOrder = updatedOrder
-                            writeApiSourceCollection(settings, CARD_ORDER_KEY, updatedOrder)
-                        },
-                        onToggleCardMinimized = { source ->
-                            val updatedMinimizedCards = if (source in minimizedCards) {
-                                minimizedCards - source
-                            } else {
-                                minimizedCards + source
-                            }
-                            minimizedCards = updatedMinimizedCards
-                            writeApiSourceCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
-                        },
-                        onOpenHistory = {
-                            currentScreen = AppScreen.HISTORY
-                            historyViewModel.refresh()
-                        },
-                        onOpenSettings = { isSettingsDialogOpen = true }
-                    )
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = CURRENT_APP_VERSION,
+                    language = language,
+                    enabledApis = enabledApis,
+                    cardOrder = cardOrder,
+                    minimizedCards = minimizedCards,
+                    onMoveCardToIndex = { source, targetIndex ->
+                        val updatedOrder = moveVisibleCardToIndex(
+                            currentOrder = cardOrder,
+                            visibleSources = enabledApisState,
+                            source = source,
+                            targetIndex = targetIndex
+                        )
+                        cardOrder = updatedOrder
+                        writeApiSourceCollection(settings, CARD_ORDER_KEY, updatedOrder)
+                    },
+                    onToggleCardMinimized = { source ->
+                        val updatedMinimizedCards = if (source in minimizedCards) {
+                            minimizedCards - source
+                        } else {
+                            minimizedCards + source
+                        }
+                        minimizedCards = updatedMinimizedCards
+                        writeApiSourceCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
+                    },
+                    onOpenHistory = { source ->
+                        historyDialogSource = source
+                        historyViewModel.openForSource(source)
+                    },
+                    onOpenSettings = { isSettingsDialogOpen = true }
+                )
+            }
+        }
+    }
 
-                    AppScreen.HISTORY -> HistoryScreen(
+    historyDialogSource?.let { source ->
+        DialogWindow(
+            onCloseRequest = { historyDialogSource = null },
+            title = historyWindowTitle(source, language),
+            icon = iconImage,
+            state = rememberDialogState(width = 860.dp, height = 760.dp),
+            resizable = true,
+            undecorated = true
+        ) {
+            AppTheme(isDark = isDark) {
+                DesktopDialogFrame(
+                    title = historyWindowTitle(source, language),
+                    iconPainter = iconImage,
+                    onCloseRequest = { historyDialogSource = null }
+                ) {
+                    HistoryScreen(
                         viewModel = historyViewModel,
                         language = language,
-                        onBack = { currentScreen = AppScreen.DASHBOARD }
+                        onBack = { historyDialogSource = null },
+                        focusedSource = source,
+                        showSourceSelector = false
                     )
                 }
             }
@@ -344,4 +358,18 @@ private fun writeApiSourceCollection(
         key,
         sources.joinToString(",") { source -> source.name }
     )
+}
+
+private fun historyWindowTitle(source: ApiSource, language: AppLanguage): String {
+    val sourceName = when (source) {
+        ApiSource.ANTHROPIC -> "Anthropic"
+        ApiSource.MINIMAX -> "MiniMax"
+        ApiSource.CODEX -> "Codex"
+    }
+
+    return if (language == AppLanguage.PT) {
+        "Histórico - $sourceName"
+    } else {
+        "History - $sourceName"
+    }
 }

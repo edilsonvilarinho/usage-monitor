@@ -63,7 +63,7 @@ fun DashboardScreen(
     minimizedCards: Set<ApiSource>,
     onMoveCardToIndex: (ApiSource, Int) -> Unit,
     onToggleCardMinimized: (ApiSource) -> Unit,
-    onOpenHistory: () -> Unit,
+    onOpenHistory: (ApiSource) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -106,7 +106,6 @@ fun DashboardScreen(
                 language = language,
                 secondsUntilRefresh = secondsUntilRefresh,
                 onRefresh = { viewModel.refresh() },
-                onOpenHistory = onOpenHistory,
                 onOpenSettings = onOpenSettings
             )
         },
@@ -152,6 +151,7 @@ fun DashboardScreen(
                                 onRefreshCard = { source -> viewModel.refresh(source) },
                                 onMoveCardToIndex = onMoveCardToIndex,
                                 onToggleCardMinimized = onToggleCardMinimized,
+                                onOpenHistoryCard = onOpenHistory,
                                 onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -250,6 +250,7 @@ private fun SuccessContent(
     onRefreshCard: (ApiSource) -> Unit,
     onMoveCardToIndex: (ApiSource, Int) -> Unit,
     onToggleCardMinimized: (ApiSource) -> Unit,
+    onOpenHistoryCard: (ApiSource) -> Unit,
     onRetryAnthropic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -307,6 +308,7 @@ private fun SuccessContent(
                 onRefreshCard = onRefreshCard,
                 onMoveCardToIndex = onMoveCardToIndex,
                 onToggleCardMinimized = onToggleCardMinimized,
+                onOpenHistoryCard = onOpenHistoryCard,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -331,6 +333,7 @@ private fun ResponsiveDashboardCardGrid(
     onRefreshCard: (ApiSource) -> Unit,
     onMoveCardToIndex: (ApiSource, Int) -> Unit,
     onToggleCardMinimized: (ApiSource) -> Unit,
+    onOpenHistoryCard: (ApiSource) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -387,6 +390,7 @@ private fun ResponsiveDashboardCardGrid(
                             language = language,
                             animationDelayMillis = index * 90,
                             onRefresh = { onRefreshCard(stats.source) },
+                            onOpenHistory = { onOpenHistoryCard(stats.source) },
                             onToggleMinimized = { onToggleCardMinimized(stats.source) },
                             onDragStart = {
                                 dragState = CardDragState(source = stats.source)
