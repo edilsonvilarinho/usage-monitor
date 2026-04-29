@@ -34,6 +34,8 @@ import com.usagemonitor.presentation.ui.DesktopDialogFrame
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
+import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -52,6 +54,12 @@ import kotlin.system.exitProcess
 
 private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+private const val ENABLED_APIS_KEY = "enabledApis"
+private const val IS_DARK_KEY = "isDark"
+private const val LANGUAGE_KEY = "language"
+private const val AUTO_START_KEY = "autoStart"
+private const val CARD_ORDER_KEY = "cardOrder"
+private const val MINIMIZED_CARDS_KEY = "minimizedCards"
 
 private enum class AppScreen {
     DASHBOARD,
@@ -91,16 +99,24 @@ fun main() = application {
     }
 
     val persistedApis = remember(settings) {
-        settings.getStringOrNull("enabledApis")
-            ?.split(",")
-            ?.filter { it.isNotBlank() }
-            ?.mapNotNull { runCatching { ApiSource.valueOf(it) }.getOrNull() }
-            ?.toSet()
-            ?: DEFAULT_ENABLED_APIS
+        readApiSourceCollection(settings, ENABLED_APIS_KEY)
+            .toSet()
+            .ifEmpty { DEFAULT_ENABLED_APIS }
+    }
+    val persistedCardOrder = remember(settings) {
+        normalizeCardOrder(readApiSourceCollection(settings, CARD_ORDER_KEY))
+    }
+    val persistedMinimizedCards = remember(settings) {
+        val storedValue = settings.getStringOrNull(MINIMIZED_CARDS_KEY)
+        if (storedValue == null) {
+            ApiSource.entries.toSet()
+        } else {
+            readApiSourceCollection(settings, MINIMIZED_CARDS_KEY).toSet()
+        }
     }
 
     val initialAutoStartEnabled = remember(settings) {
-        val storedAutoStartPreference = settings.getBoolean("autoStart", false)
+        val storedAutoStartPreference = settings.getBoolean(AUTO_START_KEY, false)
         val resolvedAutoStartEnabled = if (AutoStartManager.isAutoStartSupported()) {
             AutoStartManager.isAutoStartEnabled()
         } else {
@@ -108,13 +124,15 @@ fun main() = application {
         }
 
         if (storedAutoStartPreference != resolvedAutoStartEnabled) {
-            settings.putBoolean("autoStart", resolvedAutoStartEnabled)
+            settings.putBoolean(AUTO_START_KEY, resolvedAutoStartEnabled)
         }
 
         resolvedAutoStartEnabled
     }
 
     val enabledApis = remember { MutableStateFlow(persistedApis) }
+    var cardOrder by remember { mutableStateOf(persistedCardOrder) }
+    var minimizedCards by remember { mutableStateOf(persistedMinimizedCards) }
 
     val credentialDataSource = remember(httpClient) { LocalCredentialDataSource(httpClient) }
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
@@ -176,10 +194,10 @@ fun main() = application {
     val iconImage = remember { loadWindowIcon() }
     val mainWindowState = rememberWindowState()
     val enabledApisState by enabledApis.collectAsState()
-    var isDark by remember { mutableStateOf(settings.getBoolean("isDark", true)) }
+    var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
     var language by remember {
         mutableStateOf(
-            settings.getStringOrNull("language")
+            settings.getStringOrNull(LANGUAGE_KEY)
                 ?.let { runCatching { AppLanguage.valueOf(it) }.getOrNull() }
                 ?: AppLanguage.PT
         )
@@ -218,6 +236,27 @@ fun main() = application {
                         appVersion = CURRENT_APP_VERSION,
                         language = language,
                         enabledApis = enabledApis,
+                        cardOrder = cardOrder,
+                        minimizedCards = minimizedCards,
+                        onMoveCardToIndex = { source, targetIndex ->
+                            val updatedOrder = moveVisibleCardToIndex(
+                                currentOrder = cardOrder,
+                                visibleSources = enabledApisState,
+                                source = source,
+                                targetIndex = targetIndex
+                            )
+                            cardOrder = updatedOrder
+                            writeApiSourceCollection(settings, CARD_ORDER_KEY, updatedOrder)
+                        },
+                        onToggleCardMinimized = { source ->
+                            val updatedMinimizedCards = if (source in minimizedCards) {
+                                minimizedCards - source
+                            } else {
+                                minimizedCards + source
+                            }
+                            minimizedCards = updatedMinimizedCards
+                            writeApiSourceCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
+                        },
                         onOpenHistory = {
                             currentScreen = AppScreen.HISTORY
                             historyViewModel.refresh()
@@ -257,15 +296,15 @@ fun main() = application {
                         autoStartEnabled = autoStartEnabled,
                         onThemeToggle = {
                             isDark = !isDark
-                            settings.putBoolean("isDark", isDark)
+                            settings.putBoolean(IS_DARK_KEY, isDark)
                         },
                         onLanguageChange = { selectedLanguage ->
                             language = selectedLanguage
-                            settings.putString("language", selectedLanguage.name)
+                            settings.putString(LANGUAGE_KEY, selectedLanguage.name)
                         },
                         onAutoStartChange = { enabled ->
                             autoStartEnabled = enabled
-                            settings.putBoolean("autoStart", enabled)
+                            settings.putBoolean(AUTO_START_KEY, enabled)
                             AutoStartManager.setAutoStart(enabled)
                         },
                         onApiToggle = { api, checked ->
@@ -275,7 +314,7 @@ fun main() = application {
                                 enabledApis.value - api
                             }
                             enabledApis.value = updatedApis
-                            settings.putString("enabledApis", updatedApis.joinToString(",") { it.name })
+                            writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
                         },
                         onClose = { isSettingsDialogOpen = false }
                     )
@@ -283,4 +322,26 @@ fun main() = application {
             }
         }
     }
+}
+
+private fun readApiSourceCollection(
+    settings: PreferencesSettings,
+    key: String
+): List<ApiSource> {
+    return settings.getStringOrNull(key)
+        ?.split(",")
+        ?.filter { token -> token.isNotBlank() }
+        ?.mapNotNull { token -> runCatching { ApiSource.valueOf(token) }.getOrNull() }
+        ?: emptyList()
+}
+
+private fun writeApiSourceCollection(
+    settings: PreferencesSettings,
+    key: String,
+    sources: Collection<ApiSource>
+) {
+    settings.putString(
+        key,
+        sources.joinToString(",") { source -> source.name }
+    )
 }

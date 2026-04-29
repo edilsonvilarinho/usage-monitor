@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -7,10 +9,17 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,10 +28,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +54,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,6 +71,7 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 @Composable
 fun ApiUsageCard(
@@ -62,9 +80,16 @@ fun ApiUsageCard(
     quotas: List<QuotaInfo>,
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
+    isMinimized: Boolean = false,
+    isBeingDragged: Boolean = false,
+    isDragTarget: Boolean = false,
     language: AppLanguage,
     animationDelayMillis: Int,
     onRefresh: () -> Unit,
+    onToggleMinimized: () -> Unit = {},
+    onDragStart: () -> Unit = {},
+    onDrag: (Offset) -> Unit = {},
+    onDragEnd: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val orderedQuotas = buildList {
@@ -87,9 +112,15 @@ fun ApiUsageCard(
         animationSpec = tween(durationMillis = 550),
         label = "cardAlpha"
     )
+
     val cardScale by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.96f,
-        animationSpec = tween(durationMillis = 550),
+        targetValue = when {
+            isBeingDragged -> 1.02f
+            isDragTarget -> 0.99f
+            visible -> 1f
+            else -> 0.96f
+        },
+        animationSpec = tween(durationMillis = 240),
         label = "cardScale"
     )
     val cardOffsetY by animateDpAsState(
@@ -98,13 +129,23 @@ fun ApiUsageCard(
         label = "cardOffsetY"
     )
     val cardElevation by animateDpAsState(
-        targetValue = if (isRefreshing) 12.dp else 6.dp,
-        animationSpec = tween(durationMillis = 400),
+        targetValue = when {
+            isBeingDragged -> 18.dp
+            isRefreshing -> 12.dp
+            isDragTarget -> 9.dp
+            else -> 6.dp
+        },
+        animationSpec = tween(durationMillis = 240),
         label = "cardElevation"
     )
     val pulseAlpha by animateFloatAsState(
-        targetValue = if (isRefreshing) 0.22f else 0.12f,
-        animationSpec = tween(durationMillis = 400),
+        targetValue = when {
+            isBeingDragged -> 0.3f
+            isDragTarget -> 0.2f
+            isRefreshing -> 0.22f
+            else -> 0.12f
+        },
+        animationSpec = tween(durationMillis = 240),
         label = "pulseAlpha"
     )
     val shimmerProgress = if (isRefreshing) {
@@ -125,6 +166,17 @@ fun ApiUsageCard(
     ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(durationMillis = 240))
+            .pointerInput(source) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { onDragStart() },
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragEnd
+                ) { change, dragAmount ->
+                    change.consume()
+                    onDrag(dragAmount)
+                }
+            }
             .graphicsLayer {
                 alpha = cardAlpha
                 scaleX = cardScale
@@ -193,58 +245,212 @@ fun ApiUsageCard(
                         fontWeight = FontWeight.SemiBold
                     )
 
-                    FilledTonalButton(
-                        onClick = onRefresh,
-                        enabled = !isRefreshing,
-                        contentPadding = PaddingValues(
-                            horizontal = 10.dp,
-                            vertical = 8.dp
-                        )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (isRefreshing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-
-                        Text(
-                            text = refreshActionLabel(
+                        CardIconActionButton(
+                            label = refreshActionLabel(
                                 isRefreshing = isRefreshing,
                                 language = language
                             ),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                            onClick = onRefresh,
+                            enabled = !isRefreshing
+                        ) {
+                            if (isRefreshing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+
+                        CardIconActionButton(
+                            label = minimizeActionLabel(
+                                isMinimized = isMinimized,
+                                language = language
+                            ),
+                            onClick = onToggleMinimized
+                        ) {
+                            Icon(
+                                imageVector = if (isMinimized) {
+                                    Icons.Rounded.Add
+                                } else {
+                                    Icons.Rounded.Remove
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    for (index in orderedQuotas.indices) {
-                        val quota = orderedQuotas[index]
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.TopCenter
-                        ) {
-                            QuotaColumn(
-                                quota = quota,
-                                showUsageDetails = showUsageDetails,
-                                language = language
-                            )
-                        }
-
-                        if (index != orderedQuotas.lastIndex) {
-                            Spacer(modifier = Modifier.width(14.dp))
-                        }
+                AnimatedContent(
+                    targetState = isMinimized,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(durationMillis = 220, delayMillis = 50)) +
+                            scaleIn(
+                                animationSpec = tween(durationMillis = 240),
+                                initialScale = 0.97f
+                            )).togetherWith(
+                            fadeOut(animationSpec = tween(durationMillis = 140)) +
+                                scaleOut(
+                                    animationSpec = tween(durationMillis = 180),
+                                    targetScale = 0.98f
+                                )
+                        ).using(SizeTransform(clip = false))
+                    },
+                    label = "cardLayoutMode"
+                ) { minimized ->
+                    if (minimized) {
+                        CompactQuotaSummary(
+                            source = source,
+                            quotas = orderedQuotas,
+                            showUsageDetails = showUsageDetails
+                        )
+                    } else {
+                        ExpandedQuotaSummary(
+                            quotas = orderedQuotas,
+                            showUsageDetails = showUsageDetails,
+                            language = language
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardIconActionButton(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(34.dp)
+            .semantics {
+                contentDescription = label
+            }
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun CompactQuotaSummary(
+    source: ApiSource,
+    quotas: List<QuotaInfo>,
+    showUsageDetails: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        quotas.forEach { quota ->
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                CompactQuotaBadge(
+                    source = source,
+                    quota = quota,
+                    showUsageDetails = showUsageDetails,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactQuotaBadge(
+    source: ApiSource,
+    quota: QuotaInfo,
+    showUsageDetails: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(accentColorFor(source = source).copy(alpha = 0.12f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = quota.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = compactPercentageLabel(quota),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+
+        if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = formatUsage(quota),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExpandedQuotaSummary(
+    quotas: List<QuotaInfo>,
+    showUsageDetails: Boolean,
+    language: AppLanguage,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Top
+    ) {
+        for (index in quotas.indices) {
+            val quota = quotas[index]
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                QuotaColumn(
+                    quota = quota,
+                    showUsageDetails = showUsageDetails,
+                    language = language
+                )
+            }
+
+            if (index != quotas.lastIndex) {
+                Spacer(modifier = Modifier.width(14.dp))
             }
         }
     }
@@ -335,6 +541,14 @@ private fun refreshActionLabel(isRefreshing: Boolean, language: AppLanguage): St
     }
 }
 
+private fun minimizeActionLabel(isMinimized: Boolean, language: AppLanguage): String {
+    if (isMinimized) {
+        return if (language == AppLanguage.PT) "Expandir card" else "Expand card"
+    }
+
+    return if (language == AppLanguage.PT) "Minimizar card" else "Minimize card"
+}
+
 private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
     val saoPauloTz = TimeZone.of("America/Sao_Paulo")
     val resetLocal = quota.periodEndAt.toLocalDateTime(saoPauloTz)
@@ -353,6 +567,14 @@ private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
     } else {
         "Reset: $dayFormatted ${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')} BRT"
     }
+}
+
+private fun compactPercentageLabel(quota: QuotaInfo): String {
+    if (quota.unit == UsageUnit.PERCENTAGE) {
+        return "${quota.used}%"
+    }
+
+    return "${(quota.percentageUsed * 100).roundToInt()}%"
 }
 
 private fun formatUsage(quota: QuotaInfo): String {

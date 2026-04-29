@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -155,6 +156,51 @@ class ComponentTest {
         onNodeWithText("MiniMax").assertIsDisplayed()
         onNodeWithText("26%").assertIsDisplayed()
         onNodeWithText("12/45 req").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard shows compact quota labels when minimized`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS,
+                            rawUsed = 1800L,
+                            rawTotal = 4000L
+                        ),
+                        QuotaInfo(
+                            label = "Claude 7d",
+                            used = 80L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.TOKENS,
+                            rawUsed = 32000L,
+                            rawTotal = 40000L
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    isMinimized = true,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Claude 5h").assertIsDisplayed()
+        onNodeWithText("Claude 7d").assertIsDisplayed()
+        onNodeWithContentDescription("Atualizar").assertIsDisplayed()
+        onNodeWithContentDescription("Expandir card").assertIsDisplayed()
     }
 
     @Test
