@@ -3,10 +3,7 @@ package com.usagemonitor.presentation.ui
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -33,6 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -45,7 +44,6 @@ import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.flow.StateFlow
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
@@ -223,7 +221,6 @@ private fun ErrorContent(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SuccessContent(
     apiStatsList: List<ApiUsageStats>,
@@ -277,35 +274,15 @@ private fun SuccessContent(
                 }
             }
 
-            BoxWithConstraints(
+            ResponsiveDashboardCardGrid(
+                items = items,
+                refreshingSources = refreshingSources,
+                language = language,
+                onRefreshCard = onRefreshCard,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-            ) {
-                val compact = maxWidth < 720.dp
-                val cardMaxWidth = if (compact) maxWidth else (maxWidth - 16.dp) / 2
-
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    maxItemsInEachRow = if (compact) 1 else 2,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items.forEachIndexed { index, stats ->
-                        ApiUsageCard(
-                            source = stats.source,
-                            apiName = stats.apiName,
-                            quotas = stats.quotas,
-                            showUsageDetails = stats.source != ApiSource.ANTHROPIC,
-                            isRefreshing = stats.source in refreshingSources,
-                            language = language,
-                            animationDelayMillis = index * 90,
-                            onRefresh = { onRefreshCard(stats.source) },
-                            modifier = Modifier.widthIn(max = cardMaxWidth)
-                        )
-                    }
-                }
-            }
+            )
         }
 
         VerticalScrollbar(
@@ -314,6 +291,77 @@ private fun SuccessContent(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
         )
+    }
+}
+
+@Composable
+private fun ResponsiveDashboardCardGrid(
+    items: List<ApiUsageStats>,
+    refreshingSources: Set<ApiSource>,
+    language: AppLanguage,
+    onRefreshCard: (ApiSource) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val spacingPx = with(density) { 16.dp.roundToPx() }
+    val compactThresholdPx = with(density) { 720.dp.roundToPx() }
+
+    Layout(
+        modifier = modifier,
+        content = {
+            items.forEachIndexed { index, stats ->
+                ApiUsageCard(
+                    source = stats.source,
+                    apiName = stats.apiName,
+                    quotas = stats.quotas,
+                    showUsageDetails = stats.source != ApiSource.ANTHROPIC,
+                    isRefreshing = stats.source in refreshingSources,
+                    language = language,
+                    animationDelayMillis = index * 90,
+                    onRefresh = { onRefreshCard(stats.source) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    ) { measurables, constraints ->
+        if (measurables.isEmpty()) {
+            return@Layout layout(width = constraints.maxWidth, height = 0) {}
+        }
+
+        val columns = if (constraints.maxWidth < compactThresholdPx) 1 else 2
+        val totalSpacing = spacingPx * (columns - 1)
+        val itemWidth = ((constraints.maxWidth - totalSpacing).coerceAtLeast(0)) / columns
+        val childConstraints = constraints.copy(
+            minWidth = itemWidth,
+            maxWidth = itemWidth,
+            minHeight = 0
+        )
+        val placeables = measurables.map { measurable -> measurable.measure(childConstraints) }
+        val rowHeights = placeables
+            .chunked(columns)
+            .map { row -> row.maxOf { placeable -> placeable.height } }
+        val layoutHeight = rowHeights.sum() + spacingPx * (rowHeights.size - 1).coerceAtLeast(0)
+
+        layout(width = constraints.maxWidth, height = layoutHeight) {
+            var yPosition = 0
+            var itemIndex = 0
+
+            rowHeights.forEach { rowHeight ->
+                for (columnIndex in 0 until columns) {
+                    if (itemIndex >= placeables.size) {
+                        break
+                    }
+
+                    placeables[itemIndex].placeRelative(
+                        x = columnIndex * (itemWidth + spacingPx),
+                        y = yPosition
+                    )
+                    itemIndex++
+                }
+
+                yPosition += rowHeight + spacingPx
+            }
+        }
     }
 }
 

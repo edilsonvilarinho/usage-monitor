@@ -30,6 +30,7 @@ import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
+import com.usagemonitor.presentation.ui.DesktopDialogFrame
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -240,38 +241,45 @@ fun main() = application {
             title = if (language == AppLanguage.PT) "Configurações" else "Settings",
             icon = iconImage,
             state = rememberDialogState(width = 460.dp, height = 420.dp),
-            resizable = false
+            resizable = false,
+            undecorated = true
         ) {
             AppTheme(isDark = isDark) {
-                SettingsDialogContent(
-                    currentTheme = if (isDark) ThemeMode.DARK else ThemeMode.LIGHT,
-                    currentLanguage = language,
-                    enabledApis = enabledApisState,
-                    autoStartEnabled = autoStartEnabled,
-                    onThemeToggle = {
-                        isDark = !isDark
-                        settings.putBoolean("isDark", isDark)
-                    },
-                    onLanguageChange = { selectedLanguage ->
-                        language = selectedLanguage
-                        settings.putString("language", selectedLanguage.name)
-                    },
-                    onAutoStartChange = { enabled ->
-                        autoStartEnabled = enabled
-                        settings.putBoolean("autoStart", enabled)
-                        AutoStartManager.setAutoStart(enabled)
-                    },
-                    onApiToggle = { api, checked ->
-                        val updatedApis = if (checked) {
-                            enabledApis.value + api
-                        } else {
-                            enabledApis.value - api
-                        }
-                        enabledApis.value = updatedApis
-                        settings.putString("enabledApis", updatedApis.joinToString(",") { it.name })
-                    },
-                    onClose = { isSettingsDialogOpen = false }
-                )
+                DesktopDialogFrame(
+                    title = if (language == AppLanguage.PT) "Configurações" else "Settings",
+                    iconPainter = iconImage,
+                    onCloseRequest = { isSettingsDialogOpen = false }
+                ) {
+                    SettingsDialogContent(
+                        currentTheme = if (isDark) ThemeMode.DARK else ThemeMode.LIGHT,
+                        currentLanguage = language,
+                        enabledApis = enabledApisState,
+                        autoStartEnabled = autoStartEnabled,
+                        onThemeToggle = {
+                            isDark = !isDark
+                            settings.putBoolean("isDark", isDark)
+                        },
+                        onLanguageChange = { selectedLanguage ->
+                            language = selectedLanguage
+                            settings.putString("language", selectedLanguage.name)
+                        },
+                        onAutoStartChange = { enabled ->
+                            autoStartEnabled = enabled
+                            settings.putBoolean("autoStart", enabled)
+                            AutoStartManager.setAutoStart(enabled)
+                        },
+                        onApiToggle = { api, checked ->
+                            val updatedApis = if (checked) {
+                                enabledApis.value + api
+                            } else {
+                                enabledApis.value - api
+                            }
+                            enabledApis.value = updatedApis
+                            settings.putString("enabledApis", updatedApis.joinToString(",") { it.name })
+                        },
+                        onClose = { isSettingsDialogOpen = false }
+                    )
+                }
             }
         }
     }

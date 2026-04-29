@@ -107,18 +107,20 @@ fun ApiUsageCard(
         animationSpec = tween(durationMillis = 400),
         label = "pulseAlpha"
     )
-    val shimmerTransition = rememberInfiniteTransition(label = "cardShimmer")
-    val shimmerProgress by shimmerTransition.animateFloat(
-        initialValue = -1f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = if (isRefreshing) 1500 else 3200
-            ),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerProgress"
-    )
+    val shimmerProgress = if (isRefreshing) {
+        rememberInfiniteTransition(label = "cardShimmer")
+            .animateFloat(
+                initialValue = -1f,
+                targetValue = 2f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1500),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "shimmerProgress"
+            ).value
+    } else {
+        0f
+    }
 
     ElevatedCard(
         modifier = modifier
@@ -149,21 +151,27 @@ fun ApiUsageCard(
                         startY = 0f,
                         endY = size.height * 0.7f
                     )
-                    val streakStartX = size.width * shimmerProgress
-                    val streakBrush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            accentColor.copy(alpha = if (isRefreshing) 0.34f else 0.18f),
-                            Color.Transparent
-                        ),
-                        start = Offset(streakStartX - size.width * 0.4f, 0f),
-                        end = Offset(streakStartX, size.height)
-                    )
+                    val streakBrush = if (isRefreshing) {
+                        val streakStartX = size.width * shimmerProgress
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                accentColor.copy(alpha = 0.34f),
+                                Color.Transparent
+                            ),
+                            start = Offset(streakStartX - size.width * 0.4f, 0f),
+                            end = Offset(streakStartX, size.height)
+                        )
+                    } else {
+                        null
+                    }
 
                     onDrawWithContent {
                         drawContent()
                         drawRect(brush = topGlow)
-                        drawRect(brush = streakBrush)
+                        if (streakBrush != null) {
+                            drawRect(brush = streakBrush)
+                        }
                     }
                 }
         ) {

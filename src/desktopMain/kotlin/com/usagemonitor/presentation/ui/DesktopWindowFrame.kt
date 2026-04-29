@@ -71,6 +71,35 @@ fun WindowScope.DesktopWindowFrame(
 }
 
 @Composable
+fun WindowScope.DesktopDialogFrame(
+    title: String,
+    iconPainter: Painter?,
+    onCloseRequest: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            DesktopDialogTitleBar(
+                title = title,
+                iconPainter = iconPainter,
+                onCloseRequest = onCloseRequest
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
 private fun WindowScope.DesktopTitleBar(
     title: String,
     iconPainter: Painter?,
@@ -132,6 +161,54 @@ private fun WindowScope.DesktopTitleBar(
                     onClick = onCloseRequest
                 )
             }
+        }
+    }
+
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+}
+
+@Composable
+private fun WindowScope.DesktopDialogTitleBar(
+    title: String,
+    iconPainter: Painter?,
+    onCloseRequest: () -> Unit
+) {
+    WindowDraggableArea {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(start = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (iconPainter != null) {
+                    Icon(
+                        painter = iconPainter,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.Unspecified
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            TitleBarButton(
+                label = "×",
+                hoverColor = Color(0xFFC62828),
+                onClick = onCloseRequest
+            )
         }
     }
 
