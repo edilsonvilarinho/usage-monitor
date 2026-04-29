@@ -77,6 +77,7 @@ class ComponentTest {
         setContent {
             AppTheme(isDark = true) {
                 ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
                     quotas = listOf(
                         QuotaInfo(
@@ -101,7 +102,10 @@ class ComponentTest {
                         )
                     ),
                     showUsageDetails = false,
-                    language = AppLanguage.PT
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
                 )
             }
         }
@@ -119,6 +123,7 @@ class ComponentTest {
         setContent {
             AppTheme(isDark = true) {
                 ApiUsageCard(
+                    source = ApiSource.MINIMAX,
                     apiName = "MiniMax",
                     quotas = listOf(
                         QuotaInfo(
@@ -131,7 +136,10 @@ class ComponentTest {
                         )
                     ),
                     showUsageDetails = true,
-                    language = AppLanguage.PT
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
                 )
             }
         }

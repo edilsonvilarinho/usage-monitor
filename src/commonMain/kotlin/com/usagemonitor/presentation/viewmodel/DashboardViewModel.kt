@@ -14,7 +14,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private const val POLL_INTERVAL_SECONDS = 600
 
@@ -30,15 +33,23 @@ class DashboardViewModel(
     private val _secondsUntilRefresh = MutableStateFlow(POLL_INTERVAL_SECONDS)
     val secondsUntilRefresh: StateFlow<Int> = _secondsUntilRefresh.asStateFlow()
 
+    private val _refreshingSources = MutableStateFlow<Set<ApiSource>>(emptySet())
+    val refreshingSources: StateFlow<Set<ApiSource>> = _refreshingSources.asStateFlow()
+
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val stateMutex = Mutex()
+    private val cachedStatsBySource = mutableMapOf<ApiSource, ApiUsageStats>()
+    private val cachedErrorsBySource = mutableMapOf<ApiSource, String>()
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
 
     init {
-        initFetchJob = viewModelScope.launch { fetchUsage() }
+        initFetchJob = viewModelScope.launch {
+            fetchUsage(targetSources = enabledApis.value)
+        }
         startCountdown()
     }
 
@@ -51,64 +62,73 @@ class DashboardViewModel(
                     _secondsUntilRefresh.value = secondsLeft
                     delay(1_000L)
                 }
-                viewModelScope.launch { fetchUsage() }
+                viewModelScope.launch {
+                    fetchUsage(targetSources = enabledApis.value)
+                }
             }
         }
     }
 
-    private suspend fun fetchUsage() {
-        val stats = mutableListOf<ApiUsageStats>()
-        val errors = mutableListOf<String>()
+    private suspend fun fetchUsage(
+        targetSources: Set<ApiSource>,
+        preserveDataOnFailure: Boolean = false
+    ) {
         val enabled = enabledApis.value
+        val effectiveSources = targetSources.filterTo(linkedSetOf()) { source -> source in enabled }
 
-        if (ApiSource.ANTHROPIC in enabled) {
-            getAnthropicUsage()
-                .onSuccess { stats.add(it) }
-                .onFailure { err ->
-                    if (err.message?.contains("429") == true) {
-                        _toastMessage.value = "RATE_LIMIT:ANTHROPIC"
-                    } else {
-                        val msg = err.message ?: "erro desconhecido"
-                        _toastMessage.value = "ERROR:ANTHROPIC:${msg.replace(":", "_")}"
-                        errors.add("Anthropic: $msg")
-                    }
-                }
+        if (effectiveSources.isEmpty()) {
+            stateMutex.withLock {
+                publishUiState(enabled)
+            }
+            return
         }
 
-        if (ApiSource.MINIMAX in enabled) {
-            getMiniMaxUsage()
-                .onSuccess { stats.add(it) }
-                .onFailure { err ->
-                    if (err.message?.contains("429") == true) {
-                        _toastMessage.value = "RATE_LIMIT:MINIMAX"
+        markRefreshing(effectiveSources, refreshing = true)
+
+        val statsUpdates = mutableMapOf<ApiSource, ApiUsageStats>()
+        val errorUpdates = mutableMapOf<ApiSource, String?>()
+
+        try {
+            effectiveSources.forEach { source ->
+                fetchSource(source)
+                    .onSuccess { stats ->
+                        statsUpdates[source] = stats
+                        errorUpdates[source] = null
+                    }
+                    .onFailure { error ->
+                        errorUpdates[source] = handleSourceFailure(source, error)
+                    }
+            }
+
+            stateMutex.withLock {
+                val latestEnabledSources = enabledApis.value
+                pruneDisabledSources(latestEnabledSources)
+
+                effectiveSources.forEach { source ->
+                    val stats = statsUpdates[source]
+
+                    if (stats != null) {
+                        cachedStatsBySource[source] = stats
+                        cachedErrorsBySource.remove(source)
                     } else {
-                        val msg = err.message ?: "erro desconhecido"
-                        _toastMessage.value = "ERROR:MINIMAX:${msg.replace(":", "_")}"
-                        errors.add("MiniMax: $msg")
+                        val shouldRemoveData = !preserveDataOnFailure || source !in cachedStatsBySource
+                        if (shouldRemoveData) {
+                            cachedStatsBySource.remove(source)
+                        }
+
+                        val errorMessage = errorUpdates[source]
+                        if (errorMessage == null) {
+                            cachedErrorsBySource.remove(source)
+                        } else {
+                            cachedErrorsBySource[source] = errorMessage
+                        }
                     }
                 }
-        }
 
-        if (ApiSource.CODEX in enabled) {
-            getCodexUsage()
-                .onSuccess { stats.add(it) }
-                .onFailure { err ->
-                    if (err.message?.contains("429") == true) {
-                        _toastMessage.value = "RATE_LIMIT:CODEX"
-                    } else {
-                        val msg = err.message ?: "erro desconhecido"
-                        _toastMessage.value = "ERROR:CODEX:${msg.replace(":", "_")}"
-                        errors.add("Codex: $msg")
-                    }
-                }
-        }
-
-        println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
-
-        _uiState.value = if (stats.isNotEmpty()) {
-            UiState.Success(stats, errors)
-        } else {
-            UiState.Error(errors.joinToString("\n"))
+                publishUiState(latestEnabledSources)
+            }
+        } finally {
+            markRefreshing(effectiveSources, refreshing = false)
         }
     }
 
@@ -118,7 +138,23 @@ class DashboardViewModel(
 
     fun refresh() {
         startCountdown()
-        viewModelScope.launch { fetchUsage() }
+        viewModelScope.launch {
+            fetchUsage(targetSources = enabledApis.value)
+        }
+    }
+
+    fun refresh(source: ApiSource) {
+        if (source !in enabledApis.value) {
+            return
+        }
+
+        startCountdown()
+        viewModelScope.launch {
+            fetchUsage(
+                targetSources = setOf(source),
+                preserveDataOnFailure = true
+            )
+        }
     }
 
     fun cancelCountdown() {
@@ -132,5 +168,65 @@ class DashboardViewModel(
     fun onDestroy() {
         cancelCountdown()
         viewModelScope.cancel()
+    }
+
+    private suspend fun fetchSource(source: ApiSource): Result<ApiUsageStats> {
+        return when (source) {
+            ApiSource.ANTHROPIC -> getAnthropicUsage()
+            ApiSource.MINIMAX -> getMiniMaxUsage()
+            ApiSource.CODEX -> getCodexUsage()
+        }
+    }
+
+    private fun handleSourceFailure(source: ApiSource, error: Throwable): String? {
+        if (error.message?.contains("429") == true) {
+            _toastMessage.value = "RATE_LIMIT:${source.name}"
+            return null
+        }
+
+        val message = error.message ?: "erro desconhecido"
+        _toastMessage.value = "ERROR:${source.name}:${message.replace(":", "_")}"
+        return "${sourceLabel(source)}: $message"
+    }
+
+    private fun publishUiState(enabledSources: Set<ApiSource>) {
+        val stats = enabledSources
+            .sortedBy { source -> source.ordinal }
+            .mapNotNull { source -> cachedStatsBySource[source] }
+
+        val errors = enabledSources
+            .sortedBy { source -> source.ordinal }
+            .mapNotNull { source -> cachedErrorsBySource[source] }
+
+        println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
+
+        _uiState.value = if (stats.isNotEmpty()) {
+            UiState.Success(stats, errors)
+        } else {
+            UiState.Error(errors.joinToString("\n"))
+        }
+    }
+
+    private fun pruneDisabledSources(enabledSources: Set<ApiSource>) {
+        cachedStatsBySource.keys.removeAll { source -> source !in enabledSources }
+        cachedErrorsBySource.keys.removeAll { source -> source !in enabledSources }
+    }
+
+    private fun markRefreshing(sources: Set<ApiSource>, refreshing: Boolean) {
+        _refreshingSources.update { current ->
+            if (refreshing) {
+                current + sources
+            } else {
+                current - sources
+            }
+        }
+    }
+
+    private fun sourceLabel(source: ApiSource): String {
+        return when (source) {
+            ApiSource.ANTHROPIC -> "Anthropic"
+            ApiSource.MINIMAX -> "MiniMax"
+            ApiSource.CODEX -> "Codex"
+        }
     }
 }

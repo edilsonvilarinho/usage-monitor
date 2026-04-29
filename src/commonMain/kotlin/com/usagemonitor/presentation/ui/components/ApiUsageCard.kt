@@ -1,29 +1,51 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -31,13 +53,18 @@ import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.delay
 
 @Composable
 fun ApiUsageCard(
+    source: ApiSource,
     apiName: String,
     quotas: List<QuotaInfo>,
     showUsageDetails: Boolean,
+    isRefreshing: Boolean,
     language: AppLanguage,
+    animationDelayMillis: Int,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val orderedQuotas = buildList {
@@ -47,48 +74,167 @@ fun ApiUsageCard(
             .forEach(::add)
     }
 
+    var visible by remember(source) { mutableStateOf(false) }
+
+    LaunchedEffect(source) {
+        visible = false
+        delay(animationDelayMillis.toLong())
+        visible = true
+    }
+
+    val cardAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 550),
+        label = "cardAlpha"
+    )
+    val cardScale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.96f,
+        animationSpec = tween(durationMillis = 550),
+        label = "cardScale"
+    )
+    val cardOffsetY by animateDpAsState(
+        targetValue = if (visible) 0.dp else 18.dp,
+        animationSpec = tween(durationMillis = 550),
+        label = "cardOffsetY"
+    )
+    val cardElevation by animateDpAsState(
+        targetValue = if (isRefreshing) 12.dp else 6.dp,
+        animationSpec = tween(durationMillis = 400),
+        label = "cardElevation"
+    )
+    val pulseAlpha by animateFloatAsState(
+        targetValue = if (isRefreshing) 0.22f else 0.12f,
+        animationSpec = tween(durationMillis = 400),
+        label = "pulseAlpha"
+    )
+    val shimmerTransition = rememberInfiniteTransition(label = "cardShimmer")
+    val shimmerProgress by shimmerTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (isRefreshing) 1500 else 3200
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerProgress"
+    )
+
     ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = cardAlpha
+                scaleX = cardScale
+                scaleY = cardScale
+                translationY = cardOffsetY.toPx()
+            },
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = cardContainerColor()
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = cardElevation)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .clip(RoundedCornerShape(22.dp))
+                .drawWithCache {
+                    val accentColor = accentColorFor(source = source).copy(alpha = pulseAlpha)
+                    val topGlow = Brush.verticalGradient(
+                        colors = listOf(
+                            accentColor,
+                            Color.Transparent
+                        ),
+                        startY = 0f,
+                        endY = size.height * 0.7f
+                    )
+                    val streakStartX = size.width * shimmerProgress
+                    val streakBrush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            accentColor.copy(alpha = if (isRefreshing) 0.34f else 0.18f),
+                            Color.Transparent
+                        ),
+                        start = Offset(streakStartX - size.width * 0.4f, 0f),
+                        end = Offset(streakStartX, size.height)
+                    )
+
+                    onDrawWithContent {
+                        drawContent()
+                        drawRect(brush = topGlow)
+                        drawRect(brush = streakBrush)
+                    }
+                }
         ) {
-            Text(
-                text = apiName,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Top
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                orderedQuotas.forEachIndexed { index, quota ->
-                    Box(
-                        modifier = Modifier.weight(1f),
-                        contentAlignment = Alignment.TopCenter
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = apiName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    FilledTonalButton(
+                        onClick = onRefresh,
+                        enabled = !isRefreshing,
+                        contentPadding = PaddingValues(
+                            horizontal = 10.dp,
+                            vertical = 8.dp
+                        )
                     ) {
-                        QuotaColumn(
-                            quota = quota,
-                            showUsageDetails = showUsageDetails,
-                            language = language
+                        if (isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+
+                        Text(
+                            text = refreshActionLabel(
+                                isRefreshing = isRefreshing,
+                                language = language
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
+                }
 
-                    if (index != orderedQuotas.lastIndex) {
-                        Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    for (index in orderedQuotas.indices) {
+                        val quota = orderedQuotas[index]
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            QuotaColumn(
+                                quota = quota,
+                                showUsageDetails = showUsageDetails,
+                                language = language
+                            )
+                        }
+
+                        if (index != orderedQuotas.lastIndex) {
+                            Spacer(modifier = Modifier.width(14.dp))
+                        }
                     }
                 }
             }
@@ -162,6 +308,22 @@ private fun cardContainerColor(): Color {
         scheme.surface.copy(alpha = 0.98f)
     } else {
         scheme.surface
+    }
+}
+
+private fun accentColorFor(source: ApiSource): Color {
+    return when (source) {
+        ApiSource.ANTHROPIC -> Color(0xFF4F8CFF)
+        ApiSource.MINIMAX -> Color(0xFFFF8A3D)
+        ApiSource.CODEX -> Color(0xFF27BFA3)
+    }
+}
+
+private fun refreshActionLabel(isRefreshing: Boolean, language: AppLanguage): String {
+    return if (isRefreshing) {
+        if (language == AppLanguage.PT) "Atualizando" else "Refreshing"
+    } else {
+        if (language == AppLanguage.PT) "Atualizar" else "Refresh"
     }
 }
 

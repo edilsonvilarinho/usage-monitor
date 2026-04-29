@@ -14,9 +14,8 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -143,6 +142,15 @@ class DashboardViewModelTest {
         return viewModel.uiState.value
     }
 
+    private suspend fun awaitCondition(predicate: () -> Boolean) {
+        repeat(80) {
+            if (predicate()) {
+                return
+            }
+            delay(20)
+        }
+    }
+
     @Test
     fun `initial state is Loading`() {
         val viewModel = successViewModel()
@@ -190,6 +198,69 @@ class DashboardViewModelTest {
         val anthropicData = state.data.first { it.apiName == "Anthropic" }
         val minimaxData = state.data.first { it.apiName == "MiniMax" }
         assertEquals(50000L, anthropicData.quotas[0].used)
+        assertEquals(2223L, minimaxData.quotas[0].used)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `refreshing one source updates only that card and resets countdown`() = runTest {
+        var anthropicCalls = 0
+        var minimaxCalls = 0
+
+        val updatedAnthropicStats = sampleAnthropicStats.copy(
+            quotas = listOf(
+                sampleAnthropicStats.quotas[0].copy(
+                    used = 75000L,
+                    rawUsed = 75000L
+                )
+            )
+        )
+
+        var anthropicResult = Result.success(sampleAnthropicStats)
+
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                anthropicCalls += 1
+                return anthropicResult
+            }
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                minimaxCalls += 1
+                return Result.success(sampleMiniMaxStats)
+            }
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            defaultEnabledApis
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+        awaitCondition { anthropicCalls >= 1 && minimaxCalls >= 1 }
+        awaitSettledState(viewModel)
+        val anthropicCallsAfterGlobalRefresh = anthropicCalls
+        val minimaxCallsAfterGlobalRefresh = minimaxCalls
+
+        anthropicResult = Result.success(updatedAnthropicStats)
+        viewModel.refresh(ApiSource.ANTHROPIC)
+
+        awaitCondition { anthropicCalls == anthropicCallsAfterGlobalRefresh + 1 }
+        assertEquals(minimaxCallsAfterGlobalRefresh, minimaxCalls)
+        assertEquals(600, viewModel.secondsUntilRefresh.value)
+
+        val state = awaitSettledState(viewModel) as UiState.Success
+        val anthropicData = state.data.first { it.source == ApiSource.ANTHROPIC }
+        val minimaxData = state.data.first { it.source == ApiSource.MINIMAX }
+
+        assertEquals(75000L, anthropicData.quotas[0].used)
         assertEquals(2223L, minimaxData.quotas[0].used)
         viewModel.onDestroy()
     }

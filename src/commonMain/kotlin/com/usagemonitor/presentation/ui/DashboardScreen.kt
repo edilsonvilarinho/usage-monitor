@@ -54,6 +54,7 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
+    val refreshingSources by viewModel.refreshingSources.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val enabledApisState by enabledApis.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -126,8 +127,10 @@ fun DashboardScreen(
                             is UiState.Success -> SuccessContent(
                                 apiStatsList = state.data,
                                 partialErrors = state.errors,
+                                refreshingSources = refreshingSources,
                                 enabledApis = enabledApisState,
                                 language = language,
+                                onRefreshCard = { source -> viewModel.refresh(source) },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -190,8 +193,10 @@ private fun ErrorContent(message: String, language: AppLanguage, onRetry: () -> 
 private fun SuccessContent(
     apiStatsList: List<com.usagemonitor.domain.entity.ApiUsageStats>,
     partialErrors: List<String>,
+    refreshingSources: Set<ApiSource>,
     enabledApis: Set<ApiSource>,
     language: AppLanguage,
+    onRefreshCard: (ApiSource) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val items = apiStatsList.filter { stats -> stats.source in enabledApis }
@@ -235,12 +240,16 @@ private fun SuccessContent(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items.forEach { stats ->
+                    items.forEachIndexed { index, stats ->
                         ApiUsageCard(
+                            source = stats.source,
                             apiName = stats.apiName,
                             quotas = stats.quotas,
                             showUsageDetails = stats.source != ApiSource.ANTHROPIC,
+                            isRefreshing = stats.source in refreshingSources,
                             language = language,
+                            animationDelayMillis = index * 90,
+                            onRefresh = { onRefreshCard(stats.source) },
                             modifier = Modifier.widthIn(max = cardMaxWidth)
                         )
                     }

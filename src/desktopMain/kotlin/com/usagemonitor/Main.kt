@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberDialogState
 import com.russhwolf.settings.PreferencesSettings
@@ -25,6 +26,7 @@ import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -141,6 +143,7 @@ fun main() = application {
     }
 
     val iconImage = remember { loadWindowIcon() }
+    val mainWindowState = rememberWindowState()
     val enabledApisState by enabledApis.collectAsState()
     var isDark by remember { mutableStateOf(settings.getBoolean("isDark", true)) }
     var language by remember {
@@ -160,16 +163,29 @@ fun main() = application {
             exitProcess(0)
         },
         title = "Usage Monitor",
-        icon = iconImage
+        icon = iconImage,
+        state = mainWindowState,
+        undecorated = true
     ) {
         AppTheme(isDark = isDark) {
-            DashboardScreen(
-                viewModel = viewModel,
-                appVersion = CURRENT_APP_VERSION,
-                language = language,
-                enabledApis = enabledApis,
-                onOpenSettings = { isSettingsDialogOpen = true }
-            )
+            DesktopWindowFrame(
+                title = "Usage Monitor",
+                iconPainter = iconImage,
+                windowState = mainWindowState,
+                onCloseRequest = {
+                    viewModel.onDestroy()
+                    httpClient.close()
+                    exitProcess(0)
+                }
+            ) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = CURRENT_APP_VERSION,
+                    language = language,
+                    enabledApis = enabledApis,
+                    onOpenSettings = { isSettingsDialogOpen = true }
+                )
+            }
         }
     }
 
