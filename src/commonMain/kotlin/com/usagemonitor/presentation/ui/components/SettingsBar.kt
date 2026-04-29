@@ -7,14 +7,21 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,70 +31,64 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsBar(
-    currentTheme: AppTheme,
-    currentLanguage: AppLanguage,
+fun FooterBar(
     appVersion: String,
+    language: AppLanguage,
     secondsUntilRefresh: Int,
-    autoStartEnabled: Boolean,
-    onThemeToggle: () -> Unit,
-    onLanguageChange: (AppLanguage) -> Unit,
-    onAutoStartChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 4.dp
     ) {
-        val compact = maxWidth < 760.dp
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            val compact = maxWidth < 500.dp
 
-        if (compact) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SettingsPrimaryGroup(
-                    currentTheme = currentTheme,
-                    currentLanguage = currentLanguage,
-                    autoStartEnabled = autoStartEnabled,
-                    onThemeToggle = onThemeToggle,
-                    onAutoStartChange = onAutoStartChange
-                )
-                SettingsSecondaryGroup(
-                    currentLanguage = currentLanguage,
-                    appVersion = appVersion,
-                    secondsUntilRefresh = secondsUntilRefresh,
-                    onRefresh = onRefresh,
-                    onLanguageChange = onLanguageChange
-                )
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SettingsPrimaryGroup(
-                    currentTheme = currentTheme,
-                    currentLanguage = currentLanguage,
-                    autoStartEnabled = autoStartEnabled,
-                    onThemeToggle = onThemeToggle,
-                    onAutoStartChange = onAutoStartChange,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                SettingsSecondaryGroup(
-                    currentLanguage = currentLanguage,
-                    appVersion = appVersion,
-                    secondsUntilRefresh = secondsUntilRefresh,
-                    onRefresh = onRefresh,
-                    onLanguageChange = onLanguageChange,
-                    modifier = Modifier.weight(1f)
-                )
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FooterStatusGroup(
+                        appVersion = appVersion,
+                        language = language,
+                        secondsUntilRefresh = secondsUntilRefresh
+                    )
+                    FooterActionGroup(
+                        language = language,
+                        onRefresh = onRefresh,
+                        onOpenSettings = onOpenSettings
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FooterStatusGroup(
+                        appVersion = appVersion,
+                        language = language,
+                        secondsUntilRefresh = secondsUntilRefresh,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    FooterActionGroup(
+                        language = language,
+                        onRefresh = onRefresh,
+                        onOpenSettings = onOpenSettings
+                    )
+                }
             }
         }
     }
@@ -95,84 +96,180 @@ fun SettingsBar(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SettingsPrimaryGroup(
-    currentTheme: AppTheme,
-    currentLanguage: AppLanguage,
-    autoStartEnabled: Boolean,
-    onThemeToggle: () -> Unit,
-    onAutoStartChange: (Boolean) -> Unit,
+private fun FooterStatusGroup(
+    appVersion: String,
+    language: AppLanguage,
+    secondsUntilRefresh: Int,
     modifier: Modifier = Modifier
 ) {
     FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        ThemeToggle(
-            isDark = currentTheme == AppTheme.DARK,
-            language = currentLanguage,
-            onToggle = onThemeToggle
+        FooterStatusItem(
+            label = if (language == AppLanguage.PT) "Versão:" else "Version:",
+            value = "v$appVersion"
         )
+        FooterStatusItem(
+            label = if (language == AppLanguage.PT) "Próxima atualização:" else "Next update:",
+            value = formatRefreshCountdown(secondsUntilRefresh)
+        )
+    }
+}
 
-        AutoStartToggle(
-            enabled = autoStartEnabled,
-            language = currentLanguage,
-            onToggle = onAutoStartChange
+@Composable
+private fun FooterStatusItem(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.widthIn(min = 110.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun FooterActionGroup(
+    language: AppLanguage,
+    onRefresh: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onRefresh) {
+            Text(
+                text = "↻",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        TextButton(onClick = onOpenSettings) {
+            Text(
+                text = if (language == AppLanguage.PT) "Configurações" else "Settings",
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SettingsSecondaryGroup(
+fun SettingsDialogContent(
+    currentTheme: AppTheme,
     currentLanguage: AppLanguage,
-    appVersion: String,
-    secondsUntilRefresh: Int,
-    onRefresh: () -> Unit,
+    enabledApis: Set<ApiSource>,
+    autoStartEnabled: Boolean,
+    onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
+    onAutoStartChange: (Boolean) -> Unit,
+    onApiToggle: (ApiSource, Boolean) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    FlowRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+    val scrollState = rememberScrollState()
+
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
-        CurrentVersionLabel(
-            appVersion = appVersion,
-            language = currentLanguage
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = if (currentLanguage == AppLanguage.PT) "Configurações" else "Settings",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-        RefreshControl(
-            secondsUntilRefresh = secondsUntilRefresh,
-            language = currentLanguage,
-            onRefresh = onRefresh
-        )
+            HorizontalDivider()
 
-        LanguageSelector(
-            currentLanguage = currentLanguage,
-            onLanguageChange = onLanguageChange
-        )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ThemeToggle(
+                    isDark = currentTheme == AppTheme.DARK,
+                    language = currentLanguage,
+                    onToggle = onThemeToggle
+                )
+
+                AutoStartToggle(
+                    enabled = autoStartEnabled,
+                    language = currentLanguage,
+                    onToggle = onAutoStartChange
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = if (currentLanguage == AppLanguage.PT) "Idioma" else "Language",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                LanguageSelector(
+                    currentLanguage = currentLanguage,
+                    onLanguageChange = onLanguageChange
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = if (currentLanguage == AppLanguage.PT) "APIs monitoradas" else "Monitored APIs",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ApiSource.entries.forEach { api ->
+                        ApiCheckboxRow(
+                            api = api,
+                            isChecked = api in enabledApis,
+                            onCheckedChange = { checked -> onApiToggle(api, checked) }
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Button(onClick = onClose) {
+                    Text(if (currentLanguage == AppLanguage.PT) "Fechar" else "Close")
+                }
+            }
+        }
     }
 }
 
-@Composable
-fun CurrentVersionLabel(
-    appVersion: String,
-    language: AppLanguage,
-    modifier: Modifier = Modifier
-) {
-    val label = if (language == AppLanguage.PT) {
-        "Versão: v$appVersion"
-    } else {
-        "Version: v$appVersion"
-    }
-
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier
-    )
+private fun formatRefreshCountdown(secondsUntilRefresh: Int): String {
+    val minutes = secondsUntilRefresh / 60
+    val seconds = secondsUntilRefresh % 60
+    return String.format("%02d:%02d", minutes, seconds)
 }
 
 @Composable
@@ -241,12 +338,10 @@ fun RefreshControl(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val minutes = secondsUntilRefresh / 60
-    val seconds = secondsUntilRefresh % 60
     val countdownText = if (language == AppLanguage.PT) {
-        String.format("Próxima atualização: %02d:%02d", minutes, seconds)
+        "Próxima atualização: ${formatRefreshCountdown(secondsUntilRefresh)}"
     } else {
-        String.format("Next update: %02d:%02d", minutes, seconds)
+        "Next update: ${formatRefreshCountdown(secondsUntilRefresh)}"
     }
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
@@ -256,7 +351,7 @@ fun RefreshControl(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Start,
             modifier = Modifier
-                .widthIn(max = 128.dp)
+                .widthIn(max = 140.dp)
                 .padding(end = 4.dp)
         )
         IconButton(onClick = onRefresh) {

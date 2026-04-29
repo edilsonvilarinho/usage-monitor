@@ -25,72 +25,38 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.russhwolf.settings.Settings
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.AppTheme
-import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
-import com.usagemonitor.presentation.ui.components.SettingsBar
-import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     appVersion: String,
-    settings: Settings? = null,
-    enabledApis: MutableStateFlow<Set<ApiSource>>? = null,
-    initialAutoStartEnabled: Boolean = false,
-    onAutoStartChange: ((Boolean) -> Unit)? = null,
+    language: AppLanguage,
+    enabledApis: StateFlow<Set<ApiSource>>,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val defaultEnabledApis = emptySet<ApiSource>()
     val uiState by viewModel.uiState.collectAsState()
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
-    val snackbarHostState = SnackbarHostState()
-
-    val enabledApisValue = enabledApis?.value ?: defaultEnabledApis
-    val flow: MutableStateFlow<Set<ApiSource>> = enabledApis ?: MutableStateFlow(enabledApisValue)
-    val enabledApisState by flow.collectAsState()
-
-    var isDark by remember { mutableStateOf(settings?.getBoolean("isDark", true) ?: true) }
-    var language by remember {
-        mutableStateOf(
-            settings?.getStringOrNull("language")
-                ?.let { runCatching { AppLanguage.valueOf(it) }.getOrNull() }
-                ?: AppLanguage.PT
-        )
-    }
-    var localEnabledApis by remember { mutableStateOf(enabledApisValue) }
-    var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
-
-    LaunchedEffect(enabledApisState) {
-        localEnabledApis = enabledApisState
-    }
-
-    LaunchedEffect(localEnabledApis) {
-        if (enabledApis != null) {
-            enabledApis.emit(localEnabledApis)
-        }
-        settings?.putString("enabledApis", localEnabledApis.joinToString(",") { it.name })
-    }
+    val enabledApisState by enabledApis.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let { key ->
@@ -117,71 +83,54 @@ fun DashboardScreen(
         }
     }
 
-    AppTheme(isDark = isDark) {
-        Surface(
+    Scaffold(
+        bottomBar = {
+            FooterBar(
+                appVersion = appVersion,
+                language = language,
+                secondsUntilRefresh = secondsUntilRefresh,
+                onRefresh = { viewModel.refresh() },
+                onOpenSettings = onOpenSettings
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { scaffoldPadding ->
+        Column(
             modifier = modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
         ) {
-            Scaffold(
-                topBar = {
-                    Surface(color = MaterialTheme.colorScheme.surface) {
-                        SettingsBar(
-                            currentTheme = if (isDark) AppTheme.DARK else AppTheme.LIGHT,
-                            currentLanguage = language,
-                            appVersion = appVersion,
-                            secondsUntilRefresh = secondsUntilRefresh,
-                            autoStartEnabled = autoStartEnabled,
-                            onThemeToggle = {
-                                isDark = !isDark
-                                settings?.putBoolean("isDark", isDark)
-                            },
-                            onLanguageChange = { lang ->
-                                language = lang
-                                settings?.putString("language", lang.name)
-                            },
-                            onAutoStartChange = { enabled ->
-                                autoStartEnabled = enabled
-                                settings?.putBoolean("autoStart", enabled)
-                                onAutoStartChange?.invoke(enabled)
-                            },
-                            onRefresh = { viewModel.refresh() }
-                        )
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.background
-            ) { scaffoldPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(scaffoldPadding)
+            ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(scaffoldPadding)
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    ApiSelector(
-                        enabledApis = localEnabledApis,
-                        onToggle = { api, checked ->
-                            localEnabledApis = if (checked) localEnabledApis + api else localEnabledApis - api
-                        },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-
                     SnackbarHost(
                         hostState = snackbarHostState,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                     )
 
-                    when (val state = uiState) {
-                        is UiState.Loading -> LoadingContent(language = language)
-                        is UiState.Error -> ErrorContent(
-                            message = state.message,
-                            language = language,
-                            onRetry = { viewModel.refresh() }
-                        )
-                        is UiState.Success -> SuccessContent(
-                            apiStatsList = state.data,
-                            partialErrors = state.errors,
-                            enabledApis = localEnabledApis,
-                            language = language,
-                            modifier = Modifier.weight(1f)
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        when (val state = uiState) {
+                            is UiState.Loading -> LoadingContent(language = language)
+                            is UiState.Error -> ErrorContent(
+                                message = state.message,
+                                language = language,
+                                onRetry = { viewModel.refresh() }
+                            )
+                            is UiState.Success -> SuccessContent(
+                                apiStatsList = state.data,
+                                partialErrors = state.errors,
+                                enabledApis = enabledApisState,
+                                language = language,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             }
@@ -305,27 +254,5 @@ private fun SuccessContent(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
         )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ApiSelector(
-    enabledApis: Set<ApiSource>,
-    onToggle: (ApiSource, Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    FlowRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        ApiSource.entries.forEach { api ->
-            ApiCheckboxRow(
-                api = api,
-                isChecked = api in enabledApis,
-                onCheckedChange = { checked -> onToggle(api, checked) }
-            )
-        }
     }
 }

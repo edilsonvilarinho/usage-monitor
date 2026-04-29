@@ -17,8 +17,9 @@ import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
+import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.LanguageSelector
-import com.usagemonitor.presentation.ui.components.SettingsBar
+import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -215,52 +216,74 @@ class ComponentTest {
         assertEquals(true, toggled)
     }
 
-    // ── SettingsBar ──────────────────────────────────────────────────────
+    // ── FooterBar ───────────────────────────────────────────────────────
 
     @Test
-    fun `SettingsBar displays localized version and next update in PT`() = runDesktopComposeUiTest {
+    fun `FooterBar displays localized version and next update in PT`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                SettingsBar(
-                    currentTheme = ThemeMode.DARK,
-                    currentLanguage = AppLanguage.PT,
+                FooterBar(
                     appVersion = "1.1.0",
+                    language = AppLanguage.PT,
                     secondsUntilRefresh = 125,
-                    autoStartEnabled = false,
-                    onThemeToggle = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onRefresh = {}
+                    onRefresh = {},
+                    onOpenSettings = {}
                 )
             }
         }
 
-        onNodeWithText("Versão: v1.1.0").assertIsDisplayed()
-        onNodeWithText("Próxima atualização: 02:05").assertIsDisplayed()
-        onNodeWithText("Inicialização com Sistema").assertIsDisplayed()
+        onNodeWithText("Versão:").assertIsDisplayed()
+        onNodeWithText("v1.1.0").assertIsDisplayed()
+        onNodeWithText("Próxima atualização:").assertIsDisplayed()
+        onNodeWithText("02:05").assertIsDisplayed()
+        onNodeWithText("Configurações").assertIsDisplayed()
     }
 
     @Test
-    fun `SettingsBar displays localized version and next update in EN`() = runDesktopComposeUiTest {
+    fun `FooterBar opens settings action`() = runDesktopComposeUiTest {
+        var opened = false
+
         setContent {
             AppTheme(isDark = true) {
-                SettingsBar(
-                    currentTheme = ThemeMode.DARK,
-                    currentLanguage = AppLanguage.EN,
+                FooterBar(
                     appVersion = "1.1.0",
+                    language = AppLanguage.PT,
                     secondsUntilRefresh = 125,
-                    autoStartEnabled = false,
-                    onThemeToggle = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onRefresh = {}
+                    onRefresh = {},
+                    onOpenSettings = { opened = true }
                 )
             }
         }
 
-        onNodeWithText("Version: v1.1.0").assertIsDisplayed()
-        onNodeWithText("Next update: 02:05").assertIsDisplayed()
+        onNodeWithText("Configurações").performClick()
+        assertEquals(true, opened)
+    }
+
+    // ── SettingsDialogContent ───────────────────────────────────────────
+
+    @Test
+    fun `SettingsDialogContent displays localized controls in EN`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.EN,
+                    enabledApis = setOf(ApiSource.ANTHROPIC, ApiSource.CODEX),
+                    autoStartEnabled = false,
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onClose = {}
+                )
+            }
+        }
+
+        onNodeWithText("Settings").assertIsDisplayed()
         onNodeWithText("System Startup").assertIsDisplayed()
+        onNodeWithText("Language").assertIsDisplayed()
+        onNodeWithText("Monitored APIs").assertIsDisplayed()
+        onNodeWithText("Close").assertIsDisplayed()
     }
 
     // ── LanguageSelector ─────────────────────────────────────────────────
