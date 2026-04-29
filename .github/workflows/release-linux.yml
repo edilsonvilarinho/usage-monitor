@@ -17,12 +17,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
@@ -33,7 +27,7 @@ jobs:
       - name: Build focal packaging image
         run: |
           cat <<'EOF' > Dockerfile.linux-packager
-          FROM ubuntu:20.04
+          FROM eclipse-temurin:17-jdk-focal
 
           ENV DEBIAN_FRONTEND=noninteractive
 
@@ -85,10 +79,7 @@ jobs:
             --user "$(id -u):$(id -g)" \
             -e HOME=/tmp/usage-monitor-home \
             -e GRADLE_USER_HOME=/tmp/usage-monitor-gradle \
-            -e JAVA_HOME=/opt/java/openjdk \
-            -e PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             -v "$PWD:/workspace" \
-            -v "$JAVA_HOME:/opt/java/openjdk:ro" \
             -w /workspace \
             usage-monitor-linux-packager:focal \
             bash -lc '
