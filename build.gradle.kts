@@ -103,6 +103,7 @@ compose.desktop {
             )
             packageName = "Usage Monitor"
             packageVersion = appVersion
+            modules("java.sql")
 
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.ico"))
