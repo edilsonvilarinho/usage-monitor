@@ -42,6 +42,7 @@ fun FooterBar(
     language: AppLanguage,
     secondsUntilRefresh: Int,
     onRefresh: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -67,6 +68,7 @@ fun FooterBar(
                     FooterActionGroup(
                         language = language,
                         onRefresh = onRefresh,
+                        onOpenHistory = onOpenHistory,
                         onOpenSettings = onOpenSettings
                     )
                 }
@@ -86,6 +88,7 @@ fun FooterBar(
                     FooterActionGroup(
                         language = language,
                         onRefresh = onRefresh,
+                        onOpenHistory = onOpenHistory,
                         onOpenSettings = onOpenSettings
                     )
                 }
@@ -145,6 +148,7 @@ private fun FooterStatusItem(
 private fun FooterActionGroup(
     language: AppLanguage,
     onRefresh: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -158,6 +162,13 @@ private fun FooterActionGroup(
                 text = "↻",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        TextButton(onClick = onOpenHistory) {
+            Text(
+                text = if (language == AppLanguage.PT) "Histórico" else "History",
+                style = MaterialTheme.typography.labelLarge
             )
         }
 

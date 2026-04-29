@@ -11,18 +11,25 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.UsageForecast
+import com.usagemonitor.domain.entity.UsageHistoryPoint
+import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.FooterBar
+import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -235,6 +242,7 @@ class ComponentTest {
                     language = AppLanguage.PT,
                     secondsUntilRefresh = 125,
                     onRefresh = {},
+                    onOpenHistory = {},
                     onOpenSettings = {}
                 )
             }
@@ -258,12 +266,34 @@ class ComponentTest {
                     language = AppLanguage.PT,
                     secondsUntilRefresh = 125,
                     onRefresh = {},
+                    onOpenHistory = {},
                     onOpenSettings = { opened = true }
                 )
             }
         }
 
         onNodeWithText("Configurações").performClick()
+        assertEquals(true, opened)
+    }
+
+    @Test
+    fun `FooterBar opens history action`() = runDesktopComposeUiTest {
+        var opened = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                FooterBar(
+                    appVersion = "1.1.0",
+                    language = AppLanguage.PT,
+                    secondsUntilRefresh = 125,
+                    onRefresh = {},
+                    onOpenHistory = { opened = true },
+                    onOpenSettings = {}
+                )
+            }
+        }
+
+        onNodeWithText("Histórico").performClick()
         assertEquals(true, opened)
     }
 
@@ -326,5 +356,96 @@ class ComponentTest {
 
         onNodeWithText("EN").performClick()
         assertEquals(AppLanguage.EN, selected)
+    }
+
+    @Test
+    fun `HistoryScreen renders quota metrics`() = runDesktopComposeUiTest {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.CODEX,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-04-28T18:00:00Z"),
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "Codex 5h",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.REQUESTS,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-04-28T16:00:00Z"),
+                            used = 10,
+                            total = 100,
+                            rawUsed = 10,
+                            rawTotal = 100,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-04-28T17:00:00Z"),
+                            used = 30,
+                            total = 100,
+                            rawUsed = 30,
+                            rawTotal = 100,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-04-28T18:00:00Z"),
+                            used = 50,
+                            total = 100,
+                            rawUsed = 50,
+                            rawTotal = 100,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 50,
+                    currentDisplayTotal = 100,
+                    deltaDisplayUsed = 40,
+                    averageDisplayConsumptionPerHour = 20.0,
+                    currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                    forecast = UsageForecast.EstimatedExhaustionAt(Instant.parse("2026-04-28T20:30:00Z"))
+                )
+            )
+        )
+
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                    override suspend fun recordSnapshot(
+                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
+                        capturedAt: Instant
+                    ) = Unit
+
+                    override suspend fun getHistoryReport(
+                        source: ApiSource,
+                        range: HistoryRange,
+                        now: Instant
+                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
+                        return report
+                    }
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {}
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Codex 5h").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Histórico de uso").assertIsDisplayed()
+        onNodeWithText("Codex 5h").assertIsDisplayed()
+        onNodeWithText("Uso atual").assertIsDisplayed()
+        onNodeWithText("50 / 100 req").assertIsDisplayed()
+        viewModel.onDestroy()
     }
 }

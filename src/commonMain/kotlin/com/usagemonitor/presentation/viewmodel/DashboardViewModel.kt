@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.Clock
 
 private const val POLL_INTERVAL_SECONDS = 600
 
@@ -25,7 +27,9 @@ class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
     private val getMiniMaxUsage: GetMiniMaxUsageUseCase,
     private val getCodexUsage: GetCodexUsageUseCase,
-    private val enabledApis: StateFlow<Set<ApiSource>>
+    private val enabledApis: StateFlow<Set<ApiSource>>,
+    private val recordUsageSnapshot: RecordUsageSnapshotUseCase,
+    private val clock: Clock = Clock.System
 ) {
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -94,6 +98,7 @@ class DashboardViewModel(
                     .onSuccess { stats ->
                         statsUpdates[source] = stats
                         errorUpdates[source] = null
+                        persistSnapshot(stats)
                     }
                     .onFailure { error ->
                         errorUpdates[source] = handleSourceFailure(source, error)
@@ -227,6 +232,16 @@ class DashboardViewModel(
             ApiSource.ANTHROPIC -> "Anthropic"
             ApiSource.MINIMAX -> "MiniMax"
             ApiSource.CODEX -> "Codex"
+        }
+    }
+
+    private fun persistSnapshot(stats: ApiUsageStats) {
+        viewModelScope.launch {
+            runCatching {
+                recordUsageSnapshot(stats, clock.now())
+            }.onFailure { error ->
+                println("[history] failed to persist snapshot for ${stats.source}: ${error.message}")
+            }
         }
     }
 }

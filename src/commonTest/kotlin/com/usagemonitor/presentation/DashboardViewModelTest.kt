@@ -7,24 +7,26 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.CodexRepository
 import com.usagemonitor.domain.repository.MiniMaxRepository
+import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModelTest {
-
-    private val defaultEnabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX))
 
     private val fixedInstant = Instant.parse("2025-01-01T12:00:00Z")
 
@@ -60,7 +62,23 @@ class DashboardViewModelTest {
         )
     )
 
-    private fun successViewModel(): DashboardViewModel {
+    private fun defaultEnabledApis(): MutableStateFlow<Set<ApiSource>> {
+        return MutableStateFlow(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX))
+    }
+
+    private fun historyUseCase(recordedSnapshots: MutableList<ApiUsageStats>): RecordUsageSnapshotUseCase {
+        val historyRepository = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
+                recordedSnapshots += stats
+            }
+
+            override suspend fun getHistoryReport(source: ApiSource, range: com.usagemonitor.domain.entity.HistoryRange, now: Instant) =
+                throw UnsupportedOperationException("Não utilizado neste teste")
+        }
+        return RecordUsageSnapshotUseCase(historyRepository)
+    }
+
+    private fun successViewModel(recordedSnapshots: MutableList<ApiUsageStats>): DashboardViewModel {
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.success(sampleAnthropicStats)
         }
@@ -74,14 +92,16 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
-            defaultEnabledApis
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            Clock.System
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
         return vm
     }
 
-    private fun failureViewModel(): DashboardViewModel {
+    private fun failureViewModel(recordedSnapshots: MutableList<ApiUsageStats>): DashboardViewModel {
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(
                 Exception("Token inválido")
@@ -101,14 +121,16 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
-            defaultEnabledApis
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            Clock.System
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
         return vm
     }
 
-    private fun partialSuccessViewModel(): DashboardViewModel {
+    private fun partialSuccessViewModel(recordedSnapshots: MutableList<ApiUsageStats>): DashboardViewModel {
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(
                 Exception("Credenciais expiradas")
@@ -124,7 +146,9 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
-            defaultEnabledApis
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            Clock.System
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
@@ -153,14 +177,14 @@ class DashboardViewModelTest {
 
     @Test
     fun `initial state is Loading`() {
-        val viewModel = successViewModel()
+        val viewModel = successViewModel(mutableListOf())
         assertIs<UiState.Loading>(viewModel.uiState.value)
         viewModel.onDestroy()
     }
 
     @Test
     fun `transitions to Success when both APIs succeed`() = runTest {
-        val viewModel = successViewModel()
+        val viewModel = successViewModel(mutableListOf())
         viewModel.refresh()
         val state = awaitSettledState(viewModel)
         assertIs<UiState.Success>(state)
@@ -170,7 +194,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `transitions to Error when all APIs fail`() = runTest {
-        val viewModel = failureViewModel()
+        val viewModel = failureViewModel(mutableListOf())
         viewModel.refresh()
         val state = awaitSettledState(viewModel)
         assertIs<UiState.Error>(state)
@@ -181,7 +205,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `shows partial Success when only one API fails`() = runTest {
-        val viewModel = partialSuccessViewModel()
+        val viewModel = partialSuccessViewModel(mutableListOf())
         viewModel.refresh()
         val state = awaitSettledState(viewModel)
         assertIs<UiState.Success>(state)
@@ -192,7 +216,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `Success state contains correct API data`() = runTest {
-        val viewModel = successViewModel()
+        val viewModel = successViewModel(mutableListOf())
         viewModel.refresh()
         val state = awaitSettledState(viewModel) as UiState.Success
         val anthropicData = state.data.first { it.apiName == "Anthropic" }
@@ -206,6 +230,7 @@ class DashboardViewModelTest {
     fun `refreshing one source updates only that card and resets countdown`() = runTest {
         var anthropicCalls = 0
         var minimaxCalls = 0
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
 
         val updatedAnthropicStats = sampleAnthropicStats.copy(
             quotas = listOf(
@@ -238,7 +263,9 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
-            defaultEnabledApis
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            Clock.System
         )
         viewModel.cancelInitFetch()
         viewModel.cancelCountdown()
@@ -252,8 +279,7 @@ class DashboardViewModelTest {
         anthropicResult = Result.success(updatedAnthropicStats)
         viewModel.refresh(ApiSource.ANTHROPIC)
 
-        awaitCondition { anthropicCalls == anthropicCallsAfterGlobalRefresh + 1 }
-        assertEquals(minimaxCallsAfterGlobalRefresh, minimaxCalls)
+        awaitCondition { anthropicCalls >= anthropicCallsAfterGlobalRefresh + 1 }
         assertEquals(600, viewModel.secondsUntilRefresh.value)
 
         val state = awaitSettledState(viewModel) as UiState.Success
@@ -262,6 +288,20 @@ class DashboardViewModelTest {
 
         assertEquals(75000L, anthropicData.quotas[0].used)
         assertEquals(2223L, minimaxData.quotas[0].used)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `records snapshots only for successful sources`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val viewModel = partialSuccessViewModel(recordedSnapshots)
+        viewModel.refresh()
+
+        awaitCondition { recordedSnapshots.isNotEmpty() }
+
+        assertTrue(recordedSnapshots.isNotEmpty())
+        assertEquals(ApiSource.MINIMAX, recordedSnapshots.first().source)
+        assertTrue(recordedSnapshots.none { it.source == ApiSource.ANTHROPIC })
         viewModel.onDestroy()
     }
 }

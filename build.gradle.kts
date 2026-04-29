@@ -64,6 +64,7 @@ kotlin {
 
                 // Coroutines com suporte ao dispatcher Swing (UI thread do Desktop)
                 implementation(libs.kotlinx.coroutines.swing)
+                implementation(libs.sqlite.jdbc)
             }
         }
 

@@ -16,21 +16,27 @@ import androidx.compose.ui.window.rememberDialogState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
+import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
+import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
+import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
+import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -45,6 +51,11 @@ import kotlin.system.exitProcess
 
 private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+
+private enum class AppScreen {
+    DASHBOARD,
+    HISTORY
+}
 
 private fun loadWindowIcon() = runCatching {
     val stream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH) ?: return@runCatching null
@@ -107,6 +118,7 @@ fun main() = application {
     val credentialDataSource = remember(httpClient) { LocalCredentialDataSource(httpClient) }
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
     val remoteApiDataSource = remember(httpClient) { RemoteApiDataSource(httpClient) }
+    val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
 
     val anthropicRepository = remember(credentialDataSource, remoteApiDataSource) {
         AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
@@ -117,19 +129,37 @@ fun main() = application {
     val codexRepository = remember(codexAuthDataSource, remoteApiDataSource) {
         CodexRepositoryImpl(codexAuthDataSource, remoteApiDataSource)
     }
+    val usageHistoryRepository = remember(usageHistoryDataSource) {
+        UsageHistoryRepositoryImpl(usageHistoryDataSource)
+    }
 
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, enabledApis) {
+    val recordUsageSnapshot = remember(usageHistoryRepository) {
+        RecordUsageSnapshotUseCase(usageHistoryRepository)
+    }
+    val getUsageHistory = remember(usageHistoryRepository) {
+        GetUsageHistoryUseCase(usageHistoryRepository)
+    }
+
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, enabledApis, recordUsageSnapshot) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
             getCodexUsage = GetCodexUsageUseCase(codexRepository),
+            enabledApis = enabledApis,
+            recordUsageSnapshot = recordUsageSnapshot
+        )
+    }
+    val historyViewModel = remember(getUsageHistory, enabledApis) {
+        HistoryViewModel(
+            getUsageHistory = getUsageHistory,
             enabledApis = enabledApis
         )
     }
 
-    DisposableEffect(viewModel, httpClient) {
+    DisposableEffect(viewModel, historyViewModel, httpClient) {
         val shutdownHook = Thread {
             viewModel.onDestroy()
+            historyViewModel.onDestroy()
             httpClient.close()
         }
 
@@ -155,10 +185,12 @@ fun main() = application {
     }
     var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
+    var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
 
     Window(
         onCloseRequest = {
             viewModel.onDestroy()
+            historyViewModel.onDestroy()
             httpClient.close()
             exitProcess(0)
         },
@@ -174,17 +206,30 @@ fun main() = application {
                 windowState = mainWindowState,
                 onCloseRequest = {
                     viewModel.onDestroy()
+                    historyViewModel.onDestroy()
                     httpClient.close()
                     exitProcess(0)
                 }
             ) {
-                DashboardScreen(
-                    viewModel = viewModel,
-                    appVersion = CURRENT_APP_VERSION,
-                    language = language,
-                    enabledApis = enabledApis,
-                    onOpenSettings = { isSettingsDialogOpen = true }
-                )
+                when (currentScreen) {
+                    AppScreen.DASHBOARD -> DashboardScreen(
+                        viewModel = viewModel,
+                        appVersion = CURRENT_APP_VERSION,
+                        language = language,
+                        enabledApis = enabledApis,
+                        onOpenHistory = {
+                            currentScreen = AppScreen.HISTORY
+                            historyViewModel.refresh()
+                        },
+                        onOpenSettings = { isSettingsDialogOpen = true }
+                    )
+
+                    AppScreen.HISTORY -> HistoryScreen(
+                        viewModel = historyViewModel,
+                        language = language,
+                        onBack = { currentScreen = AppScreen.DASHBOARD }
+                    )
+                }
             }
         }
     }

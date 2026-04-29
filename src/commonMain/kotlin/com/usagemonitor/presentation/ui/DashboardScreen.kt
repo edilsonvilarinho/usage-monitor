@@ -49,6 +49,7 @@ fun DashboardScreen(
     appVersion: String,
     language: AppLanguage,
     enabledApis: StateFlow<Set<ApiSource>>,
+    onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -91,6 +92,7 @@ fun DashboardScreen(
                 language = language,
                 secondsUntilRefresh = secondsUntilRefresh,
                 onRefresh = { viewModel.refresh() },
+                onOpenHistory = onOpenHistory,
                 onOpenSettings = onOpenSettings
             )
         },

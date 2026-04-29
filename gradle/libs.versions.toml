@@ -6,6 +6,7 @@ kotlinx-serialization = "1.7.3"
 kotlinx-datetime = "0.6.1"
 kotlinx-coroutines = "1.9.0"
 multiplatform-settings = "1.2.0"
+sqlite-jdbc = "3.46.1.3"
 
 [libraries]
 # Ktor — cliente HTTP multiplataforma
@@ -27,6 +28,7 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 
 # Preferências persistidas (tema, idioma)
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 
 # Testes
 kotlin-test            = { module = "org.jetbrains.kotlin:kotlin-test" }
