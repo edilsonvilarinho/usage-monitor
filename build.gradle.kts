@@ -7,23 +7,23 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-version = "6.0.0"
+version = "7.0.0"
 
 val appVersion = version.toString()
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
 
 kotlin {
-    // Único alvo: Desktop JVM.
+    // Ãšnico alvo: Desktop JVM.
     // O nome "desktop" define o source set desktopMain/desktopTest.
     jvm("desktop")
 
-    // Java 17 é o mínimo recomendado para Compose Multiplatform Desktop
+    // Java 17 Ã© o mÃ­nimo recomendado para Compose Multiplatform Desktop
     jvmToolchain(17)
 
     sourceSets {
 
-        // ── commonMain ────────────────────────────────────────────────────
-        // Código compartilhado: domain, data e presentation.
+        // â”€â”€ commonMain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // CÃ³digo compartilhado: domain, data e presentation.
         // Depende apenas de bibliotecas multiplataforma.
         val commonMain by getting {
             dependencies {
@@ -35,13 +35,13 @@ kotlin {
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
                 implementation(compose.components.resources)
 
-                // Ktor — cliente HTTP (engine vem no desktopMain)
+                // Ktor â€” cliente HTTP (engine vem no desktopMain)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.json)
                 implementation(libs.ktor.client.logging)
 
-                // Serialização e utilitários KMP
+                // SerializaÃ§Ã£o e utilitÃ¡rios KMP
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.coroutines.core)
@@ -49,8 +49,8 @@ kotlin {
             }
         }
 
-        // ── desktopMain ───────────────────────────────────────────────────
-        // Código específico da plataforma Desktop (JVM):
+        // â”€â”€ desktopMain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // CÃ³digo especÃ­fico da plataforma Desktop (JVM):
         // - engine OkHttp do Ktor
         // - leitura de ficheiros com java.io.File
         // - entry point da janela Compose
@@ -69,8 +69,8 @@ kotlin {
             }
         }
 
-        // ── commonTest ────────────────────────────────────────────────────
-        // Testes unitários: domain, mappers, ViewModel
+        // â”€â”€ commonTest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Testes unitÃ¡rios: domain, mappers, ViewModel
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlin.test)
@@ -78,7 +78,7 @@ kotlin {
             }
         }
 
-        // ── desktopTest ───────────────────────────────────────────────────
+        // â”€â”€ desktopTest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Testes de componente Compose para Desktop
         val desktopTest by getting {
             dependencies {
@@ -90,7 +90,7 @@ kotlin {
     }
 }
 
-// Configuração da aplicação Desktop
+// ConfiguraÃ§Ã£o da aplicaÃ§Ã£o Desktop
 compose.desktop {
     application {
         mainClass = "com.usagemonitor.MainKt"
@@ -141,7 +141,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     dependsOn(generateAppVersionSource)
 }
 
-// Adicionar manifest ao desktopJar para torná-lo executável
+// Adicionar manifest ao desktopJar para tornÃ¡-lo executÃ¡vel
 tasks.named<Jar>("desktopJar") {
     manifest {
         attributes(
