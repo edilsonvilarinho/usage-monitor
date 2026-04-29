@@ -36,9 +36,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.FooterBar
+import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.flow.StateFlow
 
@@ -122,9 +125,10 @@ fun DashboardScreen(
                         when (val state = uiState) {
                             is UiState.Loading -> LoadingContent(language = language)
                             is UiState.Error -> ErrorContent(
-                                message = state.message,
+                                errors = state.errors,
                                 language = language,
-                                onRetry = { viewModel.refresh() }
+                                onRetryAll = { viewModel.refresh() },
+                                onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) }
                             )
                             is UiState.Success -> SuccessContent(
                                 apiStatsList = state.data,
@@ -133,6 +137,7 @@ fun DashboardScreen(
                                 enabledApis = enabledApisState,
                                 language = language,
                                 onRefreshCard = { source -> viewModel.refresh(source) },
+                                onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -162,29 +167,57 @@ private fun LoadingContent(language: AppLanguage) {
 }
 
 @Composable
-private fun ErrorContent(message: String, language: AppLanguage, onRetry: () -> Unit) {
+private fun ErrorContent(
+    errors: List<UiApiError>,
+    language: AppLanguage,
+    onRetryAll: () -> Unit,
+    onRetryAnthropic: () -> Unit
+) {
+    val warnings = errors.mapNotNull { error -> warningFor(error = error, language = language) }
+    val genericErrors = errors.filterNot { error -> error.isConfigurationIssue }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp)
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = if (language == AppLanguage.PT) "Erro ao carregar dados" else "Failed to load data",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.error
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRetry) {
-                Text(if (language == AppLanguage.PT) "Tentar novamente" else "Retry")
+            warnings.forEach { warning ->
+                PersistentApiWarningBanner(
+                    title = warning.title,
+                    description = warning.description,
+                    actionLabel = warning.actionLabel,
+                    onAction = warningActionFor(
+                        source = warning.source,
+                        onRetryAnthropic = onRetryAnthropic
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (genericErrors.isNotEmpty() || warnings.isEmpty()) {
+                Text(
+                    text = if (language == AppLanguage.PT) "Erro ao carregar dados" else "Failed to load data",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                genericErrors.forEach { error ->
+                    Text(
+                        text = error.formattedMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Button(onClick = onRetryAll) {
+                    Text(if (language == AppLanguage.PT) "Tentar novamente" else "Retry")
+                }
             }
         }
     }
@@ -193,15 +226,18 @@ private fun ErrorContent(message: String, language: AppLanguage, onRetry: () -> 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SuccessContent(
-    apiStatsList: List<com.usagemonitor.domain.entity.ApiUsageStats>,
-    partialErrors: List<String>,
+    apiStatsList: List<ApiUsageStats>,
+    partialErrors: List<UiApiError>,
     refreshingSources: Set<ApiSource>,
     enabledApis: Set<ApiSource>,
     language: AppLanguage,
     onRefreshCard: (ApiSource) -> Unit,
+    onRetryAnthropic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val items = apiStatsList.filter { stats -> stats.source in enabledApis }
+    val warnings = partialErrors.mapNotNull { error -> warningFor(error = error, language = language) }
+    val genericErrors = partialErrors.filterNot { error -> error.isConfigurationIssue }
     val scrollState = rememberScrollState()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -211,20 +247,33 @@ private fun SuccessContent(
                 .verticalScroll(scrollState)
                 .padding(end = 12.dp)
         ) {
-            if (partialErrors.isNotEmpty()) {
-                partialErrors.forEach { error ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "⚠ $error",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+            warnings.forEach { warning ->
+                PersistentApiWarningBanner(
+                    title = warning.title,
+                    description = warning.description,
+                    actionLabel = warning.actionLabel,
+                    onAction = warningActionFor(
+                        source = warning.source,
+                        onRetryAnthropic = onRetryAnthropic
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+
+            genericErrors.forEach { error ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⚠ ${error.formattedMessage}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
@@ -267,3 +316,64 @@ private fun SuccessContent(
         )
     }
 }
+
+private fun warningActionFor(
+    source: ApiSource,
+    onRetryAnthropic: () -> Unit
+): (() -> Unit)? {
+    return when (source) {
+        ApiSource.ANTHROPIC -> onRetryAnthropic
+        ApiSource.MINIMAX -> null
+        ApiSource.CODEX -> null
+    }
+}
+
+private fun warningFor(
+    error: UiApiError,
+    language: AppLanguage
+): DashboardWarning? {
+    if (error.isAnthropicCredentialIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                source = error.source,
+                title = "Anthropic precisa de autenticação",
+                description = "Faça login no Claude Code para recriar ou renovar `~/.claude/.credentials.json` e depois tente novamente.",
+                actionLabel = "Tentar novamente"
+            )
+        } else {
+            DashboardWarning(
+                source = error.source,
+                title = "Anthropic needs authentication",
+                description = "Sign in with Claude Code to recreate or renew `~/.claude/.credentials.json`, then try again.",
+                actionLabel = "Retry"
+            )
+        }
+    }
+
+    if (error.isMiniMaxEnvVarIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                source = error.source,
+                title = "MiniMax precisa de MINIMAX_API_KEY",
+                description = "Defina `MINIMAX_API_KEY` antes de abrir o app e reinicie o monitor. Exemplo no Windows: `set MINIMAX_API_KEY=sua_chave`.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                source = error.source,
+                title = "MiniMax needs MINIMAX_API_KEY",
+                description = "Set `MINIMAX_API_KEY` before opening the app and restart the monitor. Example on Windows: `set MINIMAX_API_KEY=your_key`.",
+                actionLabel = null
+            )
+        }
+    }
+
+    return null
+}
+
+private data class DashboardWarning(
+    val source: ApiSource,
+    val title: String,
+    val description: String,
+    val actionLabel: String?
+)

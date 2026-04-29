@@ -47,7 +47,7 @@ class DashboardViewModel(
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val stateMutex = Mutex()
     private val cachedStatsBySource = mutableMapOf<ApiSource, ApiUsageStats>()
-    private val cachedErrorsBySource = mutableMapOf<ApiSource, String>()
+    private val cachedErrorsBySource = mutableMapOf<ApiSource, UiApiError>()
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
 
@@ -92,7 +92,7 @@ class DashboardViewModel(
         markRefreshing(effectiveSources, refreshing = true)
 
         val statsUpdates = mutableMapOf<ApiSource, ApiUsageStats>()
-        val errorUpdates = mutableMapOf<ApiSource, String?>()
+        val errorUpdates = mutableMapOf<ApiSource, UiApiError?>()
 
         try {
             effectiveSources.forEach { source ->
@@ -185,15 +185,20 @@ class DashboardViewModel(
         }
     }
 
-    private fun handleSourceFailure(source: ApiSource, error: Throwable): String? {
+    private fun handleSourceFailure(source: ApiSource, error: Throwable): UiApiError? {
         if (error.message?.contains("429") == true) {
             _toastMessage.value = "RATE_LIMIT:${source.name}"
             return null
         }
 
         val message = error.message ?: "erro desconhecido"
-        _toastMessage.value = "ERROR:${source.name}:${message.replace(":", "_")}"
-        return "${sourceLabel(source)}: $message"
+        val uiError = UiApiError(source = source, message = message)
+
+        if (!uiError.isConfigurationIssue) {
+            _toastMessage.value = "ERROR:${source.name}:${message.replace(":", "_")}"
+        }
+
+        return uiError
     }
 
     private fun publishUiState(enabledSources: Set<ApiSource>) {
@@ -210,7 +215,7 @@ class DashboardViewModel(
         _uiState.value = if (stats.isNotEmpty()) {
             UiState.Success(stats, errors)
         } else {
-            UiState.Error(errors.joinToString("\n"))
+            UiState.Error(errors)
         }
     }
 
@@ -226,14 +231,6 @@ class DashboardViewModel(
             } else {
                 current - sources
             }
-        }
-    }
-
-    private fun sourceLabel(source: ApiSource): String {
-        return when (source) {
-            ApiSource.ANTHROPIC -> "Anthropic"
-            ApiSource.MINIMAX -> "MiniMax"
-            ApiSource.CODEX -> "Codex"
         }
     }
 

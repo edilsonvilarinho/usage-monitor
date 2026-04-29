@@ -216,6 +216,79 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `classifies Anthropic credential failures for guided UI`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                IllegalStateException("Token refresh retornou sem access_token")
+            )
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        assertEquals(1, state.errors.size)
+        assertEquals(ApiSource.ANTHROPIC, state.errors.first().source)
+        assertTrue(state.errors.first().isAnthropicCredentialIssue)
+        assertEquals(null, viewModel.toastMessage.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `classifies MiniMax missing env var for persistent warning`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                IllegalStateException("Variável de ambiente MINIMAX_API_KEY não configurada.")
+            )
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        assertEquals(1, state.errors.size)
+        assertEquals(ApiSource.MINIMAX, state.errors.first().source)
+        assertTrue(state.errors.first().isMiniMaxEnvVarIssue)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `Success state contains correct API data`() = runTest {
         val viewModel = successViewModel(mutableListOf())
         viewModel.refresh()

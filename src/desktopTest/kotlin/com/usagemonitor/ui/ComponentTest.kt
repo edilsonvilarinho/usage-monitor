@@ -24,6 +24,7 @@ import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
+import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
@@ -154,6 +155,27 @@ class ComponentTest {
         onNodeWithText("MiniMax").assertIsDisplayed()
         onNodeWithText("26%").assertIsDisplayed()
         onNodeWithText("12/45 req").assertIsDisplayed()
+    }
+
+    @Test
+    fun `PersistentApiWarningBanner shows title description and action`() = runDesktopComposeUiTest {
+        var actionClicked = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                PersistentApiWarningBanner(
+                    title = "Anthropic precisa de autenticação",
+                    description = "Faça login no Claude Code e tente novamente.",
+                    actionLabel = "Tentar novamente",
+                    onAction = { actionClicked = true }
+                )
+            }
+        }
+
+        onNodeWithText("Anthropic precisa de autenticação").assertIsDisplayed()
+        onNodeWithText("Faça login no Claude Code e tente novamente.").assertIsDisplayed()
+        onNodeWithText("Tentar novamente").performClick()
+        assertEquals(true, actionClicked)
     }
 
     // ── ApiCheckboxRow ────────────────────────────────────────────────────
