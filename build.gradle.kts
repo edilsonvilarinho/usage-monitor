@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-version = "4.0.0"
+version = "4.0.1"
 
 val appVersion = version.toString()
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
@@ -196,4 +196,5 @@ tasks.register("packageInstaller") {
         }
     }
 }
+
 
