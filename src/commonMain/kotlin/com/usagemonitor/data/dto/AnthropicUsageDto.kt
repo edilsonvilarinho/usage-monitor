@@ -7,8 +7,9 @@ import kotlinx.serialization.Serializable
  * Resposta de GET /api/oauth/usage — endpoint dedicado de uso do Claude.ai OAuth.
  * Requer header `anthropic-beta: oauth-2025-04-20`.
  *
- * `utilization` é uma fração (0.0 a 1.0) — não temos contagem bruta de tokens.
- * `resets_at` é ISO 8601 com timezone.
+ * `utilization` vem como percentual (0.0 a 100.0), não como fração.
+ * `resets_at` costuma vir em ISO 8601 com timezone, mas pode ser `null`
+ * quando a Anthropic ainda não materializou a janela de reset.
  */
 @Serializable
 data class AnthropicUsageResponse(
@@ -21,7 +22,7 @@ data class AnthropicUsageResponse(
 @Serializable
 data class AnthropicUsageWindow(
     val utilization: Double,
-    @SerialName("resets_at") val resetsAt: String,
+    @SerialName("resets_at") val resetsAt: String?,
 )
 
 @Serializable

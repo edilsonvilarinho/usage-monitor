@@ -14,6 +14,7 @@ import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -302,6 +303,59 @@ class DashboardViewModelTest {
         assertTrue(recordedSnapshots.isNotEmpty())
         assertEquals(ApiSource.MINIMAX, recordedSnapshots.first().source)
         assertTrue(recordedSnapshots.none { it.source == ApiSource.ANTHROPIC })
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `global refresh waits for snapshot persistence before publishing success`() = runTest {
+        val persistenceGate = CompletableDeferred<Unit>()
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val historyRepository = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
+                persistenceGate.await()
+                recordedSnapshots += stats
+            }
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: com.usagemonitor.domain.entity.HistoryRange,
+                now: Instant
+            ) = throw UnsupportedOperationException("Não utilizado neste teste")
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            RecordUsageSnapshotUseCase(historyRepository),
+            Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+        delay(100)
+
+        assertIs<UiState.Loading>(viewModel.uiState.value)
+        assertTrue(recordedSnapshots.isEmpty())
+
+        persistenceGate.complete(Unit)
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        assertEquals(1, recordedSnapshots.size)
+        assertEquals(ApiSource.ANTHROPIC, recordedSnapshots.single().source)
         viewModel.onDestroy()
     }
 }

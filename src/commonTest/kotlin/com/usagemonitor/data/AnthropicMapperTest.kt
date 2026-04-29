@@ -6,8 +6,10 @@ import com.usagemonitor.data.mapper.AnthropicMapper
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class AnthropicMapperTest {
 
@@ -84,5 +86,50 @@ class AnthropicMapperTest {
         )
         assertEquals(1L, AnthropicMapper.toUsageStats(response).quotas[0].used)
         assertEquals(45L, AnthropicMapper.toUsageStats(response).quotas[0].rawUsed)
+    }
+
+    @Test
+    fun `deserializes null resets_at without failing`() {
+        val json = Json { ignoreUnknownKeys = true }
+        val payload = """
+            {
+              "five_hour": { "utilization": 0.0, "resets_at": null },
+              "seven_day": { "utilization": 98.0, "resets_at": "2026-05-01T11:59:59.727703+00:00" }
+            }
+        """.trimIndent()
+
+        val response = json.decodeFromString<AnthropicUsageResponse>(payload)
+
+        assertEquals(null, response.fiveHour.resetsAt)
+        assertEquals("2026-05-01T11:59:59.727703+00:00", response.sevenDay.resetsAt)
+    }
+
+    @Test
+    fun `skips five_hour quota when resets_at is null`() {
+        val response = sampleResponse.copy(
+            fiveHour = AnthropicUsageWindow(utilization = 0.0, resetsAt = null)
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(1, result.quotas.size)
+        assertEquals("Claude 7d", result.quotas.single().label)
+    }
+
+    @Test
+    fun `fails with friendly message when no reset window is available`() {
+        val response = AnthropicUsageResponse(
+            fiveHour = AnthropicUsageWindow(utilization = 0.0, resetsAt = null),
+            sevenDay = AnthropicUsageWindow(utilization = 0.0, resetsAt = null)
+        )
+
+        val error = assertFailsWith<IllegalStateException> {
+            AnthropicMapper.toUsageStats(response)
+        }
+
+        assertEquals(
+            "Anthropic returned usage data without active reset windows. Open Claude Code CLI and authenticate again if the problem persists.",
+            error.message
+        )
     }
 }

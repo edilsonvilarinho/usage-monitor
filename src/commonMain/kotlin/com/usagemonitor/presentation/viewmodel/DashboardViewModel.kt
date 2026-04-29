@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 private const val POLL_INTERVAL_SECONDS = 600
 
@@ -79,6 +80,7 @@ class DashboardViewModel(
     ) {
         val enabled = enabledApis.value
         val effectiveSources = targetSources.filterTo(linkedSetOf()) { source -> source in enabled }
+        val snapshotCapturedAt = clock.now()
 
         if (effectiveSources.isEmpty()) {
             stateMutex.withLock {
@@ -98,7 +100,7 @@ class DashboardViewModel(
                     .onSuccess { stats ->
                         statsUpdates[source] = stats
                         errorUpdates[source] = null
-                        persistSnapshot(stats)
+                        persistSnapshot(stats, snapshotCapturedAt)
                     }
                     .onFailure { error ->
                         errorUpdates[source] = handleSourceFailure(source, error)
@@ -235,13 +237,11 @@ class DashboardViewModel(
         }
     }
 
-    private fun persistSnapshot(stats: ApiUsageStats) {
-        viewModelScope.launch {
-            runCatching {
-                recordUsageSnapshot(stats, clock.now())
-            }.onFailure { error ->
-                println("[history] failed to persist snapshot for ${stats.source}: ${error.message}")
-            }
+    private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
+        runCatching {
+            recordUsageSnapshot(stats, capturedAt)
+        }.onFailure { error ->
+            println("[history] failed to persist snapshot for ${stats.source}: ${error.message}")
         }
     }
 }
