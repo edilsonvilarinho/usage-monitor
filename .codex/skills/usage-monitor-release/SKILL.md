@@ -32,10 +32,12 @@ Release this repository in a way that stays aligned with the current build, inst
    - create the annotated tag `vX.Y.Z`
    - push `main` and the tag
 9. Watch the GitHub Actions workflow `Release Desktop Packages` and report the outcome.
+10. The published GitHub Release should include a short changelog built from commits between the previous `v*` tag and the new tag.
 
 ## Guardrails
 
 - Do not release from a dirty tree unless the user explicitly wants that risk.
 - Do not create a tag or push without explicit permission.
 - Do not forget that release artifacts are published by CI from `v*` tags.
+- Do not forget that the GitHub Release body should show the commit summary for the new version.
 - Prefer current code and workflow files over older notes in `.agents`, `.claude`, or `docs/research.md` when they disagree.
