@@ -1,6 +1,6 @@
 # Usage Monitor
 
-Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo e quotas de uso de APIs de IA em um único painel. Hoje a app integra Anthropic, Codex e MiniMax, mostra janelas de uso de curto e longo prazo, persiste histórico localmente e permite configurar preferências como tema, idioma, APIs ativas e auto-start no Windows.
+Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo e quotas de uso de APIs de IA em um único painel. Hoje a app integra Anthropic, Codex e MiniMax, mostra janelas de uso de curto e longo prazo, persiste histórico local em SQLite, permite reorganizar/minimizar cards, verifica atualizações publicadas no GitHub Releases e oferece auto-start em Windows e Linux.
 
 ## O que a app faz
 
@@ -9,8 +9,10 @@ Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo e 
 - Permite refresh manual global ou por card/API.
 - Exibe estado parcial com sucesso mesmo quando uma ou mais APIs falham.
 - Persiste snapshots de uso para consulta de histórico.
-- Oferece tela de histórico separada do dashboard principal.
-- Suporta tema claro/escuro, idioma PT/EN e auto-start no Windows.
+- Oferece tela de histórico separada do dashboard principal com tendência, média por hora e previsão de esgotamento.
+- Permite reordenar cards por drag-and-drop e minimizar/expandir cada card com persistência local.
+- Verifica releases novas e tenta preparar instalação automática quando há pacote compatível com a plataforma.
+- Suporta tema claro/escuro, idioma PT/EN e auto-start em Windows e Linux.
 
 ## Screenshots
 
@@ -74,15 +76,15 @@ Regras principais:
 - `domain` não pode importar Compose, Ktor ou qualquer detalhe de infra.
 - Entidades e contratos do domínio não conhecem HTTP, JSON, ficheiros locais ou UI.
 - `presentation` concentra ViewModels, `UiState` e componentes Compose.
-- `data` contém DTOs, mappers, repositories e contratos de data source.
-- Implementações que dependem de ficheiros locais do utilizador ficam em `desktopMain`.
+- `data` contém DTOs, mappers, repositories e contratos de data source, incluindo histórico e checagem de updates.
+- Implementações que dependem de ficheiros locais, SQLite, processo do SO ou instalador ficam em `desktopMain`.
 
 ## Source sets
 
 | Source set | Papel |
 |---|---|
 | `commonMain` | Código partilhado de domain, data, presentation e UI |
-| `desktopMain` | Bootstrap desktop, datasources locais, janela e integrações JVM |
+| `desktopMain` | Bootstrap desktop, datasources locais, SQLite de histórico, `AutoStartManager`, `DesktopAppUpdateInstaller`, janela e integrações JVM |
 | `commonTest` | Testes de domain, mappers e ViewModels |
 | `desktopTest` | Testes de componentes Compose Desktop |
 | `src/installer` | Scripts, idiomas e assets do instalador NSIS |
@@ -93,7 +95,7 @@ Regras principais:
 
 O grafo é montado manualmente em `src/desktopMain/kotlin/com/usagemonitor/Main.kt`:
 
-`HttpClient(OkHttp)` -> data sources locais/remotos -> repositories -> use cases -> `DashboardViewModel` / `HistoryViewModel` -> telas Compose
+`HttpClient(OkHttp)` -> data sources locais/remotos -> repositories de uso/histórico/update -> use cases -> `DashboardViewModel` / `HistoryViewModel` -> telas Compose
 
 Dependências importantes montadas no bootstrap:
 
@@ -105,6 +107,13 @@ Dependências importantes montadas no bootstrap:
 - `CodexRepositoryImpl`
 - `MiniMaxRepositoryImpl`
 - `UsageHistoryRepositoryImpl`
+- `AppUpdateRepositoryImpl`
+- `DesktopAppUpdateInstaller`
+
+Observações adicionais:
+
+- `CURRENT_APP_VERSION` é gerada a partir de `build.gradle.kts` em tempo de build.
+- O `Main.kt` também persiste ordem dos cards, estado minimizado e preferências de auto-start.
 
 ### Dashboard
 
@@ -112,6 +121,16 @@ Dependências importantes montadas no bootstrap:
 - O footer expõe versão da app, contador para próximo refresh, acesso a histórico e configurações.
 - O utilizador pode atualizar uma API específica sem recarregar o resto.
 - Se ao menos uma API responder, a UI continua em `Success` e lista erros parciais.
+- Os cards podem ser reordenados por drag-and-drop sem perder a posição das APIs ocultas.
+- Cada card pode ser minimizado; o estado fica persistido entre sessões.
+- A UI também exibe banners persistentes para problemas de configuração e para updates disponíveis.
+
+### Histórico e forecast
+
+- Cada card pode abrir um diálogo de histórico focado na API correspondente.
+- A tela de histórico suporta intervalos de `24h`, `7 dias` e `30 dias`.
+- O repositório de histórico calcula consumo acumulado, média por hora e previsão de esgotamento.
+- A série ativa ignora snapshots de janelas antigas após reset para não distorcer o forecast.
 
 ### Polling e lifecycle
 
@@ -119,8 +138,10 @@ Dependências importantes montadas no bootstrap:
 - O polling acontece num `while (true) + delay(1_000)` com ciclo de 600 segundos.
 - Ao fim de cada ciclo, a app dispara nova coleta das APIs habilitadas.
 - Cada snapshot bem-sucedido é persistido para histórico.
+- Ao fim de cada ciclo, a app também verifica se existe release mais nova publicada.
 - `viewModel.onDestroy()` precisa ser chamado no fechamento da janela.
-- `Main.kt` também fecha o `HttpClient` ao encerrar a aplicação e no shutdown hook.
+- `Main.kt` fecha `DashboardViewModel`, `HistoryViewModel` e `HttpClient` ao encerrar a aplicação e no shutdown hook.
+- Se um update automático for preparado com sucesso, a app fecha para delegar a instalação ao launcher temporário.
 
 ## Preferências e persistência
 
@@ -132,11 +153,16 @@ Preferências do utilizador:
   - `isDark`
   - `language`
   - `autoStart`
+  - `cardOrder`
+  - `minimizedCards`
 
 Persistência adicional:
 
-- Histórico de uso é salvo localmente por `LocalUsageHistoryDataSource`
-- `AutoStartManager` escreve em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+- Histórico de uso é salvo por `LocalUsageHistoryDataSource` em `~/.usage-monitor/usage-history.db`
+- O histórico aplica retenção de 30 dias
+- Snapshots sem janela de reset conhecida não entram no histórico
+- `AutoStartManager` escreve em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` no Windows
+- No Linux, o auto-start usa `~/.config/autostart/usage-monitor.desktop` ou `XDG_CONFIG_HOME/autostart/usage-monitor.desktop`
 
 Observação importante:
 
@@ -144,9 +170,14 @@ Observação importante:
 
 ## Requisitos locais
 
-- Windows para experiência completa de desktop e instalador
+- Windows ou Linux para rodar a app desktop
 - JDK 17
 - Credenciais locais válidas para os serviços que quiser monitorar
+
+Notas por plataforma:
+
+- Windows: fluxo completo com `packageInstaller`, instalador NSIS, auto-start por registry e preparação automática via `.msi`.
+- Linux: suporte a auto-start por `.desktop`, empacotamento nativo do Compose e instalação automática quando houver `.deb` e `pkexec`.
 
 ### Variável obrigatória para MiniMax
 
@@ -188,15 +219,18 @@ Importante:
 ## Build e distribuição
 
 - `desktopJar` gera o JAR executável.
-- `createDistributable` gera a distribuição desktop.
+- `createDistributable` gera a distribuição desktop em `build/compose/binaries/main/app/Usage Monitor`.
+- `packageDistributionForCurrentOS` gera os pacotes nativos da plataforma atual e é usado na pipeline de release.
 - `packageInstaller` empacota o instalador NSIS quando o NSIS estiver instalado.
+- `build-with-icon.ps1` é um fluxo auxiliar Windows para gerar distributable, aplicar ícone com `rcedit` e chamar o NSIS manualmente.
 - O projeto configura `TargetFormat.Exe`, `TargetFormat.Msi`, `TargetFormat.Deb` e `TargetFormat.Rpm`.
 - A versão atual da app vem de `build.gradle.kts` e é propagada para `CURRENT_APP_VERSION`.
+- Tags `v*` disparam `.github/workflows/release-linux.yml`, que hoje publica artefatos Linux e Windows no GitHub Release.
 
 ## Testes
 
-- `commonTest` cobre domain, mappers e `DashboardViewModel`
-- `desktopTest` cobre componentes Compose Desktop
+- `commonTest` cobre domain, mappers, histórico/forecast, layout dos cards e `DashboardViewModel`
+- `desktopTest` cobre datasource SQLite e componentes Compose Desktop do dashboard, histórico e configurações
 - A suíte agregada esperada do projeto é `gradlew.bat allTests`
 
 ## Regras de código
@@ -215,6 +249,8 @@ Importante:
 - Falha de uma API não deve cancelar as outras; por isso o uso de `SupervisorJob`.
 - Ao alterar o bootstrap, preserve o fechamento explícito de `viewModel` e `HttpClient`.
 - Ao alterar o dashboard, preserve o comportamento de sucesso parcial do `UiState`.
+- Ao alterar histórico, preserve a retenção local e a regra de ignorar quotas sem reset conhecido.
+- Ao alterar releases, alinhe `build.gradle.kts`, `CURRENT_APP_VERSION`, assets de release e o instalador/plataforma suportada.
 
 ## Instalador NSIS
 
@@ -253,9 +289,32 @@ Regra obrigatória:
 
 - Nunca rodar `git commit` ou `git push` sem pedido explícito do utilizador.
 
+## Automação e documentos auxiliares
+
+Materiais a tratar como fonte de verdade:
+
+- `AGENTS.md`
+- `README.md`
+
+Materiais auxiliares já presentes no repositório:
+
+- `.agents/skills/slash/commit-push.md`
+- `.agents/skills/slash/release.md`
+- `.claude/skills/nsis-installer.md`
+- `build-with-icon.ps1`
+
+Observações importantes:
+
+- `docs/research.md` é histórico de descoberta e não substitui o contrato atual implementado no código.
+- Arquivos auxiliares legados como `CLAUDE.md` e `.claude/skills/*` devem ser validados contra `AGENTS.md` e este `README` antes de serem reutilizados.
+
 ## Ficheiros relevantes
 
 - `AGENTS.md`: regras de trabalho e manutenção do repositório
 - `build.gradle.kts`: build, versão, distribuição e tarefas do instalador
+- `src/desktopMain/kotlin/com/usagemonitor/Main.kt`: bootstrap manual, preferências e composição principal
+- `src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt`: polling, estado parcial, snapshots e update flow
+- `src/commonMain/kotlin/com/usagemonitor/data/repository/UsageHistoryRepositoryImpl.kt`: agregação histórica e forecast
+- `.github/workflows/release-linux.yml`: pipeline de release para artefatos Linux e Windows
 - `docs/research.md`: pesquisa histórica de integrações e decisões iniciais
 - `src/installer/UsageMonitor.nsi`: script do instalador NSIS
