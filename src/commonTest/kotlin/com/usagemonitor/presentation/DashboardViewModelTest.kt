@@ -1,18 +1,24 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.AnthropicRepository
+import com.usagemonitor.domain.repository.AppUpdateRepository
 import com.usagemonitor.domain.repository.CodexRepository
 import com.usagemonitor.domain.repository.MiniMaxRepository
 import com.usagemonitor.domain.repository.UsageHistoryRepository
+import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
+import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
+import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateInstaller
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -79,6 +85,15 @@ class DashboardViewModelTest {
         return RecordUsageSnapshotUseCase(historyRepository)
     }
 
+    private fun updateUseCase(result: Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
+        val repository = object : AppUpdateRepository {
+            override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
+                return result
+            }
+        }
+        return CheckForAppUpdateUseCase(repository)
+    }
+
     private fun successViewModel(recordedSnapshots: MutableList<ApiUsageStats>): DashboardViewModel {
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.success(sampleAnthropicStats)
@@ -95,7 +110,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            Clock.System
+            clock = Clock.System
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
@@ -124,7 +139,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            Clock.System
+            clock = Clock.System
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
@@ -149,7 +164,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            Clock.System
+            clock = Clock.System
         )
         vm.cancelInitFetch()
         vm.cancelCountdown()
@@ -173,6 +188,15 @@ class DashboardViewModelTest {
                 return
             }
             delay(20)
+        }
+    }
+
+    private fun awaitConditionRealTime(predicate: () -> Boolean) {
+        repeat(250) {
+            if (predicate()) {
+                return
+            }
+            Thread.sleep(20)
         }
     }
 
@@ -202,7 +226,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             MutableStateFlow(emptySet()),
             historyUseCase(recordedSnapshots),
-            Clock.System
+            clock = Clock.System
         )
         viewModel.cancelCountdown()
 
@@ -264,7 +288,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            Clock.System
+            clock = Clock.System
         )
         viewModel.cancelInitFetch()
         viewModel.cancelCountdown()
@@ -301,7 +325,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            Clock.System
+            clock = Clock.System
         )
         viewModel.cancelInitFetch()
         viewModel.cancelCountdown()
@@ -367,7 +391,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            Clock.System
+            clock = Clock.System
         )
         viewModel.cancelInitFetch()
         viewModel.cancelCountdown()
@@ -441,7 +465,7 @@ class DashboardViewModelTest {
             GetCodexUsageUseCase(codexRepo),
             enabledApis,
             RecordUsageSnapshotUseCase(historyRepository),
-            Clock.System
+            clock = Clock.System
         )
         viewModel.cancelInitFetch()
         viewModel.cancelCountdown()
@@ -460,6 +484,161 @@ class DashboardViewModelTest {
         assertIs<UiState.Success>(state)
         assertEquals(1, recordedSnapshots.size)
         assertEquals(ApiSource.ANTHROPIC, recordedSnapshots.single().source)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `publishes available update when a newer version exists without automatic installer`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            MutableStateFlow(emptySet()),
+            historyUseCase(recordedSnapshots),
+            checkForAppUpdate = updateUseCase(
+                Result.success(
+                    AppUpdateInfo(
+                        version = "7.1.0",
+                        releasePageUrl = "https://example.com/releases/tag/v7.1.0"
+                    )
+                )
+            ),
+            appUpdateInstaller = UnsupportedAppUpdateInstaller,
+            currentAppVersion = "7.0.0",
+            clock = Clock.System
+        )
+        viewModel.cancelCountdown()
+
+        awaitConditionRealTime { viewModel.appUpdateState.value is AppUpdateUiState.Available }
+
+        val updateState = viewModel.appUpdateState.value
+        assertIs<AppUpdateUiState.Available>(updateState)
+        assertEquals("7.1.0", updateState.update.version)
+        assertEquals(false, updateState.automaticInstallSupported)
+        assertEquals(false, viewModel.shouldExitForUpdate.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `prepares automatic Windows update and requests app exit`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        var preparedVersion: String? = null
+        val installer = object : AppUpdateInstaller {
+            override val isSupported: Boolean = true
+
+            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
+                preparedVersion = update.version
+                return Result.success(Unit)
+            }
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            MutableStateFlow(emptySet()),
+            historyUseCase(recordedSnapshots),
+            checkForAppUpdate = updateUseCase(
+                Result.success(
+                    AppUpdateInfo(
+                        version = "7.1.0",
+                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
+                        windowsInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.msi"
+                    )
+                )
+            ),
+            appUpdateInstaller = installer,
+            currentAppVersion = "7.0.0",
+            clock = Clock.System
+        )
+        viewModel.cancelCountdown()
+
+        awaitConditionRealTime { viewModel.appUpdateState.value is AppUpdateUiState.Installing }
+        awaitConditionRealTime { viewModel.shouldExitForUpdate.value }
+
+        val updateState = viewModel.appUpdateState.value
+        assertIs<AppUpdateUiState.Installing>(updateState)
+        assertEquals("7.1.0", preparedVersion)
+        assertEquals(true, viewModel.shouldExitForUpdate.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `allows retrying automatic update after a preparation failure`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        var attempts = 0
+        val installer = object : AppUpdateInstaller {
+            override val isSupported: Boolean = true
+
+            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
+                attempts += 1
+                return if (attempts == 1) {
+                    Result.failure(IllegalStateException("Falha ao baixar o MSI"))
+                } else {
+                    Result.success(Unit)
+                }
+            }
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            MutableStateFlow(emptySet()),
+            historyUseCase(recordedSnapshots),
+            checkForAppUpdate = updateUseCase(
+                Result.success(
+                    AppUpdateInfo(
+                        version = "7.1.0",
+                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
+                        windowsInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.msi"
+                    )
+                )
+            ),
+            appUpdateInstaller = installer,
+            currentAppVersion = "7.0.0",
+            clock = Clock.System
+        )
+        viewModel.cancelCountdown()
+
+        awaitConditionRealTime { viewModel.appUpdateState.value is AppUpdateUiState.Failed }
+
+        viewModel.retryUpdateInstallation()
+
+        awaitConditionRealTime { viewModel.appUpdateState.value is AppUpdateUiState.Installing }
+        awaitConditionRealTime { viewModel.shouldExitForUpdate.value }
+
+        assertEquals(2, attempts)
+        assertEquals(true, viewModel.shouldExitForUpdate.value)
         viewModel.onDestroy()
     }
 }

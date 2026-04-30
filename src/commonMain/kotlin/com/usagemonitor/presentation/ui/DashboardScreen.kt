@@ -48,6 +48,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
+import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.presentation.viewmodel.UiState
@@ -71,6 +72,7 @@ fun DashboardScreen(
     val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
     val refreshingSources by viewModel.refreshingSources.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
+    val appUpdateState by viewModel.appUpdateState.collectAsState()
     val enabledApisState by enabledApis.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -122,6 +124,17 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    appUpdateState?.let { updateState ->
+                        AppUpdateBanner(
+                            state = updateState,
+                            language = language,
+                            onRetryInstallation = { viewModel.retryUpdateInstallation() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+
                     SnackbarHost(
                         hostState = snackbarHostState,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
@@ -633,9 +646,126 @@ private fun warningFor(
     return null
 }
 
+@Composable
+private fun AppUpdateBanner(
+    state: AppUpdateUiState,
+    language: AppLanguage,
+    onRetryInstallation: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val content = updateBannerContent(state = state, language = language)
+
+    PersistentApiWarningBanner(
+        title = content.title,
+        description = content.description,
+        actionLabel = content.actionLabel,
+        onAction = if (content.showRetryAction) onRetryInstallation else null,
+        modifier = modifier
+    )
+}
+
+private fun updateBannerContent(
+    state: AppUpdateUiState,
+    language: AppLanguage
+): UpdateBannerContent {
+    return when (state) {
+        is AppUpdateUiState.Available -> {
+            val title = if (language == AppLanguage.PT) {
+                "Nova versão ${state.update.version} disponível"
+            } else {
+                "Version ${state.update.version} is available"
+            }
+            val description = if (language == AppLanguage.PT) {
+                if (state.automaticInstallSupported) {
+                    "A atualização automática está pronta para este ambiente Windows."
+                } else {
+                    "A atualização automática não está disponível nesta plataforma. Atualize manualmente pela release publicada."
+                }
+            } else {
+                if (state.automaticInstallSupported) {
+                    "Automatic updating is ready for this Windows environment."
+                } else {
+                    "Automatic updating is not available on this platform. Install the published release manually."
+                }
+            }
+
+            UpdateBannerContent(
+                title = title,
+                description = description
+            )
+        }
+
+        is AppUpdateUiState.Downloading -> UpdateBannerContent(
+            title = if (language == AppLanguage.PT) {
+                "Nova versão ${state.update.version} disponível"
+            } else {
+                "Version ${state.update.version} is available"
+            },
+            description = if (language == AppLanguage.PT) {
+                "Baixando automaticamente o instalador do Windows para preparar a atualização."
+            } else {
+                "Automatically downloading the Windows installer to prepare the update."
+            }
+        )
+
+        is AppUpdateUiState.Installing -> UpdateBannerContent(
+            title = if (language == AppLanguage.PT) {
+                "Atualização pronta para instalar"
+            } else {
+                "Update is ready to install"
+            },
+            description = if (language == AppLanguage.PT) {
+                "Fechando o app para iniciar o instalador da versão ${state.update.version}."
+            } else {
+                "Closing the app to start the installer for version ${state.update.version}."
+            }
+        )
+
+        is AppUpdateUiState.Failed -> {
+            val targetVersion = state.update?.version
+            val title = if (language == AppLanguage.PT) {
+                if (targetVersion != null) {
+                    "Falha ao preparar a atualização ${targetVersion}"
+                } else {
+                    "Falha ao preparar a atualização"
+                }
+            } else {
+                if (targetVersion != null) {
+                    "Failed to prepare update ${targetVersion}"
+                } else {
+                    "Failed to prepare the update"
+                }
+            }
+            val description = if (language == AppLanguage.PT) {
+                "Não foi possível baixar ou iniciar o instalador automaticamente. ${state.message}"
+            } else {
+                "The app could not download or start the installer automatically. ${state.message}"
+            }
+
+            UpdateBannerContent(
+                title = title,
+                description = description,
+                actionLabel = if (state.update?.windowsInstallerDownloadUrl != null) {
+                    if (language == AppLanguage.PT) "Tentar novamente" else "Retry"
+                } else {
+                    null
+                },
+                showRetryAction = state.update?.windowsInstallerDownloadUrl != null
+            )
+        }
+    }
+}
+
 private data class DashboardWarning(
     val source: ApiSource,
     val title: String,
     val description: String,
     val actionLabel: String?
+)
+
+private data class UpdateBannerContent(
+    val title: String,
+    val description: String,
+    val actionLabel: String? = null,
+    val showRetryAction: Boolean = false
 )

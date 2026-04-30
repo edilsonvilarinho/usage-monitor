@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CodexUsageResponse
+import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import io.ktor.client.HttpClient
@@ -14,6 +15,8 @@ import io.ktor.http.isSuccess
 
 private const val CLAUDE_USER_AGENT = "claude-code/1.0.0"
 private const val ANTHROPIC_BETA_OAUTH = "oauth-2025-04-20"
+private const val GITHUB_API_VERSION = "2022-11-28"
+private const val USAGE_MONITOR_USER_AGENT = "UsageMonitorDesktop"
 
 class RemoteApiDataSource(private val httpClient: HttpClient) {
 
@@ -59,6 +62,22 @@ class RemoteApiDataSource(private val httpClient: HttpClient) {
         if (!response.status.isSuccess()) {
             val body = response.bodyAsText()
             throw IllegalStateException("Codex HTTP ${response.status.value}: $body")
+        }
+
+        return response.body()
+    }
+
+    suspend fun fetchLatestGitHubRelease(owner: String, repository: String): GitHubReleaseDto {
+        val response = httpClient.get("https://api.github.com/repos/$owner/$repository/releases/latest") {
+            header("Accept", "application/vnd.github+json")
+            header("User-Agent", USAGE_MONITOR_USER_AGENT)
+            header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+            contentType(ContentType.Application.Json)
+        }
+
+        if (!response.status.isSuccess()) {
+            val body = response.bodyAsText()
+            throw IllegalStateException("GitHub release HTTP ${response.status.value}: $body")
         }
 
         return response.body()

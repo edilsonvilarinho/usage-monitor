@@ -1,7 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
@@ -30,6 +32,9 @@ class DashboardViewModel(
     private val getCodexUsage: GetCodexUsageUseCase,
     private val enabledApis: StateFlow<Set<ApiSource>>,
     private val recordUsageSnapshot: RecordUsageSnapshotUseCase,
+    private val checkForAppUpdate: CheckForAppUpdateUseCase? = null,
+    private val appUpdateInstaller: AppUpdateInstaller = UnsupportedAppUpdateInstaller,
+    private val currentAppVersion: String = "0.0.0",
     private val clock: Clock = Clock.System
 ) {
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -44,16 +49,27 @@ class DashboardViewModel(
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
+    private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
+    val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
+
+    private val _shouldExitForUpdate = MutableStateFlow(false)
+    val shouldExitForUpdate: StateFlow<Boolean> = _shouldExitForUpdate.asStateFlow()
+
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val stateMutex = Mutex()
+    private val updateMutex = Mutex()
     private val cachedStatsBySource = mutableMapOf<ApiSource, ApiUsageStats>()
     private val cachedErrorsBySource = mutableMapOf<ApiSource, UiApiError>()
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
+    private var autoInstallAttemptedVersion: String? = null
 
     init {
         initFetchJob = viewModelScope.launch {
             fetchUsage(targetSources = enabledApis.value)
+        }
+        viewModelScope.launch {
+            checkForUpdate(autoInstall = true)
         }
         startCountdown()
     }
@@ -69,6 +85,9 @@ class DashboardViewModel(
                 }
                 viewModelScope.launch {
                     fetchUsage(targetSources = enabledApis.value)
+                }
+                viewModelScope.launch {
+                    checkForUpdate(autoInstall = true)
                 }
             }
         }
@@ -149,6 +168,9 @@ class DashboardViewModel(
         viewModelScope.launch {
             fetchUsage(targetSources = enabledApis.value)
         }
+        viewModelScope.launch {
+            checkForUpdate(autoInstall = true)
+        }
     }
 
     fun refresh(source: ApiSource) {
@@ -163,6 +185,26 @@ class DashboardViewModel(
                 preserveDataOnFailure = true
             )
         }
+        viewModelScope.launch {
+            checkForUpdate(autoInstall = true)
+        }
+    }
+
+    fun retryUpdateInstallation() {
+        val currentState = _appUpdateState.value
+        val update = when (currentState) {
+            is AppUpdateUiState.Available -> currentState.update
+            is AppUpdateUiState.Failed -> currentState.update
+            is AppUpdateUiState.Downloading -> null
+            is AppUpdateUiState.Installing -> null
+            null -> null
+        }
+
+        if (update == null || !canInstallAutomatically(update)) {
+            return
+        }
+
+        startAutomaticUpdate(update)
     }
 
     fun cancelCountdown() {
@@ -246,5 +288,68 @@ class DashboardViewModel(
         }.onFailure { error ->
             println("[history] failed to persist snapshot for ${stats.source}: ${error.message}")
         }
+    }
+
+    private suspend fun checkForUpdate(autoInstall: Boolean) {
+        val updateUseCase = checkForAppUpdate ?: return
+
+        updateMutex.withLock {
+            val currentState = _appUpdateState.value
+
+            if (currentState is AppUpdateUiState.Downloading || currentState is AppUpdateUiState.Installing) {
+                return@withLock
+            }
+
+            updateUseCase(currentAppVersion)
+                .onSuccess { update ->
+                    if (update == null) {
+                        if (currentState !is AppUpdateUiState.Failed) {
+                            _appUpdateState.value = null
+                        }
+                        return@onSuccess
+                    }
+
+                    if (autoInstall && canInstallAutomatically(update) && autoInstallAttemptedVersion != update.version) {
+                        autoInstallAttemptedVersion = update.version
+                        startAutomaticUpdate(update)
+                        return@onSuccess
+                    }
+
+                    if (currentState is AppUpdateUiState.Failed && currentState.update?.version == update.version) {
+                        return@onSuccess
+                    }
+
+                    _appUpdateState.value = AppUpdateUiState.Available(
+                        update = update,
+                        automaticInstallSupported = canInstallAutomatically(update)
+                    )
+                }
+                .onFailure { error ->
+                    println("[update] failed to check for updates: ${error.message}")
+                }
+        }
+    }
+
+    private fun startAutomaticUpdate(update: AppUpdateInfo) {
+        _appUpdateState.value = AppUpdateUiState.Downloading(update)
+
+        viewModelScope.launch {
+            appUpdateInstaller.prepareUpdateInstallation(update)
+                .onSuccess {
+                    _appUpdateState.value = AppUpdateUiState.Installing(update)
+                    delay(1_500L)
+                    _shouldExitForUpdate.value = true
+                }
+                .onFailure { error ->
+                    _appUpdateState.value = AppUpdateUiState.Failed(
+                        update = update,
+                        message = error.message ?: "Unknown error"
+                    )
+                }
+        }
+    }
+
+    private fun canInstallAutomatically(update: AppUpdateInfo): Boolean {
+        return appUpdateInstaller.isSupported && update.windowsInstallerDownloadUrl != null
     }
 }

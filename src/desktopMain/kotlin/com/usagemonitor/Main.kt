@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,6 +20,7 @@ import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
+import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
@@ -26,6 +28,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
+import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
@@ -40,6 +43,7 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.update.DesktopAppUpdateInstaller
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -146,6 +150,10 @@ fun main() = application {
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
     }
+    val appUpdateRepository = remember(remoteApiDataSource) {
+        AppUpdateRepositoryImpl(remoteApiDataSource)
+    }
+    val appUpdateInstaller = remember { DesktopAppUpdateInstaller() }
 
     val recordUsageSnapshot = remember(usageHistoryRepository) {
         RecordUsageSnapshotUseCase(usageHistoryRepository)
@@ -160,7 +168,10 @@ fun main() = application {
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
             getCodexUsage = GetCodexUsageUseCase(codexRepository),
             enabledApis = enabledApis,
-            recordUsageSnapshot = recordUsageSnapshot
+            recordUsageSnapshot = recordUsageSnapshot,
+            checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
+            appUpdateInstaller = appUpdateInstaller,
+            currentAppVersion = CURRENT_APP_VERSION
         )
     }
     val historyViewModel = remember(getUsageHistory, enabledApis) {
@@ -189,6 +200,7 @@ fun main() = application {
     val iconImage = remember { loadWindowIcon() }
     val mainWindowState = rememberWindowState()
     val enabledApisState by enabledApis.collectAsState()
+    val shouldExitForUpdate by viewModel.shouldExitForUpdate.collectAsState()
     var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
     var language by remember {
         mutableStateOf(
@@ -200,13 +212,24 @@ fun main() = application {
     var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
-
-    Window(
-        onCloseRequest = {
+    val shutdownApplication = remember(viewModel, historyViewModel, httpClient) {
+        {
             viewModel.onDestroy()
             historyViewModel.onDestroy()
             httpClient.close()
             exitProcess(0)
+        }
+    }
+
+    LaunchedEffect(shouldExitForUpdate) {
+        if (shouldExitForUpdate) {
+            shutdownApplication()
+        }
+    }
+
+    Window(
+        onCloseRequest = {
+            shutdownApplication()
         },
         title = "Usage Monitor",
         icon = iconImage,
@@ -219,10 +242,7 @@ fun main() = application {
                 iconPainter = iconImage,
                 windowState = mainWindowState,
                 onCloseRequest = {
-                    viewModel.onDestroy()
-                    historyViewModel.onDestroy()
-                    httpClient.close()
-                    exitProcess(0)
+                    shutdownApplication()
                 }
             ) {
                 DashboardScreen(
