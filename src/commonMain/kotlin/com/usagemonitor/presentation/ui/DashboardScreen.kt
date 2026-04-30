@@ -677,13 +677,13 @@ private fun updateBannerContent(
             }
             val description = if (language == AppLanguage.PT) {
                 if (state.automaticInstallSupported) {
-                    "A atualização automática está pronta para este ambiente Windows."
+                    "A atualização automática está pronta para este ambiente."
                 } else {
                     "A atualização automática não está disponível nesta plataforma. Atualize manualmente pela release publicada."
                 }
             } else {
                 if (state.automaticInstallSupported) {
-                    "Automatic updating is ready for this Windows environment."
+                    "Automatic updating is ready on this environment."
                 } else {
                     "Automatic updating is not available on this platform. Install the published release manually."
                 }
@@ -702,9 +702,9 @@ private fun updateBannerContent(
                 "Version ${state.update.version} is available"
             },
             description = if (language == AppLanguage.PT) {
-                "Baixando automaticamente o instalador do Windows para preparar a atualização."
+                "Baixando automaticamente o pacote da atualização para preparar a instalação."
             } else {
-                "Automatically downloading the Windows installer to prepare the update."
+                "Automatically downloading the update package to prepare the installation."
             }
         )
 
@@ -745,12 +745,12 @@ private fun updateBannerContent(
             UpdateBannerContent(
                 title = title,
                 description = description,
-                actionLabel = if (state.update?.windowsInstallerDownloadUrl != null) {
+                actionLabel = if (state.automaticInstallSupported) {
                     if (language == AppLanguage.PT) "Tentar novamente" else "Retry"
                 } else {
                     null
                 },
-                showRetryAction = state.update?.windowsInstallerDownloadUrl != null
+                showRetryAction = state.automaticInstallSupported
             )
         }
     }

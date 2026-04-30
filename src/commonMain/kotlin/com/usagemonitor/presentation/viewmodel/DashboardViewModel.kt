@@ -194,7 +194,7 @@ class DashboardViewModel(
         val currentState = _appUpdateState.value
         val update = when (currentState) {
             is AppUpdateUiState.Available -> currentState.update
-            is AppUpdateUiState.Failed -> currentState.update
+            is AppUpdateUiState.Failed -> if (currentState.automaticInstallSupported) currentState.update else null
             is AppUpdateUiState.Downloading -> null
             is AppUpdateUiState.Installing -> null
             null -> null
@@ -343,13 +343,14 @@ class DashboardViewModel(
                 .onFailure { error ->
                     _appUpdateState.value = AppUpdateUiState.Failed(
                         update = update,
-                        message = error.message ?: "Unknown error"
+                        message = error.message ?: "Unknown error",
+                        automaticInstallSupported = canInstallAutomatically(update)
                     )
                 }
         }
     }
 
     private fun canInstallAutomatically(update: AppUpdateInfo): Boolean {
-        return appUpdateInstaller.isSupported && update.windowsInstallerDownloadUrl != null
+        return appUpdateInstaller.canInstall(update)
     }
 }

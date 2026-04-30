@@ -110,7 +110,7 @@ object AutoStartManager {
         return File(configHome, "autostart/$LINUX_AUTOSTART_FILE")
     }
 
-    private fun resolveExecutablePath(): String? {
+    internal fun resolveExecutablePath(): String? {
         val userDir = System.getProperty("user.dir")
         val candidates = buildList {
             System.getProperty("jpackage.app-path")?.let(::add)

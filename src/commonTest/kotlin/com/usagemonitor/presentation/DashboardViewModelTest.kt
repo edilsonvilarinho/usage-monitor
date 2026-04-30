@@ -201,9 +201,39 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `initial state is Loading`() {
-        val viewModel = successViewModel(mutableListOf())
+    fun `initial state is Loading`() = runTest {
+        val fetchGate = CompletableDeferred<Unit>()
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                fetchGate.await()
+                return Result.success(sampleAnthropicStats)
+            }
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                fetchGate.await()
+                return Result.success(sampleMiniMaxStats)
+            }
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System
+        )
+        viewModel.cancelCountdown()
+
         assertIs<UiState.Loading>(viewModel.uiState.value)
+
+        fetchGate.complete(Unit)
+        awaitConditionRealTime { viewModel.uiState.value is UiState.Success }
         viewModel.onDestroy()
     }
 
@@ -531,7 +561,7 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `prepares automatic Windows update and requests app exit`() = runTest {
+    fun `prepares automatic update and requests app exit`() = runTest {
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
@@ -545,6 +575,10 @@ class DashboardViewModelTest {
         var preparedVersion: String? = null
         val installer = object : AppUpdateInstaller {
             override val isSupported: Boolean = true
+
+            override fun canInstall(update: AppUpdateInfo): Boolean {
+                return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
+            }
 
             override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
                 preparedVersion = update.version
@@ -563,7 +597,7 @@ class DashboardViewModelTest {
                     AppUpdateInfo(
                         version = "7.1.0",
                         releasePageUrl = "https://example.com/releases/tag/v7.1.0",
-                        windowsInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.msi"
+                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
                     )
                 )
             ),
@@ -599,10 +633,14 @@ class DashboardViewModelTest {
         val installer = object : AppUpdateInstaller {
             override val isSupported: Boolean = true
 
+            override fun canInstall(update: AppUpdateInfo): Boolean {
+                return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
+            }
+
             override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
                 attempts += 1
                 return if (attempts == 1) {
-                    Result.failure(IllegalStateException("Falha ao baixar o MSI"))
+                    Result.failure(IllegalStateException("Falha ao baixar o pacote"))
                 } else {
                     Result.success(Unit)
                 }
@@ -620,7 +658,7 @@ class DashboardViewModelTest {
                     AppUpdateInfo(
                         version = "7.1.0",
                         releasePageUrl = "https://example.com/releases/tag/v7.1.0",
-                        windowsInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.msi"
+                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
                     )
                 )
             ),

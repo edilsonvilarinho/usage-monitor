@@ -18,6 +18,7 @@ sealed interface AppUpdateUiState {
 
     data class Failed(
         val update: AppUpdateInfo?,
-        val message: String
+        val message: String,
+        val automaticInstallSupported: Boolean
     ) : AppUpdateUiState
 }

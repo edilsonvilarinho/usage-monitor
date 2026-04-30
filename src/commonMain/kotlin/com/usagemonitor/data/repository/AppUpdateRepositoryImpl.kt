@@ -28,6 +28,9 @@ class AppUpdateRepositoryImpl(
                 releasePageUrl = latestRelease.htmlUrl,
                 windowsInstallerDownloadUrl = latestRelease.assets.firstOrNull { asset ->
                     asset.name.endsWith(".msi", ignoreCase = true)
+                }?.browserDownloadUrl,
+                linuxDebInstallerDownloadUrl = latestRelease.assets.firstOrNull { asset ->
+                    asset.name.endsWith(".deb", ignoreCase = true)
                 }?.browserDownloadUrl
             )
         }
