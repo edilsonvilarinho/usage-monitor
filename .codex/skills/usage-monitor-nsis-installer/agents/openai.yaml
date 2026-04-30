@@ -1,0 +1,4 @@
+interface:
+  display_name: "Usage Monitor NSIS Installer"
+  short_description: "Build and troubleshoot the NSIS installer workflow"
+  default_prompt: "Build or troubleshoot the usage-monitor NSIS installer workflow."

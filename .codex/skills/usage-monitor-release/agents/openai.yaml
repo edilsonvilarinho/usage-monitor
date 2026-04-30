@@ -1,0 +1,4 @@
+interface:
+  display_name: "Usage Monitor Release"
+  short_description: "Cut and publish a release for this repository"
+  default_prompt: "Prepare and publish a release for the usage-monitor repository."

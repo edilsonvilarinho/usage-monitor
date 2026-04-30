@@ -296,6 +296,24 @@ Materiais a tratar como fonte de verdade:
 - `AGENTS.md`
 - `README.md`
 
+Skills Codex versionadas no repositório:
+
+- `.codex/skills/usage-monitor-commit-push`
+- `.codex/skills/usage-monitor-release`
+- `.codex/skills/usage-monitor-nsis-installer`
+
+Para instalar essas skills em outro PC:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .codex\install-repo-skills.ps1
+```
+
+Opções úteis:
+
+- instalar num `CODEX_HOME` específico: `-TargetCodexHome C:\Users\seu-usuario\.codex`
+- instalar só algumas skills: `-SkillNames usage-monitor-release,usage-monitor-commit-push`
+- se o Codex já estiver aberto no outro PC, reinicie a app ou abra uma nova sessão depois da instalação
+
 Materiais auxiliares já presentes no repositório:
 
 - `.agents/skills/slash/commit-push.md`

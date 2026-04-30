@@ -1,0 +1,4 @@
+interface:
+  display_name: "Usage Monitor Commit Push"
+  short_description: "Commit and push changes safely for this repository"
+  default_prompt: "Commit and push the intended changes in the usage-monitor repository."
