@@ -188,6 +188,11 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download packaged artifacts
         uses: actions/download-artifact@v4
         with:
@@ -198,8 +203,62 @@ jobs:
       - name: List packaged artifacts
         run: ls -la dist-build
 
+      - name: Generate release notes
+        id: release_notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_tag="${GITHUB_REF#refs/tags/}"
+          git fetch --force --tags
+
+          previous_tag="$(git tag --sort=-version:refname | grep '^v' | grep -Fxv "$current_tag" | head -n 1 || true)"
+          range_spec="$current_tag"
+
+          if [ -n "$previous_tag" ]; then
+            range_spec="${previous_tag}..${current_tag}"
+            compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/${previous_tag}...${current_tag}"
+          fi
+
+          commit_lines="$(
+            git log --no-merges --reverse --pretty='%s|%h' "$range_spec" | while IFS='|' read -r subject short_sha; do
+              if [ "$subject" = "chore: bump version to $current_tag" ]; then
+                continue
+              fi
+
+              printf -- '- %s (`%s`)\n' "$subject" "$short_sha"
+            done
+          )"
+
+          notes_path="$RUNNER_TEMP/release-notes.md"
+
+          {
+            echo "## Changes"
+            echo
+
+            if [ -n "$previous_tag" ]; then
+              echo "- Compare: [${previous_tag}...${current_tag}](${compare_url})"
+              echo
+            else
+              echo "- Initial release"
+              echo
+            fi
+
+            if [ -n "$commit_lines" ]; then
+              printf '%s\n' "$commit_lines"
+            elif [ -n "$previous_tag" ]; then
+              echo "- No user-facing commits were detected since ${previous_tag}."
+            else
+              echo "- No user-facing commits were detected for this initial release."
+            fi
+          } > "$notes_path"
+
+          cat "$notes_path"
+          echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: ${{ steps.release_notes.outputs.notes_path }}
           files: dist-build/*
           fail_on_unmatched_files: true
