@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
  * Padrão de uso no Compose:
  *   when (val state = uiState) {
  *       is UiState.Loading -> { ... }
+ *       UiState.NoApisEnabled -> { ... }
  *       is UiState.Success -> { state.data ... }
  *       is UiState.Error   -> { state.message ... }
  *   }
@@ -23,6 +24,9 @@ sealed interface UiState {
 
     /** Primeira carga: nenhum dado disponível ainda. */
     data object Loading : UiState
+
+    /** Nenhuma API foi habilitada nas configurações. */
+    data object NoApisEnabled : UiState
 
     /**
      * Dados disponíveis (pelo menos uma API retornou com sucesso).

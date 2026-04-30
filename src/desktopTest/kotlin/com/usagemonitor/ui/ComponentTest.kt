@@ -21,13 +21,23 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageForecast
+import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.repository.AnthropicRepository
+import com.usagemonitor.domain.repository.CodexRepository
+import com.usagemonitor.domain.repository.MiniMaxRepository
+import com.usagemonitor.domain.repository.UsageHistoryRepository
+import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
+import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
+import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.FooterBar
+import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
@@ -35,6 +45,7 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Instant
@@ -55,6 +66,35 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class)
 class ComponentTest {
+
+    private fun emptyDashboardViewModel(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val historyRepository = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: HistoryRange,
+                now: Instant
+            ) = throw UnsupportedOperationException("Não utilizado neste teste")
+        }
+
+        return DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            enabledApis = enabledApis,
+            recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository)
+        )
+    }
 
     // ── UsageArcChart ────────────────────────────────────────────────────
 
@@ -452,6 +492,41 @@ class ComponentTest {
         onNodeWithText("07:13").assertIsDisplayed()
         onNodeWithContentDescription("Abrir configurações").performClick()
         assertEquals(true, opened)
+    }
+
+    @Test
+    fun `DashboardScreen guides the user to settings when no APIs are enabled`() = runDesktopComposeUiTest {
+        var opened = false
+        val enabledApis = MutableStateFlow(emptySet<ApiSource>())
+        val viewModel = emptyDashboardViewModel(enabledApis)
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    enabledApis = enabledApis,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = {},
+                    onOpenSettings = { opened = true }
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Nenhuma API monitorada está habilitada").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Abrir configurações").performClick()
+        assertEquals(true, opened)
+        viewModel.onDestroy()
     }
 
     // ── SettingsDialogContent ───────────────────────────────────────────

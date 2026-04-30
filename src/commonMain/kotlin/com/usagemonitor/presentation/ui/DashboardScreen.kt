@@ -134,6 +134,10 @@ fun DashboardScreen(
                     ) {
                         when (val state = uiState) {
                             is UiState.Loading -> LoadingContent(language = language)
+                            UiState.NoApisEnabled -> NoApisEnabledContent(
+                                language = language,
+                                onOpenSettings = onOpenSettings
+                            )
                             is UiState.Error -> ErrorContent(
                                 errors = state.errors,
                                 language = language,
@@ -158,6 +162,51 @@ fun DashboardScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoApisEnabledContent(
+    language: AppLanguage,
+    onOpenSettings: () -> Unit
+) {
+    val title = if (language == AppLanguage.PT) {
+        "Nenhuma API monitorada está habilitada"
+    } else {
+        "No monitored APIs are enabled"
+    }
+    val description = if (language == AppLanguage.PT) {
+        "Abra as configurações e habilite pelo menos uma opção em APIs monitoradas para começar a carregar seus dados de uso."
+    } else {
+        "Open settings and enable at least one option in Monitored APIs to start loading your usage data."
+    }
+    val actionLabel = if (language == AppLanguage.PT) "Abrir configurações" else "Open settings"
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .widthIn(max = 460.dp)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(onClick = onOpenSettings) {
+                Text(actionLabel)
             }
         }
     }

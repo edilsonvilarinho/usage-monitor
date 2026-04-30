@@ -16,6 +16,8 @@ SetCompressor zlib
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define LOG_FILE "$INSTDIR\install.log"
 !define APP_ICON "..\desktopMain\resources\icons\app_icon.ico"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\Usage Monitor.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "$(LaunchAppNowText)"
 
 ; -----------------------------------------------
 ; Installer attributes
@@ -48,10 +50,14 @@ UninstallIcon "${APP_ICON}"
 !insertmacro MUI_LANGUAGE "PortugueseBR"
 !insertmacro MUI_LANGUAGE "English"
 
+LangString LaunchAppNowText ${LANG_PORTUGUESEBR} "Iniciar Usage Monitor agora"
+LangString LaunchAppNowText ${LANG_ENGLISH} "Launch Usage Monitor now"
+
 ; -----------------------------------------------
 ; Installer Functions
 ; -----------------------------------------------
 Function .onInit
+    SetShellVarContext current
     ; Check if already installed
     ReadRegStr $0 HKCU "${PRODUCT_UNINST_KEY}" "UninstallString"
     StrCmp $0 "" done notdone
@@ -76,6 +82,7 @@ FunctionEnd
 ; -----------------------------------------------
 Section "Usage Monitor" SEC_APP
     SectionIn RO
+    SetShellVarContext current
 
     ; Create log file
     DetailPrint "Initializing installation..."
@@ -106,9 +113,9 @@ Section "Usage Monitor" SEC_APP
 
     ; Create Start Menu shortcuts
     DetailPrint "Creating Start Menu shortcuts..."
-    CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe" "" "$INSTDIR\Usage Monitor.exe" 0 SW_SHOWNORMAL "" "${PRODUCT_NAME}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Remover.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWNORMAL "" "Remover ${PRODUCT_NAME}"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}.lnk"
+    RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe" "" "$INSTDIR\Usage Monitor.exe" 0 SW_SHOWNORMAL "" "${PRODUCT_NAME}"
 
     ; Finalize log
     FileOpen $0 "${LOG_FILE}" a
@@ -119,11 +126,13 @@ Section "Usage Monitor" SEC_APP
 SectionEnd
 
 Section "Desktop Shortcut" SEC_DESKTOP
+    SetShellVarContext current
     DetailPrint "Creating desktop shortcut..."
     CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe" "" "$INSTDIR\Usage Monitor.exe" 0 SW_SHOWNORMAL "" "${PRODUCT_NAME}"
 SectionEnd
 
 Section "Start with Windows" SEC_AUTO_START
+    SetShellVarContext current
     DetailPrint "Configuring auto-start..."
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\Usage Monitor.exe"'
 SectionEnd
@@ -141,6 +150,7 @@ SectionEnd
 ; Uninstaller Section
 ; -----------------------------------------------
 Section "Uninstall"
+    SetShellVarContext current
     ; Kill application processes BEFORE removing files
     DetailPrint "Stopping application processes..."
     ExecWait 'taskkill /F /IM "Usage Monitor.exe"' $0
@@ -162,6 +172,7 @@ Section "Uninstall"
     ; Remove shortcuts
     DetailPrint "Removing shortcuts..."
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}.lnk"
     RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
 
     DetailPrint "Uninstallation complete!"
@@ -171,6 +182,7 @@ SectionEnd
 ; Uninstaller Functions
 ; -----------------------------------------------
 Function un.onInit
+    SetShellVarContext current
     !insertmacro MUI_UNGETLANGUAGE
 FunctionEnd
 

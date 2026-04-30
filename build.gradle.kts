@@ -108,6 +108,11 @@ compose.desktop {
 
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.ico"))
+                menu = true
+                shortcut = true
+                perUserInstall = true
+                dirChooser = true
+                upgradeUuid = "D26C4B79-9F2B-4CE5-B94E-E2E6A2A9E4A4"
             }
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.png"))

@@ -84,6 +84,7 @@ class DashboardViewModel(
 
         if (effectiveSources.isEmpty()) {
             stateMutex.withLock {
+                pruneDisabledSources(enabled)
                 publishUiState(enabled)
             }
             return
@@ -202,6 +203,11 @@ class DashboardViewModel(
     }
 
     private fun publishUiState(enabledSources: Set<ApiSource>) {
+        if (enabledSources.isEmpty()) {
+            _uiState.value = UiState.NoApisEnabled
+            return
+        }
+
         val stats = enabledSources
             .sortedBy { source -> source.ordinal }
             .mapNotNull { source -> cachedStatsBySource[source] }

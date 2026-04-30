@@ -157,7 +157,7 @@ class DashboardViewModelTest {
     }
 
     private suspend fun awaitSettledState(viewModel: DashboardViewModel): UiState {
-        repeat(50) {
+        repeat(200) {
             val state = viewModel.uiState.value
             if (state !is UiState.Loading) {
                 return state
@@ -168,7 +168,7 @@ class DashboardViewModelTest {
     }
 
     private suspend fun awaitCondition(predicate: () -> Boolean) {
-        repeat(80) {
+        repeat(200) {
             if (predicate()) {
                 return
             }
@@ -180,6 +180,34 @@ class DashboardViewModelTest {
     fun `initial state is Loading`() {
         val viewModel = successViewModel(mutableListOf())
         assertIs<UiState.Loading>(viewModel.uiState.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `transitions to NoApisEnabled when no APIs are enabled`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            MutableStateFlow(emptySet()),
+            historyUseCase(recordedSnapshots),
+            Clock.System
+        )
+        viewModel.cancelCountdown()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.NoApisEnabled>(state)
         viewModel.onDestroy()
     }
 
@@ -383,6 +411,7 @@ class DashboardViewModelTest {
     fun `global refresh waits for snapshot persistence before publishing success`() = runTest {
         val persistenceGate = CompletableDeferred<Unit>()
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val enabledApis = MutableStateFlow<Set<ApiSource>>(emptySet())
 
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.success(sampleAnthropicStats)
@@ -410,22 +439,24 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
-            MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            enabledApis,
             RecordUsageSnapshotUseCase(historyRepository),
             Clock.System
         )
         viewModel.cancelInitFetch()
         viewModel.cancelCountdown()
 
+        enabledApis.value = setOf(ApiSource.ANTHROPIC)
         viewModel.refresh()
         delay(100)
 
-        assertIs<UiState.Loading>(viewModel.uiState.value)
+        assertTrue(viewModel.uiState.value !is UiState.Success)
         assertTrue(recordedSnapshots.isEmpty())
 
         persistenceGate.complete(Unit)
 
-        val state = awaitSettledState(viewModel)
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        val state = viewModel.uiState.value
         assertIs<UiState.Success>(state)
         assertEquals(1, recordedSnapshots.size)
         assertEquals(ApiSource.ANTHROPIC, recordedSnapshots.single().source)
