@@ -52,8 +52,10 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateInstaller
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -472,15 +474,19 @@ class ComponentTest {
 
     @Test
     fun `FooterBar displays localized version and next update in PT`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
                         language = AppLanguage.PT,
-                        secondsUntilRefresh = 125,
+                        nextRefreshAt = fixedNow + 125.seconds,
                         onRefresh = {},
-                        onOpenSettings = {}
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
                     )
                 }
             }
@@ -497,6 +503,7 @@ class ComponentTest {
     @Test
     fun `FooterBar opens settings action`() = runDesktopComposeUiTest {
         var opened = false
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
             AppTheme(isDark = true) {
@@ -504,9 +511,11 @@ class ComponentTest {
                     FooterBar(
                         appVersion = "1.1.0",
                         language = AppLanguage.PT,
-                        secondsUntilRefresh = 125,
+                        nextRefreshAt = fixedNow + 125.seconds,
                         onRefresh = {},
-                        onOpenSettings = { opened = true }
+                        onOpenSettings = { opened = true },
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
                     )
                 }
             }
@@ -519,6 +528,7 @@ class ComponentTest {
     @Test
     fun `FooterBar keeps controls accessible in narrow width`() = runDesktopComposeUiTest {
         var opened = false
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
             AppTheme(isDark = true) {
@@ -526,9 +536,11 @@ class ComponentTest {
                     FooterBar(
                         appVersion = "6.0.0",
                         language = AppLanguage.PT,
-                        secondsUntilRefresh = 433,
+                        nextRefreshAt = fixedNow + 433.seconds,
                         onRefresh = {},
-                        onOpenSettings = { opened = true }
+                        onOpenSettings = { opened = true },
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
                     )
                 }
             }
@@ -545,6 +557,7 @@ class ComponentTest {
         var opened = false
         val enabledApis = MutableStateFlow(emptySet<ApiSource>())
         val viewModel = emptyDashboardViewModel(enabledApis)
+        viewModel.cancelCountdown()
 
         setContent {
             AppTheme(isDark = true) {
@@ -558,7 +571,8 @@ class ComponentTest {
                     onMoveCardToIndex = { _, _ -> },
                     onToggleCardMinimized = {},
                     onOpenHistory = {},
-                    onOpenSettings = { opened = true }
+                    onOpenSettings = { opened = true },
+                    countdownUpdatesEnabled = false
                 )
             }
         }
@@ -593,7 +607,8 @@ class ComponentTest {
                     onMoveCardToIndex = { _, _ -> },
                     onToggleCardMinimized = {},
                     onOpenHistory = {},
-                    onOpenSettings = {}
+                    onOpenSettings = {},
+                    countdownUpdatesEnabled = false
                 )
             }
         }

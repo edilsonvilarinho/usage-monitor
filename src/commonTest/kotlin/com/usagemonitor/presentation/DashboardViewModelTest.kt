@@ -189,6 +189,7 @@ class DashboardViewModelTest {
             }
             delay(20)
         }
+        assertTrue(predicate(), "Condition not met within coroutine timeout")
     }
 
     private fun awaitConditionRealTime(predicate: () -> Boolean) {
@@ -198,6 +199,7 @@ class DashboardViewModelTest {
             }
             Thread.sleep(20)
         }
+        assertTrue(predicate(), "Condition not met within real-time timeout")
     }
 
     @Test
@@ -436,7 +438,8 @@ class DashboardViewModelTest {
         viewModel.refresh(ApiSource.ANTHROPIC)
 
         awaitCondition { anthropicCalls >= anthropicCallsAfterGlobalRefresh + 1 }
-        assertEquals(600, viewModel.secondsUntilRefresh.value)
+        val remaining = (viewModel.nextRefreshAt.value - Clock.System.now()).inWholeSeconds
+        assertTrue(remaining in 595L..600L)
 
         val state = awaitSettledState(viewModel) as UiState.Success
         val anthropicData = state.data.first { it.source == ApiSource.ANTHROPIC }
@@ -444,6 +447,73 @@ class DashboardViewModelTest {
 
         assertEquals(75000L, anthropicData.quotas[0].used)
         assertEquals(2223L, minimaxData.quotas[0].used)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `queues a pending refresh when another fetch is already in flight`() = runTest {
+        var anthropicCalls = 0
+        val firstFetchGate = CompletableDeferred<Unit>()
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val enabledApis = MutableStateFlow<Set<ApiSource>>(emptySet())
+        val updatedAnthropicStats = sampleAnthropicStats.copy(
+            quotas = listOf(
+                sampleAnthropicStats.quotas[0].copy(
+                    used = 91000L,
+                    rawUsed = 91000L
+                )
+            )
+        )
+
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                anthropicCalls += 1
+                if (anthropicCalls == 1) {
+                    firstFetchGate.await()
+                    return Result.success(sampleAnthropicStats)
+                }
+                return Result.success(updatedAnthropicStats)
+            }
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            enabledApis,
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+        enabledApis.value = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
+
+        viewModel.refresh()
+        awaitCondition { anthropicCalls == 1 }
+
+        viewModel.refresh(ApiSource.ANTHROPIC)
+        delay(100)
+        assertEquals(1, anthropicCalls)
+
+        firstFetchGate.complete(Unit)
+
+        awaitConditionRealTime { anthropicCalls == 2 }
+        awaitConditionRealTime {
+            val state = viewModel.uiState.value as? UiState.Success ?: return@awaitConditionRealTime false
+            val anthropicData = state.data.firstOrNull { it.source == ApiSource.ANTHROPIC } ?: return@awaitConditionRealTime false
+            anthropicData.quotas[0].used == 91000L
+        }
+
+        val state = viewModel.uiState.value
+        assertIs<UiState.Success>(state)
+        val anthropicData = state.data.first { it.source == ApiSource.ANTHROPIC }
+        assertEquals(91000L, anthropicData.quotas[0].used)
         viewModel.onDestroy()
     }
 

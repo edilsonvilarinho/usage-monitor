@@ -91,10 +91,11 @@ fun DashboardScreen(
     onToggleCardMinimized: (ApiSource) -> Unit,
     onOpenHistory: (ApiSource) -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    countdownUpdatesEnabled: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val secondsUntilRefresh by viewModel.secondsUntilRefresh.collectAsState()
+    val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
     val refreshingSources by viewModel.refreshingSources.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
@@ -114,9 +115,10 @@ fun DashboardScreen(
             FooterBar(
                 appVersion = appVersion,
                 language = language,
-                secondsUntilRefresh = secondsUntilRefresh,
+                nextRefreshAt = nextRefreshAt,
                 onRefresh = { viewModel.refresh() },
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                countdownUpdatesEnabled = countdownUpdatesEnabled
             )
         },
         containerColor = MaterialTheme.colorScheme.background

@@ -52,6 +52,24 @@ class LocalCredentialDataSourceTest {
     }
 
     @Test
+    fun `returns cached token without rereading the file`() = runTest {
+        val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
+        writeCredentials(accessToken = "fresh-token", refreshToken = "rt", expiresAt = futureExpiry)
+        val dataSource = LocalCredentialDataSource(
+            httpClient = throwingHttpClient(),
+            homeDirProvider = homeDirProvider
+        )
+
+        val firstToken = dataSource.loadAnthropicAccessToken()
+        assertTrue(credentialsFile.delete())
+
+        val secondToken = dataSource.loadAnthropicAccessToken()
+
+        assertEquals("fresh-token", firstToken)
+        assertEquals("fresh-token", secondToken)
+    }
+
+    @Test
     fun `throws IllegalStateException with PT message when file missing`() = runTest {
         val dataSource = LocalCredentialDataSource(
             httpClient = throwingHttpClient(),

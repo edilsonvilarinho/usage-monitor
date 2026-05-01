@@ -17,14 +17,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
 private const val POLL_INTERVAL_SECONDS = 600
+private const val UPDATE_CHECK_INTERVAL_MS = 6 * 3_600_000L
 private const val HTTP_RATE_LIMIT_MARKER = "429"
 private const val INSTALLER_HANDOFF_DELAY_MS = 1_500L
 
@@ -37,13 +40,19 @@ class DashboardViewModel(
     private val checkForAppUpdate: CheckForAppUpdateUseCase? = null,
     private val appUpdateInstaller: AppUpdateInstaller = UnsupportedAppUpdateInstaller,
     private val currentAppVersion: String = "0.0.0",
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true)
 ) {
+    private data class PendingFetchRequest(
+        val targetSources: Set<ApiSource>,
+        val preserveDataOnFailure: Boolean
+    )
+
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private val _secondsUntilRefresh = MutableStateFlow(POLL_INTERVAL_SECONDS)
-    val secondsUntilRefresh: StateFlow<Int> = _secondsUntilRefresh.asStateFlow()
+    private val _nextRefreshAt = MutableStateFlow(clock.now() + POLL_INTERVAL_SECONDS.seconds)
+    val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
     private val _refreshingSources = MutableStateFlow<Set<ApiSource>>(emptySet())
     val refreshingSources: StateFlow<Set<ApiSource>> = _refreshingSources.asStateFlow()
@@ -60,44 +69,103 @@ class DashboardViewModel(
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val stateMutex = Mutex()
     private val updateMutex = Mutex()
+    private val fetchMutex = Mutex()
+    private val pendingFetchMutex = Mutex()
     private val cachedStatsBySource = mutableMapOf<ApiSource, ApiUsageStats>()
     private val cachedErrorsBySource = mutableMapOf<ApiSource, UiApiError>()
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
     private var autoInstallAttemptedVersion: String? = null
+    private var pendingFetchRequest: PendingFetchRequest? = null
 
     init {
         initFetchJob = viewModelScope.launch {
-            fetchUsage(targetSources = enabledApis.value)
+            requestFetch(targetSources = enabledApis.value)
         }
-        viewModelScope.launch {
-            checkForUpdate(autoInstall = true)
-        }
+        startUpdateCheckLoop()
         startCountdown()
+    }
+
+    private fun startUpdateCheckLoop() {
+        viewModelScope.launch {
+            while (true) {
+                checkForUpdate(autoInstall = true)
+                delay(UPDATE_CHECK_INTERVAL_MS)
+            }
+        }
     }
 
     private fun startCountdown() {
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
             while (true) {
-                _secondsUntilRefresh.value = POLL_INTERVAL_SECONDS
-                for (secondsLeft in POLL_INTERVAL_SECONDS downTo 1) {
-                    _secondsUntilRefresh.value = secondsLeft
-                    delay(1_000L)
+                _nextRefreshAt.value = clock.now() + POLL_INTERVAL_SECONDS.seconds
+                delay(POLL_INTERVAL_SECONDS * 1_000L)
+                if (!isAppVisible.value) {
+                    isAppVisible.first { it }
                 }
-                viewModelScope.launch {
-                    fetchUsage(targetSources = enabledApis.value)
+                viewModelScope.launch { requestFetch(targetSources = enabledApis.value) }
+            }
+        }
+    }
+
+    private suspend fun requestFetch(
+        targetSources: Set<ApiSource>,
+        preserveDataOnFailure: Boolean = false
+    ) {
+        if (!fetchMutex.tryLock()) {
+            enqueuePendingFetch(targetSources, preserveDataOnFailure)
+            return
+        }
+
+        try {
+            var currentRequest = PendingFetchRequest(targetSources, preserveDataOnFailure)
+            while (true) {
+                performFetch(
+                    targetSources = currentRequest.targetSources,
+                    preserveDataOnFailure = currentRequest.preserveDataOnFailure
+                )
+
+                val nextRequest = dequeuePendingFetch() ?: break
+                currentRequest = nextRequest
+            }
+        } finally {
+            fetchMutex.unlock()
+        }
+    }
+
+    private suspend fun enqueuePendingFetch(
+        targetSources: Set<ApiSource>,
+        preserveDataOnFailure: Boolean
+    ) {
+        pendingFetchMutex.withLock {
+            val existingRequest = pendingFetchRequest
+            pendingFetchRequest = when {
+                existingRequest == null -> PendingFetchRequest(targetSources, preserveDataOnFailure)
+                !existingRequest.preserveDataOnFailure || !preserveDataOnFailure -> {
+                    PendingFetchRequest(enabledApis.value, preserveDataOnFailure = false)
                 }
-                viewModelScope.launch {
-                    checkForUpdate(autoInstall = true)
+                else -> {
+                    PendingFetchRequest(
+                        targetSources = existingRequest.targetSources + targetSources,
+                        preserveDataOnFailure = true
+                    )
                 }
             }
         }
     }
 
-    private suspend fun fetchUsage(
+    private suspend fun dequeuePendingFetch(): PendingFetchRequest? {
+        return pendingFetchMutex.withLock {
+            val request = pendingFetchRequest ?: return@withLock null
+            pendingFetchRequest = null
+            request
+        }
+    }
+
+    private suspend fun performFetch(
         targetSources: Set<ApiSource>,
-        preserveDataOnFailure: Boolean = false
+        preserveDataOnFailure: Boolean
     ) {
         val enabled = enabledApis.value
         val effectiveSources = targetSources.filterTo(linkedSetOf()) { source -> source in enabled }
@@ -168,10 +236,7 @@ class DashboardViewModel(
     fun refresh() {
         startCountdown()
         viewModelScope.launch {
-            fetchUsage(targetSources = enabledApis.value)
-        }
-        viewModelScope.launch {
-            checkForUpdate(autoInstall = true)
+            requestFetch(targetSources = enabledApis.value)
         }
     }
 
@@ -182,13 +247,10 @@ class DashboardViewModel(
 
         startCountdown()
         viewModelScope.launch {
-            fetchUsage(
+            requestFetch(
                 targetSources = setOf(source),
                 preserveDataOnFailure = true
             )
-        }
-        viewModelScope.launch {
-            checkForUpdate(autoInstall = true)
         }
     }
 

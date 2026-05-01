@@ -33,6 +33,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -44,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
+import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 // Breakpoints responsivos do FooterBar — abaixo de cada limite, layout colapsa um nível.
 private val NarrowBreakpoint = 360.dp
@@ -54,11 +62,32 @@ private val MediumBreakpoint = 500.dp
 fun FooterBar(
     appVersion: String,
     language: AppLanguage,
-    secondsUntilRefresh: Int,
+    nextRefreshAt: Instant,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    nowProvider: () -> Instant = { Clock.System.now() },
+    countdownUpdatesEnabled: Boolean = true
 ) {
+    val initialRemaining = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
+    var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(initialRemaining) }
+
+    LaunchedEffect(nextRefreshAt, countdownUpdatesEnabled) {
+        secondsUntilRefresh = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
+        if (!countdownUpdatesEnabled) {
+            return@LaunchedEffect
+        }
+
+        while (true) {
+            val remaining = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
+            secondsUntilRefresh = remaining
+            if (remaining <= 0) {
+                break
+            }
+            delay(1_000L)
+        }
+    }
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,

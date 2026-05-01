@@ -27,7 +27,16 @@ class LocalCredentialDataSource(
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
+    @Volatile private var cachedToken: String? = null
+    @Volatile private var cachedExpiresAt: Long = 0L
+
     override suspend fun loadAnthropicAccessToken(): String {
+        val now = System.currentTimeMillis()
+        val cached = cachedToken
+        if (cached != null && cachedExpiresAt - now > REFRESH_MARGIN_MS) {
+            return cached
+        }
+
         val credentialsFile = credentialsFile()
 
         if (!credentialsFile.exists()) {
@@ -39,12 +48,14 @@ class LocalCredentialDataSource(
 
         val creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
 
-        val needsRefresh = creds.claudeAiOauth.expiresAt - System.currentTimeMillis() < REFRESH_MARGIN_MS
+        val needsRefresh = creds.claudeAiOauth.expiresAt - now < REFRESH_MARGIN_MS
 
         if (needsRefresh && creds.claudeAiOauth.refreshToken.isNotEmpty()) {
             return refreshToken(credentialsFile, creds)
         }
 
+        cachedToken = creds.claudeAiOauth.accessToken
+        cachedExpiresAt = creds.claudeAiOauth.expiresAt
         return creds.claudeAiOauth.accessToken
     }
 
@@ -69,6 +80,8 @@ class LocalCredentialDataSource(
             )
         )
         credentialsFile.writeText(json.encodeToString(CredentialsFileDto.serializer(), updated))
+        cachedToken = newAccessToken
+        cachedExpiresAt = updated.claudeAiOauth.expiresAt
         return newAccessToken
     }
 

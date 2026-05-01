@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
@@ -52,6 +53,7 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.prefs.Preferences
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
@@ -88,7 +90,7 @@ fun main() = application {
                 })
             }
             install(Logging) {
-                level = LogLevel.INFO
+                level = LogLevel.NONE
             }
         }
     }
@@ -162,7 +164,8 @@ fun main() = application {
         GetUsageHistoryUseCase(usageHistoryRepository)
     }
 
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, enabledApis, recordUsageSnapshot) {
+    val isAppVisible = remember { MutableStateFlow(true) }
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
@@ -171,7 +174,8 @@ fun main() = application {
             recordUsageSnapshot = recordUsageSnapshot,
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
             appUpdateInstaller = appUpdateInstaller,
-            currentAppVersion = CURRENT_APP_VERSION
+            currentAppVersion = CURRENT_APP_VERSION,
+            isAppVisible = isAppVisible
         )
     }
     val historyViewModel = remember(getUsageHistory, enabledApis) {
@@ -181,11 +185,14 @@ fun main() = application {
         )
     }
 
+    val shutdownStarted = remember { AtomicBoolean(false) }
     DisposableEffect(viewModel, historyViewModel, httpClient) {
         val shutdownHook = Thread {
-            viewModel.onDestroy()
-            historyViewModel.onDestroy()
-            httpClient.close()
+            if (shutdownStarted.compareAndSet(false, true)) {
+                viewModel.onDestroy()
+                historyViewModel.onDestroy()
+                httpClient.close()
+            }
         }
 
         Runtime.getRuntime().addShutdownHook(shutdownHook)
@@ -199,6 +206,10 @@ fun main() = application {
 
     val iconImage = remember { loadWindowIcon() }
     val mainWindowState = rememberWindowState()
+    LaunchedEffect(mainWindowState) {
+        snapshotFlow { mainWindowState.isMinimized }
+            .collect { minimized -> isAppVisible.value = !minimized }
+    }
     val enabledApisState by enabledApis.collectAsState()
     val shouldExitForUpdate by viewModel.shouldExitForUpdate.collectAsState()
     var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
@@ -215,9 +226,11 @@ fun main() = application {
     var historyOpenGeneration by remember { mutableStateOf(0) }
     val shutdownApplication = remember(viewModel, historyViewModel, httpClient) {
         {
-            viewModel.onDestroy()
-            historyViewModel.onDestroy()
-            httpClient.close()
+            if (shutdownStarted.compareAndSet(false, true)) {
+                viewModel.onDestroy()
+                historyViewModel.onDestroy()
+                httpClient.close()
+            }
             exitProcess(0)
         }
     }
