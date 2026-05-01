@@ -315,15 +315,15 @@ private fun HistoryMetrics(
     ) {
         MetricItem(
             label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
-            value = "${formatQuantity(series.currentDisplayUsed)} / ${formatQuantity(series.currentDisplayTotal)} ${unitSuffix(series.unit)}"
+            value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
         )
         MetricItem(
             label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-            value = "${formatQuantity(series.deltaDisplayUsed)} ${unitSuffix(series.unit)}"
+            value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
         )
         MetricItem(
             label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-            value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} ${unitSuffix(series.unit)}/h"
+            value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
         )
         MetricItem(
             label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
@@ -413,6 +413,17 @@ private fun forecastLabel(forecast: UsageForecast, language: AppLanguage): Strin
 private fun formatInstant(instant: Instant): String {
     val local = instant.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
     return "${local.date.dayOfMonth.toString().padStart(2, '0')}/${local.date.monthNumber.toString().padStart(2, '0')} ${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')} BRT"
+}
+
+private fun currentUsagePercent(used: Long, total: Long): String {
+    if (total <= 0L) return "—"
+    return (used * 100.0 / total.toDouble()).roundToLong().toString()
+}
+
+private fun formatPercentageOfTotal(value: Double, total: Long): String {
+    if (total <= 0L) return "— %"
+    val pct = value * 100.0 / total.toDouble()
+    return "${pct.roundToLong()} %"
 }
 
 private fun formatQuantity(value: Long): String {
