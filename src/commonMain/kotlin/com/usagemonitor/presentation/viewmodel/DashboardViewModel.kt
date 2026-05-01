@@ -25,6 +25,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
 private const val POLL_INTERVAL_SECONDS = 600
+private const val HTTP_RATE_LIMIT_MARKER = "429"
+private const val INSTALLER_HANDOFF_DELAY_MS = 1_500L
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
@@ -229,7 +231,7 @@ class DashboardViewModel(
     }
 
     private fun handleSourceFailure(source: ApiSource, error: Throwable): UiApiError? {
-        if (error.message?.contains("429") == true) {
+        if (error.message?.contains(HTTP_RATE_LIMIT_MARKER) == true) {
             _toastMessage.value = "RATE_LIMIT:${source.name}"
             return null
         }
@@ -258,8 +260,6 @@ class DashboardViewModel(
             .sortedBy { source -> source.ordinal }
             .mapNotNull { source -> cachedErrorsBySource[source] }
 
-        println("[fetchUsage] stats=${stats.size} errors=${errors.size}")
-
         _uiState.value = if (stats.isNotEmpty()) {
             UiState.Success(stats, errors)
         } else {
@@ -283,10 +283,9 @@ class DashboardViewModel(
     }
 
     private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
+        // Persistência best-effort: falha não deve interromper UI nem propagar.
         runCatching {
             recordUsageSnapshot(stats, capturedAt)
-        }.onFailure { error ->
-            println("[history] failed to persist snapshot for ${stats.source}: ${error.message}")
         }
     }
 
@@ -324,8 +323,8 @@ class DashboardViewModel(
                         automaticInstallSupported = canInstallAutomatically(update)
                     )
                 }
-                .onFailure { error ->
-                    println("[update] failed to check for updates: ${error.message}")
+                .onFailure {
+                    // Falha silenciosa: UI mantém estado anterior; próxima janela de poll tenta de novo.
                 }
         }
     }
@@ -337,7 +336,7 @@ class DashboardViewModel(
             appUpdateInstaller.prepareUpdateInstallation(update)
                 .onSuccess {
                     _appUpdateState.value = AppUpdateUiState.Installing(update)
-                    delay(1_500L)
+                    delay(INSTALLER_HANDOFF_DELAY_MS)
                     _shouldExitForUpdate.value = true
                 }
                 .onFailure { error ->

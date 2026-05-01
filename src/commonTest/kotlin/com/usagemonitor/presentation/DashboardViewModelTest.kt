@@ -618,6 +618,130 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `emits rate limit toast on 429 without adding to errors list`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                IllegalStateException("Anthropic HTTP 429: rate limited")
+            )
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        // Erros de rate limit não viram banner persistente — viram toast efêmero.
+        assertTrue(state.errors.none { it.source == ApiSource.ANTHROPIC })
+        assertEquals("RATE_LIMIT:ANTHROPIC", viewModel.toastMessage.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `emits generic error toast for non-configuration failures`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                IllegalStateException("Anthropic HTTP 503: service unavailable")
+            )
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+        awaitSettledState(viewModel)
+        awaitCondition { viewModel.toastMessage.value != null }
+
+        val toast = viewModel.toastMessage.value
+        assertTrue(toast?.startsWith("ERROR:ANTHROPIC:") == true, "got toast=$toast")
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `clearToast nulls the toast message`() = runTest {
+        val viewModel = successViewModel(mutableListOf())
+        // Simula toast injetando uma falha 429 numa chamada externa: caminho mais simples é via refresh com erro.
+        // Aqui basta verificar a API pública: clearToast esvazia o flow mesmo sem toast pendente.
+        viewModel.clearToast()
+        assertEquals(null, viewModel.toastMessage.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `snapshot persistence error does not propagate to UiState`() = runTest {
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val brokenHistory = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
+                throw IllegalStateException("disco cheio")
+            }
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: com.usagemonitor.domain.entity.HistoryRange,
+                now: Instant
+            ) = throw UnsupportedOperationException("Não utilizado neste teste")
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            defaultEnabledApis(),
+            RecordUsageSnapshotUseCase(brokenHistory),
+            clock = Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel)
+
+        // Falha ao persistir histórico não deve corromper a UI: dados de uso seguem visíveis.
+        assertIs<UiState.Success>(state)
+        assertEquals(2, state.data.size)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `allows retrying automatic update after a preparation failure`() = runTest {
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {

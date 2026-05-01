@@ -93,6 +93,81 @@ class UsageHistoryRepositoryImplTest {
         assertEquals(200.0, report.series.single().averageDisplayConsumptionPerHour)
     }
 
+    @Test
+    fun `forecast returns InsufficientData when fewer than 3 points`() = kotlinx.coroutines.test.runTest {
+        val twoPoints = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 100, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 200, 1000)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(twoPoints))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertIs<UsageForecast.InsufficientData>(report.series.single().forecast)
+    }
+
+    @Test
+    fun `forecast returns InsufficientData when window under 30 minutes`() = kotlinx.coroutines.test.runTest {
+        val tightWindow = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:50:00Z", 100, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:55:00Z", 110, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T18:00:00Z", 120, 1000)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(tightWindow))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertIs<UsageForecast.InsufficientData>(report.series.single().forecast)
+    }
+
+    @Test
+    fun `forecast returns NoGrowth when delta is zero across all points`() = kotlinx.coroutines.test.runTest {
+        val flatRecords = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 500, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 500, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 500, 1000)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(flatRecords))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertIs<UsageForecast.NoGrowth>(report.series.single().forecast)
+    }
+
+    @Test
+    fun `forecast returns ResetsBeforeExhaustion when projection past period end`() = kotlinx.coroutines.test.runTest {
+        // Crescimento lento (10/h) + período termina em ~3h: total 1000, used 100 -> 900 restantes -> 90h até esgotar.
+        val slowGrowth = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 100, 1000, "2026-04-28T20:00:00Z"),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 110, 1000, "2026-04-28T20:00:00Z"),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 120, 1000, "2026-04-28T20:00:00Z")
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(slowGrowth))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertIs<UsageForecast.ResetsBeforeExhaustion>(report.series.single().forecast)
+    }
+
+    @Test
+    fun `forecast survives reset by using only post-reset segment`() = kotlinx.coroutines.test.runTest {
+        // Antes do reset: crescimento alto (800->900). Depois: ritmo estável e pequeno.
+        // Se currentSegment não filtrasse o reset, a média seria distorcida.
+        val records = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T13:00:00Z", 800, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T14:00:00Z", 900, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 50, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 100, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 150, 1000)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        // Pós-reset: ritmo de 50/h, restam 850, projeção bem além do periodEnd default (20:00 = 3h).
+        assertIs<UsageForecast.ResetsBeforeExhaustion>(report.series.single().forecast)
+    }
+
     private class FakeHistoryDataSource(
         private val records: List<UsageSnapshotRecord>
     ) : UsageHistoryDataSource {

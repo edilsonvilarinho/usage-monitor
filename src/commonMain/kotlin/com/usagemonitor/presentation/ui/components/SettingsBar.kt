@@ -45,6 +45,10 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
 
+// Breakpoints responsivos do FooterBar — abaixo de cada limite, layout colapsa um nível.
+private val NarrowBreakpoint = 360.dp
+private val MediumBreakpoint = 500.dp
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FooterBar(
@@ -65,8 +69,8 @@ fun FooterBar(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
-            val compact = maxWidth < 500.dp
-            val dense = maxWidth < 360.dp
+            val compact = maxWidth < MediumBreakpoint
+            val dense = maxWidth < NarrowBreakpoint
 
             if (dense) {
                 Row(

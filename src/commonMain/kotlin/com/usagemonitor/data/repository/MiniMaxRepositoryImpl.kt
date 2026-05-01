@@ -11,20 +11,18 @@ import com.usagemonitor.domain.repository.MiniMaxRepository
  * Lê a API Key exclusivamente da variável de ambiente MINIMAX_API_KEY.
  * É PROIBIDO ter a chave hardcoded aqui ou em qualquer outro ficheiro.
  */
+private const val ENV_VAR_NAME = "MINIMAX_API_KEY"
+
 class MiniMaxRepositoryImpl(
-    private val apiDataSource: RemoteApiDataSource
+    private val apiDataSource: RemoteApiDataSource,
+    // Costura de teste: permite injetar leitor da env var sem mexer em System.getenv global.
+    private val envVarReader: () -> String? = { System.getenv(ENV_VAR_NAME) }
 ) : MiniMaxRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
             // Falha explícita se a variável de ambiente não estiver configurada
-            val apiKey = System.getenv("MINIMAX_API_KEY")
-                ?: throw IllegalStateException(
-                    "Variável de ambiente MINIMAX_API_KEY não configurada.\n" +
-                    "Defina-a antes de iniciar a aplicação:\n" +
-                    "  Windows: set MINIMAX_API_KEY=sua_chave\n" +
-                    "  Linux/Mac: export MINIMAX_API_KEY=sua_chave"
-                )
+            val apiKey = envVarReader() ?: throw IllegalStateException(missingEnvVarMessage())
 
             val response = apiDataSource.fetchMiniMaxTokenPlan(apiKey)
 
@@ -38,5 +36,12 @@ class MiniMaxRepositoryImpl(
 
             MiniMaxMapper.toUsageStats(response)
         }
+    }
+
+    private fun missingEnvVarMessage(): String {
+        return "Variável de ambiente $ENV_VAR_NAME não configurada.\n" +
+            "Defina-a antes de iniciar a aplicação:\n" +
+            "  Windows: set $ENV_VAR_NAME=sua_chave\n" +
+            "  Linux/Mac: export $ENV_VAR_NAME=sua_chave"
     }
 }
