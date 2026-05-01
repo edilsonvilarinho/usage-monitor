@@ -762,7 +762,7 @@ class ComponentTest {
         onAllNodesWithText("API").assertCountEquals(0)
         onNodeWithText("Intervalo").assertIsDisplayed()
         onNodeWithText("Uso atual").assertIsDisplayed()
-        onNodeWithText("50 / 100 req").assertIsDisplayed()
+        onNodeWithText("50 / 100 %").assertIsDisplayed()
         viewModel.onDestroy()
     }
 }
