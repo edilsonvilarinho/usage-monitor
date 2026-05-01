@@ -212,6 +212,7 @@ fun main() = application {
     var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
+    var historyOpenGeneration by remember { mutableStateOf(0) }
     val shutdownApplication = remember(viewModel, historyViewModel, httpClient) {
         {
             viewModel.onDestroy()
@@ -273,6 +274,7 @@ fun main() = application {
                     },
                     onOpenHistory = { source ->
                         historyDialogSource = source
+                        historyOpenGeneration++
                         historyViewModel.openForSource(source)
                     },
                     onOpenSettings = { isSettingsDialogOpen = true }
@@ -282,14 +284,20 @@ fun main() = application {
     }
 
     historyDialogSource?.let { source ->
+        val historyDialogState = rememberDialogState(width = 860.dp, height = 760.dp)
         DialogWindow(
             onCloseRequest = { historyDialogSource = null },
             title = historyWindowTitle(source, language),
             icon = iconImage,
-            state = rememberDialogState(width = 860.dp, height = 760.dp),
+            state = historyDialogState,
             resizable = true,
             undecorated = true
         ) {
+            LaunchedEffect(historyOpenGeneration) {
+                window.isVisible = true
+                window.toFront()
+                window.requestFocus()
+            }
             AppTheme(isDark = isDark) {
                 DesktopDialogFrame(
                     title = historyWindowTitle(source, language),
