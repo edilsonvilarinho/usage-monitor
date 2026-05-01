@@ -65,17 +65,26 @@ private fun sourceLabel(source: ApiSource): String {
     }
 }
 
+// Marcadores usados para classificar erros como problemas de configuração
+// (ex.: arquivo de credenciais ausente, env var faltando). Mantidos como
+// substrings para tolerar pequenas variações de formatação nas mensagens.
+private val ANTHROPIC_CREDENTIAL_MARKERS = listOf(
+    "Credenciais não encontradas",
+    "Credentials not found",
+    "Token refresh retornou sem access_token",
+    "Token refresh returned without access_token"
+)
+
+private const val MINIMAX_ENV_VAR_NAME = "MINIMAX_API_KEY"
+private val MINIMAX_ENV_VAR_STATE_MARKERS = listOf("não configurada", "not configured")
+
 private fun isAnthropicCredentialMessage(message: String): Boolean {
-    return message.contains("Credenciais não encontradas", ignoreCase = true) ||
-        message.contains("Credentials not found", ignoreCase = true) ||
-        message.contains("Token refresh retornou sem access_token", ignoreCase = true) ||
-        message.contains("Token refresh returned without access_token", ignoreCase = true)
+    return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }
 
 private fun isMiniMaxEnvVarMessage(message: String): Boolean {
-    return message.contains("MINIMAX_API_KEY", ignoreCase = true) &&
-        (
-            message.contains("não configurada", ignoreCase = true) ||
-                message.contains("not configured", ignoreCase = true)
-            )
+    if (!message.contains(MINIMAX_ENV_VAR_NAME, ignoreCase = true)) {
+        return false
+    }
+    return MINIMAX_ENV_VAR_STATE_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }

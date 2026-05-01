@@ -16,15 +16,19 @@ import java.io.File
 private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L  // renova se expira em menos de 5 min
 private const val OAUTH_REFRESH_URL = "https://console.anthropic.com/v1/oauth/token"
 
-class LocalCredentialDataSource(private val httpClient: HttpClient) : CredentialDataSource {
+class LocalCredentialDataSource(
+    private val httpClient: HttpClient,
+    // Costura de teste: permite apontar para um diretório temporário em vez de ~/.claude.
+    private val homeDirProvider: () -> String = {
+        System.getProperty("user.home")
+            ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
+    }
+) : CredentialDataSource {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
     override suspend fun loadAnthropicAccessToken(): String {
-        val homeDir = System.getProperty("user.home")
-            ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-
-        val credentialsFile = File("$homeDir/.claude/.credentials.json")
+        val credentialsFile = credentialsFile()
 
         if (!credentialsFile.exists()) {
             throw IllegalStateException(
@@ -43,6 +47,8 @@ class LocalCredentialDataSource(private val httpClient: HttpClient) : Credential
 
         return creds.claudeAiOauth.accessToken
     }
+
+    private fun credentialsFile(): File = File("${homeDirProvider()}/.claude/.credentials.json")
 
     private suspend fun refreshToken(credentialsFile: File, creds: CredentialsFileDto): String {
         val response = httpClient.post(OAUTH_REFRESH_URL) {

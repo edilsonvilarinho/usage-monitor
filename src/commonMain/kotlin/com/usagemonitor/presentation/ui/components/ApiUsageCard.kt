@@ -78,6 +78,14 @@ import kotlin.math.roundToInt
 
 private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 
+// Durações centralizadas das animações do card (em ms). Mantém legibilidade ao
+// alterar timing globalmente sem caçar literais espalhados pelo composable.
+private object CardAnimations {
+    const val EXPAND_DURATION_MS = 550
+    const val MINIMIZE_DURATION_MS = 240
+    const val PULSE_DURATION_MS = 1500
+}
+
 @Composable
 fun ApiUsageCard(
     source: ApiSource,
@@ -115,7 +123,7 @@ fun ApiUsageCard(
 
     val cardAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 550),
+        animationSpec = tween(durationMillis = CardAnimations.EXPAND_DURATION_MS),
         label = "cardAlpha"
     )
 
@@ -126,12 +134,12 @@ fun ApiUsageCard(
             visible -> 1f
             else -> 0.96f
         },
-        animationSpec = tween(durationMillis = 240),
+        animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
         label = "cardScale"
     )
     val cardOffsetY by animateDpAsState(
         targetValue = if (visible) 0.dp else 18.dp,
-        animationSpec = tween(durationMillis = 550),
+        animationSpec = tween(durationMillis = CardAnimations.EXPAND_DURATION_MS),
         label = "cardOffsetY"
     )
     val cardElevation by animateDpAsState(
@@ -141,7 +149,7 @@ fun ApiUsageCard(
             isDragTarget -> 9.dp
             else -> 6.dp
         },
-        animationSpec = tween(durationMillis = 240),
+        animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
         label = "cardElevation"
     )
     val pulseAlpha by animateFloatAsState(
@@ -151,7 +159,7 @@ fun ApiUsageCard(
             isRefreshing -> 0.22f
             else -> 0.12f
         },
-        animationSpec = tween(durationMillis = 240),
+        animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
         label = "pulseAlpha"
     )
     val shimmerProgress = if (isRefreshing) {
@@ -160,7 +168,7 @@ fun ApiUsageCard(
                 initialValue = -1f,
                 targetValue = 2f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 1500),
+                    animation = tween(durationMillis = CardAnimations.PULSE_DURATION_MS),
                     repeatMode = RepeatMode.Restart
                 ),
                 label = "shimmerProgress"
@@ -172,7 +180,7 @@ fun ApiUsageCard(
     ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(durationMillis = 240))
+            .animateContentSize(animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS))
             .pointerInput(source) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { onDragStart() },
@@ -318,7 +326,7 @@ fun ApiUsageCard(
                     transitionSpec = {
                         (fadeIn(animationSpec = tween(durationMillis = 220, delayMillis = 50)) +
                             scaleIn(
-                                animationSpec = tween(durationMillis = 240),
+                                animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
                                 initialScale = 0.97f
                             )).togetherWith(
                             fadeOut(animationSpec = tween(durationMillis = 140)) +

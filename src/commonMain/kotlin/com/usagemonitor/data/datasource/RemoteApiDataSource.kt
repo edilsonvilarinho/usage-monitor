@@ -18,7 +18,8 @@ private const val ANTHROPIC_BETA_OAUTH = "oauth-2025-04-20"
 private const val GITHUB_API_VERSION = "2022-11-28"
 private const val USAGE_MONITOR_USER_AGENT = "UsageMonitorDesktop"
 
-class RemoteApiDataSource(private val httpClient: HttpClient) {
+// Aberto para permitir fakes em testes unitários (substituem chamadas HTTP reais).
+open class RemoteApiDataSource(private val httpClient: HttpClient) {
 
     /**
      * Busca uso atual via endpoint dedicado OAuth da Anthropic.
@@ -26,7 +27,7 @@ class RemoteApiDataSource(private val httpClient: HttpClient) {
      *
      * Requer `anthropic-beta: oauth-2025-04-20` para aceitar token OAuth do Claude.ai.
      */
-    suspend fun fetchAnthropicUsage(accessToken: String): AnthropicUsageResponse {
+    open suspend fun fetchAnthropicUsage(accessToken: String): AnthropicUsageResponse {
         val response = httpClient.get("https://api.anthropic.com/api/oauth/usage") {
             header("Authorization", "Bearer $accessToken")
             header("User-Agent", CLAUDE_USER_AGENT)
@@ -43,14 +44,14 @@ class RemoteApiDataSource(private val httpClient: HttpClient) {
         return response.body()
     }
 
-    suspend fun fetchMiniMaxTokenPlan(apiKey: String): MiniMaxTokenPlanResponse {
+    open suspend fun fetchMiniMaxTokenPlan(apiKey: String): MiniMaxTokenPlanResponse {
         return httpClient.get("https://www.minimax.io/v1/token_plan/remains") {
             header("Authorization", "Bearer $apiKey")
             contentType(ContentType.Application.Json)
         }.body()
     }
 
-    suspend fun fetchCodexUsage(session: CodexSession): CodexUsageResponse {
+    open suspend fun fetchCodexUsage(session: CodexSession): CodexUsageResponse {
         val response = httpClient.get("https://chatgpt.com/backend-api/codex/usage") {
             header("Authorization", "Bearer ${session.accessToken}")
             header("Cookie", "cap_sid=${session.capSid}")
@@ -67,7 +68,7 @@ class RemoteApiDataSource(private val httpClient: HttpClient) {
         return response.body()
     }
 
-    suspend fun fetchLatestGitHubRelease(owner: String, repository: String): GitHubReleaseDto {
+    open suspend fun fetchLatestGitHubRelease(owner: String, repository: String): GitHubReleaseDto {
         val response = httpClient.get("https://api.github.com/repos/$owner/$repository/releases/latest") {
             header("Accept", "application/vnd.github+json")
             header("User-Agent", USAGE_MONITOR_USER_AGENT)

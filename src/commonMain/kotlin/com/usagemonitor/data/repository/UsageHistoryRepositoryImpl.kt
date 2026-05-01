@@ -67,12 +67,12 @@ class UsageHistoryRepositoryImpl(
 
     private fun calculateForecast(points: List<UsageHistoryPoint>): UsageForecast {
         val activeSegment = currentSegment(points)
-        if (activeSegment.size < 3) {
+        if (activeSegment.size < MIN_POINTS_FOR_FORECAST) {
             return UsageForecast.InsufficientData
         }
 
         val observedHours = calculateObservedHours(activeSegment)
-        if (observedHours < 0.5) {
+        if (observedHours < MIN_HOURS_FOR_FORECAST) {
             return UsageForecast.InsufficientData
         }
 
@@ -165,5 +165,9 @@ class UsageHistoryRepositoryImpl(
 
     private companion object {
         const val MILLIS_PER_HOUR = 3_600_000.0
+        // Mínimo de pontos do segmento atual para projetar exaustão sem ruído de amostragem.
+        const val MIN_POINTS_FOR_FORECAST = 3
+        // Janela temporal mínima (em horas) — abaixo disso, taxa instantânea é instável.
+        const val MIN_HOURS_FOR_FORECAST = 0.5
     }
 }
