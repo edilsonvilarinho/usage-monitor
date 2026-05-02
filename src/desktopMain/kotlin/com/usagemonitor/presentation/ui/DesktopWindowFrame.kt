@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
+import com.usagemonitor.presentation.ui.theme.AppMotion
 
 @Composable
 fun WindowScope.DesktopWindowFrame(
@@ -91,17 +92,17 @@ fun WindowScope.DesktopDialogFrame(
 
     val frameAlpha by animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(durationMillis = 220),
+        animationSpec = tween(durationMillis = AppMotion.normal, easing = AppMotion.enterEasing),
         label = "dialogFrameAlpha"
     )
     val frameScale by animateFloatAsState(
-        targetValue = if (entered) 1f else 0.965f,
-        animationSpec = tween(durationMillis = 260),
+        targetValue = if (entered) 1f else 0.972f,
+        animationSpec = tween(durationMillis = AppMotion.normal, easing = AppMotion.enterEasing),
         label = "dialogFrameScale"
     )
     val frameOffsetY by animateDpAsState(
-        targetValue = if (entered) 0.dp else 18.dp,
-        animationSpec = tween(durationMillis = 260),
+        targetValue = if (entered) 0.dp else 14.dp,
+        animationSpec = tween(durationMillis = AppMotion.normal, easing = AppMotion.enterEasing),
         label = "dialogFrameOffsetY"
     )
 
@@ -149,7 +150,7 @@ private fun WindowScope.DesktopTitleBar(
                 .fillMaxWidth()
                 .height(42.dp)
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 12.dp),
+                .padding(start = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -216,7 +217,7 @@ private fun WindowScope.DesktopDialogTitleBar(
                 .fillMaxWidth()
                 .height(42.dp)
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 12.dp),
+                .padding(start = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
