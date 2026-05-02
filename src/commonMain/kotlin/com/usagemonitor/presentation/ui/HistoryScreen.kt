@@ -12,14 +12,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -218,8 +222,8 @@ private fun HistoryControls(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     availableSources.forEach { source ->
                         RangeChip(
@@ -260,12 +264,37 @@ private fun RangeChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    OutlinedButton(onClick = onClick) {
-        Text(
-            text = if (selected) "• $label" else label,
-            style = MaterialTheme.typography.labelLarge
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+                      else           MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = tween(durationMillis = AppMotion.fast),
+        label = "chipColor"
+    )
+    val labelColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                      else           MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = AppMotion.fast),
+        label = "chipLabelColor"
+    )
+
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = labelColor
+            )
+        },
+        shape = AppShapes.small,
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor            = containerColor,
+            selectedContainerColor    = containerColor,
+            labelColor                = labelColor,
+            selectedLabelColor        = labelColor
         )
-    }
+    )
 }
 
 @Composable
