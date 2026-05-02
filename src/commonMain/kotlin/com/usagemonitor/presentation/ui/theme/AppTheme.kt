@@ -8,11 +8,23 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+object AppMotion {
+    const val fast:   Int = 150
+    const val normal: Int = 250
+    const val slow:   Int = 350
+
+    val enterEasing: Easing = FastOutSlowInEasing
+    val exitEasing:  Easing = FastOutLinearInEasing
+}
 
 object AppElevation {
     val card:   Dp = 2.dp
