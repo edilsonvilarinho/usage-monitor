@@ -17,8 +17,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import com.usagemonitor.presentation.ui.theme.AppShapes
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
@@ -179,7 +179,7 @@ private fun FooterCompactStatusGroup(
 
     FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         FooterCompactBadge(text = "v$appVersion")
@@ -194,8 +194,8 @@ private fun FooterCompactBadge(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        shape = AppShapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
     ) {
         Text(
             text = text,
@@ -203,7 +203,7 @@ private fun FooterCompactBadge(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
         )
     }
 }
