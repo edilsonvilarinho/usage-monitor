@@ -1,10 +1,28 @@
 package com.usagemonitor.presentation.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+object AppShapes {
+    val small      = RoundedCornerShape(8.dp)
+    val medium     = RoundedCornerShape(12.dp)
+    val large      = RoundedCornerShape(16.dp)
+    val extraLarge = RoundedCornerShape(24.dp)
+}
+
+private val appShapes = Shapes(
+    extraSmall = AppShapes.small,
+    small      = AppShapes.small,
+    medium     = AppShapes.medium,
+    large      = AppShapes.large,
+    extraLarge = AppShapes.extraLarge
+)
 
 // ── Paleta Dark (#1E1E1E como background) ────────────────────────────────────
 private val DarkBackground = Color(0xFF1E1E1E)
@@ -56,6 +74,7 @@ fun AppTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        content = content
+        shapes      = appShapes,
+        content     = content
     )
 }
