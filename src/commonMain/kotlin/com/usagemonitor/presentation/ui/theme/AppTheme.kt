@@ -10,8 +10,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+object AppElevation {
+    val card:   Dp = 2.dp
+    val dialog: Dp = 8.dp
+    val banner: Dp = 1.dp
+}
 
 object AppShapes {
     val small      = RoundedCornerShape(8.dp)
@@ -67,33 +74,40 @@ private val appTypography = Typography(
     )
 )
 
-// ── Paleta Dark (#1E1E1E como background) ────────────────────────────────────
-private val DarkBackground = Color(0xFF1E1E1E)
-private val DarkSurface    = Color(0xFF2D2D2D)
+// ── Paleta Dark ───────────────────────────────────────────────────────────────
+private val DarkBackground = Color(0xFF181818)
+private val DarkSurface    = Color(0xFF242424)
 private val DarkOnSurface  = Color(0xFFE0E0E0)
-private val DarkPrimary    = Color(0xFF82B1FF)  // azul claro suave
-private val DarkSecondary  = Color(0xFF80CBC4)  // verde-azulado
+private val DarkPrimary    = Color(0xFF82B1FF)
+private val DarkSecondary  = Color(0xFF80CBC4)
 
 private val usageMonitorDarkColorScheme = darkColorScheme(
-    background       = DarkBackground,
-    surface          = DarkSurface,
-    onSurface        = DarkOnSurface,
-    primary          = DarkPrimary,
-    onPrimary        = Color(0xFF001064),
-    secondary        = DarkSecondary,
-    onSecondary      = Color(0xFF003731),
-    surfaceVariant   = Color(0xFF383838),
-    onSurfaceVariant = Color(0xFFBDBDBD)
+    background        = DarkBackground,
+    surface           = DarkSurface,
+    onSurface         = DarkOnSurface,
+    primary           = DarkPrimary,
+    onPrimary         = Color(0xFF001064),
+    secondary         = DarkSecondary,
+    onSecondary       = Color(0xFF003731),
+    surfaceVariant    = Color(0xFF2C2C2C),
+    onSurfaceVariant  = Color(0xFFBDBDBD),
+    surfaceTint       = DarkPrimary,
+    outlineVariant    = Color(0xFF3A3A3A)
 )
 
-// ── Paleta Light (Material 3 padrão ligeiramente personalizada) ───────────────
+// ── Paleta Light ──────────────────────────────────────────────────────────────
 private val usageMonitorLightColorScheme = lightColorScheme(
-    background       = Color(0xFFF5F5F5),
-    surface          = Color(0xFFFFFFFF),
-    primary          = Color(0xFF1565C0),
-    onPrimary        = Color.White,
-    secondary        = Color(0xFF00796B),
-    onSecondary      = Color.White
+    background        = Color(0xFFF4F6F8),
+    surface           = Color(0xFFF8F9FA),
+    onSurface         = Color(0xFF1A1A1A),
+    primary           = Color(0xFF1565C0),
+    onPrimary         = Color.White,
+    secondary         = Color(0xFF00796B),
+    onSecondary       = Color.White,
+    surfaceVariant    = Color(0xFFECEEF0),
+    onSurfaceVariant  = Color(0xFF555555),
+    surfaceTint       = Color(0xFF1565C0),
+    outlineVariant    = Color(0xFFD0D5DB)
 )
 
 /**
