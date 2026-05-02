@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -15,8 +16,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,15 +33,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +51,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppShapes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -114,6 +121,8 @@ fun ApiUsageCard(
     }
 
     var visible by remember(source) { mutableStateOf(false) }
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
 
     LaunchedEffect(source) {
         visible = false
@@ -144,10 +153,10 @@ fun ApiUsageCard(
     )
     val cardElevation by animateDpAsState(
         targetValue = when {
-            isBeingDragged -> 18.dp
-            isRefreshing -> 12.dp
-            isDragTarget -> 9.dp
-            else -> 6.dp
+            isBeingDragged -> 14.dp
+            isRefreshing   -> 8.dp
+            isDragTarget   -> 6.dp
+            else           -> AppElevation.card
         },
         animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
         label = "cardElevation"
@@ -177,9 +186,17 @@ fun ApiUsageCard(
         0f
     }
 
-    ElevatedCard(
+    val hoverBackground by animateColorAsState(
+        targetValue = if (isHovered) MaterialTheme.colorScheme.surfaceVariant
+                      else           cardContainerColor(),
+        animationSpec = tween(durationMillis = AppMotion.fast),
+        label = "cardHoverBg"
+    )
+
+    Card(
         modifier = modifier
             .fillMaxWidth()
+            .hoverable(hoverInteraction)
             .animateContentSize(animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS))
             .pointerInput(source) {
                 detectDragGesturesAfterLongPress(
@@ -197,16 +214,15 @@ fun ApiUsageCard(
                 scaleY = cardScale
                 translationY = cardOffsetY.toPx()
             },
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = cardContainerColor()
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = cardElevation)
+        shape = AppShapes.large,
+        colors = CardDefaults.cardColors(containerColor = hoverBackground),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
+                .clip(AppShapes.large)
                 .drawWithCache {
                     val accentColor = accentColorFor(source = source).copy(alpha = pulseAlpha)
                     val topGlow = Brush.verticalGradient(
@@ -244,7 +260,7 @@ fun ApiUsageCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -433,7 +449,7 @@ private fun CompactQuotaBadge(
     Column(
         modifier = modifier
             .testTag(COMPACT_QUOTA_BADGE_TAG)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(AppShapes.extraLarge)
             .background(accentColorFor(source = source).copy(alpha = 0.12f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
