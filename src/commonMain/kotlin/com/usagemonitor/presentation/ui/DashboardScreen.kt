@@ -16,7 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -38,6 +37,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
+import com.usagemonitor.presentation.ui.components.ShimmerBox
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
@@ -237,19 +237,26 @@ private fun NoApisEnabledContent(
 
 @Composable
 private fun LoadingContent(language: AppLanguage) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = if (language == AppLanguage.PT) "Carregando dados das APIs..." else "Loading API data...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        repeat(2) {
+            ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                cornerRadius = 16.dp
             )
         }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = if (language == AppLanguage.PT) "Carregando dados das APIs..." else "Loading API data...",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
     }
 }
 
