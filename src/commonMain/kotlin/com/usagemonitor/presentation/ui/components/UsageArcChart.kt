@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -56,7 +57,7 @@ fun UsageArcChart(
 
     val animatedPercentage by animateFloatAsState(
         targetValue = percentage,
-        animationSpec = tween(durationMillis = 800),
+        animationSpec = tween(durationMillis = 800, easing = AppMotion.enterEasing),
         label = "arcAnimation"
     )
 

@@ -88,8 +88,8 @@ private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 // Durações centralizadas das animações do card (em ms). Mantém legibilidade ao
 // alterar timing globalmente sem caçar literais espalhados pelo composable.
 private object CardAnimations {
-    const val EXPAND_DURATION_MS = 550
-    const val MINIMIZE_DURATION_MS = 240
+    val EXPAND_DURATION_MS  = AppMotion.slow + AppMotion.normal   // 600ms
+    val MINIMIZE_DURATION_MS = AppMotion.normal                   // 250ms
     const val PULSE_DURATION_MS = 1500
 }
 
@@ -340,14 +340,14 @@ fun ApiUsageCard(
                 AnimatedContent(
                     targetState = isMinimized,
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(durationMillis = 220, delayMillis = 50)) +
+                        (fadeIn(animationSpec = tween(durationMillis = AppMotion.normal, delayMillis = 50, easing = AppMotion.enterEasing)) +
                             scaleIn(
-                                animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
+                                animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS, easing = AppMotion.enterEasing),
                                 initialScale = 0.97f
                             )).togetherWith(
-                            fadeOut(animationSpec = tween(durationMillis = 140)) +
+                            fadeOut(animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.exitEasing)) +
                                 scaleOut(
-                                    animationSpec = tween(durationMillis = 180),
+                                    animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.exitEasing),
                                     targetScale = 0.98f
                                 )
                         ).using(SizeTransform(clip = false))
