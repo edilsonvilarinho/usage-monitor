@@ -19,8 +19,8 @@ fun UsageHistoryLineChart(
     points: List<UsageHistoryPoint>,
     modifier: Modifier = Modifier
 ) {
-    val lineColor = MaterialTheme.colorScheme.primary
-    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+    val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
 
     Box(
         modifier = modifier
@@ -28,7 +28,7 @@ fun UsageHistoryLineChart(
             .height(120.dp)
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
-            val strokeWidth = 3.dp.toPx()
+            val strokeWidth = 1.5.dp.toPx()
             val gridStroke = 1.dp.toPx()
 
             drawLine(

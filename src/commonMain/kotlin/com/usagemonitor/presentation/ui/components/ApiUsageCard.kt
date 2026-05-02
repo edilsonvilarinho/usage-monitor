@@ -533,7 +533,7 @@ private fun QuotaColumn(
             total = quota.total,
             unit = quota.unit,
             size = 92.dp,
-            strokeWidth = 11.dp,
+            strokeWidth = 10.dp,
             percentageTextStyle = MaterialTheme.typography.headlineMedium.copy(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold

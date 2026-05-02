@@ -45,7 +45,7 @@ fun UsageArcChart(
     unit: UsageUnit,
     modifier: Modifier = Modifier,
     size: Dp = 80.dp,
-    strokeWidth: Dp = 12.dp,
+    strokeWidth: Dp = 10.dp,
     percentageTextStyle: TextStyle? = null
 ) {
     val percentage = if (total > 0L) {
@@ -60,7 +60,7 @@ fun UsageArcChart(
         label = "arcAnimation"
     )
 
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
     val usedColor = arcColor(percentage)
     val resolvedTextStyle = percentageTextStyle ?: MaterialTheme.typography.headlineMedium
 
