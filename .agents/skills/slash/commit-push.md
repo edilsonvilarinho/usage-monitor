@@ -70,8 +70,8 @@ Se a verificação falhar, parar antes do commit.
 Antes de commitar:
 
 ```bash
-git config user.name "codex"
-git config user.email "codex@openai.com"
+git config user.name "gemini"
+git config user.email "gemini@google.com"
 ```
 
 ## Step 5 — Commit
