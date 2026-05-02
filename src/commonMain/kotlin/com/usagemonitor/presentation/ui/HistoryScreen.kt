@@ -375,7 +375,7 @@ private fun MetricItem(
     label: String,
     value: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
@@ -383,7 +383,7 @@ private fun MetricItem(
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
     }

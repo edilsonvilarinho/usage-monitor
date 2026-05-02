@@ -202,7 +202,7 @@ private fun WindowScope.DesktopTitleBar(
         }
     }
 
-    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 
 @Composable
@@ -250,7 +250,7 @@ private fun WindowScope.DesktopDialogTitleBar(
         }
     }
 
-    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
