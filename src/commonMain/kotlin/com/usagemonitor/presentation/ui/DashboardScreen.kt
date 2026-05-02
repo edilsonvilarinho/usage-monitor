@@ -141,13 +141,13 @@ fun DashboardScreen(
                             onRetryInstallation = { viewModel.retryUpdateInstallation() },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
                         )
                     }
 
                     SnackbarHost(
                         hostState = snackbarHostState,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
 
                     Box(
@@ -342,26 +342,33 @@ private fun SuccessContent(
                 .verticalScroll(scrollState)
                 .padding(end = 12.dp)
         ) {
-            warnings.forEach { warning ->
-                PersistentApiWarningBanner(
-                    title = warning.title,
-                    description = warning.description,
-                    actionLabel = warning.actionLabel,
-                    onAction = warningActionFor(
-                        source = warning.source,
-                        onRetryAnthropic = onRetryAnthropic
-                    ),
+            if (warnings.isNotEmpty()) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                )
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    warnings.forEach { warning ->
+                        PersistentApiWarningBanner(
+                            title = warning.title,
+                            description = warning.description,
+                            actionLabel = warning.actionLabel,
+                            onAction = warningActionFor(
+                                source = warning.source,
+                                onRetryAnthropic = onRetryAnthropic
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
 
             genericErrors.forEach { error ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -383,7 +390,7 @@ private fun SuccessContent(
                 onOpenHistoryCard = onOpenHistoryCard,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             )
         }
 
