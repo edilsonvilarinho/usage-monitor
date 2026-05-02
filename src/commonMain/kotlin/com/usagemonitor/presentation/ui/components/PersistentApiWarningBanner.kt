@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -15,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppShapes
 
 @Composable
 fun PersistentApiWarningBanner(
@@ -26,13 +27,13 @@ fun PersistentApiWarningBanner(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        tonalElevation = 4.dp,
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
+        shape = AppShapes.medium,
+        tonalElevation = AppElevation.banner,
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.80f)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -40,14 +41,14 @@ fun PersistentApiWarningBanner(
             ) {
                 Text(
                     text = "!",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -55,7 +56,7 @@ fun PersistentApiWarningBanner(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
             )
 
             if (actionLabel != null && onAction != null) {
