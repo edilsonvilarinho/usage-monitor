@@ -29,6 +29,7 @@ import kotlinx.datetime.Instant
 
 private const val POLL_INTERVAL_SECONDS = 600
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 3_600_000L
+private const val UPDATE_CHECK_INTERVAL_WHILE_RUNNING_MS = 60 * 60_000L
 private const val HTTP_RATE_LIMIT_MARKER = "429"
 private const val INSTALLER_HANDOFF_DELAY_MS = 1_500L
 
@@ -90,9 +91,10 @@ class DashboardViewModel(
 
     private fun startUpdateCheckLoop() {
         viewModelScope.launch {
+            checkForUpdate(autoInstall = true)
             while (true) {
-                checkForUpdate(autoInstall = true)
-                delay(UPDATE_CHECK_INTERVAL_MS)
+                delay(UPDATE_CHECK_INTERVAL_WHILE_RUNNING_MS)
+                checkForUpdate(autoInstall = false)
             }
         }
     }
