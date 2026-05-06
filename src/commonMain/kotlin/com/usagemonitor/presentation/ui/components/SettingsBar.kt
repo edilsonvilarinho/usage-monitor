@@ -23,10 +23,15 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -309,22 +314,33 @@ private fun FooterActionGroup(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FooterIconActionButton(
     label: String,
     onClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    FilledTonalIconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .height(34.dp)
-            .width(34.dp)
-            .semantics {
-                contentDescription = label
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(label)
             }
+        },
+        state = rememberTooltipState()
     ) {
-        content()
+        FilledTonalIconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .height(34.dp)
+                .width(34.dp)
+                .semantics {
+                    contentDescription = label
+                }
+        ) {
+            content()
+        }
     }
 }
 

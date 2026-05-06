@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
+import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import kotlinx.datetime.Instant
@@ -45,11 +46,12 @@ class UsageHistoryRepositoryImpl(
         records: List<UsageSnapshotRecord>
     ): UsageHistorySeries {
         val points = records.map(::toHistoryPoint)
+        val unit = records.first().unit
         val currentPoint = points.last()
-        val deltaDisplayUsed = calculatePositiveDelta(points)
+        val deltaDisplayUsed = calculatePositiveDelta(points, unit)
         val hoursObserved = calculateObservedHours(points)
         val averagePerHour = if (hoursObserved > 0.0) deltaDisplayUsed.toDouble() / hoursObserved else 0.0
-        val forecast = calculateForecast(points)
+        val forecast = calculateForecast(points, unit)
 
         return UsageHistorySeries(
             quotaLabel = key.quotaLabel,
@@ -65,8 +67,8 @@ class UsageHistoryRepositoryImpl(
         )
     }
 
-    private fun calculateForecast(points: List<UsageHistoryPoint>): UsageForecast {
-        val activeSegment = currentSegment(points)
+    private fun calculateForecast(points: List<UsageHistoryPoint>, unit: UsageUnit): UsageForecast {
+        val activeSegment = currentSegment(points, unit)
         if (activeSegment.size < MIN_POINTS_FOR_FORECAST) {
             return UsageForecast.InsufficientData
         }
@@ -76,13 +78,17 @@ class UsageHistoryRepositoryImpl(
             return UsageForecast.InsufficientData
         }
 
-        val positiveDelta = calculatePositiveDelta(activeSegment)
+        val positiveDelta = calculatePositiveDelta(activeSegment, unit)
         if (positiveDelta <= 0L) {
             return UsageForecast.NoGrowth
         }
 
         val lastPoint = activeSegment.last()
-        val remaining = (lastPoint.displayTotal - lastPoint.displayUsed).coerceAtLeast(0L)
+        val remaining = if (unit == UsageUnit.CURRENCY_USD) {
+            lastPoint.displayUsed.coerceAtLeast(0L)
+        } else {
+            (lastPoint.displayTotal - lastPoint.displayUsed).coerceAtLeast(0L)
+        }
         val averagePerHour = positiveDelta.toDouble() / observedHours
 
         if (averagePerHour <= 0.0) {
@@ -105,7 +111,7 @@ class UsageHistoryRepositoryImpl(
         }
     }
 
-    private fun currentSegment(points: List<UsageHistoryPoint>): List<UsageHistoryPoint> {
+    private fun currentSegment(points: List<UsageHistoryPoint>, unit: UsageUnit): List<UsageHistoryPoint> {
         if (points.size <= 1) {
             return points
         }
@@ -114,8 +120,12 @@ class UsageHistoryRepositoryImpl(
         for (index in 1 until points.size) {
             val previous = points[index - 1]
             val current = points[index]
-            val resetDetected = current.displayUsed < previous.displayUsed ||
+            val resetDetected = if (unit == UsageUnit.CURRENCY_USD) {
                 current.periodEndAt != previous.periodEndAt
+            } else {
+                current.displayUsed < previous.displayUsed ||
+                    current.periodEndAt != previous.periodEndAt
+            }
             if (resetDetected) {
                 segmentStartIndex = index
             }
@@ -124,14 +134,20 @@ class UsageHistoryRepositoryImpl(
         return points.subList(segmentStartIndex, points.size)
     }
 
-    private fun calculatePositiveDelta(points: List<UsageHistoryPoint>): Long {
+    private fun calculatePositiveDelta(points: List<UsageHistoryPoint>, unit: UsageUnit): Long {
         var delta = 0L
         for (index in 1 until points.size) {
             val current = points[index]
             val previous = points[index - 1]
-            val growth = current.displayUsed - previous.displayUsed
-            if (growth > 0L) {
-                delta += growth
+            val diff = current.displayUsed - previous.displayUsed
+            if (unit == UsageUnit.CURRENCY_USD) {
+                if (diff < 0L) {
+                    delta += -diff
+                }
+            } else {
+                if (diff > 0L) {
+                    delta += diff
+                }
             }
         }
         return delta

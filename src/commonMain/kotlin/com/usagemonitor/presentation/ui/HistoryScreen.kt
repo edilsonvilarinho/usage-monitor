@@ -333,7 +333,7 @@ private fun HistorySeriesCard(
                 )
             }
 
-            UsageHistoryLineChart(points = series.points)
+            UsageHistoryLineChart(points = series.points, unit = series.unit)
 
             HistoryMetrics(series = series, language = language)
         }
@@ -351,18 +351,33 @@ private fun HistoryMetrics(
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        MetricItem(
-            label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
-            value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
-        )
-        MetricItem(
-            label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-            value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
-        )
-        MetricItem(
-            label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-            value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
-        )
+        if (series.unit == UsageUnit.CURRENCY_USD) {
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+                value = formatCents(series.currentDisplayUsed)
+            )
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+                value = formatCents(series.deltaDisplayUsed)
+            )
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+                value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
+            )
+        } else {
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+                value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
+            )
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+                value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
+            )
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+                value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
+            )
+        }
         MetricItem(
             label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
             value = forecastLabel(series.forecast, language)
@@ -471,6 +486,14 @@ private fun formatQuantity(value: Long): String {
         value >= 1_000L -> "${trimDecimal(value / 1_000.0)}K"
         else -> value.toString()
     }
+}
+
+private fun formatCents(cents: Long): String {
+    val sign = if (cents < 0L) "-" else ""
+    val absCents = kotlin.math.abs(cents)
+    val dollars = absCents / 100
+    val remainder = absCents % 100
+    return "${sign}\$${dollars}.${remainder.toString().padStart(2, '0')}"
 }
 
 private fun trimDecimal(value: Double): String {

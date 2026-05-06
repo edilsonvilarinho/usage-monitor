@@ -13,10 +13,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageHistoryPoint
+import com.usagemonitor.domain.entity.UsageUnit
 
 @Composable
 fun UsageHistoryLineChart(
     points: List<UsageHistoryPoint>,
+    unit: UsageUnit,
     modifier: Modifier = Modifier
 ) {
     val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
@@ -44,16 +46,36 @@ fun UsageHistoryLineChart(
                 strokeWidth = gridStroke
             )
 
-            if (points.size <= 1) {
+            val renderPoints = if (unit == UsageUnit.CURRENCY_USD) {
+                points.filter { it.displayUsed > 0L }
+            } else {
+                points
+            }
+
+            if (renderPoints.size <= 1) {
                 return@Canvas
             }
 
-            val maxIndex = (points.lastIndex).coerceAtLeast(1)
+            val maxIndex = (renderPoints.lastIndex).coerceAtLeast(1)
             val path = Path()
 
-            points.forEachIndexed { index, point ->
+            val plotValues = if (unit == UsageUnit.CURRENCY_USD) {
+                val displayValues = renderPoints.map { it.displayUsed.toFloat() }
+                val minVal = displayValues.minOrNull() ?: return@Canvas
+                val maxVal = displayValues.maxOrNull() ?: return@Canvas
+                val range = maxVal - minVal
+                if (range > 0f) {
+                    displayValues.map { (it - minVal) / range }
+                } else {
+                    displayValues.map { 0.5f }
+                }
+            } else {
+                renderPoints.map { it.normalizedUsage }
+            }
+
+            renderPoints.forEachIndexed { index, point ->
                 val x = size.width * (index.toFloat() / maxIndex.toFloat())
-                val y = size.height - (point.normalizedUsage * size.height)
+                val y = size.height - (plotValues[index] * size.height)
                 if (index == 0) {
                     path.moveTo(x, y)
                 } else {
