@@ -790,4 +790,102 @@ class ComponentTest {
         onNodeWithText("50 / 100 %").assertIsDisplayed()
         viewModel.onDestroy()
     }
+
+    @Test
+    fun `HistoryScreen renders DeepSeek-specific balance summary`() = runDesktopComposeUiTest {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.DEEPSEEK,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-06T21:47:00Z"),
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "Saldo",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.CURRENCY_USD,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-06T18:00:00Z"),
+                            used = 0,
+                            total = 469,
+                            rawUsed = 469,
+                            rawTotal = 469,
+                            periodEndAt = Instant.parse("9999-12-31T23:59:59Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-06T19:30:00Z"),
+                            used = 0,
+                            total = 468,
+                            rawUsed = 468,
+                            rawTotal = 468,
+                            periodEndAt = Instant.parse("9999-12-31T23:59:59Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-06T21:47:00Z"),
+                            used = 0,
+                            total = 466,
+                            rawUsed = 466,
+                            rawTotal = 466,
+                            periodEndAt = Instant.parse("9999-12-31T23:59:59Z")
+                        )
+                    ),
+                    currentDisplayUsed = 466,
+                    currentDisplayTotal = 466,
+                    deltaDisplayUsed = 3,
+                    averageDisplayConsumptionPerHour = 0.8,
+                    currentPeriodEndAt = Instant.parse("9999-12-31T23:59:59Z"),
+                    forecast = UsageForecast.InsufficientData
+                )
+            )
+        )
+
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                    override suspend fun recordSnapshot(
+                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
+                        capturedAt: Instant
+                    ) = Unit
+
+                    override suspend fun getHistoryReport(
+                        source: ApiSource,
+                        range: HistoryRange,
+                        now: Instant
+                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
+                        return report
+                    }
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.DEEPSEEK))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {},
+                    focusedSource = ApiSource.DEEPSEEK,
+                    showSourceSelector = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Saldo restante").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Histórico do DeepSeek").assertIsDisplayed()
+        onNodeWithText("Saldo restante").assertIsDisplayed()
+        onNodeWithText("Saldo atual").assertIsDisplayed()
+        onNodeWithText("Gasto no período").assertIsDisplayed()
+        onNodeWithText("Ritmo médio").assertIsDisplayed()
+        onNodeWithText("Última coleta").assertIsDisplayed()
+        onNodeWithText("\$4.66").assertIsDisplayed()
+        onAllNodesWithText("Uso atual").assertCountEquals(0)
+        onAllNodesWithText("Quota intervalar").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
 }

@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageForecast
@@ -126,12 +127,6 @@ fun HistoryScreen(
                         onSelectRange = viewModel::selectRange
                     )
 
-                    Text(
-                        text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
                     if (current.report.series.isEmpty()) {
                         Text(
                             text = if (language == AppLanguage.PT) {
@@ -143,11 +138,24 @@ fun HistoryScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        current.report.series.forEach { series ->
-                            HistorySeriesCard(
-                                series = series,
+                        if (current.report.source == ApiSource.DEEPSEEK) {
+                            DeepSeekHistoryContent(
+                                report = current.report,
                                 language = language
                             )
+                        } else {
+                            Text(
+                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            current.report.series.forEach { series ->
+                                HistorySeriesCard(
+                                    series = series,
+                                    language = language
+                                )
+                            }
                         }
                     }
                 }
@@ -180,11 +188,11 @@ private fun HistoryHeader(
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = if (language == AppLanguage.PT) {
-                    "Tendência, consumo médio e previsão por quota."
-                } else {
-                    "Trend, average consumption, and forecast by quota."
-                },
+                text = historySubtitle(
+                    selectedSource = selectedSource,
+                    showSourceSelector = showSourceSelector,
+                    language = language
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -295,6 +303,109 @@ private fun RangeChip(
             selectedLabelColor        = labelColor
         )
     )
+}
+
+@Composable
+private fun DeepSeekHistoryContent(
+    report: ApiUsageHistoryReport,
+    language: AppLanguage
+) {
+    val primarySeries = report.series
+        .firstOrNull { series -> series.quotaLabel.equals("Saldo", ignoreCase = true) }
+        ?: report.series.first()
+    val extraSeries = report.series.filterNot { series -> series == primarySeries }
+
+    DeepSeekHistoryCard(
+        title = deepSeekSeriesTitle(primarySeries, language),
+        subtitle = deepSeekSeriesSubtitle(primarySeries, language),
+        series = primarySeries,
+        lastUpdatedAt = report.lastUpdatedAt,
+        language = language
+    )
+
+    extraSeries.forEach { series ->
+        DeepSeekHistoryCard(
+            title = deepSeekSeriesTitle(series, language),
+            subtitle = deepSeekSeriesSubtitle(series, language),
+            series = series,
+            lastUpdatedAt = null,
+            language = language
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DeepSeekHistoryCard(
+    title: String,
+    subtitle: String,
+    series: UsageHistorySeries,
+    lastUpdatedAt: Instant?,
+    language: AppLanguage
+) {
+    Card(
+        shape = AppShapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.card)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+                    value = formatCents(series.currentDisplayUsed)
+                )
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Gasto no período" else "Spent in range",
+                    value = formatCents(series.deltaDisplayUsed)
+                )
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Ritmo médio" else "Average pace",
+                    value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
+                )
+                if (lastUpdatedAt != null) {
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Última coleta" else "Last snapshot",
+                        value = formatInstant(lastUpdatedAt)
+                    )
+                }
+            }
+
+            UsageHistoryLineChart(points = series.points, unit = series.unit)
+
+            deepSeekForecastText(series.forecast, language)?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -437,6 +548,26 @@ private fun historyTitle(
     return if (language == AppLanguage.PT) "Histórico de uso" else "Usage history"
 }
 
+private fun historySubtitle(
+    selectedSource: ApiSource?,
+    showSourceSelector: Boolean,
+    language: AppLanguage
+): String {
+    if (selectedSource == ApiSource.DEEPSEEK) {
+        return if (language == AppLanguage.PT) {
+            "Saldo restante, gasto no intervalo e tendência recente."
+        } else {
+            "Remaining balance, spend in range, and recent trend."
+        }
+    }
+
+    return if (language == AppLanguage.PT) {
+        "Tendência, consumo médio e previsão por quota."
+    } else {
+        "Trend, average consumption, and forecast by quota."
+    }
+}
+
 private fun lastUpdatedLabel(lastUpdatedAt: Instant?, language: AppLanguage): String {
     if (lastUpdatedAt == null) {
         return if (language == AppLanguage.PT) "Última coleta: —" else "Last snapshot: —"
@@ -459,6 +590,57 @@ private fun forecastLabel(forecast: UsageForecast, language: AppLanguage): Strin
                 "Esgota por volta de ${formatInstant(forecast.instant)}"
             } else {
                 "Expected to exhaust around ${formatInstant(forecast.instant)}"
+            }
+        }
+    }
+}
+
+private fun deepSeekSeriesTitle(series: UsageHistorySeries, language: AppLanguage): String {
+    if (series.quotaLabel.equals("Saldo", ignoreCase = true)) {
+        return if (language == AppLanguage.PT) "Saldo restante" else "Remaining balance"
+    }
+
+    if (series.quotaLabel.equals("Gratuito", ignoreCase = true)) {
+        return if (language == AppLanguage.PT) "Crédito gratuito" else "Free credit"
+    }
+
+    return series.quotaLabel
+}
+
+private fun deepSeekSeriesSubtitle(series: UsageHistorySeries, language: AppLanguage): String {
+    if (series.quotaLabel.equals("Saldo", ignoreCase = true)) {
+        return if (language == AppLanguage.PT) {
+            "Leitura do saldo restante ao longo do intervalo selecionado."
+        } else {
+            "Remaining balance observed over the selected range."
+        }
+    }
+
+    if (series.quotaLabel.equals("Gratuito", ignoreCase = true)) {
+        return if (language == AppLanguage.PT) {
+            "Crédito promocional ainda disponível no período."
+        } else {
+            "Promotional credit still available in the selected range."
+        }
+    }
+
+    return if (language == AppLanguage.PT) {
+        "Saldo observado neste intervalo."
+    } else {
+        "Balance observed in this range."
+    }
+}
+
+private fun deepSeekForecastText(forecast: UsageForecast, language: AppLanguage): String? {
+    return when (forecast) {
+        UsageForecast.InsufficientData -> null
+        UsageForecast.NoGrowth -> null
+        UsageForecast.ResetsBeforeExhaustion -> null
+        is UsageForecast.EstimatedExhaustionAt -> {
+            if (language == AppLanguage.PT) {
+                "Mantendo esse ritmo, o saldo pode acabar por volta de ${formatInstant(forecast.instant)}."
+            } else {
+                "At the current pace, the balance may run out around ${formatInstant(forecast.instant)}."
             }
         }
     }
