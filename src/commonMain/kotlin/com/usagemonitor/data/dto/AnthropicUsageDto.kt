@@ -28,6 +28,6 @@ data class AnthropicUsageWindow(
 @Serializable
 data class AnthropicExtraUsage(
     @SerialName("is_enabled") val isEnabled: Boolean,
-    @SerialName("monthly_limit") val monthlyLimit: Int,
-    @SerialName("used_credits") val usedCredits: Double,
+    @SerialName("monthly_limit") val monthlyLimit: Int? = null,
+    @SerialName("used_credits") val usedCredits: Double? = null,
 )
