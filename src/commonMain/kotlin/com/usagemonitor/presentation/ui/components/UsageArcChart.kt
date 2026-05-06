@@ -93,6 +93,24 @@ fun UsageArcChart(
 
             if (animatedPercentage > 0f) {
                 drawArc(
+                    color = usedColor.copy(alpha = 0.12f),
+                    startAngle = 135f,
+                    sweepAngle = 270f * animatedPercentage,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokePx * 2.8f, cap = StrokeCap.Round)
+                )
+                drawArc(
+                    color = usedColor.copy(alpha = 0.22f),
+                    startAngle = 135f,
+                    sweepAngle = 270f * animatedPercentage,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokePx * 1.5f, cap = StrokeCap.Round)
+                )
+                drawArc(
                     color = usedColor,
                     startAngle = 135f,
                     sweepAngle = 270f * animatedPercentage,

@@ -1,5 +1,12 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -155,33 +163,44 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
-                        when (val state = uiState) {
-                            is UiState.Loading -> LoadingContent(language = language)
-                            UiState.NoApisEnabled -> NoApisEnabledContent(
-                                language = language,
-                                onOpenSettings = onOpenSettings
-                            )
-                            is UiState.Error -> ErrorContent(
-                                errors = state.errors,
-                                language = language,
-                                onRetryAll = { viewModel.refresh() },
-                                onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) }
-                            )
-                            is UiState.Success -> SuccessContent(
-                                apiStatsList = state.data,
-                                partialErrors = state.errors,
-                                refreshingSources = refreshingSources,
-                                enabledApis = enabledApisState,
-                                cardOrder = cardOrder,
-                                minimizedCards = minimizedCards,
-                                language = language,
-                                onRefreshCard = { source -> viewModel.refresh(source) },
-                                onMoveCardToIndex = onMoveCardToIndex,
-                                onToggleCardMinimized = onToggleCardMinimized,
-                                onOpenHistoryCard = onOpenHistory,
-                                onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                        AnimatedContent(
+                            targetState = uiState::class,
+                            transitionSpec = {
+                                (fadeIn(tween(AppMotion.normal, easing = AppMotion.enterEasing)) +
+                                    slideInVertically(tween(AppMotion.slow, easing = AppMotion.enterEasing)) { it / 12 })
+                                    .togetherWith(fadeOut(tween(AppMotion.fast, easing = AppMotion.exitEasing)))
+                                    .using(SizeTransform(clip = false))
+                            },
+                            label = "dashboardStateContent"
+                        ) { _ ->
+                            when (val state = uiState) {
+                                is UiState.Loading -> LoadingContent(language = language)
+                                UiState.NoApisEnabled -> NoApisEnabledContent(
+                                    language = language,
+                                    onOpenSettings = onOpenSettings
+                                )
+                                is UiState.Error -> ErrorContent(
+                                    errors = state.errors,
+                                    language = language,
+                                    onRetryAll = { viewModel.refresh() },
+                                    onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) }
+                                )
+                                is UiState.Success -> SuccessContent(
+                                    apiStatsList = state.data,
+                                    partialErrors = state.errors,
+                                    refreshingSources = refreshingSources,
+                                    enabledApis = enabledApisState,
+                                    cardOrder = cardOrder,
+                                    minimizedCards = minimizedCards,
+                                    language = language,
+                                    onRefreshCard = { source -> viewModel.refresh(source) },
+                                    onMoveCardToIndex = onMoveCardToIndex,
+                                    onToggleCardMinimized = onToggleCardMinimized,
+                                    onOpenHistoryCard = onOpenHistory,
+                                    onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
                 }

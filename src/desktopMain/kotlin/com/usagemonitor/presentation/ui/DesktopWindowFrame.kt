@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,16 +35,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.pointerMoveFilter
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.usagemonitor.presentation.ui.theme.AppMotion
+
+private val WindowCornerRadius = 16.dp
+
+private fun WindowScope.applyWindowShape(density: androidx.compose.ui.unit.Density, cornerRadius: Dp) {
+    val arcDiameter = with(density) { cornerRadius.toPx() * 2 }
+    window.shape = java.awt.geom.RoundRectangle2D.Float(
+        0f, 0f,
+        window.width.toFloat(),
+        window.height.toFloat(),
+        arcDiameter,
+        arcDiameter
+    )
+}
 
 @Composable
 fun WindowScope.DesktopWindowFrame(
@@ -53,6 +70,25 @@ fun WindowScope.DesktopWindowFrame(
     onCloseRequest: () -> Unit,
     content: @Composable () -> Unit
 ) {
+    val density = LocalDensity.current
+    val isMaximized = windowState.placement == WindowPlacement.Maximized
+
+    DisposableEffect(isMaximized, density) {
+        if (isMaximized) {
+            window.shape = null
+        } else {
+            applyWindowShape(density, WindowCornerRadius)
+            val listener = object : java.awt.event.ComponentAdapter() {
+                override fun componentResized(e: java.awt.event.ComponentEvent) {
+                    applyWindowShape(density, WindowCornerRadius)
+                }
+            }
+            window.addComponentListener(listener)
+            return@DisposableEffect onDispose { window.removeComponentListener(listener) }
+        }
+        onDispose {}
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -83,6 +119,19 @@ fun WindowScope.DesktopDialogFrame(
     onCloseRequest: () -> Unit,
     content: @Composable () -> Unit
 ) {
+    val density = LocalDensity.current
+
+    DisposableEffect(density) {
+        applyWindowShape(density, WindowCornerRadius)
+        val listener = object : java.awt.event.ComponentAdapter() {
+            override fun componentResized(e: java.awt.event.ComponentEvent) {
+                applyWindowShape(density, WindowCornerRadius)
+            }
+        }
+        window.addComponentListener(listener)
+        onDispose { window.removeComponentListener(listener) }
+    }
+
     var entered by remember(title) { mutableStateOf(false) }
 
     LaunchedEffect(title) {
@@ -90,13 +139,8 @@ fun WindowScope.DesktopDialogFrame(
         entered = true
     }
 
-    val frameAlpha by animateFloatAsState(
-        targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(durationMillis = AppMotion.normal, easing = AppMotion.enterEasing),
-        label = "dialogFrameAlpha"
-    )
     val frameScale by animateFloatAsState(
-        targetValue = if (entered) 1f else 0.972f,
+        targetValue = if (entered) 1f else 0.94f,
         animationSpec = tween(durationMillis = AppMotion.normal, easing = AppMotion.enterEasing),
         label = "dialogFrameScale"
     )
@@ -107,19 +151,17 @@ fun WindowScope.DesktopDialogFrame(
     )
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                scaleX = frameScale
+                scaleY = frameScale
+                translationY = frameOffsetY.toPx()
+                transformOrigin = TransformOrigin(0.5f, 0.3f)
+            },
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = frameAlpha
-                    scaleX = frameScale
-                    scaleY = frameScale
-                    translationY = frameOffsetY.toPx()
-                }
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             DesktopDialogTitleBar(
                 title = title,
                 iconPainter = iconPainter,

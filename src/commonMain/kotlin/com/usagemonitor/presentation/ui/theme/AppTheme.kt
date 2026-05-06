@@ -18,9 +18,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object AppMotion {
-    const val fast:   Int = 150
-    const val normal: Int = 250
-    const val slow:   Int = 350
+    const val fast:   Int  = 150
+    const val normal: Int  = 250
+    const val slow:   Int  = 350
+    const val stagger: Long = 70L
 
     val enterEasing: Easing = FastOutSlowInEasing
     val exitEasing:  Easing = FastOutLinearInEasing
@@ -33,10 +34,10 @@ object AppElevation {
 }
 
 object AppShapes {
-    val small      = RoundedCornerShape(8.dp)
-    val medium     = RoundedCornerShape(12.dp)
-    val large      = RoundedCornerShape(16.dp)
-    val extraLarge = RoundedCornerShape(24.dp)
+    val small      = RoundedCornerShape(10.dp)
+    val medium     = RoundedCornerShape(16.dp)
+    val large      = RoundedCornerShape(20.dp)
+    val extraLarge = RoundedCornerShape(28.dp)
 }
 
 private val appShapes = Shapes(

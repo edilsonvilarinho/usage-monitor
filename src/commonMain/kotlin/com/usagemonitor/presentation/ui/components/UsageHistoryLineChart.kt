@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,16 +15,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
+import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -38,6 +48,18 @@ fun UsageHistoryLineChart(
     val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     val axisTextColor = MaterialTheme.colorScheme.onSurfaceVariant
     val renderPoints = filteredPoints(points, unit)
+
+    var revealed by remember { mutableStateOf(false) }
+    val revealFraction by animateFloatAsState(
+        targetValue = if (revealed) 1f else 0f,
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label = "lineReveal"
+    )
+    LaunchedEffect(renderPoints) {
+        revealed = false
+        delay(40)
+        revealed = true
+    }
     val timeLabels = buildTimeReferenceLabels(renderPoints)
     val valueAxis = buildValueAxis(renderPoints, unit)
     val valueLabels = buildValueLabels(valueAxis, unit)
@@ -132,15 +154,16 @@ fun UsageHistoryLineChart(
                     fillPath.lineTo(lastX, size.height)
                     fillPath.close()
 
-                    if (unit == UsageUnit.CURRENCY_USD) {
-                        drawPath(path = fillPath, color = fillColor)
+                    clipRect(right = size.width * revealFraction) {
+                        if (unit == UsageUnit.CURRENCY_USD) {
+                            drawPath(path = fillPath, color = fillColor)
+                        }
+                        drawPath(
+                            path = path,
+                            color = lineColor,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                        )
                     }
-
-                    drawPath(
-                        path = path,
-                        color = lineColor,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                    )
                 }
             }
         }

@@ -1,19 +1,31 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -22,14 +34,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppMotion
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -40,8 +56,11 @@ import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
+import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -82,79 +101,103 @@ fun HistoryScreen(
                 onBack = onBack
             )
 
-            when (val current = state) {
-                is HistoryUiState.Loading -> {
-                    Text(
-                        text = if (language == AppLanguage.PT) "Carregando histórico..." else "Loading history...",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            AnimatedContent(
+                targetState = state::class,
+                transitionSpec = {
+                    (fadeIn(tween(AppMotion.normal, easing = AppMotion.enterEasing)) +
+                        slideInVertically(tween(AppMotion.slow, easing = AppMotion.enterEasing)) { it / 10 })
+                        .togetherWith(fadeOut(tween(AppMotion.fast, easing = AppMotion.exitEasing)))
+                        .using(SizeTransform(clip = false))
+                },
+                label = "historyStateContent"
+            ) { _ ->
+                when (val current = state) {
+                    is HistoryUiState.Loading -> {
+                        Text(
+                            text = if (language == AppLanguage.PT) "Carregando histórico..." else "Loading history...",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-                is HistoryUiState.Empty -> {
-                    Text(
-                        text = if (language == AppLanguage.PT) {
-                            "Ainda não há snapshots salvos. Faça algumas atualizações bem-sucedidas no dashboard para começar."
-                        } else {
-                            "There are no saved snapshots yet. Run a few successful dashboard refreshes to get started."
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                is HistoryUiState.Error -> {
-                    Text(
-                        text = if (language == AppLanguage.PT) "Erro ao carregar histórico" else "Failed to load history",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Text(
-                        text = current.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                is HistoryUiState.Success -> {
-                    HistoryControls(
-                        availableSources = current.availableSources,
-                        selectedSource = current.selectedSource,
-                        selectedRange = current.selectedRange,
-                        showSourceSelector = showSourceSelector,
-                        language = language,
-                        onSelectSource = viewModel::selectSource,
-                        onSelectRange = viewModel::selectRange
-                    )
-
-                    if (current.report.series.isEmpty()) {
+                    is HistoryUiState.Empty -> {
                         Text(
                             text = if (language == AppLanguage.PT) {
-                                "Sem dados para o intervalo selecionado."
+                                "Ainda não há snapshots salvos. Faça algumas atualizações bem-sucedidas no dashboard para começar."
                             } else {
-                                "No data for the selected range."
+                                "There are no saved snapshots yet. Run a few successful dashboard refreshes to get started."
                             },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    } else {
-                        if (current.report.source == ApiSource.DEEPSEEK) {
-                            DeepSeekHistoryContent(
-                                report = current.report,
-                                language = language
-                            )
-                        } else {
+                    }
+
+                    is HistoryUiState.Error -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
+                                text = if (language == AppLanguage.PT) "Erro ao carregar histórico" else "Failed to load history",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = current.message,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                    }
 
-                            current.report.series.forEach { series ->
-                                HistorySeriesCard(
-                                    series = series,
-                                    language = language
+                    is HistoryUiState.Success -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                            HistoryControls(
+                                availableSources = current.availableSources,
+                                selectedSource = current.selectedSource,
+                                selectedRange = current.selectedRange,
+                                showSourceSelector = showSourceSelector,
+                                language = language,
+                                onSelectSource = viewModel::selectSource,
+                                onSelectRange = viewModel::selectRange
+                            )
+
+                            if (current.report.series.isEmpty()) {
+                                Text(
+                                    text = if (language == AppLanguage.PT) {
+                                        "Sem dados para o intervalo selecionado."
+                                    } else {
+                                        "No data for the selected range."
+                                    },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            } else {
+                                val accentColor = accentColorForHistorySource(current.report.source)
+                                if (current.report.source == ApiSource.DEEPSEEK) {
+                                    DeepSeekHistoryContent(
+                                        report = current.report,
+                                        accentColor = accentColor,
+                                        language = language,
+                                        selectedRange = current.selectedRange
+                                    )
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                        Text(
+                                            text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        current.report.series.forEachIndexed { index, series ->
+                                            key(series.quotaLabel + current.selectedRange.name) {
+                                                HistorySeriesCard(
+                                                    series = series,
+                                                    index = index,
+                                                    accentColor = accentColor,
+                                                    language = language
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -308,29 +351,41 @@ private fun RangeChip(
 @Composable
 private fun DeepSeekHistoryContent(
     report: ApiUsageHistoryReport,
-    language: AppLanguage
+    accentColor: Color,
+    language: AppLanguage,
+    selectedRange: HistoryRange
 ) {
     val primarySeries = report.series
         .firstOrNull { series -> series.quotaLabel.equals("Saldo", ignoreCase = true) }
         ?: report.series.first()
     val extraSeries = report.series.filterNot { series -> series == primarySeries }
 
-    DeepSeekHistoryCard(
-        title = deepSeekSeriesTitle(primarySeries, language),
-        subtitle = deepSeekSeriesSubtitle(primarySeries, language),
-        series = primarySeries,
-        lastUpdatedAt = report.lastUpdatedAt,
-        language = language
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        key(primarySeries.quotaLabel + selectedRange.name) {
+            DeepSeekHistoryCard(
+                title = deepSeekSeriesTitle(primarySeries, language),
+                subtitle = deepSeekSeriesSubtitle(primarySeries, language),
+                series = primarySeries,
+                lastUpdatedAt = report.lastUpdatedAt,
+                accentColor = accentColor,
+                index = 0,
+                language = language
+            )
+        }
 
-    extraSeries.forEach { series ->
-        DeepSeekHistoryCard(
-            title = deepSeekSeriesTitle(series, language),
-            subtitle = deepSeekSeriesSubtitle(series, language),
-            series = series,
-            lastUpdatedAt = null,
-            language = language
-        )
+        extraSeries.forEachIndexed { i, series ->
+            key(series.quotaLabel + selectedRange.name) {
+                DeepSeekHistoryCard(
+                    title = deepSeekSeriesTitle(series, language),
+                    subtitle = deepSeekSeriesSubtitle(series, language),
+                    series = series,
+                    lastUpdatedAt = null,
+                    accentColor = accentColor,
+                    index = i + 1,
+                    language = language
+                )
+            }
+        }
     }
 }
 
@@ -341,68 +396,100 @@ private fun DeepSeekHistoryCard(
     subtitle: String,
     series: UsageHistorySeries,
     lastUpdatedAt: Instant?,
+    accentColor: Color,
+    index: Int,
     language: AppLanguage
 ) {
+    var visible by remember { mutableStateOf(false) }
+    val cardAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(AppMotion.normal, easing = AppMotion.enterEasing),
+        label = "cardAlpha$index"
+    )
+    val cardOffsetY by animateFloatAsState(
+        targetValue = if (visible) 0f else 28f,
+        animationSpec = tween(AppMotion.slow, easing = AppMotion.enterEasing),
+        label = "cardOffsetY$index"
+    )
+    LaunchedEffect(Unit) {
+        delay(index * AppMotion.stagger)
+        visible = true
+    }
+
     Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = cardAlpha
+                translationY = cardOffsetY
+            },
         shape = AppShapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.card)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(3.dp)
+                    .background(accentColor.copy(alpha = 0.85f))
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
-                    value = formatCents(series.currentDisplayUsed)
-                )
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Gasto no período" else "Spent in range",
-                    value = formatCents(series.deltaDisplayUsed)
-                )
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Ritmo médio" else "Average pace",
-                    value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
-                )
-                if (lastUpdatedAt != null) {
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Última coleta" else "Last snapshot",
-                        value = formatInstant(lastUpdatedAt)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = accentColor,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
 
-            UsageHistoryLineChart(points = series.points, unit = series.unit)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+                        value = formatCents(series.currentDisplayUsed)
+                    )
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Gasto no período" else "Spent in range",
+                        value = formatCents(series.deltaDisplayUsed)
+                    )
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Ritmo médio" else "Average pace",
+                        value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
+                    )
+                    if (lastUpdatedAt != null) {
+                        MetricItem(
+                            label = if (language == AppLanguage.PT) "Última coleta" else "Last snapshot",
+                            value = formatInstant(lastUpdatedAt)
+                        )
+                    }
+                }
 
-            deepSeekForecastText(series.forecast, language)?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                UsageHistoryLineChart(points = series.points, unit = series.unit)
+
+                deepSeekForecastText(series.forecast, language)?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -411,42 +498,74 @@ private fun DeepSeekHistoryCard(
 @Composable
 private fun HistorySeriesCard(
     series: UsageHistorySeries,
+    index: Int,
+    accentColor: Color,
     language: AppLanguage
 ) {
+    var visible by remember { mutableStateOf(false) }
+    val cardAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(AppMotion.normal, easing = AppMotion.enterEasing),
+        label = "seriesCardAlpha$index"
+    )
+    val cardOffsetY by animateFloatAsState(
+        targetValue = if (visible) 0f else 28f,
+        animationSpec = tween(AppMotion.slow, easing = AppMotion.enterEasing),
+        label = "seriesCardOffsetY$index"
+    )
+    LaunchedEffect(Unit) {
+        delay(index * AppMotion.stagger)
+        visible = true
+    }
+
     Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = cardAlpha
+                translationY = cardOffsetY
+            },
         shape = AppShapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.card)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = series.quotaLabel,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (series.periodType.name == "WEEKLY") {
-                        if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
-                    } else {
-                        if (language == AppLanguage.PT) "Quota intervalar" else "Interval quota"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(3.dp)
+                    .background(accentColor.copy(alpha = 0.85f))
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = series.quotaLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = accentColor,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (series.periodType.name == "WEEKLY") {
+                            if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
+                        } else {
+                            if (language == AppLanguage.PT) "Quota intervalar" else "Interval quota"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                UsageHistoryLineChart(points = series.points, unit = series.unit)
+
+                HistoryMetrics(series = series, language = language)
             }
-
-            UsageHistoryLineChart(points = series.points, unit = series.unit)
-
-            HistoryMetrics(series = series, language = language)
         }
     }
 }
@@ -525,6 +644,15 @@ private fun MetricItem(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+private fun accentColorForHistorySource(source: ApiSource): Color {
+    return when (source) {
+        ApiSource.ANTHROPIC -> Color(0xFF4F8CFF)
+        ApiSource.MINIMAX   -> Color(0xFFFF8A3D)
+        ApiSource.CODEX     -> Color(0xFF27BFA3)
+        ApiSource.DEEPSEEK  -> Color(0xFFC084FC)
     }
 }
 
