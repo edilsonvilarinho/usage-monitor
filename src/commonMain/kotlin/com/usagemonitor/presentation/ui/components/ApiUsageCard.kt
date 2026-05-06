@@ -471,7 +471,7 @@ private fun CompactQuotaBadge(
             fontWeight = FontWeight.Bold
         )
 
-        if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE) {
+        if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = formatUsage(quota),
@@ -542,7 +542,7 @@ private fun QuotaColumn(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE) {
+        if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
             Text(
                 text = formatUsage(quota),
                 style = MaterialTheme.typography.bodySmall,
@@ -591,6 +591,7 @@ private fun accentColorFor(source: ApiSource): Color {
         ApiSource.ANTHROPIC -> Color(0xFF4F8CFF)
         ApiSource.MINIMAX -> Color(0xFFFF8A3D)
         ApiSource.CODEX -> Color(0xFF27BFA3)
+        ApiSource.DEEPSEEK -> Color(0xFFC084FC)
     }
 }
 
@@ -615,6 +616,10 @@ private fun historyActionLabel(language: AppLanguage): String {
 }
 
 private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
+    if (quota.unit == UsageUnit.CURRENCY_USD) {
+        return if (language == AppLanguage.PT) "Saldo não expira" else "Balance never expires"
+    }
+
     if (!quota.hasKnownResetAt) {
         return if (language == AppLanguage.PT) {
             "Janela de reset ainda não disponível"
@@ -643,16 +648,17 @@ private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
 }
 
 private fun compactPercentageLabel(quota: QuotaInfo): String {
-    if (quota.unit == UsageUnit.PERCENTAGE) {
-        return "${quota.used}%"
+    return when (quota.unit) {
+        UsageUnit.CURRENCY_USD -> formatCents(quota.total)
+        UsageUnit.PERCENTAGE -> "${quota.used}%"
+        else -> "${(quota.percentageUsed * 100).roundToInt()}%"
     }
-
-    return "${(quota.percentageUsed * 100).roundToInt()}%"
 }
 
 private fun formatUsage(quota: QuotaInfo): String {
     return when (quota.unit) {
         UsageUnit.PERCENTAGE -> "${quota.used}%"
+        UsageUnit.CURRENCY_USD -> formatCents(quota.total)
         UsageUnit.TOKENS -> {
             val displayUsed = if (quota.rawUsed > 0L) quota.rawUsed else quota.used
             val displayTotal = if (quota.rawTotal > 0L) quota.rawTotal else quota.total
@@ -660,6 +666,12 @@ private fun formatUsage(quota: QuotaInfo): String {
         }
         UsageUnit.REQUESTS -> "${abbreviate(quota.used)}/${abbreviate(quota.total)} req"
     }
+}
+
+private fun formatCents(cents: Long): String {
+    val dollars = cents / 100
+    val remainder = cents % 100
+    return "\$${dollars}.${remainder.toString().padStart(2, '0')}"
 }
 
 private fun abbreviate(n: Long): String {

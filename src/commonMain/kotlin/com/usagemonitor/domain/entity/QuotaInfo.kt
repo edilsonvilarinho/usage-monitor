@@ -48,7 +48,8 @@ data class QuotaInfo(
 enum class UsageUnit {
     TOKENS,
     REQUESTS,
-    PERCENTAGE  // quando só utilization está disponível (ex: Anthropic OAuth usage endpoint)
+    PERCENTAGE,   // quando só utilization está disponível (ex: Anthropic OAuth usage endpoint)
+    CURRENCY_USD  // saldo monetário em centavos (ex: DeepSeek)
 }
 
 /** Tipo de janela temporal da cota. */

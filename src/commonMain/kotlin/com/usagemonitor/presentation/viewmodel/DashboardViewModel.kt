@@ -6,6 +6,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
+import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,7 @@ class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
     private val getMiniMaxUsage: GetMiniMaxUsageUseCase,
     private val getCodexUsage: GetCodexUsageUseCase,
+    private val getDeepSeekUsage: GetDeepSeekUsageUseCase,
     private val enabledApis: StateFlow<Set<ApiSource>>,
     private val recordUsageSnapshot: RecordUsageSnapshotUseCase,
     private val checkForAppUpdate: CheckForAppUpdateUseCase? = null,
@@ -289,6 +291,7 @@ class DashboardViewModel(
             ApiSource.ANTHROPIC -> getAnthropicUsage()
             ApiSource.MINIMAX -> getMiniMaxUsage()
             ApiSource.CODEX -> getCodexUsage()
+            ApiSource.DEEPSEEK -> getDeepSeekUsage()
         }
     }
 

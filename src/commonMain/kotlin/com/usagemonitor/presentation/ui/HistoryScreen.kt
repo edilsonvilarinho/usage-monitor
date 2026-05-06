@@ -402,6 +402,7 @@ private fun sourceLabel(source: ApiSource): String {
         ApiSource.ANTHROPIC -> "Anthropic"
         ApiSource.MINIMAX -> "MiniMax"
         ApiSource.CODEX -> "Codex"
+        ApiSource.DEEPSEEK -> "DeepSeek"
     }
 }
 
@@ -482,5 +483,6 @@ private fun unitSuffix(unit: UsageUnit): String {
         UsageUnit.TOKENS -> "tok"
         UsageUnit.REQUESTS -> "req"
         UsageUnit.PERCENTAGE -> "%"
+        UsageUnit.CURRENCY_USD -> "USD"
     }
 }

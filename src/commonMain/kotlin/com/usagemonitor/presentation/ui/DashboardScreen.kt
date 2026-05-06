@@ -419,6 +419,7 @@ private fun warningActionFor(
         ApiSource.ANTHROPIC -> onRetryAnthropic
         ApiSource.MINIMAX -> null
         ApiSource.CODEX -> null
+        ApiSource.DEEPSEEK -> null
     }
 }
 

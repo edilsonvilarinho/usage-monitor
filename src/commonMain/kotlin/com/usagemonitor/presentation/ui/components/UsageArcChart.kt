@@ -49,7 +49,11 @@ fun UsageArcChart(
     strokeWidth: Dp = 10.dp,
     percentageTextStyle: TextStyle? = null
 ) {
-    val percentage = if (total > 0L) {
+    val isCurrency = unit == UsageUnit.CURRENCY_USD
+
+    val percentage = if (isCurrency) {
+        if (total > 0L) 1f else 0f
+    } else if (total > 0L) {
         (used.toFloat() / total.toFloat()).coerceIn(0f, 1f)
     } else {
         0f
@@ -62,8 +66,10 @@ fun UsageArcChart(
     )
 
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
-    val usedColor = arcColor(percentage)
+    val usedColor = if (isCurrency) arcColor(0f) else arcColor(percentage)
     val resolvedTextStyle = percentageTextStyle ?: MaterialTheme.typography.headlineMedium
+
+    val centerText = if (isCurrency) formatCents(total) else "${(percentage * 100).toInt()}%"
 
     Box(
         contentAlignment = Alignment.Center,
@@ -99,13 +105,19 @@ fun UsageArcChart(
         }
 
         Text(
-            text = "${(percentage * 100).toInt()}%",
+            text = centerText,
             style = resolvedTextStyle,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
     }
+}
+
+private fun formatCents(cents: Long): String {
+    val dollars = cents / 100
+    val remainder = cents % 100
+    return "\$${dollars}.${remainder.toString().padStart(2, '0')}"
 }
 
 /** Cor do arco com base no nível de uso: tertiary (baixo) → primary (médio) → error (alto). */

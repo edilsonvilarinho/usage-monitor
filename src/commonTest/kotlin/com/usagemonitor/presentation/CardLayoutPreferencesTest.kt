@@ -26,7 +26,8 @@ class CardLayoutPreferencesTest {
             listOf(
                 ApiSource.CODEX,
                 ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX
+                ApiSource.MINIMAX,
+                ApiSource.DEEPSEEK
             ),
             normalized
         )
@@ -49,7 +50,8 @@ class CardLayoutPreferencesTest {
             listOf(
                 ApiSource.CODEX,
                 ApiSource.MINIMAX,
-                ApiSource.ANTHROPIC
+                ApiSource.ANTHROPIC,
+                ApiSource.DEEPSEEK
             ),
             reordered
         )
@@ -72,7 +74,8 @@ class CardLayoutPreferencesTest {
             listOf(
                 ApiSource.ANTHROPIC,
                 ApiSource.MINIMAX,
-                ApiSource.CODEX
+                ApiSource.CODEX,
+                ApiSource.DEEPSEEK
             ),
             reordered
         )
@@ -95,7 +98,8 @@ class CardLayoutPreferencesTest {
             listOf(
                 ApiSource.MINIMAX,
                 ApiSource.CODEX,
-                ApiSource.ANTHROPIC
+                ApiSource.ANTHROPIC,
+                ApiSource.DEEPSEEK
             ),
             reordered
         )

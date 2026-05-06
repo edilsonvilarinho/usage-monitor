@@ -62,6 +62,7 @@ private fun sourceLabel(source: ApiSource): String {
         ApiSource.ANTHROPIC -> "Anthropic"
         ApiSource.MINIMAX -> "MiniMax"
         ApiSource.CODEX -> "Codex"
+        ApiSource.DEEPSEEK -> "DeepSeek"
     }
 }
 

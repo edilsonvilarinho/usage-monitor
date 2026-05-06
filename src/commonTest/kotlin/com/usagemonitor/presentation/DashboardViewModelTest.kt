@@ -8,11 +8,13 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.AppUpdateRepository
 import com.usagemonitor.domain.repository.CodexRepository
+import com.usagemonitor.domain.repository.DeepSeekRepository
 import com.usagemonitor.domain.repository.MiniMaxRepository
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
+import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
@@ -104,10 +106,14 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -133,10 +139,14 @@ class DashboardViewModelTest {
                 Exception("Sessão do Codex inválida")
             )
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -158,10 +168,14 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -221,11 +235,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -251,11 +269,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             MutableStateFlow(emptySet()),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -313,11 +335,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -350,11 +376,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -416,11 +446,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -481,11 +515,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             enabledApis,
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -546,6 +584,9 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val historyRepository = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
                 persistenceGate.await()
@@ -563,6 +604,7 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             enabledApis,
             RecordUsageSnapshotUseCase(historyRepository),
             clock = Clock.System
@@ -599,11 +641,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             MutableStateFlow(emptySet()),
             historyUseCase(recordedSnapshots),
             checkForAppUpdate = updateUseCase(
@@ -642,6 +688,9 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         var preparedVersion: String? = null
         val installer = object : AppUpdateInstaller {
             override val isSupported: Boolean = true
@@ -660,6 +709,7 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             MutableStateFlow(emptySet()),
             historyUseCase(recordedSnapshots),
             checkForAppUpdate = updateUseCase(
@@ -701,11 +751,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -737,11 +791,15 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
 
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
             clock = Clock.System
@@ -779,6 +837,9 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val brokenHistory = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
                 throw IllegalStateException("disco cheio")
@@ -795,6 +856,7 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             RecordUsageSnapshotUseCase(brokenHistory),
             clock = Clock.System
@@ -823,6 +885,9 @@ class DashboardViewModelTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         var attempts = 0
         val installer = object : AppUpdateInstaller {
             override val isSupported: Boolean = true
@@ -845,6 +910,7 @@ class DashboardViewModelTest {
             GetAnthropicUsageUseCase(anthropicRepo),
             GetMiniMaxUsageUseCase(minimaxRepo),
             GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
             MutableStateFlow(emptySet()),
             historyUseCase(recordedSnapshots),
             checkForAppUpdate = updateUseCase(

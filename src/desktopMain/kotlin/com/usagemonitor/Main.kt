@@ -23,6 +23,7 @@ import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.CodexRepositoryImpl
+import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.ApiSource
@@ -31,6 +32,7 @@ import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
+import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
@@ -149,6 +151,9 @@ fun main() = application {
     val codexRepository = remember(codexAuthDataSource, remoteApiDataSource) {
         CodexRepositoryImpl(codexAuthDataSource, remoteApiDataSource)
     }
+    val deepSeekRepository = remember(remoteApiDataSource) {
+        DeepSeekRepositoryImpl(remoteApiDataSource)
+    }
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
     }
@@ -165,11 +170,12 @@ fun main() = application {
     }
 
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
             getCodexUsage = GetCodexUsageUseCase(codexRepository),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepository),
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
@@ -407,6 +413,7 @@ private fun historyWindowTitle(source: ApiSource, language: AppLanguage): String
         ApiSource.ANTHROPIC -> "Anthropic"
         ApiSource.MINIMAX -> "MiniMax"
         ApiSource.CODEX -> "Codex"
+        ApiSource.DEEPSEEK -> "DeepSeek"
     }
 
     return if (language == AppLanguage.PT) {

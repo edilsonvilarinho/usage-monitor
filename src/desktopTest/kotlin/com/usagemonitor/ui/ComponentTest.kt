@@ -30,11 +30,13 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.AppUpdateRepository
 import com.usagemonitor.domain.repository.CodexRepository
+import com.usagemonitor.domain.repository.DeepSeekRepository
 import com.usagemonitor.domain.repository.MiniMaxRepository
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
+import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
@@ -83,6 +85,9 @@ class ComponentTest {
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
         val historyRepository = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
 
@@ -97,6 +102,7 @@ class ComponentTest {
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
             getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
             enabledApis = enabledApis,
             recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository)
         )
@@ -111,6 +117,9 @@ class ComponentTest {
         }
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val historyRepository = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
@@ -136,6 +145,7 @@ class ComponentTest {
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
             getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
             enabledApis = enabledApis,
             recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository),
             checkForAppUpdate = CheckForAppUpdateUseCase(updateRepository),

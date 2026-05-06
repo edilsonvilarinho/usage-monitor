@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CodexUsageResponse
+import com.usagemonitor.data.dto.DeepSeekBalanceResponse
 import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
@@ -63,6 +64,20 @@ open class RemoteApiDataSource(private val httpClient: HttpClient) {
         if (!response.status.isSuccess()) {
             val body = response.bodyAsText()
             throw IllegalStateException("Codex HTTP ${response.status.value}: $body")
+        }
+
+        return response.body()
+    }
+
+    open suspend fun fetchDeepSeekBalance(apiKey: String): DeepSeekBalanceResponse {
+        val response = httpClient.get("https://api.deepseek.com/user/balance") {
+            header("Authorization", "Bearer $apiKey")
+            contentType(ContentType.Application.Json)
+        }
+
+        if (!response.status.isSuccess()) {
+            val body = response.bodyAsText()
+            throw IllegalStateException("DeepSeek HTTP ${response.status.value}: $body")
         }
 
         return response.body()
