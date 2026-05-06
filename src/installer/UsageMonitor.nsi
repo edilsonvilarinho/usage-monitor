@@ -65,8 +65,10 @@ notdone:
     MessageBox MB_YESNO|MB_ICONQUESTION "${PRODUCT_NAME} ja esta instalado. Deseja remover a versao anterior?" IDYES uninst IDNO done
 
 uninst:
-    ExecWait '"$0" /S'
+    ExecWait '$0'
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor"
     RMDir /r "$INSTDIR"
 
 done:
@@ -82,6 +84,10 @@ FunctionEnd
 Section "Usage Monitor" SEC_APP
     SectionIn RO
     SetShellVarContext current
+
+    ; Limpar Run keys antigos (ambos os nomes — migração de versões anteriores)
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor"
 
     ; Create log file
     DetailPrint "Initializing installation..."
@@ -133,7 +139,7 @@ SectionEnd
 Section "Start with Windows" SEC_AUTO_START
     SetShellVarContext current
     DetailPrint "Configuring auto-start..."
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\Usage Monitor.exe"'
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor" '"$INSTDIR\Usage Monitor.exe"'
 SectionEnd
 
 ; -----------------------------------------------
@@ -163,6 +169,7 @@ Section "Uninstall"
     DetailPrint "Removing registry entries..."
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor"
 
     ; Remove files and directories
     DetailPrint "Removing application files..."
