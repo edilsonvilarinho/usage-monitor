@@ -12,7 +12,7 @@ class DeepSeekRepositoryImpl(
     private val envVarReader: () -> String? = { System.getenv(ENV_VAR_NAME) }
 ) : DeepSeekRepository {
 
-    override suspend fun getBalance(): Result<ApiUsageStats> {
+    override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
             val apiKey = envVarReader() ?: throw IllegalStateException(missingEnvVarMessage())
             val response = apiDataSource.fetchDeepSeekBalance(apiKey)

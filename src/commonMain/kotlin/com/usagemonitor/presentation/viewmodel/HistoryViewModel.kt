@@ -21,8 +21,8 @@ class HistoryViewModel(
     private val _uiState = MutableStateFlow<HistoryUiState>(HistoryUiState.Loading)
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
-    private var selectedSource: ApiSource? = null
-    private var selectedRange: HistoryRange = HistoryRange.LAST_24_HOURS
+    private val selectedSource = MutableStateFlow<ApiSource?>(null)
+    private val selectedRange = MutableStateFlow(HistoryRange.LAST_24_HOURS)
 
     init {
         refresh()
@@ -35,25 +35,25 @@ class HistoryViewModel(
     }
 
     fun openForSource(source: ApiSource) {
-        selectedSource = source
+        selectedSource.value = source
         refresh()
     }
 
     fun selectSource(source: ApiSource) {
-        if (source == selectedSource) {
+        if (source == selectedSource.value) {
             return
         }
 
-        selectedSource = source
+        selectedSource.value = source
         refresh()
     }
 
     fun selectRange(range: HistoryRange) {
-        if (range == selectedRange) {
+        if (range == selectedRange.value) {
             return
         }
 
-        selectedRange = range
+        selectedRange.value = range
         refresh()
     }
 
@@ -67,36 +67,32 @@ class HistoryViewModel(
         val enabledSources = enabledApis.value.sortedBy { it.ordinal }
         try {
             if (enabledSources.isEmpty()) {
-                selectedSource = null
+                selectedSource.value = null
                 _uiState.value = HistoryUiState.Empty(
                     availableSources = emptyList(),
                     selectedSource = null,
-                    selectedRange = selectedRange
+                    selectedRange = selectedRange.value
                 )
                 return
             }
 
-            val resolvedSource = if (selectedSource in enabledSources) {
-                selectedSource
-            } else {
-                enabledSources.first()
-            }
-
-            selectedSource = resolvedSource
-            val report = getUsageHistory(resolvedSource!!, selectedRange)
+            val resolvedSource = selectedSource.value?.takeIf { it in enabledSources }
+                ?: enabledSources.first()
+            selectedSource.value = resolvedSource
+            val report = getUsageHistory(resolvedSource, selectedRange.value)
 
             _uiState.value = HistoryUiState.Success(
                 availableSources = enabledSources,
                 selectedSource = resolvedSource,
-                selectedRange = selectedRange,
+                selectedRange = selectedRange.value,
                 report = report
             )
         } catch (error: Throwable) {
             _uiState.value = HistoryUiState.Error(
                 message = error.message ?: "erro desconhecido",
                 availableSources = enabledSources,
-                selectedSource = selectedSource,
-                selectedRange = selectedRange
+                selectedSource = selectedSource.value,
+                selectedRange = selectedRange.value
             )
         }
     }

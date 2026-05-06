@@ -107,7 +107,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
@@ -140,7 +140,7 @@ class DashboardViewModelTest {
             )
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
@@ -169,7 +169,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val vm = DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
@@ -236,7 +236,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -270,7 +270,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -336,7 +336,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -377,7 +377,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -447,7 +447,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -516,7 +516,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -585,7 +585,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val historyRepository = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
@@ -642,7 +642,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -689,7 +689,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         var preparedVersion: String? = null
         val installer = object : AppUpdateInstaller {
@@ -752,7 +752,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -792,7 +792,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
 
         val viewModel = DashboardViewModel(
@@ -838,7 +838,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val brokenHistory = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
@@ -886,7 +886,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         var attempts = 0
         val installer = object : AppUpdateInstaller {

@@ -86,7 +86,7 @@ class ComponentTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val historyRepository = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
@@ -119,7 +119,7 @@ class ComponentTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getBalance() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         val historyRepository = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
@@ -799,7 +799,7 @@ class ComponentTest {
             lastUpdatedAt = Instant.parse("2026-05-06T21:47:00Z"),
             series = listOf(
                 UsageHistorySeries(
-                    quotaLabel = "Saldo",
+                    quotaLabel = com.usagemonitor.domain.entity.DeepSeekQuotaLabels.BALANCE,
                     periodType = PeriodType.INTERVAL,
                     unit = UsageUnit.CURRENCY_USD,
                     points = listOf(

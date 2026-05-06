@@ -351,9 +351,7 @@ class DashboardViewModel(
 
     private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
         // Persistência best-effort: falha não deve interromper UI nem propagar.
-        runCatching {
-            recordUsageSnapshot(stats, capturedAt)
-        }
+        recordUsageSnapshot(stats, capturedAt)
     }
 
     private suspend fun checkForUpdate(autoInstall: Boolean) {

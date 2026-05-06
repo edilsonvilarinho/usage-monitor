@@ -4,6 +4,7 @@ import com.usagemonitor.data.dto.DeepSeekBalanceInfoDto
 import com.usagemonitor.data.dto.DeepSeekBalanceResponse
 import com.usagemonitor.data.mapper.DeepSeekMapper
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,13 +34,13 @@ class DeepSeekMapperTest {
         assertEquals(2, stats.quotas.size)
 
         val saldo = stats.quotas[0]
-        assertEquals("Saldo", saldo.label)
+        assertEquals(DeepSeekQuotaLabels.BALANCE,saldo.label)
         assertEquals(1000L, saldo.total)
         assertEquals(0L, saldo.used)
         assertEquals(UsageUnit.CURRENCY_USD, saldo.unit)
 
         val gratuito = stats.quotas[1]
-        assertEquals("Gratuito", gratuito.label)
+        assertEquals(DeepSeekQuotaLabels.GRANTED,gratuito.label)
         assertEquals(250L, gratuito.total)
         assertEquals(0L, gratuito.used)
         assertEquals(UsageUnit.CURRENCY_USD, gratuito.unit)
@@ -62,7 +63,7 @@ class DeepSeekMapperTest {
         val stats = DeepSeekMapper.toUsageStats(response)
 
         assertEquals(1, stats.quotas.size)
-        assertEquals("Saldo", stats.quotas[0].label)
+        assertEquals(DeepSeekQuotaLabels.BALANCE,stats.quotas[0].label)
         assertEquals(800L, stats.quotas[0].total)
     }
 

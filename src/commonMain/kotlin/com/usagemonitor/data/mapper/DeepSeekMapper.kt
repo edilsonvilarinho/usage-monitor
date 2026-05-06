@@ -3,6 +3,7 @@ package com.usagemonitor.data.mapper
 import com.usagemonitor.data.dto.DeepSeekBalanceResponse
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
@@ -26,7 +27,7 @@ object DeepSeekMapper {
         val quotas = buildList {
             add(
                 QuotaInfo(
-                    label = "Saldo",
+                    label = DeepSeekQuotaLabels.BALANCE,
                     used = 0L,
                     total = toppedUpCents,
                     rawUsed = toppedUpCents,
@@ -40,7 +41,7 @@ object DeepSeekMapper {
             if (grantedCents > 0L) {
                 add(
                     QuotaInfo(
-                        label = "Gratuito",
+                        label = DeepSeekQuotaLabels.GRANTED,
                         used = 0L,
                         total = grantedCents,
                         rawUsed = grantedCents,

@@ -33,7 +33,7 @@ class DeepSeekRepositoryImplTest {
             envVarReader = { "test-key" }
         )
 
-        val result = repo.getBalance()
+        val result = repo.getUsage()
 
         assertTrue(result.isSuccess)
         assertEquals(ApiSource.DEEPSEEK, result.getOrThrow().source)
@@ -46,7 +46,7 @@ class DeepSeekRepositoryImplTest {
             envVarReader = { null }
         )
 
-        val result = repo.getBalance()
+        val result = repo.getUsage()
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("DEEPSEEK_API_KEY"))
@@ -65,7 +65,7 @@ class DeepSeekRepositoryImplTest {
             envVarReader = { "test-key" }
         )
 
-        val result = repo.getBalance()
+        val result = repo.getUsage()
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("401"))

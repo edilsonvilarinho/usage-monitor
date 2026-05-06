@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
@@ -356,7 +357,7 @@ private fun DeepSeekHistoryContent(
     selectedRange: HistoryRange
 ) {
     val primarySeries = report.series
-        .firstOrNull { series -> series.quotaLabel.equals("Saldo", ignoreCase = true) }
+        .firstOrNull { series -> series.quotaLabel.equals(DeepSeekQuotaLabels.BALANCE, ignoreCase = true) }
         ?: report.series.first()
     val extraSeries = report.series.filterNot { series -> series == primarySeries }
 
@@ -737,11 +738,11 @@ private fun forecastLabel(forecast: UsageForecast, language: AppLanguage): Strin
 }
 
 private fun deepSeekSeriesTitle(series: UsageHistorySeries, language: AppLanguage): String {
-    if (series.quotaLabel.equals("Saldo", ignoreCase = true)) {
+    if (series.quotaLabel.equals(DeepSeekQuotaLabels.BALANCE, ignoreCase = true)) {
         return if (language == AppLanguage.PT) "Saldo restante" else "Remaining balance"
     }
 
-    if (series.quotaLabel.equals("Gratuito", ignoreCase = true)) {
+    if (series.quotaLabel.equals(DeepSeekQuotaLabels.GRANTED, ignoreCase = true)) {
         return if (language == AppLanguage.PT) "Crédito gratuito" else "Free credit"
     }
 
@@ -749,7 +750,7 @@ private fun deepSeekSeriesTitle(series: UsageHistorySeries, language: AppLanguag
 }
 
 private fun deepSeekSeriesSubtitle(series: UsageHistorySeries, language: AppLanguage): String {
-    if (series.quotaLabel.equals("Saldo", ignoreCase = true)) {
+    if (series.quotaLabel.equals(DeepSeekQuotaLabels.BALANCE, ignoreCase = true)) {
         return if (language == AppLanguage.PT) {
             "Leitura do saldo restante ao longo do intervalo selecionado."
         } else {
@@ -757,7 +758,7 @@ private fun deepSeekSeriesSubtitle(series: UsageHistorySeries, language: AppLang
         }
     }
 
-    if (series.quotaLabel.equals("Gratuito", ignoreCase = true)) {
+    if (series.quotaLabel.equals(DeepSeekQuotaLabels.GRANTED, ignoreCase = true)) {
         return if (language == AppLanguage.PT) {
             "Crédito promocional ainda disponível no período."
         } else {
