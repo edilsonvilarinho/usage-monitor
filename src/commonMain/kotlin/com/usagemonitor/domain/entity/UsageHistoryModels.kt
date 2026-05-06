@@ -34,8 +34,8 @@ data class UsageHistoryPoint(
         get() = if (rawTotal > 0L) rawTotal else total
 
     val normalizedUsage: Float
-        get() = if (total > 0L) {
-            (used.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+        get() = if (displayTotal > 0L) {
+            (displayUsed.toFloat() / displayTotal.toFloat()).coerceIn(0f, 1f)
         } else {
             0f
         }
