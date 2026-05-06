@@ -706,7 +706,7 @@ class ComponentTest {
                 UsageHistorySeries(
                     quotaLabel = "Codex 5h",
                     periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.REQUESTS,
+                    unit = UsageUnit.PERCENTAGE,
                     points = listOf(
                         UsageHistoryPoint(
                             capturedAt = Instant.parse("2026-04-28T16:00:00Z"),
@@ -886,6 +886,91 @@ class ComponentTest {
         onNodeWithText("\$4.66").assertIsDisplayed()
         onAllNodesWithText("Uso atual").assertCountEquals(0)
         onAllNodesWithText("Quota intervalar").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `HistoryScreen renders MiniMax request metrics as counts instead of rounded percentage`() = runDesktopComposeUiTest {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.MINIMAX,
+            range = HistoryRange.LAST_30_DAYS,
+            lastUpdatedAt = Instant.parse("2026-05-06T22:02:00Z"),
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "MiniMax-M*",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.REQUESTS,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-04-28T19:00:00Z"),
+                            used = 16,
+                            total = 4500,
+                            rawUsed = 0,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T00:00:00Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-06T22:02:00Z"),
+                            used = 16,
+                            total = 4500,
+                            rawUsed = 0,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T00:00:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 16,
+                    currentDisplayTotal = 4500,
+                    deltaDisplayUsed = 0,
+                    averageDisplayConsumptionPerHour = 0.0,
+                    currentPeriodEndAt = Instant.parse("2026-05-07T00:00:00Z"),
+                    forecast = UsageForecast.ResetsBeforeExhaustion
+                )
+            )
+        )
+
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                    override suspend fun recordSnapshot(
+                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
+                        capturedAt: Instant
+                    ) = Unit
+
+                    override suspend fun getHistoryReport(
+                        source: ApiSource,
+                        range: HistoryRange,
+                        now: Instant
+                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
+                        return report
+                    }
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.MINIMAX))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {},
+                    focusedSource = ApiSource.MINIMAX,
+                    showSourceSelector = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("MiniMax-M*").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("16/4", substring = true).assertIsDisplayed()
+        onNodeWithText("0 req").assertIsDisplayed()
+        onNodeWithText("0 req/h").assertIsDisplayed()
+        onAllNodesWithText("0 / 100 %").assertCountEquals(0)
         viewModel.onDestroy()
     }
 }

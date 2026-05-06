@@ -475,6 +475,19 @@ private fun HistoryMetrics(
                 label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
                 value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
             )
+        } else if (series.unit == UsageUnit.REQUESTS) {
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+                value = "${formatQuantity(series.currentDisplayUsed)}/${formatQuantity(series.currentDisplayTotal)} req"
+            )
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+                value = "${formatQuantity(series.deltaDisplayUsed)} req"
+            )
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+                value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} req/h"
+            )
         } else {
             MetricItem(
                 label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",

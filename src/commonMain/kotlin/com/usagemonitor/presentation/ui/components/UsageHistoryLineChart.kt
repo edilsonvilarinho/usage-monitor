@@ -39,20 +39,8 @@ fun UsageHistoryLineChart(
     val axisTextColor = MaterialTheme.colorScheme.onSurfaceVariant
     val renderPoints = filteredPoints(points, unit)
     val timeLabels = buildTimeReferenceLabels(renderPoints)
-    val currencyAxis = if (unit == UsageUnit.CURRENCY_USD) {
-        buildCurrencyAxis(renderPoints.map { it.displayUsed })
-    } else {
-        null
-    }
-    val valueLabels = if (currencyAxis != null) {
-        listOf(
-            formatCentsLabel(currencyAxis.max.toLong()),
-            formatCentsLabel(((currencyAxis.max + currencyAxis.min) / 2f).toLong()),
-            formatCentsLabel(currencyAxis.min.toLong())
-        )
-    } else {
-        emptyList()
-    }
+    val valueAxis = buildValueAxis(renderPoints, unit)
+    val valueLabels = buildValueLabels(valueAxis, unit)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -114,10 +102,10 @@ fun UsageHistoryLineChart(
                         return@Canvas
                     }
 
-                    val plotValues = if (currencyAxis != null) {
-                        val range = (currencyAxis.max - currencyAxis.min).coerceAtLeast(1f)
+                    val plotValues = if (valueAxis != null) {
+                        val range = (valueAxis.max - valueAxis.min).coerceAtLeast(1f)
                         renderPoints.map { point ->
-                            ((point.displayUsed.toFloat() - currencyAxis.min) / range).coerceIn(0f, 1f)
+                            ((point.displayUsed.toFloat() - valueAxis.min) / range).coerceIn(0f, 1f)
                         }
                     } else {
                         renderPoints.map { it.normalizedUsage }
@@ -144,7 +132,7 @@ fun UsageHistoryLineChart(
                     fillPath.lineTo(lastX, size.height)
                     fillPath.close()
 
-                    if (currencyAxis != null) {
+                    if (unit == UsageUnit.CURRENCY_USD) {
                         drawPath(path = fillPath, color = fillColor)
                     }
 
@@ -182,7 +170,7 @@ fun UsageHistoryLineChart(
     }
 }
 
-internal data class CurrencyAxis(
+internal data class ValueAxis(
     val min: Float,
     val max: Float
 )
@@ -216,20 +204,28 @@ internal fun buildTimelineFractions(points: List<UsageHistoryPoint>): List<Float
     }
 }
 
-internal fun buildCurrencyAxis(values: List<Long>): CurrencyAxis? {
+internal fun buildValueAxis(points: List<UsageHistoryPoint>, unit: UsageUnit): ValueAxis? {
+    val values = points.map { it.displayUsed }
     if (values.isEmpty()) {
         return null
     }
 
+    return when (unit) {
+        UsageUnit.CURRENCY_USD -> buildAbsoluteAxis(values, minimumDisplayRange = 100f)
+        UsageUnit.REQUESTS -> buildAbsoluteAxis(values, minimumDisplayRange = 10f)
+        else -> null
+    }
+}
+
+private fun buildAbsoluteAxis(values: List<Long>, minimumDisplayRange: Float): ValueAxis? {
     val minValue = values.minOrNull()?.toFloat() ?: return null
     val maxValue = values.maxOrNull()?.toFloat() ?: return null
     val rawRange = (maxValue - minValue).coerceAtLeast(0f)
-    val minimumDisplayRange = max(maxValue * 0.15f, 100f)
     val displayRange = max(rawRange * 1.25f, minimumDisplayRange)
-    val axisMax = maxValue
+    val axisMax = maxValue.coerceAtLeast(minValue)
     val axisMin = (axisMax - displayRange).coerceAtLeast(0f)
 
-    return CurrencyAxis(
+    return ValueAxis(
         min = axisMin,
         max = axisMax
     )
@@ -263,4 +259,38 @@ private fun formatCentsLabel(cents: Long): String {
     val dollars = cents / 100
     val remainder = kotlin.math.abs(cents % 100)
     return "\$${dollars}.${remainder.toString().padStart(2, '0')}"
+}
+
+private fun buildValueLabels(axis: ValueAxis?, unit: UsageUnit): List<String> {
+    if (axis == null) {
+        return emptyList()
+    }
+
+    val middle = ((axis.max + axis.min) / 2f).toLong()
+    return when (unit) {
+        UsageUnit.CURRENCY_USD -> listOf(
+            formatCentsLabel(axis.max.toLong()),
+            formatCentsLabel(middle),
+            formatCentsLabel(axis.min.toLong())
+        )
+        UsageUnit.REQUESTS -> listOf(
+            formatCountLabel(axis.max.toLong()),
+            formatCountLabel(middle),
+            formatCountLabel(axis.min.toLong())
+        )
+        else -> emptyList()
+    }
+}
+
+private fun formatCountLabel(value: Long): String {
+    return when {
+        value >= 1_000_000L -> "${trimDecimal(value / 1_000_000.0)}M"
+        value >= 1_000L -> "${trimDecimal(value / 1_000.0)}K"
+        else -> value.toString()
+    }
+}
+
+private fun trimDecimal(value: Double): String {
+    val text = "%.1f".format(value)
+    return text.removeSuffix(".0").removeSuffix(",0")
 }

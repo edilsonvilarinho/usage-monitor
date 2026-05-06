@@ -26,11 +26,35 @@ class UsageHistoryLineChartTest {
 
     @Test
     fun `buildCurrencyAxis keeps small balance drifts from filling the whole chart`() {
-        val axis = buildCurrencyAxis(listOf(469L, 468L, 466L))
+        val axis = buildValueAxis(
+            points = listOf(
+                historyPoint("2026-05-06T18:00:00Z", 469),
+                historyPoint("2026-05-06T18:30:00Z", 468),
+                historyPoint("2026-05-06T20:00:00Z", 466)
+            ),
+            unit = com.usagemonitor.domain.entity.UsageUnit.CURRENCY_USD
+        )
 
         assertNotNull(axis)
         assertEquals(469f, axis.max)
         assertTrue(axis.max - axis.min >= 100f)
+        assertTrue(axis.min >= 0f)
+    }
+
+    @Test
+    fun `buildValueAxis for requests keeps low absolute usage readable`() {
+        val axis = buildValueAxis(
+            points = listOf(
+                historyPoint("2026-05-06T18:00:00Z", 16),
+                historyPoint("2026-05-06T19:00:00Z", 17),
+                historyPoint("2026-05-06T20:00:00Z", 18)
+            ),
+            unit = com.usagemonitor.domain.entity.UsageUnit.REQUESTS
+        )
+
+        assertNotNull(axis)
+        assertEquals(18f, axis.max)
+        assertTrue(axis.max - axis.min >= 10f)
         assertTrue(axis.min >= 0f)
     }
 
