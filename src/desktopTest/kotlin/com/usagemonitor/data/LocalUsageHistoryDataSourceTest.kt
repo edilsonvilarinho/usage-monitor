@@ -65,7 +65,7 @@ class LocalUsageHistoryDataSourceTest {
     }
 
     @Test
-    fun `snapshots skip quotas with unknown reset window`() = runTest {
+    fun `snapshots persist all quotas regardless of hasKnownResetAt`() = runTest {
         val tempDir = createTempDirectory().toFile()
         val databaseFile = File(tempDir, "history.db")
         val dataSource = LocalUsageHistoryDataSource(databaseFile)
@@ -106,8 +106,8 @@ class LocalUsageHistoryDataSourceTest {
             since = Instant.parse("2026-04-29T00:00:00Z")
         )
 
-        assertEquals(1, records.size)
-        assertEquals("Claude 7d", records.single().quotaLabel)
+        assertEquals(2, records.size)
+        assertEquals(setOf("Claude 5h", "Claude 7d"), records.map { it.quotaLabel }.toSet())
         tempDir.deleteRecursively()
     }
 

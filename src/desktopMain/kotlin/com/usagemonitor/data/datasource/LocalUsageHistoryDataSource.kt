@@ -27,7 +27,6 @@ class LocalUsageHistoryDataSource(
                 try {
                     connection.prepareStatement(INSERT_SQL).use { statement ->
                         stats.quotas
-                            .filter { quota -> quota.hasKnownResetAt }
                             .forEach { quota ->
                             statement.setString(1, stats.source.name)
                             statement.setString(2, quota.label)
