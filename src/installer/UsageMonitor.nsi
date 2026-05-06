@@ -16,9 +16,6 @@ SetCompressor zlib
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define LOG_FILE "$INSTDIR\install.log"
 !define APP_ICON "..\desktopMain\resources\icons\app_icon.ico"
-!define MUI_FINISHPAGE_RUN "$INSTDIR\Usage Monitor.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "$(LaunchAppNowText)"
-
 ; -----------------------------------------------
 ; Installer attributes
 ; -----------------------------------------------
@@ -40,6 +37,8 @@ UninstallIcon "${APP_ICON}"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
+!define MUI_FINISHPAGE_RUN "$INSTDIR\Usage Monitor.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "$(LaunchAppNowText)"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
