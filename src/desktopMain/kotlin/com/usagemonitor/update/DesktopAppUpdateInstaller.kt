@@ -9,7 +9,11 @@ import java.io.File
 import java.net.URI
 import java.nio.file.Files
 
-class DesktopAppUpdateInstaller : AppUpdateInstaller {
+class DesktopAppUpdateInstaller(
+    private val executablePathResolver: () -> String? = ::resolveExecutablePath,
+    private val commandAvailabilityChecker: (String) -> Boolean = ::isCommandAvailable,
+    private val debPackageInstallationChecker: (String) -> Boolean = ::isDebianPackageManagedInstallation
+) : AppUpdateInstaller {
     override val isSupported: Boolean = isWindows() || isLinux()
 
     override fun canInstall(update: AppUpdateInfo): Boolean {
@@ -19,7 +23,12 @@ class DesktopAppUpdateInstaller : AppUpdateInstaller {
 
         return when {
             isWindows() -> update.windowsInstallerDownloadUrl != null
-            isLinux() -> update.linuxDebInstallerDownloadUrl != null && resolveExecutablePath() != null && isCommandAvailable("pkexec")
+            isLinux() -> getLinuxAutomaticUpdateSupport(
+                update = update,
+                executablePathResolver = executablePathResolver,
+                commandAvailabilityChecker = commandAvailabilityChecker,
+                debPackageInstallationChecker = debPackageInstallationChecker
+            ).isSupported
             else -> false
         }
     }
@@ -91,20 +100,22 @@ private fun prepareWindowsUpdateInstallation(update: AppUpdateInfo): Result<Unit
 }
 
 private fun prepareLinuxUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
-    val downloadUrl = update.linuxDebInstallerDownloadUrl ?: return Result.failure(
-        IllegalStateException("No Linux DEB package was published for version ${update.version}.")
-    )
-    val executablePath = resolveExecutablePath() ?: return Result.failure(
-        IllegalStateException("Could not resolve the installed application launcher path.")
+    val support = getLinuxAutomaticUpdateSupport(
+        update = update,
+        executablePathResolver = ::resolveExecutablePath,
+        commandAvailabilityChecker = ::isCommandAvailable,
+        debPackageInstallationChecker = ::isDebianPackageManagedInstallation
     )
 
-    if (!isCommandAvailable("pkexec")) {
+    if (!support.isSupported) {
         return Result.failure(
-            IllegalStateException("pkexec is required to install the Linux update automatically.")
+            IllegalStateException(support.failureMessage ?: "Automatic Linux updates are not supported.")
         )
     }
 
     return Result.runCatching {
+        val downloadUrl = update.linuxDebInstallerDownloadUrl!!
+        val executablePath = support.executablePath!!
         val updateDirectory = Files.createTempDirectory("usage-monitor-update-${sanitize(update.version)}").toFile()
         val installerFile = File(updateDirectory, "UsageMonitor-${sanitize(update.version)}.deb")
         val launcherScript = File(updateDirectory, "install-usage-monitor-update.sh")
@@ -194,6 +205,72 @@ private fun isCommandAvailable(command: String): Boolean {
             .waitFor() == 0
     }.getOrDefault(false)
 }
+
+private fun isDebianPackageManagedInstallation(executablePath: String): Boolean {
+    return runCatching {
+        ProcessBuilder(
+            "dpkg",
+            "-S",
+            File(executablePath).canonicalPath
+        )
+            .redirectErrorStream(true)
+            .start()
+            .waitFor() == 0
+    }.getOrDefault(false)
+}
+
+internal fun getLinuxAutomaticUpdateSupport(
+    update: AppUpdateInfo,
+    executablePathResolver: () -> String?,
+    commandAvailabilityChecker: (String) -> Boolean,
+    debPackageInstallationChecker: (String) -> Boolean
+): LinuxAutomaticUpdateSupport {
+    val downloadUrl = update.linuxDebInstallerDownloadUrl
+    if (downloadUrl == null) {
+        return LinuxAutomaticUpdateSupport(
+            isSupported = false,
+            failureMessage = "No Linux DEB package was published for version ${update.version}."
+        )
+    }
+
+    val executablePath = executablePathResolver()
+        ?: return LinuxAutomaticUpdateSupport(
+            isSupported = false,
+            failureMessage = "Could not resolve the installed application launcher path."
+        )
+
+    if (!commandAvailabilityChecker("pkexec")) {
+        return LinuxAutomaticUpdateSupport(
+            isSupported = false,
+            failureMessage = "pkexec is required to install the Linux update automatically."
+        )
+    }
+
+    if (!commandAvailabilityChecker("dpkg")) {
+        return LinuxAutomaticUpdateSupport(
+            isSupported = false,
+            failureMessage = "dpkg is required to install the Linux update automatically."
+        )
+    }
+
+    if (!debPackageInstallationChecker(executablePath)) {
+        return LinuxAutomaticUpdateSupport(
+            isSupported = false,
+            failureMessage = "Automatic Linux updates currently require the app to be installed from the published DEB package."
+        )
+    }
+
+    return LinuxAutomaticUpdateSupport(
+        isSupported = true,
+        executablePath = executablePath
+    )
+}
+
+internal data class LinuxAutomaticUpdateSupport(
+    val isSupported: Boolean,
+    val executablePath: String? = null,
+    val failureMessage: String? = null
+)
 
 private fun escapeShellValue(value: String): String {
     return value.replace("'", "'\"'\"'")
