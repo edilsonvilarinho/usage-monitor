@@ -179,6 +179,13 @@ fun HistoryScreen(
                                         language = language,
                                         selectedRange = current.selectedRange
                                     )
+                                } else if (current.report.source == ApiSource.OPENCODE) {
+                                    OpenCodeHistoryContent(
+                                        report = current.report,
+                                        accentColor = accentColor,
+                                        language = language,
+                                        selectedRange = current.selectedRange
+                                    )
                                 } else {
                                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                         Text(
@@ -390,6 +397,35 @@ private fun DeepSeekHistoryContent(
     }
 }
 
+@Composable
+private fun OpenCodeHistoryContent(
+    report: ApiUsageHistoryReport,
+    accentColor: Color,
+    language: AppLanguage,
+    selectedRange: HistoryRange
+) {
+    val modelReports = remember(report.series) { buildOpenCodeHistoryGroups(report.series) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = lastUpdatedLabel(report.lastUpdatedAt, language),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        modelReports.forEachIndexed { index, modelReport ->
+            key(modelReport.modelName + selectedRange.name) {
+                OpenCodeHistoryCard(
+                    modelReport = modelReport,
+                    accentColor = accentColor,
+                    index = index,
+                    language = language
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DeepSeekHistoryCard(
@@ -489,6 +525,108 @@ private fun DeepSeekHistoryCard(
                         text = message,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OpenCodeHistoryCard(
+    modelReport: OpenCodeHistoryModelReport,
+    accentColor: Color,
+    index: Int,
+    language: AppLanguage
+) {
+    var visible by remember { mutableStateOf(false) }
+    val cardAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(AppMotion.normal, easing = AppMotion.enterEasing),
+        label = "openCodeHistoryCardAlpha$index"
+    )
+    val cardOffsetY by animateFloatAsState(
+        targetValue = if (visible) 0f else 28f,
+        animationSpec = tween(AppMotion.slow, easing = AppMotion.enterEasing),
+        label = "openCodeHistoryCardOffsetY$index"
+    )
+    LaunchedEffect(Unit) {
+        delay(index * AppMotion.stagger)
+        visible = true
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = cardAlpha
+                translationY = cardOffsetY
+            },
+        shape = AppShapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(3.dp)
+                    .background(accentColor.copy(alpha = 0.85f))
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = modelReport.modelName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = accentColor,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (language == AppLanguage.PT) {
+                            "Atividade observada do modelo free na janela semanal."
+                        } else {
+                            "Observed free-model activity in the weekly window."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                UsageHistoryLineChart(points = modelReport.chartSeries.points, unit = modelReport.chartSeries.unit)
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Requisições nas últimas 5h" else "Requests in last 5h",
+                        value = localizedRequests(modelReport.requests5h, language)
+                    )
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Requisições nos últimos 7 dias" else "Requests in last 7 days",
+                        value = localizedRequests(modelReport.requests7d, language)
+                    )
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
+                        value = localizedRequests(modelReport.chartSeries.deltaDisplayUsed, language)
+                    )
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+                        value = localizedRequests(modelReport.chartSeries.averageDisplayConsumptionPerHour.roundToLong(), language) +
+                            if (language == AppLanguage.PT) "/h" else "/h"
+                    )
+                    MetricItem(
+                        label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
+                        value = if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
                     )
                 }
             }
@@ -596,18 +734,33 @@ private fun HistoryMetrics(
                 value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
             )
         } else if (series.unit == UsageUnit.REQUESTS) {
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
-                value = "${formatQuantity(series.currentDisplayUsed)}/${formatQuantity(series.currentDisplayTotal)} req"
-            )
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-                value = "${formatQuantity(series.deltaDisplayUsed)} req"
-            )
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-                value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} req/h"
-            )
+            if (series.currentDisplayTotal > 0L) {
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+                    value = "${formatQuantity(series.currentDisplayUsed)}/${formatQuantity(series.currentDisplayTotal)} req"
+                )
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+                    value = "${formatQuantity(series.deltaDisplayUsed)} req"
+                )
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+                    value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} req/h"
+                )
+            } else {
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Requisições na janela" else "Requests in window",
+                    value = "${formatQuantity(series.currentDisplayUsed)} req"
+                )
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
+                    value = "${formatQuantity(series.deltaDisplayUsed)} req"
+                )
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+                    value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} req/h"
+                )
+            }
         } else {
             MetricItem(
                 label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
@@ -624,7 +777,11 @@ private fun HistoryMetrics(
         }
         MetricItem(
             label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
-            value = forecastLabel(series.forecast, language)
+            value = if (series.unit == UsageUnit.REQUESTS && series.currentDisplayTotal <= 0L) {
+                if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
+            } else {
+                forecastLabel(series.forecast, language)
+            }
         )
     }
 }
@@ -654,6 +811,7 @@ private fun accentColorForHistorySource(source: ApiSource): Color {
         ApiSource.MINIMAX   -> Color(0xFFFF8A3D)
         ApiSource.CODEX     -> Color(0xFF27BFA3)
         ApiSource.DEEPSEEK  -> Color(0xFFC084FC)
+        ApiSource.OPENCODE  -> Color(0xFF7BD389)
     }
 }
 
@@ -671,6 +829,7 @@ private fun sourceLabel(source: ApiSource): String {
         ApiSource.MINIMAX -> "MiniMax"
         ApiSource.CODEX -> "Codex"
         ApiSource.DEEPSEEK -> "DeepSeek"
+        ApiSource.OPENCODE -> "OpenCode Zen Free"
     }
 }
 
@@ -700,6 +859,14 @@ private fun historySubtitle(
             "Saldo restante, gasto no intervalo e tendência recente."
         } else {
             "Remaining balance, spend in range, and recent trend."
+        }
+    }
+
+    if (selectedSource == ApiSource.OPENCODE) {
+        return if (language == AppLanguage.PT) {
+            "Atividade observada por modelo free nas janelas de 5h e 7d."
+        } else {
+            "Observed activity per free model across 5h and 7d windows."
         }
     }
 
@@ -812,6 +979,14 @@ private fun formatQuantity(value: Long): String {
     }
 }
 
+private fun localizedRequests(value: Long, language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        "${formatQuantity(value)} requisições"
+    } else {
+        "${formatQuantity(value)} requests"
+    }
+}
+
 private fun formatCents(cents: Long): String {
     val sign = if (cents < 0L) "-" else ""
     val absCents = kotlin.math.abs(cents)
@@ -833,3 +1008,44 @@ private fun unitSuffix(unit: UsageUnit): String {
         UsageUnit.CURRENCY_USD -> "USD"
     }
 }
+
+private data class OpenCodeHistoryModelReport(
+    val modelName: String,
+    val chartSeries: UsageHistorySeries,
+    val requests5h: Long,
+    val requests7d: Long
+)
+
+private fun buildOpenCodeHistoryGroups(series: List<UsageHistorySeries>): List<OpenCodeHistoryModelReport> {
+    val grouped = linkedMapOf<String, MutableOpenCodeHistoryGroup>()
+
+    series.forEach { item ->
+        val modelName = when {
+            item.quotaLabel.endsWith(" 5h") -> item.quotaLabel.removeSuffix(" 5h")
+            item.quotaLabel.endsWith(" 7d") -> item.quotaLabel.removeSuffix(" 7d")
+            else -> item.quotaLabel
+        }
+
+        val group = grouped.getOrPut(modelName) { MutableOpenCodeHistoryGroup(modelName) }
+        when {
+            item.quotaLabel.endsWith(" 5h") -> group.series5h = item
+            item.quotaLabel.endsWith(" 7d") -> group.series7d = item
+        }
+    }
+
+    return grouped.values.mapNotNull { group ->
+        val chartSeries = group.series7d ?: group.series5h ?: return@mapNotNull null
+        OpenCodeHistoryModelReport(
+            modelName = group.modelName,
+            chartSeries = chartSeries,
+            requests5h = group.series5h?.currentDisplayUsed ?: 0L,
+            requests7d = group.series7d?.currentDisplayUsed ?: group.series5h?.currentDisplayUsed ?: 0L
+        )
+    }
+}
+
+private data class MutableOpenCodeHistoryGroup(
+    val modelName: String,
+    var series5h: UsageHistorySeries? = null,
+    var series7d: UsageHistorySeries? = null
+)

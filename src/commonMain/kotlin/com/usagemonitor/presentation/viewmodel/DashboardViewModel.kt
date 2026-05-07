@@ -8,7 +8,9 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
+import com.usagemonitor.domain.repository.OpenCodeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,6 +42,13 @@ class DashboardViewModel(
     private val getDeepSeekUsage: GetDeepSeekUsageUseCase,
     private val enabledApis: StateFlow<Set<ApiSource>>,
     private val recordUsageSnapshot: RecordUsageSnapshotUseCase,
+    private val getOpenCodeUsage: GetOpenCodeUsageUseCase = GetOpenCodeUsageUseCase(
+        object : OpenCodeRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("OpenCode local database is unavailable"))
+            }
+        }
+    ),
     private val checkForAppUpdate: CheckForAppUpdateUseCase? = null,
     private val appUpdateInstaller: AppUpdateInstaller = UnsupportedAppUpdateInstaller,
     private val currentAppVersion: String = "0.0.0",
@@ -294,6 +303,7 @@ class DashboardViewModel(
             ApiSource.MINIMAX -> getMiniMaxUsage()
             ApiSource.CODEX -> getCodexUsage()
             ApiSource.DEEPSEEK -> getDeepSeekUsage()
+            ApiSource.OPENCODE -> getOpenCodeUsage()
         }
     }
 

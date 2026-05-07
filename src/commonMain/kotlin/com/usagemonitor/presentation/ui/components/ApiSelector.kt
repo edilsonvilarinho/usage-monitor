@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppLanguage
 
 /**
  * Checkboxes para ativar/desativar o monitoramento de cada API.
@@ -30,6 +31,7 @@ import com.usagemonitor.domain.entity.ApiSource
 @Composable
 fun ApiSelector(
     enabledApis: Set<ApiSource>,
+    language: AppLanguage,
     onToggle: (ApiSource, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -40,6 +42,7 @@ fun ApiSelector(
         ApiSource.entries.forEach { api ->
             ApiCheckboxRow(
                 api = api,
+                language = language,
                 isChecked = api in enabledApis,
                 onCheckedChange = { checked -> onToggle(api, checked) }
             )
@@ -54,6 +57,7 @@ fun ApiSelector(
 @Composable
 fun ApiCheckboxRow(
     api: ApiSource,
+    language: AppLanguage = AppLanguage.PT,
     isChecked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -73,9 +77,19 @@ fun ApiCheckboxRow(
             onCheckedChange = null
         )
         Text(
-            text = api.name,  // "ANTHROPIC" ou "MINIMAX"
+            text = apiLabel(api, language),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+private fun apiLabel(api: ApiSource, language: AppLanguage): String {
+    return when (api) {
+        ApiSource.ANTHROPIC -> "Anthropic"
+        ApiSource.MINIMAX -> "MiniMax"
+        ApiSource.CODEX -> "Codex"
+        ApiSource.DEEPSEEK -> "DeepSeek"
+        ApiSource.OPENCODE -> if (language == AppLanguage.PT) "OpenCode Zen Free" else "OpenCode Zen Free"
     }
 }

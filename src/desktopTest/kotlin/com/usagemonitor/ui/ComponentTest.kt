@@ -420,7 +420,7 @@ class ComponentTest {
         }
 
         // Checkbox deve aparecer marcado
-        onNodeWithText("ANTHROPIC").assertIsDisplayed()
+        onNodeWithText("Anthropic").assertIsDisplayed()
     }
 
     @Test
@@ -437,7 +437,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("MINIMAX").performClick()
+        onNodeWithText("MiniMax").performClick()
         // O clique no label deve acionar o callback
         assertEquals(true, toggled)
     }
@@ -659,7 +659,168 @@ class ComponentTest {
         onNodeWithText("System Startup").assertIsDisplayed()
         onNodeWithText("Language").assertIsDisplayed()
         onNodeWithText("Monitored APIs").assertIsDisplayed()
+        onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
         onNodeWithText("Close").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard renders OpenCode free model activity without percentage gauges`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.OPENCODE,
+                    apiName = "OpenCode Zen Free",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "MiniMax M2.5 Free 5h",
+                            used = 4L,
+                            total = 0L,
+                            periodEndAt = Instant.parse("2026-05-07T15:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.REQUESTS
+                        ),
+                        QuotaInfo(
+                            label = "MiniMax M2.5 Free 7d",
+                            used = 19L,
+                            total = 0L,
+                            periodEndAt = Instant.parse("2026-05-07T15:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.REQUESTS
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
+        onNodeWithText("MiniMax M2.5 Free").assertIsDisplayed()
+        onNodeWithText("4 requisições").assertIsDisplayed()
+        onNodeWithText("Últimas 5h").assertIsDisplayed()
+        onNodeWithText("7d: 19").assertIsDisplayed()
+        onAllNodesWithText("0%").assertCountEquals(0)
+    }
+
+    @Test
+    fun `HistoryScreen renders one OpenCode chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.OPENCODE,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T14:33:00Z"),
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "MiniMax M2.5 Free 5h",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.REQUESTS,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
+                            used = 4,
+                            total = 0,
+                            rawUsed = 4,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
+                            used = 7,
+                            total = 0,
+                            rawUsed = 7,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 7,
+                    currentDisplayTotal = 0,
+                    deltaDisplayUsed = 3,
+                    averageDisplayConsumptionPerHour = 235.0,
+                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
+                    forecast = UsageForecast.InsufficientData
+                ),
+                UsageHistorySeries(
+                    quotaLabel = "MiniMax M2.5 Free 7d",
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.REQUESTS,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
+                            used = 4,
+                            total = 0,
+                            rawUsed = 4,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
+                            used = 7,
+                            total = 0,
+                            rawUsed = 7,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 7,
+                    currentDisplayTotal = 0,
+                    deltaDisplayUsed = 3,
+                    averageDisplayConsumptionPerHour = 235.0,
+                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
+                    forecast = UsageForecast.InsufficientData
+                )
+            )
+        )
+
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                    override suspend fun recordSnapshot(
+                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
+                        capturedAt: Instant
+                    ) = Unit
+
+                    override suspend fun getHistoryReport(
+                        source: ApiSource,
+                        range: HistoryRange,
+                        now: Instant
+                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
+                        return report
+                    }
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.OPENCODE))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {},
+                    focusedSource = ApiSource.OPENCODE,
+                    showSourceSelector = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("MiniMax M2.5 Free").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("MiniMax M2.5 Free").assertIsDisplayed()
+        onAllNodesWithText("MiniMax M2.5 Free 5h").assertCountEquals(0)
+        onAllNodesWithText("MiniMax M2.5 Free 7d").assertCountEquals(0)
+        onNodeWithText("Requisições nas últimas 5h").assertIsDisplayed()
+        onNodeWithText("Requisições nos últimos 7 dias").assertIsDisplayed()
+        onAllNodesWithText("7 requisições").assertCountEquals(2)
+        viewModel.onDestroy()
     }
 
     // ── LanguageSelector ─────────────────────────────────────────────────

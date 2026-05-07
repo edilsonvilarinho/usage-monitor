@@ -119,5 +119,9 @@ class UiStateTest {
             "Codex: 401 unauthorized",
             UiApiError(ApiSource.CODEX, "401 unauthorized").formattedMessage
         )
+        assertEquals(
+            "OpenCode Zen Free: local db missing",
+            UiApiError(ApiSource.OPENCODE, "local db missing").formattedMessage
+        )
     }
 }

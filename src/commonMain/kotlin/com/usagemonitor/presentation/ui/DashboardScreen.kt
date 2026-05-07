@@ -83,6 +83,8 @@ private fun sourceLabelFromKey(rawSource: String): String {
         "ANTHROPIC" -> "Anthropic"
         "MINIMAX" -> "MiniMax"
         "CODEX" -> "Codex"
+        "DEEPSEEK" -> "DeepSeek"
+        "OPENCODE" -> "OpenCode Zen Free"
         else -> rawSource
     }
 }
@@ -439,6 +441,7 @@ private fun warningActionFor(
         ApiSource.MINIMAX -> null
         ApiSource.CODEX -> null
         ApiSource.DEEPSEEK -> null
+        ApiSource.OPENCODE -> null
     }
 }
 
@@ -477,6 +480,24 @@ private fun warningFor(
                 source = error.source,
                 title = "MiniMax needs MINIMAX_API_KEY",
                 description = "Set `MINIMAX_API_KEY` before opening the app and restart the monitor. Example on Windows: `set MINIMAX_API_KEY=your_key`.",
+                actionLabel = null
+            )
+        }
+    }
+
+    if (error.isOpenCodeLocalIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                source = error.source,
+                title = "OpenCode Zen Free indisponível",
+                description = "O banco local do OpenCode não foi encontrado. Abra o OpenCode pelo menos uma vez nesta máquina para gerar `~/.local/share/opencode/opencode.db`.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                source = error.source,
+                title = "OpenCode Zen Free is unavailable",
+                description = "The local OpenCode database was not found. Open OpenCode at least once on this machine to create `~/.local/share/opencode/opencode.db`.",
                 actionLabel = null
             )
         }

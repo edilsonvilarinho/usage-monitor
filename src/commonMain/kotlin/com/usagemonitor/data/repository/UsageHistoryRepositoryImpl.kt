@@ -84,6 +84,9 @@ class UsageHistoryRepositoryImpl(
         }
 
         val lastPoint = activeSegment.last()
+        if (unit != UsageUnit.CURRENCY_USD && lastPoint.displayTotal <= 0L) {
+            return UsageForecast.InsufficientData
+        }
         val remaining = if (unit == UsageUnit.CURRENCY_USD) {
             lastPoint.displayUsed.coerceAtLeast(0L)
         } else {

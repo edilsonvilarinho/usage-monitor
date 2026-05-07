@@ -17,4 +17,4 @@ enum class AppTheme { DARK, LIGHT }
 enum class AppLanguage { PT, EN }
 
 /** Identificador de cada API suportada. */
-enum class ApiSource { ANTHROPIC, MINIMAX, CODEX, DEEPSEEK }
+enum class ApiSource { ANTHROPIC, MINIMAX, CODEX, DEEPSEEK, OPENCODE }

@@ -53,8 +53,11 @@ data class UiApiError(
     val isMiniMaxEnvVarIssue: Boolean
         get() = source == ApiSource.MINIMAX && isMiniMaxEnvVarMessage(message)
 
+    val isOpenCodeLocalIssue: Boolean
+        get() = source == ApiSource.OPENCODE && isOpenCodeLocalMessage(message)
+
     val isConfigurationIssue: Boolean
-        get() = isAnthropicCredentialIssue || isMiniMaxEnvVarIssue
+        get() = isAnthropicCredentialIssue || isMiniMaxEnvVarIssue || isOpenCodeLocalIssue
 }
 
 private fun sourceLabel(source: ApiSource): String {
@@ -63,6 +66,7 @@ private fun sourceLabel(source: ApiSource): String {
         ApiSource.MINIMAX -> "MiniMax"
         ApiSource.CODEX -> "Codex"
         ApiSource.DEEPSEEK -> "DeepSeek"
+        ApiSource.OPENCODE -> "OpenCode Zen Free"
     }
 }
 
@@ -78,6 +82,10 @@ private val ANTHROPIC_CREDENTIAL_MARKERS = listOf(
 
 private const val MINIMAX_ENV_VAR_NAME = "MINIMAX_API_KEY"
 private val MINIMAX_ENV_VAR_STATE_MARKERS = listOf("não configurada", "not configured")
+private val OPENCODE_LOCAL_MARKERS = listOf(
+    "OpenCode local database not found",
+    "OpenCode local database is unavailable"
+)
 
 private fun isAnthropicCredentialMessage(message: String): Boolean {
     return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
@@ -88,4 +96,8 @@ private fun isMiniMaxEnvVarMessage(message: String): Boolean {
         return false
     }
     return MINIMAX_ENV_VAR_STATE_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isOpenCodeLocalMessage(message: String): Boolean {
+    return OPENCODE_LOCAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }

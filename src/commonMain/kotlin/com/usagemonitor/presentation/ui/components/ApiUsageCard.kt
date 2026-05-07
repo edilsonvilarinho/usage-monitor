@@ -359,7 +359,14 @@ fun ApiUsageCard(
                     },
                     label = "cardLayoutMode"
                 ) { minimized ->
-                    if (minimized) {
+                    if (source == ApiSource.OPENCODE) {
+                        OpenCodeUsageSummary(
+                            source = source,
+                            quotas = orderedQuotas,
+                            language = language,
+                            compact = minimized
+                        )
+                    } else if (minimized) {
                         CompactQuotaSummary(
                             source = source,
                             quotas = orderedQuotas,
@@ -376,6 +383,267 @@ fun ApiUsageCard(
             }
         }
     }
+}
+
+@Composable
+private fun OpenCodeUsageSummary(
+    source: ApiSource,
+    quotas: List<QuotaInfo>,
+    language: AppLanguage,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val modelSummaries = remember(quotas) { buildOpenCodeModelSummaries(quotas) }
+
+    if (modelSummaries.isEmpty()) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(AppShapes.extraLarge)
+                .background(accentColorFor(source).copy(alpha = 0.1f))
+                .padding(horizontal = 16.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = if (language == AppLanguage.PT) {
+                    "Abra o OpenCode e use um modelo free para começar a preencher este card."
+                } else {
+                    "Use a free OpenCode model to start populating this card."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+        return
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
+    ) {
+        modelSummaries.forEach { summary ->
+            OpenCodeModelRow(
+                source = source,
+                summary = summary,
+                language = language,
+                compact = compact
+            )
+        }
+    }
+}
+
+@Composable
+private fun OpenCodeModelRow(
+    source: ApiSource,
+    summary: OpenCodeModelSummary,
+    language: AppLanguage,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(AppShapes.extraLarge)
+            .background(accentColorFor(source).copy(alpha = 0.12f))
+            .padding(horizontal = 14.dp, vertical = if (compact) 10.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = summary.modelName,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (language == AppLanguage.PT) "Limite oficial indisponível" else "Official limit unavailable",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = localizedRequestCount(summary.requestsFiveHours, language),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = openCodePrimaryWindowLabel(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = openCodeSecondaryWindowLabel(summary.requestsSevenDays, language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (!compact) {
+            OpenCodeInlineComparisonChart(
+                source = source,
+                summary = summary,
+                language = language
+            )
+        }
+    }
+}
+
+private data class OpenCodeModelSummary(
+    val modelName: String,
+    val requestsFiveHours: Long,
+    val requestsSevenDays: Long
+)
+
+private fun localizedRequestCount(value: Long, language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        "$value requisições"
+    } else {
+        "$value requests"
+    }
+}
+
+private fun openCodePrimaryWindowLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Últimas 5h" else "Last 5h"
+}
+
+private fun openCodeSecondaryWindowLabel(value: Long, language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        "7d: $value"
+    } else {
+        "7d: $value"
+    }
+}
+
+@Composable
+private fun OpenCodeInlineComparisonChart(
+    source: ApiSource,
+    summary: OpenCodeModelSummary,
+    language: AppLanguage,
+    modifier: Modifier = Modifier
+) {
+    val maxValue = maxOf(summary.requestsFiveHours, summary.requestsSevenDays, 1L).toFloat()
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = if (language == AppLanguage.PT) {
+                "Atividade observada"
+            } else {
+                "Observed activity"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        OpenCodeInlineBar(
+            label = "5h",
+            value = summary.requestsFiveHours,
+            fraction = summary.requestsFiveHours / maxValue,
+            accentColor = accentColorFor(source),
+            language = language
+        )
+        OpenCodeInlineBar(
+            label = "7d",
+            value = summary.requestsSevenDays,
+            fraction = summary.requestsSevenDays / maxValue,
+            accentColor = accentColorFor(source),
+            language = language
+        )
+    }
+}
+
+@Composable
+private fun OpenCodeInlineBar(
+    label: String,
+    value: Long,
+    fraction: Float,
+    accentColor: Color,
+    language: AppLanguage,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(8.dp)
+                .clip(AppShapes.small)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                    .height(8.dp)
+                    .clip(AppShapes.small)
+                    .background(accentColor.copy(alpha = 0.82f))
+            )
+        }
+
+        Text(
+            text = if (language == AppLanguage.PT) "$value req." else "$value req.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+private fun buildOpenCodeModelSummaries(quotas: List<QuotaInfo>): List<OpenCodeModelSummary> {
+    val grouped = linkedMapOf<String, OpenCodeModelSummary>()
+
+    quotas.forEach { quota ->
+        val modelName = when {
+            quota.label.endsWith(" 5h") -> quota.label.removeSuffix(" 5h")
+            quota.label.endsWith(" 7d") -> quota.label.removeSuffix(" 7d")
+            else -> quota.label
+        }
+
+        val existing = grouped[modelName] ?: OpenCodeModelSummary(
+            modelName = modelName,
+            requestsFiveHours = 0L,
+            requestsSevenDays = 0L
+        )
+        grouped[modelName] = when {
+            quota.label.endsWith(" 5h") -> existing.copy(requestsFiveHours = quota.used)
+            quota.label.endsWith(" 7d") -> existing.copy(requestsSevenDays = quota.used)
+            else -> existing
+        }
+    }
+
+    return grouped.values.toList()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -608,6 +876,7 @@ private fun accentColorFor(source: ApiSource): Color {
         ApiSource.MINIMAX -> Color(0xFFFF8A3D)
         ApiSource.CODEX -> Color(0xFF27BFA3)
         ApiSource.DEEPSEEK -> Color(0xFFC084FC)
+        ApiSource.OPENCODE -> Color(0xFF7BD389)
     }
 }
 

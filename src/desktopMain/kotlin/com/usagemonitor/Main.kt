@@ -18,6 +18,7 @@ import androidx.compose.ui.window.rememberDialogState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
+import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
@@ -25,6 +26,7 @@ import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
+import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -34,6 +36,7 @@ import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.ui.DesktopDialogFrame
@@ -141,6 +144,7 @@ fun main() = application {
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
     val remoteApiDataSource = remember(httpClient) { RemoteApiDataSource(httpClient) }
     val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
+    val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
 
     val anthropicRepository = remember(credentialDataSource, remoteApiDataSource) {
         AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
@@ -153,6 +157,9 @@ fun main() = application {
     }
     val deepSeekRepository = remember(remoteApiDataSource) {
         DeepSeekRepositoryImpl(remoteApiDataSource)
+    }
+    val openCodeRepository = remember(openCodeUsageDataSource) {
+        OpenCodeRepositoryImpl(openCodeUsageDataSource)
     }
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
@@ -170,12 +177,13 @@ fun main() = application {
     }
 
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
             getCodexUsage = GetCodexUsageUseCase(codexRepository),
             getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepository),
+            getOpenCodeUsage = GetOpenCodeUsageUseCase(openCodeRepository),
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
@@ -414,6 +422,7 @@ private fun historyWindowTitle(source: ApiSource, language: AppLanguage): String
         ApiSource.MINIMAX -> "MiniMax"
         ApiSource.CODEX -> "Codex"
         ApiSource.DEEPSEEK -> "DeepSeek"
+        ApiSource.OPENCODE -> "OpenCode Zen Free"
     }
 
     return if (language == AppLanguage.PT) {

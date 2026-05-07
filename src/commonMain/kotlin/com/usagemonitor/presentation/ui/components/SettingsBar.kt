@@ -419,6 +419,7 @@ fun SettingsDialogContent(
                     ApiSource.entries.forEach { api ->
                         ApiCheckboxRow(
                             api = api,
+                            language = currentLanguage,
                             isChecked = api in enabledApis,
                             onCheckedChange = { checked -> onApiToggle(api, checked) }
                         )
