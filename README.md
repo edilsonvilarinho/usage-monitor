@@ -1,18 +1,19 @@
 # Usage Monitor
 
-Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo e quotas de uso de APIs de IA em um único painel. Hoje a app integra Anthropic, Codex e MiniMax, mostra janelas de uso de curto e longo prazo, persiste histórico local em SQLite, permite reorganizar/minimizar cards, verifica atualizações publicadas no GitHub Releases e oferece auto-start em Windows e Linux.
+Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo, saldo e quotas de ferramentas/APIs de IA em um unico painel.
 
-## O que a app faz
+Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLite, oferece refresh automatico a cada 10 minutos, suporta reorder/minimizacao de cards, tema claro/escuro, idioma PT/EN, auto-start em Windows/Linux e verificacao de updates via GitHub Releases.
 
-- Consolida métricas de uso de múltiplas APIs em um dashboard único.
-- Atualiza automaticamente os dados a cada 10 minutos.
-- Permite refresh manual global ou por card/API.
-- Exibe estado parcial com sucesso mesmo quando uma ou mais APIs falham.
-- Persiste snapshots de uso para consulta de histórico.
-- Oferece tela de histórico separada do dashboard principal com tendência, média por hora e previsão de esgotamento.
-- Permite reordenar cards por drag-and-drop e minimizar/expandir cada card com persistência local.
-- Verifica releases novas e tenta preparar instalação automática quando há pacote compatível com a plataforma.
-- Suporta tema claro/escuro, idioma PT/EN e auto-start em Windows e Linux.
+## Visao geral
+
+- Dashboard unico para varias fontes de uso.
+- Refresh automatico a cada 10 minutos.
+- Refresh manual global ou por integracao.
+- Estado parcial: se uma fonte falhar, as outras continuam a aparecer.
+- Historico local com tendencia, consumo medio e forecast.
+- Reordenacao e minimizacao de cards com persistencia local.
+- Auto-start em Windows e Linux.
+- Verificacao de novas releases e tentativa de instalacao automatica quando a plataforma suporta.
 
 ## Screenshots
 
@@ -20,178 +21,94 @@ Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo e 
 
 ![Dashboard](img/1.png)
 
-### Histórico
+### Historico
 
-![Histórico](img/2.png)
+![Historico](img/2.png)
 
-### Configurações
+### Configuracoes
 
-![Configurações](img/3.png)
+![Configuracoes](img/3.png)
 
-## APIs monitoradas
+## Integracoes suportadas
+
+| Integracao | Tipo | Origem dos dados | Requisito local |
+|---|---|---|---|
+| Anthropic | Remota | `GET https://api.anthropic.com/api/oauth/usage` | `~/.claude/.credentials.json` |
+| Codex | Remota | `GET https://chatgpt.com/backend-api/codex/usage` | `~/.codex/auth.json` e `~/.codex/cap_sid` |
+| MiniMax | Remota | `GET https://www.minimax.io/v1/token_plan/remains` | `MINIMAX_API_KEY` |
+| DeepSeek | Remota | `GET https://api.deepseek.com/user/balance` | `DEEPSEEK_API_KEY` |
+| OpenCode Zen Free | Local | leitura de `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
+| Kilo Free | Local | leitura de `~/.local/share/kilo/kilo.db` | base local do Kilo existente |
 
 ### Anthropic
 
-- Endpoint atual: `GET https://api.anthropic.com/api/oauth/usage`
-- Auth: bearer token lido de `~/.claude/.credentials.json`
-- Token usado: `claudeAiOauth.accessToken`
-- Se o token estiver perto de expirar, o datasource local tenta refresh em `https://console.anthropic.com/v1/oauth/token`
-- A app trabalha com janelas `five_hour` e `seven_day`
+- Usa bearer token de `~/.claude/.credentials.json` em `claudeAiOauth.accessToken`.
+- Se o token estiver perto de expirar, `LocalCredentialDataSource` tenta refresh em `https://console.anthropic.com/v1/oauth/token`.
+- A app trabalha com as janelas `five_hour` e `seven_day`.
+- Headers obrigatorios:
+  - `Authorization: Bearer <accessToken>`
+  - `anthropic-beta: oauth-2025-04-20`
+  - `User-Agent: claude-code/1.0.0`
 
 ### Codex
 
-- Endpoint: `GET https://chatgpt.com/backend-api/codex/usage`
-- Auth:
-  - bearer token de `~/.codex/auth.json` em `tokens.access_token`
-  - cookie `cap_sid` lido de `~/.codex/cap_sid`
-- O mapper converte `primary_window` e `secondary_window` para quotas de 5h e 7d
+- Usa bearer token de `~/.codex/auth.json` em `tokens.access_token`.
+- Usa tambem o cookie `cap_sid` lido de `~/.codex/cap_sid`.
+- O mapper converte `primary_window` e `secondary_window` em quotas de 5h e 7d.
 
 ### MiniMax
 
-- Endpoint: `GET https://www.minimax.io/v1/token_plan/remains`
-- Auth: variável de ambiente `MINIMAX_API_KEY`
-- A chave nunca deve ser hardcoded
-- A app atualmente filtra quotas do modelo `MiniMax-M*`
+- Le a chave exclusivamente da variavel de ambiente `MINIMAX_API_KEY`.
+- A app filtra quotas do modelo `MiniMax-M*`.
+- Nunca hardcode a chave.
 
-## Stack
+### DeepSeek
 
-- Kotlin Multiplatform
-- Compose Multiplatform Desktop
-- Ktor + OkHttp
-- Kotlinx Serialization
-- Kotlin Coroutines
-- Kotlinx Datetime
-- Multiplatform Settings
-- SQLite JDBC
-- NSIS para instalador Windows
+- Le a chave exclusivamente da variavel de ambiente `DEEPSEEK_API_KEY`.
+- O dashboard mostra saldo pago e, quando existir, saldo concedido.
+- Os valores sao tratados em USD.
 
-## Arquitetura
+### OpenCode Zen Free
 
-O projeto segue arquitetura em três camadas com dependência unidirecional:
+- Nao chama API HTTP.
+- Le atividade observada da base local `~/.local/share/opencode/opencode.db`.
+- Conta mensagens `assistant` do provider `opencode`.
+- Agrupa uso nas janelas de 5h e 7d.
+- Monitora modelos free como `*-free` e `big-pickle`.
 
-`presentation -> domain <- data`
+### Kilo Free
 
-Regras principais:
+- Nao chama API HTTP.
+- Le atividade observada da base local `~/.local/share/kilo/kilo.db`.
+- Conta mensagens `assistant` do provider `kilo`.
+- Agrupa uso nas janelas de 5h e 7d.
+- Monitora modelos free como `kilo-auto/free`, `*/free` e `*:free`.
 
-- `domain` não pode importar Compose, Ktor ou qualquer detalhe de infra.
-- Entidades e contratos do domínio não conhecem HTTP, JSON, ficheiros locais ou UI.
-- `presentation` concentra ViewModels, `UiState` e componentes Compose.
-- `data` contém DTOs, mappers, repositories e contratos de data source, incluindo histórico e checagem de updates.
-- Implementações que dependem de ficheiros locais, SQLite, processo do SO ou instalador ficam em `desktopMain`.
+## Requisitos
 
-## Source sets
+- Windows ou Linux para o fluxo principal da app desktop.
+- JDK 17.
+- Credenciais validas apenas para as integracoes que voce quiser habilitar.
 
-| Source set | Papel |
-|---|---|
-| `commonMain` | Código partilhado de domain, data, presentation e UI |
-| `desktopMain` | Bootstrap desktop, datasources locais, SQLite de histórico, `AutoStartManager`, `DesktopAppUpdateInstaller`, janela e integrações JVM |
-| `commonTest` | Testes de domain, mappers e ViewModels |
-| `desktopTest` | Testes de componentes Compose Desktop |
-| `src/installer` | Scripts, idiomas e assets do instalador NSIS |
-
-## Estrutura funcional
-
-### Bootstrap e DI
-
-O grafo é montado manualmente em `src/desktopMain/kotlin/com/usagemonitor/Main.kt`:
-
-`HttpClient(OkHttp)` -> data sources locais/remotos -> repositories de uso/histórico/update -> use cases -> `DashboardViewModel` / `HistoryViewModel` -> telas Compose
-
-Dependências importantes montadas no bootstrap:
-
-- `LocalCredentialDataSource`
-- `LocalCodexAuthDataSource`
-- `RemoteApiDataSource`
-- `LocalUsageHistoryDataSource`
-- `AnthropicRepositoryImpl`
-- `CodexRepositoryImpl`
-- `MiniMaxRepositoryImpl`
-- `UsageHistoryRepositoryImpl`
-- `AppUpdateRepositoryImpl`
-- `DesktopAppUpdateInstaller`
-
-Observações adicionais:
-
-- `CURRENT_APP_VERSION` é gerada a partir de `build.gradle.kts` em tempo de build.
-- O `Main.kt` também persiste ordem dos cards, estado minimizado e preferências de auto-start.
-
-### Dashboard
-
-- O dashboard mostra cards por API com quotas e consumo.
-- O footer expõe versão da app, contador para próximo refresh, acesso a histórico e configurações.
-- O utilizador pode atualizar uma API específica sem recarregar o resto.
-- Se ao menos uma API responder, a UI continua em `Success` e lista erros parciais.
-- Os cards podem ser reordenados por drag-and-drop sem perder a posição das APIs ocultas.
-- Cada card pode ser minimizado; o estado fica persistido entre sessões.
-- A UI também exibe banners persistentes para problemas de configuração e para updates disponíveis.
-
-### Histórico e forecast
-
-- Cada card pode abrir um diálogo de histórico focado na API correspondente.
-- A tela de histórico suporta intervalos de `24h`, `7 dias` e `30 dias`.
-- O repositório de histórico calcula consumo acumulado, média por hora e previsão de esgotamento.
-- A série ativa ignora snapshots de janelas antigas após reset para não distorcer o forecast.
-
-### Polling e lifecycle
-
-- `DashboardViewModel` usa `SupervisorJob`.
-- O polling acontece num `while (true) + delay(1_000)` com ciclo de 600 segundos.
-- Ao fim de cada ciclo, a app dispara nova coleta das APIs habilitadas.
-- Cada snapshot bem-sucedido é persistido para histórico.
-- Ao fim de cada ciclo, a app também verifica se existe release mais nova publicada.
-- `viewModel.onDestroy()` precisa ser chamado no fechamento da janela.
-- `Main.kt` fecha `DashboardViewModel`, `HistoryViewModel` e `HttpClient` ao encerrar a aplicação e no shutdown hook.
-- Se um update automático for preparado com sucesso, a app fecha para delegar a instalação ao launcher temporário.
-
-## Preferências e persistência
-
-Preferências do utilizador:
-
-- Store: `PreferencesSettings(Preferences.userRoot().node("com.usagemonitor"))`
-- Chaves persistidas:
-  - `enabledApis`
-  - `isDark`
-  - `language`
-  - `autoStart`
-  - `cardOrder`
-  - `minimizedCards`
-
-Persistência adicional:
-
-- Histórico de uso é salvo por `LocalUsageHistoryDataSource` em `~/.usage-monitor/usage-history.db`
-- O histórico aplica retenção de 30 dias
-- Snapshots sem janela de reset conhecida não entram no histórico
-- `AutoStartManager` escreve em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` no Windows
-- No Linux, o auto-start usa `~/.config/autostart/usage-monitor.desktop` ou `XDG_CONFIG_HOME/autostart/usage-monitor.desktop`
-
-Observação importante:
-
-- A app inicia com `enabledApis` vazio por padrão. As APIs são ativadas nas configurações.
-
-## Requisitos locais
-
-- Windows ou Linux para rodar a app desktop
-- JDK 17
-- Credenciais locais válidas para os serviços que quiser monitorar
-
-Notas por plataforma:
-
-- Windows: fluxo completo com `packageInstaller`, instalador NSIS, auto-start por registry e preparação automática via `.msi`.
-- Linux: suporte a auto-start por `.desktop`, empacotamento nativo do Compose e instalação automática quando houver `.deb` e `pkexec`.
-
-### Variável obrigatória para MiniMax
+### Variaveis de ambiente
 
 ```bat
 set MINIMAX_API_KEY=your_key_here
+set DEEPSEEK_API_KEY=your_key_here
 ```
 
-Se a MiniMax estiver habilitada e a env var não existir, o projeto falha explicitamente.
+Importante:
 
-### Ficheiros de autenticação esperados
+- Se a MiniMax estiver habilitada e `MINIMAX_API_KEY` nao existir, a app falha explicitamente.
+- Se a DeepSeek estiver habilitada e `DEEPSEEK_API_KEY` nao existir, a app falha explicitamente.
+
+### Ficheiros locais esperados
 
 - Anthropic: `~/.claude/.credentials.json`
-- Codex: `~/.codex/auth.json`
+- Codex token: `~/.codex/auth.json`
 - Codex cookie: `~/.codex/cap_sid`
+- OpenCode: `~/.local/share/opencode/opencode.db`
+- Kilo: `~/.local/share/kilo/kilo.db`
 
 ## Como rodar
 
@@ -211,65 +128,163 @@ gradlew.bat packageInstaller
 gradlew.bat clean
 ```
 
-Importante:
+Observacoes:
 
-- A task raiz `test` não existe neste projeto KMP.
+- A task raiz `test` nao existe neste projeto KMP.
 - Use `allTests`, `desktopTest` ou `build`.
 
-## Build e distribuição
+## Como a app se comporta
 
-- `desktopJar` gera o JAR executável.
-- `createDistributable` gera a distribuição desktop em `build/compose/binaries/main/app/Usage Monitor`.
-- `packageDistributionForCurrentOS` gera os pacotes nativos da plataforma atual e é usado na pipeline de release.
-- `packageInstaller` empacota o instalador NSIS quando o NSIS estiver instalado.
-- `build-with-icon.ps1` é um fluxo auxiliar Windows para gerar distributable, aplicar ícone com `rcedit` e chamar o NSIS manualmente.
+### Dashboard
+
+- Mostra um card por integracao habilitada.
+- Permite refresh individual sem recarregar tudo.
+- Persiste ordem dos cards e estado minimizado.
+- Exibe banners persistentes para problemas de configuracao e updates disponiveis.
+- Se pelo menos uma integracao responder, a UI permanece em sucesso parcial e lista os erros restantes.
+
+### Historico
+
+- Cada integracao pode abrir uma tela dedicada de historico.
+- Intervalos disponiveis: `24h`, `7 dias` e `30 dias`.
+- O repositorio de historico calcula consumo acumulado, media por hora e forecast de esgotamento.
+- O historico local fica em `~/.usage-monitor/usage-history.db`.
+- A retencao atual e de 30 dias.
+
+### Update da app
+
+- A app consulta a release mais recente em `edilsonvilarinho/usage-monitor`.
+- Em Windows, tenta preparar instalacao automatica a partir do asset `.msi`.
+- Em Linux, a instalacao automatica exige `.deb`, `pkexec`, `dpkg` e instalacao previa via pacote DEB publicado.
+- Em plataformas sem suporte automatico, a UI aponta para a release publicada.
+
+### Preferencias persistidas
+
+Store local:
+
+- `PreferencesSettings(Preferences.userRoot().node("com.usagemonitor"))`
+
+Chaves persistidas:
+
+- `enabledApis`
+- `isDark`
+- `language`
+- `autoStart`
+- `cardOrder`
+- `minimizedCards`
+
+## Arquitetura
+
+O projeto segue arquitetura em tres camadas com dependencia unidirecional:
+
+`presentation -> domain <- data`
+
+### Source sets
+
+| Source set | Papel |
+|---|---|
+| `commonMain` | domain, data, presentation e UI partilhados |
+| `desktopMain` | bootstrap desktop, datasources locais, SQLite, auto-start e update installer |
+| `commonTest` | testes de domain, mappers, historico e ViewModels |
+| `desktopTest` | testes de componentes Compose Desktop e datasources JVM |
+| `src/installer` | scripts, idiomas e assets do instalador NSIS |
+
+### Regras importantes
+
+- `domain` nao pode importar Compose, Ktor ou infra.
+- Entidades e contratos do dominio nao conhecem HTTP, JSON, ficheiros locais ou UI.
+- Datasources que leem ficheiros do utilizador ficam em `desktopMain`.
+- `DashboardViewModel` usa `SupervisorJob`.
+- O polling roda em ciclo de 600 segundos.
+- `viewModel.onDestroy()` precisa ser chamado ao fechar a janela.
+- `Main.kt` fecha `DashboardViewModel`, `HistoryViewModel` e `HttpClient` no encerramento e no shutdown hook.
+
+### Bootstrap e DI
+
+O grafo e montado manualmente em `src/desktopMain/kotlin/com/usagemonitor/Main.kt`:
+
+`HttpClient(OkHttp)` -> data sources locais/remotos -> repositories -> use cases -> `DashboardViewModel` / `HistoryViewModel` -> telas Compose
+
+Dependencias principais do bootstrap:
+
+- `LocalCredentialDataSource`
+- `LocalCodexAuthDataSource`
+- `LocalOpenCodeUsageDataSource`
+- `LocalKiloUsageDataSource`
+- `LocalUsageHistoryDataSource`
+- `RemoteApiDataSource`
+- `AnthropicRepositoryImpl`
+- `MiniMaxRepositoryImpl`
+- `CodexRepositoryImpl`
+- `DeepSeekRepositoryImpl`
+- `OpenCodeRepositoryImpl`
+- `KiloRepositoryImpl`
+- `UsageHistoryRepositoryImpl`
+- `AppUpdateRepositoryImpl`
+- `DesktopAppUpdateInstaller`
+
+## Stack
+
+- Kotlin Multiplatform
+- Compose Multiplatform Desktop
+- Ktor + OkHttp
+- Kotlinx Serialization
+- Kotlin Coroutines
+- Kotlinx Datetime
+- Multiplatform Settings
+- SQLite JDBC
+- NSIS
+
+## Build e distribuicao
+
+- `desktopJar` gera o JAR executavel.
+- `createDistributable` gera a distribuicao desktop em `build/compose/binaries/main/app/Usage Monitor`.
 - O projeto configura `TargetFormat.Exe`, `TargetFormat.Msi`, `TargetFormat.Deb` e `TargetFormat.Rpm`.
-- A versão atual da app vem de `build.gradle.kts` e é propagada para `CURRENT_APP_VERSION`.
-- Tags `v*` disparam `.github/workflows/release-linux.yml`, que hoje publica artefatos Linux e Windows no GitHub Release.
+- `packageInstaller` empacota o instalador NSIS quando o NSIS estiver instalado.
+- `build-with-icon.ps1` e um fluxo auxiliar Windows para gerar distributable, aplicar icone com `rcedit` e chamar o NSIS manualmente.
+- A versao da app vem de `build.gradle.kts` e e propagada para `CURRENT_APP_VERSION`.
+- Tags `v*` disparam `.github/workflows/release-linux.yml`, que publica artefatos Linux e Windows no GitHub Release.
 
 ## Testes
 
-- `commonTest` cobre domain, mappers, histórico/forecast, layout dos cards e `DashboardViewModel`
-- `desktopTest` cobre datasource SQLite e componentes Compose Desktop do dashboard, histórico e configurações
-- A suíte agregada esperada do projeto é `gradlew.bat allTests`
-
-## Regras de código
-
-- Nomes em inglês; comentários em português.
-- Evitar nested scope functions como `let`, `apply` e `run`; preferir fluxo explícito.
-- Componentes de UI devem ser stateless: dados por parâmetros, eventos por lambdas.
-- `DashboardScreen` é o principal ponto stateful da UI.
-- Mantenha a separação de camadas; não atravesse dependências do domínio.
-- Datasources que leem ficheiros do utilizador devem ficar em `desktopMain`, não em `commonMain`.
-
-## Regras operacionais importantes
-
-- Não hardcode segredos.
-- `MINIMAX_API_KEY` deve vir sempre do ambiente.
-- Falha de uma API não deve cancelar as outras; por isso o uso de `SupervisorJob`.
-- Ao alterar o bootstrap, preserve o fechamento explícito de `viewModel` e `HttpClient`.
-- Ao alterar o dashboard, preserve o comportamento de sucesso parcial do `UiState`.
-- Ao alterar histórico, preserve a retenção local e a regra de ignorar quotas sem reset conhecido.
-- Ao alterar releases, alinhe `build.gradle.kts`, `CURRENT_APP_VERSION`, assets de release e o instalador/plataforma suportada.
+- `commonTest` cobre domain, mappers, historico, forecast e ViewModels.
+- `desktopTest` cobre datasources SQLite, componentes Compose e fluxo de update desktop.
+- A suite agregada esperada do projeto e `gradlew.bat allTests`.
 
 ## Instalador NSIS
 
-Lições importantes já validadas neste projeto:
+Licoes importantes ja validadas neste projeto:
 
-- Use `SetCompressor zlib` no topo do `.nsi`
-- Evite launch bloqueante com `ExecWait` no fluxo de sucesso
+- Use `SetCompressor zlib` no topo do `.nsi`.
+- Evite launch bloqueante com `ExecWait` no fluxo de sucesso.
 
 Sintomas conhecidos:
 
-- Freeze em 99% costuma indicar problema de compressão LZMA
-- Freeze na tela final costuma indicar processo bloqueante
+- Freeze em 99% costuma indicar problema de compressao LZMA.
+- Freeze na tela final costuma indicar processo bloqueante.
 
-Diagnóstico esperado:
+## Regras de codigo
 
-- Analisar logs e imagens com atenção
-- Confirmar o ponto exato do freeze antes de propor correção
+- Nomes em ingles, comentarios em portugues.
+- Evitar nested scope functions como `let`, `apply` e `run`; preferir fluxo explicito.
+- Componentes de UI devem ser stateless: dados por parametros, eventos por lambdas.
+- `DashboardScreen` e o principal ponto stateful da UI.
+- Preserve o comportamento de sucesso parcial do `UiState`.
+- Nao hardcode segredos.
 
-## Convenção de commit
+## Ficheiros relevantes
+
+- `AGENTS.md`: regras operacionais do repositorio.
+- `build.gradle.kts`: build, versao, distribuicao e tarefas do instalador.
+- `src/desktopMain/kotlin/com/usagemonitor/Main.kt`: bootstrap, preferencias e composicao principal.
+- `src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt`: polling, refresh, snapshots e update flow.
+- `src/commonMain/kotlin/com/usagemonitor/data/repository/UsageHistoryRepositoryImpl.kt`: agregacao historica e forecast.
+- `src/commonMain/kotlin/com/usagemonitor/data/datasource/RemoteApiDataSource.kt`: chamadas HTTP remotas.
+- `src/desktopMain/kotlin/com/usagemonitor/data/datasource/LocalObservedModelUsageReader.kt`: leitura das bases locais de OpenCode e Kilo.
+- `src/installer/UsageMonitor.nsi`: script do instalador NSIS.
+- `.github/workflows/release-linux.yml`: pipeline de release.
+
+## Convencao de commit
 
 Antes de commitar:
 
@@ -285,54 +300,6 @@ git config user.name "edilsonvilarinho"
 git config user.email "edilson.vilarinho.messias@gmail.com"
 ```
 
-Regra obrigatória:
+Regra obrigatoria:
 
-- Nunca rodar `git commit` ou `git push` sem pedido explícito do utilizador.
-
-## Automação e documentos auxiliares
-
-Materiais a tratar como fonte de verdade:
-
-- `AGENTS.md`
-- `README.md`
-
-Skills Codex versionadas no repositório:
-
-- `.codex/skills/usage-monitor-commit-push`
-- `.codex/skills/usage-monitor-release`
-- `.codex/skills/usage-monitor-nsis-installer`
-
-Para instalar essas skills em outro PC:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .codex\install-repo-skills.ps1
-```
-
-Opções úteis:
-
-- instalar num `CODEX_HOME` específico: `-TargetCodexHome C:\Users\seu-usuario\.codex`
-- instalar só algumas skills: `-SkillNames usage-monitor-release,usage-monitor-commit-push`
-- se o Codex já estiver aberto no outro PC, reinicie a app ou abra uma nova sessão depois da instalação
-
-Materiais auxiliares já presentes no repositório:
-
-- `.agents/skills/slash/commit-push.md`
-- `.agents/skills/slash/release.md`
-- `.claude/skills/nsis-installer.md`
-- `build-with-icon.ps1`
-
-Observações importantes:
-
-- `docs/research.md` é histórico de descoberta e não substitui o contrato atual implementado no código.
-- Arquivos auxiliares legados como `CLAUDE.md` e `.claude/skills/*` devem ser validados contra `AGENTS.md` e este `README` antes de serem reutilizados.
-
-## Ficheiros relevantes
-
-- `AGENTS.md`: regras de trabalho e manutenção do repositório
-- `build.gradle.kts`: build, versão, distribuição e tarefas do instalador
-- `src/desktopMain/kotlin/com/usagemonitor/Main.kt`: bootstrap manual, preferências e composição principal
-- `src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt`: polling, estado parcial, snapshots e update flow
-- `src/commonMain/kotlin/com/usagemonitor/data/repository/UsageHistoryRepositoryImpl.kt`: agregação histórica e forecast
-- `.github/workflows/release-linux.yml`: pipeline de release para artefatos Linux e Windows
-- `docs/research.md`: pesquisa histórica de integrações e decisões iniciais
-- `src/installer/UsageMonitor.nsi`: script do instalador NSIS
+- Nunca rodar `git commit` ou `git push` sem pedido explicito do utilizador.
