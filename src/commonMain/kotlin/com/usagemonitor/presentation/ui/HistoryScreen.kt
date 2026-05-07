@@ -53,6 +53,7 @@ import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
@@ -404,7 +405,9 @@ private fun OpenCodeHistoryContent(
     language: AppLanguage,
     selectedRange: HistoryRange
 ) {
-    val modelReports = remember(report.series) { buildOpenCodeHistoryGroups(report.series) }
+    val modelReports = remember(report.series, selectedRange) {
+        buildOpenCodeHistoryGroups(report.series, selectedRange)
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
@@ -590,11 +593,10 @@ private fun OpenCodeHistoryCard(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = if (language == AppLanguage.PT) {
-                            "Atividade observada do modelo free na janela semanal."
-                        } else {
-                            "Observed free-model activity in the weekly window."
-                        },
+                        text = openCodeHistorySubtitle(
+                            periodType = modelReport.chartSeries.periodType,
+                            language = language
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1016,7 +1018,10 @@ private data class OpenCodeHistoryModelReport(
     val requests7d: Long
 )
 
-private fun buildOpenCodeHistoryGroups(series: List<UsageHistorySeries>): List<OpenCodeHistoryModelReport> {
+private fun buildOpenCodeHistoryGroups(
+    series: List<UsageHistorySeries>,
+    selectedRange: HistoryRange
+): List<OpenCodeHistoryModelReport> {
     val grouped = linkedMapOf<String, MutableOpenCodeHistoryGroup>()
 
     series.forEach { item ->
@@ -1034,7 +1039,7 @@ private fun buildOpenCodeHistoryGroups(series: List<UsageHistorySeries>): List<O
     }
 
     return grouped.values.mapNotNull { group ->
-        val chartSeries = group.series7d ?: group.series5h ?: return@mapNotNull null
+        val chartSeries = selectOpenCodeChartSeries(group, selectedRange) ?: return@mapNotNull null
         OpenCodeHistoryModelReport(
             modelName = group.modelName,
             chartSeries = chartSeries,
@@ -1049,3 +1054,33 @@ private data class MutableOpenCodeHistoryGroup(
     var series5h: UsageHistorySeries? = null,
     var series7d: UsageHistorySeries? = null
 )
+
+private fun selectOpenCodeChartSeries(
+    group: MutableOpenCodeHistoryGroup,
+    selectedRange: HistoryRange
+): UsageHistorySeries? {
+    return when (selectedRange) {
+        HistoryRange.LAST_24_HOURS -> group.series5h ?: group.series7d
+        HistoryRange.LAST_7_DAYS,
+        HistoryRange.LAST_30_DAYS -> group.series7d ?: group.series5h
+    }
+}
+
+private fun openCodeHistorySubtitle(
+    periodType: PeriodType,
+    language: AppLanguage
+): String {
+    return when (periodType) {
+        PeriodType.INTERVAL -> if (language == AppLanguage.PT) {
+            "Atividade observada do modelo free na janela curta de 5h."
+        } else {
+            "Observed free-model activity in the 5h short window."
+        }
+
+        PeriodType.WEEKLY -> if (language == AppLanguage.PT) {
+            "Atividade observada do modelo free na janela semanal de 7 dias."
+        } else {
+            "Observed free-model activity in the 7-day weekly window."
+        }
+    }
+}

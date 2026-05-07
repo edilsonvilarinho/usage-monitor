@@ -729,17 +729,17 @@ class ComponentTest {
                         ),
                         UsageHistoryPoint(
                             capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
-                            used = 7,
+                            used = 11,
                             total = 0,
-                            rawUsed = 7,
+                            rawUsed = 11,
                             rawTotal = 0,
                             periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
                         )
                     ),
-                    currentDisplayUsed = 7,
+                    currentDisplayUsed = 11,
                     currentDisplayTotal = 0,
                     deltaDisplayUsed = 3,
-                    averageDisplayConsumptionPerHour = 235.0,
+                    averageDisplayConsumptionPerHour = 17.0,
                     currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
                     forecast = UsageForecast.InsufficientData
                 ),
@@ -750,25 +750,25 @@ class ComponentTest {
                     points = listOf(
                         UsageHistoryPoint(
                             capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
-                            used = 4,
+                            used = 16,
                             total = 0,
-                            rawUsed = 4,
+                            rawUsed = 16,
                             rawTotal = 0,
                             periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
                         ),
                         UsageHistoryPoint(
                             capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
-                            used = 7,
+                            used = 29,
                             total = 0,
-                            rawUsed = 7,
+                            rawUsed = 29,
                             rawTotal = 0,
                             periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
                         )
                     ),
-                    currentDisplayUsed = 7,
+                    currentDisplayUsed = 29,
                     currentDisplayTotal = 0,
-                    deltaDisplayUsed = 3,
-                    averageDisplayConsumptionPerHour = 235.0,
+                    deltaDisplayUsed = 13,
+                    averageDisplayConsumptionPerHour = 2.0,
                     currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
                     forecast = UsageForecast.InsufficientData
                 )
@@ -819,7 +819,22 @@ class ComponentTest {
         onAllNodesWithText("MiniMax M2.5 Free 7d").assertCountEquals(0)
         onNodeWithText("Requisições nas últimas 5h").assertIsDisplayed()
         onNodeWithText("Requisições nos últimos 7 dias").assertIsDisplayed()
-        onAllNodesWithText("7 requisições").assertCountEquals(2)
+        onNodeWithText("Atividade observada do modelo free na janela curta de 5h.").assertIsDisplayed()
+        onNodeWithText("3 requisições").assertIsDisplayed()
+        onNodeWithText("17 requisições/h").assertIsDisplayed()
+
+        onNodeWithText("7 dias").performClick()
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
+        onNodeWithText("13 requisições").assertIsDisplayed()
+        onNodeWithText("2 requisições/h").assertIsDisplayed()
         viewModel.onDestroy()
     }
 
