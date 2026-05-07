@@ -7,9 +7,11 @@ import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
+import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
+import com.usagemonitor.domain.repository.KiloRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +48,13 @@ class DashboardViewModel(
         object : OpenCodeRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
                 return Result.failure(IllegalStateException("OpenCode local database is unavailable"))
+            }
+        }
+    ),
+    private val getKiloUsage: GetKiloUsageUseCase = GetKiloUsageUseCase(
+        object : KiloRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Kilo local database is unavailable"))
             }
         }
     ),
@@ -304,6 +313,7 @@ class DashboardViewModel(
             ApiSource.CODEX -> getCodexUsage()
             ApiSource.DEEPSEEK -> getDeepSeekUsage()
             ApiSource.OPENCODE -> getOpenCodeUsage()
+            ApiSource.KILO -> getKiloUsage()
         }
     }
 

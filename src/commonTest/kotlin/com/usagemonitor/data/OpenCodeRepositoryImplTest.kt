@@ -17,6 +17,7 @@ class OpenCodeRepositoryImplTest {
     fun `returns empty quotas when no free activity exists`() = runTest {
         val repository = OpenCodeRepositoryImpl(
             dataSource = object : OpenCodeUsageDataSource {
+                override suspend fun isAvailable(): Boolean = true
                 override suspend fun loadFreeModelUsage(): List<OpenCodeModelUsageSnapshot> = emptyList()
             }
         )
@@ -31,6 +32,7 @@ class OpenCodeRepositoryImplTest {
     fun `maps each free model into 5h and 7d request windows`() = runTest {
         val repository = OpenCodeRepositoryImpl(
             dataSource = object : OpenCodeUsageDataSource {
+                override suspend fun isAvailable(): Boolean = true
                 override suspend fun loadFreeModelUsage(): List<OpenCodeModelUsageSnapshot> {
                     return listOf(
                         OpenCodeModelUsageSnapshot(

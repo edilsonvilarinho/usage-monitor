@@ -1,21 +1,21 @@
 package com.usagemonitor.data.repository
 
-import com.usagemonitor.data.datasource.OpenCodeUsageDataSource
+import com.usagemonitor.data.datasource.KiloUsageDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.repository.OpenCodeRepository
+import com.usagemonitor.domain.repository.KiloRepository
 
-class OpenCodeRepositoryImpl(
-    private val dataSource: OpenCodeUsageDataSource
-) : OpenCodeRepository {
+class KiloRepositoryImpl(
+    private val dataSource: KiloUsageDataSource
+) : KiloRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
             if (!dataSource.isAvailable()) {
-                error("OpenCode local database not found")
+                error("Kilo local database not found")
             }
 
             val snapshots = dataSource.loadFreeModelUsage()
@@ -23,8 +23,8 @@ class OpenCodeRepositoryImpl(
 
             if (snapshots.isEmpty()) {
                 return@runCatching ApiUsageStats(
-                    source = ApiSource.OPENCODE,
-                    apiName = OPEN_CODE_API_NAME,
+                    source = ApiSource.KILO,
+                    apiName = KILO_API_NAME,
                     quotas = emptyList()
                 )
             }
@@ -57,14 +57,14 @@ class OpenCodeRepositoryImpl(
             }
 
             ApiUsageStats(
-                source = ApiSource.OPENCODE,
-                apiName = OPEN_CODE_API_NAME,
+                source = ApiSource.KILO,
+                apiName = KILO_API_NAME,
                 quotas = quotas
             )
         }
     }
 
     private companion object {
-        const val OPEN_CODE_API_NAME = "OpenCode Zen Free"
+        const val KILO_API_NAME = "Kilo Free"
     }
 }

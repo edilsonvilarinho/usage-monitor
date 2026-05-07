@@ -82,6 +82,8 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.isObservedActivitySource
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -359,7 +361,7 @@ fun ApiUsageCard(
                     },
                     label = "cardLayoutMode"
                 ) { minimized ->
-                    if (source == ApiSource.OPENCODE) {
+                    if (source.isObservedActivitySource()) {
                         OpenCodeUsageSummary(
                             source = source,
                             quotas = orderedQuotas,
@@ -412,9 +414,9 @@ private fun OpenCodeUsageSummary(
             )
             Text(
                 text = if (language == AppLanguage.PT) {
-                    "Abra o OpenCode e use um modelo free para começar a preencher este card."
+                    "Abra o ${source.displayName(language)} e use um modelo free para começar a preencher este card."
                 } else {
-                    "Use a free OpenCode model to start populating this card."
+                    "Use a free ${source.displayName(language)} model to start populating this card."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -877,6 +879,7 @@ private fun accentColorFor(source: ApiSource): Color {
         ApiSource.CODEX -> Color(0xFF27BFA3)
         ApiSource.DEEPSEEK -> Color(0xFFC084FC)
         ApiSource.OPENCODE -> Color(0xFF7BD389)
+        ApiSource.KILO -> Color(0xFFE6D84E)
     }
 }
 

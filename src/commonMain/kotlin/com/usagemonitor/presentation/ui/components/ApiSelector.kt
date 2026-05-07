@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.displayName
 
 /**
  * Checkboxes para ativar/desativar o monitoramento de cada API.
@@ -85,11 +86,5 @@ fun ApiCheckboxRow(
 }
 
 private fun apiLabel(api: ApiSource, language: AppLanguage): String {
-    return when (api) {
-        ApiSource.ANTHROPIC -> "Anthropic"
-        ApiSource.MINIMAX -> "MiniMax"
-        ApiSource.CODEX -> "Codex"
-        ApiSource.DEEPSEEK -> "DeepSeek"
-        ApiSource.OPENCODE -> if (language == AppLanguage.PT) "OpenCode Zen Free" else "OpenCode Zen Free"
-    }
+    return api.displayName(language)
 }

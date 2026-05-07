@@ -42,6 +42,7 @@ import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
@@ -85,6 +86,7 @@ private fun sourceLabelFromKey(rawSource: String): String {
         "CODEX" -> "Codex"
         "DEEPSEEK" -> "DeepSeek"
         "OPENCODE" -> "OpenCode Zen Free"
+        "KILO" -> "Kilo Free"
         else -> rawSource
     }
 }
@@ -442,6 +444,7 @@ private fun warningActionFor(
         ApiSource.CODEX -> null
         ApiSource.DEEPSEEK -> null
         ApiSource.OPENCODE -> null
+        ApiSource.KILO -> null
     }
 }
 
@@ -498,6 +501,24 @@ private fun warningFor(
                 source = error.source,
                 title = "OpenCode Zen Free is unavailable",
                 description = "The local OpenCode database was not found. Open OpenCode at least once on this machine to create `~/.local/share/opencode/opencode.db`.",
+                actionLabel = null
+            )
+        }
+    }
+
+    if (error.isKiloLocalIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                source = error.source,
+                title = "Kilo Free indisponível",
+                description = "O banco local do Kilo não foi encontrado. Abra o Kilo pelo menos uma vez nesta máquina para gerar `~/.local/share/kilo/kilo.db`.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                source = error.source,
+                title = "Kilo Free is unavailable",
+                description = "The local Kilo database was not found. Open Kilo at least once on this machine to create `~/.local/share/kilo/kilo.db`.",
                 actionLabel = null
             )
         }

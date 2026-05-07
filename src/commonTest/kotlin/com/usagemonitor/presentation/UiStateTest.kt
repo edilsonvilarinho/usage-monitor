@@ -123,5 +123,9 @@ class UiStateTest {
             "OpenCode Zen Free: local db missing",
             UiApiError(ApiSource.OPENCODE, "local db missing").formattedMessage
         )
+        assertEquals(
+            "Kilo Free: local db missing",
+            UiApiError(ApiSource.KILO, "local db missing").formattedMessage
+        )
     }
 }

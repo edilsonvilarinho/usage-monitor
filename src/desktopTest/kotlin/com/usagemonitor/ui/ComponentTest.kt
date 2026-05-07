@@ -660,6 +660,7 @@ class ComponentTest {
         onNodeWithText("Language").assertIsDisplayed()
         onNodeWithText("Monitored APIs").assertIsDisplayed()
         onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
+        onNodeWithText("Kilo Free").assertIsDisplayed()
         onNodeWithText("Close").assertIsDisplayed()
     }
 
@@ -704,6 +705,50 @@ class ComponentTest {
         onNodeWithText("4 requisições").assertIsDisplayed()
         onNodeWithText("Últimas 5h").assertIsDisplayed()
         onNodeWithText("7d: 19").assertIsDisplayed()
+        onAllNodesWithText("0%").assertCountEquals(0)
+    }
+
+    @Test
+    fun `ApiUsageCard renders Kilo free model activity without percentage gauges`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.KILO,
+                    apiName = "Kilo Free",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Auto Free Kilo Gateway 5h",
+                            used = 7L,
+                            total = 0L,
+                            periodEndAt = Instant.parse("2026-05-07T15:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.REQUESTS
+                        ),
+                        QuotaInfo(
+                            label = "Auto Free Kilo Gateway 7d",
+                            used = 31L,
+                            total = 0L,
+                            periodEndAt = Instant.parse("2026-05-07T15:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.REQUESTS
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Kilo Free").assertIsDisplayed()
+        onNodeWithText("Auto Free Kilo Gateway").assertIsDisplayed()
+        onNodeWithText("7 requisições").assertIsDisplayed()
+        onNodeWithText("Últimas 5h").assertIsDisplayed()
+        onNodeWithText("7d: 31").assertIsDisplayed()
         onAllNodesWithText("0%").assertCountEquals(0)
     }
 
@@ -835,6 +880,141 @@ class ComponentTest {
         onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
         onNodeWithText("13 requisições").assertIsDisplayed()
         onNodeWithText("2 requisições/h").assertIsDisplayed()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `HistoryScreen renders one Kilo chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.KILO,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T14:33:00Z"),
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "Auto Free Kilo Gateway 5h",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.REQUESTS,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
+                            used = 6,
+                            total = 0,
+                            rawUsed = 6,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
+                            used = 15,
+                            total = 0,
+                            rawUsed = 15,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 15,
+                    currentDisplayTotal = 0,
+                    deltaDisplayUsed = 5,
+                    averageDisplayConsumptionPerHour = 19.0,
+                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
+                    forecast = UsageForecast.InsufficientData
+                ),
+                UsageHistorySeries(
+                    quotaLabel = "Auto Free Kilo Gateway 7d",
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.REQUESTS,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
+                            used = 20,
+                            total = 0,
+                            rawUsed = 20,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        ),
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
+                            used = 38,
+                            total = 0,
+                            rawUsed = 38,
+                            rawTotal = 0,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 38,
+                    currentDisplayTotal = 0,
+                    deltaDisplayUsed = 18,
+                    averageDisplayConsumptionPerHour = 3.0,
+                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
+                    forecast = UsageForecast.InsufficientData
+                )
+            )
+        )
+        val requestedRanges = mutableListOf<HistoryRange>()
+
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                    override suspend fun recordSnapshot(
+                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
+                        capturedAt: Instant
+                    ) = Unit
+
+                    override suspend fun getHistoryReport(
+                        source: ApiSource,
+                        range: HistoryRange,
+                        now: Instant
+                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
+                        requestedRanges += range
+                        return report
+                    }
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.KILO))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {},
+                    focusedSource = ApiSource.KILO,
+                    showSourceSelector = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Auto Free Kilo Gateway").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Auto Free Kilo Gateway").assertIsDisplayed()
+        onAllNodesWithText("Auto Free Kilo Gateway 5h").assertCountEquals(0)
+        onAllNodesWithText("Auto Free Kilo Gateway 7d").assertCountEquals(0)
+        onNodeWithText("Requisições nas últimas 5h").assertIsDisplayed()
+        onNodeWithText("Requisições nos últimos 7 dias").assertIsDisplayed()
+        onNodeWithText("Atividade observada do modelo free na janela curta de 5h.").assertIsDisplayed()
+        onNodeWithText("5 requisições").assertIsDisplayed()
+        onNodeWithText("19 requisições/h").assertIsDisplayed()
+
+        onNodeWithText("7 dias").performClick()
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
+        onNodeWithText("18 requisições").assertIsDisplayed()
+        onNodeWithText("3 requisições/h").assertIsDisplayed()
+        assertTrue(HistoryRange.LAST_24_HOURS in requestedRanges)
+        assertTrue(HistoryRange.LAST_7_DAYS in requestedRanges)
         viewModel.onDestroy()
     }
 

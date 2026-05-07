@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiUsageStats
 
 /**
@@ -56,18 +57,15 @@ data class UiApiError(
     val isOpenCodeLocalIssue: Boolean
         get() = source == ApiSource.OPENCODE && isOpenCodeLocalMessage(message)
 
+    val isKiloLocalIssue: Boolean
+        get() = source == ApiSource.KILO && isKiloLocalMessage(message)
+
     val isConfigurationIssue: Boolean
-        get() = isAnthropicCredentialIssue || isMiniMaxEnvVarIssue || isOpenCodeLocalIssue
+        get() = isAnthropicCredentialIssue || isMiniMaxEnvVarIssue || isOpenCodeLocalIssue || isKiloLocalIssue
 }
 
 private fun sourceLabel(source: ApiSource): String {
-    return when (source) {
-        ApiSource.ANTHROPIC -> "Anthropic"
-        ApiSource.MINIMAX -> "MiniMax"
-        ApiSource.CODEX -> "Codex"
-        ApiSource.DEEPSEEK -> "DeepSeek"
-        ApiSource.OPENCODE -> "OpenCode Zen Free"
-    }
+    return source.displayName()
 }
 
 // Marcadores usados para classificar erros como problemas de configuração
@@ -86,6 +84,10 @@ private val OPENCODE_LOCAL_MARKERS = listOf(
     "OpenCode local database not found",
     "OpenCode local database is unavailable"
 )
+private val KILO_LOCAL_MARKERS = listOf(
+    "Kilo local database not found",
+    "Kilo local database is unavailable"
+)
 
 private fun isAnthropicCredentialMessage(message: String): Boolean {
     return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
@@ -100,4 +102,8 @@ private fun isMiniMaxEnvVarMessage(message: String): Boolean {
 
 private fun isOpenCodeLocalMessage(message: String): Boolean {
     return OPENCODE_LOCAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isKiloLocalMessage(message: String): Boolean {
+    return KILO_LOCAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }

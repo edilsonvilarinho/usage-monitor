@@ -18,6 +18,7 @@ import androidx.compose.ui.window.rememberDialogState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
+import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
@@ -25,9 +26,11 @@ import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
+import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
+import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
@@ -35,6 +38,7 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
+import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
@@ -145,6 +149,7 @@ fun main() = application {
     val remoteApiDataSource = remember(httpClient) { RemoteApiDataSource(httpClient) }
     val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
     val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
+    val kiloUsageDataSource = remember { LocalKiloUsageDataSource() }
 
     val anthropicRepository = remember(credentialDataSource, remoteApiDataSource) {
         AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
@@ -160,6 +165,9 @@ fun main() = application {
     }
     val openCodeRepository = remember(openCodeUsageDataSource) {
         OpenCodeRepositoryImpl(openCodeUsageDataSource)
+    }
+    val kiloRepository = remember(kiloUsageDataSource) {
+        KiloRepositoryImpl(kiloUsageDataSource)
     }
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
@@ -177,12 +185,13 @@ fun main() = application {
     }
 
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
             getCodexUsage = GetCodexUsageUseCase(codexRepository),
             getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepository),
+            getKiloUsage = GetKiloUsageUseCase(kiloRepository),
             getOpenCodeUsage = GetOpenCodeUsageUseCase(openCodeRepository),
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
@@ -417,13 +426,7 @@ private fun writeApiSourceCollection(
 }
 
 private fun historyWindowTitle(source: ApiSource, language: AppLanguage): String {
-    val sourceName = when (source) {
-        ApiSource.ANTHROPIC -> "Anthropic"
-        ApiSource.MINIMAX -> "MiniMax"
-        ApiSource.CODEX -> "Codex"
-        ApiSource.DEEPSEEK -> "DeepSeek"
-        ApiSource.OPENCODE -> "OpenCode Zen Free"
-    }
+    val sourceName = source.displayName(language)
 
     return if (language == AppLanguage.PT) {
         "Histórico - $sourceName"

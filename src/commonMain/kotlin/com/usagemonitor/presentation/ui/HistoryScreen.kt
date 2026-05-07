@@ -57,6 +57,8 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -180,7 +182,7 @@ fun HistoryScreen(
                                         language = language,
                                         selectedRange = current.selectedRange
                                     )
-                                } else if (current.report.source == ApiSource.OPENCODE) {
+                                } else if (current.report.source.isObservedActivitySource()) {
                                     OpenCodeHistoryContent(
                                         report = current.report,
                                         accentColor = accentColor,
@@ -814,6 +816,7 @@ private fun accentColorForHistorySource(source: ApiSource): Color {
         ApiSource.CODEX     -> Color(0xFF27BFA3)
         ApiSource.DEEPSEEK  -> Color(0xFFC084FC)
         ApiSource.OPENCODE  -> Color(0xFF7BD389)
+        ApiSource.KILO      -> Color(0xFFE6D84E)
     }
 }
 
@@ -826,13 +829,7 @@ private fun rangeLabel(range: HistoryRange, language: AppLanguage): String {
 }
 
 private fun sourceLabel(source: ApiSource): String {
-    return when (source) {
-        ApiSource.ANTHROPIC -> "Anthropic"
-        ApiSource.MINIMAX -> "MiniMax"
-        ApiSource.CODEX -> "Codex"
-        ApiSource.DEEPSEEK -> "DeepSeek"
-        ApiSource.OPENCODE -> "OpenCode Zen Free"
-    }
+    return source.displayName()
 }
 
 private fun historyTitle(
@@ -864,7 +861,7 @@ private fun historySubtitle(
         }
     }
 
-    if (selectedSource == ApiSource.OPENCODE) {
+    if (selectedSource?.isObservedActivitySource() == true) {
         return if (language == AppLanguage.PT) {
             "Atividade observada por modelo free nas janelas de 5h e 7d."
         } else {
