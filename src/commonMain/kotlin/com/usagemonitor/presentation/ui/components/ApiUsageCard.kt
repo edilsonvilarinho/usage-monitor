@@ -780,7 +780,7 @@ private fun ExpandedQuotaSummary(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.Top
     ) {
         for (index in quotas.indices) {
@@ -795,10 +795,6 @@ private fun ExpandedQuotaSummary(
                     language = language
                 )
             }
-
-            if (index != quotas.lastIndex) {
-                Spacer(modifier = Modifier.width(14.dp))
-            }
         }
     }
 }
@@ -812,7 +808,8 @@ private fun QuotaColumn(
 ) {
     Column(
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         UsageArcChart(
             used = quota.used,
@@ -826,7 +823,15 @@ private fun QuotaColumn(
             )
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = expandedQuotaTitle(quota = quota, language = language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
 
         if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
             Text(
@@ -837,19 +842,6 @@ private fun QuotaColumn(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
             )
-        } else {
-            Spacer(modifier = Modifier.height(20.dp))
-        }
-
-        if (quota.periodType == PeriodType.WEEKLY) {
-            Text(
-                text = if (language == AppLanguage.PT) "Semanal" else "Weekly",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-        } else {
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
         Text(
@@ -859,6 +851,17 @@ private fun QuotaColumn(
             textAlign = TextAlign.Center,
             maxLines = 2
         )
+    }
+}
+
+private fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String {
+    if (quota.unit == UsageUnit.CURRENCY_USD) {
+        return quota.label
+    }
+
+    return when (quota.periodType) {
+        PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Sessão 5h" else "5h session"
+        PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Semanal" else "Weekly"
     }
 }
 

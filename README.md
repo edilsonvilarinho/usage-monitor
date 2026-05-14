@@ -154,7 +154,7 @@ Observacoes:
 ### Update da app
 
 - A app consulta a release mais recente em `edilsonvilarinho/usage-monitor`.
-- Em Windows, tenta preparar instalacao automatica a partir do asset `.msi`.
+- Em Windows, tenta preparar a instalacao automatica a partir do instalador publicado no release, preferindo o `UsageMonitor-Setup-<versao>.exe` do NSIS e mantendo fallback para `.msi`.
 - Em Linux, a instalacao automatica exige `.deb`, `pkexec`, `dpkg` e instalacao previa via pacote DEB publicado.
 - Em plataformas sem suporte automatico, a UI aponta para a release publicada.
 

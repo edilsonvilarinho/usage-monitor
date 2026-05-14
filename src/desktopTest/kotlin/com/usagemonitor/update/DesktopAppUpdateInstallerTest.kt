@@ -56,4 +56,26 @@ class DesktopAppUpdateInstallerTest {
         assertEquals("/usr/bin/usage-monitor", support.executablePath)
         assertEquals(null, support.failureMessage)
     }
+
+    @Test
+    fun `windows launcher script uses setup executable directly`() {
+        val script = buildWindowsLauncherScript(
+            processId = 42,
+            installerPath = """C:\temp\UsageMonitor-Setup-13.0.0.exe"""
+        )
+
+        assertTrue(script.contains("Start-Process -FilePath \$installerPath"))
+        assertFalse(script.contains("msiexec.exe"))
+    }
+
+    @Test
+    fun `windows launcher script uses msiexec for msi installers`() {
+        val script = buildWindowsLauncherScript(
+            processId = 42,
+            installerPath = """C:\temp\UsageMonitor-13.0.0.msi"""
+        )
+
+        assertTrue(script.contains("""Start-Process -FilePath "msiexec.exe""""))
+        assertTrue(script.contains("@('/i', \$installerPath)"))
+    }
 }

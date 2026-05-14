@@ -66,12 +66,13 @@ private fun sanitize(version: String): String {
 
 private fun prepareWindowsUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
     val downloadUrl = update.windowsInstallerDownloadUrl ?: return Result.failure(
-        IllegalStateException("No Windows MSI installer was published for version ${update.version}.")
+        IllegalStateException("No Windows installer was published for version ${update.version}.")
     )
 
     return Result.runCatching {
         val updateDirectory = Files.createTempDirectory("usage-monitor-update-${sanitize(update.version)}").toFile()
-        val installerFile = File(updateDirectory, "UsageMonitor-${sanitize(update.version)}.msi")
+        val installerExtension = inferWindowsInstallerExtension(downloadUrl)
+        val installerFile = File(updateDirectory, "UsageMonitor-${sanitize(update.version)}$installerExtension")
         val launcherScript = File(updateDirectory, "InstallUsageMonitorUpdate.ps1")
 
         downloadInstaller(downloadUrl, installerFile)
@@ -152,8 +153,9 @@ private fun downloadInstaller(downloadUrl: String, destination: File) {
     }
 }
 
-private fun buildWindowsLauncherScript(processId: Long, installerPath: String): String {
+internal fun buildWindowsLauncherScript(processId: Long, installerPath: String): String {
     val escapedInstallerPath = installerPath.replace("'", "''")
+    val installerLaunchCommand = buildWindowsInstallerLaunchCommand(installerPath)
 
     return """
         ${'$'}targetPid = $processId
@@ -163,8 +165,26 @@ private fun buildWindowsLauncherScript(processId: Long, installerPath: String): 
             Start-Sleep -Seconds 1
         }
 
-        Start-Process -FilePath "msiexec.exe" -ArgumentList @('/i', ${'$'}installerPath)
+        $installerLaunchCommand
     """.trimIndent()
+}
+
+private fun inferWindowsInstallerExtension(downloadUrl: String): String {
+    val downloadPath = runCatching { URI(downloadUrl).path }.getOrDefault(downloadUrl)
+
+    return when {
+        downloadPath.endsWith(".msi", ignoreCase = true) -> ".msi"
+        downloadPath.endsWith(".exe", ignoreCase = true) -> ".exe"
+        else -> ".exe"
+    }
+}
+
+private fun buildWindowsInstallerLaunchCommand(installerPath: String): String {
+    return if (installerPath.endsWith(".msi", ignoreCase = true)) {
+        """Start-Process -FilePath "msiexec.exe" -ArgumentList @('/i', ${'$'}installerPath)"""
+    } else {
+        "Start-Process -FilePath ${'$'}installerPath"
+    }
 }
 
 private fun buildLinuxLauncherScript(processId: Long, installerPath: String, executablePath: String): String {

@@ -66,7 +66,25 @@ class AppUpdateRepositoryImplTest {
     }
 
     @Test
-    fun `picks msi asset for windows installer url`() = runTest {
+    fun `prefers NSIS setup exe for windows installer url`() = runTest {
+        val release = release(
+            tag = "v9.0.0",
+            assets = listOf(
+                asset("UsageMonitor-Setup-9.0.0.exe", "https://example.test/win-setup.exe"),
+                asset("Usage.Monitor-9.0.0.exe", "https://example.test/win-jpackage.exe"),
+                asset("UsageMonitor-9.0.0.msi", "https://example.test/win.msi"),
+                asset("UsageMonitor-9.0.0.deb", "https://example.test/lin.deb")
+            )
+        )
+        val repo = AppUpdateRepositoryImpl(fakeRemote(release))
+
+        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion).getOrNull()
+
+        assertEquals("https://example.test/win-setup.exe", update?.windowsInstallerDownloadUrl)
+    }
+
+    @Test
+    fun `falls back to msi asset for windows installer url when setup exe is unavailable`() = runTest {
         val release = release(
             tag = "v9.0.0",
             assets = listOf(

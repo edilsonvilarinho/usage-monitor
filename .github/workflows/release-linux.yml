@@ -145,6 +145,10 @@ jobs:
         with:
           gradle-version: 8.6
 
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis -y
+
       - name: Extract version
         id: version
         shell: pwsh
@@ -156,7 +160,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat createDistributable packageDistributionForCurrentOS
+          .\gradlew.bat createDistributable packageDistributionForCurrentOS packageInstaller
 
           $version = "${{ steps.version.outputs.VERSION }}"
           $appRoot = "build\compose\binaries\main\app"
@@ -170,6 +174,7 @@ jobs:
 
           Compress-Archive -Path "$appDir\*" -DestinationPath "dist-build\usage-monitor_${version}_windows_x64.zip" -Force
           Get-ChildItem -Recurse -File build\compose\binaries -Include *.exe,*.msi | Copy-Item -Destination dist-build -Force
+          Get-ChildItem -File build\installer -Filter *.exe | Copy-Item -Destination dist-build -Force
           Get-ChildItem dist-build | Format-Table Name,Length
 
       - name: Upload Windows artifacts

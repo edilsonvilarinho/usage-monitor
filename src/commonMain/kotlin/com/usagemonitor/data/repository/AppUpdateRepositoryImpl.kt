@@ -1,6 +1,7 @@
 package com.usagemonitor.data.repository
 
 import com.usagemonitor.data.datasource.RemoteApiDataSource
+import com.usagemonitor.data.dto.GitHubReleaseAssetDto
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.repository.AppUpdateRepository
 
@@ -26,15 +27,27 @@ class AppUpdateRepositoryImpl(
             AppUpdateInfo(
                 version = latestVersion,
                 releasePageUrl = latestRelease.htmlUrl,
-                windowsInstallerDownloadUrl = latestRelease.assets.firstOrNull { asset ->
-                    asset.name.endsWith(".msi", ignoreCase = true)
-                }?.browserDownloadUrl,
+                windowsInstallerDownloadUrl = pickWindowsInstallerDownloadUrl(latestRelease.assets),
                 linuxDebInstallerDownloadUrl = latestRelease.assets.firstOrNull { asset ->
                     asset.name.endsWith(".deb", ignoreCase = true)
                 }?.browserDownloadUrl
             )
         }
     }
+}
+
+internal fun pickWindowsInstallerDownloadUrl(assets: List<GitHubReleaseAssetDto>): String? {
+    val setupExecutable = assets.firstOrNull { asset ->
+        asset.name.endsWith(".exe", ignoreCase = true) &&
+            asset.name.contains("setup", ignoreCase = true)
+    }
+    if (setupExecutable != null) {
+        return setupExecutable.browserDownloadUrl
+    }
+
+    return assets.firstOrNull { asset ->
+        asset.name.endsWith(".msi", ignoreCase = true)
+    }?.browserDownloadUrl
 }
 
 internal fun isVersionNewer(candidateVersion: String, currentVersion: String): Boolean {

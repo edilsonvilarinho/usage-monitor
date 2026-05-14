@@ -227,6 +227,7 @@ class ComponentTest {
         onNodeWithText("Anthropic").assertIsDisplayed()
         onNodeWithText("0%").assertIsDisplayed()
         onNodeWithText("98%").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
         onAllNodesWithText("0/4K tok").assertCountEquals(0)
         onAllNodesWithText("39K/40K tok").assertCountEquals(0)
         onNodeWithText("Semanal").assertIsDisplayed()
@@ -260,7 +261,43 @@ class ComponentTest {
 
         onNodeWithText("MiniMax").assertIsDisplayed()
         onNodeWithText("26%").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
         onNodeWithText("12/45 req").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard shows balance title for currency quotas`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.DEEPSEEK,
+                    apiName = "DeepSeek",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Saldo",
+                            used = 0L,
+                            total = 385L,
+                            periodEndAt = Instant.parse("2026-04-28T15:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.CURRENCY_USD,
+                            rawUsed = 385L,
+                            rawTotal = 385L
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("DeepSeek").assertIsDisplayed()
+        onNodeWithText("Saldo").assertIsDisplayed()
+        onNodeWithText("\$3.85").assertIsDisplayed()
+        onNodeWithText("Saldo não expira").assertIsDisplayed()
     }
 
     @Test
