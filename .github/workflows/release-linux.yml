@@ -1,4 +1,4 @@
-name: Release Desktop Packages
+﻿name: Release Desktop Packages
 
 on:
   push:
@@ -160,21 +160,12 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat createDistributable packageDistributionForCurrentOS packageInstaller
+          .\gradlew.bat packageMsi packageInstaller
 
           $version = "${{ steps.version.outputs.VERSION }}"
-          $appRoot = "build\compose\binaries\main\app"
-          $appDir = Join-Path $appRoot "Usage Monitor"
-
           New-Item -ItemType Directory -Force -Path dist-build | Out-Null
-
-          if (-not (Test-Path $appDir)) {
-            throw "Expected distributable directory not found: $appDir"
-          }
-
-          Compress-Archive -Path "$appDir\*" -DestinationPath "dist-build\usage-monitor_${version}_windows_x64.zip" -Force
-          Get-ChildItem -Recurse -File build\compose\binaries -Include *.exe,*.msi | Copy-Item -Destination dist-build -Force
-          Get-ChildItem -File build\installer -Filter *.exe | Copy-Item -Destination dist-build -Force
+          Get-ChildItem -Recurse -File build\compose\binaries -Filter *.msi | Copy-Item -Destination dist-build -Force
+          Get-ChildItem -File build\installer -Filter "UsageMonitor-Setup-*.exe" | Copy-Item -Destination dist-build -Force
           Get-ChildItem dist-build | Format-Table Name,Length
 
       - name: Upload Windows artifacts
