@@ -5,7 +5,9 @@ import java.io.File
 object AutoStartManager {
 
     private const val WINDOWS_RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    private const val WINDOWS_UNINSTALL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Usage Monitor"
     private const val WINDOWS_VALUE_NAME = "UsageMonitor"
+    private const val WINDOWS_INSTALL_LOCATION_VALUE = "InstallLocation"
     private const val LINUX_AUTOSTART_FILE = "usage-monitor.desktop"
     private const val APP_DISPLAY_NAME = "Usage Monitor"
 
@@ -110,35 +112,99 @@ object AutoStartManager {
         return File(configHome, "autostart/$LINUX_AUTOSTART_FILE")
     }
 
-    internal fun resolveExecutablePath(): String? {
-        val userDir = System.getProperty("user.dir")
-        val candidates = buildList {
-            System.getProperty("jpackage.app-path")?.let(::add)
-            ProcessHandle.current().info().command().orElse(null)?.let(::add)
+    internal fun resolveExecutablePath(
+        environment: RuntimeEnvironment = RuntimeEnvironment.current()
+    ): String? {
+        val candidates = buildExecutableCandidates(environment)
+        return candidates.firstOrNull { candidate ->
+            val file = File(candidate)
+            file.exists() && file.isFile && !isJavaLauncher(file.name)
+        }?.let { File(it).absolutePath }
+    }
 
-            when (currentPlatform()) {
-                Platform.WINDOWS -> {
-                    add("$userDir\\Usage Monitor.exe")
-                    add("$userDir\\UsageMonitor.exe")
-                }
+    internal fun buildExecutableCandidates(environment: RuntimeEnvironment): List<String> {
+        val launcherNames = launcherNamesFor(environment.platform)
+        val candidates = linkedSetOf<String>()
 
-                Platform.LINUX -> {
-                    add("$userDir/Usage Monitor")
-                    add("$userDir/usage-monitor")
-                    add("$userDir/bin/Usage Monitor")
-                    add("$userDir/bin/usage-monitor")
-                }
+        addDirectCandidate(candidates, environment.jpackageAppPath)
+        addDirectCandidate(candidates, environment.processCommand)
 
-                Platform.OTHER -> Unit
+        environment.appDirectories.forEach { directory ->
+            launcherNames.forEach { launcherName ->
+                addDirectCandidate(candidates, File(directory, launcherName).path)
             }
         }
 
-        return candidates
-            .map(::File)
-            .firstOrNull { file ->
-                file.exists() && file.isFile && !isJavaLauncher(file.name)
+        if (environment.platform == Platform.LINUX) {
+            listOf(
+                "/usr/bin/usage-monitor",
+                "/usr/local/bin/usage-monitor",
+                "/opt/usage-monitor/bin/usage-monitor",
+                "/opt/Usage Monitor/bin/Usage Monitor",
+                "/opt/Usage Monitor/Usage Monitor"
+            ).forEach { path ->
+                addDirectCandidate(candidates, path)
             }
-            ?.absolutePath
+        }
+
+        return candidates.toList()
+    }
+
+    private fun launcherNamesFor(platform: Platform): List<String> {
+        return when (platform) {
+            Platform.WINDOWS -> listOf(
+                "Usage Monitor.exe",
+                "UsageMonitor.exe"
+            )
+
+            Platform.LINUX -> listOf(
+                "usage-monitor",
+                "Usage Monitor",
+                "bin/usage-monitor",
+                "bin/Usage Monitor"
+            )
+
+            Platform.OTHER -> emptyList()
+        }
+    }
+
+    private fun addDirectCandidate(target: MutableSet<String>, path: String?) {
+        val normalizedPath = path
+            ?.trim()
+            ?.trim('"')
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        target += normalizedPath
+    }
+
+    private fun readWindowsInstallLocation(): String? {
+        if (currentPlatform() != Platform.WINDOWS) {
+            return null
+        }
+
+        val result = runCommand(
+            listOf(
+                "reg",
+                "query",
+                WINDOWS_UNINSTALL_KEY,
+                "/v",
+                WINDOWS_INSTALL_LOCATION_VALUE
+            )
+        )
+        if (result.exitCode != 0) {
+            return null
+        }
+
+        return result.output.lineSequence()
+            .map(String::trim)
+            .firstNotNullOfOrNull { line ->
+                Regex("""^InstallLocation\s+REG_\w+\s+(.+)$""")
+                    .find(line)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+            }
     }
 
     private fun isJavaLauncher(fileName: String): Boolean {
@@ -167,10 +233,50 @@ object AutoStartManager {
         }
     }
 
-    private enum class Platform {
+    internal enum class Platform {
         WINDOWS,
         LINUX,
         OTHER
+    }
+
+    internal data class RuntimeEnvironment(
+        val platform: Platform,
+        val processCommand: String?,
+        val jpackageAppPath: String?,
+        val appDirectories: List<String>
+    ) {
+        companion object {
+            fun current(): RuntimeEnvironment {
+                val platform = currentPlatform()
+                val userDir = System.getProperty("user.dir")
+                val skikoLibraryPath = System.getProperty("skiko.library.path")
+                val composeResourcesDir = System.getProperty("compose.application.resources.dir")
+                val windowsInstallLocation = readWindowsInstallLocation()
+
+                val appDirectories = linkedSetOf<String>()
+                addDirectoryCandidate(appDirectories, skikoLibraryPath)
+                addDirectoryCandidate(appDirectories, composeResourcesDir?.let { File(it).parent })
+                addDirectoryCandidate(appDirectories, windowsInstallLocation)
+                addDirectoryCandidate(appDirectories, ProcessHandle.current().info().command().orElse(null)?.let { File(it).parent })
+                addDirectoryCandidate(appDirectories, userDir)
+
+                return RuntimeEnvironment(
+                    platform = platform,
+                    processCommand = ProcessHandle.current().info().command().orElse(null),
+                    jpackageAppPath = System.getProperty("jpackage.app-path"),
+                    appDirectories = appDirectories.toList()
+                )
+            }
+
+            private fun addDirectoryCandidate(target: MutableSet<String>, path: String?) {
+                val normalizedPath = path
+                    ?.trim()
+                    ?.trim('"')
+                    ?.takeIf { it.isNotBlank() }
+                    ?: return
+                target += normalizedPath
+            }
+        }
     }
 
     private data class CommandResult(

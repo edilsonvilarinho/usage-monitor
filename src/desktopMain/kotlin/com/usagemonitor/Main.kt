@@ -3,11 +3,13 @@ package com.usagemonitor
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
@@ -143,6 +145,9 @@ fun main() = application {
     val enabledApis = remember { MutableStateFlow(persistedApis) }
     var cardOrder by remember { mutableStateOf(persistedCardOrder) }
     var minimizedCards by remember { mutableStateOf(persistedMinimizedCards) }
+    val persistedMainWindowState = remember(settings) {
+        readPersistedMainWindowState(settings)
+    }
 
     val credentialDataSource = remember(httpClient) { LocalCredentialDataSource(httpClient) }
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
@@ -228,10 +233,25 @@ fun main() = application {
     }
 
     val iconImage = remember { loadWindowIcon() }
-    val mainWindowState = rememberWindowState()
-    LaunchedEffect(mainWindowState) {
-        snapshotFlow { mainWindowState.isMinimized }
-            .collect { minimized -> isAppVisible.value = !minimized }
+    val mainWindowState = rememberPersistedMainWindowState(persistedMainWindowState)
+    LaunchedEffect(mainWindowState, settings) {
+        snapshotFlow {
+            Triple(
+                mainWindowState.isMinimized,
+                mainWindowState.size,
+                mainWindowState.placement
+            )
+        }.collect { (isMinimized, size, placement) ->
+            isAppVisible.value = !isMinimized
+            persistMainWindowState(
+                settings = settings,
+                snapshot = MainWindowSnapshot(
+                    widthDp = size.width.value,
+                    heightDp = size.height.value,
+                    placement = placement
+                )
+            )
+        }
     }
     val enabledApisState by enabledApis.collectAsState()
     val shouldExitForUpdate by viewModel.shouldExitForUpdate.collectAsState()
@@ -381,9 +401,13 @@ fun main() = application {
                             settings.putString(LANGUAGE_KEY, selectedLanguage.name)
                         },
                         onAutoStartChange = { enabled ->
-                            autoStartEnabled = enabled
-                            settings.putBoolean(AUTO_START_KEY, enabled)
-                            AutoStartManager.setAutoStart(enabled)
+                            val updatedState = if (AutoStartManager.setAutoStart(enabled)) {
+                                enabled
+                            } else {
+                                AutoStartManager.isAutoStartEnabled()
+                            }
+                            autoStartEnabled = updatedState
+                            settings.putBoolean(AUTO_START_KEY, updatedState)
                         },
                         onApiToggle = { api, checked ->
                             val updatedApis = if (checked) {
@@ -400,6 +424,29 @@ fun main() = application {
             }
         }
     }
+}
+
+@Composable
+private fun rememberPersistedMainWindowState(
+    persistedState: PersistedMainWindowState
+) = when {
+    persistedState.widthDp != null && persistedState.heightDp != null -> {
+        rememberWindowState(
+            placement = persistedState.composePlacement,
+            size = DpSize(
+                width = persistedState.composeWidth,
+                height = persistedState.composeHeight
+            )
+        )
+    }
+
+    persistedState.placement == PersistedWindowPlacement.MAXIMIZED -> {
+        rememberWindowState(
+            placement = persistedState.composePlacement
+        )
+    }
+
+    else -> rememberWindowState()
 }
 
 private fun readApiSourceCollection(
