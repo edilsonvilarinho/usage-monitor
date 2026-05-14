@@ -101,11 +101,43 @@ class UiStateTest {
     }
 
     @Test
+    fun `isMiniMaxInactivePlanIssue true for friendly PT message`() {
+        val error = UiApiError(
+            source = ApiSource.MINIMAX,
+            message = "MiniMax sem plano/token ativo. Ative um plano ou gere um token com assinatura válida e tente novamente."
+        )
+        assertTrue(error.isMiniMaxInactivePlanIssue)
+    }
+
+    @Test
+    fun `isMiniMaxInactivePlanIssue true for raw API message`() {
+        val error = UiApiError(
+            source = ApiSource.MINIMAX,
+            message = "no active token plan subscription"
+        )
+        assertTrue(error.isMiniMaxInactivePlanIssue)
+    }
+
+    @Test
+    fun `isMiniMaxInactivePlanIssue false when source is Anthropic`() {
+        val error = UiApiError(
+            source = ApiSource.ANTHROPIC,
+            message = "no active token plan subscription"
+        )
+        assertFalse(error.isMiniMaxInactivePlanIssue)
+    }
+
+    @Test
     fun `isConfigurationIssue true if any sub-check passes`() {
         val anthropicError = UiApiError(source = ApiSource.ANTHROPIC, message = "Credenciais não encontradas")
         val miniMaxError = UiApiError(source = ApiSource.MINIMAX, message = "MINIMAX_API_KEY not configured")
+        val inactivePlanError = UiApiError(
+            source = ApiSource.MINIMAX,
+            message = "MiniMax sem plano/token ativo"
+        )
         assertTrue(anthropicError.isConfigurationIssue)
         assertTrue(miniMaxError.isConfigurationIssue)
+        assertTrue(inactivePlanError.isConfigurationIssue)
     }
 
     @Test

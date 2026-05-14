@@ -443,6 +443,47 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `classifies MiniMax inactive plan for persistent warning without toast`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                IllegalStateException("MiniMax sem plano/token ativo. Ative um plano ou gere um token com assinatura válida e tente novamente.")
+            )
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        assertEquals(1, state.errors.size)
+        assertEquals(ApiSource.MINIMAX, state.errors.first().source)
+        assertTrue(state.errors.first().isMiniMaxInactivePlanIssue)
+        assertEquals(null, viewModel.toastMessage.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `Success state contains correct API data`() = runTest {
         val viewModel = successViewModel(mutableListOf())
         viewModel.refresh()

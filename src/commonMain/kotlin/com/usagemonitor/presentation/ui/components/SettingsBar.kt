@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -355,7 +354,6 @@ fun SettingsDialogContent(
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onApiToggle: (ApiSource, Boolean) -> Unit,
-    onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -428,15 +426,6 @@ fun SettingsDialogContent(
             }
 
             HorizontalDivider()
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Button(onClick = onClose) {
-                    Text(if (currentLanguage == AppLanguage.PT) "Fechar" else "Close")
-                }
-            }
         }
     }
 }

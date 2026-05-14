@@ -19,7 +19,7 @@ import kotlinx.datetime.Instant
 object MiniMaxMapper {
 
     fun toUsageStats(response: MiniMaxTokenPlanResponse): ApiUsageStats {
-        val quotas = response.modelRemains
+        val quotas = response.modelRemains.orEmpty()
             .filter { it.modelName == "MiniMax-M*" }
             .flatMap { dto ->
             val periodEnd = Instant.fromEpochMilliseconds(dto.endTime)

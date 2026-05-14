@@ -17,7 +17,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class MiniMaxTokenPlanResponse(
-    @SerialName("model_remains") val modelRemains: List<ModelRemainDto>,
+    @SerialName("model_remains") val modelRemains: List<ModelRemainDto>? = null,
     @SerialName("base_resp") val baseResp: BaseRespDto
 )
 

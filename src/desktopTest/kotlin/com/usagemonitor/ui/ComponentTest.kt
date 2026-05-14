@@ -686,8 +686,7 @@ class ComponentTest {
                     onThemeToggle = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    onClose = {}
+                    onApiToggle = { _, _ -> }
                 )
             }
         }
@@ -698,7 +697,7 @@ class ComponentTest {
         onNodeWithText("Monitored APIs").assertIsDisplayed()
         onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
         onNodeWithText("Kilo Free").assertIsDisplayed()
-        onNodeWithText("Close").assertIsDisplayed()
+        onAllNodesWithText("Close").assertCountEquals(0)
     }
 
     @Test
@@ -1181,6 +1180,7 @@ class ComponentTest {
         onNodeWithText("Intervalo").assertIsDisplayed()
         onNodeWithText("Uso atual").assertIsDisplayed()
         onNodeWithText("50 / 100 %").assertIsDisplayed()
+        onAllNodesWithText("Fechar").assertCountEquals(0)
         viewModel.onDestroy()
     }
 

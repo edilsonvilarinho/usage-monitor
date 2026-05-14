@@ -52,6 +52,27 @@ class MiniMaxRepositoryImplTest {
     }
 
     @Test
+    fun `returns friendly failure when MiniMax has no active token plan`() = runTest {
+        val response = MiniMaxTokenPlanResponse(
+            modelRemains = null,
+            baseResp = BaseRespDto(
+                statusCode = 2062,
+                statusMsg = "no active token plan subscription"
+            )
+        )
+        val repo = MiniMaxRepositoryImpl(
+            apiDataSource = stubRemote(response),
+            envVarReader = { "fake-key" }
+        )
+
+        val result = repo.getUsage()
+
+        assertTrue(result.isFailure)
+        val message = result.exceptionOrNull()?.message ?: ""
+        assertTrue(message.contains("MiniMax sem plano/token ativo"))
+    }
+
+    @Test
     fun `returns success and maps response when status_code is 0`() = runTest {
         val repo = MiniMaxRepositoryImpl(
             apiDataSource = stubRemote(successResponse()),

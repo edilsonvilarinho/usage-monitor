@@ -12,6 +12,8 @@ import com.usagemonitor.domain.repository.MiniMaxRepository
  * É PROIBIDO ter a chave hardcoded aqui ou em qualquer outro ficheiro.
  */
 private const val ENV_VAR_NAME = "MINIMAX_API_KEY"
+private const val MINIMAX_NO_ACTIVE_PLAN_STATUS_CODE = 2062
+private const val MINIMAX_NO_ACTIVE_PLAN_MARKER = "no active token plan subscription"
 
 class MiniMaxRepositoryImpl(
     private val apiDataSource: RemoteApiDataSource,
@@ -28,14 +30,21 @@ class MiniMaxRepositoryImpl(
 
             // status_code diferente de 0 indica erro na API MiniMax
             if (response.baseResp.statusCode != 0) {
-                throw IllegalStateException(
-                    "Erro na API MiniMax: ${response.baseResp.statusMsg} " +
-                    "(código ${response.baseResp.statusCode})"
-                )
+                throw IllegalStateException(apiErrorMessage(response.baseResp.statusCode, response.baseResp.statusMsg))
             }
 
             MiniMaxMapper.toUsageStats(response)
         }
+    }
+
+    private fun apiErrorMessage(statusCode: Int, statusMessage: String): String {
+        if (statusCode == MINIMAX_NO_ACTIVE_PLAN_STATUS_CODE ||
+            statusMessage.contains(MINIMAX_NO_ACTIVE_PLAN_MARKER, ignoreCase = true)
+        ) {
+            return "MiniMax sem plano/token ativo. Ative um plano ou gere um token com assinatura válida e tente novamente."
+        }
+
+        return "Erro na API MiniMax: $statusMessage (código $statusCode)"
     }
 
     private fun missingEnvVarMessage(): String {

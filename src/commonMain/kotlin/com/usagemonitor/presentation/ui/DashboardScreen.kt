@@ -514,6 +514,24 @@ private fun warningFor(
         }
     }
 
+    if (error.isMiniMaxInactivePlanIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                source = error.source,
+                title = "MiniMax sem plano/token ativo",
+                description = "A conta MiniMax respondeu que não há assinatura ativa para consultar as cotas. Ative um plano ou gere um token vinculado a uma assinatura válida e depois atualize o monitor.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                source = error.source,
+                title = "MiniMax has no active plan/token",
+                description = "The MiniMax account reported that there is no active subscription available for quota checks. Activate a plan or generate a token tied to a valid subscription, then refresh the monitor.",
+                actionLabel = null
+            )
+        }
+    }
+
     if (error.isOpenCodeLocalIssue) {
         return if (language == AppLanguage.PT) {
             DashboardWarning(

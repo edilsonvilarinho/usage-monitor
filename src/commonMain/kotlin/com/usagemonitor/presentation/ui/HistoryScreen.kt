@@ -33,7 +33,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -251,15 +250,10 @@ private fun HistoryHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-
-        TextButton(onClick = onBack) {
-            Text(
-                if (showSourceSelector) {
-                    if (language == AppLanguage.PT) "Voltar" else "Back"
-                } else {
-                    if (language == AppLanguage.PT) "Fechar" else "Close"
-                }
-            )
+        if (showSourceSelector) {
+            androidx.compose.material3.TextButton(onClick = onBack) {
+                Text(if (language == AppLanguage.PT) "Voltar" else "Back")
+            }
         }
     }
 }

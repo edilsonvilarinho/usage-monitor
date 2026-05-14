@@ -54,6 +54,9 @@ data class UiApiError(
     val isMiniMaxEnvVarIssue: Boolean
         get() = source == ApiSource.MINIMAX && isMiniMaxEnvVarMessage(message)
 
+    val isMiniMaxInactivePlanIssue: Boolean
+        get() = source == ApiSource.MINIMAX && isMiniMaxInactivePlanMessage(message)
+
     val isOpenCodeLocalIssue: Boolean
         get() = source == ApiSource.OPENCODE && isOpenCodeLocalMessage(message)
 
@@ -61,7 +64,11 @@ data class UiApiError(
         get() = source == ApiSource.KILO && isKiloLocalMessage(message)
 
     val isConfigurationIssue: Boolean
-        get() = isAnthropicCredentialIssue || isMiniMaxEnvVarIssue || isOpenCodeLocalIssue || isKiloLocalIssue
+        get() = isAnthropicCredentialIssue ||
+            isMiniMaxEnvVarIssue ||
+            isMiniMaxInactivePlanIssue ||
+            isOpenCodeLocalIssue ||
+            isKiloLocalIssue
 }
 
 private fun sourceLabel(source: ApiSource): String {
@@ -82,6 +89,11 @@ private val ANTHROPIC_CREDENTIAL_MARKERS = listOf(
 
 private const val MINIMAX_ENV_VAR_NAME = "MINIMAX_API_KEY"
 private val MINIMAX_ENV_VAR_STATE_MARKERS = listOf("não configurada", "not configured")
+private val MINIMAX_INACTIVE_PLAN_MARKERS = listOf(
+    "MiniMax sem plano/token ativo",
+    "no active token plan subscription",
+    "inactive token plan"
+)
 private val OPENCODE_LOCAL_MARKERS = listOf(
     "OpenCode local database not found",
     "OpenCode local database is unavailable"
@@ -100,6 +112,10 @@ private fun isMiniMaxEnvVarMessage(message: String): Boolean {
         return false
     }
     return MINIMAX_ENV_VAR_STATE_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isMiniMaxInactivePlanMessage(message: String): Boolean {
+    return MINIMAX_INACTIVE_PLAN_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }
 
 private fun isOpenCodeLocalMessage(message: String): Boolean {
