@@ -18,6 +18,7 @@ import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
+import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateInstaller
@@ -780,9 +781,9 @@ class DashboardViewModelTest {
                 return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
             }
 
-            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
+            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
                 preparedVersion = update.version
-                return Result.success(Unit)
+                return Result.success(PreparedUpdateAction.ExitAndInstall)
             }
         }
 
@@ -815,6 +816,66 @@ class DashboardViewModelTest {
         assertIs<AppUpdateUiState.Installing>(updateState)
         assertEquals("7.1.0", preparedVersion)
         assertEquals(true, viewModel.shouldExitForUpdate.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `prepares linux update without requesting app exit when installer opens externally`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        var preparedVersion: String? = null
+        val installer = object : AppUpdateInstaller {
+            override val isSupported: Boolean = true
+
+            override fun canInstall(update: AppUpdateInfo): Boolean {
+                return update.linuxDebInstallerDownloadUrl != null
+            }
+
+            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
+                preparedVersion = update.version
+                return Result.success(PreparedUpdateAction.InstallerOpened)
+            }
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            MutableStateFlow(emptySet()),
+            historyUseCase(recordedSnapshots),
+            checkForAppUpdate = updateUseCase(
+                Result.success(
+                    AppUpdateInfo(
+                        version = "7.1.0",
+                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
+                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
+                    )
+                )
+            ),
+            appUpdateInstaller = installer,
+            currentAppVersion = "7.0.0",
+            clock = Clock.System
+        )
+        viewModel.cancelCountdown()
+
+        awaitConditionRealTime { viewModel.appUpdateState.value is AppUpdateUiState.InstallerOpened }
+
+        val updateState = viewModel.appUpdateState.value
+        assertIs<AppUpdateUiState.InstallerOpened>(updateState)
+        assertEquals("7.1.0", preparedVersion)
+        assertEquals(false, viewModel.shouldExitForUpdate.value)
         viewModel.onDestroy()
     }
 
@@ -977,12 +1038,12 @@ class DashboardViewModelTest {
                 return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
             }
 
-            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
+            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
                 attempts += 1
                 return if (attempts == 1) {
                     Result.failure(IllegalStateException("Falha ao baixar o pacote"))
                 } else {
-                    Result.success(Unit)
+                    Result.success(PreparedUpdateAction.ExitAndInstall)
                 }
             }
         }

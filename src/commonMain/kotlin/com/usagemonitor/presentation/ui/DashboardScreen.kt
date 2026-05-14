@@ -646,6 +646,19 @@ private fun updateBannerContent(
             }
         )
 
+        is AppUpdateUiState.InstallerOpened -> UpdateBannerContent(
+            title = if (language == AppLanguage.PT) {
+                "Pacote da atualização aberto"
+            } else {
+                "Update package opened"
+            },
+            description = if (language == AppLanguage.PT) {
+                "O instalador do sistema foi aberto para a versão ${state.update.version}. Conclua a instalação por lá; este app continuará aberto até você terminar."
+            } else {
+                "The system package installer was opened for version ${state.update.version}. Finish the installation there; this app will stay open until you complete it."
+            }
+        )
+
         is AppUpdateUiState.Failed -> {
             val targetVersion = state.update?.version
             val title = if (language == AppLanguage.PT) {
@@ -662,9 +675,9 @@ private fun updateBannerContent(
                 }
             }
             val description = if (language == AppLanguage.PT) {
-                "Não foi possível baixar ou iniciar o instalador automaticamente. ${state.message}"
+                "Não foi possível baixar ou abrir o instalador automaticamente. ${state.message}"
             } else {
-                "The app could not download or start the installer automatically. ${state.message}"
+                "The app could not download or open the installer automatically. ${state.message}"
             }
 
             UpdateBannerContent(

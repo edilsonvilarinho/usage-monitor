@@ -19,7 +19,7 @@ class DesktopAppUpdateInstallerTest {
         val support = getLinuxAutomaticUpdateSupport(
             update = sampleUpdate,
             executablePathResolver = { "/opt/Usage Monitor/bin/usage-monitor" },
-            commandAvailabilityChecker = { command -> command == "pkexec" },
+            commandAvailabilityChecker = { command -> command == "xdg-open" },
             debPackageInstallationChecker = { true }
         )
 
@@ -44,17 +44,48 @@ class DesktopAppUpdateInstallerTest {
     }
 
     @Test
-    fun `linux automatic update support keeps launcher path for deb install`() {
+    fun `linux automatic update requires a graphical package opener`() {
         val support = getLinuxAutomaticUpdateSupport(
             update = sampleUpdate,
             executablePathResolver = { "/usr/bin/usage-monitor" },
-            commandAvailabilityChecker = { true },
+            commandAvailabilityChecker = { command -> command == "dpkg" },
+            debPackageInstallationChecker = { true }
+        )
+
+        assertFalse(support.isSupported)
+        assertEquals(
+            "A graphical package opener (xdg-open or gio open) is required to start the Linux update installer.",
+            support.failureMessage
+        )
+    }
+
+    @Test
+    fun `linux automatic update support keeps launcher path and xdg-open for deb install`() {
+        val support = getLinuxAutomaticUpdateSupport(
+            update = sampleUpdate,
+            executablePathResolver = { "/usr/bin/usage-monitor" },
+            commandAvailabilityChecker = { command -> command == "dpkg" || command == "xdg-open" },
             debPackageInstallationChecker = { true }
         )
 
         assertTrue(support.isSupported)
         assertEquals("/usr/bin/usage-monitor", support.executablePath)
+        assertEquals(listOf("xdg-open"), support.opener?.command)
         assertEquals(null, support.failureMessage)
+    }
+
+    @Test
+    fun `linux automatic update falls back to gio open when xdg-open is unavailable`() {
+        val support = getLinuxAutomaticUpdateSupport(
+            update = sampleUpdate,
+            executablePathResolver = { "/usr/bin/usage-monitor" },
+            commandAvailabilityChecker = { command -> command == "dpkg" || command == "gio" },
+            debPackageInstallationChecker = { true }
+        )
+
+        assertTrue(support.isSupported)
+        assertEquals(listOf("gio", "open"), support.opener?.command)
+        assertEquals("gio open", support.opener?.displayName)
     }
 
     @Test

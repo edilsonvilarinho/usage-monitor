@@ -283,6 +283,7 @@ class DashboardViewModel(
             is AppUpdateUiState.Failed -> if (currentState.automaticInstallSupported) currentState.update else null
             is AppUpdateUiState.Downloading -> null
             is AppUpdateUiState.Installing -> null
+            is AppUpdateUiState.InstallerOpened -> null
             null -> null
         }
 
@@ -380,7 +381,10 @@ class DashboardViewModel(
         updateMutex.withLock {
             val currentState = _appUpdateState.value
 
-            if (currentState is AppUpdateUiState.Downloading || currentState is AppUpdateUiState.Installing) {
+            if (
+                currentState is AppUpdateUiState.Downloading ||
+                currentState is AppUpdateUiState.Installing
+            ) {
                 return@withLock
             }
 
@@ -403,6 +407,10 @@ class DashboardViewModel(
                         return@onSuccess
                     }
 
+                    if (currentState is AppUpdateUiState.InstallerOpened && currentState.update.version == update.version) {
+                        return@onSuccess
+                    }
+
                     _appUpdateState.value = AppUpdateUiState.Available(
                         update = update,
                         automaticInstallSupported = canInstallAutomatically(update)
@@ -419,10 +427,18 @@ class DashboardViewModel(
 
         viewModelScope.launch {
             appUpdateInstaller.prepareUpdateInstallation(update)
-                .onSuccess {
-                    _appUpdateState.value = AppUpdateUiState.Installing(update)
-                    delay(INSTALLER_HANDOFF_DELAY_MS)
-                    _shouldExitForUpdate.value = true
+                .onSuccess { action ->
+                    when (action) {
+                        PreparedUpdateAction.ExitAndInstall -> {
+                            _appUpdateState.value = AppUpdateUiState.Installing(update)
+                            delay(INSTALLER_HANDOFF_DELAY_MS)
+                            _shouldExitForUpdate.value = true
+                        }
+
+                        PreparedUpdateAction.InstallerOpened -> {
+                            _appUpdateState.value = AppUpdateUiState.InstallerOpened(update)
+                        }
+                    }
                 }
                 .onFailure { error ->
                     _appUpdateState.value = AppUpdateUiState.Failed(

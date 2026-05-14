@@ -7,7 +7,12 @@ interface AppUpdateInstaller {
 
     fun canInstall(update: AppUpdateInfo): Boolean
 
-    suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit>
+    suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction>
+}
+
+sealed interface PreparedUpdateAction {
+    data object ExitAndInstall : PreparedUpdateAction
+    data object InstallerOpened : PreparedUpdateAction
 }
 
 object UnsupportedAppUpdateInstaller : AppUpdateInstaller {
@@ -17,7 +22,7 @@ object UnsupportedAppUpdateInstaller : AppUpdateInstaller {
         return false
     }
 
-    override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<Unit> {
+    override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
         return Result.failure(
             IllegalStateException("Automatic update installation is not supported on this platform.")
         )

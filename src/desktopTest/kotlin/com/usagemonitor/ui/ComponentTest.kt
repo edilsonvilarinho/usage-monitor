@@ -50,8 +50,10 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
 import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateInstaller
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Clock
@@ -150,6 +152,64 @@ class ComponentTest {
             recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository),
             checkForAppUpdate = CheckForAppUpdateUseCase(updateRepository),
             appUpdateInstaller = UnsupportedAppUpdateInstaller,
+            currentAppVersion = "7.0.0"
+        )
+    }
+
+    private fun dashboardViewModelWithOpenedLinuxInstaller(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val historyRepository = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: HistoryRange,
+                now: Instant
+            ) = throw UnsupportedOperationException("Não utilizado neste teste")
+        }
+        val updateRepository = object : AppUpdateRepository {
+            override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
+                return Result.success(
+                    AppUpdateInfo(
+                        version = "7.1.0",
+                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
+                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
+                    )
+                )
+            }
+        }
+        val installer = object : AppUpdateInstaller {
+            override val isSupported: Boolean = true
+
+            override fun canInstall(update: AppUpdateInfo): Boolean {
+                return update.linuxDebInstallerDownloadUrl != null
+            }
+
+            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
+                return Result.success(PreparedUpdateAction.InstallerOpened)
+            }
+        }
+
+        return DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
+            enabledApis = enabledApis,
+            recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository),
+            checkForAppUpdate = CheckForAppUpdateUseCase(updateRepository),
+            appUpdateInstaller = installer,
             currentAppVersion = "7.0.0"
         )
     }
@@ -669,6 +729,42 @@ class ComponentTest {
 
         onNodeWithText("Nova versão 7.1.0 disponível").assertIsDisplayed()
         onNodeWithText("A atualização automática não está disponível nesta plataforma. Atualize manualmente pela release publicada.").assertIsDisplayed()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `DashboardScreen shows Linux installer opened banner without closing guidance`() = runDesktopComposeUiTest {
+        val enabledApis = MutableStateFlow(emptySet<ApiSource>())
+        val viewModel = dashboardViewModelWithOpenedLinuxInstaller(enabledApis)
+        viewModel.cancelCountdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    enabledApis = enabledApis,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = {},
+                    onOpenSettings = {},
+                    countdownUpdatesEnabled = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Pacote da atualização aberto").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Pacote da atualização aberto").assertIsDisplayed()
+        onNodeWithText("O instalador do sistema foi aberto para a versão 7.1.0. Conclua a instalação por lá; este app continuará aberto até você terminar.").assertIsDisplayed()
         viewModel.onDestroy()
     }
 

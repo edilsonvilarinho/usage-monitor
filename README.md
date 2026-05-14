@@ -13,7 +13,7 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Historico local com tendencia, consumo medio e forecast.
 - Reordenacao e minimizacao de cards com persistencia local.
 - Auto-start em Windows e Linux.
-- Verificacao de novas releases e tentativa de instalacao automatica quando a plataforma suporta.
+- Verificacao de novas releases e tentativa de instalacao automatica quando a plataforma suporta, com update assistido no Linux.
 
 ## Screenshots
 
@@ -155,7 +155,8 @@ Observacoes:
 
 - A app consulta a release mais recente em `edilsonvilarinho/usage-monitor`.
 - Em Windows, tenta preparar a instalacao automatica a partir do instalador publicado no release, preferindo o `UsageMonitor-Setup-<versao>.exe` do NSIS e mantendo fallback para `.msi`.
-- Em Linux, a instalacao automatica exige `.deb`, `pkexec`, `dpkg` e instalacao previa via pacote DEB publicado.
+- Em Linux, o update assistido exige `.deb`, `dpkg`, um opener grafico (`xdg-open` ou `gio open`) e instalacao previa via pacote DEB publicado.
+- No Linux, a app baixa o `.deb` e abre o instalador grafico do sistema sem encerrar o processo atual automaticamente.
 - Em plataformas sem suporte automatico, a UI aponta para a release publicada.
 
 ### Preferencias persistidas

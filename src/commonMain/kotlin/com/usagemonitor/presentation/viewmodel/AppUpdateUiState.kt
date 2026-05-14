@@ -16,6 +16,10 @@ sealed interface AppUpdateUiState {
         val update: AppUpdateInfo
     ) : AppUpdateUiState
 
+    data class InstallerOpened(
+        val update: AppUpdateInfo
+    ) : AppUpdateUiState
+
     data class Failed(
         val update: AppUpdateInfo?,
         val message: String,
