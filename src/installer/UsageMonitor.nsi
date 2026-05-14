@@ -38,7 +38,6 @@ UninstallIcon "${APP_ICON}"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\Usage Monitor.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "$(LaunchAppNowText)"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -49,8 +48,10 @@ UninstallIcon "${APP_ICON}"
 !insertmacro MUI_LANGUAGE "PortugueseBR"
 !insertmacro MUI_LANGUAGE "English"
 
-LangString LaunchAppNowText ${LANG_PORTUGUESEBR} "Iniciar Usage Monitor agora"
-LangString LaunchAppNowText ${LANG_ENGLISH} "Launch Usage Monitor now"
+; Evitar MUI_FINISHPAGE_RUN_TEXT com LangString aqui: esse caminho e o suspeito
+; de esconder o checkbox no finish page em algumas builds.
+LangString MUI_TEXT_FINISH_RUN ${LANG_PORTUGUESEBR} "&Iniciar o Usage Monitor agora"
+LangString MUI_TEXT_FINISH_RUN ${LANG_ENGLISH} "&Launch Usage Monitor now"
 
 ; -----------------------------------------------
 ; Installer Functions
@@ -85,7 +86,7 @@ Section "Usage Monitor" SEC_APP
     SectionIn RO
     SetShellVarContext current
 
-    ; Limpar Run keys antigos (ambos os nomes — migração de versões anteriores)
+    ; Limpar Run keys antigos (ambos os nomes ? migra??o de vers?es anteriores)
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor"
 
