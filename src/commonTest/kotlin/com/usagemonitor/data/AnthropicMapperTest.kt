@@ -40,7 +40,7 @@ class AnthropicMapperTest {
         assertEquals(PeriodType.INTERVAL, quota.periodType)
         assertEquals(15L, quota.used)
         assertEquals(100L, quota.total)
-        assertEquals(UsageUnit.TOKENS, quota.unit)
+        assertEquals(UsageUnit.PERCENTAGE, quota.unit)
         assertEquals(675L, quota.rawUsed)
         assertEquals(4500L, quota.rawTotal)
     }
@@ -52,7 +52,7 @@ class AnthropicMapperTest {
         assertEquals(PeriodType.WEEKLY, quota.periodType)
         assertEquals(5L, quota.used)
         assertEquals(100L, quota.total)
-        assertEquals(UsageUnit.TOKENS, quota.unit)
+        assertEquals(UsageUnit.PERCENTAGE, quota.unit)
         assertEquals(2250L, quota.rawUsed)
         assertEquals(45000L, quota.rawTotal)
     }

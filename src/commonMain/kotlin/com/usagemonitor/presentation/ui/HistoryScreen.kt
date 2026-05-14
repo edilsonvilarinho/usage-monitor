@@ -523,7 +523,13 @@ private fun DeepSeekHistoryCard(
                     }
                 }
 
-                UsageHistoryLineChart(points = series.points, unit = series.unit)
+                UsageHistoryLineChart(
+                    points = series.points,
+                    unit = series.unit,
+                    language = language,
+                    tooltipTitle = title,
+                    tooltipSubtitle = subtitle
+                )
 
                 deepSeekForecastText(series.forecast, language)?.let { message ->
                     Text(
@@ -604,7 +610,16 @@ private fun OpenCodeHistoryCard(
                     )
                 }
 
-                UsageHistoryLineChart(points = modelReport.chartSeries.points, unit = modelReport.chartSeries.unit)
+                UsageHistoryLineChart(
+                    points = modelReport.chartSeries.points,
+                    unit = modelReport.chartSeries.unit,
+                    language = language,
+                    tooltipTitle = modelReport.modelName,
+                    tooltipSubtitle = openCodeHistorySubtitle(
+                        periodType = modelReport.chartSeries.periodType,
+                        language = language
+                    )
+                )
 
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -705,7 +720,17 @@ private fun HistorySeriesCard(
                     )
                 }
 
-                UsageHistoryLineChart(points = series.points, unit = series.unit)
+                UsageHistoryLineChart(
+                    points = series.points,
+                    unit = series.unit,
+                    language = language,
+                    tooltipTitle = series.quotaLabel,
+                    tooltipSubtitle = if (series.periodType.name == "WEEKLY") {
+                        if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
+                    } else {
+                        if (language == AppLanguage.PT) "Quota intervalar" else "Interval quota"
+                    }
+                )
 
                 HistoryMetrics(series = series, language = language)
             }

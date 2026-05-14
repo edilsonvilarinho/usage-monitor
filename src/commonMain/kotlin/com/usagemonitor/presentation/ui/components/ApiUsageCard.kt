@@ -563,6 +563,7 @@ private fun OpenCodeInlineComparisonChart(
         )
 
         OpenCodeInlineBar(
+            modelName = summary.modelName,
             label = "5h",
             value = summary.requestsFiveHours,
             fraction = summary.requestsFiveHours / maxValue,
@@ -570,6 +571,7 @@ private fun OpenCodeInlineComparisonChart(
             language = language
         )
         OpenCodeInlineBar(
+            modelName = summary.modelName,
             label = "7d",
             value = summary.requestsSevenDays,
             fraction = summary.requestsSevenDays / maxValue,
@@ -581,6 +583,7 @@ private fun OpenCodeInlineComparisonChart(
 
 @Composable
 private fun OpenCodeInlineBar(
+    modelName: String,
     label: String,
     value: Long,
     fraction: Float,
@@ -599,20 +602,42 @@ private fun OpenCodeInlineBar(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Box(
+        HoverTooltipBox(
+            title = modelName,
+            subtitle = if (language == AppLanguage.PT) {
+                "Atividade observada"
+            } else {
+                "Observed activity"
+            },
+            metrics = listOf(
+                TooltipMetric(
+                    label = if (language == AppLanguage.PT) "Janela" else "Window",
+                    value = label
+                ),
+                TooltipMetric(
+                    label = if (language == AppLanguage.PT) "Requisições" else "Requests",
+                    value = value.toString()
+                )
+            ),
             modifier = Modifier
                 .weight(1f)
                 .height(8.dp)
-                .clip(AppShapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                    .fillMaxWidth()
                     .height(8.dp)
                     .clip(AppShapes.small)
-                    .background(accentColor.copy(alpha = 0.82f))
-            )
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                        .height(8.dp)
+                        .clip(AppShapes.small)
+                        .background(accentColor.copy(alpha = 0.82f))
+                )
+            }
         }
 
         Text(
@@ -648,7 +673,6 @@ private fun buildOpenCodeModelSummaries(quotas: List<QuotaInfo>): List<OpenCodeM
     return grouped.values.toList()
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CardIconActionButton(
     label: String,
@@ -656,14 +680,9 @@ private fun CardIconActionButton(
     enabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = {
-            PlainTooltip {
-                Text(label)
-            }
-        },
-        state = rememberTooltipState()
+    HoverTooltipBox(
+        title = label,
+        metrics = emptyList()
     ) {
         FilledTonalIconButton(
             onClick = onClick,
@@ -811,17 +830,23 @@ private fun QuotaColumn(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        UsageArcChart(
-            used = quota.used,
-            total = quota.total,
-            unit = quota.unit,
-            size = 92.dp,
-            strokeWidth = 10.dp,
-            percentageTextStyle = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+        HoverTooltipBox(
+            title = quota.label,
+            subtitle = expandedQuotaTitle(quota = quota, language = language),
+            metrics = buildQuotaTooltipMetrics(quota = quota, language = language)
+        ) {
+            UsageArcChart(
+                used = quota.used,
+                total = quota.total,
+                unit = quota.unit,
+                size = 92.dp,
+                strokeWidth = 10.dp,
+                percentageTextStyle = MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
             )
-        )
+        }
 
         Text(
             text = expandedQuotaTitle(quota = quota, language = language),
@@ -936,6 +961,93 @@ private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
     } else {
         "Reset: $dayFormatted ${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')} BRT"
     }
+}
+
+private fun buildQuotaTooltipMetrics(
+    quota: QuotaInfo,
+    language: AppLanguage
+): List<TooltipMetric> {
+    val metrics = mutableListOf<TooltipMetric>()
+
+    if (quota.unit == UsageUnit.CURRENCY_USD) {
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+            value = formatCurrencyAmount(quota.total)
+        )
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Status" else "Status",
+            value = resetLabel(quota = quota, language = language)
+        )
+        return metrics
+    }
+
+    metrics += TooltipMetric(
+        label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+        value = quotaTooltipUsageValue(quota = quota, language = language)
+    )
+
+    if (quota.total > 0L) {
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Restante" else "Remaining",
+            value = quotaTooltipRemainingValue(quota = quota)
+        )
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Percentual" else "Percentage",
+            value = "${(quota.percentageUsed * 100).roundToInt()}%"
+        )
+    }
+
+    metrics += TooltipMetric(
+        label = if (language == AppLanguage.PT) "Reset" else "Reset",
+        value = resetLabel(quota = quota, language = language)
+    )
+    return metrics
+}
+
+private fun quotaTooltipUsageValue(quota: QuotaInfo, language: AppLanguage): String {
+    return when (quota.unit) {
+        UsageUnit.CURRENCY_USD -> formatCurrencyAmount(quota.total)
+        UsageUnit.PERCENTAGE -> {
+            if (quota.total > 0L) {
+                "${quota.used}/${quota.total} %"
+            } else {
+                "${quota.used} %"
+            }
+        }
+        UsageUnit.REQUESTS -> {
+            if (quota.total > 0L) {
+                "${quota.used}/${quota.total} req"
+            } else if (language == AppLanguage.PT) {
+                "${quota.used} req"
+            } else {
+                "${quota.used} req"
+            }
+        }
+        UsageUnit.TOKENS -> {
+            if (quota.total > 0L) {
+                "${quota.used}/${quota.total} tok"
+            } else {
+                "${quota.used} tok"
+            }
+        }
+    }
+}
+
+private fun quotaTooltipRemainingValue(quota: QuotaInfo): String {
+    return when (quota.unit) {
+        UsageUnit.REQUESTS -> "${quota.remaining} req"
+        UsageUnit.TOKENS -> "${quota.remaining} tok"
+        UsageUnit.PERCENTAGE -> "${quota.remaining} %"
+        UsageUnit.CURRENCY_USD -> formatCurrencyAmount(quota.remaining)
+    }
+}
+
+private fun formatCurrencyAmount(cents: Long): String {
+    val sign = if (cents < 0L) "-" else ""
+    val absoluteCents = kotlin.math.abs(cents)
+    val dollars = absoluteCents / 100
+    val remainder = absoluteCents % 100
+    return "${sign}\$${dollars}.${remainder.toString().padStart(2, '0')}"
 }
 
 private fun compactPercentageLabel(quota: QuotaInfo): String {

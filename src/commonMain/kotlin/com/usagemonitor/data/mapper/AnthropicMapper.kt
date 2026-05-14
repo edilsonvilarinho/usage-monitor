@@ -63,7 +63,7 @@ object AnthropicMapper {
             periodEndAt = periodEndAt,
             hasKnownResetAt = resetsAt != null,
             periodType = periodType,
-            unit = UsageUnit.TOKENS,
+            unit = UsageUnit.PERCENTAGE,
             rawUsed = rawUsed,
             rawTotal = maxCapacity
         )

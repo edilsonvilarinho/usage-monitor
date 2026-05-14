@@ -48,7 +48,7 @@ class DashboardViewModelTest {
                 used = 50000L,
                 total = 200000L,
                 periodEndAt = fixedInstant,
-                unit = UsageUnit.TOKENS,
+                unit = UsageUnit.PERCENTAGE,
                 rawUsed = 50000L,
                 rawTotal = 200000L
             )
