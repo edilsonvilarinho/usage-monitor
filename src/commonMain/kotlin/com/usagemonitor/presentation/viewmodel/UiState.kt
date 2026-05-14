@@ -75,7 +75,9 @@ private val ANTHROPIC_CREDENTIAL_MARKERS = listOf(
     "Credenciais não encontradas",
     "Credentials not found",
     "Token refresh retornou sem access_token",
-    "Token refresh returned without access_token"
+    "Token refresh returned without access_token",
+    "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada",
+    "Claude Code session is missing the expected permission or is outdated"
 )
 
 private const val MINIMAX_ENV_VAR_NAME = "MINIMAX_API_KEY"

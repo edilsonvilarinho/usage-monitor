@@ -46,6 +46,15 @@ class UiStateTest {
     }
 
     @Test
+    fun `isAnthropicCredentialIssue true for Claude Code session scope guidance`() {
+        val error = UiApiError(
+            source = ApiSource.ANTHROPIC,
+            message = "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada. Feche o app, reautentique no Claude Code e abra o monitor novamente."
+        )
+        assertTrue(error.isAnthropicCredentialIssue)
+    }
+
+    @Test
     fun `isAnthropicCredentialIssue false for unrelated error`() {
         val error = UiApiError(source = ApiSource.ANTHROPIC, message = "Anthropic HTTP 500: server error")
         assertFalse(error.isAnthropicCredentialIssue)

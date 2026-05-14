@@ -453,6 +453,32 @@ private fun warningFor(
     language: AppLanguage
 ): DashboardWarning? {
     if (error.isAnthropicCredentialIssue) {
+        val hasScopeGuidance = error.message.contains(
+            "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada",
+            ignoreCase = true
+        ) || error.message.contains(
+            "Claude Code session is missing the expected permission or is outdated",
+            ignoreCase = true
+        )
+
+        if (hasScopeGuidance) {
+            return if (language == AppLanguage.PT) {
+                DashboardWarning(
+                    source = error.source,
+                    title = "Anthropic precisa revalidar a sessão",
+                    description = "1. Feche o Usage Monitor.\n2. Abra o Claude Code e confirme que a sessão está ativa; se preciso, faça login novamente.\n3. Abra o Usage Monitor outra vez.\n4. Se ainda falhar, desative temporariamente Anthropic nas configurações para continuar vendo as outras APIs.",
+                    actionLabel = "Tentar novamente"
+                )
+            } else {
+                DashboardWarning(
+                    source = error.source,
+                    title = "Anthropic needs the session refreshed",
+                    description = "1. Close Usage Monitor.\n2. Open Claude Code and confirm the session is active; sign in again if needed.\n3. Open Usage Monitor again.\n4. If it still fails, temporarily disable Anthropic in settings so the other APIs keep working.",
+                    actionLabel = "Retry"
+                )
+            }
+        }
+
         return if (language == AppLanguage.PT) {
             DashboardWarning(
                 source = error.source,

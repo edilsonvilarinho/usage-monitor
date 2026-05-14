@@ -22,9 +22,46 @@ class AnthropicRepositoryImpl(
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
-            val token = credentialDataSource.loadAnthropicAccessToken()
-            val dto = apiDataSource.fetchAnthropicUsage(token)
-            AnthropicMapper.toUsageStats(dto)
+            fetchUsageWithRecovery()
         }
+    }
+
+    private suspend fun fetchUsageWithRecovery(): ApiUsageStats {
+        val cachedToken = credentialDataSource.loadAnthropicAccessToken()
+
+        try {
+            return fetchUsageForToken(cachedToken)
+        } catch (error: Throwable) {
+            if (!isScopeRequirementFailure(error)) {
+                throw error
+            }
+        }
+
+        credentialDataSource.invalidateAnthropicAccessTokenCache()
+        val refreshedToken = credentialDataSource.loadAnthropicAccessToken()
+
+        try {
+            return fetchUsageForToken(refreshedToken)
+        } catch (retryError: Throwable) {
+            throw IllegalStateException(ANTHROPIC_REAUTH_GUIDANCE_MESSAGE, retryError)
+        }
+    }
+
+    private suspend fun fetchUsageForToken(accessToken: String): ApiUsageStats {
+        val dto = apiDataSource.fetchAnthropicUsage(accessToken)
+        return AnthropicMapper.toUsageStats(dto)
+    }
+
+    private fun isScopeRequirementFailure(error: Throwable): Boolean {
+        val message = error.message ?: return false
+        return message.contains("Anthropic HTTP 403", ignoreCase = true) &&
+            message.contains("permission_error", ignoreCase = true) &&
+            message.contains("scope requirement", ignoreCase = true) &&
+            message.contains("user:profile", ignoreCase = true)
+    }
+
+    companion object {
+        const val ANTHROPIC_REAUTH_GUIDANCE_MESSAGE =
+            "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada. Feche o app, reautentique no Claude Code e abra o monitor novamente."
     }
 }

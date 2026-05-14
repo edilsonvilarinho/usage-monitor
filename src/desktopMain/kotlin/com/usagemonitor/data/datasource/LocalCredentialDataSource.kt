@@ -59,6 +59,11 @@ class LocalCredentialDataSource(
         return creds.claudeAiOauth.accessToken
     }
 
+    override fun invalidateAnthropicAccessTokenCache() {
+        cachedToken = null
+        cachedExpiresAt = 0L
+    }
+
     private fun credentialsFile(): File = File("${homeDirProvider()}/.claude/.credentials.json")
 
     private suspend fun refreshToken(credentialsFile: File, creds: CredentialsFileDto): String {

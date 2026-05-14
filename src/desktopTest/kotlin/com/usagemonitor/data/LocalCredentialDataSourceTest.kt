@@ -70,6 +70,27 @@ class LocalCredentialDataSourceTest {
     }
 
     @Test
+    fun `invalidateAnthropicAccessTokenCache forces file reread on next load`() = runTest {
+        val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
+        writeCredentials(accessToken = "cached-token", refreshToken = "rt", expiresAt = futureExpiry)
+        val dataSource = LocalCredentialDataSource(
+            httpClient = throwingHttpClient(),
+            homeDirProvider = homeDirProvider
+        )
+
+        val firstToken = dataSource.loadAnthropicAccessToken()
+        writeCredentials(accessToken = "rotated-on-disk", refreshToken = "rt", expiresAt = futureExpiry)
+
+        val cachedToken = dataSource.loadAnthropicAccessToken()
+        dataSource.invalidateAnthropicAccessTokenCache()
+        val rereadToken = dataSource.loadAnthropicAccessToken()
+
+        assertEquals("cached-token", firstToken)
+        assertEquals("cached-token", cachedToken)
+        assertEquals("rotated-on-disk", rereadToken)
+    }
+
+    @Test
     fun `throws IllegalStateException with PT message when file missing`() = runTest {
         val dataSource = LocalCredentialDataSource(
             httpClient = throwingHttpClient(),

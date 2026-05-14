@@ -15,4 +15,9 @@ interface CredentialDataSource {
      * Lança exceção se o ficheiro não existir ou o token estiver expirado.
      */
     suspend fun loadAnthropicAccessToken(): String
+
+    /**
+     * Limpa o cache em memória do token Anthropic para forçar releitura do disco.
+     */
+    fun invalidateAnthropicAccessTokenCache()
 }

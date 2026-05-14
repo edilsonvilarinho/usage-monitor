@@ -363,6 +363,46 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `treats Anthropic scope guidance as persistent warning without generic toast`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                IllegalStateException("Sua sessão do Claude Code está sem a permissão esperada ou desatualizada. Feche o app, reautentique no Claude Code e abra o monitor novamente.")
+            )
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        assertEquals(1, state.errors.size)
+        assertTrue(state.errors.first().isAnthropicCredentialIssue)
+        assertEquals(null, viewModel.toastMessage.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `classifies MiniMax missing env var for persistent warning`() = runTest {
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {
