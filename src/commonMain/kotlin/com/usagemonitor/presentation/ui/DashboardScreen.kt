@@ -63,8 +63,8 @@ private fun decodeToastMessage(key: String, language: AppLanguage): String {
     val isPt = language == AppLanguage.PT
     if (key.startsWith(RATE_LIMIT_PREFIX)) {
         val sourceLabel = sourceLabelFromKey(key.removePrefix(RATE_LIMIT_PREFIX))
-        return if (isPt) "$sourceLabel rate limited — tentando novamente..."
-        else "$sourceLabel rate limited — retrying..."
+        return if (isPt) "$sourceLabel limitado temporariamente — aguardando próxima atualização..."
+        else "$sourceLabel temporarily limited — waiting for the next refresh..."
     }
     if (key.startsWith(ERROR_PREFIX)) {
         val rest = key.removePrefix(ERROR_PREFIX)
@@ -291,7 +291,7 @@ private fun ErrorContent(
     onRetryAnthropic: () -> Unit
 ) {
     val warnings = errors.mapNotNull { error -> warningFor(error = error, language = language) }
-    val genericErrors = errors.filterNot { error -> error.isConfigurationIssue }
+    val genericErrors = errors.filterNot { error -> error.isConfigurationIssue || error.isRateLimitIssue }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -362,7 +362,7 @@ private fun SuccessContent(
     val items = cardOrder.mapNotNull(itemBySource::get) +
         visibleItems.filter { stats -> stats.source !in orderedSources }
     val warnings = partialErrors.mapNotNull { error -> warningFor(error = error, language = language) }
-    val genericErrors = partialErrors.filterNot { error -> error.isConfigurationIssue }
+    val genericErrors = partialErrors.filterNot { error -> error.isConfigurationIssue || error.isRateLimitIssue }
     val scrollState = rememberScrollState()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -452,6 +452,24 @@ private fun warningFor(
     error: UiApiError,
     language: AppLanguage
 ): DashboardWarning? {
+    if (error.isRateLimitIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                source = error.source,
+                title = "${sourceLabelFromKey(error.source.name)} temporariamente limitado",
+                description = "A API respondeu HTTP 429. Isso normalmente é limite de requisições ou cota temporária do próprio serviço; estar logado no Claude Code não evita esse bloqueio. Aguarde a janela de limite liberar e tente novamente.",
+                actionLabel = "Tentar novamente"
+            )
+        } else {
+            DashboardWarning(
+                source = error.source,
+                title = "${sourceLabelFromKey(error.source.name)} is temporarily limited",
+                description = "The API returned HTTP 429. This usually means a request limit or temporary quota window on the service side; being signed in to Claude Code does not bypass it. Wait for the limit window to clear, then retry.",
+                actionLabel = "Retry"
+            )
+        }
+    }
+
     if (error.isAnthropicCredentialIssue) {
         val hasScopeGuidance = error.message.contains(
             "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada",

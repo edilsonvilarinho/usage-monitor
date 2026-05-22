@@ -880,7 +880,7 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `emits rate limit toast on 429 without adding to errors list`() = runTest {
+    fun `emits rate limit toast on 429 and keeps persistent source error`() = runTest {
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(
@@ -913,8 +913,50 @@ class DashboardViewModelTest {
 
         val state = awaitSettledState(viewModel)
         assertIs<UiState.Success>(state)
-        // Erros de rate limit não viram banner persistente — viram toast efêmero.
-        assertTrue(state.errors.none { it.source == ApiSource.ANTHROPIC })
+        assertEquals(1, state.errors.size)
+        assertEquals(ApiSource.ANTHROPIC, state.errors.first().source)
+        assertTrue(state.errors.first().isRateLimitIssue)
+        assertEquals("RATE_LIMIT:ANTHROPIC", viewModel.toastMessage.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `shows rate limit error when Anthropic is the only enabled API`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                IllegalStateException("Anthropic HTTP 429: rate limited")
+            )
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System
+        )
+        viewModel.cancelInitFetch()
+        viewModel.cancelCountdown()
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Error>(state)
+        assertEquals(1, state.errors.size)
+        assertEquals(ApiSource.ANTHROPIC, state.errors.first().source)
+        assertTrue(state.errors.first().isRateLimitIssue)
         assertEquals("RATE_LIMIT:ANTHROPIC", viewModel.toastMessage.value)
         viewModel.onDestroy()
     }

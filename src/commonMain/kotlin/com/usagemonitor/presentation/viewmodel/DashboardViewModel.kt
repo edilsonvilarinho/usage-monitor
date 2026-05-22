@@ -34,7 +34,7 @@ import kotlinx.datetime.Instant
 private const val POLL_INTERVAL_SECONDS = 600
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 3_600_000L
 private const val UPDATE_CHECK_INTERVAL_WHILE_RUNNING_MS = 60 * 60_000L
-private const val HTTP_RATE_LIMIT_MARKER = "429"
+private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
 private const val INSTALLER_HANDOFF_DELAY_MS = 1_500L
 
 class DashboardViewModel(
@@ -319,12 +319,13 @@ class DashboardViewModel(
     }
 
     private fun handleSourceFailure(source: ApiSource, error: Throwable): UiApiError? {
-        if (error.message?.contains(HTTP_RATE_LIMIT_MARKER) == true) {
+        val message = error.message ?: "erro desconhecido"
+
+        if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
             _toastMessage.value = "RATE_LIMIT:${source.name}"
-            return null
+            return UiApiError(source = source, message = message)
         }
 
-        val message = error.message ?: "erro desconhecido"
         val uiError = UiApiError(source = source, message = message)
 
         if (!uiError.isConfigurationIssue) {

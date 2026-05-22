@@ -63,6 +63,9 @@ data class UiApiError(
     val isKiloLocalIssue: Boolean
         get() = source == ApiSource.KILO && isKiloLocalMessage(message)
 
+    val isRateLimitIssue: Boolean
+        get() = isRateLimitMessage(message)
+
     val isConfigurationIssue: Boolean
         get() = isAnthropicCredentialIssue ||
             isMiniMaxEnvVarIssue ||
@@ -102,6 +105,12 @@ private val KILO_LOCAL_MARKERS = listOf(
     "Kilo local database not found",
     "Kilo local database is unavailable"
 )
+private val RATE_LIMIT_MARKERS = listOf(
+    "HTTP 429",
+    "rate limited",
+    "rate limit",
+    "Too Many Requests"
+)
 
 private fun isAnthropicCredentialMessage(message: String): Boolean {
     return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
@@ -124,4 +133,8 @@ private fun isOpenCodeLocalMessage(message: String): Boolean {
 
 private fun isKiloLocalMessage(message: String): Boolean {
     return KILO_LOCAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isRateLimitMessage(message: String): Boolean {
+    return RATE_LIMIT_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }
