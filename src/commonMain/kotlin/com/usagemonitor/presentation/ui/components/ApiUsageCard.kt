@@ -955,11 +955,29 @@ private fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
         DayOfWeek.SATURDAY -> if (language == AppLanguage.PT) "Sáb" else "Sat"
         DayOfWeek.SUNDAY -> if (language == AppLanguage.PT) "Dom" else "Sun"
     }
+    val dateFormatted = if (language == AppLanguage.PT) {
+        "${resetLocal.date.dayOfMonth.toString().padStart(2, '0')}/${resetLocal.date.monthNumber.toString().padStart(2, '0')}"
+    } else {
+        "${resetLocal.date.monthNumber.toString().padStart(2, '0')}/${resetLocal.date.dayOfMonth.toString().padStart(2, '0')}"
+    }
+    val timeFormatted = if (language == AppLanguage.PT) {
+        "${resetLocal.hour}h${resetLocal.minute.toString().padStart(2, '0')}"
+    } else {
+        "${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')}"
+    }
 
     return if (language == AppLanguage.PT) {
-        "Reinício: $dayFormatted ${resetLocal.hour}h${resetLocal.minute.toString().padStart(2, '0')} BRT"
+        if (quota.periodType == PeriodType.WEEKLY) {
+            "Reinício: $dayFormatted $dateFormatted $timeFormatted BRT"
+        } else {
+            "Reinício: $dayFormatted $timeFormatted BRT"
+        }
     } else {
-        "Reset: $dayFormatted ${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')} BRT"
+        if (quota.periodType == PeriodType.WEEKLY) {
+            "Reset: $dayFormatted $dateFormatted $timeFormatted BRT"
+        } else {
+            "Reset: $dayFormatted $timeFormatted BRT"
+        }
     }
 }
 
