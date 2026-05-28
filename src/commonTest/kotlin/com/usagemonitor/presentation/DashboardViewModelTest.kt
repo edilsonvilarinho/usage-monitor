@@ -18,6 +18,7 @@ import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
+import com.usagemonitor.presentation.viewmodel.AutomaticUpdateStage
 import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -781,7 +782,10 @@ class DashboardViewModelTest {
                 return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
             }
 
-            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
+            override suspend fun prepareUpdateInstallation(
+                update: AppUpdateInfo,
+                onStageChanged: (AutomaticUpdateStage) -> Unit
+            ): Result<PreparedUpdateAction> {
                 preparedVersion = update.version
                 return Result.success(PreparedUpdateAction.ExitAndInstall)
             }
@@ -820,7 +824,7 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `prepares linux update without requesting app exit when installer opens externally`() = runTest {
+    fun `prepares linux update and exits only after managed restart is ready`() = runTest {
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
@@ -835,6 +839,7 @@ class DashboardViewModelTest {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
         var preparedVersion: String? = null
+        val stages = mutableListOf<AutomaticUpdateStage>()
         val installer = object : AppUpdateInstaller {
             override val isSupported: Boolean = true
 
@@ -842,9 +847,16 @@ class DashboardViewModelTest {
                 return update.linuxDebInstallerDownloadUrl != null
             }
 
-            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
+            override suspend fun prepareUpdateInstallation(
+                update: AppUpdateInfo,
+                onStageChanged: (AutomaticUpdateStage) -> Unit
+            ): Result<PreparedUpdateAction> {
                 preparedVersion = update.version
-                return Result.success(PreparedUpdateAction.InstallerOpened)
+                stages += AutomaticUpdateStage.INSTALLING
+                onStageChanged(AutomaticUpdateStage.INSTALLING)
+                stages += AutomaticUpdateStage.RESTARTING
+                onStageChanged(AutomaticUpdateStage.RESTARTING)
+                return Result.success(PreparedUpdateAction.RestartAndExit)
             }
         }
 
@@ -870,12 +882,17 @@ class DashboardViewModelTest {
         )
         viewModel.cancelCountdown()
 
-        awaitConditionRealTime { viewModel.appUpdateState.value is AppUpdateUiState.InstallerOpened }
+        awaitConditionRealTime { viewModel.appUpdateState.value is AppUpdateUiState.Restarting }
+        awaitConditionRealTime { viewModel.shouldExitForUpdate.value }
 
         val updateState = viewModel.appUpdateState.value
-        assertIs<AppUpdateUiState.InstallerOpened>(updateState)
+        assertIs<AppUpdateUiState.Restarting>(updateState)
         assertEquals("7.1.0", preparedVersion)
-        assertEquals(false, viewModel.shouldExitForUpdate.value)
+        assertEquals(
+            listOf(AutomaticUpdateStage.INSTALLING, AutomaticUpdateStage.RESTARTING),
+            stages
+        )
+        assertEquals(true, viewModel.shouldExitForUpdate.value)
         viewModel.onDestroy()
     }
 
@@ -1080,7 +1097,10 @@ class DashboardViewModelTest {
                 return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
             }
 
-            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
+            override suspend fun prepareUpdateInstallation(
+                update: AppUpdateInfo,
+                onStageChanged: (AutomaticUpdateStage) -> Unit
+            ): Result<PreparedUpdateAction> {
                 attempts += 1
                 return if (attempts == 1) {
                     Result.failure(IllegalStateException("Falha ao baixar o pacote"))

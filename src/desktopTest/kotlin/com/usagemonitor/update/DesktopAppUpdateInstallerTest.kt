@@ -1,25 +1,34 @@
 package com.usagemonitor.update
 
 import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.presentation.viewmodel.AutomaticUpdateStage
+import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DesktopAppUpdateInstallerTest {
 
-    private val sampleUpdate = AppUpdateInfo(
-        version = "13.0.0",
-        releasePageUrl = "https://example.com/releases/tag/v13.0.0",
-        linuxDebInstallerDownloadUrl = "https://example.com/usage-monitor_13.0.0_amd64.deb"
-    )
+    private fun sampleUpdate(downloadUrl: String = "https://example.com/usage-monitor_13.0.0_amd64.deb"): AppUpdateInfo {
+        return AppUpdateInfo(
+            version = "13.0.0",
+            releasePageUrl = "https://example.com/releases/tag/v13.0.0",
+            linuxDebInstallerDownloadUrl = downloadUrl
+        )
+    }
 
     @Test
     fun `linux automatic update requires dpkg`() {
         val support = getLinuxAutomaticUpdateSupport(
-            update = sampleUpdate,
+            update = sampleUpdate(),
             executablePathResolver = { "/opt/Usage Monitor/bin/usage-monitor" },
-            commandAvailabilityChecker = { command -> command == "xdg-open" },
+            commandAvailabilityChecker = { command -> command == "pkcon" },
             debPackageInstallationChecker = { true }
         )
 
@@ -30,7 +39,7 @@ class DesktopAppUpdateInstallerTest {
     @Test
     fun `linux automatic update requires deb-managed launcher`() {
         val support = getLinuxAutomaticUpdateSupport(
-            update = sampleUpdate,
+            update = sampleUpdate(),
             executablePathResolver = { "/home/user/apps/usage-monitor/usage-monitor" },
             commandAvailabilityChecker = { true },
             debPackageInstallationChecker = { false }
@@ -44,9 +53,9 @@ class DesktopAppUpdateInstallerTest {
     }
 
     @Test
-    fun `linux automatic update requires a graphical package opener`() {
+    fun `linux automatic update requires pkcon`() {
         val support = getLinuxAutomaticUpdateSupport(
-            update = sampleUpdate,
+            update = sampleUpdate(),
             executablePathResolver = { "/usr/bin/usage-monitor" },
             commandAvailabilityChecker = { command -> command == "dpkg" },
             debPackageInstallationChecker = { true }
@@ -54,38 +63,118 @@ class DesktopAppUpdateInstallerTest {
 
         assertFalse(support.isSupported)
         assertEquals(
-            "A graphical package opener (xdg-open or gio open) is required to start the Linux update installer.",
+            "PackageKit pkcon is required to install the Linux update automatically.",
             support.failureMessage
         )
     }
 
     @Test
-    fun `linux automatic update support keeps launcher path and xdg-open for deb install`() {
+    fun `linux automatic update support keeps launcher path and pkcon command`() {
         val support = getLinuxAutomaticUpdateSupport(
-            update = sampleUpdate,
+            update = sampleUpdate(),
             executablePathResolver = { "/usr/bin/usage-monitor" },
-            commandAvailabilityChecker = { command -> command == "dpkg" || command == "xdg-open" },
+            commandAvailabilityChecker = { command -> command == "dpkg" || command == "pkcon" },
             debPackageInstallationChecker = { true }
         )
 
         assertTrue(support.isSupported)
         assertEquals("/usr/bin/usage-monitor", support.executablePath)
-        assertEquals(listOf("xdg-open"), support.opener?.command)
+        assertEquals(listOf("pkcon", "--noninteractive", "install-local"), support.packageManager?.command)
+        assertEquals("pkcon install-local", support.packageManager?.displayName)
         assertEquals(null, support.failureMessage)
     }
 
     @Test
-    fun `linux automatic update falls back to gio open when xdg-open is unavailable`() {
-        val support = getLinuxAutomaticUpdateSupport(
-            update = sampleUpdate,
-            executablePathResolver = { "/usr/bin/usage-monitor" },
-            commandAvailabilityChecker = { command -> command == "dpkg" || command == "gio" },
-            debPackageInstallationChecker = { true }
+    fun `linux automatic update installs via pkcon and requests restart`() {
+        val downloadedDeb = createTempDebFile()
+        val launcher = createTempLauncherFile()
+        val commands = mutableListOf<List<String>>()
+        val stages = mutableListOf<AutomaticUpdateStage>()
+        var invocations = 0
+
+        val result = prepareLinuxUpdateInstallation(
+            update = sampleUpdate(downloadedDeb.toURI().toString()),
+            executablePathResolver = { launcher.absolutePath },
+            commandAvailabilityChecker = { command -> command == "dpkg" || command == "pkcon" },
+            debPackageInstallationChecker = { true },
+            processLauncher = { command, _ ->
+                commands += command
+                invocations += 1
+                when (invocations) {
+                    1 -> FakeProcess(exitCode = 0, output = "install complete")
+                    2 -> FakeProcess(exitCode = 0, output = "", waitCompletes = false)
+                    else -> error("unexpected process invocation")
+                }
+            },
+            onStageChanged = { stages += it }
         )
 
-        assertTrue(support.isSupported)
-        assertEquals(listOf("gio", "open"), support.opener?.command)
-        assertEquals("gio open", support.opener?.displayName)
+        assertTrue(result.isSuccess)
+        assertIs<PreparedUpdateAction.RestartAndExit>(result.getOrThrow())
+        assertEquals(
+            listOf("pkcon", "--noninteractive", "install-local"),
+            commands.first().dropLast(1)
+        )
+        assertTrue(commands.first().last().endsWith("${File.separator}UsageMonitor-13.0.0.deb"))
+        assertEquals(listOf(launcher.absolutePath), commands.last())
+        assertEquals(
+            listOf(AutomaticUpdateStage.INSTALLING, AutomaticUpdateStage.RESTARTING),
+            stages
+        )
+    }
+
+    @Test
+    fun `linux automatic update fails when pkcon cannot authenticate`() {
+        val downloadedDeb = createTempDebFile()
+        val launcher = createTempLauncherFile()
+        val stages = mutableListOf<AutomaticUpdateStage>()
+
+        val result = prepareLinuxUpdateInstallation(
+            update = sampleUpdate(downloadedDeb.toURI().toString()),
+            executablePathResolver = { launcher.absolutePath },
+            commandAvailabilityChecker = { command -> command == "dpkg" || command == "pkcon" },
+            debPackageInstallationChecker = { true },
+            processLauncher = { _, _ ->
+                FakeProcess(exitCode = 1, output = "Authentication failed")
+            },
+            onStageChanged = { stages += it }
+        )
+
+        assertTrue(result.isFailure)
+        assertEquals(
+            "pkcon install-local could not authenticate the Linux update request.",
+            result.exceptionOrNull()?.message
+        )
+        assertEquals(listOf(AutomaticUpdateStage.INSTALLING), stages)
+    }
+
+    @Test
+    fun `linux automatic update fails when restarted app cannot be launched`() {
+        val downloadedDeb = createTempDebFile()
+        val launcher = createTempLauncherFile()
+        var invocations = 0
+
+        val result = prepareLinuxUpdateInstallation(
+            update = sampleUpdate(downloadedDeb.toURI().toString()),
+            executablePathResolver = { launcher.absolutePath },
+            commandAvailabilityChecker = { command -> command == "dpkg" || command == "pkcon" },
+            debPackageInstallationChecker = { true },
+            processLauncher = { _, _ ->
+                invocations += 1
+                when (invocations) {
+                    1 -> FakeProcess(exitCode = 0, output = "install complete")
+                    2 -> FakeProcess(exitCode = 1, output = "launcher boom")
+                    else -> error("unexpected process invocation")
+                }
+            },
+            onStageChanged = {}
+        )
+
+        assertTrue(result.isFailure)
+        assertEquals(
+            "Installed application launcher could not be started after the Linux update: launcher boom",
+            result.exceptionOrNull()?.message
+        )
     }
 
     @Test
@@ -108,5 +197,46 @@ class DesktopAppUpdateInstallerTest {
 
         assertTrue(script.contains("""Start-Process -FilePath "msiexec.exe""""))
         assertTrue(script.contains("@('/i', \$installerPath)"))
+    }
+
+    private fun createTempDebFile(): File {
+        val file = Files.createTempFile("usage-monitor-update-test", ".deb").toFile()
+        file.writeText("fake deb content")
+        file.deleteOnExit()
+        return file
+    }
+
+    private fun createTempLauncherFile(): File {
+        val file = Files.createTempFile("usage-monitor-launcher-test", ".sh").toFile()
+        file.writeText("#!/bin/sh\nexit 0\n")
+        file.deleteOnExit()
+        return file
+    }
+
+    private class FakeProcess(
+        private val exitCode: Int,
+        output: String,
+        private val waitCompletes: Boolean = true
+    ) : Process() {
+        private val input = ByteArrayInputStream(output.toByteArray())
+        private val output = ByteArrayOutputStream()
+
+        override fun getOutputStream() = output
+
+        override fun getInputStream() = input
+
+        override fun getErrorStream() = ByteArrayInputStream(ByteArray(0))
+
+        override fun waitFor(): Int = exitCode
+
+        override fun waitFor(timeout: Long, unit: java.util.concurrent.TimeUnit): Boolean = waitCompletes
+
+        override fun exitValue(): Int = exitCode
+
+        override fun destroy() = Unit
+
+        override fun destroyForcibly(): Process = this
+
+        override fun isAlive(): Boolean = !waitCompletes
     }
 }

@@ -36,6 +36,7 @@ private const val UPDATE_CHECK_INTERVAL_MS = 6 * 3_600_000L
 private const val UPDATE_CHECK_INTERVAL_WHILE_RUNNING_MS = 60 * 60_000L
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
 private const val INSTALLER_HANDOFF_DELAY_MS = 1_500L
+private const val RESTART_HANDOFF_DELAY_MS = 800L
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
@@ -283,7 +284,7 @@ class DashboardViewModel(
             is AppUpdateUiState.Failed -> if (currentState.automaticInstallSupported) currentState.update else null
             is AppUpdateUiState.Downloading -> null
             is AppUpdateUiState.Installing -> null
-            is AppUpdateUiState.InstallerOpened -> null
+            is AppUpdateUiState.Restarting -> null
             null -> null
         }
 
@@ -384,7 +385,8 @@ class DashboardViewModel(
 
             if (
                 currentState is AppUpdateUiState.Downloading ||
-                currentState is AppUpdateUiState.Installing
+                currentState is AppUpdateUiState.Installing ||
+                currentState is AppUpdateUiState.Restarting
             ) {
                 return@withLock
             }
@@ -408,7 +410,7 @@ class DashboardViewModel(
                         return@onSuccess
                     }
 
-                    if (currentState is AppUpdateUiState.InstallerOpened && currentState.update.version == update.version) {
+                    if (currentState is AppUpdateUiState.Restarting && currentState.update.version == update.version) {
                         return@onSuccess
                     }
 
@@ -427,7 +429,17 @@ class DashboardViewModel(
         _appUpdateState.value = AppUpdateUiState.Downloading(update)
 
         viewModelScope.launch {
-            appUpdateInstaller.prepareUpdateInstallation(update)
+            appUpdateInstaller.prepareUpdateInstallation(update) { stage ->
+                when (stage) {
+                    AutomaticUpdateStage.INSTALLING -> {
+                        _appUpdateState.value = AppUpdateUiState.Installing(update)
+                    }
+
+                    AutomaticUpdateStage.RESTARTING -> {
+                        _appUpdateState.value = AppUpdateUiState.Restarting(update)
+                    }
+                }
+            }
                 .onSuccess { action ->
                     when (action) {
                         PreparedUpdateAction.ExitAndInstall -> {
@@ -436,8 +448,10 @@ class DashboardViewModel(
                             _shouldExitForUpdate.value = true
                         }
 
-                        PreparedUpdateAction.InstallerOpened -> {
-                            _appUpdateState.value = AppUpdateUiState.InstallerOpened(update)
+                        PreparedUpdateAction.RestartAndExit -> {
+                            _appUpdateState.value = AppUpdateUiState.Restarting(update)
+                            delay(RESTART_HANDOFF_DELAY_MS)
+                            _shouldExitForUpdate.value = true
                         }
                     }
                 }

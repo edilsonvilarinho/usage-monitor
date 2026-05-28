@@ -44,6 +44,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
+import com.usagemonitor.presentation.ui.components.BannerTone
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.ShimmerBox
@@ -603,6 +604,7 @@ private fun AppUpdateBanner(
         description = content.description,
         actionLabel = content.actionLabel,
         onAction = if (content.showRetryAction) onRetryInstallation else null,
+        tone = if (state is AppUpdateUiState.Failed) BannerTone.ERROR else BannerTone.INFO,
         modifier = modifier
     )
 }
@@ -653,27 +655,27 @@ private fun updateBannerContent(
 
         is AppUpdateUiState.Installing -> UpdateBannerContent(
             title = if (language == AppLanguage.PT) {
-                "Atualização pronta para instalar"
+                "Instalando atualização ${state.update.version}"
             } else {
-                "Update is ready to install"
+                "Installing update ${state.update.version}"
             },
             description = if (language == AppLanguage.PT) {
-                "Fechando o app para iniciar o instalador da versão ${state.update.version}."
+                "Executando a instalação automática da atualização. Isso pode levar alguns instantes."
             } else {
-                "Closing the app to start the installer for version ${state.update.version}."
+                "Running the automatic update installation. This may take a few moments."
             }
         )
 
-        is AppUpdateUiState.InstallerOpened -> UpdateBannerContent(
+        is AppUpdateUiState.Restarting -> UpdateBannerContent(
             title = if (language == AppLanguage.PT) {
-                "Pacote da atualização aberto"
+                "Reiniciando na versão ${state.update.version}"
             } else {
-                "Update package opened"
+                "Restarting into version ${state.update.version}"
             },
             description = if (language == AppLanguage.PT) {
-                "O instalador do sistema foi aberto para a versão ${state.update.version}. Conclua a instalação por lá; este app continuará aberto até você terminar."
+                "A nova versão já foi instalada. Fechando esta instância para abrir o app atualizado."
             } else {
-                "The system package installer was opened for version ${state.update.version}. Finish the installation there; this app will stay open until you complete it."
+                "The new version has already been installed. Closing this instance to open the updated app."
             }
         )
 
@@ -693,9 +695,9 @@ private fun updateBannerContent(
                 }
             }
             val description = if (language == AppLanguage.PT) {
-                "Não foi possível baixar ou abrir o instalador automaticamente. ${state.message}"
+                "Não foi possível concluir a instalação automática da atualização. ${state.message}"
             } else {
-                "The app could not download or open the installer automatically. ${state.message}"
+                "The app could not finish the automatic update installation. ${state.message}"
             }
 
             UpdateBannerContent(

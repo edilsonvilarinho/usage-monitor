@@ -17,19 +17,38 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 
+enum class BannerTone {
+    INFO,
+    ERROR
+}
+
 @Composable
 fun PersistentApiWarningBanner(
     title: String,
     description: String,
     actionLabel: String?,
     onAction: (() -> Unit)?,
+    tone: BannerTone = BannerTone.ERROR,
     modifier: Modifier = Modifier
 ) {
+    val containerColor = when (tone) {
+        BannerTone.INFO -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f)
+        BannerTone.ERROR -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.80f)
+    }
+    val accentColor = when (tone) {
+        BannerTone.INFO -> MaterialTheme.colorScheme.primary
+        BannerTone.ERROR -> MaterialTheme.colorScheme.error
+    }
+    val contentColor = when (tone) {
+        BannerTone.INFO -> MaterialTheme.colorScheme.onPrimaryContainer
+        BannerTone.ERROR -> MaterialTheme.colorScheme.onErrorContainer
+    }
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         tonalElevation = AppElevation.banner,
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.80f)
+        color = containerColor
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -40,15 +59,15 @@ fun PersistentApiWarningBanner(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "!",
+                    text = if (tone == BannerTone.INFO) "i" else "!",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    color = accentColor,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    color = contentColor,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -56,7 +75,7 @@ fun PersistentApiWarningBanner(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                color = contentColor.copy(alpha = 0.85f)
             )
 
             if (actionLabel != null && onAction != null) {

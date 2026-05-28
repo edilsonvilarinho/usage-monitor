@@ -51,6 +51,7 @@ import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
+import com.usagemonitor.presentation.viewmodel.AutomaticUpdateStage
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
@@ -156,7 +157,7 @@ class ComponentTest {
         )
     }
 
-    private fun dashboardViewModelWithOpenedLinuxInstaller(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
+    private fun dashboardViewModelWithManagedLinuxUpdate(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         }
@@ -196,8 +197,13 @@ class ComponentTest {
                 return update.linuxDebInstallerDownloadUrl != null
             }
 
-            override suspend fun prepareUpdateInstallation(update: AppUpdateInfo): Result<PreparedUpdateAction> {
-                return Result.success(PreparedUpdateAction.InstallerOpened)
+            override suspend fun prepareUpdateInstallation(
+                update: AppUpdateInfo,
+                onStageChanged: (AutomaticUpdateStage) -> Unit
+            ): Result<PreparedUpdateAction> {
+                onStageChanged(AutomaticUpdateStage.INSTALLING)
+                onStageChanged(AutomaticUpdateStage.RESTARTING)
+                return Result.success(PreparedUpdateAction.RestartAndExit)
             }
         }
 
@@ -735,9 +741,9 @@ class ComponentTest {
     }
 
     @Test
-    fun `DashboardScreen shows Linux installer opened banner without closing guidance`() = runDesktopComposeUiTest {
+    fun `DashboardScreen shows Linux restarting banner after managed update`() = runDesktopComposeUiTest {
         val enabledApis = MutableStateFlow(emptySet<ApiSource>())
-        val viewModel = dashboardViewModelWithOpenedLinuxInstaller(enabledApis)
+        val viewModel = dashboardViewModelWithManagedLinuxUpdate(enabledApis)
         viewModel.cancelCountdown()
 
         setContent {
@@ -760,13 +766,13 @@ class ComponentTest {
 
         waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                onNodeWithText("Pacote da atualização aberto").fetchSemanticsNode()
+                onNodeWithText("Reiniciando na versão 7.1.0").fetchSemanticsNode()
                 true
             }.getOrDefault(false)
         }
 
-        onNodeWithText("Pacote da atualização aberto").assertIsDisplayed()
-        onNodeWithText("O instalador do sistema foi aberto para a versão 7.1.0. Conclua a instalação por lá; este app continuará aberto até você terminar.").assertIsDisplayed()
+        onNodeWithText("Reiniciando na versão 7.1.0").assertIsDisplayed()
+        onNodeWithText("A nova versão já foi instalada. Fechando esta instância para abrir o app atualizado.").assertIsDisplayed()
         viewModel.onDestroy()
     }
 
