@@ -291,6 +291,8 @@ class ComponentTest {
         onAllNodesWithText("0/4K tok").assertCountEquals(0)
         onAllNodesWithText("39K/40K tok").assertCountEquals(0)
         onNodeWithText("Semanal").assertIsDisplayed()
+        onNodeWithText("Reinício: Ter 14h40 BRT").assertIsDisplayed()
+        onNodeWithText("Reinício: Dom 03/05 9h00 BRT").assertIsDisplayed()
     }
 
     @Test
