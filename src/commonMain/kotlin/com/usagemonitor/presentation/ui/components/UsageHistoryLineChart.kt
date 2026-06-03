@@ -33,7 +33,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,16 +56,59 @@ import kotlin.math.roundToInt
 
 private const val HISTORY_TOOLTIP_PADDING_PX = 8f
 private const val HISTORY_TOOLTIP_OFFSET_PX = 10f
+private const val HISTORY_DRAG_SELECTION_THRESHOLD_PX = 10f
 private val HISTORY_PLOT_HEIGHT = 120.dp
 private val HISTORY_TOOLTIP_BAND_HEIGHT = 48.dp
 private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HEIGHT
 
+internal data class PinnedHistorySelection(
+    val chartKey: String,
+    val anchorIndex: Int,
+    val currentIndex: Int
+)
+
+internal class HistoryChartSelectionController(
+    initialSelection: PinnedHistorySelection? = null
+) {
+    var selection by mutableStateOf(initialSelection)
+        private set
+
+    fun pin(chartKey: String, anchorIndex: Int, currentIndex: Int) {
+        selection = PinnedHistorySelection(
+            chartKey = chartKey,
+            anchorIndex = anchorIndex,
+            currentIndex = currentIndex
+        )
+    }
+
+    fun clear() {
+        selection = null
+    }
+}
+
+internal data class DragSelectionSession(
+    val chartKey: String,
+    val anchorIndex: Int?,
+    val currentIndex: Int?,
+    val pointerDownX: Float,
+    val startedWithPinnedSelection: Boolean,
+    val hasDragged: Boolean = false
+)
+
+internal sealed interface HistorySelectionGestureOutcome {
+    data object NoChange : HistorySelectionGestureOutcome
+    data object Clear : HistorySelectionGestureOutcome
+    data class Pin(val selection: PinnedHistorySelection) : HistorySelectionGestureOutcome
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun UsageHistoryLineChart(
+internal fun UsageHistoryLineChart(
     points: List<UsageHistoryPoint>,
     unit: UsageUnit,
     language: AppLanguage,
+    chartSelectionKey: String,
+    selectionController: HistoryChartSelectionController? = null,
     modifier: Modifier = Modifier,
     tooltipTitle: String? = null,
     tooltipSubtitle: String? = null
@@ -80,7 +125,9 @@ fun UsageHistoryLineChart(
     var frameSize by remember(renderPoints) { mutableStateOf(IntSize.Zero) }
     var plotSize by remember(renderPoints) { mutableStateOf(IntSize.Zero) }
     var tooltipSize by remember(renderPoints) { mutableStateOf(IntSize.Zero) }
-    var hoveredIndex by remember(renderPoints) { mutableStateOf<Int?>(null) }
+    var hoveredIndex by remember(renderPoints, chartSelectionKey) { mutableStateOf<Int?>(null) }
+    var dragSession by remember(renderPoints, chartSelectionKey) { mutableStateOf<DragSelectionSession?>(null) }
+    val density = LocalDensity.current
 
     val revealFraction by animateFloatAsState(
         targetValue = if (revealed) 1f else 0f,
@@ -88,10 +135,18 @@ fun UsageHistoryLineChart(
         label = "lineReveal"
     )
 
-    LaunchedEffect(renderPoints) {
+    LaunchedEffect(renderPoints, chartSelectionKey) {
         revealed = false
         hoveredIndex = null
+        dragSession = null
         tooltipSize = IntSize.Zero
+        val currentSelection = selectionController?.selection
+        if (currentSelection != null &&
+            currentSelection.chartKey == chartSelectionKey &&
+            !currentSelection.isValidFor(renderPoints.size)
+        ) {
+            selectionController.clear()
+        }
         delay(40)
         revealed = true
     }
@@ -107,15 +162,31 @@ fun UsageHistoryLineChart(
             axis = valueAxis
         )
     }
-    val activePoint = hoveredIndex?.let { index -> plotPoints.getOrNull(index) }
-    val tooltipModel = remember(activePoint, renderPoints, unit, language, tooltipTitle, tooltipSubtitle) {
+    val pinnedSelection = selectionController
+        ?.selection
+        ?.takeIf { selection ->
+            selection.chartKey == chartSelectionKey && selection.isValidFor(renderPoints.size)
+        }
+    val activeIndex = pinnedSelection?.currentIndex ?: hoveredIndex
+    val activePoint = activeIndex?.let { index -> plotPoints.getOrNull(index) }
+    val comparisonPoint = pinnedSelection?.anchorIndex?.let(renderPoints::getOrNull)
+    val tooltipModel = remember(
+        activePoint,
+        comparisonPoint,
+        renderPoints,
+        unit,
+        language,
+        tooltipTitle,
+        tooltipSubtitle
+    ) {
         buildHistoryTooltipModel(
             activePoint = activePoint,
             points = renderPoints,
             unit = unit,
             language = language,
             title = tooltipTitle,
-            subtitle = tooltipSubtitle
+            subtitle = tooltipSubtitle,
+            comparisonPoint = comparisonPoint
         )
     }
 
@@ -147,6 +218,7 @@ fun UsageHistoryLineChart(
             }
 
             val startPadding = if (valueLabels.isNotEmpty()) 48.dp else 0.dp
+            val startPaddingPx = with(density) { startPadding.toPx() }
             val plotTop = (frameSize.height - plotSize.height).coerceAtLeast(0)
 
             Box(
@@ -156,23 +228,17 @@ fun UsageHistoryLineChart(
                     .fillMaxWidth()
                     .height(HISTORY_PLOT_HEIGHT)
                     .onSizeChanged { plotSize = it }
-                    .onPointerEvent(PointerEventType.Enter) { event ->
-                        val pointerX = event.changes.firstOrNull()?.position?.x ?: return@onPointerEvent
-                        hoveredIndex = findClosestPlotPointIndex(plotPoints, pointerX)
-                    }
-                    .onPointerEvent(PointerEventType.Move) { event ->
-                        val pointerX = event.changes.firstOrNull()?.position?.x ?: return@onPointerEvent
-                        hoveredIndex = findClosestPlotPointIndex(plotPoints, pointerX)
-                    }
-                    .onPointerEvent(PointerEventType.Exit) {
-                        hoveredIndex = null
-                    }
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val strokeWidth = 1.75.dp.toPx()
                     val gridStroke = 1.dp.toPx()
                     val activeMarkerRadius = 4.dp.toPx()
                     val activeMarkerHaloRadius = 7.dp.toPx()
+                    val anchorMarkerRadius = 3.dp.toPx()
+                    val anchorMarkerHaloRadius = 6.dp.toPx()
+                    val anchorPoint = pinnedSelection
+                        ?.anchorIndex
+                        ?.let { anchorIndex -> plotPoints.getOrNull(anchorIndex) }
 
                     drawLine(
                         color = gridColor,
@@ -242,6 +308,25 @@ fun UsageHistoryLineChart(
                             center = Offset(activePoint.x, activePoint.y)
                         )
                     }
+
+                    if (anchorPoint != null && anchorPoint.index != activePoint?.index) {
+                        drawLine(
+                            color = chartIndicatorColor.copy(alpha = 0.12f),
+                            start = Offset(anchorPoint.x, 0f),
+                            end = Offset(anchorPoint.x, size.height),
+                            strokeWidth = gridStroke
+                        )
+                        drawCircle(
+                            color = chartIndicatorHaloColor.copy(alpha = 0.9f),
+                            radius = anchorMarkerHaloRadius,
+                            center = Offset(anchorPoint.x, anchorPoint.y)
+                        )
+                        drawCircle(
+                            color = chartIndicatorColor.copy(alpha = 0.72f),
+                            radius = anchorMarkerRadius,
+                            center = Offset(anchorPoint.x, anchorPoint.y)
+                        )
+                    }
                 }
             }
 
@@ -279,6 +364,119 @@ fun UsageHistoryLineChart(
                     }
                 }
             }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onPointerEvent(PointerEventType.Enter) { event ->
+                        if (selectionController?.selection != null || dragSession != null) {
+                            return@onPointerEvent
+                        }
+
+                        val framePointerX = event.changes.firstOrNull()?.position?.x ?: return@onPointerEvent
+                        val plotPointerX = framePointerToPlotPointerX(
+                            framePointerX = framePointerX,
+                            plotStartX = startPaddingPx,
+                            plotWidth = plotSize.width.toFloat()
+                        ) ?: return@onPointerEvent
+                        hoveredIndex = findClosestPlotPointIndex(plotPoints, plotPointerX)
+                    }
+                    .onPointerEvent(PointerEventType.Press) { event ->
+                        val framePointerX = event.changes.firstOrNull()?.position?.x ?: return@onPointerEvent
+                        val plotPointerX = framePointerToPlotPointerX(
+                            framePointerX = framePointerX,
+                            plotStartX = startPaddingPx,
+                            plotWidth = plotSize.width.toFloat()
+                        ) ?: return@onPointerEvent
+
+                        dragSession = startHistoryDragSelectionSession(
+                            chartKey = chartSelectionKey,
+                            plotPoints = plotPoints,
+                            pointerDownX = plotPointerX,
+                            existingSelection = selectionController?.selection
+                        )
+                    }
+                    .onPointerEvent(PointerEventType.Move) { event ->
+                        val primaryPressed = event.buttons.isPrimaryPressed ||
+                            event.changes.any { change -> change.pressed }
+                        val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                        val plotPointerX = coerceFramePointerToPlotPointerX(
+                            framePointerX = change.position.x,
+                            plotStartX = startPaddingPx,
+                            plotWidth = plotSize.width.toFloat()
+                        )
+
+                        if (primaryPressed) {
+                            val activePlotPointerX = plotPointerX ?: return@onPointerEvent
+                            val session = dragSession ?: startHistoryDragSelectionSession(
+                                chartKey = chartSelectionKey,
+                                plotPoints = plotPoints,
+                                pointerDownX = coerceFramePointerToPlotPointerX(
+                                    framePointerX = change.previousPosition.x,
+                                    plotStartX = startPaddingPx,
+                                    plotWidth = plotSize.width.toFloat()
+                                ) ?: activePlotPointerX,
+                                existingSelection = selectionController?.selection
+                            )
+                            val updatedSession = updateHistoryDragSelectionSession(
+                                session = session,
+                                plotPoints = plotPoints,
+                                pointerX = activePlotPointerX,
+                                dragThresholdPx = HISTORY_DRAG_SELECTION_THRESHOLD_PX
+                            )
+                            dragSession = updatedSession
+                            if (updatedSession.hasDragged &&
+                                updatedSession.anchorIndex != null &&
+                                updatedSession.currentIndex != null
+                            ) {
+                                hoveredIndex = null
+                                selectionController?.pin(
+                                    chartKey = chartSelectionKey,
+                                    anchorIndex = updatedSession.anchorIndex,
+                                    currentIndex = updatedSession.currentIndex
+                                )
+                            }
+                            return@onPointerEvent
+                        }
+
+                        finalizeDragSelectionSession(
+                            session = dragSession,
+                            selectionController = selectionController,
+                            onCleared = { hoveredIndex = null }
+                        )
+                        dragSession = null
+
+                        if (selectionController?.selection != null) {
+                            return@onPointerEvent
+                        }
+
+                        if (plotPointerX == null) {
+                            hoveredIndex = null
+                            return@onPointerEvent
+                        }
+
+                        hoveredIndex = findClosestPlotPointIndex(plotPoints, plotPointerX)
+                    }
+                    .onPointerEvent(PointerEventType.Release) {
+                        finalizeDragSelectionSession(
+                            session = dragSession,
+                            selectionController = selectionController,
+                            onCleared = { hoveredIndex = null }
+                        )
+                        dragSession = null
+                    }
+                    .onPointerEvent(PointerEventType.Exit) {
+                        finalizeDragSelectionSession(
+                            session = dragSession,
+                            selectionController = selectionController,
+                            onCleared = { hoveredIndex = null }
+                        )
+                        dragSession = null
+                        if (selectionController?.selection == null) {
+                            hoveredIndex = null
+                        }
+                    }
+            )
         }
 
         if (timeLabels.isNotEmpty()) {
@@ -491,20 +689,125 @@ internal fun clampTooltipLeft(
     return unclampedLeft.coerceIn(minLeft, maxLeft)
 }
 
+internal fun framePointerToPlotPointerX(
+    framePointerX: Float,
+    plotStartX: Float,
+    plotWidth: Float
+): Float? {
+    if (plotWidth <= 0f) {
+        return null
+    }
+
+    val translatedPointerX = framePointerX - plotStartX
+    if (translatedPointerX < 0f || translatedPointerX > plotWidth) {
+        return null
+    }
+
+    return translatedPointerX
+}
+
+internal fun coerceFramePointerToPlotPointerX(
+    framePointerX: Float,
+    plotStartX: Float,
+    plotWidth: Float
+): Float? {
+    if (plotWidth <= 0f) {
+        return null
+    }
+
+    return (framePointerX - plotStartX).coerceIn(0f, plotWidth)
+}
+
+internal fun startHistoryDragSelectionSession(
+    chartKey: String,
+    plotPoints: List<ChartPlotPoint>,
+    pointerDownX: Float,
+    existingSelection: PinnedHistorySelection?
+): DragSelectionSession {
+    val anchorIndex = findClosestPlotPointIndex(plotPoints, pointerDownX)
+    return DragSelectionSession(
+        chartKey = chartKey,
+        anchorIndex = anchorIndex,
+        currentIndex = anchorIndex,
+        pointerDownX = pointerDownX,
+        startedWithPinnedSelection = existingSelection?.chartKey == chartKey
+    )
+}
+
+internal fun updateHistoryDragSelectionSession(
+    session: DragSelectionSession,
+    plotPoints: List<ChartPlotPoint>,
+    pointerX: Float,
+    dragThresholdPx: Float = HISTORY_DRAG_SELECTION_THRESHOLD_PX
+): DragSelectionSession {
+    val currentIndex = findClosestPlotPointIndex(plotPoints, pointerX) ?: session.currentIndex
+    val hasDragged = session.hasDragged || abs(pointerX - session.pointerDownX) >= dragThresholdPx
+    return session.copy(
+        currentIndex = currentIndex,
+        hasDragged = hasDragged
+    )
+}
+
+internal fun finalizeDragSelectionSession(
+    session: DragSelectionSession?,
+    selectionController: HistoryChartSelectionController?,
+    onCleared: () -> Unit = {}
+) {
+    val activeSession = session ?: return
+    when (val outcome = resolveHistorySelectionGestureOutcome(activeSession)) {
+        HistorySelectionGestureOutcome.Clear -> {
+            selectionController?.clear()
+            onCleared()
+        }
+
+        HistorySelectionGestureOutcome.NoChange -> Unit
+
+        is HistorySelectionGestureOutcome.Pin -> {
+            selectionController?.pin(
+                chartKey = outcome.selection.chartKey,
+                anchorIndex = outcome.selection.anchorIndex,
+                currentIndex = outcome.selection.currentIndex
+            )
+            onCleared()
+        }
+    }
+}
+
+internal fun resolveHistorySelectionGestureOutcome(
+    session: DragSelectionSession
+): HistorySelectionGestureOutcome {
+    if (session.hasDragged && session.anchorIndex != null && session.currentIndex != null) {
+        return HistorySelectionGestureOutcome.Pin(
+            PinnedHistorySelection(
+                chartKey = session.chartKey,
+                anchorIndex = session.anchorIndex,
+                currentIndex = session.currentIndex
+            )
+        )
+    }
+
+    if (session.startedWithPinnedSelection) {
+        return HistorySelectionGestureOutcome.Clear
+    }
+
+    return HistorySelectionGestureOutcome.NoChange
+}
+
 internal fun buildHistoryTooltipModel(
     activePoint: ChartPlotPoint?,
     points: List<UsageHistoryPoint>,
     unit: UsageUnit,
     language: AppLanguage,
     title: String?,
-    subtitle: String?
+    subtitle: String?,
+    comparisonPoint: UsageHistoryPoint? = null
 ): HistoryTooltipModel? {
     if (activePoint == null) {
         return null
     }
 
     val point = activePoint.point
-    val previousPoint = points.getOrNull(activePoint.index - 1)
+    val fallbackComparisonPoint = points.getOrNull(activePoint.index - 1)
     val timestamp = formatTooltipTimestamp(point.capturedAt)
     val contextualSubtitle = if (subtitle.isNullOrBlank()) {
         timestamp
@@ -517,7 +820,7 @@ internal fun buildHistoryTooltipModel(
         subtitle = contextualSubtitle,
         metrics = buildHistoryTooltipMetrics(
             point = point,
-            previousPoint = previousPoint,
+            comparisonPoint = comparisonPoint ?: fallbackComparisonPoint,
             unit = unit,
             language = language
         )
@@ -526,7 +829,7 @@ internal fun buildHistoryTooltipModel(
 
 internal fun buildHistoryTooltipMetrics(
     point: UsageHistoryPoint,
-    previousPoint: UsageHistoryPoint?,
+    comparisonPoint: UsageHistoryPoint?,
     unit: UsageUnit,
     language: AppLanguage
 ): List<TooltipMetric> {
@@ -549,7 +852,7 @@ internal fun buildHistoryTooltipMetrics(
                 label = changeLabel,
                 value = formatTooltipDeltaValue(
                     point = point,
-                    previousPoint = previousPoint,
+                    comparisonPoint = comparisonPoint,
                     unit = unit,
                     language = language
                 )
@@ -579,6 +882,10 @@ internal fun buildTimeReferenceLabels(points: List<UsageHistoryPoint>): List<Str
         formatTimeReference(middlePoint.capturedAt, points.first().capturedAt, points.last().capturedAt),
         formatTimeReference(points.last().capturedAt, points.first().capturedAt, points.last().capturedAt)
     )
+}
+
+private fun PinnedHistorySelection.isValidFor(pointCount: Int): Boolean {
+    return anchorIndex in 0 until pointCount && currentIndex in 0 until pointCount
 }
 
 private fun buildAbsoluteAxis(values: List<Long>, minimumDisplayRange: Float): ValueAxis? {
@@ -636,6 +943,7 @@ private fun formatTooltipUsageValue(
                 "${formatCountValue(point.displayUsed)} req"
             }
         }
+
         UsageUnit.PERCENTAGE -> {
             if (point.total > 0L) {
                 "${point.used}/${point.total} % (${formatPercentage(point.used, point.total)})"
@@ -643,6 +951,7 @@ private fun formatTooltipUsageValue(
                 "${point.used} %"
             }
         }
+
         UsageUnit.TOKENS -> {
             if (point.displayTotal > 0L) {
                 val percentage = formatPercentage(point.displayUsed, point.displayTotal)
@@ -656,21 +965,75 @@ private fun formatTooltipUsageValue(
 
 private fun formatTooltipDeltaValue(
     point: UsageHistoryPoint,
-    previousPoint: UsageHistoryPoint?,
+    comparisonPoint: UsageHistoryPoint?,
     unit: UsageUnit,
     language: AppLanguage
 ): String {
-    if (previousPoint == null) {
+    if (comparisonPoint == null) {
         return if (language == AppLanguage.PT) "Sem base anterior" else "No previous point"
     }
 
-    val delta = point.displayUsed - previousPoint.displayUsed
+    val baseUnavailableLabel = if (language == AppLanguage.PT) "base indisponível" else "base unavailable"
     return when (unit) {
-        UsageUnit.CURRENCY_USD -> formatSignedCurrencyValue(delta)
-        UsageUnit.REQUESTS -> "${formatSignedCountValue(delta)} req"
-        UsageUnit.PERCENTAGE -> "${formatSignedCountValue(point.used - previousPoint.used)} p.p."
-        UsageUnit.TOKENS -> "${formatSignedCountValue(delta)} tok"
+        UsageUnit.CURRENCY_USD -> {
+            val delta = point.displayUsed - comparisonPoint.displayUsed
+            val absolute = formatSignedCurrencyValue(delta)
+            appendRelativeVariation(
+                absoluteValue = absolute,
+                deltaValue = delta.toDouble(),
+                baseValue = comparisonPoint.displayUsed.toDouble(),
+                baseUnavailableLabel = baseUnavailableLabel
+            )
+        }
+
+        UsageUnit.REQUESTS -> {
+            val delta = point.displayUsed - comparisonPoint.displayUsed
+            val absolute = "${formatSignedCountValue(delta)} req"
+            appendRelativeVariation(
+                absoluteValue = absolute,
+                deltaValue = delta.toDouble(),
+                baseValue = comparisonPoint.displayUsed.toDouble(),
+                baseUnavailableLabel = baseUnavailableLabel
+            )
+        }
+
+        UsageUnit.PERCENTAGE -> {
+            val delta = point.used - comparisonPoint.used
+            val absolute = "${formatSignedCountValue(delta)} p.p."
+            appendRelativeVariation(
+                absoluteValue = absolute,
+                deltaValue = delta.toDouble(),
+                baseValue = comparisonPoint.used.toDouble(),
+                baseUnavailableLabel = baseUnavailableLabel
+            )
+        }
+
+        UsageUnit.TOKENS -> {
+            val delta = point.displayUsed - comparisonPoint.displayUsed
+            val absolute = "${formatSignedCountValue(delta)} tok"
+            appendRelativeVariation(
+                absoluteValue = absolute,
+                deltaValue = delta.toDouble(),
+                baseValue = comparisonPoint.displayUsed.toDouble(),
+                baseUnavailableLabel = baseUnavailableLabel
+            )
+        }
     }
+}
+
+private fun appendRelativeVariation(
+    absoluteValue: String,
+    deltaValue: Double,
+    baseValue: Double,
+    baseUnavailableLabel: String
+): String {
+    if (baseValue <= 0.0) {
+        return "$absoluteValue ($baseUnavailableLabel)"
+    }
+
+    val relativePercent = (deltaValue * 100.0 / baseValue).roundToInt()
+    val relativePrefix = if (relativePercent > 0) "+" else ""
+    return "$absoluteValue (${relativePrefix}${relativePercent}%)"
 }
 
 private fun formatTooltipWindowValue(
@@ -713,11 +1076,13 @@ private fun buildValueLabels(axis: ValueAxis?, unit: UsageUnit): List<String> {
             formatCentsLabel(middle),
             formatCentsLabel(axis.min.toLong())
         )
+
         UsageUnit.REQUESTS -> listOf(
             formatCountValue(axis.max.toLong()),
             formatCountValue(middle),
             formatCountValue(axis.min.toLong())
         )
+
         else -> emptyList()
     }
 }

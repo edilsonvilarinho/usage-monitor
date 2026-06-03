@@ -58,6 +58,7 @@ import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.presentation.ui.components.HistoryChartSelectionController
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -79,6 +80,7 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val chartSelectionController = remember { HistoryChartSelectionController() }
     val selectedSourceForHeader = when (val current = state) {
         is HistoryUiState.Empty -> current.selectedSource
         is HistoryUiState.Error -> current.selectedSource
@@ -151,6 +153,10 @@ fun HistoryScreen(
                     }
 
                     is HistoryUiState.Success -> {
+                        LaunchedEffect(current.selectedSource, current.selectedRange) {
+                            chartSelectionController.clear()
+                        }
+
                         Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             HistoryControls(
                                 availableSources = current.availableSources,
@@ -179,14 +185,16 @@ fun HistoryScreen(
                                         report = current.report,
                                         accentColor = accentColor,
                                         language = language,
-                                        selectedRange = current.selectedRange
+                                        selectedRange = current.selectedRange,
+                                        selectionController = chartSelectionController
                                     )
                                 } else if (current.report.source.isObservedActivitySource()) {
                                     OpenCodeHistoryContent(
                                         report = current.report,
                                         accentColor = accentColor,
                                         language = language,
-                                        selectedRange = current.selectedRange
+                                        selectedRange = current.selectedRange,
+                                        selectionController = chartSelectionController
                                     )
                                 } else {
                                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -202,7 +210,14 @@ fun HistoryScreen(
                                                     series = series,
                                                     index = index,
                                                     accentColor = accentColor,
-                                                    language = language
+                                                    language = language,
+                                                    chartSelectionKey = buildQuotaChartSelectionKey(
+                                                        source = current.report.source,
+                                                        quotaLabel = series.quotaLabel,
+                                                        periodType = series.periodType,
+                                                        selectedRange = current.selectedRange
+                                                    ),
+                                                    selectionController = chartSelectionController
                                                 )
                                             }
                                         }
@@ -358,7 +373,8 @@ private fun DeepSeekHistoryContent(
     report: ApiUsageHistoryReport,
     accentColor: Color,
     language: AppLanguage,
-    selectedRange: HistoryRange
+    selectedRange: HistoryRange,
+    selectionController: HistoryChartSelectionController
 ) {
     val primarySeries = report.series
         .firstOrNull { series -> series.quotaLabel.equals(DeepSeekQuotaLabels.BALANCE, ignoreCase = true) }
@@ -374,7 +390,14 @@ private fun DeepSeekHistoryContent(
                 lastUpdatedAt = report.lastUpdatedAt,
                 accentColor = accentColor,
                 index = 0,
-                language = language
+                language = language,
+                chartSelectionKey = buildQuotaChartSelectionKey(
+                    source = report.source,
+                    quotaLabel = primarySeries.quotaLabel,
+                    periodType = primarySeries.periodType,
+                    selectedRange = selectedRange
+                ),
+                selectionController = selectionController
             )
         }
 
@@ -387,7 +410,14 @@ private fun DeepSeekHistoryContent(
                     lastUpdatedAt = null,
                     accentColor = accentColor,
                     index = i + 1,
-                    language = language
+                    language = language,
+                    chartSelectionKey = buildQuotaChartSelectionKey(
+                        source = report.source,
+                        quotaLabel = series.quotaLabel,
+                        periodType = series.periodType,
+                        selectedRange = selectedRange
+                    ),
+                    selectionController = selectionController
                 )
             }
         }
@@ -399,7 +429,8 @@ private fun OpenCodeHistoryContent(
     report: ApiUsageHistoryReport,
     accentColor: Color,
     language: AppLanguage,
-    selectedRange: HistoryRange
+    selectedRange: HistoryRange,
+    selectionController: HistoryChartSelectionController
 ) {
     val modelReports = remember(report.series, selectedRange) {
         buildOpenCodeHistoryGroups(report.series, selectedRange)
@@ -418,7 +449,14 @@ private fun OpenCodeHistoryContent(
                     modelReport = modelReport,
                     accentColor = accentColor,
                     index = index,
-                    language = language
+                    language = language,
+                    chartSelectionKey = buildQuotaChartSelectionKey(
+                        source = report.source,
+                        quotaLabel = modelReport.modelName,
+                        periodType = modelReport.chartSeries.periodType,
+                        selectedRange = selectedRange
+                    ),
+                    selectionController = selectionController
                 )
             }
         }
@@ -434,7 +472,9 @@ private fun DeepSeekHistoryCard(
     lastUpdatedAt: Instant?,
     accentColor: Color,
     index: Int,
-    language: AppLanguage
+    language: AppLanguage,
+    chartSelectionKey: String,
+    selectionController: HistoryChartSelectionController
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -521,6 +561,8 @@ private fun DeepSeekHistoryCard(
                     points = series.points,
                     unit = series.unit,
                     language = language,
+                    chartSelectionKey = chartSelectionKey,
+                    selectionController = selectionController,
                     tooltipTitle = title,
                     tooltipSubtitle = subtitle
                 )
@@ -543,7 +585,9 @@ private fun OpenCodeHistoryCard(
     modelReport: OpenCodeHistoryModelReport,
     accentColor: Color,
     index: Int,
-    language: AppLanguage
+    language: AppLanguage,
+    chartSelectionKey: String,
+    selectionController: HistoryChartSelectionController
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -608,6 +652,8 @@ private fun OpenCodeHistoryCard(
                     points = modelReport.chartSeries.points,
                     unit = modelReport.chartSeries.unit,
                     language = language,
+                    chartSelectionKey = chartSelectionKey,
+                    selectionController = selectionController,
                     tooltipTitle = modelReport.modelName,
                     tooltipSubtitle = openCodeHistorySubtitle(
                         periodType = modelReport.chartSeries.periodType,
@@ -652,7 +698,9 @@ private fun HistorySeriesCard(
     series: UsageHistorySeries,
     index: Int,
     accentColor: Color,
-    language: AppLanguage
+    language: AppLanguage,
+    chartSelectionKey: String,
+    selectionController: HistoryChartSelectionController
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -718,6 +766,8 @@ private fun HistorySeriesCard(
                     points = series.points,
                     unit = series.unit,
                     language = language,
+                    chartSelectionKey = chartSelectionKey,
+                    selectionController = selectionController,
                     tooltipTitle = series.quotaLabel,
                     tooltipSubtitle = if (series.periodType.name == "WEEKLY") {
                         if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
@@ -1099,4 +1149,13 @@ private fun openCodeHistorySubtitle(
             "Observed free-model activity in the 7-day weekly window."
         }
     }
+}
+
+private fun buildQuotaChartSelectionKey(
+    source: ApiSource,
+    quotaLabel: String,
+    periodType: PeriodType,
+    selectedRange: HistoryRange
+): String {
+    return "${source.name}:${quotaLabel}:${periodType.name}:${selectedRange.name}"
 }
