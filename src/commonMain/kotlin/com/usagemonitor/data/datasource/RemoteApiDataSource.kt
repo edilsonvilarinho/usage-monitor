@@ -13,6 +13,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.datetime.Clock
 
 private const val CLAUDE_USER_AGENT = "claude-code/1.0.0"
 private const val ANTHROPIC_BETA_OAUTH = "oauth-2025-04-20"
@@ -20,7 +21,10 @@ private const val GITHUB_API_VERSION = "2022-11-28"
 private const val USAGE_MONITOR_USER_AGENT = "UsageMonitorDesktop"
 
 // Aberto para permitir fakes em testes unitários (substituem chamadas HTTP reais).
-open class RemoteApiDataSource(private val httpClient: HttpClient) {
+open class RemoteApiDataSource(
+    private val httpClient: HttpClient,
+    private val codexDiagnosticsRecorder: CodexDiagnosticsRecorder = NoOpCodexDiagnosticsRecorder
+) {
 
     /**
      * Busca uso atual via endpoint dedicado OAuth da Anthropic.
@@ -53,20 +57,73 @@ open class RemoteApiDataSource(private val httpClient: HttpClient) {
     }
 
     open suspend fun fetchCodexUsage(session: CodexSession): CodexUsageResponse {
-        val response = httpClient.get("https://chatgpt.com/backend-api/codex/usage") {
-            header("Authorization", "Bearer ${session.accessToken}")
-            header("Cookie", "cap_sid=${session.capSid}")
-            header("Accept", "application/json")
-            header("User-Agent", "Codex/0.125.0")
-            contentType(ContentType.Application.Json)
-        }
+        var failureRecorded = false
 
-        if (!response.status.isSuccess()) {
-            val body = response.bodyAsText()
-            throw IllegalStateException("Codex HTTP ${response.status.value}: $body")
-        }
+        try {
+            val response = httpClient.get("https://chatgpt.com/backend-api/codex/usage") {
+                header("Authorization", "Bearer ${session.accessToken}")
+                header("Cookie", "cap_sid=${session.capSid}")
+                header("Accept", "application/json")
+                header("User-Agent", "Codex/0.125.0")
+                contentType(ContentType.Application.Json)
+            }
 
-        return response.body()
+            if (!response.status.isSuccess()) {
+                val body = response.bodyAsText()
+                codexDiagnosticsRecorder.recordFailure(
+                    CodexDiagnosticsFailureEvent(
+                        timestamp = Clock.System.now().toString(),
+                        statusCode = response.status.value,
+                        failureKind = "http_error",
+                        message = summarizeCodexFailure(body)
+                    )
+                )
+                failureRecorded = true
+                throw IllegalStateException("Codex HTTP ${response.status.value}: $body")
+            }
+
+            return try {
+                val payload = response.body<CodexUsageResponse>()
+                codexDiagnosticsRecorder.recordSuccess(
+                    CodexDiagnosticsSuccessEvent(
+                        timestamp = Clock.System.now().toString(),
+                        planType = payload.planType,
+                        allowed = payload.rateLimit.allowed,
+                        limitReached = payload.rateLimit.limitReached,
+                        primaryUsedPercent = payload.rateLimit.primaryWindow.usedPercent,
+                        primaryResetAt = payload.rateLimit.primaryWindow.resetAt,
+                        primaryResetAfterSeconds = payload.rateLimit.primaryWindow.resetAfterSeconds,
+                        primaryLimitWindowSeconds = payload.rateLimit.primaryWindow.limitWindowSeconds,
+                        secondaryUsedPercent = payload.rateLimit.secondaryWindow.usedPercent,
+                        secondaryResetAt = payload.rateLimit.secondaryWindow.resetAt,
+                        secondaryResetAfterSeconds = payload.rateLimit.secondaryWindow.resetAfterSeconds,
+                        secondaryLimitWindowSeconds = payload.rateLimit.secondaryWindow.limitWindowSeconds
+                    )
+                )
+                payload
+            } catch (error: Throwable) {
+                codexDiagnosticsRecorder.recordFailure(
+                    CodexDiagnosticsFailureEvent(
+                        timestamp = Clock.System.now().toString(),
+                        failureKind = "parse_error",
+                        message = summarizeCodexFailure(error.message ?: error::class.simpleName ?: "unknown parse error")
+                    )
+                )
+                failureRecorded = true
+                throw error
+            }
+        } catch (error: Throwable) {
+            if (!failureRecorded) {
+                codexDiagnosticsRecorder.recordFailure(
+                    CodexDiagnosticsFailureEvent(
+                        timestamp = Clock.System.now().toString(),
+                        failureKind = "request_error",
+                        message = summarizeCodexFailure(error.message ?: error::class.simpleName ?: "unknown request error")
+                    )
+                )
+            }
+            throw error
+        }
     }
 
     open suspend fun fetchDeepSeekBalance(apiKey: String): DeepSeekBalanceResponse {
@@ -97,5 +154,22 @@ open class RemoteApiDataSource(private val httpClient: HttpClient) {
         }
 
         return response.body()
+    }
+
+    private fun summarizeCodexFailure(rawMessage: String): String {
+        val flattened = rawMessage.replace(Regex("\\s+"), " ").trim()
+        val redacted = flattened
+            .replace(Regex("Bearer\\s+[A-Za-z0-9._\\-]+", RegexOption.IGNORE_CASE), "Bearer [REDACTED]")
+            .replace(Regex("cap_sid=[^;\\s]+", RegexOption.IGNORE_CASE), "cap_sid=[REDACTED]")
+
+        if (redacted.contains("Enable JavaScript and cookies to continue", ignoreCase = true)) {
+            return "Cloudflare challenge page returned by chatgpt.com"
+        }
+
+        if (redacted.isBlank()) {
+            return "empty error message"
+        }
+
+        return redacted.take(180)
     }
 }

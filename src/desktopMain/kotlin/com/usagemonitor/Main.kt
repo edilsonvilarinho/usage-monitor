@@ -20,6 +20,7 @@ import androidx.compose.ui.window.rememberDialogState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
+import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
@@ -151,7 +152,10 @@ fun main() = application {
 
     val credentialDataSource = remember(httpClient) { LocalCredentialDataSource(httpClient) }
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
-    val remoteApiDataSource = remember(httpClient) { RemoteApiDataSource(httpClient) }
+    val codexDiagnosticsRecorder = remember { LocalCodexDiagnosticsRecorder() }
+    val remoteApiDataSource = remember(httpClient, codexDiagnosticsRecorder) {
+        RemoteApiDataSource(httpClient, codexDiagnosticsRecorder)
+    }
     val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
     val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
     val kiloUsageDataSource = remember { LocalKiloUsageDataSource() }
