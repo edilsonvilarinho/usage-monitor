@@ -5,15 +5,18 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 
-class LocalCodexAuthDataSource : CodexAuthDataSource {
-
-    private val json = Json { ignoreUnknownKeys = true }
+class LocalCodexAuthDataSource(
+    private val homeDirProvider: () -> String? = { System.getProperty("user.home") },
+    private val authFileProvider: (String) -> File = { homeDir -> File("$homeDir/.codex/auth.json") },
+    private val capSidFileProvider: (String) -> File = { homeDir -> File("$homeDir/.codex/cap_sid") },
+    private val json: Json = Json { ignoreUnknownKeys = true }
+) : CodexAuthDataSource {
 
     override suspend fun loadSession(): CodexSession {
-        val homeDir = System.getProperty("user.home")
+        val homeDir = homeDirProvider()
             ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
 
-        val authFile = File("$homeDir/.codex/auth.json")
+        val authFile = authFileProvider(homeDir)
         if (!authFile.exists()) {
             throw IllegalStateException(
                 "Sessão do Codex não encontrada: ${authFile.absolutePath}. " +
@@ -21,7 +24,7 @@ class LocalCodexAuthDataSource : CodexAuthDataSource {
             )
         }
 
-        val capSidFile = File("$homeDir/.codex/cap_sid")
+        val capSidFile = capSidFileProvider(homeDir)
         if (!capSidFile.exists()) {
             throw IllegalStateException(
                 "Cookie cap_sid do Codex não encontrado: ${capSidFile.absolutePath}. " +

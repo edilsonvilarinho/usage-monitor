@@ -88,9 +88,10 @@ private fun loadWindowIcon() = runCatching {
 
 fun main() = application {
 
-    val singleInstance = java.util.concurrent.Semaphore(1)
-    if (!singleInstance.tryAcquire()) {
+    val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
+    if (singleInstanceGuard == null) {
         exitApplication()
+        return@application
     }
 
     val httpClient = remember {
@@ -218,12 +219,13 @@ fun main() = application {
     }
 
     val shutdownStarted = remember { AtomicBoolean(false) }
-    DisposableEffect(viewModel, historyViewModel, httpClient) {
+    DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard) {
         val shutdownHook = Thread {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 httpClient.close()
+                singleInstanceGuard.close()
             }
         }
 
@@ -232,6 +234,12 @@ fun main() = application {
         onDispose {
             runCatching {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook)
+            }
+            if (shutdownStarted.compareAndSet(false, true)) {
+                viewModel.onDestroy()
+                historyViewModel.onDestroy()
+                httpClient.close()
+                singleInstanceGuard.close()
             }
         }
     }
@@ -277,6 +285,7 @@ fun main() = application {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 httpClient.close()
+                singleInstanceGuard.close()
             }
             exitProcess(0)
         }

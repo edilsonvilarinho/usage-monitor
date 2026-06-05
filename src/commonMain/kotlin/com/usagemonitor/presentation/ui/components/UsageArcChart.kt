@@ -132,12 +132,6 @@ fun UsageArcChart(
     }
 }
 
-private fun formatCents(cents: Long): String {
-    val dollars = cents / 100
-    val remainder = cents % 100
-    return "\$${dollars}.${remainder.toString().padStart(2, '0')}"
-}
-
 /** Cor do arco com base no nível de uso: tertiary (baixo) → primary (médio) → error (alto). */
 private fun arcColor(percentage: Float): androidx.compose.ui.graphics.Color {
     return when {

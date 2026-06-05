@@ -13,8 +13,8 @@ import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.repository.KiloRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -31,12 +31,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
-private const val POLL_INTERVAL_SECONDS = 600
-private const val UPDATE_CHECK_INTERVAL_MS = 6 * 3_600_000L
-private const val UPDATE_CHECK_INTERVAL_WHILE_RUNNING_MS = 60 * 60_000L
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
-private const val INSTALLER_HANDOFF_DELAY_MS = 1_500L
-private const val RESTART_HANDOFF_DELAY_MS = 800L
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
@@ -63,7 +58,8 @@ class DashboardViewModel(
     private val appUpdateInstaller: AppUpdateInstaller = UnsupportedAppUpdateInstaller,
     private val currentAppVersion: String = "0.0.0",
     private val clock: Clock = Clock.System,
-    private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true)
+    private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
+    private val config: DashboardViewModelConfig = DashboardViewModelConfig()
 ) {
     private data class PendingFetchRequest(
         val targetSources: Set<ApiSource>,
@@ -73,14 +69,14 @@ class DashboardViewModel(
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private val _nextRefreshAt = MutableStateFlow(clock.now() + POLL_INTERVAL_SECONDS.seconds)
+    private val _nextRefreshAt = MutableStateFlow(clock.now() + config.pollInterval)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
     private val _refreshingSources = MutableStateFlow<Set<ApiSource>>(emptySet())
     val refreshingSources: StateFlow<Set<ApiSource>> = _refreshingSources.asStateFlow()
 
-    private val _toastMessage = MutableStateFlow<String?>(null)
-    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+    private val _toastMessage = MutableStateFlow<DashboardToast?>(null)
+    val toastMessage: StateFlow<DashboardToast?> = _toastMessage.asStateFlow()
 
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
     val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
@@ -88,7 +84,7 @@ class DashboardViewModel(
     private val _shouldExitForUpdate = MutableStateFlow(false)
     val shouldExitForUpdate: StateFlow<Boolean> = _shouldExitForUpdate.asStateFlow()
 
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val viewModelScope = CoroutineScope(SupervisorJob() + config.workerDispatcher)
     private val stateMutex = Mutex()
     private val updateMutex = Mutex()
     private val fetchMutex = Mutex()
@@ -112,7 +108,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             checkForUpdate(autoInstall = true)
             while (true) {
-                delay(UPDATE_CHECK_INTERVAL_WHILE_RUNNING_MS)
+                delay(config.updateCheckIntervalWhileRunning)
                 checkForUpdate(autoInstall = false)
             }
         }
@@ -122,8 +118,8 @@ class DashboardViewModel(
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
             while (true) {
-                _nextRefreshAt.value = clock.now() + POLL_INTERVAL_SECONDS.seconds
-                delay(POLL_INTERVAL_SECONDS * 1_000L)
+                _nextRefreshAt.value = clock.now() + config.pollInterval
+                delay(config.pollInterval)
                 if (!isAppVisible.value) {
                     isAppVisible.first { it }
                 }
@@ -323,14 +319,17 @@ class DashboardViewModel(
         val message = error.message ?: "erro desconhecido"
 
         if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
-            _toastMessage.value = "RATE_LIMIT:${source.name}"
+            _toastMessage.value = DashboardToast.RateLimit(source)
             return UiApiError(source = source, message = message)
         }
 
         val uiError = UiApiError(source = source, message = message)
 
         if (!uiError.isConfigurationIssue) {
-            _toastMessage.value = "ERROR:${source.name}:${message.replace(":", "_")}"
+            _toastMessage.value = DashboardToast.ApiError(
+                source = source,
+                message = message
+            )
         }
 
         return uiError
@@ -444,13 +443,13 @@ class DashboardViewModel(
                     when (action) {
                         PreparedUpdateAction.ExitAndInstall -> {
                             _appUpdateState.value = AppUpdateUiState.Installing(update)
-                            delay(INSTALLER_HANDOFF_DELAY_MS)
+                            delay(config.installerHandoffDelay)
                             _shouldExitForUpdate.value = true
                         }
 
                         PreparedUpdateAction.RestartAndExit -> {
                             _appUpdateState.value = AppUpdateUiState.Restarting(update)
-                            delay(RESTART_HANDOFF_DELAY_MS)
+                            delay(config.restartHandoffDelay)
                             _shouldExitForUpdate.value = true
                         }
                     }

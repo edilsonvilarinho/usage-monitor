@@ -122,7 +122,7 @@ class MiniMaxMapperTest {
     }
 
     @Test
-    fun `non-M* models are excluded`() {
+    fun `non-M-star models are excluded`() {
         val responseWithOtherModels = MiniMaxTokenPlanResponse(
             modelRemains = listOf(
                 ModelRemainDto(

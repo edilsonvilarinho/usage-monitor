@@ -9,6 +9,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -33,27 +34,30 @@ open class RemoteApiDataSource(
      * Requer `anthropic-beta: oauth-2025-04-20` para aceitar token OAuth do Claude.ai.
      */
     open suspend fun fetchAnthropicUsage(accessToken: String): AnthropicUsageResponse {
-        val response = httpClient.get("https://api.anthropic.com/api/oauth/usage") {
-            header("Authorization", "Bearer $accessToken")
-            header("User-Agent", CLAUDE_USER_AGENT)
-            header("anthropic-beta", ANTHROPIC_BETA_OAUTH)
-            header("Accept", "application/json")
-            contentType(ContentType.Application.Json)
-        }
-
-        if (!response.status.isSuccess()) {
-            val body = response.bodyAsText()
-            throw IllegalStateException("Anthropic HTTP ${response.status.value}: $body")
-        }
+        val response = requireSuccess(
+            response = httpClient.get("https://api.anthropic.com/api/oauth/usage") {
+                header("Authorization", "Bearer $accessToken")
+                header("User-Agent", CLAUDE_USER_AGENT)
+                header("anthropic-beta", ANTHROPIC_BETA_OAUTH)
+                header("Accept", "application/json")
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "Anthropic"
+        )
 
         return response.body()
     }
 
     open suspend fun fetchMiniMaxTokenPlan(apiKey: String): MiniMaxTokenPlanResponse {
-        return httpClient.get("https://www.minimax.io/v1/token_plan/remains") {
-            header("Authorization", "Bearer $apiKey")
-            contentType(ContentType.Application.Json)
-        }.body()
+        val response = requireSuccess(
+            response = httpClient.get("https://www.minimax.io/v1/token_plan/remains") {
+                header("Authorization", "Bearer $apiKey")
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "MiniMax"
+        )
+
+        return response.body()
     }
 
     open suspend fun fetchCodexUsage(session: CodexSession): CodexUsageResponse {
@@ -127,33 +131,41 @@ open class RemoteApiDataSource(
     }
 
     open suspend fun fetchDeepSeekBalance(apiKey: String): DeepSeekBalanceResponse {
-        val response = httpClient.get("https://api.deepseek.com/user/balance") {
-            header("Authorization", "Bearer $apiKey")
-            contentType(ContentType.Application.Json)
-        }
-
-        if (!response.status.isSuccess()) {
-            val body = response.bodyAsText()
-            throw IllegalStateException("DeepSeek HTTP ${response.status.value}: $body")
-        }
+        val response = requireSuccess(
+            response = httpClient.get("https://api.deepseek.com/user/balance") {
+                header("Authorization", "Bearer $apiKey")
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "DeepSeek"
+        )
 
         return response.body()
     }
 
     open suspend fun fetchLatestGitHubRelease(owner: String, repository: String): GitHubReleaseDto {
-        val response = httpClient.get("https://api.github.com/repos/$owner/$repository/releases/latest") {
-            header("Accept", "application/vnd.github+json")
-            header("User-Agent", USAGE_MONITOR_USER_AGENT)
-            header("X-GitHub-Api-Version", GITHUB_API_VERSION)
-            contentType(ContentType.Application.Json)
-        }
-
-        if (!response.status.isSuccess()) {
-            val body = response.bodyAsText()
-            throw IllegalStateException("GitHub release HTTP ${response.status.value}: $body")
-        }
+        val response = requireSuccess(
+            response = httpClient.get("https://api.github.com/repos/$owner/$repository/releases/latest") {
+                header("Accept", "application/vnd.github+json")
+                header("User-Agent", USAGE_MONITOR_USER_AGENT)
+                header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "GitHub release"
+        )
 
         return response.body()
+    }
+
+    private suspend fun requireSuccess(
+        response: HttpResponse,
+        sourceName: String
+    ): HttpResponse {
+        if (!response.status.isSuccess()) {
+            val body = response.bodyAsText()
+            throw IllegalStateException("$sourceName HTTP ${response.status.value}: $body")
+        }
+
+        return response
     }
 
     private fun summarizeCodexFailure(rawMessage: String): String {

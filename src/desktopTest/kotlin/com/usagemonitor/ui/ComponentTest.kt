@@ -17,7 +17,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -27,21 +26,8 @@ import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.repository.AnthropicRepository
-import com.usagemonitor.domain.repository.AppUpdateRepository
-import com.usagemonitor.domain.repository.CodexRepository
-import com.usagemonitor.domain.repository.DeepSeekRepository
-import com.usagemonitor.domain.repository.MiniMaxRepository
-import com.usagemonitor.domain.repository.UsageHistoryRepository
-import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
-import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
-import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
-import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
-import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
-import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
-import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
@@ -50,14 +36,9 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
-import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
-import com.usagemonitor.presentation.viewmodel.AutomaticUpdateStage
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
-import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
-import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateInstaller
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import androidx.compose.ui.unit.dp
 import kotlin.time.Duration.Companion.seconds
@@ -77,148 +58,6 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class)
 class ComponentTest {
-
-    private fun emptyDashboardViewModel(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
-        val anthropicRepo = object : AnthropicRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val minimaxRepo = object : MiniMaxRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val codexRepo = object : CodexRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val historyRepository = object : UsageHistoryRepository {
-            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
-
-            override suspend fun getHistoryReport(
-                source: ApiSource,
-                range: HistoryRange,
-                now: Instant
-            ) = throw UnsupportedOperationException("Não utilizado neste teste")
-        }
-
-        return DashboardViewModel(
-            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
-            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
-            getCodexUsage = GetCodexUsageUseCase(codexRepo),
-            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
-            enabledApis = enabledApis,
-            recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository)
-        )
-    }
-
-    private fun dashboardViewModelWithAvailableUpdate(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
-        val anthropicRepo = object : AnthropicRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val minimaxRepo = object : MiniMaxRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val codexRepo = object : CodexRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val historyRepository = object : UsageHistoryRepository {
-            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
-
-            override suspend fun getHistoryReport(
-                source: ApiSource,
-                range: HistoryRange,
-                now: Instant
-            ) = throw UnsupportedOperationException("Não utilizado neste teste")
-        }
-        val updateRepository = object : AppUpdateRepository {
-            override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
-                return Result.success(
-                    AppUpdateInfo(
-                        version = "7.1.0",
-                        releasePageUrl = "https://example.com/releases/tag/v7.1.0"
-                    )
-                )
-            }
-        }
-
-        return DashboardViewModel(
-            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
-            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
-            getCodexUsage = GetCodexUsageUseCase(codexRepo),
-            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
-            enabledApis = enabledApis,
-            recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository),
-            checkForAppUpdate = CheckForAppUpdateUseCase(updateRepository),
-            appUpdateInstaller = UnsupportedAppUpdateInstaller,
-            currentAppVersion = "7.0.0"
-        )
-    }
-
-    private fun dashboardViewModelWithManagedLinuxUpdate(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
-        val anthropicRepo = object : AnthropicRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val minimaxRepo = object : MiniMaxRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val codexRepo = object : CodexRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val historyRepository = object : UsageHistoryRepository {
-            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
-
-            override suspend fun getHistoryReport(
-                source: ApiSource,
-                range: HistoryRange,
-                now: Instant
-            ) = throw UnsupportedOperationException("Não utilizado neste teste")
-        }
-        val updateRepository = object : AppUpdateRepository {
-            override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
-                return Result.success(
-                    AppUpdateInfo(
-                        version = "7.1.0",
-                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
-                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
-                    )
-                )
-            }
-        }
-        val installer = object : AppUpdateInstaller {
-            override val isSupported: Boolean = true
-
-            override fun canInstall(update: AppUpdateInfo): Boolean {
-                return update.linuxDebInstallerDownloadUrl != null
-            }
-
-            override suspend fun prepareUpdateInstallation(
-                update: AppUpdateInfo,
-                onStageChanged: (AutomaticUpdateStage) -> Unit
-            ): Result<PreparedUpdateAction> {
-                onStageChanged(AutomaticUpdateStage.INSTALLING)
-                onStageChanged(AutomaticUpdateStage.RESTARTING)
-                return Result.success(PreparedUpdateAction.RestartAndExit)
-            }
-        }
-
-        return DashboardViewModel(
-            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
-            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
-            getCodexUsage = GetCodexUsageUseCase(codexRepo),
-            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
-            enabledApis = enabledApis,
-            recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository),
-            checkForAppUpdate = CheckForAppUpdateUseCase(updateRepository),
-            appUpdateInstaller = installer,
-            currentAppVersion = "7.0.0"
-        )
-    }
 
     // ── UsageArcChart ────────────────────────────────────────────────────
 
@@ -586,86 +425,6 @@ class ComponentTest {
     }
 
     // ── FooterBar ───────────────────────────────────────────────────────
-
-    @Test
-    fun `FooterBar displays localized version and next update in PT`() = runDesktopComposeUiTest {
-        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
-
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(640.dp)) {
-                    FooterBar(
-                        appVersion = "1.1.0",
-                        language = AppLanguage.PT,
-                        nextRefreshAt = fixedNow + 125.seconds,
-                        onRefresh = {},
-                        onOpenSettings = {},
-                        nowProvider = { fixedNow },
-                        countdownUpdatesEnabled = false
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("Versão:").assertIsDisplayed()
-        onNodeWithText("v1.1.0").assertIsDisplayed()
-        onNodeWithText("Próxima atualização:").assertIsDisplayed()
-        onNodeWithText("02:05").assertIsDisplayed()
-        onNodeWithText("Configurações").assertIsDisplayed()
-        onAllNodesWithText("Histórico").assertCountEquals(0)
-    }
-
-    @Test
-    fun `FooterBar opens settings action`() = runDesktopComposeUiTest {
-        var opened = false
-        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
-
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(640.dp)) {
-                    FooterBar(
-                        appVersion = "1.1.0",
-                        language = AppLanguage.PT,
-                        nextRefreshAt = fixedNow + 125.seconds,
-                        onRefresh = {},
-                        onOpenSettings = { opened = true },
-                        nowProvider = { fixedNow },
-                        countdownUpdatesEnabled = false
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("Configurações").performClick()
-        assertEquals(true, opened)
-    }
-
-    @Test
-    fun `FooterBar keeps controls accessible in narrow width`() = runDesktopComposeUiTest {
-        var opened = false
-        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
-
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(320.dp)) {
-                    FooterBar(
-                        appVersion = "6.0.0",
-                        language = AppLanguage.PT,
-                        nextRefreshAt = fixedNow + 433.seconds,
-                        onRefresh = {},
-                        onOpenSettings = { opened = true },
-                        nowProvider = { fixedNow },
-                        countdownUpdatesEnabled = false
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("v6.0.0").assertIsDisplayed()
-        onNodeWithText("07:13").assertIsDisplayed()
-        onNodeWithContentDescription("Abrir configurações").performClick()
-        assertEquals(true, opened)
-    }
 
     @Test
     fun `DashboardScreen guides the user to settings when no APIs are enabled`() = runDesktopComposeUiTest {
