@@ -1,8 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
-import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.repository.KiloRepository
+import com.usagemonitor.domain.repository.OpenCodeRepository
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
@@ -11,9 +12,6 @@ import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
-import com.usagemonitor.domain.repository.KiloRepository
-import com.usagemonitor.domain.repository.OpenCodeRepository
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -27,7 +25,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
@@ -55,7 +52,7 @@ class DashboardViewModel(
         }
     ),
     private val checkForAppUpdate: CheckForAppUpdateUseCase? = null,
-    private val appUpdateInstaller: AppUpdateInstaller = UnsupportedAppUpdateInstaller,
+    private val appUpdateReleaseOpener: AppUpdateReleaseOpener = UnsupportedAppUpdateReleaseOpener,
     private val currentAppVersion: String = "0.0.0",
     private val clock: Clock = Clock.System,
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
@@ -81,9 +78,6 @@ class DashboardViewModel(
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
     val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
 
-    private val _shouldExitForUpdate = MutableStateFlow(false)
-    val shouldExitForUpdate: StateFlow<Boolean> = _shouldExitForUpdate.asStateFlow()
-
     private val viewModelScope = CoroutineScope(SupervisorJob() + config.workerDispatcher)
     private val stateMutex = Mutex()
     private val updateMutex = Mutex()
@@ -93,7 +87,6 @@ class DashboardViewModel(
     private val cachedErrorsBySource = mutableMapOf<ApiSource, UiApiError>()
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
-    private var autoInstallAttemptedVersion: String? = null
     private var pendingFetchRequest: PendingFetchRequest? = null
 
     init {
@@ -106,10 +99,10 @@ class DashboardViewModel(
 
     private fun startUpdateCheckLoop() {
         viewModelScope.launch {
-            checkForUpdate(autoInstall = true)
+            checkForUpdate()
             while (true) {
                 delay(config.updateCheckIntervalWhileRunning)
-                checkForUpdate(autoInstall = false)
+                checkForUpdate()
             }
         }
     }
@@ -164,6 +157,7 @@ class DashboardViewModel(
                 !existingRequest.preserveDataOnFailure || !preserveDataOnFailure -> {
                     PendingFetchRequest(enabledApis.value, preserveDataOnFailure = false)
                 }
+
                 else -> {
                     PendingFetchRequest(
                         targetSources = existingRequest.targetSources + targetSources,
@@ -256,6 +250,7 @@ class DashboardViewModel(
         startCountdown()
         viewModelScope.launch {
             requestFetch(targetSources = enabledApis.value)
+            checkForUpdate()
         }
     }
 
@@ -273,22 +268,14 @@ class DashboardViewModel(
         }
     }
 
-    fun retryUpdateInstallation() {
-        val currentState = _appUpdateState.value
-        val update = when (currentState) {
-            is AppUpdateUiState.Available -> currentState.update
-            is AppUpdateUiState.Failed -> if (currentState.automaticInstallSupported) currentState.update else null
-            is AppUpdateUiState.Downloading -> null
-            is AppUpdateUiState.Installing -> null
-            is AppUpdateUiState.Restarting -> null
-            null -> null
-        }
-
-        if (update == null || !canInstallAutomatically(update)) {
-            return
-        }
-
-        startAutomaticUpdate(update)
+    fun openUpdateReleasePage() {
+        val update = (_appUpdateState.value as? AppUpdateUiState.Available)?.update ?: return
+        appUpdateReleaseOpener.open(update.releasePageUrl)
+            .onFailure { error ->
+                _toastMessage.value = DashboardToast.ReleasePageError(
+                    error.message ?: "Unknown error"
+                )
+            }
     }
 
     fun cancelCountdown() {
@@ -372,99 +359,25 @@ class DashboardViewModel(
     }
 
     private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
-        // Persistência best-effort: falha não deve interromper UI nem propagar.
         recordUsageSnapshot(stats, capturedAt)
     }
 
-    private suspend fun checkForUpdate(autoInstall: Boolean) {
+    private suspend fun checkForUpdate() {
         val updateUseCase = checkForAppUpdate ?: return
 
         updateMutex.withLock {
-            val currentState = _appUpdateState.value
-
-            if (
-                currentState is AppUpdateUiState.Downloading ||
-                currentState is AppUpdateUiState.Installing ||
-                currentState is AppUpdateUiState.Restarting
-            ) {
-                return@withLock
-            }
-
             updateUseCase(currentAppVersion)
                 .onSuccess { update ->
                     if (update == null) {
-                        if (currentState !is AppUpdateUiState.Failed) {
-                            _appUpdateState.value = null
-                        }
+                        _appUpdateState.value = null
                         return@onSuccess
                     }
 
-                    if (autoInstall && canInstallAutomatically(update) && autoInstallAttemptedVersion != update.version) {
-                        autoInstallAttemptedVersion = update.version
-                        startAutomaticUpdate(update)
-                        return@onSuccess
-                    }
-
-                    if (currentState is AppUpdateUiState.Failed && currentState.update?.version == update.version) {
-                        return@onSuccess
-                    }
-
-                    if (currentState is AppUpdateUiState.Restarting && currentState.update.version == update.version) {
-                        return@onSuccess
-                    }
-
-                    _appUpdateState.value = AppUpdateUiState.Available(
-                        update = update,
-                        automaticInstallSupported = canInstallAutomatically(update)
-                    )
+                    _appUpdateState.value = AppUpdateUiState.Available(update)
                 }
                 .onFailure {
                     // Falha silenciosa: UI mantém estado anterior; próxima janela de poll tenta de novo.
                 }
         }
-    }
-
-    private fun startAutomaticUpdate(update: AppUpdateInfo) {
-        _appUpdateState.value = AppUpdateUiState.Downloading(update)
-
-        viewModelScope.launch {
-            appUpdateInstaller.prepareUpdateInstallation(update) { stage ->
-                when (stage) {
-                    AutomaticUpdateStage.INSTALLING -> {
-                        _appUpdateState.value = AppUpdateUiState.Installing(update)
-                    }
-
-                    AutomaticUpdateStage.RESTARTING -> {
-                        _appUpdateState.value = AppUpdateUiState.Restarting(update)
-                    }
-                }
-            }
-                .onSuccess { action ->
-                    when (action) {
-                        PreparedUpdateAction.ExitAndInstall -> {
-                            _appUpdateState.value = AppUpdateUiState.Installing(update)
-                            delay(config.installerHandoffDelay)
-                            _shouldExitForUpdate.value = true
-                        }
-
-                        PreparedUpdateAction.RestartAndExit -> {
-                            _appUpdateState.value = AppUpdateUiState.Restarting(update)
-                            delay(config.restartHandoffDelay)
-                            _shouldExitForUpdate.value = true
-                        }
-                    }
-                }
-                .onFailure { error ->
-                    _appUpdateState.value = AppUpdateUiState.Failed(
-                        update = update,
-                        message = error.message ?: "Unknown error",
-                        automaticInstallSupported = canInstallAutomatically(update)
-                    )
-                }
-        }
-    }
-
-    private fun canInstallAutomatically(update: AppUpdateInfo): Boolean {
-        return appUpdateInstaller.canInstall(update)
     }
 }

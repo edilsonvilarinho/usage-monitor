@@ -168,7 +168,7 @@ internal fun warningFor(
 internal fun AppUpdateBanner(
     state: AppUpdateUiState,
     language: AppLanguage,
-    onRetryInstallation: () -> Unit,
+    onOpenRelease: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val content = updateBannerContent(state = state, language = language)
@@ -177,8 +177,8 @@ internal fun AppUpdateBanner(
         title = content.title,
         description = content.description,
         actionLabel = content.actionLabel,
-        onAction = if (content.showRetryAction) onRetryInstallation else null,
-        tone = if (state is AppUpdateUiState.Failed) BannerTone.ERROR else BannerTone.INFO,
+        onAction = if (content.showAction) onOpenRelease else null,
+        tone = BannerTone.INFO,
         modifier = modifier
     )
 }
@@ -195,94 +195,20 @@ internal fun updateBannerContent(
                 "Version ${state.update.version} is available"
             }
             val description = if (language == AppLanguage.PT) {
-                if (state.automaticInstallSupported) {
-                    "A atualização automática está pronta para este ambiente."
-                } else {
-                    "A atualização automática não está disponível nesta plataforma. Atualize manualmente pela release publicada."
-                }
+                "A atualização está disponível na release publicada. Abra a página da versão para baixar e instalar."
             } else {
-                if (state.automaticInstallSupported) {
-                    "Automatic updating is ready on this environment."
-                } else {
-                    "Automatic updating is not available on this platform. Install the published release manually."
-                }
-            }
-
-            UpdateBannerContent(
-                title = title,
-                description = description
-            )
-        }
-
-        is AppUpdateUiState.Downloading -> UpdateBannerContent(
-            title = if (language == AppLanguage.PT) {
-                "Nova versão ${state.update.version} disponível"
-            } else {
-                "Version ${state.update.version} is available"
-            },
-            description = if (language == AppLanguage.PT) {
-                "Baixando automaticamente o pacote da atualização para preparar a instalação."
-            } else {
-                "Automatically downloading the update package to prepare the installation."
-            }
-        )
-
-        is AppUpdateUiState.Installing -> UpdateBannerContent(
-            title = if (language == AppLanguage.PT) {
-                "Instalando atualização ${state.update.version}"
-            } else {
-                "Installing update ${state.update.version}"
-            },
-            description = if (language == AppLanguage.PT) {
-                "Executando a instalação automática da atualização. Isso pode levar alguns instantes."
-            } else {
-                "Running the automatic update installation. This may take a few moments."
-            }
-        )
-
-        is AppUpdateUiState.Restarting -> UpdateBannerContent(
-            title = if (language == AppLanguage.PT) {
-                "Reiniciando na versão ${state.update.version}"
-            } else {
-                "Restarting into version ${state.update.version}"
-            },
-            description = if (language == AppLanguage.PT) {
-                "A nova versão já foi instalada. Fechando esta instância para abrir o app atualizado."
-            } else {
-                "The new version has already been installed. Closing this instance to open the updated app."
-            }
-        )
-
-        is AppUpdateUiState.Failed -> {
-            val targetVersion = state.update?.version
-            val title = if (language == AppLanguage.PT) {
-                if (targetVersion != null) {
-                    "Falha ao preparar a atualização ${targetVersion}"
-                } else {
-                    "Falha ao preparar a atualização"
-                }
-            } else {
-                if (targetVersion != null) {
-                    "Failed to prepare update ${targetVersion}"
-                } else {
-                    "Failed to prepare the update"
-                }
-            }
-            val description = if (language == AppLanguage.PT) {
-                "Não foi possível concluir a instalação automática da atualização. ${state.message}"
-            } else {
-                "The app could not finish the automatic update installation. ${state.message}"
+                "The update is available on the published release page. Open the version page to download and install it."
             }
 
             UpdateBannerContent(
                 title = title,
                 description = description,
-                actionLabel = if (state.automaticInstallSupported) {
-                    if (language == AppLanguage.PT) "Tentar novamente" else "Retry"
+                actionLabel = if (language == AppLanguage.PT) {
+                    "Baixar atualização"
                 } else {
-                    null
+                    "Download update"
                 },
-                showRetryAction = state.automaticInstallSupported
+                showAction = true
             )
         }
     }
@@ -299,5 +225,5 @@ internal data class UpdateBannerContent(
     val title: String,
     val description: String,
     val actionLabel: String? = null,
-    val showRetryAction: Boolean = false
+    val showAction: Boolean = false
 )

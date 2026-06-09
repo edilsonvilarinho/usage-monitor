@@ -19,6 +19,14 @@ internal fun decodeToastMessage(toast: DashboardToast, language: AppLanguage): S
             val sourceLabel = sourceLabelFromKey(toast.source)
             "$sourceLabel: ${toast.message}"
         }
+
+        is DashboardToast.ReleasePageError -> {
+            if (language == AppLanguage.PT) {
+                "Não foi possível abrir a página da release. ${toast.message}"
+            } else {
+                "Could not open the release page. ${toast.message}"
+            }
+        }
     }
 }
 

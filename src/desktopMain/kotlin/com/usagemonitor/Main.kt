@@ -56,7 +56,7 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
-import com.usagemonitor.update.DesktopAppUpdateInstaller
+import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -185,7 +185,7 @@ fun main() = application {
     val appUpdateRepository = remember(remoteApiDataSource) {
         AppUpdateRepositoryImpl(remoteApiDataSource)
     }
-    val appUpdateInstaller = remember { DesktopAppUpdateInstaller() }
+    val appUpdateReleaseOpener = remember { DesktopAppUpdateReleaseOpener() }
 
     val recordUsageSnapshot = remember(usageHistoryRepository) {
         RecordUsageSnapshotUseCase(usageHistoryRepository)
@@ -206,7 +206,7 @@ fun main() = application {
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
-            appUpdateInstaller = appUpdateInstaller,
+            appUpdateReleaseOpener = appUpdateReleaseOpener,
             currentAppVersion = CURRENT_APP_VERSION,
             isAppVisible = isAppVisible
         )
@@ -266,7 +266,6 @@ fun main() = application {
         }
     }
     val enabledApisState by enabledApis.collectAsState()
-    val shouldExitForUpdate by viewModel.shouldExitForUpdate.collectAsState()
     var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
     var language by remember {
         mutableStateOf(
@@ -288,12 +287,6 @@ fun main() = application {
                 singleInstanceGuard.close()
             }
             exitProcess(0)
-        }
-    }
-
-    LaunchedEffect(shouldExitForUpdate) {
-        if (shouldExitForUpdate) {
-            shutdownApplication()
         }
     }
 

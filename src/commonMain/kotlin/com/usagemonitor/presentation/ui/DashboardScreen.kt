@@ -113,7 +113,7 @@ fun DashboardScreen(
                         AppUpdateBanner(
                             state = updateState,
                             language = language,
-                            onRetryInstallation = { viewModel.retryUpdateInstallation() },
+                            onOpenRelease = { viewModel.openUpdateReleasePage() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 10.dp)

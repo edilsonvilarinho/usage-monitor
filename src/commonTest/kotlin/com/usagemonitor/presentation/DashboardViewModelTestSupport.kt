@@ -84,10 +84,10 @@ abstract class DashboardViewModelTestSupport {
         return RecordUsageSnapshotUseCase(historyRepository)
     }
 
-    protected fun updateUseCase(result: Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
+    protected fun updateUseCase(block: suspend () -> Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
         val repository = object : AppUpdateRepository {
             override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
-                return result
+                return block()
             }
         }
         return CheckForAppUpdateUseCase(repository)
@@ -96,6 +96,10 @@ abstract class DashboardViewModelTestSupport {
     protected fun virtualTimeConfig(testScheduler: TestCoroutineScheduler) = DashboardViewModelConfig(
         workerDispatcher = StandardTestDispatcher(testScheduler),
         updateCheckIntervalWhileRunning = 365.days
+    )
+
+    protected fun periodicUpdateConfig(testScheduler: TestCoroutineScheduler) = DashboardViewModelConfig(
+        workerDispatcher = StandardTestDispatcher(testScheduler)
     )
 
     protected fun successViewModel(recordedSnapshots: MutableList<ApiUsageStats>): DashboardViewModel {

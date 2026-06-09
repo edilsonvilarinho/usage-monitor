@@ -10,12 +10,10 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
-import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
+import com.usagemonitor.presentation.viewmodel.AppUpdateReleaseOpener
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
-import com.usagemonitor.presentation.viewmodel.AutomaticUpdateStage
+import com.usagemonitor.presentation.viewmodel.DashboardToast
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
-import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
-import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateInstaller
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
@@ -25,44 +23,16 @@ import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModelUpdateTest : DashboardViewModelTestSupport() {
 
     @Test
-    fun `publishes available update when a newer version exists without automatic installer`() = runTest {
-        val recordedSnapshots = mutableListOf<ApiUsageStats>()
-        val anthropicRepo = object : AnthropicRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val minimaxRepo = object : MiniMaxRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val codexRepo = object : CodexRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-
-        val viewModel = DashboardViewModel(
-            GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(minimaxRepo),
-            GetCodexUsageUseCase(codexRepo),
-            GetDeepSeekUsageUseCase(deepSeekRepo),
-            MutableStateFlow(emptySet()),
-            historyUseCase(recordedSnapshots),
-            checkForAppUpdate = updateUseCase(
-                Result.success(
-                    AppUpdateInfo(
-                        version = "7.1.0",
-                        releasePageUrl = "https://example.com/releases/tag/v7.1.0"
-                    )
-                )
-            ),
-            appUpdateInstaller = UnsupportedAppUpdateInstaller,
-            currentAppVersion = "7.0.0",
-            clock = Clock.System,
+    fun `publishes available update when a newer version exists`() = runTest {
+        val viewModel = updateViewModel(
+            recordedSnapshots = mutableListOf(),
+            checkForUpdate = { Result.success(AppUpdateInfo("7.1.0", "https://example.com/releases/tag/v7.1.0")) },
             config = virtualTimeConfig(testScheduler)
         )
         viewModel.cancelCountdown()
@@ -73,215 +43,87 @@ class DashboardViewModelUpdateTest : DashboardViewModelTestSupport() {
             val updateState = viewModel.appUpdateState.value
             assertIs<AppUpdateUiState.Available>(updateState)
             assertEquals("7.1.0", updateState.update.version)
-            assertEquals(false, updateState.automaticInstallSupported)
-            assertEquals(false, viewModel.shouldExitForUpdate.value)
         } finally {
             viewModel.onDestroy()
         }
     }
 
     @Test
-    fun `prepares automatic update and requests app exit`() = runTest {
-        val recordedSnapshots = mutableListOf<ApiUsageStats>()
-        val anthropicRepo = object : AnthropicRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val minimaxRepo = object : MiniMaxRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val codexRepo = object : CodexRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        var preparedVersion: String? = null
-        val installer = object : AppUpdateInstaller {
-            override val isSupported: Boolean = true
-
-            override fun canInstall(update: AppUpdateInfo): Boolean {
-                return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
-            }
-
-            override suspend fun prepareUpdateInstallation(
-                update: AppUpdateInfo,
-                onStageChanged: (AutomaticUpdateStage) -> Unit
-            ): Result<PreparedUpdateAction> {
-                preparedVersion = update.version
-                return Result.success(PreparedUpdateAction.ExitAndInstall)
-            }
-        }
-
-        val viewModel = DashboardViewModel(
-            GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(minimaxRepo),
-            GetCodexUsageUseCase(codexRepo),
-            GetDeepSeekUsageUseCase(deepSeekRepo),
-            MutableStateFlow(emptySet()),
-            historyUseCase(recordedSnapshots),
-            checkForAppUpdate = updateUseCase(
-                Result.success(
-                    AppUpdateInfo(
-                        version = "7.1.0",
-                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
-                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
-                    )
-                )
-            ),
-            appUpdateInstaller = installer,
-            currentAppVersion = "7.0.0",
-            clock = Clock.System,
-            config = virtualTimeConfig(testScheduler)
-        )
-        viewModel.cancelCountdown()
-
-        try {
-            runCurrent()
-            advanceTimeBy(1_500)
-            runCurrent()
-
-            val updateState = viewModel.appUpdateState.value
-            assertIs<AppUpdateUiState.Installing>(updateState)
-            assertEquals("7.1.0", preparedVersion)
-            assertEquals(true, viewModel.shouldExitForUpdate.value)
-        } finally {
-            viewModel.onDestroy()
-        }
-    }
-
-    @Test
-    fun `prepares linux update and exits only after managed restart is ready`() = runTest {
-        val recordedSnapshots = mutableListOf<ApiUsageStats>()
-        val anthropicRepo = object : AnthropicRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val minimaxRepo = object : MiniMaxRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val codexRepo = object : CodexRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        var preparedVersion: String? = null
-        val stages = mutableListOf<AutomaticUpdateStage>()
-        val installer = object : AppUpdateInstaller {
-            override val isSupported: Boolean = true
-
-            override fun canInstall(update: AppUpdateInfo): Boolean {
-                return update.linuxDebInstallerDownloadUrl != null
-            }
-
-            override suspend fun prepareUpdateInstallation(
-                update: AppUpdateInfo,
-                onStageChanged: (AutomaticUpdateStage) -> Unit
-            ): Result<PreparedUpdateAction> {
-                preparedVersion = update.version
-                stages += AutomaticUpdateStage.INSTALLING
-                onStageChanged(AutomaticUpdateStage.INSTALLING)
-                stages += AutomaticUpdateStage.RESTARTING
-                onStageChanged(AutomaticUpdateStage.RESTARTING)
-                return Result.success(PreparedUpdateAction.RestartAndExit)
-            }
-        }
-
-        val viewModel = DashboardViewModel(
-            GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(minimaxRepo),
-            GetCodexUsageUseCase(codexRepo),
-            GetDeepSeekUsageUseCase(deepSeekRepo),
-            MutableStateFlow(emptySet()),
-            historyUseCase(recordedSnapshots),
-            checkForAppUpdate = updateUseCase(
-                Result.success(
-                    AppUpdateInfo(
-                        version = "7.1.0",
-                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
-                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
-                    )
-                )
-            ),
-            appUpdateInstaller = installer,
-            currentAppVersion = "7.0.0",
-            clock = Clock.System,
-            config = virtualTimeConfig(testScheduler)
-        )
-        viewModel.cancelCountdown()
-
-        try {
-            runCurrent()
-            advanceTimeBy(800)
-            runCurrent()
-
-            val updateState = viewModel.appUpdateState.value
-            assertIs<AppUpdateUiState.Restarting>(updateState)
-            assertEquals("7.1.0", preparedVersion)
-            assertEquals(
-                listOf(AutomaticUpdateStage.INSTALLING, AutomaticUpdateStage.RESTARTING),
-                stages
-            )
-            assertEquals(true, viewModel.shouldExitForUpdate.value)
-        } finally {
-            viewModel.onDestroy()
-        }
-    }
-
-    @Test
-    fun `allows retrying automatic update after a preparation failure`() = runTest {
-        val recordedSnapshots = mutableListOf<ApiUsageStats>()
-        val anthropicRepo = object : AnthropicRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val minimaxRepo = object : MiniMaxRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val codexRepo = object : CodexRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        val deepSeekRepo = object : DeepSeekRepository {
-            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
-        }
-        var attempts = 0
-        val installer = object : AppUpdateInstaller {
-            override val isSupported: Boolean = true
-
-            override fun canInstall(update: AppUpdateInfo): Boolean {
-                return update.windowsInstallerDownloadUrl != null || update.linuxDebInstallerDownloadUrl != null
-            }
-
-            override suspend fun prepareUpdateInstallation(
-                update: AppUpdateInfo,
-                onStageChanged: (AutomaticUpdateStage) -> Unit
-            ): Result<PreparedUpdateAction> {
-                attempts += 1
-                return if (attempts == 1) {
-                    Result.failure(IllegalStateException("Falha ao baixar o pacote"))
+    fun `rechecks for updates every 10 minutes while running`() = runTest {
+        var checks = 0
+        val viewModel = updateViewModel(
+            recordedSnapshots = mutableListOf(),
+            checkForUpdate = {
+                checks += 1
+                if (checks == 1) {
+                    Result.success(null)
                 } else {
-                    Result.success(PreparedUpdateAction.ExitAndInstall)
+                    Result.success(AppUpdateInfo("7.1.0", "https://example.com/releases/tag/v7.1.0"))
                 }
-            }
-        }
+            },
+            config = periodicUpdateConfig(testScheduler)
+        )
+        viewModel.cancelCountdown()
 
-        val viewModel = DashboardViewModel(
-            GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(minimaxRepo),
-            GetCodexUsageUseCase(codexRepo),
-            GetDeepSeekUsageUseCase(deepSeekRepo),
-            MutableStateFlow(emptySet()),
-            historyUseCase(recordedSnapshots),
-            checkForAppUpdate = updateUseCase(
-                Result.success(
-                    AppUpdateInfo(
-                        version = "7.1.0",
-                        releasePageUrl = "https://example.com/releases/tag/v7.1.0",
-                        linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
-                    )
-                )
-            ),
-            appUpdateInstaller = installer,
-            currentAppVersion = "7.0.0",
-            clock = Clock.System,
+        try {
+            runCurrent()
+            assertNull(viewModel.appUpdateState.value)
+
+            advanceTimeBy(10 * 60 * 1_000L)
+            runCurrent()
+
+            val updateState = viewModel.appUpdateState.value
+            assertIs<AppUpdateUiState.Available>(updateState)
+            assertEquals(2, checks)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `refresh triggers an immediate update recheck`() = runTest {
+        var checks = 0
+        val viewModel = updateViewModel(
+            recordedSnapshots = mutableListOf(),
+            checkForUpdate = {
+                checks += 1
+                if (checks == 1) {
+                    Result.success(null)
+                } else {
+                    Result.success(AppUpdateInfo("7.1.0", "https://example.com/releases/tag/v7.1.0"))
+                }
+            },
+            config = virtualTimeConfig(testScheduler)
+        )
+        viewModel.cancelCountdown()
+
+        try {
+            runCurrent()
+            assertNull(viewModel.appUpdateState.value)
+
+            viewModel.refresh()
+            runCurrent()
+
+            val updateState = viewModel.appUpdateState.value
+            assertIs<AppUpdateUiState.Available>(updateState)
+            assertEquals(2, checks)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `opens the release page when the update banner action is used`() = runTest {
+        var openedUrl: String? = null
+        val viewModel = updateViewModel(
+            recordedSnapshots = mutableListOf(),
+            checkForUpdate = { Result.success(AppUpdateInfo("7.1.0", "https://example.com/releases/tag/v7.1.0")) },
+            releaseOpener = object : AppUpdateReleaseOpener {
+                override fun open(releasePageUrl: String): Result<Unit> {
+                    openedUrl = releasePageUrl
+                    return Result.success(Unit)
+                }
+            },
             config = virtualTimeConfig(testScheduler)
         )
         viewModel.cancelCountdown()
@@ -289,16 +131,74 @@ class DashboardViewModelUpdateTest : DashboardViewModelTestSupport() {
         try {
             runCurrent()
 
-            viewModel.retryUpdateInstallation()
+            viewModel.openUpdateReleasePage()
 
-            runCurrent()
-            advanceTimeBy(1_500)
-            runCurrent()
-
-            assertEquals(2, attempts)
-            assertEquals(true, viewModel.shouldExitForUpdate.value)
+            assertEquals("https://example.com/releases/tag/v7.1.0", openedUrl)
+            assertNull(viewModel.toastMessage.value)
         } finally {
             viewModel.onDestroy()
         }
+    }
+
+    @Test
+    fun `shows toast when opening the release page fails and keeps update banner`() = runTest {
+        val viewModel = updateViewModel(
+            recordedSnapshots = mutableListOf(),
+            checkForUpdate = { Result.success(AppUpdateInfo("7.1.0", "https://example.com/releases/tag/v7.1.0")) },
+            releaseOpener = object : AppUpdateReleaseOpener {
+                override fun open(releasePageUrl: String): Result<Unit> {
+                    return Result.failure(IllegalStateException("browser indisponível"))
+                }
+            },
+            config = virtualTimeConfig(testScheduler)
+        )
+        viewModel.cancelCountdown()
+
+        try {
+            runCurrent()
+
+            viewModel.openUpdateReleasePage()
+
+            assertIs<DashboardToast.ReleasePageError>(viewModel.toastMessage.value)
+            assertIs<AppUpdateUiState.Available>(viewModel.appUpdateState.value)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    private fun updateViewModel(
+        recordedSnapshots: MutableList<ApiUsageStats>,
+        checkForUpdate: suspend () -> Result<AppUpdateInfo?>,
+        releaseOpener: AppUpdateReleaseOpener = object : AppUpdateReleaseOpener {
+            override fun open(releasePageUrl: String): Result<Unit> = Result.success(Unit)
+        },
+        config: com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
+    ): DashboardViewModel {
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        return DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            MutableStateFlow(emptySet()),
+            historyUseCase(recordedSnapshots),
+            checkForAppUpdate = updateUseCase { checkForUpdate() },
+            appUpdateReleaseOpener = releaseOpener,
+            currentAppVersion = "7.0.0",
+            clock = Clock.System,
+            config = config
+        )
     }
 }

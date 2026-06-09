@@ -495,14 +495,17 @@ class ComponentTest {
         }
 
         onNodeWithText("Nova versão 7.1.0 disponível").assertIsDisplayed()
-        onNodeWithText("A atualização automática não está disponível nesta plataforma. Atualize manualmente pela release publicada.").assertIsDisplayed()
+        onNodeWithText("A atualização está disponível na release publicada. Abra a página da versão para baixar e instalar.").assertIsDisplayed()
         viewModel.onDestroy()
     }
 
     @Test
-    fun `DashboardScreen shows Linux restarting banner after managed update`() = runDesktopComposeUiTest {
+    fun `DashboardScreen opens release page from update banner action`() = runDesktopComposeUiTest {
         val enabledApis = MutableStateFlow(emptySet<ApiSource>())
-        val viewModel = dashboardViewModelWithManagedLinuxUpdate(enabledApis)
+        var opened = false
+        val viewModel = dashboardViewModelWithAvailableUpdateAction(enabledApis) {
+            opened = true
+        }
         viewModel.cancelCountdown()
 
         setContent {
@@ -525,13 +528,13 @@ class ComponentTest {
 
         waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                onNodeWithText("Reiniciando na versão 7.1.0").fetchSemanticsNode()
+                onNodeWithText("Baixar atualização").fetchSemanticsNode()
                 true
             }.getOrDefault(false)
         }
 
-        onNodeWithText("Reiniciando na versão 7.1.0").assertIsDisplayed()
-        onNodeWithText("A nova versão já foi instalada. Fechando esta instância para abrir o app atualizado.").assertIsDisplayed()
+        onNodeWithText("Baixar atualização").performClick()
+        assertEquals(true, opened)
         viewModel.onDestroy()
     }
 

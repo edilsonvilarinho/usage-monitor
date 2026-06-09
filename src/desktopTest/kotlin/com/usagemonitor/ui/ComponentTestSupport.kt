@@ -16,11 +16,9 @@ import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
-import com.usagemonitor.presentation.viewmodel.AppUpdateInstaller
-import com.usagemonitor.presentation.viewmodel.AutomaticUpdateStage
+import com.usagemonitor.presentation.viewmodel.AppUpdateReleaseOpener
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
-import com.usagemonitor.presentation.viewmodel.PreparedUpdateAction
-import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateInstaller
+import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateReleaseOpener
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Instant
 
@@ -98,12 +96,15 @@ internal fun dashboardViewModelWithAvailableUpdate(enabledApis: MutableStateFlow
         enabledApis = enabledApis,
         recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository),
         checkForAppUpdate = CheckForAppUpdateUseCase(updateRepository),
-        appUpdateInstaller = UnsupportedAppUpdateInstaller,
+        appUpdateReleaseOpener = UnsupportedAppUpdateReleaseOpener,
         currentAppVersion = "7.0.0"
     )
 }
 
-internal fun dashboardViewModelWithManagedLinuxUpdate(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
+internal fun dashboardViewModelWithAvailableUpdateAction(
+    enabledApis: MutableStateFlow<Set<ApiSource>>,
+    onOpenRelease: () -> Unit
+): DashboardViewModel {
     val anthropicRepo = object : AnthropicRepository {
         override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
     }
@@ -130,26 +131,16 @@ internal fun dashboardViewModelWithManagedLinuxUpdate(enabledApis: MutableStateF
             return Result.success(
                 AppUpdateInfo(
                     version = "7.1.0",
-                    releasePageUrl = "https://example.com/releases/tag/v7.1.0",
-                    linuxDebInstallerDownloadUrl = "https://example.com/UsageMonitor-7.1.0.deb"
+                    releasePageUrl = "https://example.com/releases/tag/v7.1.0"
                 )
             )
         }
     }
-    val installer = object : AppUpdateInstaller {
-        override val isSupported: Boolean = true
 
-        override fun canInstall(update: AppUpdateInfo): Boolean {
-            return update.linuxDebInstallerDownloadUrl != null
-        }
-
-        override suspend fun prepareUpdateInstallation(
-            update: AppUpdateInfo,
-            onStageChanged: (AutomaticUpdateStage) -> Unit
-        ): Result<PreparedUpdateAction> {
-            onStageChanged(AutomaticUpdateStage.INSTALLING)
-            onStageChanged(AutomaticUpdateStage.RESTARTING)
-            return Result.success(PreparedUpdateAction.RestartAndExit)
+    val releaseOpener = object : AppUpdateReleaseOpener {
+        override fun open(releasePageUrl: String): Result<Unit> {
+            onOpenRelease()
+            return Result.success(Unit)
         }
     }
 
@@ -161,7 +152,7 @@ internal fun dashboardViewModelWithManagedLinuxUpdate(enabledApis: MutableStateF
         enabledApis = enabledApis,
         recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository),
         checkForAppUpdate = CheckForAppUpdateUseCase(updateRepository),
-        appUpdateInstaller = installer,
+        appUpdateReleaseOpener = releaseOpener,
         currentAppVersion = "7.0.0"
     )
 }

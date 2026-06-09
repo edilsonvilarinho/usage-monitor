@@ -11,4 +11,8 @@ sealed interface DashboardToast {
         val source: ApiSource,
         val message: String
     ) : DashboardToast
+
+    data class ReleasePageError(
+        val message: String
+    ) : DashboardToast
 }
