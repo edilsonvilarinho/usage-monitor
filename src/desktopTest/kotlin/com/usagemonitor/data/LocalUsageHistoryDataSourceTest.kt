@@ -38,7 +38,7 @@ class LocalUsageHistoryDataSourceTest {
     }
 
     @Test
-    fun `prune removes snapshots older than thirty days`() = runTest {
+    fun `older snapshots remain available after newer inserts`() = runTest {
         val tempDir = createTempDirectory().toFile()
         val databaseFile = File(tempDir, "history.db")
         val dataSource = LocalUsageHistoryDataSource(databaseFile)
@@ -51,7 +51,7 @@ class LocalUsageHistoryDataSourceTest {
             since = Instant.parse("2026-02-20T00:00:00Z")
         )
 
-        assertEquals(2, records.size)
+        assertEquals(4, records.size)
 
         dataSource.insertSnapshot(sampleStats(), Instant.parse("2026-05-05T18:00:00Z"))
 
@@ -60,7 +60,8 @@ class LocalUsageHistoryDataSourceTest {
             since = Instant.parse("2026-02-20T00:00:00Z")
         )
 
-        assertTrue(afterPrune.all { it.capturedAt >= Instant.parse("2026-04-05T18:00:00Z") })
+        assertEquals(6, afterPrune.size)
+        assertTrue(afterPrune.any { it.capturedAt == Instant.parse("2026-03-01T10:00:00Z") })
         tempDir.deleteRecursively()
     }
 

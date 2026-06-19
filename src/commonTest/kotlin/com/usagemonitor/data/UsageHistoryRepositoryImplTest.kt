@@ -168,6 +168,31 @@ class UsageHistoryRepositoryImplTest {
         assertIs<UsageForecast.ResetsBeforeExhaustion>(report.series.single().forecast)
     }
 
+    @Test
+    fun `TOTAL range returns all snapshots including records older than thirty days`() = kotlinx.coroutines.test.runTest {
+        val records = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-02-15T10:00:00Z", 20, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-03-10T10:00:00Z", 40, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 80, 1000),
+            record("Codex 7d", ApiSource.CODEX, "2026-02-20T10:00:00Z", 100, 5000, "2026-02-27T10:00:00Z")
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.TOTAL, now)
+
+        assertEquals(HistoryRange.TOTAL, report.range)
+        assertEquals(2, report.series.size)
+        assertEquals(Instant.parse("2026-04-28T17:00:00Z"), report.lastUpdatedAt)
+        assertEquals(
+            listOf(
+                Instant.parse("2026-02-15T10:00:00Z"),
+                Instant.parse("2026-03-10T10:00:00Z"),
+                Instant.parse("2026-04-28T17:00:00Z")
+            ),
+            report.series.first { it.quotaLabel == "Codex 5h" }.points.map { it.capturedAt }
+        )
+    }
+
     private class FakeHistoryDataSource(
         private val records: List<UsageSnapshotRecord>
     ) : UsageHistoryDataSource {

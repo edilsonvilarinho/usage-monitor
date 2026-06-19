@@ -32,6 +32,7 @@ internal fun rangeLabel(range: HistoryRange, language: AppLanguage): String {
         HistoryRange.LAST_24_HOURS -> if (language == AppLanguage.PT) "24h" else "24h"
         HistoryRange.LAST_7_DAYS -> if (language == AppLanguage.PT) "7 dias" else "7 days"
         HistoryRange.LAST_30_DAYS -> if (language == AppLanguage.PT) "30 dias" else "30 days"
+        HistoryRange.TOTAL -> if (language == AppLanguage.PT) "Total" else "All"
     }
 }
 
@@ -266,7 +267,8 @@ internal fun selectOpenCodeChartSeries(
     return when (selectedRange) {
         HistoryRange.LAST_24_HOURS -> group.series5h ?: group.series7d
         HistoryRange.LAST_7_DAYS,
-        HistoryRange.LAST_30_DAYS -> group.series7d ?: group.series5h
+        HistoryRange.LAST_30_DAYS,
+        HistoryRange.TOTAL -> group.series7d ?: group.series5h
     }
 }
 

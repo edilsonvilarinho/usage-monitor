@@ -8,14 +8,20 @@ import kotlinx.datetime.toLocalDateTime
 enum class HistoryRange {
     LAST_24_HOURS,
     LAST_7_DAYS,
-    LAST_30_DAYS;
+    LAST_30_DAYS,
+    TOTAL;
 
     fun windowStart(now: Instant): Instant {
         return when (this) {
             LAST_24_HOURS -> now.minus(24, kotlinx.datetime.DateTimeUnit.HOUR, TimeZone.UTC)
             LAST_7_DAYS -> now.minus(7, kotlinx.datetime.DateTimeUnit.DAY, TimeZone.UTC)
             LAST_30_DAYS -> now.minus(30, kotlinx.datetime.DateTimeUnit.DAY, TimeZone.UTC)
+            TOTAL -> TOTAL_WINDOW_START
         }
+    }
+
+    private companion object {
+        val TOTAL_WINDOW_START: Instant = Instant.fromEpochMilliseconds(Long.MIN_VALUE)
     }
 }
 

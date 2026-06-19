@@ -43,11 +43,6 @@ class LocalUsageHistoryDataSource(
                         statement.executeBatch()
                     }
 
-                    connection.prepareStatement(PRUNE_SQL).use { pruneStatement ->
-                        pruneStatement.setLong(1, retentionCutoff(capturedAt))
-                        pruneStatement.executeUpdate()
-                    }
-
                     connection.commit()
                 } catch (error: Throwable) {
                     connection.rollback()
@@ -115,13 +110,7 @@ class LocalUsageHistoryDataSource(
         return "jdbc:sqlite:${databaseFile.absolutePath}"
     }
 
-    private fun retentionCutoff(capturedAt: Instant): Long {
-        return capturedAt.toEpochMilliseconds() - RETENTION_MILLIS
-    }
-
     private companion object {
-        const val RETENTION_MILLIS = 30L * 24L * 60L * 60L * 1000L
-
         const val CREATE_TABLE_SQL = """
             CREATE TABLE IF NOT EXISTS usage_snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,11 +150,6 @@ class LocalUsageHistoryDataSource(
                 period_end_at,
                 captured_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """
-
-        const val PRUNE_SQL = """
-            DELETE FROM usage_snapshots
-            WHERE captured_at < ?;
         """
 
         const val SELECT_SQL = """

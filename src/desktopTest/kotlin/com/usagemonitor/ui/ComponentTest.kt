@@ -915,8 +915,17 @@ class ComponentTest {
         onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
         onNodeWithText("18 requisições").assertIsDisplayed()
         onNodeWithText("3 requisições/h").assertIsDisplayed()
+
+        onNodeWithText("Total").performClick()
+
+        waitUntil(timeoutMillis = 5_000) {
+            requestedRanges.contains(HistoryRange.TOTAL)
+        }
+
+        onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
         assertTrue(HistoryRange.LAST_24_HOURS in requestedRanges)
         assertTrue(HistoryRange.LAST_7_DAYS in requestedRanges)
+        assertTrue(HistoryRange.TOTAL in requestedRanges)
         viewModel.onDestroy()
     }
 
@@ -1044,6 +1053,7 @@ class ComponentTest {
         onNodeWithText("Codex 5h").assertIsDisplayed()
         onAllNodesWithText("API").assertCountEquals(0)
         onNodeWithText("Intervalo").assertIsDisplayed()
+        onNodeWithText("Total").assertIsDisplayed()
         onNodeWithText("Uso atual").assertIsDisplayed()
         onNodeWithText("50 / 100 %").assertIsDisplayed()
         onAllNodesWithText("Fechar").assertCountEquals(0)

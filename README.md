@@ -146,10 +146,10 @@ Observacoes:
 ### Historico
 
 - Cada integracao pode abrir uma tela dedicada de historico.
-- Intervalos disponiveis: `24h`, `7 dias` e `30 dias`.
+- Intervalos disponiveis: `24h`, `7 dias`, `30 dias` e `Total`.
 - O repositorio de historico calcula consumo acumulado, media por hora e forecast de esgotamento.
 - O historico local fica em `~/.usage-monitor/usage-history.db`.
-- A retencao atual e de 30 dias.
+- Novos snapshots nao sao mais podados automaticamente; o filtro `Total` usa todo o historico ainda existente no banco local.
 
 ### Update da app
 
