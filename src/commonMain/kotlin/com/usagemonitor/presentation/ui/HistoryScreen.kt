@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -81,6 +83,7 @@ fun HistoryScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val chartSelectionController = remember { HistoryChartSelectionController() }
+    val scrollState = rememberScrollState()
     val selectedSourceForHeader = when (val current = state) {
         is HistoryUiState.Empty -> current.selectedSource
         is HistoryUiState.Error -> current.selectedSource
@@ -92,133 +95,136 @@ fun HistoryScreen(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            HistoryHeader(
-                language = language,
-                selectedSource = selectedSourceForHeader,
-                showSourceSelector = showSourceSelector,
-                onBack = onBack
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 20.dp, vertical = 24.dp)
+                    .padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                HistoryHeader(
+                    language = language,
+                    selectedSource = selectedSourceForHeader,
+                    showSourceSelector = showSourceSelector,
+                    onBack = onBack
+                )
 
-            AnimatedContent(
-                targetState = state::class,
-                transitionSpec = {
-                    (fadeIn(tween(AppMotion.normal, easing = AppMotion.enterEasing)) +
-                        slideInVertically(tween(AppMotion.slow, easing = AppMotion.enterEasing)) { it / 10 })
-                        .togetherWith(fadeOut(tween(AppMotion.fast, easing = AppMotion.exitEasing)))
-                        .using(SizeTransform(clip = false))
-                },
-                label = "historyStateContent"
-            ) { _ ->
-                when (val current = state) {
-                    is HistoryUiState.Loading -> {
-                        Text(
-                            text = if (language == AppLanguage.PT) "Carregando histórico..." else "Loading history...",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    is HistoryUiState.Empty -> {
-                        Text(
-                            text = if (language == AppLanguage.PT) {
-                                "Ainda não há snapshots salvos. Faça algumas atualizações bem-sucedidas no dashboard para começar."
-                            } else {
-                                "There are no saved snapshots yet. Run a few successful dashboard refreshes to get started."
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    is HistoryUiState.Error -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                AnimatedContent(
+                    targetState = state::class,
+                    transitionSpec = {
+                        (fadeIn(tween(AppMotion.normal, easing = AppMotion.enterEasing)) +
+                            slideInVertically(tween(AppMotion.slow, easing = AppMotion.enterEasing)) { it / 10 })
+                            .togetherWith(fadeOut(tween(AppMotion.fast, easing = AppMotion.exitEasing)))
+                            .using(SizeTransform(clip = false))
+                    },
+                    label = "historyStateContent"
+                ) { _ ->
+                    when (val current = state) {
+                        is HistoryUiState.Loading -> {
                             Text(
-                                text = if (language == AppLanguage.PT) "Erro ao carregar histórico" else "Failed to load history",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                text = current.message,
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = if (language == AppLanguage.PT) "Carregando histórico..." else "Loading history...",
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
 
-                    is HistoryUiState.Success -> {
-                        LaunchedEffect(current.selectedSource, current.selectedRange) {
-                            chartSelectionController.clear()
+                        is HistoryUiState.Empty -> {
+                            Text(
+                                text = if (language == AppLanguage.PT) {
+                                    "Ainda não há snapshots salvos. Faça algumas atualizações bem-sucedidas no dashboard para começar."
+                                } else {
+                                    "There are no saved snapshots yet. Run a few successful dashboard refreshes to get started."
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                            HistoryControls(
-                                availableSources = current.availableSources,
-                                selectedSource = current.selectedSource,
-                                selectedRange = current.selectedRange,
-                                showSourceSelector = showSourceSelector,
-                                language = language,
-                                onSelectSource = viewModel::selectSource,
-                                onSelectRange = viewModel::selectRange
-                            )
-
-                            if (current.report.series.isEmpty()) {
+                        is HistoryUiState.Error -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = if (language == AppLanguage.PT) {
-                                        "Sem dados para o intervalo selecionado."
-                                    } else {
-                                        "No data for the selected range."
-                                    },
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    text = if (language == AppLanguage.PT) "Erro ao carregar histórico" else "Failed to load history",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = current.message,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            } else {
-                                val accentColor = accentColorForHistorySource(current.report.source)
-                                if (current.report.source == ApiSource.DEEPSEEK) {
-                                    DeepSeekHistoryContent(
-                                        report = current.report,
-                                        accentColor = accentColor,
-                                        language = language,
-                                        selectedRange = current.selectedRange,
-                                        selectionController = chartSelectionController
-                                    )
-                                } else if (current.report.source.isObservedActivitySource()) {
-                                    OpenCodeHistoryContent(
-                                        report = current.report,
-                                        accentColor = accentColor,
-                                        language = language,
-                                        selectedRange = current.selectedRange,
-                                        selectionController = chartSelectionController
+                            }
+                        }
+
+                        is HistoryUiState.Success -> {
+                            LaunchedEffect(current.selectedSource, current.selectedRange) {
+                                chartSelectionController.clear()
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                                HistoryControls(
+                                    availableSources = current.availableSources,
+                                    selectedSource = current.selectedSource,
+                                    selectedRange = current.selectedRange,
+                                    showSourceSelector = showSourceSelector,
+                                    language = language,
+                                    onSelectSource = viewModel::selectSource,
+                                    onSelectRange = viewModel::selectRange
+                                )
+
+                                if (current.report.series.isEmpty()) {
+                                    Text(
+                                        text = if (language == AppLanguage.PT) {
+                                            "Sem dados para o intervalo selecionado."
+                                        } else {
+                                            "No data for the selected range."
+                                        },
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 } else {
-                                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        Text(
-                                            text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    val accentColor = accentColorForHistorySource(current.report.source)
+                                    if (current.report.source == ApiSource.DEEPSEEK) {
+                                        DeepSeekHistoryContent(
+                                            report = current.report,
+                                            accentColor = accentColor,
+                                            language = language,
+                                            selectedRange = current.selectedRange,
+                                            selectionController = chartSelectionController
                                         )
+                                    } else if (current.report.source.isObservedActivitySource()) {
+                                        OpenCodeHistoryContent(
+                                            report = current.report,
+                                            accentColor = accentColor,
+                                            language = language,
+                                            selectedRange = current.selectedRange,
+                                            selectionController = chartSelectionController
+                                        )
+                                    } else {
+                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                            Text(
+                                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
 
-                                        current.report.series.forEachIndexed { index, series ->
-                                            key(series.quotaLabel + current.selectedRange.name) {
-                                                HistorySeriesCard(
-                                                    series = series,
-                                                    index = index,
-                                                    accentColor = accentColor,
-                                                    language = language,
-                                                    chartSelectionKey = buildQuotaChartSelectionKey(
-                                                        source = current.report.source,
-                                                        quotaLabel = series.quotaLabel,
-                                                        periodType = series.periodType,
-                                                        selectedRange = current.selectedRange
-                                                    ),
-                                                    selectionController = chartSelectionController
-                                                )
+                                            current.report.series.forEachIndexed { index, series ->
+                                                key(series.quotaLabel + current.selectedRange.name) {
+                                                    HistorySeriesCard(
+                                                        series = series,
+                                                        index = index,
+                                                        accentColor = accentColor,
+                                                        language = language,
+                                                        chartSelectionKey = buildQuotaChartSelectionKey(
+                                                            source = current.report.source,
+                                                            quotaLabel = series.quotaLabel,
+                                                            periodType = series.periodType,
+                                                            selectedRange = current.selectedRange
+                                                        ),
+                                                        selectionController = chartSelectionController
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -228,6 +234,13 @@ fun HistoryScreen(
                     }
                 }
             }
+
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(scrollState),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+            )
         }
     }
 }
