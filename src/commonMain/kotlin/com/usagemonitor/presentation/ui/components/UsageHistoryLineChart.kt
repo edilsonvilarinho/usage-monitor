@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,6 +30,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -57,9 +59,23 @@ import kotlin.math.roundToInt
 private const val HISTORY_TOOLTIP_PADDING_PX = 8f
 private const val HISTORY_TOOLTIP_OFFSET_PX = 10f
 private const val HISTORY_DRAG_SELECTION_THRESHOLD_PX = 10f
+private const val HISTORY_PLOT_HORIZONTAL_INSET_PX = 14f
 private val HISTORY_PLOT_HEIGHT = 120.dp
 private val HISTORY_TOOLTIP_BAND_HEIGHT = 48.dp
 private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HEIGHT
+private val HISTORY_ANNOTATION_LABEL_WIDTH = 64.dp
+
+internal data class HistoryRangeAnnotations(
+    val startIndex: Int,
+    val endIndex: Int,
+    val resetIndices: List<Int>
+)
+
+internal data class HistoryIntervalSummaryModel(
+    val headline: String? = null,
+    val supportingText: String,
+    val metrics: List<TooltipMetric>
+)
 
 internal data class PinnedHistorySelection(
     val chartKey: String,
@@ -83,6 +99,14 @@ internal class HistoryChartSelectionController(
 
     fun clear() {
         selection = null
+    }
+
+    fun selectionFor(chartKey: String, pointCount: Int): PinnedHistorySelection? {
+        val currentSelection = selection ?: return null
+        if (currentSelection.chartKey != chartKey || !currentSelection.isValidFor(pointCount)) {
+            return null
+        }
+        return currentSelection
     }
 }
 
@@ -154,19 +178,22 @@ internal fun UsageHistoryLineChart(
     val timeLabels = buildTimeReferenceLabels(renderPoints)
     val valueAxis = buildValueAxis(renderPoints, unit)
     val valueLabels = buildValueLabels(valueAxis, unit)
+    val plotInset = remember(plotSize) {
+        resolvePlotHorizontalInset(plotSize.width.toFloat())
+    }
     val plotPoints = remember(renderPoints, valueAxis, plotSize) {
         buildPlotPoints(
             points = renderPoints,
             chartWidth = plotSize.width.toFloat(),
             chartHeight = plotSize.height.toFloat(),
-            axis = valueAxis
+            axis = valueAxis,
+            horizontalInsetPx = plotInset
         )
     }
-    val pinnedSelection = selectionController
-        ?.selection
-        ?.takeIf { selection ->
-            selection.chartKey == chartSelectionKey && selection.isValidFor(renderPoints.size)
-        }
+    val pinnedSelection = selectionController?.selectionFor(chartSelectionKey, renderPoints.size)
+    val rangeAnnotations = remember(renderPoints, unit) {
+        detectHistoryRangeAnnotations(renderPoints, unit)
+    }
     val activeIndex = pinnedSelection?.currentIndex ?: hoveredIndex
     val activePoint = activeIndex?.let { index -> plotPoints.getOrNull(index) }
     val comparisonPoint = pinnedSelection?.anchorIndex?.let(renderPoints::getOrNull)
@@ -239,6 +266,13 @@ internal fun UsageHistoryLineChart(
                     val anchorPoint = pinnedSelection
                         ?.anchorIndex
                         ?.let { anchorIndex -> plotPoints.getOrNull(anchorIndex) }
+                    val resetPathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
+                    val rangeStartPoint = rangeAnnotations?.startIndex?.let(plotPoints::getOrNull)
+                    val rangeEndPoint = rangeAnnotations?.endIndex?.let(plotPoints::getOrNull)
+                    val resetPoints = rangeAnnotations
+                        ?.resetIndices
+                        ?.mapNotNull(plotPoints::getOrNull)
+                        .orEmpty()
 
                     drawLine(
                         color = gridColor,
@@ -258,6 +292,16 @@ internal fun UsageHistoryLineChart(
                         end = Offset(size.width, size.height),
                         strokeWidth = gridStroke
                     )
+
+                    resetPoints.forEach { resetPoint ->
+                        drawLine(
+                            color = chartIndicatorColor.copy(alpha = 0.22f),
+                            start = Offset(resetPoint.x, 0f),
+                            end = Offset(resetPoint.x, size.height),
+                            strokeWidth = gridStroke,
+                            pathEffect = resetPathEffect
+                        )
+                    }
 
                     if (plotPoints.size > 1) {
                         val path = Path()
@@ -288,6 +332,39 @@ internal fun UsageHistoryLineChart(
                                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                             )
                         }
+                    }
+
+                    if (rangeStartPoint != null &&
+                        rangeStartPoint.index != activePoint?.index &&
+                        rangeStartPoint.index != anchorPoint?.index
+                    ) {
+                        drawCircle(
+                            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
+                            radius = activeMarkerHaloRadius,
+                            center = Offset(rangeStartPoint.x, rangeStartPoint.y)
+                        )
+                        drawCircle(
+                            color = lineColor.copy(alpha = 0.9f),
+                            radius = activeMarkerRadius,
+                            center = Offset(rangeStartPoint.x, rangeStartPoint.y),
+                            style = Stroke(width = 2.dp.toPx())
+                        )
+                    }
+
+                    if (rangeEndPoint != null &&
+                        rangeEndPoint.index != activePoint?.index &&
+                        rangeEndPoint.index != anchorPoint?.index
+                    ) {
+                        drawCircle(
+                            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
+                            radius = activeMarkerHaloRadius,
+                            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
+                        )
+                        drawCircle(
+                            color = lineColor.copy(alpha = 0.92f),
+                            radius = activeMarkerRadius,
+                            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
+                        )
                     }
 
                     if (activePoint != null) {
@@ -328,13 +405,23 @@ internal fun UsageHistoryLineChart(
                         )
                     }
                 }
+
+                HistoryRangeAnnotationLabels(
+                    startPoint = rangeAnnotations?.startIndex?.let(plotPoints::getOrNull),
+                    endPoint = rangeAnnotations?.endIndex?.let(plotPoints::getOrNull),
+                    resetPoint = rangeAnnotations?.resetIndices?.lastOrNull()?.let(plotPoints::getOrNull),
+                    plotWidth = plotSize.width.toFloat(),
+                    plotInset = plotInset,
+                    language = language
+                )
             }
 
             if (activePoint != null && tooltipModel != null) {
                 val tooltipLeft = clampTooltipLeft(
                     desiredCenterX = activePoint.x,
                     tooltipWidth = tooltipSize.width.toFloat(),
-                    containerWidth = plotSize.width.toFloat()
+                    containerWidth = plotSize.width.toFloat(),
+                    horizontalPadding = plotInset
                 )
                 val tooltipTop = buildHistoryTooltipTop(
                     pointY = activePoint.y + plotTop,
@@ -369,7 +456,7 @@ internal fun UsageHistoryLineChart(
                 modifier = Modifier
                     .fillMaxSize()
                     .onPointerEvent(PointerEventType.Enter) { event ->
-                        if (selectionController?.selection != null || dragSession != null) {
+                        if (pinnedSelection != null || dragSession != null) {
                             return@onPointerEvent
                         }
 
@@ -446,7 +533,7 @@ internal fun UsageHistoryLineChart(
                         )
                         dragSession = null
 
-                        if (selectionController?.selection != null) {
+                        if (selectionController?.selectionFor(chartSelectionKey, renderPoints.size) != null) {
                             return@onPointerEvent
                         }
 
@@ -472,7 +559,7 @@ internal fun UsageHistoryLineChart(
                             onCleared = { hoveredIndex = null }
                         )
                         dragSession = null
-                        if (selectionController?.selection == null) {
+                        if (selectionController?.selectionFor(chartSelectionKey, renderPoints.size) == null) {
                             hoveredIndex = null
                         }
                     }
@@ -501,6 +588,92 @@ internal fun UsageHistoryLineChart(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HistoryRangeAnnotationLabels(
+    startPoint: ChartPlotPoint?,
+    endPoint: ChartPlotPoint?,
+    resetPoint: ChartPlotPoint?,
+    plotWidth: Float,
+    plotInset: Float,
+    language: AppLanguage
+) {
+    val density = LocalDensity.current
+    val labelWidthPx = with(density) { HISTORY_ANNOTATION_LABEL_WIDTH.toPx() }
+    val showStartLabel = startPoint != null &&
+        (endPoint == null || abs(endPoint.x - startPoint.x) >= labelWidthPx)
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (showStartLabel) {
+            val point = startPoint!!
+            HistoryAnnotationLabel(
+                text = if (language == AppLanguage.PT) "Início" else "Start",
+                left = clampTooltipLeft(
+                    desiredCenterX = point.x,
+                    tooltipWidth = labelWidthPx,
+                    containerWidth = plotWidth,
+                    horizontalPadding = plotInset
+                )
+            )
+        }
+
+        endPoint?.let { point ->
+            HistoryAnnotationLabel(
+                text = if (language == AppLanguage.PT) "Agora" else "Now",
+                left = clampTooltipLeft(
+                    desiredCenterX = point.x,
+                    tooltipWidth = labelWidthPx,
+                    containerWidth = plotWidth,
+                    horizontalPadding = plotInset
+                )
+            )
+        }
+
+        resetPoint?.let { point ->
+            HistoryAnnotationLabel(
+                text = if (language == AppLanguage.PT) "Reset" else "Reset",
+                left = clampTooltipLeft(
+                    desiredCenterX = point.x,
+                    tooltipWidth = labelWidthPx,
+                    containerWidth = plotWidth,
+                    horizontalPadding = plotInset
+                ),
+                topPadding = 22.dp
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryAnnotationLabel(
+    text: String,
+    left: Float,
+    topPadding: androidx.compose.ui.unit.Dp = 4.dp
+) {
+    Surface(
+        modifier = Modifier
+            .width(HISTORY_ANNOTATION_LABEL_WIDTH)
+            .offset {
+                IntOffset(
+                    x = left.roundToInt(),
+                    y = topPadding.roundToPx()
+                )
+            },
+        shape = AppShapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        tonalElevation = 1.dp
+    ) {
+        Text(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -626,7 +799,8 @@ internal fun buildPlotPoints(
     points: List<UsageHistoryPoint>,
     chartWidth: Float,
     chartHeight: Float,
-    axis: ValueAxis?
+    axis: ValueAxis?,
+    horizontalInsetPx: Float = HISTORY_PLOT_HORIZONTAL_INSET_PX
 ): List<ChartPlotPoint> {
     if (points.isEmpty() || chartWidth <= 0f || chartHeight <= 0f) {
         return emptyList()
@@ -641,6 +815,8 @@ internal fun buildPlotPoints(
         points.map { it.normalizedUsage }
     }
     val xFractions = buildTimelineFractions(points)
+    val inset = resolvePlotHorizontalInset(chartWidth, horizontalInsetPx)
+    val usableWidth = (chartWidth - inset * 2f).coerceAtLeast(0f)
 
     return points.mapIndexed { index, point ->
         val xFraction = if (points.size == 1) 0.5f else xFractions[index]
@@ -648,10 +824,25 @@ internal fun buildPlotPoints(
         ChartPlotPoint(
             index = index,
             point = point,
-            x = chartWidth * xFraction,
+            x = if (points.size == 1) {
+                chartWidth * xFraction
+            } else {
+                inset + (usableWidth * xFraction)
+            },
             y = y
         )
     }
+}
+
+internal fun resolvePlotHorizontalInset(
+    chartWidth: Float,
+    preferredInsetPx: Float = HISTORY_PLOT_HORIZONTAL_INSET_PX
+): Float {
+    if (chartWidth <= 0f) {
+        return 0f
+    }
+
+    return preferredInsetPx.coerceAtMost((chartWidth / 2f) - 1f).coerceAtLeast(0f)
 }
 
 internal fun findClosestPlotPointIndex(plotPoints: List<ChartPlotPoint>, pointerX: Float): Int? {
@@ -884,8 +1075,103 @@ internal fun buildTimeReferenceLabels(points: List<UsageHistoryPoint>): List<Str
     )
 }
 
+internal fun detectHistoryRangeAnnotations(
+    points: List<UsageHistoryPoint>,
+    unit: UsageUnit
+): HistoryRangeAnnotations? {
+    if (points.isEmpty()) {
+        return null
+    }
+
+    val resetIndices = mutableListOf<Int>()
+    for (index in 1 until points.size) {
+        val previous = points[index - 1]
+        val current = points[index]
+        val periodChanged = current.periodEndAt != previous.periodEndAt
+        val usageDropped = unit != UsageUnit.CURRENCY_USD && current.displayUsed < previous.displayUsed
+        if (periodChanged || usageDropped) {
+            resetIndices += index
+        }
+    }
+
+    return HistoryRangeAnnotations(
+        startIndex = 0,
+        endIndex = points.lastIndex,
+        resetIndices = resetIndices
+    )
+}
+
+internal fun buildHistoryIntervalSummaryModel(
+    points: List<UsageHistoryPoint>,
+    unit: UsageUnit,
+    language: AppLanguage,
+    selection: PinnedHistorySelection? = null
+): HistoryIntervalSummaryModel? {
+    if (points.isEmpty()) {
+        return null
+    }
+
+    if (selection != null && selection.isValidFor(points.size)) {
+        val comparisonHeadline = buildHistoryComparisonHeadline(selection, points, language)
+        return HistoryIntervalSummaryModel(
+            headline = comparisonHeadline,
+            supportingText = if (language == AppLanguage.PT) {
+                "Clique no gráfico para limpar."
+            } else {
+                "Click the chart to clear."
+            },
+            metrics = emptyList()
+        )
+    }
+
+    val firstPoint = points.first()
+    val lastPoint = points.last()
+    return HistoryIntervalSummaryModel(
+        supportingText = if (language == AppLanguage.PT) {
+            "Arraste no gráfico para comparar dois pontos."
+        } else {
+            "Drag across the chart to compare two points."
+        },
+        metrics = listOf(
+            TooltipMetric(
+                label = if (language == AppLanguage.PT) "Início do recorte" else "Range start",
+                value = formatTooltipUsageValue(firstPoint, unit, language)
+            ),
+            TooltipMetric(
+                label = if (language == AppLanguage.PT) "Atual" else "Current",
+                value = formatTooltipUsageValue(lastPoint, unit, language)
+            ),
+            TooltipMetric(
+                label = if (language == AppLanguage.PT) "Variação no recorte" else "Change in range",
+                value = formatTooltipDeltaValue(
+                    point = lastPoint,
+                    comparisonPoint = firstPoint,
+                    unit = unit,
+                    language = language
+                )
+            )
+        )
+    )
+}
+
 private fun PinnedHistorySelection.isValidFor(pointCount: Int): Boolean {
     return anchorIndex in 0 until pointCount && currentIndex in 0 until pointCount
+}
+
+private fun buildHistoryComparisonHeadline(
+    selection: PinnedHistorySelection,
+    points: List<UsageHistoryPoint>,
+    language: AppLanguage
+): String {
+    val anchorPoint = points[selection.anchorIndex]
+    val currentPoint = points[selection.currentIndex]
+    val startReference = formatTimeReference(anchorPoint.capturedAt, points.first().capturedAt, points.last().capturedAt)
+    val endReference = formatTimeReference(currentPoint.capturedAt, points.first().capturedAt, points.last().capturedAt)
+    return if (language == AppLanguage.PT) {
+        "Comparando $startReference -> $endReference"
+    } else {
+        "Comparing $startReference -> $endReference"
+    }
 }
 
 private fun buildAbsoluteAxis(values: List<Long>, minimumDisplayRange: Float): ValueAxis? {

@@ -61,7 +61,9 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.HistoryChartSelectionController
+import com.usagemonitor.presentation.ui.components.HistoryIntervalSummaryModel
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
+import com.usagemonitor.presentation.ui.components.buildHistoryIntervalSummaryModel
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
@@ -775,6 +777,17 @@ private fun HistorySeriesCard(
                     )
                 }
 
+                if (series.periodType == PeriodType.INTERVAL) {
+                    IntervalSummaryPanel(
+                        summary = buildHistoryIntervalSummaryModel(
+                            points = series.points,
+                            unit = series.unit,
+                            language = language,
+                            selection = selectionController.selectionFor(chartSelectionKey, series.points.size)
+                        )
+                    )
+                }
+
                 UsageHistoryLineChart(
                     points = series.points,
                     unit = series.unit,
@@ -791,6 +804,55 @@ private fun HistorySeriesCard(
 
                 HistoryMetrics(series = series, language = language)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun IntervalSummaryPanel(
+    summary: HistoryIntervalSummaryModel?
+) {
+    if (summary == null) {
+        return
+    }
+
+    Surface(
+        shape = AppShapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            summary.headline?.let { headline ->
+                Text(
+                    text = headline,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            if (summary.metrics.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    summary.metrics.forEach { metric ->
+                        MetricItem(label = metric.label, value = metric.value)
+                    }
+                }
+            }
+
+            Text(
+                text = summary.supportingText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

@@ -78,6 +78,25 @@ class UsageHistoryLineChartTest {
     }
 
     @Test
+    fun `buildPlotPoints keeps first and last point away from chart edges`() {
+        val points = listOf(
+            historyPoint("2026-05-06T18:00:00Z", 20, total = 100),
+            historyPoint("2026-05-06T20:00:00Z", 80, total = 100)
+        )
+
+        val plotPoints = buildPlotPoints(
+            points = points,
+            chartWidth = 200f,
+            chartHeight = 120f,
+            axis = null
+        )
+
+        val inset = resolvePlotHorizontalInset(200f)
+        assertEquals(inset, plotPoints.first().x)
+        assertEquals(200f - inset, plotPoints.last().x)
+    }
+
+    @Test
     fun `findClosestPlotPointIndex prefers later point when timestamps overlap on same x`() {
         val points = listOf(
             historyPoint("2026-05-06T18:00:00Z", 10, total = 100),
@@ -205,6 +224,80 @@ class UsageHistoryLineChartTest {
 
         assertNotNull(tooltip)
         assertEquals("+15 req (base indisponível)", tooltip.metrics[1].value)
+    }
+
+    @Test
+    fun `detectHistoryRangeAnnotations marks reset when period end changes`() {
+        val annotations = detectHistoryRangeAnnotations(
+            points = listOf(
+                historyPoint("2026-05-06T18:00:00Z", 20, total = 100, periodEndAt = "2026-05-06T23:00:00Z"),
+                historyPoint("2026-05-06T19:00:00Z", 35, total = 100, periodEndAt = "2026-05-06T23:00:00Z"),
+                historyPoint("2026-05-06T20:00:00Z", 5, total = 100, periodEndAt = "2026-05-07T04:00:00Z")
+            ),
+            unit = UsageUnit.REQUESTS
+        )
+
+        assertNotNull(annotations)
+        assertEquals(listOf(2), annotations.resetIndices)
+    }
+
+    @Test
+    fun `detectHistoryRangeAnnotations marks reset when non monetary usage drops`() {
+        val annotations = detectHistoryRangeAnnotations(
+            points = listOf(
+                historyPoint("2026-05-06T18:00:00Z", 45, total = 100, periodEndAt = "2026-05-06T23:00:00Z"),
+                historyPoint("2026-05-06T19:00:00Z", 30, total = 100, periodEndAt = "2026-05-06T23:00:00Z")
+            ),
+            unit = UsageUnit.PERCENTAGE
+        )
+
+        assertNotNull(annotations)
+        assertEquals(listOf(1), annotations.resetIndices)
+    }
+
+    @Test
+    fun `buildHistoryIntervalSummaryModel formats default interval summary`() {
+        val summary = buildHistoryIntervalSummaryModel(
+            points = listOf(
+                historyPoint("2026-05-06T18:00:00Z", 40, total = 100),
+                historyPoint("2026-05-06T19:00:00Z", 70, total = 100)
+            ),
+            unit = UsageUnit.REQUESTS,
+            language = AppLanguage.PT
+        )
+
+        assertNotNull(summary)
+        assertEquals(null, summary.headline)
+        assertEquals("Arraste no gráfico para comparar dois pontos.", summary.supportingText)
+        assertEquals("Início do recorte", summary.metrics[0].label)
+        assertEquals("40/100 req (40%)", summary.metrics[0].value)
+        assertEquals("Atual", summary.metrics[1].label)
+        assertEquals("70/100 req (70%)", summary.metrics[1].value)
+        assertEquals("Variação no recorte", summary.metrics[2].label)
+        assertEquals("+30 req (+75%)", summary.metrics[2].value)
+    }
+
+    @Test
+    fun `buildHistoryIntervalSummaryModel formats comparison summary`() {
+        val summary = buildHistoryIntervalSummaryModel(
+            points = listOf(
+                historyPoint("2026-05-06T18:00:00Z", 40, total = 100),
+                historyPoint("2026-05-06T19:00:00Z", 55, total = 100),
+                historyPoint("2026-05-06T20:00:00Z", 70, total = 100)
+            ),
+            unit = UsageUnit.REQUESTS,
+            language = AppLanguage.PT,
+            selection = PinnedHistorySelection(
+                chartKey = "codex:req:24h",
+                anchorIndex = 0,
+                currentIndex = 2
+            )
+        )
+
+        assertNotNull(summary)
+        assertEquals("Comparando 15:00 -> 17:00", summary.headline)
+        assertEquals("Clique no gráfico para limpar.", summary.supportingText)
+        assertTrue(summary.metrics.isEmpty())
     }
 
     @Test
