@@ -117,20 +117,27 @@ fun WindowScope.DesktopWindowFrame(
 fun WindowScope.DesktopDialogFrame(
     title: String,
     iconPainter: Painter?,
+    windowState: WindowState? = null,
     onCloseRequest: () -> Unit,
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
+    val isMaximized = windowState?.placement == WindowPlacement.Maximized
 
-    DisposableEffect(density) {
-        applyWindowShape(density, WindowCornerRadius)
-        val listener = object : java.awt.event.ComponentAdapter() {
-            override fun componentResized(e: java.awt.event.ComponentEvent) {
-                applyWindowShape(density, WindowCornerRadius)
+    DisposableEffect(density, isMaximized) {
+        if (isMaximized) {
+            window.shape = null
+        } else {
+            applyWindowShape(density, WindowCornerRadius)
+            val listener = object : java.awt.event.ComponentAdapter() {
+                override fun componentResized(e: java.awt.event.ComponentEvent) {
+                    applyWindowShape(density, WindowCornerRadius)
+                }
             }
+            window.addComponentListener(listener)
+            return@DisposableEffect onDispose { window.removeComponentListener(listener) }
         }
-        window.addComponentListener(listener)
-        onDispose { window.removeComponentListener(listener) }
+        onDispose {}
     }
 
     var entered by remember(title) { mutableStateOf(false) }
@@ -166,6 +173,7 @@ fun WindowScope.DesktopDialogFrame(
             DesktopDialogTitleBar(
                 title = title,
                 iconPainter = iconPainter,
+                windowState = windowState,
                 onCloseRequest = onCloseRequest
             )
 
@@ -252,6 +260,7 @@ private fun WindowScope.DesktopTitleBar(
 private fun WindowScope.DesktopDialogTitleBar(
     title: String,
     iconPainter: Painter?,
+    windowState: WindowState?,
     onCloseRequest: () -> Unit
 ) {
     WindowDraggableArea {
@@ -285,11 +294,29 @@ private fun WindowScope.DesktopDialogTitleBar(
                 )
             }
 
-            TitleBarButton(
-                label = "×",
-                hoverColor = Color(0xFFC62828),
-                onClick = onCloseRequest
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (windowState != null) {
+                    TitleBarButton(
+                        label = if (windowState.placement == WindowPlacement.Maximized) "❐" else "□",
+                        onClick = {
+                            windowState.placement = if (windowState.placement == WindowPlacement.Maximized) {
+                                WindowPlacement.Floating
+                            } else {
+                                WindowPlacement.Maximized
+                            }
+                        }
+                    )
+                }
+
+                TitleBarButton(
+                    label = "×",
+                    hoverColor = Color(0xFFC62828),
+                    onClick = onCloseRequest
+                )
+            }
         }
     }
 

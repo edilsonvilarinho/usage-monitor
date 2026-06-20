@@ -150,6 +150,9 @@ fun main() = application {
     val persistedMainWindowState = remember(settings) {
         readPersistedMainWindowState(settings)
     }
+    val persistedHistoryWindowState = remember(settings) {
+        readPersistedHistoryWindowState(settings)
+    }
 
     val credentialDataSource = remember(httpClient) { LocalCredentialDataSource(httpClient) }
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
@@ -246,6 +249,7 @@ fun main() = application {
 
     val iconImage = remember { loadWindowIcon() }
     val mainWindowState = rememberPersistedMainWindowState(persistedMainWindowState)
+    val historyWindowState = rememberPersistedHistoryWindowState(persistedHistoryWindowState)
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -260,6 +264,26 @@ fun main() = application {
                 snapshot = MainWindowSnapshot(
                     widthDp = size.width.value,
                     heightDp = size.height.value,
+                    placement = placement
+                )
+            )
+        }
+    }
+    LaunchedEffect(historyWindowState, settings) {
+        snapshotFlow {
+            Triple(
+                historyWindowState.position,
+                historyWindowState.size,
+                historyWindowState.placement
+            )
+        }.collect { (position, size, placement) ->
+            persistHistoryWindowState(
+                settings = settings,
+                snapshot = HistoryWindowSnapshot(
+                    widthDp = size.width.value,
+                    heightDp = size.height.value,
+                    xDp = if (position.isSpecified) position.x.value else null,
+                    yDp = if (position.isSpecified) position.y.value else null,
                     placement = placement
                 )
             )
@@ -346,25 +370,22 @@ fun main() = application {
     }
 
     historyDialogSource?.let { source ->
-        val historyDialogState = rememberDialogState(width = 860.dp, height = 760.dp)
-        DialogWindow(
+        Window(
             onCloseRequest = { historyDialogSource = null },
             title = historyWindowTitle(source, language),
             icon = iconImage,
-            state = historyDialogState,
+            state = historyWindowState,
             resizable = true,
             undecorated = true
         ) {
             LaunchedEffect(historyOpenGeneration) {
-                expandWindowToSafeScreenBounds(window)
-                window.isVisible = true
-                window.toFront()
-                window.requestFocus()
+                activateHistoryWindow(window)
             }
             AppTheme(isDark = isDark) {
                 DesktopDialogFrame(
                     title = historyWindowTitle(source, language),
                     iconPainter = iconImage,
+                    windowState = historyWindowState,
                     onCloseRequest = { historyDialogSource = null }
                 ) {
                     HistoryScreen(
@@ -486,18 +507,4 @@ private fun historyWindowTitle(source: ApiSource, language: AppLanguage): String
     } else {
         "History - $sourceName"
     }
-}
-
-private fun expandWindowToSafeScreenBounds(window: java.awt.Window) {
-    val graphicsConfiguration = window.graphicsConfiguration ?: return
-    val screenBounds = graphicsConfiguration.bounds
-    val insets = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(graphicsConfiguration)
-    val safeX = screenBounds.x + insets.left
-    val safeY = screenBounds.y + insets.top
-    val safeWidth = screenBounds.width - insets.left - insets.right
-    val safeHeight = screenBounds.height - insets.top - insets.bottom
-
-    if (safeWidth <= 0 || safeHeight <= 0) return
-
-    window.setBounds(safeX, safeY, safeWidth, safeHeight)
 }
