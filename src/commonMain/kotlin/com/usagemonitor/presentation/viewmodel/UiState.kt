@@ -43,7 +43,8 @@ sealed interface UiState {
 
 data class UiApiError(
     val source: ApiSource,
-    val message: String
+    val message: String,
+    val rawMessage: String = message
 ) {
     val formattedMessage: String
         get() = "${sourceLabel(source)}: $message"
@@ -72,6 +73,25 @@ data class UiApiError(
             isMiniMaxInactivePlanIssue ||
             isOpenCodeLocalIssue ||
             isKiloLocalIssue
+}
+
+internal fun sanitizeUiErrorMessage(source: ApiSource, rawMessage: String): String {
+    val flattened = rawMessage.replace(Regex("\\s+"), " ").trim()
+    val redacted = flattened
+        .replace(Regex("Bearer\\s+[A-Za-z0-9._\\-]+", RegexOption.IGNORE_CASE), "Bearer [REDACTED]")
+        .replace(Regex("cap_sid=[^;\\s]+", RegexOption.IGNORE_CASE), "cap_sid=[REDACTED]")
+        .replace(Regex("access_token[\"'=:\\s]+[A-Za-z0-9._\\-]+", RegexOption.IGNORE_CASE), "access_token=[REDACTED]")
+        .replace(Regex("refresh_token[\"'=:\\s]+[A-Za-z0-9._\\-]+", RegexOption.IGNORE_CASE), "refresh_token=[REDACTED]")
+
+    if (redacted.isBlank()) {
+        return if (source == ApiSource.ANTHROPIC) "Anthropic request failed with an empty error message" else "Request failed with an empty error message"
+    }
+
+    if (redacted.contains("Enable JavaScript and cookies to continue", ignoreCase = true)) {
+        return "Cloudflare challenge page returned by chatgpt.com"
+    }
+
+    return redacted.take(220)
 }
 
 private fun sourceLabel(source: ApiSource): String {

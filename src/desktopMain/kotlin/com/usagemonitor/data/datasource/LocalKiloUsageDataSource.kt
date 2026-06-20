@@ -7,7 +7,7 @@ import java.io.File
 class LocalKiloUsageDataSource(
     private val databaseFile: File = defaultDatabaseFile(),
     private val nowProvider: () -> Instant = { Clock.System.now() }
-) : KiloUsageDataSource {
+) : KiloUsageDataSource, AutoCloseable {
 
     private val reader = LocalObservedModelUsageReader(
         databaseFile = databaseFile,
@@ -31,6 +31,10 @@ class LocalKiloUsageDataSource(
                 capturedAt = snapshot.capturedAt
             )
         }
+    }
+
+    override fun close() {
+        reader.close()
     }
 
     private fun isFreeKiloModel(modelId: String): Boolean {

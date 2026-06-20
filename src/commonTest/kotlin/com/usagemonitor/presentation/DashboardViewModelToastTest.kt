@@ -50,10 +50,9 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
 
@@ -91,10 +90,9 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
 
@@ -132,10 +130,9 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
         awaitSettledState(viewModel)

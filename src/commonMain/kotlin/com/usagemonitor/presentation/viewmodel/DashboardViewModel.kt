@@ -15,7 +15,11 @@ import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,9 +28,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
 
@@ -85,16 +94,29 @@ class DashboardViewModel(
     private val pendingFetchMutex = Mutex()
     private val cachedStatsBySource = mutableMapOf<ApiSource, ApiUsageStats>()
     private val cachedErrorsBySource = mutableMapOf<ApiSource, UiApiError>()
+    private val sourceFetchSemaphore = Semaphore(config.maxConcurrentSourceFetches.coerceAtLeast(1))
+    private val pollWakeUpSignal = Channel<Unit>(capacity = Channel.CONFLATED)
+    private val initialFetchCancelled = AtomicBoolean(false)
+    @Volatile private var scheduledRefreshAt: Instant = clock.now() + config.pollInterval
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
     private var pendingFetchRequest: PendingFetchRequest? = null
 
     init {
-        initFetchJob = viewModelScope.launch {
-            requestFetch(targetSources = enabledApis.value)
+        if (config.autoStartInitialFetch) {
+            initFetchJob = viewModelScope.launch {
+                if (initialFetchCancelled.get()) {
+                    return@launch
+                }
+                requestFetch(targetSources = enabledApis.value)
+            }
         }
-        startUpdateCheckLoop()
-        startCountdown()
+        if (config.autoStartUpdateChecks) {
+            startUpdateCheckLoop()
+        }
+        if (config.autoStartCountdown) {
+            startCountdown()
+        }
     }
 
     private fun startUpdateCheckLoop() {
@@ -111,12 +133,22 @@ class DashboardViewModel(
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
             while (true) {
-                _nextRefreshAt.value = clock.now() + config.pollInterval
-                delay(config.pollInterval)
+                val currentTarget = scheduledRefreshAt
+                _nextRefreshAt.value = currentTarget
+                val waitMillis = (currentTarget - clock.now()).inWholeMilliseconds.coerceAtLeast(0L)
+                val rescheduled = withTimeoutOrNull(waitMillis) {
+                    pollWakeUpSignal.receive()
+                } != null
+                if (rescheduled) {
+                    continue
+                }
                 if (!isAppVisible.value) {
                     isAppVisible.first { it }
                 }
-                viewModelScope.launch { requestFetch(targetSources = enabledApis.value) }
+                viewModelScope.launch {
+                    requestFetch(targetSources = enabledApis.value)
+                }
+                scheduleNextRefresh()
             }
         }
     }
@@ -127,23 +159,35 @@ class DashboardViewModel(
     ) {
         if (!fetchMutex.tryLock()) {
             enqueuePendingFetch(targetSources, preserveDataOnFailure)
+            fetchMutex.withLock {
+                drainPendingFetchQueue() ?: return
+            }
             return
         }
 
         try {
-            var currentRequest = PendingFetchRequest(targetSources, preserveDataOnFailure)
-            while (true) {
-                performFetch(
-                    targetSources = currentRequest.targetSources,
-                    preserveDataOnFailure = currentRequest.preserveDataOnFailure
-                )
-
-                val nextRequest = dequeuePendingFetch() ?: break
-                currentRequest = nextRequest
-            }
+            drainFetchRequests(PendingFetchRequest(targetSources, preserveDataOnFailure))
         } finally {
             fetchMutex.unlock()
         }
+    }
+
+    private suspend fun drainFetchRequests(initialRequest: PendingFetchRequest) {
+        var currentRequest: PendingFetchRequest? = initialRequest
+
+        while (currentRequest != null) {
+            performFetch(
+                targetSources = currentRequest.targetSources,
+                preserveDataOnFailure = currentRequest.preserveDataOnFailure
+            )
+            currentRequest = dequeuePendingFetch()
+        }
+    }
+
+    private suspend fun drainPendingFetchQueue(): PendingFetchRequest? {
+        val pendingRequest = dequeuePendingFetch() ?: return null
+        drainFetchRequests(pendingRequest)
+        return pendingRequest
     }
 
     private suspend fun enqueuePendingFetch(
@@ -198,8 +242,22 @@ class DashboardViewModel(
         val errorUpdates = mutableMapOf<ApiSource, UiApiError?>()
 
         try {
-            effectiveSources.forEach { source ->
-                fetchSource(source)
+            val fetchResults = coroutineScope {
+                effectiveSources.map { source ->
+                    async {
+                        sourceFetchSemaphore.withPermit {
+                            source to runCatching {
+                                withTimeout(config.perSourceTimeout) {
+                                    fetchSource(source).getOrThrow()
+                                }
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+
+            fetchResults.forEach { (source, result) ->
+                result
                     .onSuccess { stats ->
                         statsUpdates[source] = stats
                         errorUpdates[source] = null
@@ -247,7 +305,7 @@ class DashboardViewModel(
     }
 
     fun refresh() {
-        startCountdown()
+        scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targetSources = enabledApis.value)
             checkForUpdate()
@@ -259,7 +317,7 @@ class DashboardViewModel(
             return
         }
 
-        startCountdown()
+        scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(
                 targetSources = setOf(source),
@@ -283,6 +341,7 @@ class DashboardViewModel(
     }
 
     fun cancelInitFetch() {
+        initialFetchCancelled.set(true)
         initFetchJob?.cancel()
     }
 
@@ -303,14 +362,15 @@ class DashboardViewModel(
     }
 
     private fun handleSourceFailure(source: ApiSource, error: Throwable): UiApiError? {
-        val message = error.message ?: "erro desconhecido"
+        val rawMessage = error.message ?: error::class.simpleName ?: "erro desconhecido"
+        val message = sanitizeUiErrorMessage(source, rawMessage)
 
         if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
             _toastMessage.value = DashboardToast.RateLimit(source)
-            return UiApiError(source = source, message = message)
+            return UiApiError(source = source, message = message, rawMessage = rawMessage)
         }
 
-        val uiError = UiApiError(source = source, message = message)
+        val uiError = UiApiError(source = source, message = message, rawMessage = rawMessage)
 
         if (!uiError.isConfigurationIssue) {
             _toastMessage.value = DashboardToast.ApiError(
@@ -359,7 +419,10 @@ class DashboardViewModel(
     }
 
     private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
-        recordUsageSnapshot(stats, capturedAt)
+        val persistenceResult = recordUsageSnapshot(stats, capturedAt)
+        if (persistenceResult.isFailure) {
+            // Persistencia de historico nao pode degradar o refresh principal.
+        }
     }
 
     private suspend fun checkForUpdate() {
@@ -379,5 +442,11 @@ class DashboardViewModel(
                     // Falha silenciosa: UI mantém estado anterior; próxima janela de poll tenta de novo.
                 }
         }
+    }
+
+    private fun scheduleNextRefresh(baseTime: Instant = clock.now()) {
+        scheduledRefreshAt = baseTime + config.pollInterval
+        _nextRefreshAt.value = scheduledRefreshAt
+        pollWakeUpSignal.trySend(Unit)
     }
 }

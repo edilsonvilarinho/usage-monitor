@@ -7,7 +7,7 @@ import java.io.File
 class LocalOpenCodeUsageDataSource(
     private val databaseFile: File = defaultDatabaseFile(),
     private val nowProvider: () -> Instant = { Clock.System.now() }
-) : OpenCodeUsageDataSource {
+) : OpenCodeUsageDataSource, AutoCloseable {
 
     private val reader = LocalObservedModelUsageReader(
         databaseFile = databaseFile,
@@ -31,6 +31,10 @@ class LocalOpenCodeUsageDataSource(
                 capturedAt = snapshot.capturedAt
             )
         }
+    }
+
+    override fun close() {
+        reader.close()
     }
 
     private fun isFreeZenModel(modelId: String): Boolean {

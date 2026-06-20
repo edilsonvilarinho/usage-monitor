@@ -30,7 +30,7 @@ class UsageHistoryRepositoryImpl(
         val records = dataSource.readSnapshots(source, range.windowStart(now))
         val groupedSeries = records
             .groupBy { record -> HistorySeriesKey(record.quotaLabel, record.periodType) }
-            .map { (key, groupRecords) -> buildSeries(key, groupRecords.sortedBy { it.capturedAt }) }
+            .map { (key, groupRecords) -> buildSeries(key, groupRecords.sortedBy { it.capturedAt }, range) }
             .sortedWith(compareBy({ it.periodType.ordinal }, { it.quotaLabel }))
 
         return ApiUsageHistoryReport(
@@ -43,21 +43,27 @@ class UsageHistoryRepositoryImpl(
 
     private fun buildSeries(
         key: HistorySeriesKey,
-        records: List<UsageSnapshotRecord>
+        records: List<UsageSnapshotRecord>,
+        range: HistoryRange
     ): UsageHistorySeries {
         val points = records.map(::toHistoryPoint)
+        val renderPoints = if (range == HistoryRange.TOTAL) {
+            downsamplePoints(points, MAX_TOTAL_POINTS_PER_SERIES)
+        } else {
+            points
+        }
         val unit = records.first().unit
-        val currentPoint = points.last()
-        val deltaDisplayUsed = calculatePositiveDelta(points, unit)
-        val hoursObserved = calculateObservedHours(points)
+        val currentPoint = renderPoints.last()
+        val deltaDisplayUsed = calculatePositiveDelta(renderPoints, unit)
+        val hoursObserved = calculateObservedHours(renderPoints)
         val averagePerHour = if (hoursObserved > 0.0) deltaDisplayUsed.toDouble() / hoursObserved else 0.0
-        val forecast = calculateForecast(points, unit)
+        val forecast = calculateForecast(renderPoints, unit)
 
         return UsageHistorySeries(
             quotaLabel = key.quotaLabel,
             periodType = key.periodType,
             unit = records.last().unit,
-            points = points,
+            points = renderPoints,
             currentDisplayUsed = currentPoint.displayUsed,
             currentDisplayTotal = currentPoint.displayTotal,
             deltaDisplayUsed = deltaDisplayUsed,
@@ -137,6 +143,20 @@ class UsageHistoryRepositoryImpl(
         return points.subList(segmentStartIndex, points.size)
     }
 
+    private fun downsamplePoints(points: List<UsageHistoryPoint>, maxPoints: Int): List<UsageHistoryPoint> {
+        if (points.size <= maxPoints) {
+            return points
+        }
+
+        val sampled = LinkedHashSet<UsageHistoryPoint>()
+        val lastIndex = points.lastIndex
+        for (index in 0 until maxPoints) {
+            val scaledIndex = ((index.toDouble() * lastIndex) / (maxPoints - 1)).toInt()
+            sampled += points[scaledIndex]
+        }
+        return sampled.toList()
+    }
+
     private fun calculatePositiveDelta(points: List<UsageHistoryPoint>, unit: UsageUnit): Long {
         var delta = 0L
         for (index in 1 until points.size) {
@@ -188,5 +208,6 @@ class UsageHistoryRepositoryImpl(
         const val MIN_POINTS_FOR_FORECAST = 3
         // Janela temporal mínima (em horas) — abaixo disso, taxa instantânea é instável.
         const val MIN_HOURS_FOR_FORECAST = 0.5
+        const val MAX_TOTAL_POINTS_PER_SERIES = 720
     }
 }

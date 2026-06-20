@@ -8,21 +8,25 @@ import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
+import kotlinx.datetime.minus
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import java.io.File
 import java.sql.Connection
-import java.sql.DriverManager
 
 class LocalUsageHistoryDataSource(
-    private val databaseFile: File = defaultDatabaseFile()
-) : UsageHistoryDataSource {
+    private val databaseFile: File = defaultDatabaseFile(),
+    private val retentionPeriod: Duration = 90.days
+) : UsageHistoryDataSource, AutoCloseable {
 
-    @Volatile
-    private var initialized = false
+    private val connectionManager = SqliteConnectionManager(
+        databaseFile = databaseFile,
+        onOpen = { connection -> initializeSchema(connection) }
+    )
 
     override suspend fun insertSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
         withContext(Dispatchers.IO) {
-            ensureInitialized()
-            DriverManager.getConnection(databaseUrl()).use { connection ->
+            connectionManager.useConnection { connection ->
                 connection.autoCommit = false
                 try {
                     connection.prepareStatement(INSERT_SQL).use { statement ->
@@ -42,11 +46,14 @@ class LocalUsageHistoryDataSource(
                         }
                         statement.executeBatch()
                     }
+                    pruneExpiredSnapshots(connection, capturedAt)
 
                     connection.commit()
                 } catch (error: Throwable) {
                     connection.rollback()
                     throw error
+                } finally {
+                    connection.autoCommit = true
                 }
             }
         }
@@ -54,8 +61,7 @@ class LocalUsageHistoryDataSource(
 
     override suspend fun readSnapshots(source: ApiSource, since: Instant): List<UsageSnapshotRecord> {
         return withContext(Dispatchers.IO) {
-            ensureInitialized()
-            DriverManager.getConnection(databaseUrl()).use { connection ->
+            connectionManager.useConnection { connection ->
                 connection.prepareStatement(SELECT_SQL).use { statement ->
                     statement.setString(1, source.name)
                     statement.setLong(2, since.toEpochMilliseconds())
@@ -82,32 +88,27 @@ class LocalUsageHistoryDataSource(
         }
     }
 
-    private fun ensureInitialized() {
-        if (initialized) {
-            return
-        }
+    override fun close() {
+        connectionManager.close()
+    }
 
-        synchronized(this) {
-            if (initialized) {
-                return
-            }
-
-            databaseFile.parentFile?.mkdirs()
-            DriverManager.getConnection(databaseUrl()).use { connection ->
-                connection.createStatement().use { statement ->
-                    statement.execute("PRAGMA journal_mode = WAL;")
-                    statement.execute("PRAGMA user_version = 1;")
-                    statement.execute(CREATE_TABLE_SQL)
-                    statement.execute(CREATE_INDEX_BY_SOURCE_SQL)
-                    statement.execute(CREATE_INDEX_BY_SERIES_SQL)
-                }
-            }
-            initialized = true
+    private fun initializeSchema(connection: Connection) {
+        connection.createStatement().use { statement ->
+            statement.execute("PRAGMA journal_mode = WAL;")
+            statement.execute("PRAGMA synchronous = NORMAL;")
+            statement.execute("PRAGMA user_version = 2;")
+            statement.execute(CREATE_TABLE_SQL)
+            statement.execute(CREATE_INDEX_BY_SOURCE_SQL)
+            statement.execute(CREATE_INDEX_BY_SERIES_SQL)
         }
     }
 
-    private fun databaseUrl(): String {
-        return "jdbc:sqlite:${databaseFile.absolutePath}"
+    private fun pruneExpiredSnapshots(connection: Connection, capturedAt: Instant) {
+        val cutoff = capturedAt.minus(retentionPeriod)
+        connection.prepareStatement(DELETE_EXPIRED_SQL).use { statement ->
+            statement.setLong(1, cutoff.toEpochMilliseconds())
+            statement.executeUpdate()
+        }
     }
 
     private companion object {
@@ -167,6 +168,11 @@ class LocalUsageHistoryDataSource(
             FROM usage_snapshots
             WHERE source = ? AND captured_at >= ?
             ORDER BY quota_label ASC, captured_at ASC;
+        """
+
+        const val DELETE_EXPIRED_SQL = """
+            DELETE FROM usage_snapshots
+            WHERE captured_at < ?;
         """
 
         fun defaultDatabaseFile(): File {

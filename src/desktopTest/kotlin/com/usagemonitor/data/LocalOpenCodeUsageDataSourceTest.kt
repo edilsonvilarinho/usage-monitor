@@ -35,6 +35,7 @@ class LocalOpenCodeUsageDataSourceTest {
         assertEquals(2L, snapshots[1].requestsLastSevenDays)
         assertTrue(snapshots.none { it.modelName.contains("DeepSeek", ignoreCase = true) })
 
+        dataSource.close()
         Files.deleteIfExists(tempDir.resolve("opencode.db"))
         Files.deleteIfExists(tempDir)
     }

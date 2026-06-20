@@ -60,15 +60,19 @@ import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.prefs.Preferences
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
 
 private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
@@ -86,6 +90,7 @@ private fun loadWindowIcon() = runCatching {
     }
 }.getOrNull()
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 fun main() = application {
 
     val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
@@ -101,6 +106,11 @@ fun main() = application {
                     ignoreUnknownKeys = true
                     isLenient = true
                 })
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 20_000
+                connectTimeoutMillis = 10_000
+                socketTimeoutMillis = 20_000
             }
             install(Logging) {
                 level = LogLevel.NONE
@@ -222,12 +232,15 @@ fun main() = application {
     }
 
     val shutdownStarted = remember { AtomicBoolean(false) }
-    DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard) {
+    DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         val shutdownHook = Thread {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 httpClient.close()
+                usageHistoryDataSource.close()
+                openCodeUsageDataSource.close()
+                kiloUsageDataSource.close()
                 singleInstanceGuard.close()
             }
         }
@@ -242,6 +255,9 @@ fun main() = application {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 httpClient.close()
+                usageHistoryDataSource.close()
+                openCodeUsageDataSource.close()
+                kiloUsageDataSource.close()
                 singleInstanceGuard.close()
             }
         }
@@ -257,7 +273,10 @@ fun main() = application {
                 mainWindowState.size,
                 mainWindowState.placement
             )
-        }.collect { (isMinimized, size, placement) ->
+        }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { (isMinimized, size, placement) ->
             isAppVisible.value = !isMinimized
             persistMainWindowState(
                 settings = settings,
@@ -267,7 +286,7 @@ fun main() = application {
                     placement = placement
                 )
             )
-        }
+            }
     }
     LaunchedEffect(historyWindowState, settings) {
         snapshotFlow {
@@ -276,7 +295,10 @@ fun main() = application {
                 historyWindowState.size,
                 historyWindowState.placement
             )
-        }.collect { (position, size, placement) ->
+        }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { (position, size, placement) ->
             persistHistoryWindowState(
                 settings = settings,
                 snapshot = HistoryWindowSnapshot(
@@ -287,7 +309,7 @@ fun main() = application {
                     placement = placement
                 )
             )
-        }
+            }
     }
     val enabledApisState by enabledApis.collectAsState()
     var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
@@ -302,12 +324,15 @@ fun main() = application {
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
     var historyOpenGeneration by remember { mutableStateOf(0) }
-    val shutdownApplication = remember(viewModel, historyViewModel, httpClient) {
+    val shutdownApplication = remember(viewModel, historyViewModel, httpClient, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 httpClient.close()
+                usageHistoryDataSource.close()
+                openCodeUsageDataSource.close()
+                kiloUsageDataSource.close()
                 singleInstanceGuard.close()
             }
             exitProcess(0)

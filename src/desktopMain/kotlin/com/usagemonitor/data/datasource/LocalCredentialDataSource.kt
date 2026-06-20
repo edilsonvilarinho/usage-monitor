@@ -12,6 +12,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L  // renova se expira em menos de 5 min
 private const val OAUTH_REFRESH_URL = "https://console.anthropic.com/v1/oauth/token"
@@ -84,10 +87,40 @@ class LocalCredentialDataSource(
                 else creds.claudeAiOauth.expiresAt
             )
         )
-        credentialsFile.writeText(json.encodeToString(CredentialsFileDto.serializer(), updated))
+        atomicWriteText(
+            target = credentialsFile,
+            content = json.encodeToString(CredentialsFileDto.serializer(), updated)
+        )
         cachedToken = newAccessToken
         cachedExpiresAt = updated.claudeAiOauth.expiresAt
         return newAccessToken
+    }
+
+    private fun atomicWriteText(target: File, content: String) {
+        val parentDir = target.parentFile ?: throw IllegalStateException("Diretório pai do ficheiro de credenciais não encontrado.")
+        parentDir.mkdirs()
+        val tempFile = File(parentDir, "${target.name}.tmp")
+        try {
+            Files.writeString(tempFile.toPath(), content)
+            try {
+                Files.move(
+                    tempFile.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(
+                    tempFile.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+            }
+        } finally {
+            if (tempFile.exists()) {
+                tempFile.delete()
+            }
+        }
     }
 
     @Serializable

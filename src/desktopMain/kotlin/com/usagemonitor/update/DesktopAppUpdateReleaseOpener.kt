@@ -11,6 +11,7 @@ class DesktopAppUpdateReleaseOpener(
     override fun open(releasePageUrl: String): Result<Unit> {
         return Result.runCatching {
             val releaseUri = URI(releasePageUrl)
+            validateReleaseUri(releaseUri)
 
             if (Desktop.isDesktopSupported()) {
                 val desktop = Desktop.getDesktop()
@@ -28,6 +29,25 @@ class DesktopAppUpdateReleaseOpener(
 
             processLauncher(command, null)
         }
+    }
+
+    private fun validateReleaseUri(releaseUri: URI) {
+        val scheme = releaseUri.scheme?.lowercase()
+        val host = releaseUri.host?.lowercase()
+        val path = releaseUri.path.orEmpty()
+        if (scheme != "https") {
+            throw IllegalStateException("Release URL inválida: apenas HTTPS é aceito.")
+        }
+        if (host !in TRUSTED_RELEASE_HOSTS) {
+            throw IllegalStateException("Release URL inválida: host não confiável.")
+        }
+        if (!path.startsWith("/edilsonvilarinho/usage-monitor/releases/", ignoreCase = true)) {
+            throw IllegalStateException("Release URL inválida: caminho fora da release esperada.")
+        }
+    }
+
+    private companion object {
+        val TRUSTED_RELEASE_HOSTS = setOf("github.com", "www.github.com")
     }
 }
 

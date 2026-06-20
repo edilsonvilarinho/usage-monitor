@@ -34,6 +34,7 @@ class LocalKiloUsageDataSourceTest {
         assertEquals(1L, snapshots[1].requestsLastFiveHours)
         assertEquals(1L, snapshots[1].requestsLastSevenDays)
 
+        dataSource.close()
         Files.deleteIfExists(tempDir.resolve("kilo.db"))
         Files.deleteIfExists(tempDir)
     }
@@ -50,6 +51,7 @@ class LocalKiloUsageDataSourceTest {
 
         assertTrue(dataSource.loadFreeModelUsage().isEmpty())
 
+        dataSource.close()
         Files.deleteIfExists(tempDir)
     }
 

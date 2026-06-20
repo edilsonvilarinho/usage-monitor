@@ -159,10 +159,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
 
@@ -200,10 +199,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
 
@@ -240,10 +238,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
 
@@ -280,10 +277,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
 
@@ -351,10 +347,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
         awaitCondition { anthropicCalls >= 1 && minimaxCalls >= 1 }
@@ -420,10 +415,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             enabledApis,
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
         enabledApis.value = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
 
         viewModel.refresh()
@@ -501,10 +495,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             enabledApis,
             RecordUsageSnapshotUseCase(historyRepository),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         enabledApis.value = setOf(ApiSource.ANTHROPIC)
         viewModel.refresh()
@@ -556,10 +549,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             RecordUsageSnapshotUseCase(brokenHistory),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        viewModel.cancelInitFetch()
-        viewModel.cancelCountdown()
 
         viewModel.refresh()
         val state = awaitSettledState(viewModel)

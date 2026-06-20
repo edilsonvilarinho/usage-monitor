@@ -20,10 +20,13 @@ import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
 import com.usagemonitor.presentation.viewmodel.UiState
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.yield
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.test.assertTrue
@@ -95,11 +98,24 @@ abstract class DashboardViewModelTestSupport {
 
     protected fun virtualTimeConfig(testScheduler: TestCoroutineScheduler) = DashboardViewModelConfig(
         workerDispatcher = StandardTestDispatcher(testScheduler),
-        updateCheckIntervalWhileRunning = 365.days
+        updateCheckIntervalWhileRunning = 365.days,
+        autoStartInitialFetch = false,
+        autoStartCountdown = false
     )
 
     protected fun periodicUpdateConfig(testScheduler: TestCoroutineScheduler) = DashboardViewModelConfig(
-        workerDispatcher = StandardTestDispatcher(testScheduler)
+        workerDispatcher = StandardTestDispatcher(testScheduler),
+        autoStartInitialFetch = false,
+        autoStartCountdown = false
+    )
+
+    protected fun manualRefreshConfig(
+        workerDispatcher: CoroutineDispatcher = Dispatchers.Default
+    ) = DashboardViewModelConfig(
+        workerDispatcher = workerDispatcher,
+        autoStartInitialFetch = false,
+        autoStartCountdown = false,
+        autoStartUpdateChecks = false
     )
 
     protected fun successViewModel(recordedSnapshots: MutableList<ApiUsageStats>): DashboardViewModel {
@@ -122,10 +138,9 @@ abstract class DashboardViewModelTestSupport {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        vm.cancelInitFetch()
-        vm.cancelCountdown()
         return vm
     }
 
@@ -155,10 +170,9 @@ abstract class DashboardViewModelTestSupport {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        vm.cancelInitFetch()
-        vm.cancelCountdown()
         return vm
     }
 
@@ -184,10 +198,9 @@ abstract class DashboardViewModelTestSupport {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             defaultEnabledApis(),
             historyUseCase(recordedSnapshots),
-            clock = Clock.System
+            clock = Clock.System,
+            config = manualRefreshConfig()
         )
-        vm.cancelInitFetch()
-        vm.cancelCountdown()
         return vm
     }
 
@@ -197,7 +210,7 @@ abstract class DashboardViewModelTestSupport {
             if (state !is UiState.Loading) {
                 return state
             }
-            delay(20)
+            pauseForBackgroundWork()
         }
         return viewModel.uiState.value
     }
@@ -207,7 +220,7 @@ abstract class DashboardViewModelTestSupport {
             if (predicate()) {
                 return
             }
-            delay(20)
+            pauseForBackgroundWork()
         }
         assertTrue(predicate(), "Condition not met within coroutine timeout")
     }
@@ -217,8 +230,13 @@ abstract class DashboardViewModelTestSupport {
             if (predicate()) {
                 return
             }
-            delay(20)
+            pauseForBackgroundWork()
         }
         assertTrue(predicate(), "Condition not met within real-time timeout")
+    }
+
+    private suspend fun pauseForBackgroundWork() {
+        yield()
+        Thread.sleep(20)
     }
 }

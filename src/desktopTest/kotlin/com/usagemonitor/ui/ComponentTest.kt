@@ -1240,7 +1240,7 @@ class ComponentTest {
             }.getOrDefault(false)
         }
 
-        onNodeWithText("16/4", substring = true).assertIsDisplayed()
+        onAllNodesWithText("16/4", substring = true).assertCountEquals(3)
         onNodeWithText("0 req").assertIsDisplayed()
         onNodeWithText("0 req/h").assertIsDisplayed()
         onAllNodesWithText("0 / 100 %").assertCountEquals(0)
