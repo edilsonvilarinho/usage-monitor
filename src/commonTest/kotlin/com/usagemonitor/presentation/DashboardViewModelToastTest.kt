@@ -106,11 +106,11 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
     }
 
     @Test
-    fun `emits generic error toast for non-configuration failures`() = runTest {
+    fun `does not emit toast for upstream 503 failures when persistent warning is shown`() = runTest {
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(
-                IllegalStateException("Anthropic HTTP 503: service unavailable")
+                IllegalStateException("Anthropic HTTP 503: upstream connect error or disconnect/reset before headers. reset reason: remote connection failure")
             )
         }
         val minimaxRepo = object : MiniMaxRepository {
@@ -135,13 +135,12 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
         )
 
         viewModel.refresh()
-        awaitSettledState(viewModel)
-        awaitCondition { viewModel.toastMessage.value != null }
+        val state = awaitSettledState(viewModel)
 
-        val toast = viewModel.toastMessage.value
-        assertTrue(toast is DashboardToast.ApiError, "got toast=$toast")
-        assertEquals(ApiSource.ANTHROPIC, toast.source)
-        assertTrue(toast.message.contains("Anthropic HTTP 503"), "got toast=$toast")
+        assertIs<UiState.Success>(state)
+        assertEquals(1, state.errors.size)
+        assertTrue(state.errors.first().isServiceUnavailableIssue)
+        assertEquals(null, viewModel.toastMessage.value)
         viewModel.onDestroy()
     }
 

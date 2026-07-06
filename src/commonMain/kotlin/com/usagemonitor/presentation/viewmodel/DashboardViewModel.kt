@@ -372,6 +372,10 @@ class DashboardViewModel(
 
         val uiError = UiApiError(source = source, message = message, rawMessage = rawMessage)
 
+        if (uiError.isServiceUnavailableIssue) {
+            return uiError
+        }
+
         if (!uiError.isConfigurationIssue) {
             _toastMessage.value = DashboardToast.ApiError(
                 source = source,

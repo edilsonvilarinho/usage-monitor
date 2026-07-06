@@ -254,7 +254,9 @@ private fun ErrorContent(
     onRetryAnthropic: () -> Unit
 ) {
     val warnings = errors.mapNotNull { error -> warningFor(error = error, language = language) }
-    val genericErrors = errors.filterNot { error -> error.isConfigurationIssue || error.isRateLimitIssue }
+    val genericErrors = errors.filterNot { error ->
+        error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue
+    }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -325,7 +327,9 @@ private fun SuccessContent(
     val items = cardOrder.mapNotNull(itemBySource::get) +
         visibleItems.filter { stats -> stats.source !in orderedSources }
     val warnings = partialErrors.mapNotNull { error -> warningFor(error = error, language = language) }
-    val genericErrors = partialErrors.filterNot { error -> error.isConfigurationIssue || error.isRateLimitIssue }
+    val genericErrors = partialErrors.filterNot { error ->
+        error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue
+    }
     val scrollState = rememberScrollState()
 
     Box(modifier = modifier.fillMaxSize()) {

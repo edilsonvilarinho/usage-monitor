@@ -15,6 +15,15 @@ internal fun decodeToastMessage(toast: DashboardToast, language: AppLanguage): S
             }
         }
 
+        is DashboardToast.ServiceUnavailable -> {
+            val sourceLabel = sourceLabelFromKey(toast.source)
+            if (language == AppLanguage.PT) {
+                "$sourceLabel temporariamente indisponível - tente novamente em instantes."
+            } else {
+                "$sourceLabel is temporarily unavailable - retry in a few moments."
+            }
+        }
+
         is DashboardToast.ApiError -> {
             val sourceLabel = sourceLabelFromKey(toast.source)
             "$sourceLabel: ${toast.message}"

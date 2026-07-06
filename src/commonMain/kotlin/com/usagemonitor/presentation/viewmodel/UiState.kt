@@ -67,6 +67,9 @@ data class UiApiError(
     val isRateLimitIssue: Boolean
         get() = isRateLimitMessage(message)
 
+    val isServiceUnavailableIssue: Boolean
+        get() = isServiceUnavailableMessage(message)
+
     val isConfigurationIssue: Boolean
         get() = isAnthropicCredentialIssue ||
             isMiniMaxEnvVarIssue ||
@@ -131,6 +134,13 @@ private val RATE_LIMIT_MARKERS = listOf(
     "rate limit",
     "Too Many Requests"
 )
+private val SERVICE_UNAVAILABLE_MARKERS = listOf(
+    "HTTP 503",
+    "service unavailable",
+    "upstream connect error",
+    "disconnect/reset before headers",
+    "remote connection failure"
+)
 
 private fun isAnthropicCredentialMessage(message: String): Boolean {
     return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
@@ -157,4 +167,8 @@ private fun isKiloLocalMessage(message: String): Boolean {
 
 private fun isRateLimitMessage(message: String): Boolean {
     return RATE_LIMIT_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isServiceUnavailableMessage(message: String): Boolean {
+    return SERVICE_UNAVAILABLE_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }

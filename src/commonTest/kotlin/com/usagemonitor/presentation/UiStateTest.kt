@@ -147,6 +147,24 @@ class UiStateTest {
     }
 
     @Test
+    fun `isServiceUnavailableIssue true for upstream 503 message`() {
+        val error = UiApiError(
+            source = ApiSource.ANTHROPIC,
+            message = "Anthropic HTTP 503: upstream connect error or disconnect/reset before headers. reset reason: remote connection failure"
+        )
+        assertTrue(error.isServiceUnavailableIssue)
+    }
+
+    @Test
+    fun `isServiceUnavailableIssue false for unrelated client error`() {
+        val error = UiApiError(
+            source = ApiSource.ANTHROPIC,
+            message = "Anthropic HTTP 400: invalid request"
+        )
+        assertFalse(error.isServiceUnavailableIssue)
+    }
+
+    @Test
     fun `formattedMessage prefixes source label`() {
         assertEquals(
             "Anthropic: timeout",

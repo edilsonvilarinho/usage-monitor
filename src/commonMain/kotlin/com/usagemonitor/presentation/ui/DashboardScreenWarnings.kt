@@ -45,6 +45,24 @@ internal fun warningFor(
         }
     }
 
+    if (error.isServiceUnavailableIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                source = error.source,
+                title = "${sourceLabelFromKey(error.source)} temporariamente indisponível",
+                description = "O serviço remoto respondeu com indisponibilidade temporária ou falha de upstream. Aguarde alguns instantes e tente novamente. As outras integrações podem continuar funcionando normalmente.",
+                actionLabel = "Tentar novamente"
+            )
+        } else {
+            DashboardWarning(
+                source = error.source,
+                title = "${sourceLabelFromKey(error.source)} is temporarily unavailable",
+                description = "The remote service returned a temporary unavailability or upstream failure. Wait a few moments and retry. Other integrations can continue working normally.",
+                actionLabel = "Retry"
+            )
+        }
+    }
+
     if (error.isAnthropicCredentialIssue) {
         val hasScopeGuidance = error.message.contains(
             "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada",

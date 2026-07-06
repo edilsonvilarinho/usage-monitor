@@ -7,6 +7,10 @@ sealed interface DashboardToast {
         val source: ApiSource
     ) : DashboardToast
 
+    data class ServiceUnavailable(
+        val source: ApiSource
+    ) : DashboardToast
+
     data class ApiError(
         val source: ApiSource,
         val message: String
