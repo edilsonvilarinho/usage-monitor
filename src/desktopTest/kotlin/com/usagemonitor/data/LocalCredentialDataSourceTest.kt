@@ -209,6 +209,32 @@ class LocalCredentialDataSourceTest {
         assertEquals("expired-token", token)
     }
 
+    @Test
+    fun `accepts null optional Claude metadata fields`() = runTest {
+        val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
+        credentialsFile.writeText(
+            """
+            {
+              "claudeAiOauth": {
+                "accessToken": "fresh-token",
+                "refreshToken": "rt",
+                "expiresAt": $futureExpiry,
+                "subscriptionType": null,
+                "rateLimitTier": null
+              }
+            }
+            """.trimIndent()
+        )
+        val dataSource = LocalCredentialDataSource(
+            httpClient = throwingHttpClient(),
+            homeDirProvider = homeDirProvider
+        )
+
+        val token = dataSource.loadAnthropicAccessToken()
+
+        assertEquals("fresh-token", token)
+    }
+
     private fun writeCredentials(accessToken: String, refreshToken: String, expiresAt: Long) {
         credentialsFile.writeText(
             """

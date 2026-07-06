@@ -23,6 +23,6 @@ data class OAuthCredentialsDto(
     val expiresAt: Long = Long.MAX_VALUE,
 
     val scopes: List<String> = emptyList(),
-    val subscriptionType: String = "",
-    val rateLimitTier: String = ""
+    val subscriptionType: String? = null,
+    val rateLimitTier: String? = null
 )
