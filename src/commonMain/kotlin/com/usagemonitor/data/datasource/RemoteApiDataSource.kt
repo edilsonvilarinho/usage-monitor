@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CodexUsageResponse
+import com.usagemonitor.data.dto.CodexWeeklyUsageResponse
 import com.usagemonitor.data.dto.DeepSeekBalanceResponse
 import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.dto.AnthropicUsageResponse
@@ -60,7 +61,7 @@ open class RemoteApiDataSource(
         return response.body()
     }
 
-    open suspend fun fetchCodexUsage(session: CodexSession): CodexUsageResponse {
+    open suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
         var failureRecorded = false
 
         try {
@@ -97,11 +98,7 @@ open class RemoteApiDataSource(
                         primaryUsedPercent = payload.rateLimit.primaryWindow.usedPercent,
                         primaryResetAt = payload.rateLimit.primaryWindow.resetAt,
                         primaryResetAfterSeconds = payload.rateLimit.primaryWindow.resetAfterSeconds,
-                        primaryLimitWindowSeconds = payload.rateLimit.primaryWindow.limitWindowSeconds,
-                        secondaryUsedPercent = payload.rateLimit.secondaryWindow.usedPercent,
-                        secondaryResetAt = payload.rateLimit.secondaryWindow.resetAt,
-                        secondaryResetAfterSeconds = payload.rateLimit.secondaryWindow.resetAfterSeconds,
-                        secondaryLimitWindowSeconds = payload.rateLimit.secondaryWindow.limitWindowSeconds
+                        primaryLimitWindowSeconds = payload.rateLimit.primaryWindow.limitWindowSeconds
                     )
                 )
                 payload
@@ -128,6 +125,13 @@ open class RemoteApiDataSource(
             }
             throw error
         }
+    }
+
+    open suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
+        throw UnsupportedOperationException(
+            "Codex weekly usage source not implemented yet. " +
+            "No reusable HTTP endpoint was confirmed from the authenticated ChatGPT UI."
+        )
     }
 
     open suspend fun fetchDeepSeekBalance(apiKey: String): DeepSeekBalanceResponse {

@@ -14,5 +14,12 @@ data class ApiUsageStats(
     val apiName: String,
 
     // Lista de cotas. Para Anthropic terá 1 item; para MiniMax, vários.
-    val quotas: List<QuotaInfo>
+    val quotas: List<QuotaInfo>,
+
+    // Avisos não fatais que a UI pode expor sem rebaixar a fonte para erro.
+    val notices: Set<ApiUsageNotice> = emptySet()
 )
+
+enum class ApiUsageNotice {
+    WEEKLY_QUOTA_UNAVAILABLE
+}

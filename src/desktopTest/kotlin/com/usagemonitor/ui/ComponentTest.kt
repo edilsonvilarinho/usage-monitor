@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
@@ -170,6 +171,40 @@ class ComponentTest {
         onNodeWithText("26%").assertIsDisplayed()
         onNodeWithText("Sessão 5h").assertIsDisplayed()
         onNodeWithText("12/45 req").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard shows inline Codex notice when weekly quota is unavailable`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex 5h",
+                            used = 42L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    notices = setOf(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Codex").assertIsDisplayed()
+        onNodeWithText("42%").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Quota 7d indisponível na fonte semanal do Codex").assertIsDisplayed()
+        onAllNodesWithText("Codex 7d").assertCountEquals(0)
     }
 
     @Test

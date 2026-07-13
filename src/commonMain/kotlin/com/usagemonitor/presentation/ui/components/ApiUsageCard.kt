@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -105,6 +106,7 @@ fun ApiUsageCard(
     source: ApiSource,
     apiName: String,
     quotas: List<QuotaInfo>,
+    notices: Set<ApiUsageNotice> = emptySet(),
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
     isMinimized: Boolean = false,
@@ -382,6 +384,57 @@ fun ApiUsageCard(
                         )
                     }
                 }
+
+                if (notices.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    InlineNotices(
+                        notices = notices,
+                        source = source,
+                        language = language
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineNotices(
+    notices: Set<ApiUsageNotice>,
+    source: ApiSource,
+    language: AppLanguage,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        notices
+            .toList()
+            .sortedBy { notice -> notice.ordinal }
+            .forEach { notice ->
+                Text(
+                    text = inlineNoticeText(notice = notice, language = language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = accentColorFor(source),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(AppShapes.medium)
+                        .background(accentColorFor(source).copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+    }
+}
+
+private fun inlineNoticeText(notice: ApiUsageNotice, language: AppLanguage): String {
+    return when (notice) {
+        ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE -> {
+            if (language == AppLanguage.PT) {
+                "Quota 7d indisponível na fonte semanal do Codex"
+            } else {
+                "7d quota unavailable in Codex weekly source"
             }
         }
     }

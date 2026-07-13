@@ -54,6 +54,7 @@ class LocalCodexDiagnosticsRecorderTest {
 
         val successJson = Json.parseToJsonElement(lines[0]).jsonObject
         assertEquals("success", successJson.getValue("event").jsonPrimitive.content)
+        assertEquals("legacy_five_hour", successJson.getValue("sourceKind").jsonPrimitive.content)
         assertEquals("plus", successJson.getValue("planType").jsonPrimitive.content)
         assertEquals("1", successJson.getValue("primaryUsedPercent").jsonPrimitive.content)
 
@@ -72,11 +73,7 @@ class LocalCodexDiagnosticsRecorderTest {
             primaryUsedPercent = 1L,
             primaryResetAt = 1780610643L,
             primaryResetAfterSeconds = 17940L,
-            primaryLimitWindowSeconds = 18000L,
-            secondaryUsedPercent = 12L,
-            secondaryResetAt = 1781139417L,
-            secondaryResetAfterSeconds = 580000L,
-            secondaryLimitWindowSeconds = 604800L
+            primaryLimitWindowSeconds = 18000L
         )
     }
 

@@ -1,7 +1,9 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.dto.CodexUsageResponse
+import com.usagemonitor.data.dto.CodexWeeklyUsageResponse
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -12,31 +14,48 @@ object CodexMapper {
 
     private const val PERCENT_SCALE = 100L
 
-    fun toUsageStats(response: CodexUsageResponse): ApiUsageStats {
-        val primaryResetAt = Instant.fromEpochSeconds(response.rateLimit.primaryWindow.resetAt)
-        val secondaryResetAt = Instant.fromEpochSeconds(response.rateLimit.secondaryWindow.resetAt)
+    fun toFiveHourQuota(response: CodexUsageResponse): QuotaInfo {
+        return QuotaInfo(
+            label = "Codex 5h",
+            used = response.rateLimit.primaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
+            total = PERCENT_SCALE,
+            periodEndAt = Instant.fromEpochSeconds(response.rateLimit.primaryWindow.resetAt),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.PERCENTAGE
+        )
+    }
+
+    fun toWeeklyQuota(response: CodexWeeklyUsageResponse): QuotaInfo {
+        return QuotaInfo(
+            label = "Codex 7d",
+            used = response.usedPercent.coerceIn(0L, PERCENT_SCALE),
+            total = PERCENT_SCALE,
+            periodEndAt = Instant.fromEpochSeconds(response.resetAt),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.PERCENTAGE
+        )
+    }
+
+    fun mergeUsage(
+        fiveHourQuota: QuotaInfo,
+        weeklyQuota: QuotaInfo?
+    ): ApiUsageStats {
+        val quotas = buildList {
+            add(fiveHourQuota)
+            if (weeklyQuota != null) {
+                add(weeklyQuota)
+            }
+        }
 
         return ApiUsageStats(
             source = ApiSource.CODEX,
             apiName = "Codex",
-            quotas = listOf(
-                QuotaInfo(
-                    label = "Codex 5h",
-                    used = response.rateLimit.primaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
-                    total = PERCENT_SCALE,
-                    periodEndAt = primaryResetAt,
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.PERCENTAGE
-                ),
-                QuotaInfo(
-                    label = "Codex 7d",
-                    used = response.rateLimit.secondaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
-                    total = PERCENT_SCALE,
-                    periodEndAt = secondaryResetAt,
-                    periodType = PeriodType.WEEKLY,
-                    unit = UsageUnit.PERCENTAGE
-                )
-            )
+            quotas = quotas,
+            notices = if (weeklyQuota == null) {
+                setOf(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE)
+            } else {
+                emptySet()
+            }
         )
     }
 }

@@ -34,7 +34,7 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 | Integracao | Tipo | Origem dos dados | Requisito local |
 |---|---|---|---|
 | Anthropic | Remota | `GET https://api.anthropic.com/api/oauth/usage` | `~/.claude/.credentials.json` |
-| Codex | Remota | `GET https://chatgpt.com/backend-api/codex/usage` | `~/.codex/auth.json` e `~/.codex/cap_sid` |
+| Codex | Remota | `GET https://chatgpt.com/backend-api/codex/usage` (5h legado) | `~/.codex/auth.json` e `~/.codex/cap_sid` |
 | MiniMax | Remota | `GET https://www.minimax.io/v1/token_plan/remains` | `MINIMAX_API_KEY` |
 | DeepSeek | Remota | `GET https://api.deepseek.com/user/balance` | `DEEPSEEK_API_KEY` |
 | OpenCode Zen Free | Local | leitura de `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
@@ -54,7 +54,8 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 
 - Usa bearer token de `~/.codex/auth.json` em `tokens.access_token`.
 - Usa tambem o cookie `cap_sid` lido de `~/.codex/cap_sid`.
-- O mapper converte `primary_window` e `secondary_window` em quotas de 5h e 7d.
+- O endpoint legado do Codex alimenta apenas a quota 5h.
+- A quota semanal depende de uma segunda fonte que ainda precisa ser descoberta e validada como HTTP reutilizável.
 
 ### MiniMax
 

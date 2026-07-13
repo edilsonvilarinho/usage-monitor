@@ -18,17 +18,14 @@ object NoOpCodexDiagnosticsRecorder : CodexDiagnosticsRecorder {
 data class CodexDiagnosticsSuccessEvent(
     val timestamp: String,
     val event: String = "success",
+    val sourceKind: String = "legacy_five_hour",
     val planType: String,
     val allowed: Boolean,
     val limitReached: Boolean,
     val primaryUsedPercent: Long,
     val primaryResetAt: Long,
     val primaryResetAfterSeconds: Long,
-    val primaryLimitWindowSeconds: Long,
-    val secondaryUsedPercent: Long,
-    val secondaryResetAt: Long,
-    val secondaryResetAfterSeconds: Long,
-    val secondaryLimitWindowSeconds: Long
+    val primaryLimitWindowSeconds: Long
 )
 
 @Serializable

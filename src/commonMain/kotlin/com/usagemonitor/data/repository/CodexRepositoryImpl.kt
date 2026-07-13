@@ -14,8 +14,16 @@ class CodexRepositoryImpl(
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
             val session = authDataSource.loadSession()
-            val response = apiDataSource.fetchCodexUsage(session)
-            CodexMapper.toUsageStats(response)
+            val fiveHourResponse = apiDataSource.fetchCodexFiveHourUsage(session)
+            val fiveHourQuota = CodexMapper.toFiveHourQuota(fiveHourResponse)
+            val weeklyQuota = runCatching {
+                apiDataSource.fetchCodexWeeklyUsage(session)
+            }.getOrNull()?.let(CodexMapper::toWeeklyQuota)
+
+            CodexMapper.mergeUsage(
+                fiveHourQuota = fiveHourQuota,
+                weeklyQuota = weeklyQuota
+            )
         }
     }
 }

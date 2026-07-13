@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 class RemoteApiDataSourceCodexDiagnosticsTest {
 
     @Test
-    fun `records sanitized success payload for Codex`() = runTest {
+    fun `records sanitized success payload for Codex five hour endpoint`() = runTest {
         val recorder = RecordingCodexDiagnosticsRecorder()
         val dataSource = RemoteApiDataSource(
             httpClient = jsonHttpClient {
@@ -59,13 +59,52 @@ class RemoteApiDataSourceCodexDiagnosticsTest {
             codexDiagnosticsRecorder = recorder
         )
 
-        val response = dataSource.fetchCodexUsage(sampleSession())
+        val response = dataSource.fetchCodexFiveHourUsage(sampleSession())
 
         assertEquals("plus", response.planType)
         assertEquals(1, recorder.successEvents.size)
         assertTrue(recorder.failureEvents.isEmpty())
         assertEquals(1L, recorder.successEvents.single().primaryUsedPercent)
-        assertEquals(12L, recorder.successEvents.single().secondaryUsedPercent)
+    }
+
+    @Test
+    fun `records sanitized success payload even when legacy response omits weekly window`() = runTest {
+        val recorder = RecordingCodexDiagnosticsRecorder()
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel(
+                        """
+                        {
+                          "plan_type": "plus",
+                          "rate_limit": {
+                            "allowed": true,
+                            "limit_reached": false,
+                            "primary_window": {
+                              "used_percent": 21,
+                              "limit_window_seconds": 18000,
+                              "reset_after_seconds": 5400,
+                              "reset_at": 1780610643
+                            },
+                            "secondary_window": null
+                          }
+                        }
+                        """.trimIndent()
+                    ),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            },
+            codexDiagnosticsRecorder = recorder
+        )
+
+        val response = dataSource.fetchCodexFiveHourUsage(sampleSession())
+
+        assertEquals("plus", response.planType)
+        assertEquals(null, response.rateLimit.secondaryWindow)
+        assertEquals(1, recorder.successEvents.size)
+        assertTrue(recorder.failureEvents.isEmpty())
+        assertEquals(21L, recorder.successEvents.single().primaryUsedPercent)
     }
 
     @Test
@@ -91,7 +130,7 @@ class RemoteApiDataSourceCodexDiagnosticsTest {
         )
 
         assertFailsWith<IllegalStateException> {
-            dataSource.fetchCodexUsage(sampleSession())
+            dataSource.fetchCodexFiveHourUsage(sampleSession())
         }
 
         assertTrue(recorder.successEvents.isEmpty())
@@ -117,7 +156,7 @@ class RemoteApiDataSourceCodexDiagnosticsTest {
         )
 
         assertFailsWith<Throwable> {
-            dataSource.fetchCodexUsage(sampleSession())
+            dataSource.fetchCodexFiveHourUsage(sampleSession())
         }
 
         assertTrue(recorder.successEvents.isEmpty())

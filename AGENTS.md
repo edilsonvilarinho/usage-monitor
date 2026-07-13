@@ -83,7 +83,8 @@ Regras importantes:
 - Autenticacao:
   - bearer token de `~/.codex/auth.json` -> `tokens.access_token`
   - cookie `cap_sid` lido de `~/.codex/cap_sid`
-- O mapper transforma as janelas `primary_window` e `secondary_window` em quotas de 5h e 7d
+- O endpoint legado hoje deve ser tratado como fonte da quota 5h
+- A quota semanal do Codex depende de uma segunda fonte ainda nao descoberta/validada
 
 ## Persistence and preferences
 

@@ -4,11 +4,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Resposta do endpoint privado GET /backend-api/codex/usage.
+ * Resposta legada do endpoint privado GET /backend-api/codex/usage.
  *
- * O payload contém metadados da conta e as duas janelas de consumo do Codex:
- * - primary_window: janela de 5 horas
- * - secondary_window: janela semanal
+ * Hoje ele é tratado apenas como fonte confiável da janela curta (5h).
+ * `secondary_window` pode até aparecer, mas não é mais usado como fonte oficial
+ * da quota semanal.
  */
 @Serializable
 data class CodexUsageResponse(
@@ -21,7 +21,7 @@ data class CodexRateLimitDto(
     val allowed: Boolean,
     @SerialName("limit_reached") val limitReached: Boolean,
     @SerialName("primary_window") val primaryWindow: CodexUsageWindowDto,
-    @SerialName("secondary_window") val secondaryWindow: CodexUsageWindowDto
+    @SerialName("secondary_window") val secondaryWindow: CodexUsageWindowDto?
 )
 
 @Serializable
