@@ -21,5 +21,6 @@ data class ApiUsageStats(
 )
 
 enum class ApiUsageNotice {
-    WEEKLY_QUOTA_UNAVAILABLE
+    WEEKLY_QUOTA_UNAVAILABLE,
+    SOURCE_UNSTABLE
 }

@@ -61,6 +61,14 @@ internal fun historySubtitle(
     showSourceSelector: Boolean,
     language: AppLanguage
 ): String {
+    if (selectedSource == ApiSource.CODEX) {
+        return if (language == AppLanguage.PT) {
+            "Série atual reportada pelo Codex e séries legadas de janelas antigas."
+        } else {
+            "Current Codex-reported series plus legacy historical windows."
+        }
+    }
+
     if (selectedSource == ApiSource.DEEPSEEK) {
         return if (language == AppLanguage.PT) {
             "Saldo restante, gasto no intervalo e tendência recente."
@@ -288,6 +296,55 @@ internal fun openCodeHistorySubtitle(
         } else {
             "Observed free-model activity in the 7-day weekly window."
         }
+        PeriodType.REPORTED -> if (language == AppLanguage.PT) {
+            "Janela reportada pela fonte."
+        } else {
+            "Source-reported window."
+        }
+    }
+}
+
+internal fun historySeriesDisplayTitle(
+    source: ApiSource,
+    series: UsageHistorySeries,
+    language: AppLanguage
+): String {
+    if (source == ApiSource.CODEX && series.periodType != PeriodType.REPORTED) {
+        return if (language == AppLanguage.PT) {
+            "${series.quotaLabel} (legado)"
+        } else {
+            "${series.quotaLabel} (legacy)"
+        }
+    }
+
+    return series.quotaLabel
+}
+
+internal fun historySeriesDisplaySubtitle(
+    source: ApiSource,
+    series: UsageHistorySeries,
+    language: AppLanguage
+): String {
+    if (source == ApiSource.CODEX && series.periodType == PeriodType.REPORTED) {
+        return if (language == AppLanguage.PT) {
+            "Janela reportada pelo Codex (fonte instável)."
+        } else {
+            "Codex-reported window (unstable source)."
+        }
+    }
+
+    if (source == ApiSource.CODEX && series.periodType == PeriodType.INTERVAL) {
+        return if (language == AppLanguage.PT) "Quota intervalar legada" else "Legacy interval quota"
+    }
+
+    if (source == ApiSource.CODEX && series.periodType == PeriodType.WEEKLY) {
+        return if (language == AppLanguage.PT) "Quota semanal legada" else "Legacy weekly quota"
+    }
+
+    return when (series.periodType) {
+        PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
+        PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Quota intervalar" else "Interval quota"
+        PeriodType.REPORTED -> if (language == AppLanguage.PT) "Janela reportada" else "Reported window"
     }
 }
 

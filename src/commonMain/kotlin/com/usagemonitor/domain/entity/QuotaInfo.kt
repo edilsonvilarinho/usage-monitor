@@ -55,5 +55,6 @@ enum class UsageUnit {
 /** Tipo de janela temporal da cota. */
 enum class PeriodType {
     INTERVAL,  // janela curta (ex: 5 horas no MiniMax)
-    WEEKLY     // janela semanal
+    WEEKLY,    // janela semanal
+    REPORTED   // janela reportada pela fonte, sem semântica local confiável
 }

@@ -33,7 +33,11 @@ class LocalUsageHistoryDataSourceTest {
         )
 
         assertEquals(2, records.size)
-        assertEquals("Codex 5h", records.first().quotaLabel)
+        assertEquals(
+            setOf("Codex atual", "Codex 7d"),
+            records.map { it.quotaLabel }.toSet()
+        )
+        assertEquals(PeriodType.REPORTED, records.first { it.quotaLabel == "Codex atual" }.periodType)
         tempDir.deleteRecursively()
     }
 
@@ -118,24 +122,24 @@ class LocalUsageHistoryDataSourceTest {
             apiName = "Codex",
             quotas = listOf(
                 QuotaInfo(
-                    label = "Codex 5h",
+                    label = "Codex atual",
                     used = 45L,
                     total = 100L,
                     periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.REQUESTS,
-                    rawUsed = 45L,
-                    rawTotal = 100L
+                    periodType = PeriodType.REPORTED,
+                    unit = UsageUnit.PERCENTAGE,
+                    rawUsed = 0L,
+                    rawTotal = 0L
                 ),
                 QuotaInfo(
                     label = "Codex 7d",
-                    used = 200L,
-                    total = 500L,
+                    used = 20L,
+                    total = 100L,
                     periodEndAt = Instant.parse("2026-05-02T20:00:00Z"),
                     periodType = PeriodType.WEEKLY,
-                    unit = UsageUnit.REQUESTS,
-                    rawUsed = 200L,
-                    rawTotal = 500L
+                    unit = UsageUnit.PERCENTAGE,
+                    rawUsed = 0L,
+                    rawTotal = 0L
                 )
             )
         )

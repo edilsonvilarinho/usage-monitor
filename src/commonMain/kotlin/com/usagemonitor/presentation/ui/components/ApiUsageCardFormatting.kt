@@ -73,6 +73,7 @@ internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String
     return when (quota.periodType) {
         PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Sessão 5h" else "5h session"
         PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Semanal" else "Weekly"
+        PeriodType.REPORTED -> if (language == AppLanguage.PT) "Uso atual" else "Current usage"
     }
 }
 
@@ -153,16 +154,16 @@ internal fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
     }
 
     return if (language == AppLanguage.PT) {
-        if (quota.periodType == PeriodType.WEEKLY) {
-            "Reinício: $dayFormatted $dateFormatted $timeFormatted BRT"
-        } else {
-            "Reinício: $dayFormatted $timeFormatted BRT"
+        when (quota.periodType) {
+            PeriodType.WEEKLY -> "Reinício: $dayFormatted $dateFormatted $timeFormatted BRT"
+            PeriodType.REPORTED -> "Reinício reportado: $dayFormatted $dateFormatted $timeFormatted BRT"
+            PeriodType.INTERVAL -> "Reinício: $dayFormatted $timeFormatted BRT"
         }
     } else {
-        if (quota.periodType == PeriodType.WEEKLY) {
-            "Reset: $dayFormatted $dateFormatted $timeFormatted BRT"
-        } else {
-            "Reset: $dayFormatted $timeFormatted BRT"
+        when (quota.periodType) {
+            PeriodType.WEEKLY -> "Reset: $dayFormatted $dateFormatted $timeFormatted BRT"
+            PeriodType.REPORTED -> "Reported reset: $dayFormatted $dateFormatted $timeFormatted BRT"
+            PeriodType.INTERVAL -> "Reset: $dayFormatted $timeFormatted BRT"
         }
     }
 }

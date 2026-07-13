@@ -30,8 +30,8 @@ class CodexRepositoryImplTest {
         val result = repository.getUsage().getOrThrow()
 
         assertEquals(2, result.quotas.size)
-        assertEquals(listOf("Codex 5h", "Codex 7d"), result.quotas.map { it.label })
-        assertTrue(result.notices.isEmpty())
+        assertEquals(listOf("Codex atual", "Codex 7d"), result.quotas.map { it.label })
+        assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
     }
 
     @Test
@@ -47,8 +47,14 @@ class CodexRepositoryImplTest {
         val result = repository.getUsage().getOrThrow()
 
         assertEquals(1, result.quotas.size)
-        assertEquals("Codex 5h", result.quotas.single().label)
-        assertEquals(setOf(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE), result.notices)
+        assertEquals("Codex atual", result.quotas.single().label)
+        assertEquals(
+            setOf(
+                ApiUsageNotice.SOURCE_UNSTABLE,
+                ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE
+            ),
+            result.notices
+        )
     }
 
     @Test

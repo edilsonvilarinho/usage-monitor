@@ -39,11 +39,12 @@ class UsageHistoryRepositoryImplTest {
                 apiName = "Codex",
                 quotas = listOf(
                     QuotaInfo(
-                        label = "Codex 5h",
+                        label = "Codex atual",
                         used = 10,
                         total = 100,
                         periodEndAt = now,
-                        unit = UsageUnit.REQUESTS
+                        periodType = PeriodType.REPORTED,
+                        unit = UsageUnit.PERCENTAGE
                     )
                 )
             ),
@@ -193,6 +194,47 @@ class UsageHistoryRepositoryImplTest {
         )
     }
 
+    @Test
+    fun `reported Codex series comes before legacy series and suppresses inference`() = kotlinx.coroutines.test.runTest {
+        val records = listOf(
+            record(
+                label = "Codex 5h",
+                source = ApiSource.CODEX,
+                capturedAt = "2026-04-28T16:00:00Z",
+                used = 5,
+                total = 100,
+                periodType = PeriodType.INTERVAL,
+                unit = UsageUnit.PERCENTAGE
+            ),
+            record(
+                label = "Codex atual",
+                source = ApiSource.CODEX,
+                capturedAt = "2026-04-28T16:00:00Z",
+                used = 5,
+                total = 100,
+                periodType = PeriodType.REPORTED,
+                unit = UsageUnit.PERCENTAGE
+            ),
+            record(
+                label = "Codex atual",
+                source = ApiSource.CODEX,
+                capturedAt = "2026-04-28T17:00:00Z",
+                used = 16,
+                total = 100,
+                periodType = PeriodType.REPORTED,
+                unit = UsageUnit.PERCENTAGE
+            )
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertEquals(listOf("Codex atual", "Codex 5h"), report.series.map { it.quotaLabel })
+        assertEquals(PeriodType.REPORTED, report.series.first().periodType)
+        assertEquals(0.0, report.series.first().averageDisplayConsumptionPerHour)
+        assertIs<UsageForecast.InsufficientData>(report.series.first().forecast)
+    }
+
     private class FakeHistoryDataSource(
         private val records: List<UsageSnapshotRecord>
     ) : UsageHistoryDataSource {
@@ -234,13 +276,15 @@ class UsageHistoryRepositoryImplTest {
         capturedAt: String,
         used: Long,
         total: Long,
-        periodEndAt: String = "2026-04-28T20:00:00Z"
+        periodEndAt: String = "2026-04-28T20:00:00Z",
+        periodType: PeriodType = PeriodType.INTERVAL,
+        unit: UsageUnit = UsageUnit.REQUESTS
     ): UsageSnapshotRecord {
         return UsageSnapshotRecord(
             source = source,
             quotaLabel = label,
-            periodType = PeriodType.INTERVAL,
-            unit = UsageUnit.REQUESTS,
+            periodType = periodType,
+            unit = unit,
             used = used,
             total = total,
             rawUsed = used,

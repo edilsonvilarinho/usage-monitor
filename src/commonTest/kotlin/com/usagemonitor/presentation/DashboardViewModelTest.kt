@@ -361,6 +361,14 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         viewModel.refresh(ApiSource.ANTHROPIC)
 
         awaitCondition { anthropicCalls >= anthropicCallsAfterGlobalRefresh + 1 }
+        awaitCondition {
+            val currentState = viewModel.uiState.value as? UiState.Success ?: return@awaitCondition false
+            currentState.data
+                .firstOrNull { it.source == ApiSource.ANTHROPIC }
+                ?.quotas
+                ?.firstOrNull()
+                ?.used == 75000L
+        }
         val remaining = (viewModel.nextRefreshAt.value - Clock.System.now()).inWholeSeconds
         assertTrue(remaining in 595L..600L)
 

@@ -42,6 +42,7 @@ class CodexMapperTest {
         )
         assertEquals(ApiSource.CODEX, result.source)
         assertEquals("Codex", result.apiName)
+        assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
     }
 
     @Test
@@ -54,10 +55,10 @@ class CodexMapperTest {
     }
 
     @Test
-    fun `maps primary window to interval percentage quota`() {
+    fun `maps primary window to reported percentage quota`() {
         val quota = CodexMapper.toFiveHourQuota(sampleResponse)
-        assertEquals("Codex 5h", quota.label)
-        assertEquals(PeriodType.INTERVAL, quota.periodType)
+        assertEquals("Codex atual", quota.label)
+        assertEquals(PeriodType.REPORTED, quota.periodType)
         assertEquals(UsageUnit.PERCENTAGE, quota.unit)
         assertEquals(8L, quota.used)
         assertEquals(100L, quota.total)
@@ -83,8 +84,14 @@ class CodexMapperTest {
         )
 
         assertEquals(1, result.quotas.size)
-        assertEquals("Codex 5h", result.quotas.single().label)
-        assertEquals(setOf(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE), result.notices)
+        assertEquals("Codex atual", result.quotas.single().label)
+        assertEquals(
+            setOf(
+                ApiUsageNotice.SOURCE_UNSTABLE,
+                ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE
+            ),
+            result.notices
+        )
     }
 
     private fun sampleWeeklyResponse(): CodexWeeklyUsageResponse {

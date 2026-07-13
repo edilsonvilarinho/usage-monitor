@@ -182,15 +182,18 @@ class ComponentTest {
                     apiName = "Codex",
                     quotas = listOf(
                         QuotaInfo(
-                            label = "Codex 5h",
+                            label = "Codex atual",
                             used = 42L,
                             total = 100L,
                             periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                            periodType = PeriodType.INTERVAL,
+                            periodType = PeriodType.REPORTED,
                             unit = UsageUnit.PERCENTAGE
                         )
                     ),
-                    notices = setOf(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE),
+                    notices = setOf(
+                        ApiUsageNotice.SOURCE_UNSTABLE,
+                        ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE
+                    ),
                     showUsageDetails = true,
                     isRefreshing = false,
                     language = AppLanguage.PT,
@@ -201,8 +204,11 @@ class ComponentTest {
         }
 
         onNodeWithText("Codex").assertIsDisplayed()
+        onNodeWithText("Instável").assertIsDisplayed()
         onNodeWithText("42%").assertIsDisplayed()
-        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Uso atual").assertIsDisplayed()
+        onNodeWithText("Reinício reportado: Ter 28/04 17h00 BRT").assertIsDisplayed()
+        onNodeWithText("Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar.").assertIsDisplayed()
         onNodeWithText("Quota 7d indisponível na fonte semanal do Codex").assertIsDisplayed()
         onAllNodesWithText("Codex 7d").assertCountEquals(0)
     }
@@ -253,11 +259,11 @@ class ComponentTest {
                     apiName = "Codex",
                     quotas = listOf(
                         QuotaInfo(
-                            label = "Codex 5h",
+                            label = "Codex atual",
                             used = 57L,
                             total = 100L,
                             periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                            periodType = PeriodType.INTERVAL,
+                            periodType = PeriodType.REPORTED,
                             unit = UsageUnit.REQUESTS
                         )
                     ),
@@ -400,6 +406,25 @@ class ComponentTest {
 
         // Checkbox deve aparecer marcado
         onNodeWithText("Anthropic").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiCheckboxRow shows instability badge and reason for Codex`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiCheckboxRow(
+                    api = ApiSource.CODEX,
+                    isChecked = true,
+                    onCheckedChange = {}
+                )
+            }
+        }
+
+        onNodeWithText("Codex").assertIsDisplayed()
+        onNodeWithText("Instável").assertIsDisplayed()
+        onNodeWithText(
+            "Monitoramento em transição: o contrato de uso mudou e os limites podem oscilar até a fonte estabilizar."
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -999,15 +1024,15 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen renders quota metrics`() = runDesktopComposeUiTest {
+    fun `HistoryScreen renders reported Codex series without inferred metrics`() = runDesktopComposeUiTest {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.CODEX,
             range = HistoryRange.LAST_24_HOURS,
             lastUpdatedAt = Instant.parse("2026-04-28T18:00:00Z"),
             series = listOf(
                 UsageHistorySeries(
-                    quotaLabel = "Codex 5h",
-                    periodType = PeriodType.INTERVAL,
+                    quotaLabel = "Codex atual",
+                    periodType = PeriodType.REPORTED,
                     unit = UsageUnit.PERCENTAGE,
                     points = listOf(
                         UsageHistoryPoint(
@@ -1038,9 +1063,9 @@ class ComponentTest {
                     currentDisplayUsed = 50,
                     currentDisplayTotal = 100,
                     deltaDisplayUsed = 40,
-                    averageDisplayConsumptionPerHour = 20.0,
+                    averageDisplayConsumptionPerHour = 0.0,
                     currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    forecast = UsageForecast.EstimatedExhaustionAt(Instant.parse("2026-04-28T20:30:00Z"))
+                    forecast = UsageForecast.InsufficientData
                 )
             )
         )
@@ -1079,23 +1104,127 @@ class ComponentTest {
 
         waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                onNodeWithText("Codex 5h").fetchSemanticsNode()
+                onNodeWithText("Codex atual").fetchSemanticsNode()
                 true
             }.getOrDefault(false)
         }
 
         onNodeWithText("Histórico do Codex").assertIsDisplayed()
-        onNodeWithText("Codex 5h").assertIsDisplayed()
+        onNodeWithText("Codex atual").assertIsDisplayed()
+        onNodeWithText("Janela reportada pelo Codex (fonte instável).").assertIsDisplayed()
         onAllNodesWithText("API").assertCountEquals(0)
         onNodeWithText("Intervalo").assertIsDisplayed()
         onNodeWithText("Total").assertIsDisplayed()
-        onNodeWithText("Início do recorte").assertIsDisplayed()
-        onNodeWithText("Atual").assertIsDisplayed()
-        onNodeWithText("Variação no recorte").assertIsDisplayed()
-        onNodeWithText("Arraste no gráfico para comparar dois pontos.").assertIsDisplayed()
+        onAllNodesWithText("Início do recorte").assertCountEquals(0)
+        onAllNodesWithText("Atual").assertCountEquals(0)
+        onAllNodesWithText("Variação no recorte").assertCountEquals(0)
+        onAllNodesWithText("Arraste no gráfico para comparar dois pontos.").assertCountEquals(0)
         onNodeWithText("Uso atual").assertIsDisplayed()
         onNodeWithText("50 / 100 %").assertIsDisplayed()
+        onNodeWithText("Variação observada").assertIsDisplayed()
+        onNodeWithText("40 %").assertIsDisplayed()
+        onNodeWithText("Último reinício reportado").assertIsDisplayed()
+        onNodeWithText("28/04 17:00 BRT").assertIsDisplayed()
+        onAllNodesWithText("Média por hora").assertCountEquals(0)
+        onAllNodesWithText("Previsão").assertCountEquals(0)
         onAllNodesWithText("Fechar").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `HistoryScreen keeps reported Codex series separate from legacy series`() = runDesktopComposeUiTest {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.CODEX,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-04-28T18:00:00Z"),
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "Codex atual",
+                    periodType = PeriodType.REPORTED,
+                    unit = UsageUnit.PERCENTAGE,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-04-28T17:00:00Z"),
+                            used = 16,
+                            total = 100,
+                            rawUsed = 16,
+                            rawTotal = 100,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 16,
+                    currentDisplayTotal = 100,
+                    deltaDisplayUsed = 0,
+                    averageDisplayConsumptionPerHour = 0.0,
+                    currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                    forecast = UsageForecast.InsufficientData
+                ),
+                UsageHistorySeries(
+                    quotaLabel = "Codex 5h",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-04-28T16:00:00Z"),
+                            used = 5,
+                            total = 100,
+                            rawUsed = 5,
+                            rawTotal = 100,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 5,
+                    currentDisplayTotal = 100,
+                    deltaDisplayUsed = 0,
+                    averageDisplayConsumptionPerHour = 0.0,
+                    currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                    forecast = UsageForecast.InsufficientData
+                )
+            )
+        )
+
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                    override suspend fun recordSnapshot(
+                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
+                        capturedAt: Instant
+                    ) = Unit
+
+                    override suspend fun getHistoryReport(
+                        source: ApiSource,
+                        range: HistoryRange,
+                        now: Instant
+                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
+                        return report
+                    }
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {},
+                    focusedSource = ApiSource.CODEX,
+                    showSourceSelector = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Codex atual").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Codex atual").assertIsDisplayed()
+        onNodeWithText("Codex 5h (legado)").assertIsDisplayed()
+        onNodeWithText("Quota intervalar legada").assertIsDisplayed()
         viewModel.onDestroy()
     }
 

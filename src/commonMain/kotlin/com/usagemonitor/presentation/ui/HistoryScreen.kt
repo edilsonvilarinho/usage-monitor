@@ -214,6 +214,7 @@ fun HistoryScreen(
                                             current.report.series.forEachIndexed { index, series ->
                                                 key(series.quotaLabel + current.selectedRange.name) {
                                                     HistorySeriesCard(
+                                                        source = current.report.source,
                                                         series = series,
                                                         index = index,
                                                         accentColor = accentColor,
@@ -710,6 +711,7 @@ private fun OpenCodeHistoryCard(
 
 @Composable
 private fun HistorySeriesCard(
+    source: ApiSource,
     series: UsageHistorySeries,
     index: Int,
     accentColor: Color,
@@ -732,6 +734,17 @@ private fun HistorySeriesCard(
         delay(index * AppMotion.stagger)
         visible = true
     }
+
+    val title = historySeriesDisplayTitle(
+        source = source,
+        series = series,
+        language = language
+    )
+    val subtitle = historySeriesDisplaySubtitle(
+        source = source,
+        series = series,
+        language = language
+    )
 
     Card(
         modifier = Modifier
@@ -761,17 +774,13 @@ private fun HistorySeriesCard(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = series.quotaLabel,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         color = accentColor,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = if (series.periodType.name == "WEEKLY") {
-                            if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
-                        } else {
-                            if (language == AppLanguage.PT) "Quota intervalar" else "Interval quota"
-                        },
+                        text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -794,15 +803,15 @@ private fun HistorySeriesCard(
                     language = language,
                     chartSelectionKey = chartSelectionKey,
                     selectionController = selectionController,
-                    tooltipTitle = series.quotaLabel,
-                    tooltipSubtitle = if (series.periodType.name == "WEEKLY") {
-                        if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
-                    } else {
-                        if (language == AppLanguage.PT) "Quota intervalar" else "Interval quota"
-                    }
+                    tooltipTitle = title,
+                    tooltipSubtitle = subtitle
                 )
 
-                HistoryMetrics(series = series, language = language)
+                HistoryMetrics(
+                    source = source,
+                    series = series,
+                    language = language
+                )
             }
         }
     }
@@ -860,6 +869,7 @@ private fun IntervalSummaryPanel(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HistoryMetrics(
+    source: ApiSource,
     series: UsageHistorySeries,
     language: AppLanguage
 ) {
@@ -868,7 +878,22 @@ private fun HistoryMetrics(
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (series.unit == UsageUnit.CURRENCY_USD) {
+        if (series.periodType == PeriodType.REPORTED) {
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+                value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
+            )
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
+                value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
+            )
+            if (source == ApiSource.CODEX) {
+                MetricItem(
+                    label = if (language == AppLanguage.PT) "Último reinício reportado" else "Last reported reset",
+                    value = formatInstant(series.currentPeriodEndAt)
+                )
+            }
+        } else if (series.unit == UsageUnit.CURRENCY_USD) {
             MetricItem(
                 label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
                 value = formatCents(series.currentDisplayUsed)
@@ -923,14 +948,16 @@ private fun HistoryMetrics(
                 value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
             )
         }
-        MetricItem(
-            label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
-            value = if (series.unit == UsageUnit.REQUESTS && series.currentDisplayTotal <= 0L) {
-                if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
-            } else {
-                forecastLabel(series.forecast, language)
-            }
-        )
+        if (series.periodType != PeriodType.REPORTED) {
+            MetricItem(
+                label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
+                value = if (series.unit == UsageUnit.REQUESTS && series.currentDisplayTotal <= 0L) {
+                    if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
+                } else {
+                    forecastLabel(series.forecast, language)
+                }
+            )
+        }
     }
 }
 

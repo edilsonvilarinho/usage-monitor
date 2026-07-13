@@ -85,6 +85,7 @@ import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.domain.entity.statusBadgeLabel
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -123,6 +124,7 @@ fun ApiUsageCard(
     modifier: Modifier = Modifier
 ) {
     val orderedQuotas = buildList {
+        quotas.firstOrNull { it.periodType == PeriodType.REPORTED }?.let(::add)
         quotas.firstOrNull { it.periodType == PeriodType.INTERVAL }?.let(::add)
         quotas.firstOrNull { it.periodType == PeriodType.WEEKLY }?.let(::add)
         quotas.filterNot { quota -> quota in this }
@@ -277,12 +279,28 @@ fun ApiUsageCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = apiName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = apiName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        source.statusBadgeLabel(language)?.let { badgeLabel ->
+                            Text(
+                                text = badgeLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier
+                                    .clip(AppShapes.medium)
+                                    .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.92f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -435,6 +453,13 @@ private fun inlineNoticeText(notice: ApiUsageNotice, language: AppLanguage): Str
                 "Quota 7d indisponível na fonte semanal do Codex"
             } else {
                 "7d quota unavailable in Codex weekly source"
+            }
+        }
+        ApiUsageNotice.SOURCE_UNSTABLE -> {
+            if (language == AppLanguage.PT) {
+                "Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar."
+            } else {
+                "Codex usage source is unstable: the contract changed and limits may fluctuate until it stabilizes."
             }
         }
     }

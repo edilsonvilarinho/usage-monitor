@@ -31,7 +31,7 @@ class UsageHistoryRepositoryImpl(
         val groupedSeries = records
             .groupBy { record -> HistorySeriesKey(record.quotaLabel, record.periodType) }
             .map { (key, groupRecords) -> buildSeries(key, groupRecords.sortedBy { it.capturedAt }, range) }
-            .sortedWith(compareBy({ it.periodType.ordinal }, { it.quotaLabel }))
+            .sortedWith(compareBy<UsageHistorySeries>({ historySeriesRank(source, it) }, { it.quotaLabel }))
 
         return ApiUsageHistoryReport(
             source = source,
@@ -56,8 +56,18 @@ class UsageHistoryRepositoryImpl(
         val currentPoint = renderPoints.last()
         val deltaDisplayUsed = calculatePositiveDelta(renderPoints, unit)
         val hoursObserved = calculateObservedHours(renderPoints)
-        val averagePerHour = if (hoursObserved > 0.0) deltaDisplayUsed.toDouble() / hoursObserved else 0.0
-        val forecast = calculateForecast(renderPoints, unit)
+        val averagePerHour = if (key.periodType == PeriodType.REPORTED) {
+            0.0
+        } else if (hoursObserved > 0.0) {
+            deltaDisplayUsed.toDouble() / hoursObserved
+        } else {
+            0.0
+        }
+        val forecast = if (key.periodType == PeriodType.REPORTED) {
+            UsageForecast.InsufficientData
+        } else {
+            calculateForecast(renderPoints, unit)
+        }
 
         return UsageHistorySeries(
             quotaLabel = key.quotaLabel,
@@ -201,6 +211,22 @@ class UsageHistoryRepositoryImpl(
         val quotaLabel: String,
         val periodType: PeriodType
     )
+
+    private fun historySeriesRank(source: ApiSource, series: UsageHistorySeries): Int {
+        if (source == ApiSource.CODEX) {
+            return when (series.periodType) {
+                PeriodType.REPORTED -> 0
+                PeriodType.INTERVAL -> 1
+                PeriodType.WEEKLY -> 2
+            }
+        }
+
+        return when (series.periodType) {
+            PeriodType.INTERVAL -> 0
+            PeriodType.WEEKLY -> 1
+            PeriodType.REPORTED -> 2
+        }
+    }
 
     private companion object {
         const val MILLIS_PER_HOUR = 3_600_000.0

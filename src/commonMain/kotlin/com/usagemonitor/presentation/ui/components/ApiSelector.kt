@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.statusBadgeLabel
+import com.usagemonitor.domain.entity.statusSupportingText
 
 /**
  * Checkboxes para ativar/desativar o monitoramento de cada API.
@@ -63,8 +67,11 @@ fun ApiCheckboxRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val badgeLabel = api.statusBadgeLabel(language)
+    val supportingText = api.statusSupportingText(language)
+
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         modifier = modifier
             .toggleable(
                 value = isChecked,
@@ -77,10 +84,49 @@ fun ApiCheckboxRow(
             checked = isChecked,
             onCheckedChange = null
         )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(top = 10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = apiLabel(api, language),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (badgeLabel != null) {
+                    SourceStatusBadge(label = badgeLabel)
+                }
+            }
+            if (supportingText != null) {
+                Text(
+                    text = supportingText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceStatusBadge(
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.9f),
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+    ) {
         Text(
-            text = apiLabel(api, language),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
     }
 }

@@ -16,11 +16,11 @@ object CodexMapper {
 
     fun toFiveHourQuota(response: CodexUsageResponse): QuotaInfo {
         return QuotaInfo(
-            label = "Codex 5h",
+            label = "Codex atual",
             used = response.rateLimit.primaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
             total = PERCENT_SCALE,
             periodEndAt = Instant.fromEpochSeconds(response.rateLimit.primaryWindow.resetAt),
-            periodType = PeriodType.INTERVAL,
+            periodType = PeriodType.REPORTED,
             unit = UsageUnit.PERCENTAGE
         )
     }
@@ -51,10 +51,11 @@ object CodexMapper {
             source = ApiSource.CODEX,
             apiName = "Codex",
             quotas = quotas,
-            notices = if (weeklyQuota == null) {
-                setOf(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE)
-            } else {
-                emptySet()
+            notices = buildSet {
+                add(ApiUsageNotice.SOURCE_UNSTABLE)
+                if (weeklyQuota == null) {
+                    add(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE)
+                }
             }
         )
     }
