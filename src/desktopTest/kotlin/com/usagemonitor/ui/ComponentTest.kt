@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -25,6 +26,8 @@ import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
@@ -139,6 +142,47 @@ class ComponentTest {
         onNodeWithText("Semanal").assertIsDisplayed()
         onNodeWithText("Reinício: Ter 14h40 BRT").assertIsDisplayed()
         onNodeWithText("Reinício: Dom 03/05 9h00 BRT").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard shows account from last successful snapshot`() = runDesktopComposeUiTest {
+        val account = UsageAccountContext(
+            key = UsageAccountKey(
+                source = ApiSource.CODEX,
+                providerAccountId = "user-a",
+                workspaceId = "workspace-a"
+            ),
+            email = "conta-codex-muito-longa@example.com",
+            workspaceName = "Equipe Principal"
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex atual",
+                            used = 42L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.REPORTED,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    accountContext = account,
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithTag("usageAccountLabel", useUnmergedTree = true).assertIsDisplayed()
+        onNodeWithText(account.displayLabel).assertIsDisplayed()
+        onNodeWithContentDescription("Conta da última coleta: ${account.displayLabel}").assertIsDisplayed()
     }
 
     @Test
@@ -1021,6 +1065,72 @@ class ComponentTest {
 
         onNodeWithText("EN").performClick()
         assertEquals(AppLanguage.EN, selected)
+    }
+
+    @Test
+    fun `HistoryScreen lists accounts and allows selecting another workspace`() = runDesktopComposeUiTest {
+        val accountA = UsageAccountContext(
+            key = UsageAccountKey(ApiSource.CODEX, "same-user", "workspace-a"),
+            email = "same@example.com",
+            workspaceName = "Workspace A"
+        )
+        val accountB = UsageAccountContext(
+            key = UsageAccountKey(ApiSource.CODEX, "same-user", "workspace-b"),
+            email = "same@example.com",
+            workspaceName = "Workspace B"
+        )
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.CODEX,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = null,
+            series = emptyList()
+        )
+        val repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+            override suspend fun listAccounts(source: ApiSource): List<UsageAccountContext> {
+                return listOf(accountA, accountB)
+            }
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: HistoryRange,
+                now: Instant
+            ) = report
+        }
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(repository),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {},
+                    focusedSource = ApiSource.CODEX,
+                    showSourceSelector = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText(accountA.displayLabel).fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+        onNodeWithText("Conta").assertIsDisplayed()
+        onNodeWithText(accountA.displayLabel).assertIsSelected()
+        onNodeWithText(accountB.displayLabel).performClick()
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText(accountB.displayLabel).assertIsSelected()
+                true
+            }.getOrDefault(false)
+        }
+        viewModel.onDestroy()
     }
 
     @Test

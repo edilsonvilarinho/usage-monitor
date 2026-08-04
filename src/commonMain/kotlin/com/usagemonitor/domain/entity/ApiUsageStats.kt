@@ -16,6 +16,10 @@ data class ApiUsageStats(
     // Lista de cotas. Para Anthropic terá 1 item; para MiniMax, vários.
     val quotas: List<QuotaInfo>,
 
+    // Identidade da conta que originou esta coleta. Obrigatória para fontes
+    // autenticadas que persistem histórico separado por conta.
+    val accountContext: UsageAccountContext? = null,
+
     // Avisos não fatais que a UI pode expor sem rebaixar a fonte para erro.
     val notices: Set<ApiUsageNotice> = emptySet()
 )

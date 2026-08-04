@@ -4,6 +4,8 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
@@ -161,6 +163,35 @@ class HistoryViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `selects most recent account and reloads history when account changes`() = runTest {
+        val accountA = account("user-a", "workspace-a", "a@example.com")
+        val accountB = account("user-b", "workspace-b", "b@example.com")
+        val repo = FakeRepo(
+            report = emptyReport(ApiSource.CODEX),
+            accounts = listOf(accountA, accountB)
+        )
+        val viewModel = HistoryViewModel(
+            getUsageHistory = GetUsageHistoryUseCase(repo) { now },
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
+        )
+
+        val initialState = awaitNonLoading(viewModel)
+        assertIs<HistoryUiState.Success>(initialState)
+        assertEquals(accountA, initialState.selectedAccount)
+        assertEquals(accountA.key, repo.lastAccountKey)
+        val callsBefore = repo.invocations
+
+        viewModel.selectAccount(accountB)
+        awaitInvocations(repo, callsBefore + 1)
+        val updatedState = awaitNonLoading(viewModel)
+
+        assertIs<HistoryUiState.Success>(updatedState)
+        assertEquals(accountB, updatedState.selectedAccount)
+        assertEquals(accountB.key, repo.lastAccountKey)
+        viewModel.onDestroy()
+    }
+
     private fun emptyReport(source: ApiSource): ApiUsageHistoryReport {
         return ApiUsageHistoryReport(
             source = source,
@@ -170,12 +201,26 @@ class HistoryViewModelTest {
         )
     }
 
+    private fun account(userId: String, workspaceId: String, email: String): UsageAccountContext {
+        return UsageAccountContext(
+            key = UsageAccountKey(
+                source = ApiSource.CODEX,
+                providerAccountId = userId,
+                workspaceId = workspaceId
+            ),
+            email = email,
+            workspaceName = workspaceId
+        )
+    }
+
     private class FakeRepo(
         var report: ApiUsageHistoryReport? = null,
-        var error: Throwable? = null
+        var error: Throwable? = null,
+        var accounts: List<UsageAccountContext> = emptyList()
     ) : UsageHistoryRepository {
         var invocations: Int = 0
         var lastRange: HistoryRange? = null
+        var lastAccountKey: UsageAccountKey? = null
 
         override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
 
@@ -184,6 +229,24 @@ class HistoryViewModelTest {
             range: HistoryRange,
             now: Instant
         ): ApiUsageHistoryReport {
+            return respond(range)
+        }
+
+        override suspend fun listAccounts(source: ApiSource): List<UsageAccountContext> {
+            return accounts.filter { account -> account.key.source == source }
+        }
+
+        override suspend fun getHistoryReport(
+            source: ApiSource,
+            accountKey: UsageAccountKey?,
+            range: HistoryRange,
+            now: Instant
+        ): ApiUsageHistoryReport {
+            lastAccountKey = accountKey
+            return respond(range)
+        }
+
+        private fun respond(range: HistoryRange): ApiUsageHistoryReport {
             invocations += 1
             lastRange = range
             error?.let { throw it }

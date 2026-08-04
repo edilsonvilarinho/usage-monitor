@@ -11,13 +11,15 @@ package com.usagemonitor.data.datasource
  */
 interface CredentialDataSource {
     /**
-     * Lê e retorna o accessToken OAuth do Claude.ai.
-     * Lança exceção se o ficheiro não existir ou o token estiver expirado.
+     * Lê a sessão OAuth do Claude.ai junto da identidade da conta ativa.
+     * Lança exceção se as credenciais ou a identidade não estiverem disponíveis.
      */
-    suspend fun loadAnthropicAccessToken(): String
+    suspend fun loadAnthropicSession(): AnthropicSession
 
-    /**
-     * Limpa o cache em memória do token Anthropic para forçar releitura do disco.
-     */
-    fun invalidateAnthropicAccessTokenCache()
+    suspend fun isAnthropicSessionCurrent(session: AnthropicSession): Boolean = true
 }
+
+data class AnthropicSession(
+    val accessToken: String,
+    val accountContext: com.usagemonitor.domain.entity.UsageAccountContext
+)

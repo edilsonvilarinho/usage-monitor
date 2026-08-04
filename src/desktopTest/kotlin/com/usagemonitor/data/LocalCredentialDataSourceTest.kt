@@ -30,6 +30,9 @@ class LocalCredentialDataSourceTest {
     private val tempDir: File = createTempDirectory(prefix = "usage-monitor-test").toFile()
     private val claudeDir: File = File(tempDir, ".claude").also { it.mkdirs() }
     private val credentialsFile: File = File(claudeDir, ".credentials.json")
+    private val claudeConfigFile: File = File(tempDir, ".claude.json").also { file ->
+        writeClaudeConfig(file, "account-a", "org-a", "first@example.com", "Org A")
+    }
     private val homeDirProvider: () -> String = { tempDir.absolutePath }
 
     @AfterTest
@@ -46,13 +49,16 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        val token = dataSource.loadAnthropicAccessToken()
+        val session = dataSource.loadAnthropicSession()
 
-        assertEquals("fresh-token", token)
+        assertEquals("fresh-token", session.accessToken)
+        assertEquals("account-a", session.accountContext.key.providerAccountId)
+        assertEquals("org-a", session.accountContext.key.workspaceId)
+        assertEquals("first@example.com", session.accountContext.email)
     }
 
     @Test
-    fun `returns cached token without rereading the file`() = runTest {
+    fun `rereads token from disk on every session load`() = runTest {
         val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
         writeCredentials(accessToken = "fresh-token", refreshToken = "rt", expiresAt = futureExpiry)
         val dataSource = LocalCredentialDataSource(
@@ -60,34 +66,12 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        val firstToken = dataSource.loadAnthropicAccessToken()
-        assertTrue(credentialsFile.delete())
-
-        val secondToken = dataSource.loadAnthropicAccessToken()
+        val firstToken = dataSource.loadAnthropicSession().accessToken
+        writeCredentials(accessToken = "rotated-on-disk", refreshToken = "rt", expiresAt = futureExpiry)
+        val secondToken = dataSource.loadAnthropicSession().accessToken
 
         assertEquals("fresh-token", firstToken)
-        assertEquals("fresh-token", secondToken)
-    }
-
-    @Test
-    fun `invalidateAnthropicAccessTokenCache forces file reread on next load`() = runTest {
-        val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
-        writeCredentials(accessToken = "cached-token", refreshToken = "rt", expiresAt = futureExpiry)
-        val dataSource = LocalCredentialDataSource(
-            httpClient = throwingHttpClient(),
-            homeDirProvider = homeDirProvider
-        )
-
-        val firstToken = dataSource.loadAnthropicAccessToken()
-        writeCredentials(accessToken = "rotated-on-disk", refreshToken = "rt", expiresAt = futureExpiry)
-
-        val cachedToken = dataSource.loadAnthropicAccessToken()
-        dataSource.invalidateAnthropicAccessTokenCache()
-        val rereadToken = dataSource.loadAnthropicAccessToken()
-
-        assertEquals("cached-token", firstToken)
-        assertEquals("cached-token", cachedToken)
-        assertEquals("rotated-on-disk", rereadToken)
+        assertEquals("rotated-on-disk", secondToken)
     }
 
     @Test
@@ -97,7 +81,7 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        val error = assertFailsWith<IllegalStateException> { dataSource.loadAnthropicAccessToken() }
+        val error = assertFailsWith<IllegalStateException> { dataSource.loadAnthropicSession() }
         assertTrue(error.message.orEmpty().contains("Credenciais não encontradas"))
     }
 
@@ -114,7 +98,7 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        val token = dataSource.loadAnthropicAccessToken()
+        val token = dataSource.loadAnthropicSession().accessToken
 
         assertEquals("rotated-token", token)
     }
@@ -132,7 +116,7 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        dataSource.loadAnthropicAccessToken()
+        dataSource.loadAnthropicSession()
 
         val written = readCredentialsJson()
         val oauth = written["claudeAiOauth"]!!.jsonObject
@@ -149,7 +133,7 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        dataSource.loadAnthropicAccessToken()
+        dataSource.loadAnthropicSession()
 
         val oauth = readCredentialsJson()["claudeAiOauth"]!!.jsonObject
         assertEquals("preserved-rt", oauth["refreshToken"]!!.jsonPrimitive.content)
@@ -165,7 +149,7 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        dataSource.loadAnthropicAccessToken()
+        dataSource.loadAnthropicSession()
 
         val oauth = readCredentialsJson()["claudeAiOauth"]!!.jsonObject
         val newExpiresAt = oauth["expiresAt"]!!.jsonPrimitive.content.toLong()
@@ -191,7 +175,7 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        val error = assertFailsWith<IllegalStateException> { dataSource.loadAnthropicAccessToken() }
+        val error = assertFailsWith<IllegalStateException> { dataSource.loadAnthropicSession() }
         assertTrue(error.message.orEmpty().contains("Token refresh retornou sem access_token"))
     }
 
@@ -205,7 +189,7 @@ class LocalCredentialDataSourceTest {
         )
 
         // Sem refresh_token o data source devolve o accessToken atual sem chamar HTTP.
-        val token = dataSource.loadAnthropicAccessToken()
+        val token = dataSource.loadAnthropicSession().accessToken
         assertEquals("expired-token", token)
     }
 
@@ -230,9 +214,49 @@ class LocalCredentialDataSourceTest {
             homeDirProvider = homeDirProvider
         )
 
-        val token = dataSource.loadAnthropicAccessToken()
+        val token = dataSource.loadAnthropicSession().accessToken
 
         assertEquals("fresh-token", token)
+    }
+
+    @Test
+    fun `detects account switch without recreating datasource`() = runTest {
+        val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
+        writeCredentials(accessToken = "token-a", refreshToken = "rt-a", expiresAt = futureExpiry)
+        val dataSource = LocalCredentialDataSource(
+            httpClient = throwingHttpClient(),
+            homeDirProvider = homeDirProvider
+        )
+
+        val firstSession = dataSource.loadAnthropicSession()
+        writeCredentials(accessToken = "token-b", refreshToken = "rt-b", expiresAt = futureExpiry)
+        writeClaudeConfig(claudeConfigFile, "account-b", "org-b", "second@example.com", "Org B")
+        val secondSession = dataSource.loadAnthropicSession()
+
+        assertEquals(false, dataSource.isAnthropicSessionCurrent(firstSession))
+        assertEquals(true, dataSource.isAnthropicSessionCurrent(secondSession))
+        assertEquals("second@example.com", secondSession.accountContext.email)
+    }
+
+    private fun writeClaudeConfig(
+        file: File,
+        accountUuid: String,
+        organizationUuid: String,
+        email: String,
+        organizationName: String
+    ) {
+        file.writeText(
+            """
+            {
+              "oauthAccount": {
+                "accountUuid": "$accountUuid",
+                "organizationUuid": "$organizationUuid",
+                "emailAddress": "$email",
+                "organizationName": "$organizationName"
+              }
+            }
+            """.trimIndent()
+        )
     }
 
     private fun writeCredentials(accessToken: String, refreshToken: String, expiresAt: Long) {

@@ -382,6 +382,66 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     }
 
     @Test
+    fun `successful account switch updates card identity and failed refresh preserves last account`() = runTest {
+        var calls = 0
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val accountB = sampleAnthropicStats.accountContext!!.copy(
+            key = sampleAnthropicStats.accountContext!!.key.copy(
+                providerAccountId = "anthropic-user-b",
+                workspaceId = "anthropic-org-b"
+            ),
+            email = "account-b@example.com",
+            workspaceName = "Org B"
+        )
+        val statsB = sampleAnthropicStats.copy(accountContext = accountB)
+        var anthropicResult: Result<ApiUsageStats> = Result.success(sampleAnthropicStats)
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                calls += 1
+                return anthropicResult
+            }
+        }
+        val disabledRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(disabledRepo),
+            getCodexUsage = GetCodexUsageUseCase(
+                object : CodexRepository {
+                    override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+                }
+            ),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(
+                object : DeepSeekRepository {
+                    override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            recordUsageSnapshot = historyUseCase(recordedSnapshots),
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+        awaitCondition { calls == 1 && recordedSnapshots.size == 1 }
+        anthropicResult = Result.success(statsB)
+        viewModel.refresh(ApiSource.ANTHROPIC)
+        awaitCondition { calls == 2 && recordedSnapshots.size == 2 }
+        var state = viewModel.uiState.value as UiState.Success
+        assertEquals("account-b@example.com", state.data.single().accountContext?.email)
+
+        anthropicResult = Result.failure(IllegalStateException("login ainda em andamento"))
+        viewModel.refresh(ApiSource.ANTHROPIC)
+        awaitCondition { calls == 3 }
+        awaitCondition { viewModel.refreshingSources.value.isEmpty() }
+        state = viewModel.uiState.value as UiState.Success
+
+        assertEquals("account-b@example.com", state.data.single().accountContext?.email)
+        assertEquals(2, recordedSnapshots.size)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `queues a pending refresh when another fetch is already in flight`() = runTest {
         var anthropicCalls = 0
         val firstFetchGate = CompletableDeferred<Unit>()

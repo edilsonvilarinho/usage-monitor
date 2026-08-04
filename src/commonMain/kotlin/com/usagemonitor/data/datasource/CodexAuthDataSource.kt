@@ -7,6 +7,8 @@ package com.usagemonitor.data.datasource
  */
 interface CodexAuthDataSource {
     suspend fun loadSession(): CodexSession
+
+    suspend fun isSessionCurrent(session: CodexSession): Boolean = true
 }
 
 /**
@@ -14,5 +16,6 @@ interface CodexAuthDataSource {
  */
 data class CodexSession(
     val accessToken: String,
-    val capSid: String
+    val capSid: String,
+    val accountContext: com.usagemonitor.domain.entity.UsageAccountContext
 )

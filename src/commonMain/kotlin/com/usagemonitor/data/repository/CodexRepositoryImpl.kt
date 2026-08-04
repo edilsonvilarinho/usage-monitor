@@ -13,6 +13,12 @@ class CodexRepositoryImpl(
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
+            fetchStableUsage()
+        }
+    }
+
+    private suspend fun fetchStableUsage(): ApiUsageStats {
+        for (attempt in 0..1) {
             val session = authDataSource.loadSession()
             val fiveHourResponse = apiDataSource.fetchCodexFiveHourUsage(session)
             val fiveHourQuota = CodexMapper.toFiveHourQuota(fiveHourResponse)
@@ -20,10 +26,21 @@ class CodexRepositoryImpl(
                 apiDataSource.fetchCodexWeeklyUsage(session)
             }.getOrNull()?.let(CodexMapper::toWeeklyQuota)
 
-            CodexMapper.mergeUsage(
+            val stats = CodexMapper.mergeUsage(
                 fiveHourQuota = fiveHourQuota,
                 weeklyQuota = weeklyQuota
-            )
+            ).copy(accountContext = session.accountContext)
+
+            if (authDataSource.isSessionCurrent(session)) {
+                return stats
+            }
         }
+
+        throw IllegalStateException(ACCOUNT_CHANGED_DURING_FETCH_MESSAGE)
+    }
+
+    companion object {
+        const val ACCOUNT_CHANGED_DURING_FETCH_MESSAGE =
+            "A conta do Codex mudou durante a atualização. Aguarde o login terminar e atualize novamente."
     }
 }

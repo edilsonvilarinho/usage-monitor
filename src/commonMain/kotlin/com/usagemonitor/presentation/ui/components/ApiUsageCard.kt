@@ -83,6 +83,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.statusBadgeLabel
@@ -107,6 +108,7 @@ fun ApiUsageCard(
     source: ApiSource,
     apiName: String,
     quotas: List<QuotaInfo>,
+    accountContext: UsageAccountContext? = null,
     notices: Set<ApiUsageNotice> = emptySet(),
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
@@ -362,6 +364,15 @@ fun ApiUsageCard(
                     }
                 }
 
+                if (accountContext != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    AccountIdentityLabel(
+                        account = accountContext,
+                        language = language,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 AnimatedContent(
@@ -413,6 +424,51 @@ fun ApiUsageCard(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountIdentityLabel(
+    account: UsageAccountContext,
+    language: AppLanguage,
+    modifier: Modifier = Modifier
+) {
+    val tooltipState = rememberTooltipState()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(
+                    text = if (language == AppLanguage.PT) {
+                        "Conta da última coleta: ${account.displayLabel}"
+                    } else {
+                        "Account from last snapshot: ${account.displayLabel}"
+                    }
+                )
+            }
+        },
+        state = tooltipState,
+        modifier = modifier
+    ) {
+        Text(
+            text = account.displayLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("usageAccountLabel")
+                .semantics {
+                    contentDescription = if (language == AppLanguage.PT) {
+                        "Conta da última coleta: ${account.displayLabel}"
+                    } else {
+                        "Account from last snapshot: ${account.displayLabel}"
+                    }
+                }
+        )
     }
 }
 
