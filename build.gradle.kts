@@ -8,23 +8,23 @@ plugins {
     alias(libs.plugins.kover)
 }
 
-version = "18.0.0"
+version = "19.0.0"
 
 val appVersion = version.toString()
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
 
 kotlin {
-    // ÃƒÅ¡nico alvo: Desktop JVM.
+    // ÃƒÆ’Ã…Â¡nico alvo: Desktop JVM.
     // O nome "desktop" define o source set desktopMain/desktopTest.
     jvm("desktop")
 
-    // Java 17 ÃƒÂ© o mÃƒÂ­nimo recomendado para Compose Multiplatform Desktop
+    // Java 17 ÃƒÆ’Ã‚Â© o mÃƒÆ’Ã‚Â­nimo recomendado para Compose Multiplatform Desktop
     jvmToolchain(17)
 
     sourceSets {
 
         // --- commonMain ---
-        // CÃƒÂ³digo compartilhado: domain, data e presentation.
+        // CÃƒÆ’Ã‚Â³digo compartilhado: domain, data e presentation.
         // Depende apenas de bibliotecas multiplataforma.
         val commonMain by getting {
             dependencies {
@@ -36,13 +36,13 @@ kotlin {
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
                 implementation(compose.components.resources)
 
-                // Ktor Ã¢â‚¬â€ cliente HTTP (engine vem no desktopMain)
+                // Ktor ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â cliente HTTP (engine vem no desktopMain)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.json)
                 implementation(libs.ktor.client.logging)
 
-                // SerializaÃƒÂ§ÃƒÂ£o e utilitÃƒÂ¡rios KMP
+                // SerializaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o e utilitÃƒÆ’Ã‚Â¡rios KMP
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.coroutines.core)
@@ -51,7 +51,7 @@ kotlin {
         }
 
         // --- desktopMain ---
-        // CÃƒÂ³digo especÃƒÂ­fico da plataforma Desktop (JVM):
+        // CÃƒÆ’Ã‚Â³digo especÃƒÆ’Ã‚Â­fico da plataforma Desktop (JVM):
         // - engine OkHttp do Ktor
         // - leitura de ficheiros com java.io.File
         // - entry point da janela Compose
@@ -71,7 +71,7 @@ kotlin {
         }
 
         // --- commonTest ---
-        // Testes unitÃƒÂ¡rios: domain, mappers, ViewModel
+        // Testes unitÃƒÆ’Ã‚Â¡rios: domain, mappers, ViewModel
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlin.test)
@@ -92,7 +92,7 @@ kotlin {
     }
 }
 
-// ConfiguraÃƒÂ§ÃƒÂ£o da aplicaÃƒÂ§ÃƒÂ£o Desktop
+// ConfiguraÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o da aplicaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o Desktop
 compose.desktop {
     application {
         mainClass = "com.usagemonitor.MainKt"
@@ -148,7 +148,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     dependsOn(generateAppVersionSource)
 }
 
-// Adicionar manifest ao desktopJar para tornÃƒÂ¡-lo executÃƒÂ¡vel
+// Adicionar manifest ao desktopJar para tornÃƒÆ’Ã‚Â¡-lo executÃƒÆ’Ã‚Â¡vel
 tasks.named<Jar>("desktopJar") {
     manifest {
         attributes(
