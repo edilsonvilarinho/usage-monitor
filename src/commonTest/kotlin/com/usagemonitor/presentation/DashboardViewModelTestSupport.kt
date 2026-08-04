@@ -5,6 +5,8 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.AppUpdateRepository
 import com.usagemonitor.domain.repository.CodexRepository
@@ -39,6 +41,15 @@ abstract class DashboardViewModelTestSupport {
     protected val sampleAnthropicStats = ApiUsageStats(
         source = ApiSource.ANTHROPIC,
         apiName = "Anthropic",
+        accountContext = UsageAccountContext(
+            key = UsageAccountKey(
+                source = ApiSource.ANTHROPIC,
+                providerAccountId = "anthropic-user-a",
+                workspaceId = "anthropic-org-a"
+            ),
+            email = "account-a@example.com",
+            workspaceName = "Org A"
+        ),
         quotas = listOf(
             QuotaInfo(
                 label = "Tokens",

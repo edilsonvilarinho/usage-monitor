@@ -4,6 +4,9 @@ import com.usagemonitor.data.datasource.CodexDiagnosticsFailureEvent
 import com.usagemonitor.data.datasource.CodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.CodexDiagnosticsSuccessEvent
 import com.usagemonitor.data.datasource.CodexSession
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -178,7 +181,15 @@ class RemoteApiDataSourceCodexDiagnosticsTest {
     private fun sampleSession(): CodexSession {
         return CodexSession(
             accessToken = "test-access-token",
-            capSid = "test-cap-sid"
+            capSid = "test-cap-sid",
+            accountContext = UsageAccountContext(
+                key = UsageAccountKey(
+                    source = ApiSource.CODEX,
+                    providerAccountId = "test-user",
+                    workspaceId = "test-workspace"
+                ),
+                email = "test@example.com"
+            )
         )
     }
 

@@ -2,6 +2,9 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CredentialsFileDto
 import com.usagemonitor.data.dto.OAuthCredentialsDto
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -25,23 +28,15 @@ class LocalCredentialDataSource(
     private val homeDirProvider: () -> String = {
         System.getProperty("user.home")
             ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-    }
+    },
+    private val claudeConfigFileProvider: (String) -> File = { homeDir -> File(homeDir, ".claude.json") }
 ) : CredentialDataSource {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
-    @Volatile private var cachedToken: String? = null
-    @Volatile private var cachedExpiresAt: Long = 0L
-
-    override suspend fun loadAnthropicAccessToken(): String {
+    override suspend fun loadAnthropicSession(): AnthropicSession {
         val now = System.currentTimeMillis()
-        val cached = cachedToken
-        if (cached != null && cachedExpiresAt - now > REFRESH_MARGIN_MS) {
-            return cached
-        }
-
         val credentialsFile = credentialsFile()
-
         if (!credentialsFile.exists()) {
             throw IllegalStateException(
                 "Credenciais não encontradas: ${credentialsFile.absolutePath}. " +
@@ -49,27 +44,74 @@ class LocalCredentialDataSource(
             )
         }
 
-        val creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
+        var creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
 
         val needsRefresh = creds.claudeAiOauth.expiresAt - now < REFRESH_MARGIN_MS
 
         if (needsRefresh && creds.claudeAiOauth.refreshToken.isNotEmpty()) {
-            return refreshToken(credentialsFile, creds)
+            creds = refreshToken(credentialsFile, creds)
         }
 
-        cachedToken = creds.claudeAiOauth.accessToken
-        cachedExpiresAt = creds.claudeAiOauth.expiresAt
-        return creds.claudeAiOauth.accessToken
+        val accessToken = creds.claudeAiOauth.accessToken.ifBlank {
+            throw IllegalStateException("Credenciais do Claude Code inválidas: accessToken ausente.")
+        }
+
+        return AnthropicSession(
+            accessToken = accessToken,
+            accountContext = loadAccountContext()
+        )
     }
 
-    override fun invalidateAnthropicAccessTokenCache() {
-        cachedToken = null
-        cachedExpiresAt = 0L
+    override suspend fun isAnthropicSessionCurrent(session: AnthropicSession): Boolean {
+        val credentialsFile = credentialsFile()
+        if (!credentialsFile.exists()) {
+            return false
+        }
+
+        return try {
+            val creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
+            val currentAccount = loadAccountContext()
+            creds.claudeAiOauth.accessToken == session.accessToken &&
+                currentAccount.key == session.accountContext.key
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     private fun credentialsFile(): File = File("${homeDirProvider()}/.claude/.credentials.json")
 
-    private suspend fun refreshToken(credentialsFile: File, creds: CredentialsFileDto): String {
+    private fun loadAccountContext(): UsageAccountContext {
+        val homeDir = homeDirProvider()
+        val configFile = claudeConfigFileProvider(homeDir)
+        if (!configFile.exists()) {
+            throw IllegalStateException(
+                "Identidade do Claude Code não encontrada: ${configFile.absolutePath}. " +
+                    "Execute /login no Claude Code para autenticar."
+            )
+        }
+
+        val config = json.decodeFromString<ClaudeConfigDto>(configFile.readText())
+        val account = config.oauthAccount
+            ?: throw IllegalStateException("Identidade do Claude Code inválida: oauthAccount ausente.")
+        val providerAccountId = account.accountUuid.ifBlank {
+            throw IllegalStateException("Identidade do Claude Code inválida: accountUuid ausente.")
+        }
+        val email = account.emailAddress.ifBlank {
+            throw IllegalStateException("Identidade do Claude Code inválida: emailAddress ausente.")
+        }
+
+        return UsageAccountContext(
+            key = UsageAccountKey(
+                source = ApiSource.ANTHROPIC,
+                providerAccountId = providerAccountId,
+                workspaceId = account.organizationUuid?.ifBlank { null }
+            ),
+            email = email,
+            workspaceName = account.organizationName?.ifBlank { null }
+        )
+    }
+
+    private suspend fun refreshToken(credentialsFile: File, creds: CredentialsFileDto): CredentialsFileDto {
         val response = httpClient.post(OAUTH_REFRESH_URL) {
             contentType(ContentType.Application.Json)
             setBody(TokenRefreshRequest("refresh_token", creds.claudeAiOauth.refreshToken))
@@ -91,9 +133,7 @@ class LocalCredentialDataSource(
             target = credentialsFile,
             content = json.encodeToString(CredentialsFileDto.serializer(), updated)
         )
-        cachedToken = newAccessToken
-        cachedExpiresAt = updated.claudeAiOauth.expiresAt
-        return newAccessToken
+        return updated
     }
 
     private fun atomicWriteText(target: File, content: String) {
@@ -134,5 +174,18 @@ class LocalCredentialDataSource(
         @SerialName("access_token") val accessToken: String? = null,
         @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("expires_in") val expiresIn: Long? = null,
+    )
+
+    @Serializable
+    private data class ClaudeConfigDto(
+        val oauthAccount: ClaudeOauthAccountDto? = null
+    )
+
+    @Serializable
+    private data class ClaudeOauthAccountDto(
+        val accountUuid: String = "",
+        val emailAddress: String = "",
+        val organizationUuid: String? = null,
+        val organizationName: String? = null
     )
 }

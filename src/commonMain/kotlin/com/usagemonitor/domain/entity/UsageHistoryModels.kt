@@ -71,7 +71,8 @@ data class ApiUsageHistoryReport(
     val source: ApiSource,
     val range: HistoryRange,
     val lastUpdatedAt: Instant?,
-    val series: List<UsageHistorySeries>
+    val series: List<UsageHistorySeries>,
+    val accountContext: UsageAccountContext? = null
 ) {
     val isEmpty: Boolean
         get() = series.isEmpty()

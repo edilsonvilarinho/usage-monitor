@@ -58,8 +58,10 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.domain.entity.requiresUsageAccount
 import com.usagemonitor.presentation.ui.components.HistoryChartSelectionController
 import com.usagemonitor.presentation.ui.components.HistoryIntervalSummaryModel
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
@@ -160,7 +162,7 @@ fun HistoryScreen(
                         }
 
                         is HistoryUiState.Success -> {
-                            LaunchedEffect(current.selectedSource, current.selectedRange) {
+                            LaunchedEffect(current.selectedSource, current.selectedAccount?.key, current.selectedRange) {
                                 chartSelectionController.clear()
                             }
 
@@ -168,10 +170,13 @@ fun HistoryScreen(
                                 HistoryControls(
                                     availableSources = current.availableSources,
                                     selectedSource = current.selectedSource,
+                                    availableAccounts = current.availableAccounts,
+                                    selectedAccount = current.selectedAccount,
                                     selectedRange = current.selectedRange,
                                     showSourceSelector = showSourceSelector,
                                     language = language,
                                     onSelectSource = viewModel::selectSource,
+                                    onSelectAccount = viewModel::selectAccount,
                                     onSelectRange = viewModel::selectRange
                                 )
 
@@ -212,7 +217,11 @@ fun HistoryScreen(
                                             )
 
                                             current.report.series.forEachIndexed { index, series ->
-                                                key(series.quotaLabel + current.selectedRange.name) {
+                                                key(
+                                                    series.quotaLabel +
+                                                        current.selectedAccount?.key.toString() +
+                                                        current.selectedRange.name
+                                                ) {
                                                     HistorySeriesCard(
                                                         source = current.report.source,
                                                         series = series,
@@ -294,10 +303,13 @@ private fun HistoryHeader(
 private fun HistoryControls(
     availableSources: List<ApiSource>,
     selectedSource: ApiSource,
+    availableAccounts: List<UsageAccountContext>,
+    selectedAccount: UsageAccountContext?,
     selectedRange: HistoryRange,
     showSourceSelector: Boolean,
     language: AppLanguage,
     onSelectSource: (ApiSource) -> Unit,
+    onSelectAccount: (UsageAccountContext) -> Unit,
     onSelectRange: (HistoryRange) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -318,6 +330,40 @@ private fun HistoryControls(
                             selected = source == selectedSource,
                             onClick = { onSelectSource(source) }
                         )
+                    }
+                }
+            }
+        }
+
+        if (selectedSource.requiresUsageAccount) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = if (language == AppLanguage.PT) "Conta" else "Account",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (availableAccounts.isEmpty()) {
+                    Text(
+                        text = if (language == AppLanguage.PT) {
+                            "Nenhuma conta identificada. Atualize o card após concluir o login."
+                        } else {
+                            "No account identified. Refresh the card after sign-in completes."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for (account in availableAccounts) {
+                            RangeChip(
+                                label = account.displayLabel,
+                                selected = account.key == selectedAccount?.key,
+                                onClick = { onSelectAccount(account) }
+                            )
+                        }
                     }
                 }
             }

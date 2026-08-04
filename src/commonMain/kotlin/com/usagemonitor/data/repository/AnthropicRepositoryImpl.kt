@@ -2,6 +2,7 @@ package com.usagemonitor.data.repository
 
 import com.usagemonitor.data.datasource.CredentialDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
+import com.usagemonitor.data.datasource.AnthropicSession
 import com.usagemonitor.data.mapper.AnthropicMapper
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.repository.AnthropicRepository
@@ -22,34 +23,40 @@ class AnthropicRepositoryImpl(
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
-            fetchUsageWithRecovery()
+            fetchStableUsage()
         }
     }
 
-    private suspend fun fetchUsageWithRecovery(): ApiUsageStats {
-        val cachedToken = credentialDataSource.loadAnthropicAccessToken()
+    private suspend fun fetchStableUsage(): ApiUsageStats {
+        var lastError: Throwable? = null
 
-        try {
-            return fetchUsageForToken(cachedToken)
-        } catch (error: Throwable) {
-            if (!isScopeRequirementFailure(error)) {
-                throw error
+        for (attempt in 0..1) {
+            val session = credentialDataSource.loadAnthropicSession()
+            try {
+                val stats = fetchUsageForSession(session)
+                if (credentialDataSource.isAnthropicSessionCurrent(session)) {
+                    return stats
+                }
+                lastError = IllegalStateException(ACCOUNT_CHANGED_DURING_FETCH_MESSAGE)
+            } catch (error: Throwable) {
+                val sessionChanged = !credentialDataSource.isAnthropicSessionCurrent(session)
+                if (!sessionChanged && !isScopeRequirementFailure(error)) {
+                    throw error
+                }
+                lastError = if (isScopeRequirementFailure(error)) {
+                    IllegalStateException(ANTHROPIC_REAUTH_GUIDANCE_MESSAGE, error)
+                } else {
+                    IllegalStateException(ACCOUNT_CHANGED_DURING_FETCH_MESSAGE, error)
+                }
             }
         }
 
-        credentialDataSource.invalidateAnthropicAccessTokenCache()
-        val refreshedToken = credentialDataSource.loadAnthropicAccessToken()
-
-        try {
-            return fetchUsageForToken(refreshedToken)
-        } catch (retryError: Throwable) {
-            throw IllegalStateException(ANTHROPIC_REAUTH_GUIDANCE_MESSAGE, retryError)
-        }
+        throw lastError ?: IllegalStateException(ACCOUNT_CHANGED_DURING_FETCH_MESSAGE)
     }
 
-    private suspend fun fetchUsageForToken(accessToken: String): ApiUsageStats {
-        val dto = apiDataSource.fetchAnthropicUsage(accessToken)
-        return AnthropicMapper.toUsageStats(dto)
+    private suspend fun fetchUsageForSession(session: AnthropicSession): ApiUsageStats {
+        val dto = apiDataSource.fetchAnthropicUsage(session.accessToken)
+        return AnthropicMapper.toUsageStats(dto).copy(accountContext = session.accountContext)
     }
 
     private fun isScopeRequirementFailure(error: Throwable): Boolean {
@@ -61,7 +68,9 @@ class AnthropicRepositoryImpl(
     }
 
     companion object {
+        const val ACCOUNT_CHANGED_DURING_FETCH_MESSAGE =
+            "A conta do Claude Code mudou durante a atualização. Aguarde o login terminar e atualize novamente."
         const val ANTHROPIC_REAUTH_GUIDANCE_MESSAGE =
-            "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada. Feche o app, reautentique no Claude Code e abra o monitor novamente."
+            "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada. Execute /logout e /login no Claude Code, conclua a autenticação e atualize novamente."
     }
 }

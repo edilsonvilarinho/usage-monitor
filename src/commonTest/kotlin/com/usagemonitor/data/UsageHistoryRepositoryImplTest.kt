@@ -10,6 +10,8 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -235,6 +237,55 @@ class UsageHistoryRepositoryImplTest {
         assertIs<UsageForecast.InsufficientData>(report.series.first().forecast)
     }
 
+    @Test
+    fun `account scoped report never mixes points from another workspace`() = kotlinx.coroutines.test.runTest {
+        val accountA = account("same-user", "workspace-a")
+        val accountB = account("same-user", "workspace-b")
+        val recordsByAccount = mapOf(
+            accountA.key to listOf(
+                record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 100, 1000),
+                record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 200, 1000),
+                record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 300, 1000)
+            ),
+            accountB.key to listOf(
+                record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 700, 1000),
+                record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 800, 1000),
+                record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 900, 1000)
+            )
+        )
+        val dataSource = object : UsageHistoryDataSource {
+            override suspend fun insertSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+            override suspend fun readSnapshots(source: ApiSource, since: Instant): List<UsageSnapshotRecord> {
+                return recordsByAccount.values.flatten()
+            }
+
+            override suspend fun readSnapshots(
+                source: ApiSource,
+                accountKey: UsageAccountKey?,
+                since: Instant
+            ): List<UsageSnapshotRecord> {
+                return recordsByAccount[accountKey].orEmpty()
+            }
+
+            override suspend fun readAccounts(source: ApiSource): List<UsageAccountContext> {
+                return listOf(accountA, accountB)
+            }
+        }
+        val repository = UsageHistoryRepositoryImpl(dataSource)
+
+        val report = repository.getHistoryReport(
+            ApiSource.CODEX,
+            accountA.key,
+            HistoryRange.LAST_24_HOURS,
+            now
+        )
+
+        assertEquals(accountA, report.accountContext)
+        assertEquals(listOf(100L, 200L, 300L), report.series.single().points.map { it.displayUsed })
+        assertEquals(200L, report.series.single().deltaDisplayUsed)
+    }
+
     private class FakeHistoryDataSource(
         private val records: List<UsageSnapshotRecord>
     ) : UsageHistoryDataSource {
@@ -291,6 +342,18 @@ class UsageHistoryRepositoryImplTest {
             rawTotal = total,
             periodEndAt = Instant.parse(periodEndAt),
             capturedAt = Instant.parse(capturedAt)
+        )
+    }
+
+    private fun account(userId: String, workspaceId: String): UsageAccountContext {
+        return UsageAccountContext(
+            key = UsageAccountKey(
+                source = ApiSource.CODEX,
+                providerAccountId = userId,
+                workspaceId = workspaceId
+            ),
+            email = "same@example.com",
+            workspaceName = workspaceId
         )
     }
 }

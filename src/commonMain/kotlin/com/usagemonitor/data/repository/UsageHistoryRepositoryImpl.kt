@@ -10,6 +10,8 @@ import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import kotlinx.datetime.Instant
@@ -22,12 +24,40 @@ class UsageHistoryRepositoryImpl(
         dataSource.insertSnapshot(stats, capturedAt)
     }
 
+    override suspend fun listAccounts(source: ApiSource): List<UsageAccountContext> {
+        return dataSource.readAccounts(source)
+    }
+
     override suspend fun getHistoryReport(
         source: ApiSource,
         range: HistoryRange,
         now: Instant
     ): ApiUsageHistoryReport {
         val records = dataSource.readSnapshots(source, range.windowStart(now))
+        return buildReport(source, range, records, accountContext = null)
+    }
+
+    override suspend fun getHistoryReport(
+        source: ApiSource,
+        accountKey: UsageAccountKey?,
+        range: HistoryRange,
+        now: Instant
+    ): ApiUsageHistoryReport {
+        val records = dataSource.readSnapshots(source, accountKey, range.windowStart(now))
+        val accountContext = if (accountKey == null) {
+            null
+        } else {
+            dataSource.readAccounts(source).firstOrNull { account -> account.key == accountKey }
+        }
+        return buildReport(source, range, records, accountContext)
+    }
+
+    private fun buildReport(
+        source: ApiSource,
+        range: HistoryRange,
+        records: List<UsageSnapshotRecord>,
+        accountContext: UsageAccountContext?
+    ): ApiUsageHistoryReport {
         val groupedSeries = records
             .groupBy { record -> HistorySeriesKey(record.quotaLabel, record.periodType) }
             .map { (key, groupRecords) -> buildSeries(key, groupRecords.sortedBy { it.capturedAt }, range) }
@@ -37,7 +67,8 @@ class UsageHistoryRepositoryImpl(
             source = source,
             range = range,
             lastUpdatedAt = records.maxOfOrNull { it.capturedAt },
-            series = groupedSeries
+            series = groupedSeries,
+            accountContext = accountContext
         )
     }
 

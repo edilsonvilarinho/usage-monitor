@@ -9,6 +9,9 @@ import com.usagemonitor.data.dto.CodexUsageWindowDto
 import com.usagemonitor.data.dto.CodexWeeklyUsageResponse
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.domain.entity.ApiUsageNotice
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -30,6 +33,7 @@ class CodexRepositoryImplTest {
         val result = repository.getUsage().getOrThrow()
 
         assertEquals(2, result.quotas.size)
+        assertEquals("codex@example.com", result.accountContext?.email)
         assertEquals(listOf("Codex atual", "Codex 7d"), result.quotas.map { it.label })
         assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
     }
@@ -77,12 +81,57 @@ class CodexRepositoryImplTest {
         assertEquals("five hour source failed", result.exceptionOrNull()?.message)
     }
 
+    @Test
+    fun `retries with new account when Codex credentials change during fetch`() = runTest {
+        val sessions = listOf(
+            session("token-a", "user-a", "workspace-a", "a@example.com"),
+            session("token-b", "user-b", "workspace-b", "b@example.com")
+        )
+        var sessionIndex = 0
+        var apiCalls = 0
+        val repository = CodexRepositoryImpl(
+            authDataSource = object : CodexAuthDataSource {
+                override suspend fun loadSession(): CodexSession {
+                    val session = sessions[sessionIndex]
+                    if (sessionIndex < sessions.lastIndex) {
+                        sessionIndex += 1
+                    }
+                    return session
+                }
+
+                override suspend fun isSessionCurrent(session: CodexSession): Boolean {
+                    return session.accountContext.key.providerAccountId == "user-b"
+                }
+            },
+            apiDataSource = object : FakeCodexDataSource() {
+                override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
+                    apiCalls += 1
+                    return sampleFiveHourResponse
+                }
+            }
+        )
+
+        val stats = repository.getUsage().getOrThrow()
+
+        assertEquals(2, apiCalls)
+        assertEquals("user-b", stats.accountContext?.key?.providerAccountId)
+        assertEquals("b@example.com", stats.accountContext?.email)
+    }
+
     private fun repositoryWith(dataSource: RemoteApiDataSource): CodexRepositoryImpl {
         return CodexRepositoryImpl(
             authDataSource = object : CodexAuthDataSource {
                 override suspend fun loadSession(): CodexSession = CodexSession(
                     accessToken = "token",
-                    capSid = "cap"
+                    capSid = "cap",
+                    accountContext = UsageAccountContext(
+                        key = UsageAccountKey(
+                            source = ApiSource.CODEX,
+                            providerAccountId = "user-a",
+                            workspaceId = "workspace-a"
+                        ),
+                        email = "codex@example.com"
+                    )
                 )
             },
             apiDataSource = dataSource
@@ -93,6 +142,26 @@ class CodexRepositoryImplTest {
         override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
             return sampleFiveHourResponse
         }
+    }
+
+    private fun session(
+        token: String,
+        userId: String,
+        workspaceId: String,
+        email: String
+    ): CodexSession {
+        return CodexSession(
+            accessToken = token,
+            capSid = "cap-$workspaceId",
+            accountContext = UsageAccountContext(
+                key = UsageAccountKey(
+                    source = ApiSource.CODEX,
+                    providerAccountId = userId,
+                    workspaceId = workspaceId
+                ),
+                email = email
+            )
+        )
     }
 
     private companion object {

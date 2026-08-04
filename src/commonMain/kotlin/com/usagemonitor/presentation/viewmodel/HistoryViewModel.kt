@@ -2,6 +2,9 @@ package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.requiresUsageAccount
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +29,7 @@ class HistoryViewModel(
 
     private val selectedSource = MutableStateFlow<ApiSource?>(null)
     private val selectedRange = MutableStateFlow(HistoryRange.LAST_24_HOURS)
+    private val selectedAccountsBySource = mutableMapOf<ApiSource, UsageAccountKey>()
 
     init {
         refresh()
@@ -62,6 +66,16 @@ class HistoryViewModel(
         refresh()
     }
 
+    fun selectAccount(account: UsageAccountContext) {
+        val source = selectedSource.value ?: return
+        if (account.key.source != source || selectedAccountsBySource[source] == account.key) {
+            return
+        }
+
+        selectedAccountsBySource[source] = account.key
+        refresh()
+    }
+
     fun onDestroy() {
         loadJob?.cancel()
         viewModelScope.cancel()
@@ -88,7 +102,17 @@ class HistoryViewModel(
             val resolvedSource = selectedSource.value?.takeIf { it in enabledSources }
                 ?: enabledSources.first()
             selectedSource.value = resolvedSource
-            val report = getUsageHistory(resolvedSource, selectedRange.value)
+            val availableAccounts = if (resolvedSource.requiresUsageAccount) {
+                getUsageHistory.listAccounts(resolvedSource)
+            } else {
+                emptyList()
+            }
+            val selectedAccount = resolveSelectedAccount(resolvedSource, availableAccounts)
+            val report = getUsageHistory(
+                source = resolvedSource,
+                range = selectedRange.value,
+                accountKey = selectedAccount?.key
+            )
 
             publishIfLatest(
                 requestId,
@@ -96,7 +120,9 @@ class HistoryViewModel(
                     availableSources = enabledSources,
                     selectedSource = resolvedSource,
                     selectedRange = selectedRange.value,
-                    report = report
+                    report = report,
+                    availableAccounts = availableAccounts,
+                    selectedAccount = selectedAccount
                 )
             )
         } catch (error: Throwable) {
@@ -116,5 +142,24 @@ class HistoryViewModel(
         if (requestId == loadRequestId) {
             _uiState.value = state
         }
+    }
+
+    private fun resolveSelectedAccount(
+        source: ApiSource,
+        availableAccounts: List<UsageAccountContext>
+    ): UsageAccountContext? {
+        val selectedKey = selectedAccountsBySource[source]
+        val selected = availableAccounts.firstOrNull { account -> account.key == selectedKey }
+        if (selected != null) {
+            return selected
+        }
+
+        val latestAccount = availableAccounts.firstOrNull()
+        if (latestAccount != null) {
+            selectedAccountsBySource[source] = latestAccount.key
+        } else {
+            selectedAccountsBySource.remove(source)
+        }
+        return latestAccount
     }
 }

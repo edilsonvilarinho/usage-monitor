@@ -96,6 +96,7 @@ internal fun ResponsiveDashboardCardGrid(
                             source = stats.source,
                             apiName = stats.apiName,
                             quotas = stats.quotas,
+                            accountContext = stats.accountContext,
                             notices = stats.notices,
                             showUsageDetails = stats.source != ApiSource.ANTHROPIC,
                             isRefreshing = stats.source in refreshingSources,
