@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.UsageTargetKey
 
 /**
  * Representa todos os estados possíveis da UI do Dashboard.
@@ -42,12 +43,25 @@ sealed interface UiState {
 }
 
 data class UiApiError(
-    val source: ApiSource,
+    val target: UsageTargetKey,
     val message: String,
-    val rawMessage: String = message
+    val rawMessage: String = message,
+    val targetLabel: String? = null
 ) {
+    constructor(
+        source: ApiSource,
+        message: String,
+        rawMessage: String = message
+    ) : this(UsageTargetKey.forSource(source), message, rawMessage)
+
+    val source: ApiSource
+        get() = target.source
+
     val formattedMessage: String
-        get() = "${sourceLabel(source)}: $message"
+        get() {
+            val label = targetLabel?.takeIf { it.isNotBlank() } ?: sourceLabel(source)
+            return "$label: $message"
+        }
 
     val isAnthropicCredentialIssue: Boolean
         get() = source == ApiSource.ANTHROPIC && isAnthropicCredentialMessage(message)

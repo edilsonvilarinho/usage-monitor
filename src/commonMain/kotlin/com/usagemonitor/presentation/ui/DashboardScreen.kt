@@ -42,6 +42,8 @@ import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.FooterBar
@@ -52,29 +54,26 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
-import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     appVersion: String,
     language: AppLanguage,
-    enabledApis: StateFlow<Set<ApiSource>>,
-    cardOrder: List<ApiSource>,
-    minimizedCards: Set<ApiSource>,
-    onMoveCardToIndex: (ApiSource, Int) -> Unit,
-    onToggleCardMinimized: (ApiSource) -> Unit,
-    onOpenHistory: (ApiSource) -> Unit,
+    cardOrder: List<UsageTargetKey>,
+    minimizedCards: Set<UsageTargetKey>,
+    onMoveCardToIndex: (UsageTargetKey, Int) -> Unit,
+    onToggleCardMinimized: (UsageTargetKey) -> Unit,
+    onOpenHistory: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
-    val refreshingSources by viewModel.refreshingSources.collectAsState()
+    val refreshingTargets by viewModel.refreshingTargets.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
-    val enabledApisState by enabledApis.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(toastMessage) {
@@ -155,12 +154,11 @@ fun DashboardScreen(
                                 is UiState.Success -> SuccessContent(
                                     apiStatsList = state.data,
                                     partialErrors = state.errors,
-                                    refreshingSources = refreshingSources,
-                                    enabledApis = enabledApisState,
+                                    refreshingTargets = refreshingTargets,
                                     cardOrder = cardOrder,
                                     minimizedCards = minimizedCards,
                                     language = language,
-                                    onRefreshCard = { source -> viewModel.refresh(source) },
+                                    onRefreshCard = { target -> viewModel.refresh(target) },
                                     onMoveCardToIndex = onMoveCardToIndex,
                                     onToggleCardMinimized = onToggleCardMinimized,
                                     onOpenHistoryCard = onOpenHistory,
@@ -309,23 +307,21 @@ private fun ErrorContent(
 private fun SuccessContent(
     apiStatsList: List<ApiUsageStats>,
     partialErrors: List<UiApiError>,
-    refreshingSources: Set<ApiSource>,
-    enabledApis: Set<ApiSource>,
-    cardOrder: List<ApiSource>,
-    minimizedCards: Set<ApiSource>,
+    refreshingTargets: Set<UsageTargetKey>,
+    cardOrder: List<UsageTargetKey>,
+    minimizedCards: Set<UsageTargetKey>,
     language: AppLanguage,
-    onRefreshCard: (ApiSource) -> Unit,
-    onMoveCardToIndex: (ApiSource, Int) -> Unit,
-    onToggleCardMinimized: (ApiSource) -> Unit,
-    onOpenHistoryCard: (ApiSource) -> Unit,
+    onRefreshCard: (UsageTargetKey) -> Unit,
+    onMoveCardToIndex: (UsageTargetKey, Int) -> Unit,
+    onToggleCardMinimized: (UsageTargetKey) -> Unit,
+    onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onRetryAnthropic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val visibleItems = apiStatsList.filter { stats -> stats.source in enabledApis }
-    val itemBySource = visibleItems.associateBy { stats -> stats.source }
-    val orderedSources = cardOrder.toSet()
-    val items = cardOrder.mapNotNull(itemBySource::get) +
-        visibleItems.filter { stats -> stats.source !in orderedSources }
+    val itemByTarget = apiStatsList.associateBy { stats -> stats.targetKey }
+    val orderedTargets = cardOrder.toSet()
+    val items = cardOrder.mapNotNull(itemByTarget::get) +
+        apiStatsList.filter { stats -> stats.targetKey !in orderedTargets }
     val warnings = partialErrors.mapNotNull { error -> warningFor(error = error, language = language) }
     val genericErrors = partialErrors.filterNot { error ->
         error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue
@@ -378,7 +374,7 @@ private fun SuccessContent(
 
             ResponsiveDashboardCardGrid(
                 items = items,
-                refreshingSources = refreshingSources,
+                refreshingTargets = refreshingTargets,
                 minimizedCards = minimizedCards,
                 language = language,
                 onRefreshCard = onRefreshCard,

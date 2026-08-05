@@ -7,15 +7,20 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -30,6 +35,19 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
 
+enum class AnthropicProfileUiStatus { READY, INCOMPLETE, INVALID, DUPLICATE }
+
+data class AnthropicProfileUiModel(
+    val id: String,
+    val label: String,
+    val path: String,
+    val enabled: Boolean,
+    val removable: Boolean,
+    val identityLabel: String?,
+    val status: AnthropicProfileUiStatus,
+    val detail: String? = null
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsDialogContent(
@@ -41,6 +59,12 @@ fun SettingsDialogContent(
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onApiToggle: (ApiSource, Boolean) -> Unit,
+    anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
+    onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
+    onAnthropicProfileRename: (String, String) -> Unit = { _, _ -> },
+    onAddAnthropicProfile: () -> Unit = {},
+    onRemoveAnthropicProfile: (String) -> Unit = {},
+    onRescanAnthropicProfiles: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -112,7 +136,118 @@ fun SettingsDialogContent(
                 }
             }
 
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (currentLanguage == AppLanguage.PT) "Contas Anthropic" else "Anthropic accounts",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onRescanAnthropicProfiles) {
+                        Text(if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan")
+                    }
+                    Button(onClick = onAddAnthropicProfile) {
+                        Text(if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add")
+                    }
+                }
+
+                if (anthropicProfiles.isEmpty()) {
+                    Text(
+                        text = if (currentLanguage == AppLanguage.PT) {
+                            "Nenhum perfil Anthropic detectado."
+                        } else {
+                            "No Anthropic profile detected."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    anthropicProfiles.forEach { profile ->
+                        AnthropicProfileRow(
+                            profile = profile,
+                            language = currentLanguage,
+                            onToggle = onAnthropicProfileToggle,
+                            onRename = onAnthropicProfileRename,
+                            onRemove = onRemoveAnthropicProfile
+                        )
+                    }
+                }
+            }
+
             HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+private fun AnthropicProfileRow(
+    profile: AnthropicProfileUiModel,
+    language: AppLanguage,
+    onToggle: (String, Boolean) -> Unit,
+    onRename: (String, String) -> Unit,
+    onRemove: (String) -> Unit
+) {
+    val statusText = when (profile.status) {
+        AnthropicProfileUiStatus.READY -> if (language == AppLanguage.PT) "Pronto" else "Ready"
+        AnthropicProfileUiStatus.INCOMPLETE -> if (language == AppLanguage.PT) "Incompleto" else "Incomplete"
+        AnthropicProfileUiStatus.INVALID -> if (language == AppLanguage.PT) "Inválido" else "Invalid"
+        AnthropicProfileUiStatus.DUPLICATE -> if (language == AppLanguage.PT) "Conta duplicada" else "Duplicate account"
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = profile.label,
+                    onValueChange = { value -> onRename(profile.id, value) },
+                    singleLine = true,
+                    label = { Text(if (language == AppLanguage.PT) "Apelido" else "Label") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = profile.enabled,
+                    onCheckedChange = { checked -> onToggle(profile.id, checked) }
+                )
+            }
+            Text(
+                text = profile.path,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val identity = profile.identityLabel
+            if (identity != null) {
+                Text(
+                    text = identity,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (profile.status == AnthropicProfileUiStatus.READY) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                }
+            )
+            if (profile.removable) {
+                TextButton(onClick = { onRemove(profile.id) }) {
+                    Text(if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor")
+                }
+            }
         }
     }
 }

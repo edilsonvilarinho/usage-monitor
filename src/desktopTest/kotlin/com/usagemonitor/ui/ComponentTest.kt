@@ -37,6 +37,8 @@ import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -543,12 +545,11 @@ class ComponentTest {
                     viewModel = viewModel,
                     appVersion = "7.0.0",
                     language = AppLanguage.PT,
-                    enabledApis = enabledApis,
                     cardOrder = emptyList(),
                     minimizedCards = emptySet(),
                     onMoveCardToIndex = { _, _ -> },
                     onToggleCardMinimized = {},
-                    onOpenHistory = {},
+                    onOpenHistory = { _, _ -> },
                     onOpenSettings = { opened = true },
                     countdownUpdatesEnabled = false
                 )
@@ -579,12 +580,11 @@ class ComponentTest {
                     viewModel = viewModel,
                     appVersion = "7.0.0",
                     language = AppLanguage.PT,
-                    enabledApis = enabledApis,
                     cardOrder = emptyList(),
                     minimizedCards = emptySet(),
                     onMoveCardToIndex = { _, _ -> },
                     onToggleCardMinimized = {},
-                    onOpenHistory = {},
+                    onOpenHistory = { _, _ -> },
                     onOpenSettings = {},
                     countdownUpdatesEnabled = false
                 )
@@ -618,12 +618,11 @@ class ComponentTest {
                     viewModel = viewModel,
                     appVersion = "7.0.0",
                     language = AppLanguage.PT,
-                    enabledApis = enabledApis,
                     cardOrder = emptyList(),
                     minimizedCards = emptySet(),
                     onMoveCardToIndex = { _, _ -> },
                     onToggleCardMinimized = {},
-                    onOpenHistory = {},
+                    onOpenHistory = { _, _ -> },
                     onOpenSettings = {},
                     countdownUpdatesEnabled = false
                 )
@@ -656,7 +655,18 @@ class ComponentTest {
                     onThemeToggle = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
+                    onApiToggle = { _, _ -> },
+                    anthropicProfiles = listOf(
+                        AnthropicProfileUiModel(
+                            id = "default",
+                            label = "Personal",
+                            path = "C:\\Users\\test\\.claude",
+                            enabled = true,
+                            removable = false,
+                            identityLabel = "personal@example.com",
+                            status = AnthropicProfileUiStatus.READY
+                        )
+                    )
                 )
             }
         }
@@ -665,6 +675,8 @@ class ComponentTest {
         onNodeWithText("System Startup").assertIsDisplayed()
         onNodeWithText("Language").assertIsDisplayed()
         onNodeWithText("Monitored APIs").assertIsDisplayed()
+        onNodeWithText("Anthropic accounts").assertIsDisplayed()
+        onNodeWithText("personal@example.com").assertIsDisplayed()
         onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
         onNodeWithText("Kilo Free").assertIsDisplayed()
         onAllNodesWithText("Close").assertCountEquals(0)

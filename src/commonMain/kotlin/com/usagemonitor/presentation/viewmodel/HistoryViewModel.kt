@@ -43,8 +43,11 @@ class HistoryViewModel(
         }
     }
 
-    fun openForSource(source: ApiSource) {
+    fun openForSource(source: ApiSource, accountKey: UsageAccountKey? = null) {
         selectedSource.value = source
+        if (accountKey != null && accountKey.source == source) {
+            selectedAccountsBySource[source] = accountKey
+        }
         refresh()
     }
 

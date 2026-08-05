@@ -18,7 +18,10 @@ import com.usagemonitor.domain.repository.AnthropicRepository
 class GetAnthropicUsageUseCase(
     private val repository: AnthropicRepository
 ) {
-    suspend operator fun invoke(): Result<ApiUsageStats> {
-        return repository.getUsage()
+    suspend operator fun invoke(
+        profile: com.usagemonitor.domain.entity.AnthropicProfileRef =
+            com.usagemonitor.domain.entity.AnthropicProfileRef.DEFAULT
+    ): Result<ApiUsageStats> {
+        return repository.getUsage(profile)
     }
 }

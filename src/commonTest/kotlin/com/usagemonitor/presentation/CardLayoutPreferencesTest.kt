@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import androidx.compose.ui.geometry.Offset
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
@@ -11,140 +12,69 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class CardLayoutPreferencesTest {
+    private val codex = UsageTargetKey.forSource(ApiSource.CODEX)
+    private val anthropicA = UsageTargetKey(ApiSource.ANTHROPIC, "profile-a")
+    private val anthropicB = UsageTargetKey(ApiSource.ANTHROPIC, "profile-b")
+    private val minimax = UsageTargetKey.forSource(ApiSource.MINIMAX)
 
     @Test
-    fun `normalizeCardOrder removes duplicates and appends missing APIs`() {
+    fun `normalizeCardOrder removes duplicates and appends missing targets`() {
         val normalized = normalizeCardOrder(
-            listOf(
-                ApiSource.CODEX,
-                ApiSource.ANTHROPIC,
-                ApiSource.CODEX
-            )
+            storedOrder = listOf(codex, anthropicA, codex),
+            availableTargets = listOf(anthropicA, anthropicB, minimax, codex)
         )
 
-        assertEquals(
-            listOf(
-                ApiSource.CODEX,
-                ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX,
-                ApiSource.DEEPSEEK,
-                ApiSource.OPENCODE,
-                ApiSource.KILO
-            ),
-            normalized
-        )
+        assertEquals(listOf(codex, anthropicA, anthropicB, minimax), normalized)
     }
 
     @Test
     fun `reorderVisibleCards moves visible cards without shifting hidden positions`() {
         val reordered = reorderVisibleCards(
-            currentOrder = listOf(
-                ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX,
-                ApiSource.CODEX
-            ),
-            visibleSources = setOf(ApiSource.ANTHROPIC, ApiSource.CODEX),
-            source = ApiSource.CODEX,
+            currentOrder = listOf(anthropicA, minimax, codex),
+            visibleTargets = setOf(anthropicA, codex),
+            target = codex,
             offset = -1
         )
 
-        assertEquals(
-            listOf(
-                ApiSource.CODEX,
-                ApiSource.MINIMAX,
-                ApiSource.ANTHROPIC,
-                ApiSource.DEEPSEEK,
-                ApiSource.OPENCODE,
-                ApiSource.KILO
-            ),
-            reordered
-        )
+        assertEquals(listOf(codex, minimax, anthropicA), reordered)
     }
 
     @Test
-    fun `reorderVisibleCards ignores sources that are not visible`() {
+    fun `reorderVisibleCards ignores targets that are not visible`() {
+        val order = listOf(anthropicA, minimax, codex)
         val reordered = reorderVisibleCards(
-            currentOrder = listOf(
-                ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX,
-                ApiSource.CODEX
-            ),
-            visibleSources = setOf(ApiSource.ANTHROPIC, ApiSource.CODEX),
-            source = ApiSource.MINIMAX,
+            currentOrder = order,
+            visibleTargets = setOf(anthropicA, codex),
+            target = minimax,
             offset = 1
         )
 
-        assertEquals(
-            listOf(
-                ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX,
-                ApiSource.CODEX,
-                ApiSource.DEEPSEEK,
-                ApiSource.OPENCODE,
-                ApiSource.KILO
-            ),
-            reordered
-        )
+        assertEquals(order, reordered)
     }
 
     @Test
-    fun `moveVisibleCardToIndex inserts dragged card at dropped slot`() {
+    fun `moveVisibleCardToIndex distinguishes two Anthropic profiles`() {
         val reordered = moveVisibleCardToIndex(
-            currentOrder = listOf(
-                ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX,
-                ApiSource.CODEX
-            ),
-            visibleSources = setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX, ApiSource.CODEX),
-            source = ApiSource.ANTHROPIC,
+            currentOrder = listOf(anthropicA, anthropicB, codex),
+            visibleTargets = setOf(anthropicA, anthropicB, codex),
+            target = anthropicA,
             targetIndex = 2
         )
 
-        assertEquals(
-            listOf(
-                ApiSource.MINIMAX,
-                ApiSource.CODEX,
-                ApiSource.ANTHROPIC,
-                ApiSource.DEEPSEEK,
-                ApiSource.OPENCODE,
-                ApiSource.KILO
-            ),
-            reordered
-        )
+        assertEquals(listOf(anthropicB, codex, anthropicA), reordered)
     }
 
     @Test
-    fun `resolveDropTargetIndex maps a top right drop to the second slot`() {
+    fun `resolveDropTargetIndex maps top right drop to second slot`() {
+        val bounds = mapOf(
+            codex to CardGridSlot(codex, 0f, 0f, 100, 80),
+            anthropicA to CardGridSlot(anthropicA, 120f, 0f, 100, 80),
+            minimax to CardGridSlot(minimax, 0f, 96f, 100, 80)
+        )
         val targetIndex = resolveDropTargetIndex(
-            orderedSources = listOf(
-                ApiSource.CODEX,
-                ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX
-            ),
-            boundsBySource = mapOf(
-                ApiSource.CODEX to CardGridSlot(
-                    source = ApiSource.CODEX,
-                    left = 0f,
-                    top = 0f,
-                    width = 100,
-                    height = 80
-                ),
-                ApiSource.ANTHROPIC to CardGridSlot(
-                    source = ApiSource.ANTHROPIC,
-                    left = 120f,
-                    top = 0f,
-                    width = 100,
-                    height = 80
-                ),
-                ApiSource.MINIMAX to CardGridSlot(
-                    source = ApiSource.MINIMAX,
-                    left = 0f,
-                    top = 96f,
-                    width = 100,
-                    height = 80
-                )
-            ),
-            draggedSource = ApiSource.MINIMAX,
+            orderedTargets = listOf(codex, anthropicA, minimax),
+            boundsByTarget = bounds,
+            draggedTarget = minimax,
             draggedCenter = Offset(170f, 40f)
         )
 
@@ -152,37 +82,16 @@ class CardLayoutPreferencesTest {
     }
 
     @Test
-    fun `resolveDropTargetIndex maps a top left drop to the first slot`() {
+    fun `resolveDropTargetIndex maps top left drop to first slot`() {
+        val bounds = mapOf(
+            codex to CardGridSlot(codex, 0f, 0f, 100, 80),
+            anthropicA to CardGridSlot(anthropicA, 120f, 0f, 100, 80),
+            minimax to CardGridSlot(minimax, 0f, 96f, 100, 80)
+        )
         val targetIndex = resolveDropTargetIndex(
-            orderedSources = listOf(
-                ApiSource.CODEX,
-                ApiSource.ANTHROPIC,
-                ApiSource.MINIMAX
-            ),
-            boundsBySource = mapOf(
-                ApiSource.CODEX to CardGridSlot(
-                    source = ApiSource.CODEX,
-                    left = 0f,
-                    top = 0f,
-                    width = 100,
-                    height = 80
-                ),
-                ApiSource.ANTHROPIC to CardGridSlot(
-                    source = ApiSource.ANTHROPIC,
-                    left = 120f,
-                    top = 0f,
-                    width = 100,
-                    height = 80
-                ),
-                ApiSource.MINIMAX to CardGridSlot(
-                    source = ApiSource.MINIMAX,
-                    left = 0f,
-                    top = 96f,
-                    width = 100,
-                    height = 80
-                )
-            ),
-            draggedSource = ApiSource.MINIMAX,
+            orderedTargets = listOf(codex, anthropicA, minimax),
+            boundsByTarget = bounds,
+            draggedTarget = minimax,
             draggedCenter = Offset(40f, 40f)
         )
 

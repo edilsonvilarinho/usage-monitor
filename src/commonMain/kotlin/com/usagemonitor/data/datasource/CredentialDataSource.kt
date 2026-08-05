@@ -16,7 +16,16 @@ interface CredentialDataSource {
      */
     suspend fun loadAnthropicSession(): AnthropicSession
 
+    suspend fun loadAnthropicSession(
+        profile: com.usagemonitor.domain.entity.AnthropicProfileRef
+    ): AnthropicSession = loadAnthropicSession()
+
     suspend fun isAnthropicSessionCurrent(session: AnthropicSession): Boolean = true
+
+    suspend fun isAnthropicSessionCurrent(
+        profile: com.usagemonitor.domain.entity.AnthropicProfileRef,
+        session: AnthropicSession
+    ): Boolean = isAnthropicSessionCurrent(session)
 }
 
 data class AnthropicSession(

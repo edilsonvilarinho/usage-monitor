@@ -2,6 +2,8 @@ package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.KiloRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
@@ -65,10 +67,12 @@ class DashboardViewModel(
     private val currentAppVersion: String = "0.0.0",
     private val clock: Clock = Clock.System,
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
+    private val anthropicProfiles: StateFlow<List<AnthropicProfileRef>> =
+        MutableStateFlow(listOf(AnthropicProfileRef.DEFAULT)),
     private val config: DashboardViewModelConfig = DashboardViewModelConfig()
 ) {
     private data class PendingFetchRequest(
-        val targetSources: Set<ApiSource>,
+        val targets: Set<UsageTargetKey>,
         val preserveDataOnFailure: Boolean
     )
 
@@ -78,6 +82,8 @@ class DashboardViewModel(
     private val _nextRefreshAt = MutableStateFlow(clock.now() + config.pollInterval)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
+    private val _refreshingTargets = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
+    val refreshingTargets: StateFlow<Set<UsageTargetKey>> = _refreshingTargets.asStateFlow()
     private val _refreshingSources = MutableStateFlow<Set<ApiSource>>(emptySet())
     val refreshingSources: StateFlow<Set<ApiSource>> = _refreshingSources.asStateFlow()
 
@@ -92,8 +98,8 @@ class DashboardViewModel(
     private val updateMutex = Mutex()
     private val fetchMutex = Mutex()
     private val pendingFetchMutex = Mutex()
-    private val cachedStatsBySource = mutableMapOf<ApiSource, ApiUsageStats>()
-    private val cachedErrorsBySource = mutableMapOf<ApiSource, UiApiError>()
+    private val cachedStatsByTarget = mutableMapOf<UsageTargetKey, ApiUsageStats>()
+    private val cachedErrorsByTarget = mutableMapOf<UsageTargetKey, UiApiError>()
     private val sourceFetchSemaphore = Semaphore(config.maxConcurrentSourceFetches.coerceAtLeast(1))
     private val pollWakeUpSignal = Channel<Unit>(capacity = Channel.CONFLATED)
     private val initialFetchCancelled = AtomicBoolean(false)
@@ -108,7 +114,7 @@ class DashboardViewModel(
                 if (initialFetchCancelled.get()) {
                     return@launch
                 }
-                requestFetch(targetSources = enabledApis.value)
+                requestFetch(targets = enabledTargets())
             }
         }
         if (config.autoStartUpdateChecks) {
@@ -146,7 +152,7 @@ class DashboardViewModel(
                     isAppVisible.first { it }
                 }
                 viewModelScope.launch {
-                    requestFetch(targetSources = enabledApis.value)
+                    requestFetch(targets = enabledTargets())
                 }
                 scheduleNextRefresh()
             }
@@ -154,11 +160,11 @@ class DashboardViewModel(
     }
 
     private suspend fun requestFetch(
-        targetSources: Set<ApiSource>,
+        targets: Set<UsageTargetKey>,
         preserveDataOnFailure: Boolean = false
     ) {
         if (!fetchMutex.tryLock()) {
-            enqueuePendingFetch(targetSources, preserveDataOnFailure)
+            enqueuePendingFetch(targets, preserveDataOnFailure)
             fetchMutex.withLock {
                 drainPendingFetchQueue() ?: return
             }
@@ -166,7 +172,7 @@ class DashboardViewModel(
         }
 
         try {
-            drainFetchRequests(PendingFetchRequest(targetSources, preserveDataOnFailure))
+            drainFetchRequests(PendingFetchRequest(targets, preserveDataOnFailure))
         } finally {
             fetchMutex.unlock()
         }
@@ -177,7 +183,7 @@ class DashboardViewModel(
 
         while (currentRequest != null) {
             performFetch(
-                targetSources = currentRequest.targetSources,
+                targets = currentRequest.targets,
                 preserveDataOnFailure = currentRequest.preserveDataOnFailure
             )
             currentRequest = dequeuePendingFetch()
@@ -191,20 +197,20 @@ class DashboardViewModel(
     }
 
     private suspend fun enqueuePendingFetch(
-        targetSources: Set<ApiSource>,
+        targets: Set<UsageTargetKey>,
         preserveDataOnFailure: Boolean
     ) {
         pendingFetchMutex.withLock {
             val existingRequest = pendingFetchRequest
             pendingFetchRequest = when {
-                existingRequest == null -> PendingFetchRequest(targetSources, preserveDataOnFailure)
+                existingRequest == null -> PendingFetchRequest(targets, preserveDataOnFailure)
                 !existingRequest.preserveDataOnFailure || !preserveDataOnFailure -> {
-                    PendingFetchRequest(enabledApis.value, preserveDataOnFailure = false)
+                    PendingFetchRequest(enabledTargets(), preserveDataOnFailure = false)
                 }
 
                 else -> {
                     PendingFetchRequest(
-                        targetSources = existingRequest.targetSources + targetSources,
+                        targets = existingRequest.targets + targets,
                         preserveDataOnFailure = true
                     )
                 }
@@ -221,34 +227,34 @@ class DashboardViewModel(
     }
 
     private suspend fun performFetch(
-        targetSources: Set<ApiSource>,
+        targets: Set<UsageTargetKey>,
         preserveDataOnFailure: Boolean
     ) {
-        val enabled = enabledApis.value
-        val effectiveSources = targetSources.filterTo(linkedSetOf()) { source -> source in enabled }
+        val enabled = enabledTargets()
+        val effectiveTargets = targets.filterTo(linkedSetOf()) { target -> target in enabled }
         val snapshotCapturedAt = clock.now()
 
-        if (effectiveSources.isEmpty()) {
+        if (effectiveTargets.isEmpty()) {
             stateMutex.withLock {
-                pruneDisabledSources(enabled)
+                pruneDisabledTargets(enabled)
                 publishUiState(enabled)
             }
             return
         }
 
-        markRefreshing(effectiveSources, refreshing = true)
+        markRefreshing(effectiveTargets, refreshing = true)
 
-        val statsUpdates = mutableMapOf<ApiSource, ApiUsageStats>()
-        val errorUpdates = mutableMapOf<ApiSource, UiApiError?>()
+        val statsUpdates = mutableMapOf<UsageTargetKey, ApiUsageStats>()
+        val errorUpdates = mutableMapOf<UsageTargetKey, UiApiError?>()
 
         try {
             val fetchResults = coroutineScope {
-                effectiveSources.map { source ->
+                effectiveTargets.map { target ->
                     async {
                         sourceFetchSemaphore.withPermit {
-                            source to runCatching {
+                            target to runCatching {
                                 withTimeout(config.perSourceTimeout) {
-                                    fetchSource(source).getOrThrow()
+                                    fetchTarget(target).getOrThrow()
                                 }
                             }
                         }
@@ -256,47 +262,47 @@ class DashboardViewModel(
                 }.awaitAll()
             }
 
-            fetchResults.forEach { (source, result) ->
+            fetchResults.forEach { (target, result) ->
                 result
                     .onSuccess { stats ->
-                        statsUpdates[source] = stats
-                        errorUpdates[source] = null
+                        statsUpdates[target] = stats
+                        errorUpdates[target] = null
                         persistSnapshot(stats, snapshotCapturedAt)
                     }
                     .onFailure { error ->
-                        errorUpdates[source] = handleSourceFailure(source, error)
+                        errorUpdates[target] = handleTargetFailure(target, error)
                     }
             }
 
             stateMutex.withLock {
-                val latestEnabledSources = enabledApis.value
-                pruneDisabledSources(latestEnabledSources)
+                val latestEnabledTargets = enabledTargets()
+                pruneDisabledTargets(latestEnabledTargets)
 
-                effectiveSources.forEach { source ->
-                    val stats = statsUpdates[source]
+                effectiveTargets.forEach { target ->
+                    val stats = statsUpdates[target]
 
                     if (stats != null) {
-                        cachedStatsBySource[source] = stats
-                        cachedErrorsBySource.remove(source)
+                        cachedStatsByTarget[target] = stats
+                        cachedErrorsByTarget.remove(target)
                     } else {
-                        val shouldRemoveData = !preserveDataOnFailure || source !in cachedStatsBySource
+                        val shouldRemoveData = !preserveDataOnFailure || target !in cachedStatsByTarget
                         if (shouldRemoveData) {
-                            cachedStatsBySource.remove(source)
+                            cachedStatsByTarget.remove(target)
                         }
 
-                        val errorMessage = errorUpdates[source]
+                        val errorMessage = errorUpdates[target]
                         if (errorMessage == null) {
-                            cachedErrorsBySource.remove(source)
+                            cachedErrorsByTarget.remove(target)
                         } else {
-                            cachedErrorsBySource[source] = errorMessage
+                            cachedErrorsByTarget[target] = errorMessage
                         }
                     }
                 }
 
-                publishUiState(latestEnabledSources)
+                publishUiState(latestEnabledTargets)
             }
         } finally {
-            markRefreshing(effectiveSources, refreshing = false)
+            markRefreshing(effectiveTargets, refreshing = false)
         }
     }
 
@@ -307,7 +313,7 @@ class DashboardViewModel(
     fun refresh() {
         scheduleNextRefresh()
         viewModelScope.launch {
-            requestFetch(targetSources = enabledApis.value)
+            requestFetch(targets = enabledTargets())
             checkForUpdate()
         }
     }
@@ -320,9 +326,19 @@ class DashboardViewModel(
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(
-                targetSources = setOf(source),
+                targets = enabledTargets().filterTo(linkedSetOf()) { target -> target.source == source },
                 preserveDataOnFailure = true
             )
+        }
+    }
+
+    fun refresh(target: UsageTargetKey) {
+        if (target !in enabledTargets()) {
+            return
+        }
+        scheduleNextRefresh()
+        viewModelScope.launch {
+            requestFetch(targets = setOf(target), preserveDataOnFailure = true)
         }
     }
 
@@ -350,9 +366,13 @@ class DashboardViewModel(
         viewModelScope.cancel()
     }
 
-    private suspend fun fetchSource(source: ApiSource): Result<ApiUsageStats> {
-        return when (source) {
-            ApiSource.ANTHROPIC -> getAnthropicUsage()
+    private suspend fun fetchTarget(target: UsageTargetKey): Result<ApiUsageStats> {
+        return when (target.source) {
+            ApiSource.ANTHROPIC -> {
+                val profile = anthropicProfiles.value.firstOrNull { it.id == target.profileId }
+                    ?: return Result.failure(IllegalStateException("Perfil Anthropic não configurado."))
+                getAnthropicUsage(profile)
+            }
             ApiSource.MINIMAX -> getMiniMaxUsage()
             ApiSource.CODEX -> getCodexUsage()
             ApiSource.DEEPSEEK -> getDeepSeekUsage()
@@ -361,16 +381,22 @@ class DashboardViewModel(
         }
     }
 
-    private fun handleSourceFailure(source: ApiSource, error: Throwable): UiApiError? {
+    private fun handleTargetFailure(target: UsageTargetKey, error: Throwable): UiApiError? {
+        val source = target.source
+        val targetLabel = if (source == ApiSource.ANTHROPIC) {
+            anthropicProfiles.value.firstOrNull { it.id == target.profileId }?.let { "Anthropic — ${it.label}" }
+        } else {
+            null
+        }
         val rawMessage = error.message ?: error::class.simpleName ?: "erro desconhecido"
         val message = sanitizeUiErrorMessage(source, rawMessage)
 
         if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
             _toastMessage.value = DashboardToast.RateLimit(source)
-            return UiApiError(source = source, message = message, rawMessage = rawMessage)
+            return UiApiError(target = target, message = message, rawMessage = rawMessage, targetLabel = targetLabel)
         }
 
-        val uiError = UiApiError(source = source, message = message, rawMessage = rawMessage)
+        val uiError = UiApiError(target = target, message = message, rawMessage = rawMessage, targetLabel = targetLabel)
 
         if (uiError.isServiceUnavailableIssue) {
             return uiError
@@ -386,19 +412,19 @@ class DashboardViewModel(
         return uiError
     }
 
-    private fun publishUiState(enabledSources: Set<ApiSource>) {
-        if (enabledSources.isEmpty()) {
+    private fun publishUiState(enabledTargets: Set<UsageTargetKey>) {
+        if (enabledTargets.isEmpty()) {
             _uiState.value = UiState.NoApisEnabled
             return
         }
 
-        val stats = enabledSources
-            .sortedBy { source -> source.ordinal }
-            .mapNotNull { source -> cachedStatsBySource[source] }
+        val stats = enabledTargets
+            .sortedWith(compareBy<UsageTargetKey> { it.source.ordinal }.thenBy { it.profileId.orEmpty() })
+            .mapNotNull { target -> cachedStatsByTarget[target] }
 
-        val errors = enabledSources
-            .sortedBy { source -> source.ordinal }
-            .mapNotNull { source -> cachedErrorsBySource[source] }
+        val errors = enabledTargets
+            .sortedWith(compareBy<UsageTargetKey> { it.source.ordinal }.thenBy { it.profileId.orEmpty() })
+            .mapNotNull { target -> cachedErrorsByTarget[target] }
 
         _uiState.value = if (stats.isNotEmpty()) {
             UiState.Success(stats, errors)
@@ -407,19 +433,35 @@ class DashboardViewModel(
         }
     }
 
-    private fun pruneDisabledSources(enabledSources: Set<ApiSource>) {
-        cachedStatsBySource.keys.removeAll { source -> source !in enabledSources }
-        cachedErrorsBySource.keys.removeAll { source -> source !in enabledSources }
+    private fun pruneDisabledTargets(enabledTargets: Set<UsageTargetKey>) {
+        cachedStatsByTarget.keys.removeAll { target -> target !in enabledTargets }
+        cachedErrorsByTarget.keys.removeAll { target -> target !in enabledTargets }
     }
 
-    private fun markRefreshing(sources: Set<ApiSource>, refreshing: Boolean) {
-        _refreshingSources.update { current ->
+    private fun markRefreshing(targets: Set<UsageTargetKey>, refreshing: Boolean) {
+        _refreshingTargets.update { current ->
             if (refreshing) {
-                current + sources
+                current + targets
             } else {
-                current - sources
+                current - targets
             }
         }
+        _refreshingSources.value = _refreshingTargets.value.mapTo(linkedSetOf()) { target -> target.source }
+    }
+
+    private fun enabledTargets(): Set<UsageTargetKey> {
+        val enabledSources = enabledApis.value
+        val targets = linkedSetOf<UsageTargetKey>()
+        enabledSources.sortedBy { it.ordinal }.forEach { source ->
+            if (source == ApiSource.ANTHROPIC) {
+                anthropicProfiles.value.forEach { profile ->
+                    targets += UsageTargetKey(ApiSource.ANTHROPIC, profile.id)
+                }
+            } else {
+                targets += UsageTargetKey.forSource(source)
+            }
+        }
+        return targets
     }
 
     private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {

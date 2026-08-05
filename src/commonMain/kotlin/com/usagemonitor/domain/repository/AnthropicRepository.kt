@@ -17,4 +17,8 @@ import com.usagemonitor.domain.entity.ApiUsageStats
  */
 interface AnthropicRepository {
     suspend fun getUsage(): Result<ApiUsageStats>
+
+    suspend fun getUsage(
+        profile: com.usagemonitor.domain.entity.AnthropicProfileRef
+    ): Result<ApiUsageStats> = getUsage()
 }

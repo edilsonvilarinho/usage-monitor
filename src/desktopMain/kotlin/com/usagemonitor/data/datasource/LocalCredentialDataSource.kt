@@ -1,7 +1,9 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.AnthropicProfileLocation
 import com.usagemonitor.data.dto.CredentialsFileDto
 import com.usagemonitor.data.dto.OAuthCredentialsDto
+import com.usagemonitor.domain.entity.AnthropicProfileRef
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -14,6 +16,8 @@ import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -22,55 +26,83 @@ import java.nio.file.StandardCopyOption
 private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L  // renova se expira em menos de 5 min
 private const val OAUTH_REFRESH_URL = "https://console.anthropic.com/v1/oauth/token"
 
-class LocalCredentialDataSource(
+internal class LocalCredentialDataSource(
     private val httpClient: HttpClient,
     // Costura de teste: permite apontar para um diretório temporário em vez de ~/.claude.
     private val homeDirProvider: () -> String = {
         System.getProperty("user.home")
             ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
     },
-    private val claudeConfigFileProvider: (String) -> File = { homeDir -> File(homeDir, ".claude.json") }
+    private val claudeConfigFileProvider: (String) -> File = { homeDir -> File(homeDir, ".claude.json") },
+    private val profileLocationProvider: (AnthropicProfileRef) -> AnthropicProfileLocation? = { profile ->
+        if (profile.id == AnthropicProfileRef.DEFAULT.id) {
+            val homeDir = homeDirProvider()
+            AnthropicProfileLocation(
+                profile = profile,
+                configDirectory = File(homeDir, ".claude"),
+                credentialsFile = File(homeDir, ".claude/.credentials.json"),
+                identityFile = claudeConfigFileProvider(homeDir)
+            )
+        } else {
+            null
+        }
+    }
 ) : CredentialDataSource {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val profileMutexes = mutableMapOf<String, Mutex>()
 
     override suspend fun loadAnthropicSession(): AnthropicSession {
-        val now = System.currentTimeMillis()
-        val credentialsFile = credentialsFile()
-        if (!credentialsFile.exists()) {
-            throw IllegalStateException(
-                "Credenciais não encontradas: ${credentialsFile.absolutePath}. " +
-                "Execute o Claude Code CLI para autenticar."
-            )
-        }
-
-        var creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
-
-        val needsRefresh = creds.claudeAiOauth.expiresAt - now < REFRESH_MARGIN_MS
-
-        if (needsRefresh && creds.claudeAiOauth.refreshToken.isNotEmpty()) {
-            creds = refreshToken(credentialsFile, creds)
-        }
-
-        val accessToken = creds.claudeAiOauth.accessToken.ifBlank {
-            throw IllegalStateException("Credenciais do Claude Code inválidas: accessToken ausente.")
-        }
-
-        return AnthropicSession(
-            accessToken = accessToken,
-            accountContext = loadAccountContext()
-        )
+        return loadAnthropicSession(AnthropicProfileRef.DEFAULT)
     }
 
-    override suspend fun isAnthropicSessionCurrent(session: AnthropicSession): Boolean {
-        val credentialsFile = credentialsFile()
+    override suspend fun loadAnthropicSession(profile: AnthropicProfileRef): AnthropicSession {
+        val mutex = synchronized(profileMutexes) {
+            profileMutexes.getOrPut(profile.id) { Mutex() }
+        }
+        return mutex.withLock {
+            val location = resolveLocation(profile)
+            val now = System.currentTimeMillis()
+            val credentialsFile = location.credentialsFile
+            if (!credentialsFile.exists()) {
+                throw IllegalStateException(
+                    "Credenciais não encontradas para o perfil '${profile.label}': ${credentialsFile.absolutePath}. " +
+                        "Execute o Claude Code CLI com esse CLAUDE_CONFIG_DIR para autenticar."
+                )
+            }
+
+            val originalContent = credentialsFile.readText()
+            var creds = json.decodeFromString<CredentialsFileDto>(originalContent)
+            val needsRefresh = creds.claudeAiOauth.expiresAt - now < REFRESH_MARGIN_MS
+
+            if (needsRefresh && creds.claudeAiOauth.refreshToken.isNotEmpty()) {
+                creds = refreshToken(credentialsFile, originalContent, creds)
+            }
+
+            val accessToken = creds.claudeAiOauth.accessToken.ifBlank {
+                throw IllegalStateException("Credenciais do Claude Code inválidas: accessToken ausente.")
+            }
+
+            AnthropicSession(
+                accessToken = accessToken,
+                accountContext = loadAccountContext(location)
+            )
+        }
+    }
+
+    override suspend fun isAnthropicSessionCurrent(
+        profile: AnthropicProfileRef,
+        session: AnthropicSession
+    ): Boolean {
+        val location = resolveLocation(profile)
+        val credentialsFile = location.credentialsFile
         if (!credentialsFile.exists()) {
             return false
         }
 
         return try {
             val creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
-            val currentAccount = loadAccountContext()
+            val currentAccount = loadAccountContext(location)
             creds.claudeAiOauth.accessToken == session.accessToken &&
                 currentAccount.key == session.accountContext.key
         } catch (_: Throwable) {
@@ -78,11 +110,17 @@ class LocalCredentialDataSource(
         }
     }
 
-    private fun credentialsFile(): File = File("${homeDirProvider()}/.claude/.credentials.json")
+    private fun resolveLocation(profile: AnthropicProfileRef): AnthropicProfileLocation {
+        return profileLocationProvider(profile)
+            ?: throw IllegalStateException("Perfil Anthropic não configurado: ${profile.label}.")
+    }
 
-    private fun loadAccountContext(): UsageAccountContext {
-        val homeDir = homeDirProvider()
-        val configFile = claudeConfigFileProvider(homeDir)
+    override suspend fun isAnthropicSessionCurrent(session: AnthropicSession): Boolean {
+        return isAnthropicSessionCurrent(AnthropicProfileRef.DEFAULT, session)
+    }
+
+    private fun loadAccountContext(location: AnthropicProfileLocation): UsageAccountContext {
+        val configFile = location.identityFile
         if (!configFile.exists()) {
             throw IllegalStateException(
                 "Identidade do Claude Code não encontrada: ${configFile.absolutePath}. " +
@@ -111,7 +149,11 @@ class LocalCredentialDataSource(
         )
     }
 
-    private suspend fun refreshToken(credentialsFile: File, creds: CredentialsFileDto): CredentialsFileDto {
+    private suspend fun refreshToken(
+        credentialsFile: File,
+        originalContent: String,
+        creds: CredentialsFileDto
+    ): CredentialsFileDto {
         val response = httpClient.post(OAUTH_REFRESH_URL) {
             contentType(ContentType.Application.Json)
             setBody(TokenRefreshRequest("refresh_token", creds.claudeAiOauth.refreshToken))
@@ -129,6 +171,10 @@ class LocalCredentialDataSource(
                 else creds.claudeAiOauth.expiresAt
             )
         )
+        if (!credentialsFile.exists() || credentialsFile.readText() != originalContent) {
+            throw IllegalStateException("As credenciais do Claude Code mudaram durante a renovação; a coleta será repetida.")
+        }
+
         atomicWriteText(
             target = credentialsFile,
             content = json.encodeToString(CredentialsFileDto.serializer(), updated)

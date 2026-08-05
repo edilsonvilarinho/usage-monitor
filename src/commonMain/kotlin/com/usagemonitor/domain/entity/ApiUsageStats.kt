@@ -10,6 +10,9 @@ data class ApiUsageStats(
     // Identificador estável da fonte para filtros e lógica da UI.
     val source: ApiSource,
 
+    // Identifica o card/coleta. Para Anthropic inclui o perfil de credenciais.
+    val targetKey: UsageTargetKey = UsageTargetKey.forSource(source),
+
     // Nome da API: "Anthropic" ou "MiniMax"
     val apiName: String,
 
@@ -19,6 +22,9 @@ data class ApiUsageStats(
     // Identidade da conta que originou esta coleta. Obrigatória para fontes
     // autenticadas que persistem histórico separado por conta.
     val accountContext: UsageAccountContext? = null,
+
+    // Apelido local do perfil monitorado; não participa da identidade histórica.
+    val profileLabel: String? = null,
 
     // Avisos não fatais que a UI pode expor sem rebaixar a fonte para erro.
     val notices: Set<ApiUsageNotice> = emptySet()

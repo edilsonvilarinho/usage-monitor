@@ -36,6 +36,10 @@ import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
+import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
@@ -53,6 +57,8 @@ import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
@@ -70,7 +76,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.prefs.Preferences
+import java.io.File
 import javax.imageio.ImageIO
+import javax.swing.JFileChooser
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -118,27 +126,14 @@ fun main() = application {
         }
     }
 
-    val settings = remember {
-        PreferencesSettings(Preferences.userRoot().node("com.usagemonitor"))
-    }
+    val preferencesNode = remember { Preferences.userRoot().node("com.usagemonitor") }
+    val settings = remember(preferencesNode) { PreferencesSettings(preferencesNode) }
 
     val persistedApis = remember(settings) {
         readApiSourceCollection(settings, ENABLED_APIS_KEY)
             .toSet()
             .ifEmpty { DEFAULT_ENABLED_APIS }
     }
-    val persistedCardOrder = remember(settings) {
-        normalizeCardOrder(readApiSourceCollection(settings, CARD_ORDER_KEY))
-    }
-    val persistedMinimizedCards = remember(settings) {
-        val storedValue = settings.getStringOrNull(MINIMIZED_CARDS_KEY)
-        if (storedValue == null) {
-            ApiSource.entries.toSet()
-        } else {
-            readApiSourceCollection(settings, MINIMIZED_CARDS_KEY).toSet()
-        }
-    }
-
     val initialAutoStartEnabled = remember(settings) {
         val storedAutoStartPreference = settings.getBoolean(AUTO_START_KEY, false)
         val resolvedAutoStartEnabled = if (AutoStartManager.isAutoStartSupported()) {
@@ -155,6 +150,28 @@ fun main() = application {
     }
 
     val enabledApis = remember { MutableStateFlow(persistedApis) }
+    val profileRegistry = remember(preferencesNode) {
+        AnthropicProfileRegistry(
+            preferences = preferencesNode,
+            defaultEnabled = ApiSource.ANTHROPIC in persistedApis
+        )
+    }
+    val profileRecords by profileRegistry.profiles.collectAsState()
+    val profileResolution = resolveAnthropicProfiles(profileRegistry, profileRecords)
+    val enabledAnthropicProfiles = remember { MutableStateFlow(profileResolution.enabledProfiles) }
+    enabledAnthropicProfiles.value = profileResolution.enabledProfiles
+    val availableTargets = remember(profileRecords) { availableUsageTargets(profileRecords) }
+    val persistedCardOrder = remember(settings) {
+        normalizeCardOrder(readUsageTargetCollection(settings, CARD_ORDER_KEY), availableTargets)
+    }
+    val persistedMinimizedCards = remember(settings) {
+        val storedValue = settings.getStringOrNull(MINIMIZED_CARDS_KEY)
+        if (storedValue == null) {
+            availableTargets.toSet()
+        } else {
+            readUsageTargetCollection(settings, MINIMIZED_CARDS_KEY).toSet()
+        }
+    }
     var cardOrder by remember { mutableStateOf(persistedCardOrder) }
     var minimizedCards by remember { mutableStateOf(persistedMinimizedCards) }
     val persistedMainWindowState = remember(settings) {
@@ -164,7 +181,12 @@ fun main() = application {
         readPersistedHistoryWindowState(settings)
     }
 
-    val credentialDataSource = remember(httpClient) { LocalCredentialDataSource(httpClient) }
+    val credentialDataSource = remember(httpClient, profileRegistry) {
+        LocalCredentialDataSource(
+            httpClient = httpClient,
+            profileLocationProvider = { profile -> profileRegistry.locationFor(profile.id) }
+        )
+    }
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
     val codexDiagnosticsRecorder = remember { LocalCodexDiagnosticsRecorder() }
     val remoteApiDataSource = remember(httpClient, codexDiagnosticsRecorder) {
@@ -208,7 +230,7 @@ fun main() = application {
     }
 
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, recordUsageSnapshot, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
@@ -221,7 +243,8 @@ fun main() = application {
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
             appUpdateReleaseOpener = appUpdateReleaseOpener,
             currentAppVersion = CURRENT_APP_VERSION,
-            isAppVisible = isAppVisible
+            isAppVisible = isAppVisible,
+            anthropicProfiles = enabledAnthropicProfiles
         )
     }
     val historyViewModel = remember(getUsageHistory, enabledApis) {
@@ -312,6 +335,17 @@ fun main() = application {
             }
     }
     val enabledApisState by enabledApis.collectAsState()
+    val profileUiModels = buildAnthropicProfileUiModels(
+        records = profileRecords,
+        inspections = profileResolution.inspections,
+        duplicateProfileIds = profileResolution.duplicateProfileIds
+    )
+    LaunchedEffect(availableTargets) {
+        cardOrder = normalizeCardOrder(cardOrder, availableTargets)
+        minimizedCards = minimizedCards.filterTo(linkedSetOf()) { target -> target in availableTargets }
+        writeUsageTargetCollection(settings, CARD_ORDER_KEY, cardOrder)
+        writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, minimizedCards)
+    }
     var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
     var language by remember {
         mutableStateOf(
@@ -361,32 +395,35 @@ fun main() = application {
                     viewModel = viewModel,
                     appVersion = CURRENT_APP_VERSION,
                     language = language,
-                    enabledApis = enabledApis,
                     cardOrder = cardOrder,
                     minimizedCards = minimizedCards,
-                    onMoveCardToIndex = { source, targetIndex ->
+                    onMoveCardToIndex = { target, targetIndex ->
+                        val visibleTargets = enabledUsageTargets(
+                            enabledSources = enabledApisState,
+                            enabledProfiles = profileResolution.enabledProfiles
+                        )
                         val updatedOrder = moveVisibleCardToIndex(
                             currentOrder = cardOrder,
-                            visibleSources = enabledApisState,
-                            source = source,
+                            visibleTargets = visibleTargets,
+                            target = target,
                             targetIndex = targetIndex
                         )
                         cardOrder = updatedOrder
-                        writeApiSourceCollection(settings, CARD_ORDER_KEY, updatedOrder)
+                        writeUsageTargetCollection(settings, CARD_ORDER_KEY, updatedOrder)
                     },
-                    onToggleCardMinimized = { source ->
-                        val updatedMinimizedCards = if (source in minimizedCards) {
-                            minimizedCards - source
+                    onToggleCardMinimized = { target ->
+                        val updatedMinimizedCards = if (target in minimizedCards) {
+                            minimizedCards - target
                         } else {
-                            minimizedCards + source
+                            minimizedCards + target
                         }
                         minimizedCards = updatedMinimizedCards
-                        writeApiSourceCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
+                        writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
                     },
-                    onOpenHistory = { source ->
+                    onOpenHistory = { source, accountKey ->
                         historyDialogSource = source
                         historyOpenGeneration++
-                        historyViewModel.openForSource(source)
+                        historyViewModel.openForSource(source, accountKey)
                     },
                     onOpenSettings = { isSettingsDialogOpen = true }
                 )
@@ -430,8 +467,8 @@ fun main() = application {
             onCloseRequest = { isSettingsDialogOpen = false },
             title = if (language == AppLanguage.PT) "Configurações" else "Settings",
             icon = iconImage,
-            state = rememberDialogState(width = 460.dp, height = 420.dp),
-            resizable = false,
+            state = rememberDialogState(width = 620.dp, height = 700.dp),
+            resizable = true,
             undecorated = true
         ) {
             AppTheme(isDark = isDark) {
@@ -471,6 +508,44 @@ fun main() = application {
                             enabledApis.value = updatedApis
                             writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
                             viewModel.refresh()
+                        },
+                        anthropicProfiles = profileUiModels,
+                        onAnthropicProfileToggle = { profileId, checked ->
+                            profileRegistry.setEnabled(profileId, checked)
+                            enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                                profileRegistry,
+                                profileRegistry.profiles.value
+                            ).enabledProfiles
+                            viewModel.refresh(ApiSource.ANTHROPIC)
+                        },
+                        onAnthropicProfileRename = { profileId, label ->
+                            profileRegistry.updateLabel(profileId, label)
+                        },
+                        onAddAnthropicProfile = {
+                            val selectedDirectory = chooseAnthropicConfigDirectory()
+                            if (selectedDirectory != null) {
+                                profileRegistry.addManual(selectedDirectory)
+                                enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                                    profileRegistry,
+                                    profileRegistry.profiles.value
+                                ).enabledProfiles
+                            }
+                        },
+                        onRemoveAnthropicProfile = { profileId ->
+                            profileRegistry.removeFromMonitor(profileId)
+                            enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                                profileRegistry,
+                                profileRegistry.profiles.value
+                            ).enabledProfiles
+                            viewModel.refresh(ApiSource.ANTHROPIC)
+                        },
+                        onRescanAnthropicProfiles = {
+                            profileRegistry.rescan(restoreRemoved = true)
+                            enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                                profileRegistry,
+                                profileRegistry.profiles.value
+                            ).enabledProfiles
+                            viewModel.refresh(ApiSource.ANTHROPIC)
                         }
                     )
                 }
@@ -522,6 +597,118 @@ private fun writeApiSourceCollection(
         key,
         sources.joinToString(",") { source -> source.name }
     )
+}
+
+internal data class AnthropicProfileResolution(
+    val enabledProfiles: List<AnthropicProfileRef>,
+    val inspections: Map<String, AnthropicProfileInspection>,
+    val duplicateProfileIds: Set<String>
+)
+
+internal fun resolveAnthropicProfiles(
+    registry: AnthropicProfileRegistry,
+    records: List<AnthropicProfileRecord>
+): AnthropicProfileResolution {
+    val inspections = records.associate { record -> record.id to registry.inspect(record) }
+    val seenAccounts = linkedSetOf<UsageAccountKey>()
+    val duplicateIds = linkedSetOf<String>()
+    val enabledProfiles = mutableListOf<AnthropicProfileRef>()
+
+    records.filter { it.enabled }.forEach { record ->
+        val accountKey = inspections[record.id]?.accountContext?.key
+        if (accountKey != null && !seenAccounts.add(accountKey)) {
+            duplicateIds += record.id
+        } else {
+            enabledProfiles += record.ref
+        }
+    }
+
+    return AnthropicProfileResolution(enabledProfiles, inspections, duplicateIds)
+}
+
+private fun buildAnthropicProfileUiModels(
+    records: List<AnthropicProfileRecord>,
+    inspections: Map<String, AnthropicProfileInspection>,
+    duplicateProfileIds: Set<String>
+): List<AnthropicProfileUiModel> {
+    return records.map { record ->
+        val inspection = inspections[record.id]
+        val duplicate = record.id in duplicateProfileIds
+        val status = when {
+            duplicate -> AnthropicProfileUiStatus.DUPLICATE
+            inspection?.status == AnthropicProfileInspectionStatus.READY -> AnthropicProfileUiStatus.READY
+            inspection?.status == AnthropicProfileInspectionStatus.INVALID -> AnthropicProfileUiStatus.INVALID
+            else -> AnthropicProfileUiStatus.INCOMPLETE
+        }
+        AnthropicProfileUiModel(
+            id = record.id,
+            label = record.label,
+            path = record.configDirectory,
+            enabled = record.enabled,
+            removable = record.id != DEFAULT_ANTHROPIC_PROFILE_ID,
+            identityLabel = inspection?.accountContext?.displayLabel,
+            status = status,
+            detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail
+        )
+    }
+}
+
+private fun availableUsageTargets(records: List<AnthropicProfileRecord>): List<UsageTargetKey> {
+    val targets = mutableListOf<UsageTargetKey>()
+    ApiSource.entries.forEach { source ->
+        if (source == ApiSource.ANTHROPIC) {
+            records.forEach { record -> targets += UsageTargetKey(source, record.id) }
+        } else {
+            targets += UsageTargetKey.forSource(source)
+        }
+    }
+    return targets
+}
+
+private fun enabledUsageTargets(
+    enabledSources: Set<ApiSource>,
+    enabledProfiles: List<AnthropicProfileRef>
+): Set<UsageTargetKey> {
+    val targets = linkedSetOf<UsageTargetKey>()
+    enabledSources.sortedBy { it.ordinal }.forEach { source ->
+        if (source == ApiSource.ANTHROPIC) {
+            enabledProfiles.forEach { profile -> targets += UsageTargetKey(source, profile.id) }
+        } else {
+            targets += UsageTargetKey.forSource(source)
+        }
+    }
+    return targets
+}
+
+private fun readUsageTargetCollection(
+    settings: PreferencesSettings,
+    key: String
+): List<UsageTargetKey> {
+    return settings.getStringOrNull(key)
+        ?.split(",")
+        ?.filter { token -> token.isNotBlank() }
+        ?.mapNotNull(UsageTargetKey::fromStorageKey)
+        ?: emptyList()
+}
+
+private fun writeUsageTargetCollection(
+    settings: PreferencesSettings,
+    key: String,
+    targets: Collection<UsageTargetKey>
+) {
+    settings.putString(key, targets.joinToString(",") { target -> target.storageKey })
+}
+
+private fun chooseAnthropicConfigDirectory(): File? {
+    val chooser = JFileChooser()
+    chooser.dialogTitle = "Selecionar diretório de configuração Anthropic"
+    chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+    chooser.isAcceptAllFileFilterUsed = false
+    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+        chooser.selectedFile
+    } else {
+        null
+    }
 }
 
 private fun historyWindowTitle(source: ApiSource, language: AppLanguage): String {

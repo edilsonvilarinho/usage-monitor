@@ -22,6 +22,8 @@ import androidx.compose.ui.zIndex
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
 import com.usagemonitor.presentation.ui.resolveDropTargetIndex
 
@@ -41,19 +43,19 @@ private val CardSpacing = 16.dp
 @Composable
 internal fun ResponsiveDashboardCardGrid(
     items: List<ApiUsageStats>,
-    refreshingSources: Set<ApiSource>,
-    minimizedCards: Set<ApiSource>,
+    refreshingTargets: Set<UsageTargetKey>,
+    minimizedCards: Set<UsageTargetKey>,
     language: AppLanguage,
-    onRefreshCard: (ApiSource) -> Unit,
-    onMoveCardToIndex: (ApiSource, Int) -> Unit,
-    onToggleCardMinimized: (ApiSource) -> Unit,
-    onOpenHistoryCard: (ApiSource) -> Unit,
+    onRefreshCard: (UsageTargetKey) -> Unit,
+    onMoveCardToIndex: (UsageTargetKey, Int) -> Unit,
+    onToggleCardMinimized: (UsageTargetKey) -> Unit,
+    onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
     val spacingPx = with(density) { CardSpacing.roundToPx() }
     val compactThresholdPx = with(density) { CompactColumnsThreshold.roundToPx() }
-    val itemBounds = remember { mutableStateMapOf<ApiSource, CardGridBounds>() }
+    val itemBounds = remember { mutableStateMapOf<UsageTargetKey, CardGridBounds>() }
     var dragState by remember { mutableStateOf<CardDragState?>(null) }
     var dropTargetIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -61,7 +63,7 @@ internal fun ResponsiveDashboardCardGrid(
         modifier = modifier,
         content = {
             items.forEachIndexed { index, stats ->
-                val isBeingDragged = dragState?.source == stats.source
+                val isBeingDragged = dragState?.target == stats.targetKey
                 val isDropTarget = dropTargetIndex == index && !isBeingDragged
                 val translation = if (isBeingDragged) {
                     dragState?.dragOffset ?: Offset.Zero
@@ -69,7 +71,7 @@ internal fun ResponsiveDashboardCardGrid(
                     Offset.Zero
                 }
 
-                key(stats.source) {
+                key(stats.targetKey) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -81,7 +83,7 @@ internal fun ResponsiveDashboardCardGrid(
                                 }
                             )
                             .onGloballyPositioned { coordinates ->
-                                itemBounds[stats.source] = CardGridBounds(
+                                itemBounds[stats.targetKey] = CardGridBounds(
                                     topLeft = coordinates.positionInParent(),
                                     width = coordinates.size.width,
                                     height = coordinates.size.height
@@ -94,49 +96,49 @@ internal fun ResponsiveDashboardCardGrid(
                     ) {
                         ApiUsageCard(
                             source = stats.source,
-                            apiName = stats.apiName,
+                            apiName = stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName,
                             quotas = stats.quotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,
                             showUsageDetails = stats.source != ApiSource.ANTHROPIC,
-                            isRefreshing = stats.source in refreshingSources,
-                            isMinimized = stats.source in minimizedCards,
+                            isRefreshing = stats.targetKey in refreshingTargets,
+                            isMinimized = stats.targetKey in minimizedCards,
                             isBeingDragged = isBeingDragged,
                             isDragTarget = isDropTarget,
                             language = language,
                             animationDelayMillis = index * 90,
-                            onRefresh = { onRefreshCard(stats.source) },
-                            onOpenHistory = { onOpenHistoryCard(stats.source) },
-                            onToggleMinimized = { onToggleCardMinimized(stats.source) },
+                            onRefresh = { onRefreshCard(stats.targetKey) },
+                            onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
+                            onToggleMinimized = { onToggleCardMinimized(stats.targetKey) },
                             onDragStart = {
-                                dragState = CardDragState(source = stats.source)
-                                dropTargetIndex = items.indexOfFirst { item -> item.source == stats.source }
+                                dragState = CardDragState(target = stats.targetKey)
+                                dropTargetIndex = items.indexOfFirst { item -> item.targetKey == stats.targetKey }
                             },
                             onDrag = { dragAmount ->
                                 val activeDrag = dragState
-                                if (activeDrag != null && activeDrag.source == stats.source) {
+                                if (activeDrag != null && activeDrag.target == stats.targetKey) {
                                     val updatedDrag = activeDrag.copy(
                                         dragOffset = activeDrag.dragOffset + dragAmount
                                     )
                                     dragState = updatedDrag
 
-                                    val draggedBounds = itemBounds[stats.source]
+                                    val draggedBounds = itemBounds[stats.targetKey]
                                     if (draggedBounds == null) {
                                         dropTargetIndex = null
                                     } else {
                                         val draggedCenter = draggedBounds.center + updatedDrag.dragOffset
                                         dropTargetIndex = resolveDropTargetIndex(
-                                            orderedSources = items.map { item -> item.source },
-                                            boundsBySource = itemBounds.mapValues { (source, bounds) ->
+                                            orderedTargets = items.map { item -> item.targetKey },
+                                            boundsByTarget = itemBounds.mapValues { (target, bounds) ->
                                                 CardGridSlot(
-                                                    source = source,
+                                                    target = target,
                                                     left = bounds.topLeft.x,
                                                     top = bounds.topLeft.y,
                                                     width = bounds.width,
                                                     height = bounds.height
                                                 )
                                             },
-                                            draggedSource = stats.source,
+                                            draggedTarget = stats.targetKey,
                                             draggedCenter = draggedCenter
                                         )
                                     }
@@ -148,8 +150,8 @@ internal fun ResponsiveDashboardCardGrid(
                                 dragState = null
                                 dropTargetIndex = null
 
-                                if (activeDrag != null && activeDrag.source == stats.source && targetIndex != null) {
-                                    onMoveCardToIndex(stats.source, targetIndex)
+                                if (activeDrag != null && activeDrag.target == stats.targetKey && targetIndex != null) {
+                                    onMoveCardToIndex(stats.targetKey, targetIndex)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -223,7 +225,7 @@ internal fun ResponsiveDashboardCardGrid(
 }
 
 private data class CardDragState(
-    val source: ApiSource,
+    val target: UsageTargetKey,
     val dragOffset: Offset = Offset.Zero
 )
 

@@ -5,6 +5,9 @@ import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.datasource.AnthropicSession
 import com.usagemonitor.data.mapper.AnthropicMapper
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.AnthropicRepository
 
 /**
@@ -22,24 +25,36 @@ class AnthropicRepositoryImpl(
 ) : AnthropicRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
+        return getUsage(AnthropicProfileRef.DEFAULT)
+    }
+
+    override suspend fun getUsage(profile: AnthropicProfileRef): Result<ApiUsageStats> {
         return Result.runCatching {
-            fetchStableUsage()
+            fetchStableUsage(profile)
         }
     }
 
-    private suspend fun fetchStableUsage(): ApiUsageStats {
+    private suspend fun fetchStableUsage(profile: AnthropicProfileRef): ApiUsageStats {
         var lastError: Throwable? = null
 
         for (attempt in 0..1) {
-            val session = credentialDataSource.loadAnthropicSession()
+            val session = try {
+                credentialDataSource.loadAnthropicSession(profile)
+            } catch (error: Throwable) {
+                lastError = error
+                if (attempt == 0 && isConcurrentCredentialChange(error)) {
+                    continue
+                }
+                throw error
+            }
             try {
-                val stats = fetchUsageForSession(session)
-                if (credentialDataSource.isAnthropicSessionCurrent(session)) {
+                val stats = fetchUsageForSession(profile, session)
+                if (credentialDataSource.isAnthropicSessionCurrent(profile, session)) {
                     return stats
                 }
                 lastError = IllegalStateException(ACCOUNT_CHANGED_DURING_FETCH_MESSAGE)
             } catch (error: Throwable) {
-                val sessionChanged = !credentialDataSource.isAnthropicSessionCurrent(session)
+                val sessionChanged = !credentialDataSource.isAnthropicSessionCurrent(profile, session)
                 if (!sessionChanged && !isScopeRequirementFailure(error)) {
                     throw error
                 }
@@ -54,9 +69,16 @@ class AnthropicRepositoryImpl(
         throw lastError ?: IllegalStateException(ACCOUNT_CHANGED_DURING_FETCH_MESSAGE)
     }
 
-    private suspend fun fetchUsageForSession(session: AnthropicSession): ApiUsageStats {
+    private suspend fun fetchUsageForSession(
+        profile: AnthropicProfileRef,
+        session: AnthropicSession
+    ): ApiUsageStats {
         val dto = apiDataSource.fetchAnthropicUsage(session.accessToken)
-        return AnthropicMapper.toUsageStats(dto).copy(accountContext = session.accountContext)
+        return AnthropicMapper.toUsageStats(dto).copy(
+            targetKey = UsageTargetKey(ApiSource.ANTHROPIC, profile.id),
+            accountContext = session.accountContext,
+            profileLabel = profile.label
+        )
     }
 
     private fun isScopeRequirementFailure(error: Throwable): Boolean {
@@ -65,6 +87,12 @@ class AnthropicRepositoryImpl(
             message.contains("permission_error", ignoreCase = true) &&
             message.contains("scope requirement", ignoreCase = true) &&
             message.contains("user:profile", ignoreCase = true)
+    }
+
+    private fun isConcurrentCredentialChange(error: Throwable): Boolean {
+        val message = error.message ?: return false
+        return message.contains("mudaram durante a renovação", ignoreCase = true) ||
+            message.contains("changed during refresh", ignoreCase = true)
     }
 
     companion object {

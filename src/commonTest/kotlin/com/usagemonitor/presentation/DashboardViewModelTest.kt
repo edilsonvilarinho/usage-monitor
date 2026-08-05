@@ -2,6 +2,8 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.CodexRepository
 import com.usagemonitor.domain.repository.DeepSeekRepository
@@ -427,6 +429,10 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         anthropicResult = Result.success(statsB)
         viewModel.refresh(ApiSource.ANTHROPIC)
         awaitCondition { calls == 2 && recordedSnapshots.size == 2 }
+        awaitCondition {
+            val current = viewModel.uiState.value as? UiState.Success
+            current?.data?.singleOrNull()?.accountContext?.email == "account-b@example.com"
+        }
         var state = viewModel.uiState.value as UiState.Success
         assertEquals("account-b@example.com", state.data.single().accountContext?.email)
 
@@ -627,6 +633,64 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         // Falha ao persistir histórico não deve corromper a UI: dados de uso seguem visíveis.
         assertIs<UiState.Success>(state)
         assertEquals(2, state.data.size)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `collects and refreshes multiple Anthropic profiles independently`() = runTest {
+        val profileA = AnthropicProfileRef("profile-a", "Pessoal")
+        val profileB = AnthropicProfileRef("profile-b", "Empresa")
+        val calls = mutableListOf<String>()
+        val snapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Perfil obrigatório"))
+            }
+
+            override suspend fun getUsage(profile: AnthropicProfileRef): Result<ApiUsageStats> {
+                calls += profile.id
+                val account = sampleAnthropicStats.accountContext!!.copy(
+                    key = sampleAnthropicStats.accountContext!!.key.copy(
+                        providerAccountId = "account-${profile.id}",
+                        workspaceId = "workspace-${profile.id}"
+                    ),
+                    email = "${profile.id}@example.com"
+                )
+                return Result.success(
+                    sampleAnthropicStats.copy(
+                        targetKey = UsageTargetKey(ApiSource.ANTHROPIC, profile.id),
+                        profileLabel = profile.label,
+                        accountContext = account
+                    )
+                )
+            }
+        }
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(object : MiniMaxRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getCodexUsage = GetCodexUsageUseCase(object : CodexRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(object : DeepSeekRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            recordUsageSnapshot = historyUseCase(snapshots),
+            anthropicProfiles = MutableStateFlow(listOf(profileA, profileB)),
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+        awaitCondition { snapshots.size == 2 }
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(setOf("profile-a", "profile-b"), state.data.map { it.targetKey.profileId }.toSet())
+        assertEquals(setOf("profile-a", "profile-b"), calls.toSet())
+
+        viewModel.refresh(UsageTargetKey(ApiSource.ANTHROPIC, profileA.id))
+        awaitCondition { calls.count { it == profileA.id } == 2 }
+        assertEquals(1, calls.count { it == profileB.id })
         viewModel.onDestroy()
     }
 

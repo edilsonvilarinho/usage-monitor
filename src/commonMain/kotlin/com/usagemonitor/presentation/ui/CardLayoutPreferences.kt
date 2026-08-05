@@ -2,20 +2,24 @@ package com.usagemonitor.presentation.ui
 
 import androidx.compose.ui.geometry.Offset
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageTargetKey
 import kotlin.math.roundToInt
 
-internal fun normalizeCardOrder(storedOrder: List<ApiSource>): List<ApiSource> {
-    val normalized = mutableListOf<ApiSource>()
+internal fun normalizeCardOrder(
+    storedOrder: List<UsageTargetKey>,
+    availableTargets: Collection<UsageTargetKey> = ApiSource.entries.map(UsageTargetKey::forSource)
+): List<UsageTargetKey> {
+    val normalized = mutableListOf<UsageTargetKey>()
 
-    storedOrder.forEach { source ->
-        if (source !in normalized) {
-            normalized += source
+    storedOrder.forEach { target ->
+        if (target in availableTargets && target !in normalized) {
+            normalized += target
         }
     }
 
-    ApiSource.entries.forEach { source ->
-        if (source !in normalized) {
-            normalized += source
+    availableTargets.forEach { target ->
+        if (target !in normalized) {
+            normalized += target
         }
     }
 
@@ -23,7 +27,7 @@ internal fun normalizeCardOrder(storedOrder: List<ApiSource>): List<ApiSource> {
 }
 
 internal data class CardGridSlot(
-    val source: ApiSource,
+    val target: UsageTargetKey,
     val left: Float,
     val top: Float,
     val width: Int,
@@ -37,16 +41,16 @@ internal data class CardGridSlot(
 }
 
 internal fun resolveDropTargetIndex(
-    orderedSources: List<ApiSource>,
-    boundsBySource: Map<ApiSource, CardGridSlot>,
-    draggedSource: ApiSource,
+    orderedTargets: List<UsageTargetKey>,
+    boundsByTarget: Map<UsageTargetKey, CardGridSlot>,
+    draggedTarget: UsageTargetKey,
     draggedCenter: Offset
 ): Int? {
-    if (orderedSources.isEmpty()) {
+    if (orderedTargets.isEmpty()) {
         return null
     }
 
-    val slots = orderedSources.mapNotNull { source -> boundsBySource[source] }
+    val slots = orderedTargets.mapNotNull { target -> boundsByTarget[target] }
     if (slots.isEmpty()) {
         return null
     }
@@ -79,13 +83,13 @@ internal fun resolveDropTargetIndex(
         centers = columnCenters
     )
 
-    val sourceIndex = orderedSources.indexOf(draggedSource)
+    val sourceIndex = orderedTargets.indexOf(draggedTarget)
     if (sourceIndex == -1) {
         return null
     }
 
     return (targetRow * columns + targetColumn)
-        .coerceIn(0, orderedSources.lastIndex)
+        .coerceIn(0, orderedTargets.lastIndex)
 }
 
 private fun resolveBandIndex(
@@ -111,45 +115,45 @@ private fun resolveBandIndex(
 }
 
 internal fun reorderVisibleCards(
-    currentOrder: List<ApiSource>,
-    visibleSources: Set<ApiSource>,
-    source: ApiSource,
+    currentOrder: List<UsageTargetKey>,
+    visibleTargets: Set<UsageTargetKey>,
+    target: UsageTargetKey,
     offset: Int
-): List<ApiSource> {
-    val normalizedOrder = normalizeCardOrder(currentOrder)
-    val visibleOrder = normalizedOrder.filter { orderedSource -> orderedSource in visibleSources }
+): List<UsageTargetKey> {
+    val normalizedOrder = normalizeCardOrder(currentOrder, currentOrder)
+    val visibleOrder = normalizedOrder.filter { orderedTarget -> orderedTarget in visibleTargets }
 
     if (visibleOrder.isEmpty()) {
         return normalizedOrder
     }
 
-    val sourceIndex = visibleOrder.indexOf(source)
+    val sourceIndex = visibleOrder.indexOf(target)
     if (sourceIndex == -1 || offset == 0) {
         return normalizedOrder
     }
 
     return moveVisibleCardToIndex(
         currentOrder = normalizedOrder,
-        visibleSources = visibleSources,
-        source = source,
+        visibleTargets = visibleTargets,
+        target = target,
         targetIndex = sourceIndex + offset
     )
 }
 
 internal fun moveVisibleCardToIndex(
-    currentOrder: List<ApiSource>,
-    visibleSources: Set<ApiSource>,
-    source: ApiSource,
+    currentOrder: List<UsageTargetKey>,
+    visibleTargets: Set<UsageTargetKey>,
+    target: UsageTargetKey,
     targetIndex: Int
-): List<ApiSource> {
-    val normalizedOrder = normalizeCardOrder(currentOrder)
-    val visibleOrder = normalizedOrder.filter { orderedSource -> orderedSource in visibleSources }
+): List<UsageTargetKey> {
+    val normalizedOrder = normalizeCardOrder(currentOrder, currentOrder)
+    val visibleOrder = normalizedOrder.filter { orderedTarget -> orderedTarget in visibleTargets }
 
     if (visibleOrder.isEmpty()) {
         return normalizedOrder
     }
 
-    val sourceIndex = visibleOrder.indexOf(source)
+    val sourceIndex = visibleOrder.indexOf(target)
     if (sourceIndex == -1) {
         return normalizedOrder
     }
@@ -164,11 +168,11 @@ internal fun moveVisibleCardToIndex(
     reorderedVisible.add(boundedTargetIndex, movedSource)
 
     var visibleCursor = 0
-    return normalizedOrder.map { orderedSource ->
-        if (orderedSource in visibleSources) {
+    return normalizedOrder.map { orderedTarget ->
+        if (orderedTarget in visibleTargets) {
             reorderedVisible[visibleCursor++]
         } else {
-            orderedSource
+            orderedTarget
         }
     }
 }

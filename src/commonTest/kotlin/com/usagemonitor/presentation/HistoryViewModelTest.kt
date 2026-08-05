@@ -192,6 +192,31 @@ class HistoryViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `openForSource preselects account requested by dashboard card`() = runTest {
+        val accountA = account("user-a", "workspace-a", "a@example.com")
+        val accountB = account("user-b", "workspace-b", "b@example.com")
+        val repo = FakeRepo(
+            report = emptyReport(ApiSource.CODEX),
+            accounts = listOf(accountA, accountB)
+        )
+        val viewModel = HistoryViewModel(
+            getUsageHistory = GetUsageHistoryUseCase(repo) { now },
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
+        )
+        awaitNonLoading(viewModel)
+        val callsBefore = repo.invocations
+
+        viewModel.openForSource(ApiSource.CODEX, accountB.key)
+        awaitInvocations(repo, callsBefore + 1)
+        val state = awaitNonLoading(viewModel)
+
+        assertIs<HistoryUiState.Success>(state)
+        assertEquals(accountB, state.selectedAccount)
+        assertEquals(accountB.key, repo.lastAccountKey)
+        viewModel.onDestroy()
+    }
+
     private fun emptyReport(source: ApiSource): ApiUsageHistoryReport {
         return ApiUsageHistoryReport(
             source = source,
