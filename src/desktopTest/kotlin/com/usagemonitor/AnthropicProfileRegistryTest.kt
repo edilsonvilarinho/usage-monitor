@@ -68,6 +68,21 @@ class AnthropicProfileRegistryTest {
     }
 
     @Test
+    fun `updateLabel persists an empty value instead of reverting to the previous label`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        val workDir = File(tempDir, ".claude-work").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        writeProfileFiles(workDir, File(workDir, ".claude.json"), "work@example.com", "account-b")
+        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val work = registry.profiles.value.first { it.id != "default" }
+
+        registry.updateLabel(work.id, "Empresa")
+        registry.updateLabel(work.id, "")
+        val updated = registry.profiles.value.first { it.id == work.id }
+        assertEquals("", updated.label)
+    }
+
+    @Test
     fun `marks profile with missing identity as incomplete`() {
         val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
         File(defaultDir, ".credentials.json").writeText("{\"claudeAiOauth\":{}}")

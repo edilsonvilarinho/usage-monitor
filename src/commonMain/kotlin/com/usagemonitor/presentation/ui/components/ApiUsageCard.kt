@@ -283,13 +283,17 @@ fun ApiUsageCard(
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text(
                             text = apiName,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         source.statusBadgeLabel(language)?.let { badgeLabel ->
                             Text(
@@ -414,7 +418,7 @@ fun ApiUsageCard(
                     }
                 }
 
-                if (notices.isNotEmpty()) {
+                if (!isMinimized && notices.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     InlineNotices(
                         notices = notices,

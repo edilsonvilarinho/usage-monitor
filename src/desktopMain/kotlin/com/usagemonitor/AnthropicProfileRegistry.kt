@@ -117,9 +117,7 @@ internal class AnthropicProfileRegistry(
     }
 
     fun updateLabel(profileId: String, label: String) {
-        update(profileId) { record ->
-            record.copy(label = label.trim().takeIf { it.isNotEmpty() } ?: record.label)
-        }
+        update(profileId) { record -> record.copy(label = label) }
     }
 
     fun setEnabled(profileId: String, enabled: Boolean) {
