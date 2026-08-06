@@ -150,6 +150,12 @@ internal class AnthropicProfileRegistry(
         // Debounce da gravação fora da UI thread; o estado em memória acima já é a
         // fonte de verdade imediata para a UI.
         pendingLabelJob?.cancel()
+        if (label.isBlank()) {
+            // Apelido vazio nunca é persistido — evita gravar valor em branco no
+            // Registro do Windows caso o usuário apague o campo por completo.
+            pendingLabelWrite = null
+            return
+        }
         pendingLabelWrite = updated
         pendingLabelJob = ioScope.launch {
             delay(LABEL_AUTOSAVE_DEBOUNCE)
