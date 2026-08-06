@@ -117,7 +117,15 @@ internal class AnthropicProfileRegistry(
     }
 
     fun updateLabel(profileId: String, label: String) {
-        update(profileId) { record -> record.copy(label = label) }
+        val current = readStoredProfiles().firstOrNull { it.id == profileId } ?: return
+        val updated = current.copy(label = label)
+        writeProfile(updated)
+        // Atualiza in-place, preservando a ordem atual da lista publicada.
+        // Evita chamar rescan()/publish() (que reordena por label) a cada tecla digitada,
+        // o que fazia o Compose perder o estado do campo de texto (cursor voltava pro final).
+        _profiles.value = _profiles.value.map { record ->
+            if (record.id == profileId) updated else record
+        }
     }
 
     fun setEnabled(profileId: String, enabled: Boolean) {

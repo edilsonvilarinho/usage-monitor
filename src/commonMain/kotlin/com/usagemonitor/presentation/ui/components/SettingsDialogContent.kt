@@ -26,6 +26,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -167,13 +168,15 @@ fun SettingsDialogContent(
                     )
                 } else {
                     anthropicProfiles.forEach { profile ->
-                        AnthropicProfileRow(
-                            profile = profile,
-                            language = currentLanguage,
-                            onToggle = onAnthropicProfileToggle,
-                            onRename = onAnthropicProfileRename,
-                            onRemove = onRemoveAnthropicProfile
-                        )
+                        key(profile.id) {
+                            AnthropicProfileRow(
+                                profile = profile,
+                                language = currentLanguage,
+                                onToggle = onAnthropicProfileToggle,
+                                onRename = onAnthropicProfileRename,
+                                onRemove = onRemoveAnthropicProfile
+                            )
+                        }
                     }
                 }
             }
