@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
@@ -47,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.isSamePeriod
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
@@ -64,6 +67,10 @@ private val HISTORY_PLOT_HEIGHT = 120.dp
 private val HISTORY_TOOLTIP_BAND_HEIGHT = 48.dp
 private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HEIGHT
 private val HISTORY_ANNOTATION_LABEL_WIDTH = 64.dp
+private const val HISTORY_RESET_CLUSTER_GAP_PX = 24f
+private const val HISTORY_MIN_ZOOM_WIDTH_FRACTION = 0.05f
+private const val HISTORY_ZOOM_STEP_FACTOR = 0.85f
+private const val HISTORY_PAN_SENSITIVITY = 0.1f
 
 internal data class HistoryRangeAnnotations(
     val startIndex: Int,
@@ -151,6 +158,7 @@ internal fun UsageHistoryLineChart(
     var tooltipSize by remember(renderPoints) { mutableStateOf(IntSize.Zero) }
     var hoveredIndex by remember(renderPoints, chartSelectionKey) { mutableStateOf<Int?>(null) }
     var dragSession by remember(renderPoints, chartSelectionKey) { mutableStateOf<DragSelectionSession?>(null) }
+    var zoomRange by remember(renderPoints, chartSelectionKey) { mutableStateOf(0f..1f) }
     val density = LocalDensity.current
 
     val revealFraction by animateFloatAsState(
@@ -159,48 +167,66 @@ internal fun UsageHistoryLineChart(
         label = "lineReveal"
     )
 
+    val windowedPoints = remember(renderPoints, zoomRange) {
+        zoomedPoints(renderPoints, zoomRange)
+    }
+
     LaunchedEffect(renderPoints, chartSelectionKey) {
         revealed = false
         hoveredIndex = null
         dragSession = null
         tooltipSize = IntSize.Zero
-        val currentSelection = selectionController?.selection
-        if (currentSelection != null &&
-            currentSelection.chartKey == chartSelectionKey &&
-            !currentSelection.isValidFor(renderPoints.size)
-        ) {
-            selectionController.clear()
-        }
         delay(40)
         revealed = true
     }
 
-    val timeLabels = buildTimeReferenceLabels(renderPoints)
-    val valueAxis = buildValueAxis(renderPoints, unit)
+    LaunchedEffect(zoomRange, chartSelectionKey) {
+        hoveredIndex = null
+        dragSession = null
+        val currentSelection = selectionController?.selection
+        if (currentSelection != null &&
+            currentSelection.chartKey == chartSelectionKey &&
+            !currentSelection.isValidFor(windowedPoints.size)
+        ) {
+            selectionController.clear()
+        }
+    }
+
+    val timeLabels = buildTimeReferenceLabels(windowedPoints)
+    val valueAxis = buildValueAxis(windowedPoints, unit)
     val valueLabels = buildValueLabels(valueAxis, unit)
     val plotInset = remember(plotSize) {
         resolvePlotHorizontalInset(plotSize.width.toFloat())
     }
-    val plotPoints = remember(renderPoints, valueAxis, plotSize) {
+    val plotPoints = remember(windowedPoints, valueAxis, plotSize) {
         buildPlotPoints(
-            points = renderPoints,
+            points = windowedPoints,
             chartWidth = plotSize.width.toFloat(),
             chartHeight = plotSize.height.toFloat(),
             axis = valueAxis,
             horizontalInsetPx = plotInset
         )
     }
-    val pinnedSelection = selectionController?.selectionFor(chartSelectionKey, renderPoints.size)
-    val rangeAnnotations = remember(renderPoints, unit) {
-        detectHistoryRangeAnnotations(renderPoints, unit)
+    val pinnedSelection = selectionController?.selectionFor(chartSelectionKey, windowedPoints.size)
+    val rangeAnnotations = remember(windowedPoints, unit) {
+        detectHistoryRangeAnnotations(windowedPoints, unit)
+    }
+    val resetClusterPoints = remember(rangeAnnotations, plotPoints) {
+        clusterResetIndices(
+            resetIndices = rangeAnnotations?.resetIndices.orEmpty(),
+            plotPoints = plotPoints,
+            minPixelGap = HISTORY_RESET_CLUSTER_GAP_PX
+        ).mapNotNull { marker ->
+            plotPoints.getOrNull(marker.representativeIndex)?.let { point -> marker to point }
+        }
     }
     val activeIndex = pinnedSelection?.currentIndex ?: hoveredIndex
     val activePoint = activeIndex?.let { index -> plotPoints.getOrNull(index) }
-    val comparisonPoint = pinnedSelection?.anchorIndex?.let(renderPoints::getOrNull)
+    val comparisonPoint = pinnedSelection?.anchorIndex?.let(windowedPoints::getOrNull)
     val tooltipModel = remember(
         activePoint,
         comparisonPoint,
-        renderPoints,
+        windowedPoints,
         unit,
         language,
         tooltipTitle,
@@ -208,7 +234,7 @@ internal fun UsageHistoryLineChart(
     ) {
         buildHistoryTooltipModel(
             activePoint = activePoint,
-            points = renderPoints,
+            points = windowedPoints,
             unit = unit,
             language = language,
             title = tooltipTitle,
@@ -227,6 +253,18 @@ internal fun UsageHistoryLineChart(
                 .height(HISTORY_FRAME_HEIGHT)
                 .onSizeChanged { frameSize = it }
         ) {
+            if (zoomRange != 0f..1f) {
+                TextButton(
+                    onClick = { zoomRange = 0f..1f },
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.PT) "Ver tudo" else "View all",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+
             if (valueLabels.isNotEmpty()) {
                 Column(
                     modifier = Modifier
@@ -269,10 +307,6 @@ internal fun UsageHistoryLineChart(
                     val resetPathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
                     val rangeStartPoint = rangeAnnotations?.startIndex?.let(plotPoints::getOrNull)
                     val rangeEndPoint = rangeAnnotations?.endIndex?.let(plotPoints::getOrNull)
-                    val resetPoints = rangeAnnotations
-                        ?.resetIndices
-                        ?.mapNotNull(plotPoints::getOrNull)
-                        .orEmpty()
 
                     drawLine(
                         color = gridColor,
@@ -293,12 +327,12 @@ internal fun UsageHistoryLineChart(
                         strokeWidth = gridStroke
                     )
 
-                    resetPoints.forEach { resetPoint ->
+                    resetClusterPoints.forEach { (_, resetPoint) ->
                         drawLine(
-                            color = chartIndicatorColor.copy(alpha = 0.22f),
+                            color = chartIndicatorColor.copy(alpha = 0.4f),
                             start = Offset(resetPoint.x, 0f),
                             end = Offset(resetPoint.x, size.height),
-                            strokeWidth = gridStroke,
+                            strokeWidth = gridStroke * 1.5f,
                             pathEffect = resetPathEffect
                         )
                     }
@@ -409,7 +443,7 @@ internal fun UsageHistoryLineChart(
                 HistoryRangeAnnotationLabels(
                     startPoint = rangeAnnotations?.startIndex?.let(plotPoints::getOrNull),
                     endPoint = rangeAnnotations?.endIndex?.let(plotPoints::getOrNull),
-                    resetPoint = rangeAnnotations?.resetIndices?.lastOrNull()?.let(plotPoints::getOrNull),
+                    resetClusters = resetClusterPoints,
                     plotWidth = plotSize.width.toFloat(),
                     plotInset = plotInset,
                     language = language
@@ -455,6 +489,26 @@ internal fun UsageHistoryLineChart(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onPointerEvent(PointerEventType.Scroll) { event ->
+                        val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                        val plotPointerX = coerceFramePointerToPlotPointerX(
+                            framePointerX = change.position.x,
+                            plotStartX = startPaddingPx,
+                            plotWidth = plotSize.width.toFloat()
+                        ) ?: return@onPointerEvent
+                        val pointerIndex = findClosestPlotPointIndex(plotPoints, plotPointerX)
+                        val pointerFraction = pointerIndex
+                            ?.let { index -> buildTimelineFractions(windowedPoints).getOrNull(index) }
+                            ?: 0.5f
+                        zoomRange = applyChartScroll(
+                            current = zoomRange,
+                            scrollDeltaY = change.scrollDelta.y,
+                            scrollDeltaX = change.scrollDelta.x,
+                            pointerFraction = pointerFraction,
+                            shiftPressed = event.keyboardModifiers.isShiftPressed
+                        )
+                        change.consume()
+                    }
                     .onPointerEvent(PointerEventType.Enter) { event ->
                         if (pinnedSelection != null || dragSession != null) {
                             return@onPointerEvent
@@ -595,7 +649,7 @@ internal fun UsageHistoryLineChart(
 private fun HistoryRangeAnnotationLabels(
     startPoint: ChartPlotPoint?,
     endPoint: ChartPlotPoint?,
-    resetPoint: ChartPlotPoint?,
+    resetClusters: List<Pair<ResetMarker, ChartPlotPoint>>,
     plotWidth: Float,
     plotInset: Float,
     language: AppLanguage
@@ -631,19 +685,33 @@ private fun HistoryRangeAnnotationLabels(
             )
         }
 
-        resetPoint?.let { point ->
-            HistoryAnnotationLabel(
-                text = if (language == AppLanguage.PT) "Reset" else "Reset",
-                left = clampTooltipLeft(
-                    desiredCenterX = point.x,
-                    tooltipWidth = labelWidthPx,
-                    containerWidth = plotWidth,
-                    horizontalPadding = plotInset
-                ),
-                topPadding = 22.dp
-            )
+        val occupiedX = mutableListOf<Float>()
+        if (showStartLabel) {
+            startPoint?.let { occupiedX += it.x }
+        }
+        endPoint?.let { occupiedX += it.x }
+
+        resetClusters.forEach { (marker, point) ->
+            val collides = occupiedX.any { x -> abs(point.x - x) < labelWidthPx }
+            if (!collides) {
+                HistoryAnnotationLabel(
+                    text = resetLabelText(marker.count),
+                    left = clampTooltipLeft(
+                        desiredCenterX = point.x,
+                        tooltipWidth = labelWidthPx,
+                        containerWidth = plotWidth,
+                        horizontalPadding = plotInset
+                    ),
+                    topPadding = 22.dp
+                )
+                occupiedX += point.x
+            }
         }
     }
+}
+
+private fun resetLabelText(count: Int): String {
+    return if (count > 1) "Reset ×$count" else "Reset"
 }
 
 @Composable
@@ -745,6 +813,11 @@ internal data class ChartPlotPoint(
     val point: UsageHistoryPoint,
     val x: Float,
     val y: Float
+)
+
+internal data class ResetMarker(
+    val representativeIndex: Int,
+    val count: Int
 )
 
 internal data class HistoryTooltipModel(
@@ -1087,7 +1160,7 @@ internal fun detectHistoryRangeAnnotations(
     for (index in 1 until points.size) {
         val previous = points[index - 1]
         val current = points[index]
-        val periodChanged = current.periodEndAt != previous.periodEndAt
+        val periodChanged = !isSamePeriod(current.periodEndAt, previous.periodEndAt)
         val usageDropped = unit != UsageUnit.CURRENCY_USD && current.displayUsed < previous.displayUsed
         if (periodChanged || usageDropped) {
             resetIndices += index
@@ -1099,6 +1172,100 @@ internal fun detectHistoryRangeAnnotations(
         endIndex = points.lastIndex,
         resetIndices = resetIndices
     )
+}
+
+internal fun clusterResetIndices(
+    resetIndices: List<Int>,
+    plotPoints: List<ChartPlotPoint>,
+    minPixelGap: Float
+): List<ResetMarker> {
+    if (resetIndices.isEmpty()) {
+        return emptyList()
+    }
+
+    val sortedIndices = resetIndices.sorted()
+    val clusters = mutableListOf<MutableList<Int>>()
+
+    for (index in sortedIndices) {
+        val point = plotPoints.getOrNull(index) ?: continue
+        val lastCluster = clusters.lastOrNull()
+        val lastPoint = lastCluster?.lastOrNull()?.let(plotPoints::getOrNull)
+        if (lastCluster != null && lastPoint != null && abs(point.x - lastPoint.x) < minPixelGap) {
+            lastCluster += index
+        } else {
+            clusters += mutableListOf(index)
+        }
+    }
+
+    return clusters.map { cluster ->
+        ResetMarker(representativeIndex = cluster.last(), count = cluster.size)
+    }
+}
+
+internal fun zoomedPoints(
+    points: List<UsageHistoryPoint>,
+    zoomRange: ClosedFloatingPointRange<Float>
+): List<UsageHistoryPoint> {
+    if (points.isEmpty() || zoomRange == 0f..1f) {
+        return points
+    }
+
+    val fractions = buildTimelineFractions(points)
+    val filtered = points.filterIndexed { index, _ ->
+        fractions[index] >= zoomRange.start && fractions[index] <= zoomRange.endInclusive
+    }
+    return filtered.ifEmpty { points }
+}
+
+internal fun applyChartScroll(
+    current: ClosedFloatingPointRange<Float>,
+    scrollDeltaY: Float,
+    scrollDeltaX: Float,
+    pointerFraction: Float,
+    shiftPressed: Boolean,
+    minWidth: Float = HISTORY_MIN_ZOOM_WIDTH_FRACTION
+): ClosedFloatingPointRange<Float> {
+    val width = current.endInclusive - current.start
+    val effectivePanDelta = if (shiftPressed) scrollDeltaY else scrollDeltaX
+    val isPan = shiftPressed || abs(scrollDeltaX) > abs(scrollDeltaY)
+
+    if (isPan) {
+        if (effectivePanDelta == 0f) {
+            return current
+        }
+        val panDelta = effectivePanDelta * width * HISTORY_PAN_SENSITIVITY
+        var newStart = current.start + panDelta
+        var newEnd = current.endInclusive + panDelta
+        if (newStart < 0f) {
+            newEnd -= newStart
+            newStart = 0f
+        }
+        if (newEnd > 1f) {
+            newStart -= (newEnd - 1f)
+            newEnd = 1f
+        }
+        return newStart.coerceAtLeast(0f)..newEnd.coerceAtMost(1f)
+    }
+
+    if (scrollDeltaY == 0f) {
+        return current
+    }
+
+    val zoomingIn = scrollDeltaY < 0f
+    val zoomFactor = if (zoomingIn) HISTORY_ZOOM_STEP_FACTOR else 1f / HISTORY_ZOOM_STEP_FACTOR
+    val newWidth = (width * zoomFactor).coerceIn(minWidth, 1f)
+    val anchor = pointerFraction.coerceIn(0f, 1f)
+    var newStart = anchor - (anchor - current.start) * (newWidth / width)
+    var newEnd = newStart + newWidth
+    if (newStart < 0f) {
+        newEnd -= newStart
+        newStart = 0f
+    }
+    if (newEnd > 1f) {
+        newStart -= (newEnd - 1f)
+        newEnd = 1f
+    }
+    return newStart.coerceAtLeast(0f)..newEnd.coerceAtMost(1f)
 }
 
 internal fun buildHistoryIntervalSummaryModel(

@@ -25,6 +25,18 @@ enum class HistoryRange {
     }
 }
 
+private const val RESET_DETECTION_TOLERANCE_MS = 300_000L
+
+/**
+ * O `resets_at` devolvido pelas APIs de uso (ex.: Anthropic) sofre jitter
+ * de até ~1s entre polls dentro da MESMA janela, sem reset real. Como a
+ * menor janela real (5h) é muito maior que esse jitter, só tratamos como
+ * mudança de período diferenças acima de [RESET_DETECTION_TOLERANCE_MS].
+ */
+fun isSamePeriod(a: Instant, b: Instant): Boolean {
+    return kotlin.math.abs(a.toEpochMilliseconds() - b.toEpochMilliseconds()) <= RESET_DETECTION_TOLERANCE_MS
+}
+
 data class UsageHistoryPoint(
     val capturedAt: Instant,
     val used: Long,

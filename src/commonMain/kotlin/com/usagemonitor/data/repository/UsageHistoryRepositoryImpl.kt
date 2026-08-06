@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.isSamePeriod
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -170,11 +171,11 @@ class UsageHistoryRepositoryImpl(
         for (index in 1 until points.size) {
             val previous = points[index - 1]
             val current = points[index]
+            val periodChanged = !isSamePeriod(current.periodEndAt, previous.periodEndAt)
             val resetDetected = if (unit == UsageUnit.CURRENCY_USD) {
-                current.periodEndAt != previous.periodEndAt
+                periodChanged
             } else {
-                current.displayUsed < previous.displayUsed ||
-                    current.periodEndAt != previous.periodEndAt
+                current.displayUsed < previous.displayUsed || periodChanged
             }
             if (resetDetected) {
                 segmentStartIndex = index

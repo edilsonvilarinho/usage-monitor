@@ -172,6 +172,24 @@ class UsageHistoryRepositoryImplTest {
     }
 
     @Test
+    fun `currentSegment ignores millisecond jitter in periodEndAt and keeps the full history`() = kotlinx.coroutines.test.runTest {
+        // used sobe de forma constante (50/h) e periodEndAt oscila por jitter de servidor
+        // (~1s), sem reset real. Se cada jitter cortasse o segmento, a média por hora
+        // observada cairia pra quase zero (só o último ponto entraria no cálculo).
+        val records = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T13:00:00Z", 100, 1000, "2026-04-28T20:00:00.100Z"),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T14:00:00Z", 150, 1000, "2026-04-28T19:59:59.700Z"),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 200, 1000, "2026-04-28T20:00:00.900Z")
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertEquals(50.0, series.averageDisplayConsumptionPerHour, 0.001)
+    }
+
+    @Test
     fun `TOTAL range returns all snapshots including records older than thirty days`() = kotlinx.coroutines.test.runTest {
         val records = listOf(
             record("Codex 5h", ApiSource.CODEX, "2026-02-15T10:00:00Z", 20, 1000),
