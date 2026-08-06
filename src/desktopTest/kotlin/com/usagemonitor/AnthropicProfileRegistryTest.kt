@@ -83,6 +83,28 @@ class AnthropicProfileRegistryTest {
     }
 
     @Test
+    fun `updateLabel does not reorder the published profile list`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        val aDir = File(tempDir, ".claude-alpha").also { it.mkdirs() }
+        val bDir = File(tempDir, ".claude-beta").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        writeProfileFiles(aDir, File(aDir, ".claude.json"), "alpha@example.com", "account-b")
+        writeProfileFiles(bDir, File(bDir, ".claude.json"), "beta@example.com", "account-c")
+        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val alpha = registry.profiles.value.first { it.configDirectory == aDir.absolutePath }
+        val beta = registry.profiles.value.first { it.configDirectory == bDir.absolutePath }
+        val orderBefore = registry.profiles.value.map { it.id }
+
+        // Rótulo escolhido de propósito para inverter a ordem alfabética (alpha < beta)
+        // caso a lista fosse reordenada por label, como fazia o fluxo antigo via rescan()/publish().
+        registry.updateLabel(beta.id, "Aaa - antes de tudo")
+
+        assertEquals(orderBefore, registry.profiles.value.map { it.id })
+        assertEquals("Aaa - antes de tudo", registry.profiles.value.first { it.id == beta.id }.label)
+        assertEquals(alpha.label, registry.profiles.value.first { it.id == alpha.id }.label)
+    }
+
+    @Test
     fun `marks profile with missing identity as incomplete`() {
         val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
         File(defaultDir, ".credentials.json").writeText("{\"claudeAiOauth\":{}}")
