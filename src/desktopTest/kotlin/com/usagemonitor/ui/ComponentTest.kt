@@ -2,6 +2,10 @@ package com.usagemonitor.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -680,6 +684,49 @@ class ComponentTest {
         onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
         onNodeWithText("Kilo Free").assertIsDisplayed()
         onAllNodesWithText("Close").assertCountEquals(0)
+    }
+
+    @Test
+    fun `SettingsDialogContent expands Anthropic profile editor only after Edit click`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                var expandedProfileId by remember { mutableStateOf<String?>(null) }
+                SettingsDialogContent(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.EN,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    anthropicProfiles = listOf(
+                        AnthropicProfileUiModel(
+                            id = "default",
+                            label = "Personal",
+                            path = "C:\\Users\\test\\.claude",
+                            enabled = true,
+                            removable = false,
+                            identityLabel = "personal@example.com",
+                            status = AnthropicProfileUiStatus.READY
+                        )
+                    ),
+                    expandedProfileId = expandedProfileId,
+                    onToggleProfileExpanded = { profileId ->
+                        expandedProfileId = if (expandedProfileId == profileId) null else profileId
+                    }
+                )
+            }
+        }
+
+        // Colapsado por padrão: identidade visível, campo de edição do apelido ainda não.
+        onNodeWithText("personal@example.com").assertIsDisplayed()
+        onAllNodesWithText("Label").assertCountEquals(0)
+
+        onNodeWithContentDescription("Edit").performClick()
+
+        // Expandido após clicar em "Editar": campo de edição do apelido aparece.
+        onNodeWithText("Label").assertIsDisplayed()
     }
 
     @Test
