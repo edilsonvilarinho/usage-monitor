@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v22.1.0). Must already exist on the remote.'
+        required: true
+        type: string
 
 jobs:
   build-linux:
@@ -16,13 +22,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
       - name: Extract version
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Build focal packaging image
         run: |
@@ -133,6 +147,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -153,7 +169,12 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF -replace '^refs/tags/v', ''
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $tag = '${{ inputs.tag }}'
+          } else {
+            $tag = $env:GITHUB_REF -replace '^refs/tags/', ''
+          }
+          $version = $tag -replace '^v', ''
           "VERSION=$version" >> $env:GITHUB_OUTPUT
 
       - name: Build Windows release artifacts
@@ -187,6 +208,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: Download packaged artifacts
@@ -205,7 +227,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          current_tag="${GITHUB_REF#refs/tags/}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            current_tag="${{ inputs.tag }}"
+          else
+            current_tag="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$current_tag" >> "$GITHUB_OUTPUT"
           git fetch --force --tags
 
           previous_tag="$(git tag --sort=-version:refname | grep '^v' | grep -Fxv "$current_tag" | head -n 1 || true)"
@@ -255,6 +282,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release_notes.outputs.tag }}
           body_path: ${{ steps.release_notes.outputs.notes_path }}
           files: dist-build/*
           fail_on_unmatched_files: true
