@@ -174,6 +174,9 @@ fun main() = application {
     }
     var cardOrder by remember { mutableStateOf(persistedCardOrder) }
     var minimizedCards by remember { mutableStateOf(persistedMinimizedCards) }
+    // Estado efêmero de expansão do editor de conta Anthropic nas Configurações.
+    // Não é persistido: reabrir o diálogo pode voltar ao estado colapsado.
+    var expandedAnthropicProfileId by remember { mutableStateOf<String?>(null) }
     val persistedMainWindowState = remember(settings) {
         readPersistedMainWindowState(settings)
     }
@@ -546,6 +549,14 @@ fun main() = application {
                                 profileRegistry.profiles.value
                             ).enabledProfiles
                             viewModel.refresh(ApiSource.ANTHROPIC)
+                        },
+                        expandedProfileId = expandedAnthropicProfileId,
+                        onToggleProfileExpanded = { profileId ->
+                            expandedAnthropicProfileId = if (expandedAnthropicProfileId == profileId) {
+                                null
+                            } else {
+                                profileId
+                            }
                         }
                     )
                 }

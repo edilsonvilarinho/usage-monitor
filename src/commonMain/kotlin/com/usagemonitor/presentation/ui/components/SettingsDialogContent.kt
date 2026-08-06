@@ -7,17 +7,19 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -65,6 +67,8 @@ fun SettingsDialogContent(
     onAddAnthropicProfile: () -> Unit = {},
     onRemoveAnthropicProfile: (String) -> Unit = {},
     onRescanAnthropicProfiles: () -> Unit = {},
+    expandedProfileId: String? = null,
+    onToggleProfileExpanded: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -170,9 +174,11 @@ fun SettingsDialogContent(
                         AnthropicProfileRow(
                             profile = profile,
                             language = currentLanguage,
+                            expanded = profile.id == expandedProfileId,
                             onToggle = onAnthropicProfileToggle,
                             onRename = onAnthropicProfileRename,
-                            onRemove = onRemoveAnthropicProfile
+                            onRemove = onRemoveAnthropicProfile,
+                            onToggleExpanded = { onToggleProfileExpanded(profile.id) }
                         )
                     }
                 }
@@ -187,9 +193,11 @@ fun SettingsDialogContent(
 private fun AnthropicProfileRow(
     profile: AnthropicProfileUiModel,
     language: AppLanguage,
+    expanded: Boolean,
     onToggle: (String, Boolean) -> Unit,
     onRename: (String, String) -> Unit,
-    onRemove: (String) -> Unit
+    onRemove: (String) -> Unit,
+    onToggleExpanded: () -> Unit
 ) {
     val statusText = when (profile.status) {
         AnthropicProfileUiStatus.READY -> if (language == AppLanguage.PT) "Pronto" else "Ready"
@@ -197,6 +205,13 @@ private fun AnthropicProfileRow(
         AnthropicProfileUiStatus.INVALID -> if (language == AppLanguage.PT) "Inválido" else "Invalid"
         AnthropicProfileUiStatus.DUPLICATE -> if (language == AppLanguage.PT) "Conta duplicada" else "Duplicate account"
     }
+    val statusColor = if (profile.status == AnthropicProfileUiStatus.READY) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.error
+    }
+    val editLabel = if (language == AppLanguage.PT) "Editar" else "Edit"
+    val collapseLabel = if (language == AppLanguage.PT) "Recolher" else "Collapse"
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -207,45 +222,65 @@ private fun AnthropicProfileRow(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = profile.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    val identity = profile.identityLabel
+                    if (identity != null) {
+                        Text(
+                            text = identity,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Switch(
+                    checked = profile.enabled,
+                    onCheckedChange = { checked -> onToggle(profile.id, checked) }
+                )
+                IconButton(onClick = onToggleExpanded) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Rounded.Close else Icons.Rounded.Edit,
+                        contentDescription = if (expanded) collapseLabel else editLabel
+                    )
+                }
+            }
+
+            if (expanded) {
                 OutlinedTextField(
                     value = profile.label,
                     onValueChange = { value -> onRename(profile.id, value) },
                     singleLine = true,
                     label = { Text(if (language == AppLanguage.PT) "Apelido" else "Label") },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Switch(
-                    checked = profile.enabled,
-                    onCheckedChange = { checked -> onToggle(profile.id, checked) }
-                )
-            }
-            Text(
-                text = profile.path,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            val identity = profile.identityLabel
-            if (identity != null) {
                 Text(
-                    text = identity,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = profile.path,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            Text(
-                text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (profile.status == AnthropicProfileUiStatus.READY) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
-                }
-            )
-            if (profile.removable) {
-                TextButton(onClick = { onRemove(profile.id) }) {
-                    Text(if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor")
+                Text(
+                    text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor
+                )
+                if (profile.removable) {
+                    TextButton(onClick = { onRemove(profile.id) }) {
+                        Text(if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor")
+                    }
                 }
             }
         }
