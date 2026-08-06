@@ -32,10 +32,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -273,9 +279,21 @@ private fun AnthropicProfileRow(
             }
 
             if (expanded) {
+                // Estado do campo é local (não round-tripa por profile.label a cada tecla).
+                // O OutlinedTextField(String) controlado por um valor que volta via StateFlow
+                // reseta a seleção com base no texto externo a cada recomposição, e esse
+                // recálculo ficava um caractere atrasado em relação ao texto (issue #19).
+                // Mantendo o cursor só na memória local do campo, ele nunca depende do
+                // round-trip; onRename ainda propaga o texto pra cima a cada tecla.
+                var labelFieldValue by remember {
+                    mutableStateOf(TextFieldValue(profile.label, TextRange(profile.label.length)))
+                }
                 OutlinedTextField(
-                    value = profile.label,
-                    onValueChange = { value -> onRename(profile.id, value) },
+                    value = labelFieldValue,
+                    onValueChange = { newValue ->
+                        labelFieldValue = newValue
+                        onRename(profile.id, newValue.text)
+                    },
                     singleLine = true,
                     label = { Text(if (language == AppLanguage.PT) "Apelido" else "Label") },
                     modifier = Modifier.fillMaxWidth()

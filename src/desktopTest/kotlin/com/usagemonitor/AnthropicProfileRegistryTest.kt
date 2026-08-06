@@ -105,6 +105,24 @@ class AnthropicProfileRegistryTest {
     }
 
     @Test
+    fun `updateLabel autosaves to disk after flushing the pending write`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        val workDir = File(tempDir, ".claude-work").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        writeProfileFiles(workDir, File(workDir, ".claude.json"), "work@example.com", "account-b")
+        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val work = registry.profiles.value.first { it.id != "default" }
+
+        // updateLabel atualiza a memória na hora, mas grava em disco de forma
+        // debounced (fora da UI thread) para não travar o cursor do TextField (#19).
+        registry.updateLabel(work.id, "Novo apelido")
+        registry.flushPendingLabelWrite()
+
+        val reloaded = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        assertEquals("Novo apelido", reloaded.profiles.value.first { it.id == work.id }.label)
+    }
+
+    @Test
     fun `marks profile with missing identity as incomplete`() {
         val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
         File(defaultDir, ".credentials.json").writeText("{\"claudeAiOauth\":{}}")

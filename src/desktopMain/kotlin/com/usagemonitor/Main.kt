@@ -258,11 +258,12 @@ fun main() = application {
     }
 
     val shutdownStarted = remember { AtomicBoolean(false) }
-    DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
+    DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource, profileRegistry) {
         val shutdownHook = Thread {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
                 openCodeUsageDataSource.close()
@@ -280,6 +281,7 @@ fun main() = application {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
                 openCodeUsageDataSource.close()
