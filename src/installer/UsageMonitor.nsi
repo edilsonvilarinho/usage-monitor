@@ -8,7 +8,7 @@ SetCompressor zlib
 ; General
 ; -----------------------------------------------
 !ifndef PRODUCT_VERSION
-!define PRODUCT_VERSION "21.0.0"
+!define PRODUCT_VERSION "22.0.0"
 !endif
 
 !define PRODUCT_NAME "Usage Monitor"
