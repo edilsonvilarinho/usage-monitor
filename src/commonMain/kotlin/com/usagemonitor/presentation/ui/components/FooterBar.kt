@@ -1,18 +1,14 @@
 package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -45,10 +41,6 @@ import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
-private val NarrowBreakpoint = 360.dp
-private val MediumBreakpoint = 500.dp
-
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FooterBar(
     appVersion: String,
@@ -85,68 +77,26 @@ fun FooterBar(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp
     ) {
-        BoxWithConstraints(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val compact = maxWidth < MediumBreakpoint
-            val dense = maxWidth < NarrowBreakpoint
-
-            if (dense) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FooterCompactStatusGroup(
-                        appVersion = appVersion,
-                        language = language,
-                        secondsUntilRefresh = secondsUntilRefresh,
-                        dense = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    FooterActionGroup(
-                        language = language,
-                        onRefresh = onRefresh,
-                        onOpenSettings = onOpenSettings,
-                        iconOnly = true
-                    )
-                }
-            } else if (compact) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FooterCompactStatusGroup(
-                        appVersion = appVersion,
-                        language = language,
-                        secondsUntilRefresh = secondsUntilRefresh
-                    )
-                    FooterActionGroup(
-                        language = language,
-                        onRefresh = onRefresh,
-                        onOpenSettings = onOpenSettings,
-                        compact = true
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FooterStatusGroup(
-                        appVersion = appVersion,
-                        language = language,
-                        secondsUntilRefresh = secondsUntilRefresh,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    FooterActionGroup(
-                        language = language,
-                        onRefresh = onRefresh,
-                        onOpenSettings = onOpenSettings
-                    )
-                }
-            }
+            FooterCompactStatusGroup(
+                appVersion = appVersion,
+                language = language,
+                secondsUntilRefresh = secondsUntilRefresh,
+                dense = true,
+                modifier = Modifier.weight(1f)
+            )
+            FooterActionGroup(
+                language = language,
+                onRefresh = onRefresh,
+                onOpenSettings = onOpenSettings,
+                iconOnly = true
+            )
         }
     }
 }
@@ -168,82 +118,53 @@ private fun FooterCompactStatusGroup(
     } else {
         "Next $countdown"
     }
+    val versionTooltip = if (language == AppLanguage.PT) "Versão do app" else "App version"
+    val refreshTooltip = if (language == AppLanguage.PT) {
+        "Próxima atualização automática"
+    } else {
+        "Next automatic refresh"
+    }
 
     FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        FooterCompactBadge(text = "v$appVersion")
-        FooterCompactBadge(text = refreshLabel)
+        FooterCompactBadge(text = "v$appVersion", tooltipLabel = versionTooltip)
+        FooterCompactBadge(text = refreshLabel, tooltipLabel = refreshTooltip)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FooterCompactBadge(
     text: String,
+    tooltipLabel: String,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier,
-        shape = AppShapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(tooltipLabel)
+            }
+        },
+        state = rememberTooltipState()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-        )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FooterStatusGroup(
-    appVersion: String,
-    language: AppLanguage,
-    secondsUntilRefresh: Int,
-    modifier: Modifier = Modifier
-) {
-    FlowRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FooterStatusItem(
-            label = if (language == AppLanguage.PT) "Versão:" else "Version:",
-            value = "v$appVersion"
-        )
-        FooterStatusItem(
-            label = if (language == AppLanguage.PT) "Próxima atualização:" else "Next update:",
-            value = formatRefreshCountdown(secondsUntilRefresh)
-        )
-    }
-}
-
-@Composable
-private fun FooterStatusItem(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.widthIn(min = 110.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Surface(
+            modifier = modifier,
+            shape = AppShapes.small,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
     }
 }
 
@@ -252,7 +173,6 @@ private fun FooterActionGroup(
     language: AppLanguage,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
-    compact: Boolean = false,
     iconOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -286,11 +206,7 @@ private fun FooterActionGroup(
         } else {
             TextButton(
                 onClick = onOpenSettings,
-                contentPadding = if (compact) {
-                    PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                } else {
-                    PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                }
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = if (language == AppLanguage.PT) "Configurações" else "Settings",

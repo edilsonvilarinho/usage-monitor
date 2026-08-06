@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.seconds
 class FooterBarTest {
 
     @Test
-    fun `FooterBar displays localized version and next update in PT`() = runDesktopComposeUiTest {
+    fun `FooterBar displays version and countdown badges with settings icon`() = runDesktopComposeUiTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
@@ -44,11 +44,9 @@ class FooterBarTest {
             }
         }
 
-        onNodeWithText("Versão:").assertIsDisplayed()
         onNodeWithText("v1.1.0").assertIsDisplayed()
-        onNodeWithText("Próxima atualização:").assertIsDisplayed()
         onNodeWithText("02:05").assertIsDisplayed()
-        onNodeWithText("Configurações").assertIsDisplayed()
+        onNodeWithContentDescription("Abrir configurações").assertIsDisplayed()
         onAllNodesWithText("Histórico").assertCountEquals(0)
     }
 
@@ -73,7 +71,7 @@ class FooterBarTest {
             }
         }
 
-        onNodeWithText("Configurações").performClick()
+        onNodeWithContentDescription("Abrir configurações").performClick()
         assertEquals(true, opened)
     }
 
