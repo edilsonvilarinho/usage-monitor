@@ -34,7 +34,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,7 @@ import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
+import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ShimmerBox
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -75,6 +78,7 @@ fun DashboardScreen(
     val toastMessage by viewModel.toastMessage.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var pendingRefreshAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let { toast ->
@@ -90,7 +94,7 @@ fun DashboardScreen(
                 appVersion = appVersion,
                 language = language,
                 nextRefreshAt = nextRefreshAt,
-                onRefresh = { viewModel.refresh() },
+                onRefresh = { pendingRefreshAction = { viewModel.refresh() } },
                 onOpenSettings = onOpenSettings,
                 countdownUpdatesEnabled = countdownUpdatesEnabled
             )
@@ -158,7 +162,7 @@ fun DashboardScreen(
                                     cardOrder = cardOrder,
                                     minimizedCards = minimizedCards,
                                     language = language,
-                                    onRefreshCard = { target -> viewModel.refresh(target) },
+                                    onRefreshCard = { target -> pendingRefreshAction = { viewModel.refresh(target) } },
                                     onMoveCardToIndex = onMoveCardToIndex,
                                     onToggleCardMinimized = onToggleCardMinimized,
                                     onOpenHistoryCard = onOpenHistory,
@@ -171,6 +175,17 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    pendingRefreshAction?.let { action ->
+        RefreshWarningDialog(
+            language = language,
+            onConfirm = {
+                action()
+                pendingRefreshAction = null
+            },
+            onDismiss = { pendingRefreshAction = null }
+        )
     }
 }
 

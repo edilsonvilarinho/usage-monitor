@@ -55,6 +55,57 @@ internal fun emptyDashboardViewModel(enabledApis: MutableStateFlow<Set<ApiSource
     )
 }
 
+internal fun successDashboardViewModelCountingFetches(
+    enabledApis: MutableStateFlow<Set<ApiSource>>,
+    fetchCount: java.util.concurrent.atomic.AtomicInteger
+): DashboardViewModel {
+    val anthropicRepo = object : AnthropicRepository {
+        override suspend fun getUsage(): Result<ApiUsageStats> {
+            fetchCount.incrementAndGet()
+            return Result.success(
+                ApiUsageStats(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = emptyList()
+                )
+            )
+        }
+    }
+    val minimaxRepo = object : MiniMaxRepository {
+        override suspend fun getUsage() = Result.success(
+            ApiUsageStats(
+                source = ApiSource.MINIMAX,
+                apiName = "MiniMax",
+                quotas = emptyList()
+            )
+        )
+    }
+    val codexRepo = object : CodexRepository {
+        override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+    }
+    val deepSeekRepo = object : DeepSeekRepository {
+        override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+    }
+    val historyRepository = object : UsageHistoryRepository {
+        override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+        override suspend fun getHistoryReport(
+            source: ApiSource,
+            range: HistoryRange,
+            now: Instant
+        ) = throw UnsupportedOperationException("Não utilizado neste teste")
+    }
+
+    return DashboardViewModel(
+        getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+        getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
+        getCodexUsage = GetCodexUsageUseCase(codexRepo),
+        getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
+        enabledApis = enabledApis,
+        recordUsageSnapshot = RecordUsageSnapshotUseCase(historyRepository)
+    )
+}
+
 internal fun dashboardViewModelWithAvailableUpdate(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
     val anthropicRepo = object : AnthropicRepository {
         override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))

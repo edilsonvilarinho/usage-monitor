@@ -537,6 +537,49 @@ class ComponentTest {
     // ── FooterBar ───────────────────────────────────────────────────────
 
     @Test
+    fun `DashboardScreen shows refresh warning dialog and only refreshes on confirm`() = runDesktopComposeUiTest {
+        val enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX))
+        val fetchCount = java.util.concurrent.atomic.AtomicInteger(0)
+        val viewModel = successDashboardViewModelCountingFetches(enabledApis, fetchCount)
+        viewModel.cancelCountdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = { _, _ -> },
+                    onOpenSettings = {},
+                    countdownUpdatesEnabled = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            fetchCount.get() >= 1
+        }
+        val fetchCountBeforeManualRefresh = fetchCount.get()
+
+        onNodeWithContentDescription("Atualizar agora").performClick()
+        onNodeWithText("Atualizar agora?").assertIsDisplayed()
+        onNodeWithText("Cancelar").performClick()
+        assertEquals(fetchCountBeforeManualRefresh, fetchCount.get())
+
+        onNodeWithContentDescription("Atualizar agora").performClick()
+        onNodeWithText("Atualizar agora?").assertIsDisplayed()
+        onNodeWithText("Atualizar").performClick()
+
+        waitUntil(timeoutMillis = 5_000) {
+            fetchCount.get() > fetchCountBeforeManualRefresh
+        }
+    }
+
+    @Test
     fun `DashboardScreen guides the user to settings when no APIs are enabled`() = runDesktopComposeUiTest {
         var opened = false
         val enabledApis = MutableStateFlow(emptySet<ApiSource>())

@@ -73,6 +73,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.prefs.Preferences
@@ -90,6 +91,7 @@ private const val LANGUAGE_KEY = "language"
 private const val AUTO_START_KEY = "autoStart"
 private const val CARD_ORDER_KEY = "cardOrder"
 private const val MINIMIZED_CARDS_KEY = "minimizedCards"
+private const val NEXT_REFRESH_AT_KEY = "nextRefreshAtMillis"
 
 private fun loadWindowIcon() = runCatching {
     val stream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH) ?: return@runCatching null
@@ -147,6 +149,12 @@ fun main() = application {
         }
 
         resolvedAutoStartEnabled
+    }
+
+    val persistedNextRefreshAt = remember(settings) {
+        settings.getLong(NEXT_REFRESH_AT_KEY, -1L)
+            .takeIf { it > 0 }
+            ?.let { Instant.fromEpochMilliseconds(it) }
     }
 
     val enabledApis = remember { MutableStateFlow(persistedApis) }
@@ -247,7 +255,9 @@ fun main() = application {
             appUpdateReleaseOpener = appUpdateReleaseOpener,
             currentAppVersion = CURRENT_APP_VERSION,
             isAppVisible = isAppVisible,
-            anthropicProfiles = enabledAnthropicProfiles
+            anthropicProfiles = enabledAnthropicProfiles,
+            persistedNextRefreshAt = persistedNextRefreshAt,
+            onNextRefreshAtChanged = { instant -> settings.putLong(NEXT_REFRESH_AT_KEY, instant.toEpochMilliseconds()) }
         )
     }
     val historyViewModel = remember(getUsageHistory, enabledApis) {

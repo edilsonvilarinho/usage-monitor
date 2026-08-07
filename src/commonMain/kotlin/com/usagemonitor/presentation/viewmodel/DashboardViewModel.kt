@@ -69,17 +69,22 @@ class DashboardViewModel(
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
     private val anthropicProfiles: StateFlow<List<AnthropicProfileRef>> =
         MutableStateFlow(listOf(AnthropicProfileRef.DEFAULT)),
-    private val config: DashboardViewModelConfig = DashboardViewModelConfig()
+    private val config: DashboardViewModelConfig = DashboardViewModelConfig(),
+    private val persistedNextRefreshAt: Instant? = null,
+    private val onNextRefreshAtChanged: (Instant) -> Unit = {}
 ) {
     private data class PendingFetchRequest(
         val targets: Set<UsageTargetKey>,
         val preserveDataOnFailure: Boolean
     )
 
+    private val initialScheduledRefreshAt: Instant =
+        persistedNextRefreshAt?.takeIf { it > clock.now() } ?: (clock.now() + config.pollInterval)
+
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private val _nextRefreshAt = MutableStateFlow(clock.now() + config.pollInterval)
+    private val _nextRefreshAt = MutableStateFlow(initialScheduledRefreshAt)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
     private val _refreshingTargets = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
@@ -103,13 +108,14 @@ class DashboardViewModel(
     private val sourceFetchSemaphore = Semaphore(config.maxConcurrentSourceFetches.coerceAtLeast(1))
     private val pollWakeUpSignal = Channel<Unit>(capacity = Channel.CONFLATED)
     private val initialFetchCancelled = AtomicBoolean(false)
-    @Volatile private var scheduledRefreshAt: Instant = clock.now() + config.pollInterval
+    @Volatile private var scheduledRefreshAt: Instant = initialScheduledRefreshAt
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
     private var pendingFetchRequest: PendingFetchRequest? = null
 
     init {
-        if (config.autoStartInitialFetch) {
+        val isPersistedRefreshStillPending = persistedNextRefreshAt != null && persistedNextRefreshAt > clock.now()
+        if (config.autoStartInitialFetch && !isPersistedRefreshStillPending) {
             initFetchJob = viewModelScope.launch {
                 if (initialFetchCancelled.get()) {
                     return@launch
@@ -493,6 +499,7 @@ class DashboardViewModel(
     private fun scheduleNextRefresh(baseTime: Instant = clock.now()) {
         scheduledRefreshAt = baseTime + config.pollInterval
         _nextRefreshAt.value = scheduledRefreshAt
+        onNextRefreshAtChanged(scheduledRefreshAt)
         pollWakeUpSignal.trySend(Unit)
     }
 }
