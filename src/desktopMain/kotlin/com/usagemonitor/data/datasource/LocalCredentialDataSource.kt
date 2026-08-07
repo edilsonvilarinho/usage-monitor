@@ -202,6 +202,7 @@ internal class LocalCredentialDataSource(
                     StandardCopyOption.REPLACE_EXISTING
                 )
             }
+            restrictToOwnerReadWrite(target.toPath())
         } finally {
             if (tempFile.exists()) {
                 tempFile.delete()

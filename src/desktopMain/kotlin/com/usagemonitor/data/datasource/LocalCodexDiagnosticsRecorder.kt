@@ -35,6 +35,7 @@ class LocalCodexDiagnosticsRecorder(
         synchronized(lock) {
             diagnosticsFile.parentFile?.mkdirs()
             diagnosticsFile.appendText("$line\n")
+            restrictToOwnerReadWrite(diagnosticsFile.toPath())
         }
     }
 

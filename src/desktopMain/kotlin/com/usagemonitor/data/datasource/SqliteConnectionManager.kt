@@ -37,6 +37,7 @@ internal class SqliteConnectionManager(
             .also { openedConnection ->
                 onOpen(openedConnection)
                 connection = openedConnection
+                restrictToOwnerReadWrite(databaseFile.toPath())
             }
     }
 }

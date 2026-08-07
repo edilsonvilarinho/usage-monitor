@@ -70,9 +70,11 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicBoolean
@@ -137,19 +139,11 @@ fun main() = application {
             .toSet()
             .ifEmpty { DEFAULT_ENABLED_APIS }
     }
-    val initialAutoStartEnabled = remember(settings) {
-        val storedAutoStartPreference = settings.getBoolean(AUTO_START_KEY, false)
-        val resolvedAutoStartEnabled = if (AutoStartManager.isAutoStartSupported()) {
-            AutoStartManager.isAutoStartEnabled()
-        } else {
-            storedAutoStartPreference
-        }
-
-        if (storedAutoStartPreference != resolvedAutoStartEnabled) {
-            settings.putBoolean(AUTO_START_KEY, resolvedAutoStartEnabled)
-        }
-
-        resolvedAutoStartEnabled
+    // Valor inicial vem só das preferências persistidas (leitura em memória, sem custo de I/O).
+    // A confirmação real do estado do SO (que pode envolver "reg query", bloqueante) acontece
+    // depois, de forma assíncrona, para não atrasar o primeiro frame da janela.
+    val storedAutoStartPreference = remember(settings) {
+        settings.getBoolean(AUTO_START_KEY, false)
     }
 
     val persistedNextRefreshAt = remember(settings) {
@@ -371,7 +365,18 @@ fun main() = application {
                 ?: AppLanguage.PT
         )
     }
-    var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
+    var autoStartEnabled by remember { mutableStateOf(storedAutoStartPreference) }
+    LaunchedEffect(settings) {
+        if (AutoStartManager.isAutoStartSupported()) {
+            val resolvedAutoStartEnabled = withContext(Dispatchers.IO) {
+                AutoStartManager.isAutoStartEnabled()
+            }
+            if (resolvedAutoStartEnabled != storedAutoStartPreference) {
+                settings.putBoolean(AUTO_START_KEY, resolvedAutoStartEnabled)
+            }
+            autoStartEnabled = resolvedAutoStartEnabled
+        }
+    }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
