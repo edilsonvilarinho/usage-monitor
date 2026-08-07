@@ -445,7 +445,7 @@ private fun AccountIdentityLabel(
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
-    val tooltipState = rememberTooltipState()
+    val tooltipState = rememberTooltipState(isPersistent = true)
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = {

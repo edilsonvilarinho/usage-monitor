@@ -115,7 +115,7 @@ internal fun HoverTooltipBox(
                 metrics = metrics
             )
         },
-        state = rememberTooltipState()
+        state = rememberTooltipState(isPersistent = true)
     ) {
         Box(modifier = modifier) {
             content()

@@ -149,7 +149,7 @@ private fun FooterCompactBadge(
                 Text(tooltipLabel)
             }
         },
-        state = rememberTooltipState()
+        state = rememberTooltipState(isPersistent = true)
     ) {
         Surface(
             modifier = modifier,
@@ -231,7 +231,7 @@ private fun FooterIconActionButton(
                 Text(label)
             }
         },
-        state = rememberTooltipState()
+        state = rememberTooltipState(isPersistent = true)
     ) {
         FilledTonalIconButton(
             onClick = onClick,
