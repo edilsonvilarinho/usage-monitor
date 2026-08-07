@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui.theme
 
+import androidx.compose.foundation.LocalScrollbarStyle
+import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -7,6 +9,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -145,7 +148,14 @@ fun AppTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         shapes      = appShapes,
-        typography  = appTypography,
-        content     = content
-    )
+        typography  = appTypography
+    ) {
+        val scrollbarStyle = LocalScrollbarStyle.current.copy(
+            unhoverColor = colorScheme.onSurface.copy(alpha = 0.24f),
+            hoverColor   = colorScheme.onSurface.copy(alpha = 0.5f)
+        )
+        CompositionLocalProvider(LocalScrollbarStyle provides scrollbarStyle) {
+            content()
+        }
+    }
 }

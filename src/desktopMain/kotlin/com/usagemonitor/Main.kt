@@ -372,6 +372,7 @@ fun main() = application {
     }
     var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
+    var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
     var historyOpenGeneration by remember { mutableStateOf(0) }
     val shutdownApplication = remember(viewModel, historyViewModel, httpClient, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
@@ -441,7 +442,10 @@ fun main() = application {
                         historyOpenGeneration++
                         historyViewModel.openForSource(source, accountKey)
                     },
-                    onOpenSettings = { isSettingsDialogOpen = true }
+                    onOpenSettings = {
+                        isSettingsDialogOpen = true
+                        settingsOpenGeneration++
+                    }
                 )
             }
         }
@@ -457,7 +461,7 @@ fun main() = application {
             undecorated = true
         ) {
             LaunchedEffect(historyOpenGeneration) {
-                activateHistoryWindow(window)
+                activateWindow(window)
             }
             AppTheme(isDark = isDark) {
                 DesktopDialogFrame(
@@ -487,6 +491,9 @@ fun main() = application {
             resizable = true,
             undecorated = true
         ) {
+            LaunchedEffect(settingsOpenGeneration) {
+                activateWindow(window)
+            }
             AppTheme(isDark = isDark) {
                 DesktopDialogFrame(
                     title = if (language == AppLanguage.PT) "Configurações" else "Settings",

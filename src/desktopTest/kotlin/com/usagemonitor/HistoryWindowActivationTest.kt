@@ -8,10 +8,10 @@ import kotlin.test.assertTrue
 class HistoryWindowActivationTest {
 
     @Test
-    fun `activate history window brings it to front without forcing fullscreen bounds`() {
-        val window = FakeHistoryWindowActivationTarget()
+    fun `activate window brings it to front without forcing fullscreen bounds`() {
+        val window = FakeWindowActivationTarget()
 
-        activateHistoryWindow(window)
+        activateWindow(window)
 
         assertTrue(window.isVisible)
         assertTrue(window.broughtToFront)
@@ -19,7 +19,7 @@ class HistoryWindowActivationTest {
         assertFalse(window.setBoundsCalled)
     }
 
-    private class FakeHistoryWindowActivationTarget : HistoryWindowActivationTarget {
+    private class FakeWindowActivationTarget : WindowActivationTarget {
         override var isVisible: Boolean = false
         var broughtToFront = false
         var focusRequested = false

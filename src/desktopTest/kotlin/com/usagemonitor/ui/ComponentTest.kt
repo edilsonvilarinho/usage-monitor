@@ -827,7 +827,6 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("Settings").assertIsDisplayed()
         onNodeWithText("System Startup").assertIsDisplayed()
         onNodeWithText("Language").assertIsDisplayed()
         onNodeWithText("Monitored APIs").assertIsDisplayed()

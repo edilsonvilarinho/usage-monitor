@@ -22,7 +22,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
+import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppShapes
 
 enum class AnthropicProfileUiStatus { READY, INCOMPLETE, INVALID, DUPLICATE }
 
@@ -96,114 +99,124 @@ fun SettingsDialogContent(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = if (currentLanguage == AppLanguage.PT) "Configurações" else "Settings",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            SettingsSectionCard {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ThemeToggle(
+                        isDark = currentTheme == AppTheme.DARK,
+                        language = currentLanguage,
+                        onToggle = onThemeToggle
+                    )
 
-            HorizontalDivider()
+                    AutoStartToggle(
+                        enabled = autoStartEnabled,
+                        language = currentLanguage,
+                        onToggle = onAutoStartChange
+                    )
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ThemeToggle(
-                    isDark = currentTheme == AppTheme.DARK,
-                    language = currentLanguage,
-                    onToggle = onThemeToggle
-                )
-
-                AutoStartToggle(
-                    enabled = autoStartEnabled,
-                    language = currentLanguage,
-                    onToggle = onAutoStartChange
-                )
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = if (currentLanguage == AppLanguage.PT) "Idioma" else "Language",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                LanguageSelector(
-                    currentLanguage = currentLanguage,
-                    onLanguageChange = onLanguageChange
-                )
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = if (currentLanguage == AppLanguage.PT) "APIs monitoradas" else "Monitored APIs",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ApiSource.entries.forEach { api ->
-                        ApiCheckboxRow(
-                            api = api,
-                            language = currentLanguage,
-                            isChecked = api in enabledApis,
-                            onCheckedChange = { checked -> onApiToggle(api, checked) }
-                        )
-                    }
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Text(
-                        text = if (currentLanguage == AppLanguage.PT) "Contas Anthropic" else "Anthropic accounts",
+                        text = if (currentLanguage == AppLanguage.PT) "Idioma" else "Language",
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    TextButton(onClick = onRescanAnthropicProfiles) {
-                        Text(if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan")
-                    }
-                    Button(onClick = onAddAnthropicProfile) {
-                        Text(if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add")
-                    }
+                    LanguageSelector(
+                        currentLanguage = currentLanguage,
+                        onLanguageChange = onLanguageChange
+                    )
                 }
+            }
 
-                if (anthropicProfiles.isEmpty()) {
+            SettingsSectionCard {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = if (currentLanguage == AppLanguage.PT) {
-                            "Nenhum perfil Anthropic detectado."
-                        } else {
-                            "No Anthropic profile detected."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = if (currentLanguage == AppLanguage.PT) "APIs monitoradas" else "Monitored APIs",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                } else {
-                    anthropicProfiles.forEach { profile ->
-                        key(profile.id) {
-                            AnthropicProfileRow(
-                                profile = profile,
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ApiSource.entries.forEach { api ->
+                            ApiCheckboxRow(
+                                api = api,
                                 language = currentLanguage,
-                                expanded = profile.id == expandedProfileId,
-                                onToggle = onAnthropicProfileToggle,
-                                onRename = onAnthropicProfileRename,
-                                onRemove = onRemoveAnthropicProfile,
-                                onToggleExpanded = { onToggleProfileExpanded(profile.id) }
+                                isChecked = api in enabledApis,
+                                onCheckedChange = { checked -> onApiToggle(api, checked) }
                             )
                         }
                     }
                 }
             }
 
-            HorizontalDivider()
+            SettingsSectionCard {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (currentLanguage == AppLanguage.PT) "Contas Anthropic" else "Anthropic accounts",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onRescanAnthropicProfiles) {
+                            Text(if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan")
+                        }
+                        Button(onClick = onAddAnthropicProfile) {
+                            Text(if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add")
+                        }
+                    }
+
+                    if (anthropicProfiles.isEmpty()) {
+                        Text(
+                            text = if (currentLanguage == AppLanguage.PT) {
+                                "Nenhum perfil Anthropic detectado."
+                            } else {
+                                "No Anthropic profile detected."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        anthropicProfiles.forEach { profile ->
+                            key(profile.id) {
+                                AnthropicProfileRow(
+                                    profile = profile,
+                                    language = currentLanguage,
+                                    expanded = profile.id == expandedProfileId,
+                                    onToggle = onAnthropicProfileToggle,
+                                    onRename = onAnthropicProfileRename,
+                                    onRemove = onRemoveAnthropicProfile,
+                                    onToggleExpanded = { onToggleProfileExpanded(profile.id) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
         VerticalScrollbar(
             adapter = rememberScrollbarAdapter(scrollState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
         )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionCard(
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.card)
+    ) {
+        Box(modifier = Modifier.padding(16.dp)) {
+            content()
         }
     }
 }
