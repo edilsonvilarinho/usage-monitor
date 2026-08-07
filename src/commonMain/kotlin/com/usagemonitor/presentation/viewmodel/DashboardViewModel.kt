@@ -16,8 +16,10 @@ import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
+import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
+import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -53,6 +55,8 @@ class DashboardViewModel(
     private val enabledApis: StateFlow<Set<ApiSource>>,
     private val recordUsageSnapshot: RecordUsageSnapshotUseCase,
     private val getUsageHistory: GetUsageHistoryUseCase? = null,
+    private val getCachedDashboardStats: GetCachedDashboardStatsUseCase? = null,
+    private val saveDashboardCache: SaveDashboardCacheUseCase? = null,
     private val getOpenCodeUsage: GetOpenCodeUsageUseCase = GetOpenCodeUsageUseCase(
         object : OpenCodeRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
@@ -121,6 +125,11 @@ class DashboardViewModel(
 
     init {
         val isPersistedRefreshStillPending = persistedNextRefreshAt != null && persistedNextRefreshAt > clock.now()
+        if (isPersistedRefreshStillPending) {
+            // Ainda não é hora do próximo ciclo: reidrata a UI com o último
+            // snapshot salvo em vez de deixar a tela presa em Loading.
+            loadCachedStateIfAvailable()
+        }
         if (config.autoStartInitialFetch && !isPersistedRefreshStillPending) {
             initFetchJob = viewModelScope.launch {
                 if (initialFetchCancelled.get()) {
@@ -134,6 +143,27 @@ class DashboardViewModel(
         }
         if (config.autoStartCountdown) {
             startCountdown()
+        }
+    }
+
+    private fun loadCachedStateIfAvailable() {
+        val cacheUseCase = getCachedDashboardStats ?: return
+        viewModelScope.launch {
+            val cachedStats = cacheUseCase().getOrNull().orEmpty()
+            if (cachedStats.isEmpty()) {
+                return@launch
+            }
+            stateMutex.withLock {
+                // Não sobrescreve dados já obtidos por uma fetch que tenha
+                // completado antes desta corrotina (ex.: refresh manual do usuário).
+                val enabled = enabledTargets()
+                cachedStats.forEach { stats ->
+                    if (stats.targetKey in enabled && stats.targetKey !in cachedStatsByTarget) {
+                        cachedStatsByTarget[stats.targetKey] = stats
+                    }
+                }
+                publishUiState(enabled)
+            }
         }
     }
 
@@ -314,6 +344,8 @@ class DashboardViewModel(
 
                 publishUiState(latestEnabledTargets)
             }
+
+            persistDashboardCache()
         } finally {
             markRefreshing(effectiveTargets, refreshing = false)
         }
@@ -480,6 +512,15 @@ class DashboardViewModel(
             }
         }
         return targets
+    }
+
+    private suspend fun persistDashboardCache() {
+        val cacheUseCase = saveDashboardCache ?: return
+        val snapshot = stateMutex.withLock { cachedStatsByTarget.values.toList() }
+        if (snapshot.isEmpty()) {
+            return
+        }
+        cacheUseCase(snapshot, clock.now())
     }
 
     private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {

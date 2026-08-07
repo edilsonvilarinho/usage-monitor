@@ -21,6 +21,7 @@ import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
 import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
+import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
@@ -28,6 +29,7 @@ import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.CodexRepositoryImpl
+import com.usagemonitor.data.repository.DashboardCacheRepositoryImpl
 import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
 import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
@@ -48,8 +50,10 @@ import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
+import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
+import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import com.usagemonitor.presentation.ui.DesktopDialogFrame
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
@@ -199,6 +203,7 @@ fun main() = application {
         RemoteApiDataSource(httpClient, codexDiagnosticsRecorder)
     }
     val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
+    val dashboardCacheDataSource = remember { LocalDashboardCacheDataSource() }
     val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
     val kiloUsageDataSource = remember { LocalKiloUsageDataSource() }
 
@@ -223,6 +228,9 @@ fun main() = application {
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
     }
+    val dashboardCacheRepository = remember(dashboardCacheDataSource) {
+        DashboardCacheRepositoryImpl(dashboardCacheDataSource)
+    }
     val appUpdateRepository = remember(remoteApiDataSource) {
         AppUpdateRepositoryImpl(remoteApiDataSource)
     }
@@ -234,9 +242,15 @@ fun main() = application {
     val getUsageHistory = remember(usageHistoryRepository) {
         GetUsageHistoryUseCase(usageHistoryRepository)
     }
+    val saveDashboardCache = remember(dashboardCacheRepository) {
+        SaveDashboardCacheUseCase(dashboardCacheRepository)
+    }
+    val getCachedDashboardStats = remember(dashboardCacheRepository) {
+        GetCachedDashboardStatsUseCase(dashboardCacheRepository)
+    }
 
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
@@ -247,6 +261,8 @@ fun main() = application {
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
             getUsageHistory = getUsageHistory,
+            getCachedDashboardStats = getCachedDashboardStats,
+            saveDashboardCache = saveDashboardCache,
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
             appUpdateReleaseOpener = appUpdateReleaseOpener,
             currentAppVersion = CURRENT_APP_VERSION,

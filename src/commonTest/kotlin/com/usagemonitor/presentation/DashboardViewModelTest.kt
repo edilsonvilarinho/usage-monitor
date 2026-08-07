@@ -802,4 +802,58 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `boots from cache instead of Loading when a scheduled refresh is still pending`() = runTest {
+        var anthropicCalled = false
+        var minimaxCalled = false
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                anthropicCalled = true
+                return Result.failure(Exception("Não deve ser chamado: timer ainda pendente"))
+            }
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                minimaxCalled = true
+                return Result.failure(Exception("Não deve ser chamado: timer ainda pendente"))
+            }
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val fixedClock = object : Clock {
+            override fun now(): Instant = fixedInstant
+        }
+        val cachedStats = listOf(sampleAnthropicStats, sampleMiniMaxStats)
+        val cacheUseCase = com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase(
+            object : com.usagemonitor.domain.repository.DashboardCacheRepository {
+                override suspend fun saveSnapshot(stats: List<ApiUsageStats>, capturedAt: Instant) = Unit
+                override suspend fun loadSnapshot(): List<ApiUsageStats> = cachedStats
+            }
+        )
+
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
+            enabledApis = defaultEnabledApis(),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getCachedDashboardStats = cacheUseCase,
+            clock = fixedClock,
+            config = manualRefreshConfig(),
+            persistedNextRefreshAt = fixedInstant + with(kotlin.time.Duration.Companion) { 5.minutes }
+        )
+
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(2, state.data.size)
+        assertTrue(!anthropicCalled)
+        assertTrue(!minimaxCalled)
+        viewModel.onDestroy()
+    }
+
 }
