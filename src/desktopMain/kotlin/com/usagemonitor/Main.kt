@@ -89,6 +89,7 @@ private const val ENABLED_APIS_KEY = "enabledApis"
 private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
 private const val AUTO_START_KEY = "autoStart"
+private const val ALWAYS_ON_TOP_KEY = "alwaysOnTop"
 private const val CARD_ORDER_KEY = "cardOrder"
 private const val MINIMIZED_CARDS_KEY = "minimizedCards"
 private const val NEXT_REFRESH_AT_KEY = "nextRefreshAtMillis"
@@ -371,6 +372,7 @@ fun main() = application {
         )
     }
     var autoStartEnabled by remember { mutableStateOf(initialAutoStartEnabled) }
+    var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
@@ -397,7 +399,8 @@ fun main() = application {
         title = "Usage Monitor",
         icon = iconImage,
         state = mainWindowState,
-        undecorated = true
+        undecorated = true,
+        alwaysOnTop = alwaysOnTopEnabled
     ) {
         AppTheme(isDark = isDark) {
             DesktopWindowFrame(
@@ -505,6 +508,7 @@ fun main() = application {
                         currentLanguage = language,
                         enabledApis = enabledApisState,
                         autoStartEnabled = autoStartEnabled,
+                        alwaysOnTopEnabled = alwaysOnTopEnabled,
                         onThemeToggle = {
                             isDark = !isDark
                             settings.putBoolean(IS_DARK_KEY, isDark)
@@ -521,6 +525,10 @@ fun main() = application {
                             }
                             autoStartEnabled = updatedState
                             settings.putBoolean(AUTO_START_KEY, updatedState)
+                        },
+                        onAlwaysOnTopChange = { enabled ->
+                            alwaysOnTopEnabled = enabled
+                            settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
                         },
                         onApiToggle = { api, checked ->
                             val updatedApis = if (checked) {
