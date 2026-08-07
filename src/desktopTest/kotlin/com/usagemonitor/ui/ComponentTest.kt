@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,7 +27,10 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageForecast
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
@@ -375,6 +379,111 @@ class ComponentTest {
         onNodeWithContentDescription("Atualizar").assertIsDisplayed()
         onNodeWithContentDescription("Abrir histórico").assertIsDisplayed()
         onNodeWithContentDescription("Expandir card").assertIsDisplayed()
+    }
+
+    // ── RiskSemaphoreDot ─────────────────────────────────────────────────
+
+    @Test
+    fun `RiskSemaphoreDot appears minimized with content description for each risk level`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 90L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.TOKENS
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.WILL_EXCEED,
+                            estimatedExhaustionAt = Instant.parse("2026-04-28T19:00:00Z")
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Risco de estouro Claude 5h: Crítico").assertIsDisplayed()
+    }
+
+    @Test
+    fun `RiskSemaphoreDot appears expanded with content description matching risk level`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 7d",
+            used = 60L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.TOKENS
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.ON_TRACK,
+                            estimatedExhaustionAt = null
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Risco de estouro Claude 7d: Normal").assertIsDisplayed()
+    }
+
+    @Test
+    fun `RiskSemaphoreDot is absent when no risk summary is provided for the quota`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Claude 5h").assertIsDisplayed()
+        onAllNodesWithContentDescription("Risco de estouro Claude 5h: Normal").assertCountEquals(0)
+        onAllNodesWithContentDescription("Risco de estouro Claude 5h: Atenção").assertCountEquals(0)
+        onAllNodesWithContentDescription("Risco de estouro Claude 5h: Crítico").assertCountEquals(0)
     }
 
     @Test
@@ -894,7 +1003,8 @@ class ComponentTest {
                     deltaDisplayUsed = 3,
                     averageDisplayConsumptionPerHour = 17.0,
                     currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 ),
                 UsageHistorySeries(
                     quotaLabel = "MiniMax M2.5 Free 7d",
@@ -923,7 +1033,8 @@ class ComponentTest {
                     deltaDisplayUsed = 13,
                     averageDisplayConsumptionPerHour = 2.0,
                     currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 )
             )
         )
@@ -1025,7 +1136,8 @@ class ComponentTest {
                     deltaDisplayUsed = 5,
                     averageDisplayConsumptionPerHour = 19.0,
                     currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 ),
                 UsageHistorySeries(
                     quotaLabel = "Auto Free Kilo Gateway 7d",
@@ -1054,7 +1166,8 @@ class ComponentTest {
                     deltaDisplayUsed = 18,
                     averageDisplayConsumptionPerHour = 3.0,
                     currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 )
             )
         )
@@ -1277,7 +1390,8 @@ class ComponentTest {
                     deltaDisplayUsed = 40,
                     averageDisplayConsumptionPerHour = 0.0,
                     currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 )
             )
         )
@@ -1369,7 +1483,8 @@ class ComponentTest {
                     deltaDisplayUsed = 0,
                     averageDisplayConsumptionPerHour = 0.0,
                     currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 ),
                 UsageHistorySeries(
                     quotaLabel = "Codex 5h",
@@ -1390,7 +1505,8 @@ class ComponentTest {
                     deltaDisplayUsed = 0,
                     averageDisplayConsumptionPerHour = 0.0,
                     currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 )
             )
         )
@@ -1482,7 +1598,8 @@ class ComponentTest {
                     deltaDisplayUsed = 3,
                     averageDisplayConsumptionPerHour = 0.8,
                     currentPeriodEndAt = Instant.parse("9999-12-31T23:59:59Z"),
-                    forecast = UsageForecast.InsufficientData
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
                 )
             )
         )
@@ -1572,7 +1689,8 @@ class ComponentTest {
                     deltaDisplayUsed = 0,
                     averageDisplayConsumptionPerHour = 0.0,
                     currentPeriodEndAt = Instant.parse("2026-05-07T00:00:00Z"),
-                    forecast = UsageForecast.ResetsBeforeExhaustion
+                    forecast = UsageForecast.ResetsBeforeExhaustion,
+                    riskSummary = null
                 )
             )
         )

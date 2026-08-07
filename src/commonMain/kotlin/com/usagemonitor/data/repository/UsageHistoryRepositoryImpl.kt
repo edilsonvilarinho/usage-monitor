@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isSamePeriod
+import com.usagemonitor.domain.entity.riskSummary
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -111,7 +112,11 @@ class UsageHistoryRepositoryImpl(
             deltaDisplayUsed = deltaDisplayUsed,
             averageDisplayConsumptionPerHour = averagePerHour,
             currentPeriodEndAt = currentPoint.periodEndAt,
-            forecast = forecast
+            forecast = forecast,
+            riskSummary = forecast.riskSummary(
+                referenceAt = currentPoint.capturedAt,
+                periodEndAt = currentPoint.periodEndAt
+            )
         )
     }
 

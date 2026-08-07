@@ -3,6 +3,8 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 
 /**
@@ -34,7 +36,11 @@ sealed interface UiState {
      * Dados disponíveis (pelo menos uma API retornou com sucesso).
      * `errors` lista APIs que falharam parcialmente (visíveis na UI).
      */
-    data class Success(val data: List<ApiUsageStats>, val errors: List<UiApiError> = emptyList()) : UiState
+    data class Success(
+        val data: List<ApiUsageStats>,
+        val errors: List<UiApiError> = emptyList(),
+        val riskSummaries: Map<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>> = emptyMap()
+    ) : UiState
 
     /** Todas as APIs falharam. Mostra mensagem de erro ao utilizador. */
     data class Error(val errors: List<UiApiError>) : UiState {

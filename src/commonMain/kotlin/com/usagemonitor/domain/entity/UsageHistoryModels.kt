@@ -66,6 +66,41 @@ sealed interface UsageForecast {
     data class EstimatedExhaustionAt(val instant: Instant) : UsageForecast
 }
 
+/** Nível de risco de a cota estourar antes do reset da sessão, com base na projeção de consumo. */
+enum class UsageRiskLevel { ON_TRACK, AT_RISK, WILL_EXCEED }
+
+data class QuotaRiskSummary(
+    val level: UsageRiskLevel,
+    val estimatedExhaustionAt: Instant? // não nulo apenas quando level != ON_TRACK
+)
+
+/**
+ * Deriva o nível de risco a partir do forecast. `referenceAt` deve ser o mesmo instante-base
+ * usado para projetar [UsageForecast.EstimatedExhaustionAt.instant] (o `capturedAt` do último
+ * ponto), não o relógio atual — mantém a proporção tempo-até-estourar/tempo-até-reset consistente
+ * com o cálculo original.
+ */
+fun UsageForecast.riskSummary(referenceAt: Instant, periodEndAt: Instant): QuotaRiskSummary? {
+    return when (this) {
+        UsageForecast.ResetsBeforeExhaustion ->
+            QuotaRiskSummary(level = UsageRiskLevel.ON_TRACK, estimatedExhaustionAt = null)
+        is UsageForecast.EstimatedExhaustionAt -> {
+            val msToExhaustion = (instant.toEpochMilliseconds() - referenceAt.toEpochMilliseconds()).coerceAtLeast(0L)
+            val msToReset = (periodEndAt.toEpochMilliseconds() - referenceAt.toEpochMilliseconds()).coerceAtLeast(1L)
+            val ratio = msToExhaustion.toDouble() / msToReset.toDouble()
+            val level = if (ratio < 0.5) UsageRiskLevel.WILL_EXCEED else UsageRiskLevel.AT_RISK
+            QuotaRiskSummary(level = level, estimatedExhaustionAt = instant)
+        }
+        UsageForecast.NoGrowth, UsageForecast.InsufficientData -> null
+    }
+}
+
+/** Chave estável para correlacionar uma [QuotaInfo] com sua [UsageHistorySeries] correspondente. */
+data class QuotaSeriesKey(val label: String, val periodType: PeriodType)
+
+val QuotaInfo.seriesKey: QuotaSeriesKey
+    get() = QuotaSeriesKey(label = label, periodType = periodType)
+
 data class UsageHistorySeries(
     val quotaLabel: String,
     val periodType: PeriodType,
@@ -76,8 +111,12 @@ data class UsageHistorySeries(
     val deltaDisplayUsed: Long,
     val averageDisplayConsumptionPerHour: Double,
     val currentPeriodEndAt: Instant,
-    val forecast: UsageForecast
-)
+    val forecast: UsageForecast,
+    val riskSummary: QuotaRiskSummary?
+) {
+    val seriesKey: QuotaSeriesKey
+        get() = QuotaSeriesKey(label = quotaLabel, periodType = periodType)
+}
 
 data class ApiUsageHistoryReport(
     val source: ApiSource,

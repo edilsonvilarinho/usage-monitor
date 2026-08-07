@@ -1,9 +1,19 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.UsageForecast
+import com.usagemonitor.domain.entity.UsageHistoryPoint
+import com.usagemonitor.domain.entity.UsageHistorySeries
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.CodexRepository
 import com.usagemonitor.domain.repository.DeepSeekRepository
@@ -133,6 +143,104 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         assertIs<UiState.Success>(state)
         assertEquals(1, state.data.size)
         assertEquals("MiniMax", state.data[0].apiName)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `risk summaries are populated after successful fetch when history use case is provided`() = runTest {
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val expectedRisk = QuotaRiskSummary(level = UsageRiskLevel.WILL_EXCEED, estimatedExhaustionAt = fixedInstant)
+        val report = ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_7_DAYS,
+            lastUpdatedAt = fixedInstant,
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "Tokens",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE,
+                    points = emptyList(),
+                    currentDisplayUsed = 50000L,
+                    currentDisplayTotal = 200000L,
+                    deltaDisplayUsed = 50000L,
+                    averageDisplayConsumptionPerHour = 100.0,
+                    currentPeriodEndAt = fixedInstant,
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = expectedRisk
+                )
+            )
+        )
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            historyUseCase(mutableListOf()),
+            getUsageHistory = getUsageHistoryUseCase(reportsBySource = mapOf(ApiSource.ANTHROPIC to report)),
+            clock = Clock.System,
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        val target = UsageTargetKey.forSource(ApiSource.ANTHROPIC)
+        val riskForTarget = state.riskSummaries[target]
+        assertEquals(expectedRisk, riskForTarget?.get(QuotaSeriesKey("Tokens", PeriodType.INTERVAL)))
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `risk summaries stay empty when history use case is not provided`() = runTest {
+        val viewModel = successViewModel(mutableListOf())
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        assertTrue(state.riskSummaries.isEmpty())
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `history read failure does not propagate to UiState`() = runTest {
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(object : AnthropicRepository {
+                override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+            }),
+            GetMiniMaxUsageUseCase(object : MiniMaxRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            GetCodexUsageUseCase(object : CodexRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            GetDeepSeekUsageUseCase(object : DeepSeekRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            historyUseCase(mutableListOf()),
+            getUsageHistory = failingUsageHistoryUseCase(),
+            clock = Clock.System,
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+
+        val state = awaitSettledState(viewModel)
+        assertIs<UiState.Success>(state)
+        assertTrue(state.riskSummaries.isEmpty())
         viewModel.onDestroy()
     }
 

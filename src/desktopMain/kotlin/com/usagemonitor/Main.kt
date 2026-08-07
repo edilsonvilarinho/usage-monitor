@@ -241,7 +241,7 @@ fun main() = application {
     }
 
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
@@ -251,6 +251,7 @@ fun main() = application {
             getOpenCodeUsage = GetOpenCodeUsageUseCase(openCodeRepository),
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
+            getUsageHistory = getUsageHistory,
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
             appUpdateReleaseOpener = appUpdateReleaseOpener,
             currentAppVersion = CURRENT_APP_VERSION,

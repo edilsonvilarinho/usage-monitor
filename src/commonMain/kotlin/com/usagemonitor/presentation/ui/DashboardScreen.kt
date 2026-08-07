@@ -44,6 +44,8 @@ import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
@@ -158,6 +160,7 @@ fun DashboardScreen(
                                 is UiState.Success -> SuccessContent(
                                     apiStatsList = state.data,
                                     partialErrors = state.errors,
+                                    riskSummaries = state.riskSummaries,
                                     refreshingTargets = refreshingTargets,
                                     cardOrder = cardOrder,
                                     minimizedCards = minimizedCards,
@@ -322,6 +325,7 @@ private fun ErrorContent(
 private fun SuccessContent(
     apiStatsList: List<ApiUsageStats>,
     partialErrors: List<UiApiError>,
+    riskSummaries: Map<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>,
     refreshingTargets: Set<UsageTargetKey>,
     cardOrder: List<UsageTargetKey>,
     minimizedCards: Set<UsageTargetKey>,
@@ -391,6 +395,7 @@ private fun SuccessContent(
                 items = items,
                 refreshingTargets = refreshingTargets,
                 minimizedCards = minimizedCards,
+                riskSummaries = riskSummaries,
                 language = language,
                 onRefreshCard = onRefreshCard,
                 onMoveCardToIndex = onMoveCardToIndex,

@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageForecast
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -16,6 +17,7 @@ import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class UsageHistoryRepositoryImplTest {
 
@@ -150,6 +152,58 @@ class UsageHistoryRepositoryImplTest {
         val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
 
         assertIs<UsageForecast.ResetsBeforeExhaustion>(report.series.single().forecast)
+    }
+
+    @Test
+    fun `risk summary grades WILL_EXCEED vs AT_RISK using time to exhaustion ratio`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(steadyGrowthRecords()))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        // Último ponto 17:00, exaustão projetada 19:00, período termina 20:00.
+        // Tempo até estourar (2h) é mais da metade do tempo até o reset (3h) -> AT_RISK.
+        val risk = report.series.single().riskSummary
+        assertEquals(UsageRiskLevel.AT_RISK, risk?.level)
+        assertEquals(Instant.parse("2026-04-28T19:00:00Z"), risk?.estimatedExhaustionAt)
+    }
+
+    @Test
+    fun `risk summary is ON_TRACK when forecast resets before exhaustion`() = kotlinx.coroutines.test.runTest {
+        val slowGrowth = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 100, 1000, "2026-04-28T20:00:00Z"),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 110, 1000, "2026-04-28T20:00:00Z"),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 120, 1000, "2026-04-28T20:00:00Z")
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(slowGrowth))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        val risk = report.series.single().riskSummary
+        assertEquals(UsageRiskLevel.ON_TRACK, risk?.level)
+        assertNull(risk?.estimatedExhaustionAt)
+    }
+
+    @Test
+    fun `risk summary is null when there is no growth`() = kotlinx.coroutines.test.runTest {
+        val flatRecords = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 500, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T16:00:00Z", 500, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 500, 1000)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(flatRecords))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertNull(report.series.single().riskSummary)
+    }
+
+    @Test
+    fun `risk summary is null when forecast has insufficient data`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(shortRecords()))
+
+        val report = repository.getHistoryReport(ApiSource.ANTHROPIC, HistoryRange.LAST_24_HOURS, now)
+
+        assertNull(report.series.single().riskSummary)
     }
 
     @Test

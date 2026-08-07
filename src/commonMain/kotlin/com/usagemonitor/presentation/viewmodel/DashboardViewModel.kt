@@ -3,6 +3,9 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.KiloRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
@@ -13,6 +16,7 @@ import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
+import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -48,6 +52,7 @@ class DashboardViewModel(
     private val getDeepSeekUsage: GetDeepSeekUsageUseCase,
     private val enabledApis: StateFlow<Set<ApiSource>>,
     private val recordUsageSnapshot: RecordUsageSnapshotUseCase,
+    private val getUsageHistory: GetUsageHistoryUseCase? = null,
     private val getOpenCodeUsage: GetOpenCodeUsageUseCase = GetOpenCodeUsageUseCase(
         object : OpenCodeRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
@@ -105,6 +110,7 @@ class DashboardViewModel(
     private val pendingFetchMutex = Mutex()
     private val cachedStatsByTarget = mutableMapOf<UsageTargetKey, ApiUsageStats>()
     private val cachedErrorsByTarget = mutableMapOf<UsageTargetKey, UiApiError>()
+    private val cachedRiskByTarget = mutableMapOf<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>()
     private val sourceFetchSemaphore = Semaphore(config.maxConcurrentSourceFetches.coerceAtLeast(1))
     private val pollWakeUpSignal = Channel<Unit>(capacity = Channel.CONFLATED)
     private val initialFetchCancelled = AtomicBoolean(false)
@@ -274,6 +280,7 @@ class DashboardViewModel(
                         statsUpdates[target] = stats
                         errorUpdates[target] = null
                         persistSnapshot(stats, snapshotCapturedAt)
+                        refreshRiskSummaries(target, stats, snapshotCapturedAt)
                     }
                     .onFailure { error ->
                         errorUpdates[target] = handleTargetFailure(target, error)
@@ -432,8 +439,12 @@ class DashboardViewModel(
             .sortedWith(compareBy<UsageTargetKey> { it.source.ordinal }.thenBy { it.profileId.orEmpty() })
             .mapNotNull { target -> cachedErrorsByTarget[target] }
 
+        val riskSummaries = enabledTargets
+            .mapNotNull { target -> cachedRiskByTarget[target]?.let { risks -> target to risks } }
+            .toMap()
+
         _uiState.value = if (stats.isNotEmpty()) {
-            UiState.Success(stats, errors)
+            UiState.Success(stats, errors, riskSummaries)
         } else {
             UiState.Error(errors)
         }
@@ -442,6 +453,7 @@ class DashboardViewModel(
     private fun pruneDisabledTargets(enabledTargets: Set<UsageTargetKey>) {
         cachedStatsByTarget.keys.removeAll { target -> target !in enabledTargets }
         cachedErrorsByTarget.keys.removeAll { target -> target !in enabledTargets }
+        cachedRiskByTarget.keys.removeAll { target -> target !in enabledTargets }
     }
 
     private fun markRefreshing(targets: Set<UsageTargetKey>, refreshing: Boolean) {
@@ -475,6 +487,23 @@ class DashboardViewModel(
         if (persistenceResult.isFailure) {
             // Persistencia de historico nao pode degradar o refresh principal.
         }
+    }
+
+    private suspend fun refreshRiskSummaries(target: UsageTargetKey, stats: ApiUsageStats, capturedAt: Instant) {
+        val historyUseCase = getUsageHistory ?: return
+        val risks = runCatching {
+            historyUseCase(
+                source = stats.source,
+                range = HistoryRange.LAST_7_DAYS,
+                accountKey = stats.accountContext?.key,
+                now = capturedAt
+            )
+        }.getOrNull()?.series
+            ?.mapNotNull { series -> series.riskSummary?.let { risk -> series.seriesKey to risk } }
+            ?.toMap()
+            ?: return
+
+        cachedRiskByTarget[target] = risks
     }
 
     private suspend fun checkForUpdate() {

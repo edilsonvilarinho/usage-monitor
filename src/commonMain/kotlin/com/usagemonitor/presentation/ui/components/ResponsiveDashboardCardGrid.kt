@@ -22,6 +22,8 @@ import androidx.compose.ui.zIndex
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
@@ -45,6 +47,7 @@ internal fun ResponsiveDashboardCardGrid(
     items: List<ApiUsageStats>,
     refreshingTargets: Set<UsageTargetKey>,
     minimizedCards: Set<UsageTargetKey>,
+    riskSummaries: Map<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>> = emptyMap(),
     language: AppLanguage,
     onRefreshCard: (UsageTargetKey) -> Unit,
     onMoveCardToIndex: (UsageTargetKey, Int) -> Unit,
@@ -100,6 +103,7 @@ internal fun ResponsiveDashboardCardGrid(
                             quotas = stats.quotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,
+                            riskByQuotaKey = riskSummaries[stats.targetKey].orEmpty(),
                             showUsageDetails = stats.source != ApiSource.ANTHROPIC,
                             isRefreshing = stats.targetKey in refreshingTargets,
                             isMinimized = stats.targetKey in minimizedCards,

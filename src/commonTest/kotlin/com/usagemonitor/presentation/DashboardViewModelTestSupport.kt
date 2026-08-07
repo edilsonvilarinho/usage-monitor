@@ -1,8 +1,10 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAccountContext
@@ -18,6 +20,7 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
@@ -96,6 +99,45 @@ abstract class DashboardViewModelTestSupport {
             ) = throw UnsupportedOperationException("Não utilizado neste teste")
         }
         return RecordUsageSnapshotUseCase(historyRepository)
+    }
+
+    protected fun getUsageHistoryUseCase(
+        reportsBySource: Map<ApiSource, ApiUsageHistoryReport> = emptyMap(),
+        onRequest: (ApiSource) -> Unit = {}
+    ): GetUsageHistoryUseCase {
+        val historyRepository = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: HistoryRange,
+                now: Instant
+            ): ApiUsageHistoryReport {
+                onRequest(source)
+                return reportsBySource[source] ?: ApiUsageHistoryReport(
+                    source = source,
+                    range = range,
+                    lastUpdatedAt = null,
+                    series = emptyList()
+                )
+            }
+        }
+        return GetUsageHistoryUseCase(historyRepository)
+    }
+
+    protected fun failingUsageHistoryUseCase(): GetUsageHistoryUseCase {
+        val historyRepository = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: HistoryRange,
+                now: Instant
+            ): ApiUsageHistoryReport {
+                throw IllegalStateException("Falha simulada de leitura de histórico")
+            }
+        }
+        return GetUsageHistoryUseCase(historyRepository)
     }
 
     protected fun updateUseCase(block: suspend () -> Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {

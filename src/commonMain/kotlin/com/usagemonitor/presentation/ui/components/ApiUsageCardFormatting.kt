@@ -8,7 +8,10 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
+import kotlinx.datetime.Instant
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -131,27 +134,7 @@ internal fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
         }
     }
 
-    val saoPauloTz = TimeZone.of("America/Sao_Paulo")
-    val resetLocal = quota.periodEndAt.toLocalDateTime(saoPauloTz)
-    val dayFormatted = when (resetLocal.dayOfWeek) {
-        DayOfWeek.MONDAY -> if (language == AppLanguage.PT) "Seg" else "Mon"
-        DayOfWeek.TUESDAY -> if (language == AppLanguage.PT) "Ter" else "Tue"
-        DayOfWeek.WEDNESDAY -> if (language == AppLanguage.PT) "Qua" else "Wed"
-        DayOfWeek.THURSDAY -> if (language == AppLanguage.PT) "Qui" else "Thu"
-        DayOfWeek.FRIDAY -> if (language == AppLanguage.PT) "Sex" else "Fri"
-        DayOfWeek.SATURDAY -> if (language == AppLanguage.PT) "Sáb" else "Sat"
-        DayOfWeek.SUNDAY -> if (language == AppLanguage.PT) "Dom" else "Sun"
-    }
-    val dateFormatted = if (language == AppLanguage.PT) {
-        "${resetLocal.date.dayOfMonth.toString().padStart(2, '0')}/${resetLocal.date.monthNumber.toString().padStart(2, '0')}"
-    } else {
-        "${resetLocal.date.monthNumber.toString().padStart(2, '0')}/${resetLocal.date.dayOfMonth.toString().padStart(2, '0')}"
-    }
-    val timeFormatted = if (language == AppLanguage.PT) {
-        "${resetLocal.hour}h${resetLocal.minute.toString().padStart(2, '0')}"
-    } else {
-        "${resetLocal.hour}:${resetLocal.minute.toString().padStart(2, '0')}"
-    }
+    val (dayFormatted, dateFormatted, timeFormatted) = formatBrtDateTimeParts(quota.periodEndAt, language)
 
     return if (language == AppLanguage.PT) {
         when (quota.periodType) {
@@ -164,6 +147,94 @@ internal fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
             PeriodType.WEEKLY -> "Reset: $dayFormatted $dateFormatted $timeFormatted BRT"
             PeriodType.REPORTED -> "Reported reset: $dayFormatted $dateFormatted $timeFormatted BRT"
             PeriodType.INTERVAL -> "Reset: $dayFormatted $timeFormatted BRT"
+        }
+    }
+}
+
+private data class BrtDateTimeParts(val day: String, val date: String, val time: String)
+
+private fun formatBrtDateTimeParts(instant: Instant, language: AppLanguage): BrtDateTimeParts {
+    val saoPauloTz = TimeZone.of("America/Sao_Paulo")
+    val local = instant.toLocalDateTime(saoPauloTz)
+    val dayFormatted = when (local.dayOfWeek) {
+        DayOfWeek.MONDAY -> if (language == AppLanguage.PT) "Seg" else "Mon"
+        DayOfWeek.TUESDAY -> if (language == AppLanguage.PT) "Ter" else "Tue"
+        DayOfWeek.WEDNESDAY -> if (language == AppLanguage.PT) "Qua" else "Wed"
+        DayOfWeek.THURSDAY -> if (language == AppLanguage.PT) "Qui" else "Thu"
+        DayOfWeek.FRIDAY -> if (language == AppLanguage.PT) "Sex" else "Fri"
+        DayOfWeek.SATURDAY -> if (language == AppLanguage.PT) "Sáb" else "Sat"
+        DayOfWeek.SUNDAY -> if (language == AppLanguage.PT) "Dom" else "Sun"
+    }
+    val dateFormatted = if (language == AppLanguage.PT) {
+        "${local.date.dayOfMonth.toString().padStart(2, '0')}/${local.date.monthNumber.toString().padStart(2, '0')}"
+    } else {
+        "${local.date.monthNumber.toString().padStart(2, '0')}/${local.date.dayOfMonth.toString().padStart(2, '0')}"
+    }
+    val timeFormatted = if (language == AppLanguage.PT) {
+        "${local.hour}h${local.minute.toString().padStart(2, '0')}"
+    } else {
+        "${local.hour}:${local.minute.toString().padStart(2, '0')}"
+    }
+    return BrtDateTimeParts(dayFormatted, dateFormatted, timeFormatted)
+}
+
+/** Formata um instante em BRT (America/Sao_Paulo) como "Seg 11/08 14h32" / "Mon 08/11 14:32". */
+internal fun formatBrtDateTime(instant: Instant, language: AppLanguage): String {
+    val parts = formatBrtDateTimeParts(instant, language)
+    return "${parts.day} ${parts.date} ${parts.time}"
+}
+
+internal fun colorFor(level: UsageRiskLevel): Color {
+    return when (level) {
+        UsageRiskLevel.ON_TRACK -> Color(0xFF4CAF50)
+        UsageRiskLevel.AT_RISK -> Color(0xFFFFC107)
+        UsageRiskLevel.WILL_EXCEED -> Color(0xFFF44336)
+    }
+}
+
+internal fun riskLevelLabel(level: UsageRiskLevel, language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        when (level) {
+            UsageRiskLevel.ON_TRACK -> "Normal"
+            UsageRiskLevel.AT_RISK -> "Atenção"
+            UsageRiskLevel.WILL_EXCEED -> "Crítico"
+        }
+    } else {
+        when (level) {
+            UsageRiskLevel.ON_TRACK -> "Normal"
+            UsageRiskLevel.AT_RISK -> "Warning"
+            UsageRiskLevel.WILL_EXCEED -> "Critical"
+        }
+    }
+}
+
+internal fun riskDotContentDescription(risk: QuotaRiskSummary, quotaLabel: String, language: AppLanguage): String {
+    val levelLabel = riskLevelLabel(risk.level, language)
+    return if (language == AppLanguage.PT) {
+        "Risco de estouro $quotaLabel: $levelLabel"
+    } else {
+        "Overage risk $quotaLabel: $levelLabel"
+    }
+}
+
+internal fun riskDotTooltipTitle(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Projeção de uso" else "Usage projection"
+}
+
+internal fun riskDotTooltipSubtitle(risk: QuotaRiskSummary, language: AppLanguage): String {
+    val exhaustionAt = risk.estimatedExhaustionAt
+    return if (exhaustionAt == null) {
+        if (language == AppLanguage.PT) {
+            "No ritmo atual, a cota deve resetar antes de esgotar."
+        } else {
+            "At the current pace, the quota should reset before running out."
+        }
+    } else {
+        val formattedInstant = formatBrtDateTime(exhaustionAt, language)
+        if (language == AppLanguage.PT) {
+            "No ritmo atual, a cota deve esgotar antes do reset — previsão: $formattedInstant BRT."
+        } else {
+            "At the current pace, the quota should run out before reset — estimated: $formattedInstant BRT."
         }
     }
 }

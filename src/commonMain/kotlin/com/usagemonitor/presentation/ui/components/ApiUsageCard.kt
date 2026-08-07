@@ -82,8 +82,11 @@ import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.statusBadgeLabel
@@ -110,6 +113,7 @@ fun ApiUsageCard(
     quotas: List<QuotaInfo>,
     accountContext: UsageAccountContext? = null,
     notices: Set<ApiUsageNotice> = emptySet(),
+    riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary> = emptyMap(),
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
     isMinimized: Boolean = false,
@@ -407,13 +411,16 @@ fun ApiUsageCard(
                         CompactQuotaSummary(
                             source = source,
                             quotas = orderedQuotas,
-                            showUsageDetails = showUsageDetails
+                            showUsageDetails = showUsageDetails,
+                            language = language,
+                            riskByQuotaKey = riskByQuotaKey
                         )
                     } else {
                         ExpandedQuotaSummary(
                             quotas = orderedQuotas,
                             showUsageDetails = showUsageDetails,
-                            language = language
+                            language = language,
+                            riskByQuotaKey = riskByQuotaKey
                         )
                     }
                 }
@@ -792,6 +799,8 @@ private fun CompactQuotaSummary(
     source: ApiSource,
     quotas: List<QuotaInfo>,
     showUsageDetails: Boolean,
+    language: AppLanguage,
+    riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     modifier: Modifier = Modifier
 ) {
     if (quotas.size == 1) {
@@ -805,6 +814,8 @@ private fun CompactQuotaSummary(
                 source = source,
                 quota = quotas.first(),
                 showUsageDetails = showUsageDetails,
+                language = language,
+                risk = riskByQuotaKey[quotas.first().seriesKey],
                 modifier = Modifier.fillMaxWidth(badgeWidthFraction)
             )
         }
@@ -826,6 +837,8 @@ private fun CompactQuotaSummary(
                     source = source,
                     quota = quota,
                     showUsageDetails = showUsageDetails,
+                    language = language,
+                    risk = riskByQuotaKey[quota.seriesKey],
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -838,6 +851,8 @@ private fun CompactQuotaBadge(
     source: ApiSource,
     quota: QuotaInfo,
     showUsageDetails: Boolean,
+    language: AppLanguage,
+    risk: QuotaRiskSummary?,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -848,13 +863,29 @@ private fun CompactQuotaBadge(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = quota.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (risk != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RiskSemaphoreDot(risk = risk, quotaLabel = quota.label, language = language)
+                Text(
+                    text = quota.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Text(
+                text = quota.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -884,6 +915,7 @@ private fun ExpandedQuotaSummary(
     quotas: List<QuotaInfo>,
     showUsageDetails: Boolean,
     language: AppLanguage,
+    riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -900,7 +932,8 @@ private fun ExpandedQuotaSummary(
                 QuotaColumn(
                     quota = quota,
                     showUsageDetails = showUsageDetails,
-                    language = language
+                    language = language,
+                    risk = riskByQuotaKey[quota.seriesKey]
                 )
             }
         }
@@ -912,6 +945,7 @@ private fun QuotaColumn(
     quota: QuotaInfo,
     showUsageDetails: Boolean,
     language: AppLanguage,
+    risk: QuotaRiskSummary?,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -937,15 +971,33 @@ private fun QuotaColumn(
             )
         }
 
-        Text(
-            text = expandedQuotaTitle(quota = quota, language = language),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (risk != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RiskSemaphoreDot(risk = risk, quotaLabel = quota.label, language = language)
+                Text(
+                    text = expandedQuotaTitle(quota = quota, language = language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Text(
+                text = expandedQuotaTitle(quota = quota, language = language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
             Text(
