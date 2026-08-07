@@ -14,6 +14,11 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Reordenacao e minimizacao de cards com persistencia local.
 - Auto-start em Windows e Linux.
 - Verificacao de novas releases com banner manual e link para a pagina publicada no GitHub Releases.
+- Sinalizador semaforo de risco de overage nos cards de uso.
+- Contagem regressiva de refresh persiste entre reinicios da app e avisa antes de um refresh manual.
+- Modais de Historico e Configuracoes voltam ao topo automaticamente ao reabrir, mesmo se ficaram atras de outra janela.
+- Scrollbar com contraste ajustado para o tema escuro.
+- Modal de Configuracoes reorganizado em cartoes (Geral/Idioma, APIs monitoradas, Contas Anthropic).
 
 ## Screenshots
 
