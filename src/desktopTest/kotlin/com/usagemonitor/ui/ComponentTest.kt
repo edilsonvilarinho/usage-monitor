@@ -20,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
@@ -1170,7 +1171,9 @@ class ComponentTest {
                 )
             )
         )
-        val requestedRanges = mutableListOf<HistoryRange>()
+        // HistoryViewModel agora busca o relatório de totais (parametrizado por range)
+        // e o de linhas (sempre TOTAL) em paralelo — a lista precisa ser thread-safe.
+        val requestedRanges = java.util.Collections.synchronizedList(mutableListOf<HistoryRange>())
 
         val viewModel = HistoryViewModel(
             getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
@@ -1550,8 +1553,8 @@ class ComponentTest {
         }
 
         onNodeWithText("Codex atual").assertIsDisplayed()
-        onNodeWithText("Codex 5h (legado)").assertIsDisplayed()
-        onNodeWithText("Quota intervalar legada").assertIsDisplayed()
+        onNodeWithText("Codex 5h (legado)").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Quota intervalar legada").performScrollTo().assertIsDisplayed()
         viewModel.onDestroy()
     }
 

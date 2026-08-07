@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -11,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +38,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -59,11 +65,13 @@ import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.bucketedConsumption
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.requiresUsageAccount
 import com.usagemonitor.presentation.ui.components.HistoryChartSelectionController
 import com.usagemonitor.presentation.ui.components.HistoryIntervalSummaryModel
+import com.usagemonitor.presentation.ui.components.UsageHistoryBarChart
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.components.buildHistoryIntervalSummaryModel
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -162,7 +170,7 @@ fun HistoryScreen(
                         }
 
                         is HistoryUiState.Success -> {
-                            LaunchedEffect(current.selectedSource, current.selectedAccount?.key, current.selectedRange) {
+                            LaunchedEffect(current.selectedSource, current.selectedAccount?.key) {
                                 chartSelectionController.clear()
                             }
 
@@ -180,27 +188,31 @@ fun HistoryScreen(
                                     onSelectRange = viewModel::selectRange
                                 )
 
-                                if (current.report.series.isEmpty()) {
+                                if (current.linesReport.series.isEmpty()) {
                                     Text(
                                         text = if (language == AppLanguage.PT) {
-                                            "Sem dados para o intervalo selecionado."
+                                            "Ainda não há histórico coletado."
                                         } else {
-                                            "No data for the selected range."
+                                            "No history collected yet."
                                         },
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 } else {
-                                    val accentColor = accentColorForHistorySource(current.report.source)
-                                    if (current.report.source == ApiSource.DEEPSEEK) {
+                                    val accentColor = accentColorForHistorySource(current.linesReport.source)
+                                    if (current.linesReport.source == ApiSource.DEEPSEEK) {
                                         DeepSeekHistoryContent(
-                                            report = current.report,
+                                            linesReport = current.linesReport,
+                                            totalsReport = current.report,
                                             accentColor = accentColor,
                                             language = language,
                                             selectedRange = current.selectedRange,
                                             selectionController = chartSelectionController
                                         )
-                                    } else if (current.report.source.isObservedActivitySource()) {
+                                    } else if (current.linesReport.source.isObservedActivitySource()) {
+                                        // OpenCode/Kilo escolhem entre a série de 5h e a de 7d conforme o
+                                        // Intervalo (ver selectOpenCodeChartSeries) — mecanismo próprio,
+                                        // não desacoplado nesta mudança para não regredir esse comportamento.
                                         OpenCodeHistoryContent(
                                             report = current.report,
                                             accentColor = accentColor,
@@ -211,28 +223,31 @@ fun HistoryScreen(
                                     } else {
                                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                             Text(
-                                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
+                                                text = lastUpdatedLabel(current.linesReport.lastUpdatedAt, language),
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
 
-                                            current.report.series.forEachIndexed { index, series ->
+                                            val totalsBySeriesKey = current.report.series.associateBy { it.seriesKey }
+                                            current.linesReport.series.forEachIndexed { index, series ->
                                                 key(
                                                     series.quotaLabel +
-                                                        current.selectedAccount?.key.toString() +
-                                                        current.selectedRange.name
+                                                        current.selectedAccount?.key.toString()
                                                 ) {
                                                     HistorySeriesCard(
-                                                        source = current.report.source,
+                                                        source = current.linesReport.source,
                                                         series = series,
+                                                        totalsSeries = totalsBySeriesKey[series.seriesKey],
+                                                        selectedRange = current.selectedRange,
+                                                        totalsNow = current.report.lastUpdatedAt,
                                                         index = index,
                                                         accentColor = accentColor,
                                                         language = language,
                                                         chartSelectionKey = buildQuotaChartSelectionKey(
-                                                            source = current.report.source,
+                                                            source = current.linesReport.source,
                                                             quotaLabel = series.quotaLabel,
                                                             periodType = series.periodType,
-                                                            selectedRange = current.selectedRange
+                                                            selectedRange = HistoryRange.TOTAL
                                                         ),
                                                         selectionController = chartSelectionController
                                                     )
@@ -375,18 +390,79 @@ private fun HistoryControls(
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                HistoryRange.entries.forEach { range ->
-                    RangeChip(
-                        label = rangeLabel(range, language),
-                        selected = range == selectedRange,
-                        onClick = { onSelectRange(range) }
-                    )
-                }
+            HistoryRangeTabRow(
+                selectedRange = selectedRange,
+                language = language,
+                onSelectRange = onSelectRange
+            )
+        }
+    }
+}
+
+private val HISTORY_RANGE_TAB_GAP = 20.dp
+
+@Composable
+private fun HistoryRangeTabRow(
+    selectedRange: HistoryRange,
+    language: AppLanguage,
+    onSelectRange: (HistoryRange) -> Unit
+) {
+    val ranges = HistoryRange.entries
+    val selectedIndex = ranges.indexOf(selectedRange).coerceAtLeast(0)
+    var tabWidthsPx by remember { mutableStateOf(List(ranges.size) { 0 }) }
+    val density = LocalDensity.current
+    val gapPx = with(density) { HISTORY_RANGE_TAB_GAP.toPx() }
+
+    val indicatorOffsetPx = tabWidthsPx.take(selectedIndex).sum().toFloat() + gapPx * selectedIndex
+    val indicatorWidthPx = tabWidthsPx.getOrElse(selectedIndex) { 0 }.toFloat()
+
+    val indicatorOffset by animateDpAsState(
+        targetValue = with(density) { indicatorOffsetPx.toDp() },
+        animationSpec = tween(durationMillis = AppMotion.fast),
+        label = "rangeIndicatorOffset"
+    )
+    val indicatorWidth by animateDpAsState(
+        targetValue = with(density) { indicatorWidthPx.toDp() },
+        animationSpec = tween(durationMillis = AppMotion.fast),
+        label = "rangeIndicatorWidth"
+    )
+
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(HISTORY_RANGE_TAB_GAP)) {
+            ranges.forEachIndexed { index, range ->
+                val selected = range == selectedRange
+                val labelColor by animateColorAsState(
+                    targetValue = if (selected) MaterialTheme.colorScheme.primary
+                                  else           MaterialTheme.colorScheme.onSurfaceVariant,
+                    animationSpec = tween(durationMillis = AppMotion.fast),
+                    label = "rangeTabColor"
+                )
+                Text(
+                    text = rangeLabel(range, language),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = labelColor,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier
+                        .clickable { onSelectRange(range) }
+                        .onSizeChanged { size ->
+                            tabWidthsPx = tabWidthsPx.toMutableList().apply { this[index] = size.width }
+                        }
+                        .padding(vertical = 8.dp)
+                )
             }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(indicatorWidth)
+                    .height(2.dp)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
         }
     }
 }
@@ -432,52 +508,60 @@ private fun RangeChip(
 
 @Composable
 private fun DeepSeekHistoryContent(
-    report: ApiUsageHistoryReport,
+    linesReport: ApiUsageHistoryReport,
+    totalsReport: ApiUsageHistoryReport,
     accentColor: Color,
     language: AppLanguage,
     selectedRange: HistoryRange,
     selectionController: HistoryChartSelectionController
 ) {
-    val primarySeries = report.series
+    val primarySeries = linesReport.series
         .firstOrNull { series -> series.quotaLabel.equals(DeepSeekQuotaLabels.BALANCE, ignoreCase = true) }
-        ?: report.series.first()
-    val extraSeries = report.series.filterNot { series -> series == primarySeries }
+        ?: linesReport.series.first()
+    val extraSeries = linesReport.series.filterNot { series -> series == primarySeries }
+    val totalsBySeriesKey = totalsReport.series.associateBy { it.seriesKey }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        key(primarySeries.quotaLabel + selectedRange.name) {
+        key(primarySeries.quotaLabel) {
             DeepSeekHistoryCard(
                 title = deepSeekSeriesTitle(primarySeries, language),
                 subtitle = deepSeekSeriesSubtitle(primarySeries, language),
                 series = primarySeries,
-                lastUpdatedAt = report.lastUpdatedAt,
+                totalsSeries = totalsBySeriesKey[primarySeries.seriesKey],
+                selectedRange = selectedRange,
+                totalsNow = totalsReport.lastUpdatedAt,
+                lastUpdatedAt = linesReport.lastUpdatedAt,
                 accentColor = accentColor,
                 index = 0,
                 language = language,
                 chartSelectionKey = buildQuotaChartSelectionKey(
-                    source = report.source,
+                    source = linesReport.source,
                     quotaLabel = primarySeries.quotaLabel,
                     periodType = primarySeries.periodType,
-                    selectedRange = selectedRange
+                    selectedRange = HistoryRange.TOTAL
                 ),
                 selectionController = selectionController
             )
         }
 
         extraSeries.forEachIndexed { i, series ->
-            key(series.quotaLabel + selectedRange.name) {
+            key(series.quotaLabel) {
                 DeepSeekHistoryCard(
                     title = deepSeekSeriesTitle(series, language),
                     subtitle = deepSeekSeriesSubtitle(series, language),
                     series = series,
+                    totalsSeries = totalsBySeriesKey[series.seriesKey],
+                    selectedRange = selectedRange,
+                    totalsNow = totalsReport.lastUpdatedAt,
                     lastUpdatedAt = null,
                     accentColor = accentColor,
                     index = i + 1,
                     language = language,
                     chartSelectionKey = buildQuotaChartSelectionKey(
-                        source = report.source,
+                        source = linesReport.source,
                         quotaLabel = series.quotaLabel,
                         periodType = series.periodType,
-                        selectedRange = selectedRange
+                        selectedRange = HistoryRange.TOTAL
                     ),
                     selectionController = selectionController
                 )
@@ -531,6 +615,9 @@ private fun DeepSeekHistoryCard(
     title: String,
     subtitle: String,
     series: UsageHistorySeries,
+    totalsSeries: UsageHistorySeries?,
+    selectedRange: HistoryRange,
+    totalsNow: Instant?,
     lastUpdatedAt: Instant?,
     accentColor: Color,
     index: Int,
@@ -636,6 +723,13 @@ private fun DeepSeekHistoryCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                HistoryTotalsSection(
+                    totalsSeries = totalsSeries,
+                    selectedRange = selectedRange,
+                    totalsNow = totalsNow,
+                    language = language
+                )
             }
         }
     }
@@ -759,6 +853,9 @@ private fun OpenCodeHistoryCard(
 private fun HistorySeriesCard(
     source: ApiSource,
     series: UsageHistorySeries,
+    totalsSeries: UsageHistorySeries?,
+    selectedRange: HistoryRange,
+    totalsNow: Instant?,
     index: Int,
     accentColor: Color,
     language: AppLanguage,
@@ -839,10 +936,17 @@ private fun HistorySeriesCard(
                             unit = series.unit,
                             language = language,
                             selection = selectionController.selectionFor(chartSelectionKey, series.points.size)
-                        )
+                        ),
+                        language = language,
+                        onClearSelection = selectionController::clear
                     )
                 }
 
+                Text(
+                    text = if (language == AppLanguage.PT) "Histórico completo" else "Full history",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 UsageHistoryLineChart(
                     points = series.points,
                     unit = series.unit,
@@ -858,15 +962,63 @@ private fun HistorySeriesCard(
                     series = series,
                     language = language
                 )
+
+                HistoryTotalsSection(
+                    totalsSeries = totalsSeries,
+                    selectedRange = selectedRange,
+                    totalsNow = totalsNow,
+                    language = language
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun HistoryTotalsSection(
+    totalsSeries: UsageHistorySeries?,
+    selectedRange: HistoryRange,
+    totalsNow: Instant?,
+    language: AppLanguage
+) {
+    if (totalsSeries == null || totalsSeries.points.isEmpty()) {
+        return
+    }
+
+    val granularity = granularityForRange(selectedRange)
+    val now = totalsNow ?: totalsSeries.points.last().capturedAt
+    val buckets = remember(totalsSeries.points, selectedRange) {
+        val raw = bucketedConsumption(totalsSeries.points, totalsSeries.unit, granularity)
+        val windowStart = if (selectedRange == HistoryRange.TOTAL) {
+            totalsSeries.points.first().capturedAt
+        } else {
+            selectedRange.windowStart(now)
+        }
+        fillBucketGaps(raw, windowStart, granularity, now)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = if (language == AppLanguage.PT) "Consumo por período" else "Consumption by period",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        UsageHistoryBarChart(
+            buckets = buckets,
+            granularity = granularity,
+            unit = totalsSeries.unit,
+            totalForRatio = totalsSeries.currentDisplayTotal,
+            language = language
+        )
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IntervalSummaryPanel(
-    summary: HistoryIntervalSummaryModel?
+    summary: HistoryIntervalSummaryModel?,
+    language: AppLanguage,
+    onClearSelection: () -> Unit
 ) {
     if (summary == null) {
         return
@@ -883,12 +1035,24 @@ private fun IntervalSummaryPanel(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             summary.headline?.let { headline ->
-                Text(
-                    text = headline,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = headline,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    TextButton(onClick = onClearSelection) {
+                        Text(
+                            text = if (language == AppLanguage.PT) "Limpar" else "Clear",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
             }
 
             if (summary.metrics.isNotEmpty()) {
@@ -987,11 +1151,21 @@ private fun HistoryMetrics(
             )
             MetricItem(
                 label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-                value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
+                value = formatCumulativeConsumption(
+                    delta = series.deltaDisplayUsed.toDouble(),
+                    total = series.currentDisplayTotal,
+                    unit = series.unit,
+                    language = language
+                )
             )
             MetricItem(
                 label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-                value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
+                value = formatCumulativeConsumption(
+                    delta = series.averageDisplayConsumptionPerHour,
+                    total = series.currentDisplayTotal,
+                    unit = series.unit,
+                    language = language
+                ) + "/h"
             )
         }
         if (series.periodType != PeriodType.REPORTED) {

@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -49,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.cumulativePositiveDelta
 import com.usagemonitor.domain.entity.isSamePeriod
+import com.usagemonitor.presentation.ui.formatCumulativeConsumption
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
@@ -326,6 +329,16 @@ internal fun UsageHistoryLineChart(
                         end = Offset(size.width, size.height),
                         strokeWidth = gridStroke
                     )
+
+                    if (anchorPoint != null && activePoint != null && anchorPoint.index != activePoint.index) {
+                        val bandLeft = minOf(anchorPoint.x, activePoint.x)
+                        val bandRight = maxOf(anchorPoint.x, activePoint.x)
+                        drawRect(
+                            color = chartIndicatorColor.copy(alpha = 0.10f),
+                            topLeft = Offset(bandLeft, 0f),
+                            size = Size(bandRight - bandLeft, size.height)
+                        )
+                    }
 
                     resetClusterPoints.forEach { (_, resetPoint) ->
                         drawLine(
@@ -1280,14 +1293,36 @@ internal fun buildHistoryIntervalSummaryModel(
 
     if (selection != null && selection.isValidFor(points.size)) {
         val comparisonHeadline = buildHistoryComparisonHeadline(selection, points, language)
+        val startIndex = minOf(selection.anchorIndex, selection.currentIndex)
+        val endIndex = maxOf(selection.anchorIndex, selection.currentIndex)
+        val rangeSlice = points.subList(startIndex, endIndex + 1)
+        val cumulativeDelta = cumulativePositiveDelta(rangeSlice, unit)
         return HistoryIntervalSummaryModel(
             headline = comparisonHeadline,
             supportingText = if (language == AppLanguage.PT) {
-                "Clique no gráfico para limpar."
+                "Faixa selecionada no gráfico."
             } else {
-                "Click the chart to clear."
+                "Range selected on the chart."
             },
-            metrics = emptyList()
+            metrics = listOf(
+                TooltipMetric(
+                    label = if (language == AppLanguage.PT) "Início da faixa" else "Range start",
+                    value = formatTooltipUsageValue(rangeSlice.first(), unit, language)
+                ),
+                TooltipMetric(
+                    label = if (language == AppLanguage.PT) "Fim da faixa" else "Range end",
+                    value = formatTooltipUsageValue(rangeSlice.last(), unit, language)
+                ),
+                TooltipMetric(
+                    label = if (language == AppLanguage.PT) "Consumido na faixa" else "Consumed in range",
+                    value = formatCumulativeConsumption(
+                        delta = cumulativeDelta.toDouble(),
+                        total = points.last().displayTotal,
+                        unit = unit,
+                        language = language
+                    )
+                )
+            )
         )
     }
 

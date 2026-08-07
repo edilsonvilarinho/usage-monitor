@@ -1,8 +1,12 @@
 package com.usagemonitor.domain.entity
 
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
 enum class HistoryRange {
@@ -92,6 +96,98 @@ fun UsageForecast.riskSummary(referenceAt: Instant, periodEndAt: Instant): Quota
             QuotaRiskSummary(level = level, estimatedExhaustionAt = instant)
         }
         UsageForecast.NoGrowth, UsageForecast.InsufficientData -> null
+    }
+}
+
+/**
+ * Soma os incrementos positivos entre pontos consecutivos, ignorando quedas
+ * (resets de janela) — é o consumo acumulado ao longo do recorte, atravessando
+ * múltiplos ciclos de reset. Para [UsageUnit.CURRENCY_USD] soma quedas
+ * (saldo diminui com uso, então "consumo" é o inverso da variação).
+ *
+ * Usado tanto para calcular `UsageHistorySeries.deltaDisplayUsed` (recorte
+ * completo) quanto para recalcular o mesmo total sobre uma sub-faixa
+ * selecionada manualmente no gráfico (comparação por arraste).
+ */
+fun cumulativePositiveDelta(points: List<UsageHistoryPoint>, unit: UsageUnit): Long {
+    var delta = 0L
+    for (index in 1 until points.size) {
+        val diff = points[index].displayUsed - points[index - 1].displayUsed
+        if (unit == UsageUnit.CURRENCY_USD) {
+            if (diff < 0L) {
+                delta += -diff
+            }
+        } else if (diff > 0L) {
+            delta += diff
+        }
+    }
+    return delta
+}
+
+/** Granularidade dos buckets de calendário usados por [bucketedConsumption]. */
+enum class UsageBucketGranularity { HOUR, DAY, WEEK }
+
+/** Total de consumo acumulado num bucket de calendário (ver [bucketedConsumption]). */
+data class UsageBucketTotal(val bucketStart: Instant, val delta: Long)
+
+/**
+ * Particiona o consumo acumulado (mesma regra de "incremento positivo" de
+ * [cumulativePositiveDelta]) em buckets de calendário (hora/dia/semana),
+ * atribuindo cada delta ao bucket do ponto final do par. A soma de todos os
+ * buckets devolvidos é exatamente igual a `cumulativePositiveDelta(points, unit)`
+ * — nenhum consumo é perdido ou duplicado nas fronteiras.
+ *
+ * Buckets sem nenhum incremento positivo não aparecem na lista — quem exibe
+ * o gráfico decide se preenche as lacunas com zero.
+ */
+fun bucketedConsumption(
+    points: List<UsageHistoryPoint>,
+    unit: UsageUnit,
+    granularity: UsageBucketGranularity,
+    timeZone: TimeZone = TimeZone.of("America/Sao_Paulo")
+): List<UsageBucketTotal> {
+    if (points.size < 2) {
+        return emptyList()
+    }
+
+    val totalsByBucket = linkedMapOf<Instant, Long>()
+    for (index in 1 until points.size) {
+        val diff = points[index].displayUsed - points[index - 1].displayUsed
+        val positive = if (unit == UsageUnit.CURRENCY_USD) {
+            if (diff < 0L) -diff else 0L
+        } else {
+            if (diff > 0L) diff else 0L
+        }
+        if (positive == 0L) {
+            continue
+        }
+
+        val bucketStart = truncateToBucket(points[index].capturedAt, granularity, timeZone)
+        totalsByBucket[bucketStart] = (totalsByBucket[bucketStart] ?: 0L) + positive
+    }
+
+    return totalsByBucket
+        .map { (bucketStart, delta) -> UsageBucketTotal(bucketStart, delta) }
+        .sortedBy { it.bucketStart }
+}
+
+/** Trunca [instant] para o início do bucket de calendário correspondente. */
+fun truncateToBucket(
+    instant: Instant,
+    granularity: UsageBucketGranularity,
+    timeZone: TimeZone
+): Instant {
+    val local = instant.toLocalDateTime(timeZone)
+    return when (granularity) {
+        UsageBucketGranularity.HOUR ->
+            LocalDateTime(local.date, LocalTime(local.hour, 0)).toInstant(timeZone)
+        UsageBucketGranularity.DAY ->
+            local.date.atStartOfDayIn(timeZone)
+        UsageBucketGranularity.WEEK -> {
+            val daysSinceMonday = local.date.dayOfWeek.ordinal
+            val weekStart = local.date.minus(daysSinceMonday, kotlinx.datetime.DateTimeUnit.DAY)
+            weekStart.atStartOfDayIn(timeZone)
+        }
     }
 }
 

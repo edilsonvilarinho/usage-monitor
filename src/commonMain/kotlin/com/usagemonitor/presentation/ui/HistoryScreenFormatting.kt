@@ -6,15 +6,20 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.UsageBucketGranularity
+import com.usagemonitor.domain.entity.UsageBucketTotal
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.domain.entity.truncateToBucket
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 internal fun accentColorForHistorySource(source: ApiSource): Color {
     return when (source) {
@@ -184,6 +189,121 @@ internal fun formatPercentageOfTotal(value: Double, total: Long): String {
     if (total <= 0L) return "— %"
     val pct = value * 100.0 / total.toDouble()
     return "${pct.roundToLong()} %"
+}
+
+/**
+ * Formata um totalizador de consumo acumulado (soma através de resets, ver
+ * `cumulativePositiveDelta`). Para `PERCENTAGE`/`TOKENS`, um recorte que
+ * atravessa múltiplos ciclos de reset facilmente ultrapassa 100% do total de
+ * UM ciclo — nesse caso, em vez de um percentual sem sentido (ex.: "636 %"),
+ * mostra quantas cotas cheias foram consumidas (ex.: "6,4× a cota").
+ */
+internal fun formatCumulativeConsumption(
+    delta: Double,
+    total: Long,
+    unit: UsageUnit,
+    language: AppLanguage
+): String {
+    return when (unit) {
+        UsageUnit.CURRENCY_USD -> formatCents(delta.roundToLong())
+        UsageUnit.REQUESTS -> "${formatQuantity(delta.roundToLong())} req"
+        UsageUnit.PERCENTAGE, UsageUnit.TOKENS -> formatConsumptionRatio(delta, total, language)
+    }
+}
+
+private fun formatConsumptionRatio(delta: Double, total: Long, language: AppLanguage): String {
+    if (total <= 0L) return "— %"
+    val ratio = delta / total.toDouble()
+    if (ratio <= 1.0) {
+        return "${(ratio * 100.0).roundToLong()} %"
+    }
+    val multiplier = formatMultiplier(ratio, language)
+    return if (language == AppLanguage.PT) "${multiplier}× a cota" else "${multiplier}× the quota"
+}
+
+/** Granularidade de bucket adequada para cada chip de Intervalo. */
+internal fun granularityForRange(range: HistoryRange): UsageBucketGranularity {
+    return when (range) {
+        HistoryRange.LAST_24_HOURS -> UsageBucketGranularity.HOUR
+        HistoryRange.LAST_7_DAYS, HistoryRange.LAST_30_DAYS -> UsageBucketGranularity.DAY
+        HistoryRange.TOTAL -> UsageBucketGranularity.WEEK
+    }
+}
+
+/**
+ * Completa a lista de buckets com zero nos intervalos de calendário sem
+ * nenhuma coleta, para o eixo do gráfico de barras não "pular" quando o app
+ * ficou fechado. `windowStart` deve ser o início real do recorte exibido —
+ * para `HistoryRange.TOTAL` (sem início fixo), o chamador deve usar o
+ * `capturedAt` do primeiro ponto disponível em vez de `range.windowStart`.
+ */
+internal fun fillBucketGaps(
+    buckets: List<UsageBucketTotal>,
+    windowStart: Instant,
+    granularity: UsageBucketGranularity,
+    now: Instant,
+    timeZone: TimeZone = TimeZone.of("America/Sao_Paulo"),
+    maxBuckets: Int = 400
+): List<UsageBucketTotal> {
+    val alignedStart = truncateToBucket(windowStart, granularity, timeZone)
+    val alignedEnd = truncateToBucket(now, granularity, timeZone)
+    if (alignedStart > alignedEnd) {
+        return emptyList()
+    }
+
+    val step = bucketStep(granularity)
+    val existingByStart = buckets.associateBy { it.bucketStart }
+    val filled = mutableListOf<UsageBucketTotal>()
+    var cursor = alignedStart
+    var guard = 0
+    while (cursor <= alignedEnd && guard < maxBuckets) {
+        filled += existingByStart[cursor] ?: UsageBucketTotal(cursor, 0L)
+        cursor += step
+        guard++
+    }
+    return filled
+}
+
+private fun bucketStep(granularity: UsageBucketGranularity): kotlin.time.Duration {
+    return when (granularity) {
+        UsageBucketGranularity.HOUR -> 1.hours
+        UsageBucketGranularity.DAY -> 1.days
+        UsageBucketGranularity.WEEK -> 7.days
+    }
+}
+
+/** Rótulo curto de um bucket para eixo/tooltip do gráfico de barras. */
+internal fun formatBucketLabel(
+    bucketStart: Instant,
+    granularity: UsageBucketGranularity,
+    language: AppLanguage
+): String {
+    val local = bucketStart.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
+    val day = local.date.dayOfMonth.toString().padStart(2, '0')
+    val month = local.date.monthNumber.toString().padStart(2, '0')
+    return when (granularity) {
+        UsageBucketGranularity.HOUR -> "${local.hour.toString().padStart(2, '0')}h"
+        UsageBucketGranularity.DAY -> "$day/$month"
+        UsageBucketGranularity.WEEK -> if (language == AppLanguage.PT) "Sem. $day/$month" else "Wk $day/$month"
+    }
+}
+
+/**
+ * Formata um multiplicador com 1 casa decimal usando o separador do idioma
+ * escolhido pelo app, não o locale padrão da JVM — `"%.1f".format(...)`
+ * (usado em [trimDecimal]) segue o locale do sistema operacional, que pode
+ * divergir do idioma selecionado no app (ex.: JVM em pt-BR produzindo vírgula
+ * mesmo com `language == AppLanguage.EN`).
+ */
+private fun formatMultiplier(value: Double, language: AppLanguage): String {
+    val tenths = (value * 10.0).roundToLong()
+    val whole = tenths / 10
+    val fraction = kotlin.math.abs(tenths % 10)
+    if (fraction == 0L) {
+        return whole.toString()
+    }
+    val separator = if (language == AppLanguage.PT) "," else "."
+    return "$whole$separator$fraction"
 }
 
 internal fun formatQuantity(value: Long): String {

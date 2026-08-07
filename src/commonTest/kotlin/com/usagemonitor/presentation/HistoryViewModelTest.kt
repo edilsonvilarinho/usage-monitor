@@ -125,7 +125,10 @@ class HistoryViewModelTest {
 
         assertIs<HistoryUiState.Success>(state)
         assertEquals(HistoryRange.LAST_7_DAYS, state.selectedRange)
-        assertEquals(HistoryRange.LAST_7_DAYS, repo.lastRange)
+        // HistoryViewModel busca o relatório de totais (parametrizado por range) e o de
+        // linhas (sempre TOTAL) em paralelo — ambos devem ter sido requisitados.
+        assertTrue(repo.requestedRanges.contains(HistoryRange.LAST_7_DAYS))
+        assertTrue(repo.requestedRanges.contains(HistoryRange.TOTAL))
         viewModel.onDestroy()
     }
 
@@ -243,9 +246,13 @@ class HistoryViewModelTest {
         var error: Throwable? = null,
         var accounts: List<UsageAccountContext> = emptyList()
     ) : UsageHistoryRepository {
-        var invocations: Int = 0
-        var lastRange: HistoryRange? = null
-        var lastAccountKey: UsageAccountKey? = null
+        // HistoryViewModel busca o relatório de totais e o de linhas em paralelo
+        // (coroutines reais em Dispatchers.Default) — estado precisa ser thread-safe.
+        private val invocationsCounter = java.util.concurrent.atomic.AtomicInteger(0)
+        val requestedRanges: MutableList<HistoryRange> = java.util.Collections.synchronizedList(mutableListOf())
+        @Volatile var lastAccountKey: UsageAccountKey? = null
+
+        val invocations: Int get() = invocationsCounter.get()
 
         override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
 
@@ -272,8 +279,8 @@ class HistoryViewModelTest {
         }
 
         private fun respond(range: HistoryRange): ApiUsageHistoryReport {
-            invocations += 1
-            lastRange = range
+            invocationsCounter.incrementAndGet()
+            requestedRanges += range
             error?.let { throw it }
             return report ?: throw IllegalStateException("FakeRepo: nem report nem error configurado")
         }
