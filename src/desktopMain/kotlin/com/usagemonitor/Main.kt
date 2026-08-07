@@ -512,7 +512,7 @@ fun main() = application {
                             }
                             enabledApis.value = updatedApis
                             writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
-                            viewModel.refresh()
+                            viewModel.refresh(api)
                         },
                         anthropicProfiles = profileUiModels,
                         onAnthropicProfileToggle = { profileId, checked ->
