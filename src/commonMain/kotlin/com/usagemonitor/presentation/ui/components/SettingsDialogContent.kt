@@ -71,9 +71,11 @@ fun SettingsDialogContent(
     currentLanguage: AppLanguage,
     enabledApis: Set<ApiSource>,
     autoStartEnabled: Boolean,
+    alwaysOnTopEnabled: Boolean = false,
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
+    onAlwaysOnTopChange: (Boolean) -> Unit = {},
     onApiToggle: (ApiSource, Boolean) -> Unit,
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
@@ -111,6 +113,12 @@ fun SettingsDialogContent(
                         enabled = autoStartEnabled,
                         language = currentLanguage,
                         onToggle = onAutoStartChange
+                    )
+
+                    AlwaysOnTopToggle(
+                        enabled = alwaysOnTopEnabled,
+                        language = currentLanguage,
+                        onToggle = onAlwaysOnTopChange
                     )
 
                     Text(
@@ -373,6 +381,31 @@ fun AutoStartToggle(
     modifier: Modifier = Modifier
 ) {
     val label = if (language == AppLanguage.PT) "Inicialização com Sistema" else "System Startup"
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 4.dp)
+        )
+        Switch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) }
+        )
+    }
+}
+
+@Composable
+fun AlwaysOnTopToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val label = if (language == AppLanguage.PT) "Manter sempre visível" else "Always on top"
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
