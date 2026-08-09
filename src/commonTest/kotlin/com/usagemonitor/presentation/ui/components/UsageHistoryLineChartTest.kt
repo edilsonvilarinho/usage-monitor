@@ -325,13 +325,8 @@ class UsageHistoryLineChartTest {
 
         assertNotNull(summary)
         assertEquals("Comparando 15:00 -> 17:00", summary.headline)
-        assertEquals("Faixa selecionada no gráfico.", summary.supportingText)
-        assertEquals("Início da faixa", summary.metrics[0].label)
-        assertEquals("40/100 req (40%)", summary.metrics[0].value)
-        assertEquals("Fim da faixa", summary.metrics[1].label)
-        assertEquals("70/100 req (70%)", summary.metrics[1].value)
-        assertEquals("Consumido na faixa", summary.metrics[2].label)
-        assertEquals("30 req", summary.metrics[2].value)
+        assertEquals("Clique no gráfico para limpar.", summary.supportingText)
+        assertTrue(summary.metrics.isEmpty())
     }
 
     @Test

@@ -10,9 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -113,23 +111,11 @@ class HistoryViewModel(
                 emptyList()
             }
             val selectedAccount = resolveSelectedAccount(resolvedSource, availableAccounts)
-            val (report, linesReport) = coroutineScope {
-                val reportDeferred = async {
-                    getUsageHistory(
-                        source = resolvedSource,
-                        range = selectedRange.value,
-                        accountKey = selectedAccount?.key
-                    )
-                }
-                val linesReportDeferred = async {
-                    getUsageHistory(
-                        source = resolvedSource,
-                        range = HistoryRange.TOTAL,
-                        accountKey = selectedAccount?.key
-                    )
-                }
-                reportDeferred.await() to linesReportDeferred.await()
-            }
+            val report = getUsageHistory(
+                source = resolvedSource,
+                range = selectedRange.value,
+                accountKey = selectedAccount?.key
+            )
 
             publishIfLatest(
                 requestId,
@@ -138,7 +124,6 @@ class HistoryViewModel(
                     selectedSource = resolvedSource,
                     selectedRange = selectedRange.value,
                     report = report,
-                    linesReport = linesReport,
                     availableAccounts = availableAccounts,
                     selectedAccount = selectedAccount
                 )

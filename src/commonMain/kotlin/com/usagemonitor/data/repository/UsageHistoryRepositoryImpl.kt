@@ -10,7 +10,6 @@ import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.entity.cumulativePositiveDelta
 import com.usagemonitor.domain.entity.isSamePeriod
 import com.usagemonitor.domain.entity.riskSummary
 import com.usagemonitor.domain.entity.UsageAccountContext
@@ -206,7 +205,22 @@ class UsageHistoryRepositoryImpl(
     }
 
     private fun calculatePositiveDelta(points: List<UsageHistoryPoint>, unit: UsageUnit): Long {
-        return cumulativePositiveDelta(points, unit)
+        var delta = 0L
+        for (index in 1 until points.size) {
+            val current = points[index]
+            val previous = points[index - 1]
+            val diff = current.displayUsed - previous.displayUsed
+            if (unit == UsageUnit.CURRENCY_USD) {
+                if (diff < 0L) {
+                    delta += -diff
+                }
+            } else {
+                if (diff > 0L) {
+                    delta += diff
+                }
+            }
+        }
+        return delta
     }
 
     private fun calculateObservedHours(points: List<UsageHistoryPoint>): Double {
