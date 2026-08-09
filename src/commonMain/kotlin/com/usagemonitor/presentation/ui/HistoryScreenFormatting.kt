@@ -408,6 +408,10 @@ internal fun weeklySummaryLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Cota semanal atual" else "Current weekly quota"
 }
 
+internal fun intervalSummaryLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Cota intervalar atual" else "Current interval quota"
+}
+
 internal fun buildQuotaChartSelectionKey(
     source: ApiSource,
     quotaLabel: String,

@@ -62,10 +62,7 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.requiresUsageAccount
-import com.usagemonitor.presentation.ui.components.HistoryChartSelectionController
-import com.usagemonitor.presentation.ui.components.HistoryIntervalSummaryModel
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
-import com.usagemonitor.presentation.ui.components.buildHistoryIntervalSummaryModel
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
@@ -86,7 +83,6 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val chartSelectionController = remember { HistoryChartSelectionController() }
     val scrollState = rememberScrollState()
     val selectedSourceForHeader = when (val current = state) {
         is HistoryUiState.Empty -> current.selectedSource
@@ -162,10 +158,6 @@ fun HistoryScreen(
                         }
 
                         is HistoryUiState.Success -> {
-                            LaunchedEffect(current.selectedSource, current.selectedAccount?.key, current.selectedRange) {
-                                chartSelectionController.clear()
-                            }
-
                             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                                 HistoryControls(
                                     availableSources = current.availableSources,
@@ -197,16 +189,14 @@ fun HistoryScreen(
                                             report = current.report,
                                             accentColor = accentColor,
                                             language = language,
-                                            selectedRange = current.selectedRange,
-                                            selectionController = chartSelectionController
+                                            selectedRange = current.selectedRange
                                         )
                                     } else if (current.report.source.isObservedActivitySource()) {
                                         OpenCodeHistoryContent(
                                             report = current.report,
                                             accentColor = accentColor,
                                             language = language,
-                                            selectedRange = current.selectedRange,
-                                            selectionController = chartSelectionController
+                                            selectedRange = current.selectedRange
                                         )
                                     } else if (current.report.source == ApiSource.CODEX) {
                                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -233,8 +223,7 @@ fun HistoryScreen(
                                                             quotaLabel = series.quotaLabel,
                                                             periodType = series.periodType,
                                                             selectedRange = current.selectedRange
-                                                        ),
-                                                        selectionController = chartSelectionController
+                                                        )
                                                     )
                                                 }
                                             }
@@ -269,7 +258,6 @@ fun HistoryScreen(
                                                             periodType = model.chartSeries.periodType,
                                                             selectedRange = current.selectedRange
                                                         ),
-                                                        selectionController = chartSelectionController,
                                                         titleOverride = model.baseLabel,
                                                         subtitleOverride = genericHistorySubtitle(language),
                                                         weeklySummary = model.weeklySummary
@@ -473,8 +461,7 @@ private fun DeepSeekHistoryContent(
     report: ApiUsageHistoryReport,
     accentColor: Color,
     language: AppLanguage,
-    selectedRange: HistoryRange,
-    selectionController: HistoryChartSelectionController
+    selectedRange: HistoryRange
 ) {
     val primarySeries = report.series
         .firstOrNull { series -> series.quotaLabel.equals(DeepSeekQuotaLabels.BALANCE, ignoreCase = true) }
@@ -496,8 +483,7 @@ private fun DeepSeekHistoryContent(
                     quotaLabel = primarySeries.quotaLabel,
                     periodType = primarySeries.periodType,
                     selectedRange = selectedRange
-                ),
-                selectionController = selectionController
+                )
             )
         }
 
@@ -516,8 +502,7 @@ private fun DeepSeekHistoryContent(
                         quotaLabel = series.quotaLabel,
                         periodType = series.periodType,
                         selectedRange = selectedRange
-                    ),
-                    selectionController = selectionController
+                    )
                 )
             }
         }
@@ -529,8 +514,7 @@ private fun OpenCodeHistoryContent(
     report: ApiUsageHistoryReport,
     accentColor: Color,
     language: AppLanguage,
-    selectedRange: HistoryRange,
-    selectionController: HistoryChartSelectionController
+    selectedRange: HistoryRange
 ) {
     val modelReports = remember(report.series, selectedRange) {
         buildOpenCodeHistoryGroups(report.series, selectedRange)
@@ -555,8 +539,7 @@ private fun OpenCodeHistoryContent(
                         quotaLabel = modelReport.modelName,
                         periodType = modelReport.chartSeries.periodType,
                         selectedRange = selectedRange
-                    ),
-                    selectionController = selectionController
+                    )
                 )
             }
         }
@@ -573,8 +556,7 @@ private fun DeepSeekHistoryCard(
     accentColor: Color,
     index: Int,
     language: AppLanguage,
-    chartSelectionKey: String,
-    selectionController: HistoryChartSelectionController
+    chartSelectionKey: String
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -662,7 +644,6 @@ private fun DeepSeekHistoryCard(
                     unit = series.unit,
                     language = language,
                     chartSelectionKey = chartSelectionKey,
-                    selectionController = selectionController,
                     tooltipTitle = title,
                     tooltipSubtitle = subtitle
                 )
@@ -686,8 +667,7 @@ private fun OpenCodeHistoryCard(
     accentColor: Color,
     index: Int,
     language: AppLanguage,
-    chartSelectionKey: String,
-    selectionController: HistoryChartSelectionController
+    chartSelectionKey: String
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -753,7 +733,6 @@ private fun OpenCodeHistoryCard(
                     unit = modelReport.chartSeries.unit,
                     language = language,
                     chartSelectionKey = chartSelectionKey,
-                    selectionController = selectionController,
                     tooltipTitle = modelReport.modelName,
                     tooltipSubtitle = openCodeHistorySubtitle(
                         periodType = modelReport.chartSeries.periodType,
@@ -801,7 +780,6 @@ private fun HistorySeriesCard(
     accentColor: Color,
     language: AppLanguage,
     chartSelectionKey: String,
-    selectionController: HistoryChartSelectionController,
     titleOverride: String? = null,
     subtitleOverride: String? = null,
     weeklySummary: UsageHistorySeries? = null
@@ -873,37 +851,32 @@ private fun HistorySeriesCard(
                     )
                 }
 
-                if (series.periodType == PeriodType.INTERVAL) {
-                    IntervalSummaryPanel(
-                        summary = buildHistoryIntervalSummaryModel(
-                            points = series.points,
-                            unit = series.unit,
-                            language = language,
-                            selection = selectionController.selectionFor(chartSelectionKey, series.points.size)
-                        )
-                    )
-                }
-
                 UsageHistoryLineChart(
                     points = series.points,
                     unit = series.unit,
                     language = language,
                     chartSelectionKey = chartSelectionKey,
-                    selectionController = selectionController,
                     tooltipTitle = title,
                     tooltipSubtitle = subtitle
                 )
 
-                HistoryMetrics(
-                    source = source,
-                    series = series,
-                    language = language
-                )
-
                 if (weeklySummary != null) {
-                    WeeklySummaryPanel(
+                    HistoryMetricsPanel(
+                        title = intervalSummaryLabel(language),
+                        source = source,
+                        series = series,
+                        language = language
+                    )
+                    HistoryMetricsPanel(
+                        title = weeklySummaryLabel(language),
                         source = source,
                         series = weeklySummary,
+                        language = language
+                    )
+                } else {
+                    HistoryMetrics(
+                        source = source,
+                        series = series,
                         language = language
                     )
                 }
@@ -914,7 +887,8 @@ private fun HistorySeriesCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WeeklySummaryPanel(
+private fun HistoryMetricsPanel(
+    title: String,
     source: ApiSource,
     series: UsageHistorySeries,
     language: AppLanguage
@@ -930,7 +904,7 @@ private fun WeeklySummaryPanel(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = weeklySummaryLabel(language),
+                text = title,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold
@@ -939,55 +913,6 @@ private fun WeeklySummaryPanel(
                 source = source,
                 series = series,
                 language = language
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun IntervalSummaryPanel(
-    summary: HistoryIntervalSummaryModel?
-) {
-    if (summary == null) {
-        return
-    }
-
-    Surface(
-        shape = AppShapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            summary.headline?.let { headline ->
-                Text(
-                    text = headline,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            if (summary.metrics.isNotEmpty()) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    summary.metrics.forEach { metric ->
-                        MetricItem(label = metric.label, value = metric.value)
-                    }
-                }
-            }
-
-            Text(
-                text = summary.supportingText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

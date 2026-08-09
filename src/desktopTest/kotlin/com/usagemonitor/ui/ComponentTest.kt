@@ -1343,7 +1343,10 @@ class ComponentTest {
         onNodeWithText("Claude").assertIsDisplayed()
         onAllNodesWithText("Claude 5h").assertCountEquals(0)
         onAllNodesWithText("Claude 7d").assertCountEquals(0)
+        onNodeWithText("Cota intervalar atual").assertIsDisplayed()
         onNodeWithText("Cota semanal atual").assertIsDisplayed()
+        onAllNodesWithText("Início do recorte").assertCountEquals(0)
+        onAllNodesWithText("Arraste no gráfico para comparar dois pontos.").assertCountEquals(0)
         viewModel.onDestroy()
     }
 
@@ -1833,7 +1836,7 @@ class ComponentTest {
             }.getOrDefault(false)
         }
 
-        onAllNodesWithText("16/4", substring = true).assertCountEquals(3)
+        onAllNodesWithText("16/4", substring = true).assertCountEquals(1)
         onNodeWithText("0 req").assertIsDisplayed()
         onNodeWithText("0 req/h").assertIsDisplayed()
         onAllNodesWithText("0 / 100 %").assertCountEquals(0)
