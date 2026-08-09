@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.kover)
 }
 
-version = "23.0.0"
+version = "23.0.1"
 
 val appVersion = version.toString()
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
