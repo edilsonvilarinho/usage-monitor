@@ -208,7 +208,7 @@ fun HistoryScreen(
                                             selectedRange = current.selectedRange,
                                             selectionController = chartSelectionController
                                         )
-                                    } else {
+                                    } else if (current.report.source == ApiSource.CODEX) {
                                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                             Text(
                                                 text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
@@ -235,6 +235,44 @@ fun HistoryScreen(
                                                             selectedRange = current.selectedRange
                                                         ),
                                                         selectionController = chartSelectionController
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        val cardModels = remember(current.report.series) {
+                                            buildGenericHistoryGroups(current.report.series)
+                                        }
+
+                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                            Text(
+                                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            cardModels.forEachIndexed { index, model ->
+                                                key(
+                                                    model.baseLabel +
+                                                        current.selectedAccount?.key.toString() +
+                                                        current.selectedRange.name
+                                                ) {
+                                                    HistorySeriesCard(
+                                                        source = current.report.source,
+                                                        series = model.chartSeries,
+                                                        index = index,
+                                                        accentColor = accentColor,
+                                                        language = language,
+                                                        chartSelectionKey = buildQuotaChartSelectionKey(
+                                                            source = current.report.source,
+                                                            quotaLabel = model.chartSeries.quotaLabel,
+                                                            periodType = model.chartSeries.periodType,
+                                                            selectedRange = current.selectedRange
+                                                        ),
+                                                        selectionController = chartSelectionController,
+                                                        titleOverride = model.baseLabel,
+                                                        subtitleOverride = genericHistorySubtitle(language),
+                                                        weeklySummary = model.weeklySummary
                                                     )
                                                 }
                                             }
@@ -763,7 +801,10 @@ private fun HistorySeriesCard(
     accentColor: Color,
     language: AppLanguage,
     chartSelectionKey: String,
-    selectionController: HistoryChartSelectionController
+    selectionController: HistoryChartSelectionController,
+    titleOverride: String? = null,
+    subtitleOverride: String? = null,
+    weeklySummary: UsageHistorySeries? = null
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -781,12 +822,12 @@ private fun HistorySeriesCard(
         visible = true
     }
 
-    val title = historySeriesDisplayTitle(
+    val title = titleOverride ?: historySeriesDisplayTitle(
         source = source,
         series = series,
         language = language
     )
-    val subtitle = historySeriesDisplaySubtitle(
+    val subtitle = subtitleOverride ?: historySeriesDisplaySubtitle(
         source = source,
         series = series,
         language = language
@@ -858,7 +899,47 @@ private fun HistorySeriesCard(
                     series = series,
                     language = language
                 )
+
+                if (weeklySummary != null) {
+                    WeeklySummaryPanel(
+                        source = source,
+                        series = weeklySummary,
+                        language = language
+                    )
+                }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WeeklySummaryPanel(
+    source: ApiSource,
+    series: UsageHistorySeries,
+    language: AppLanguage
+) {
+    Surface(
+        shape = AppShapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = weeklySummaryLabel(language),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            HistoryMetrics(
+                source = source,
+                series = series,
+                language = language
+            )
         }
     }
 }
