@@ -1247,6 +1247,109 @@ class ComponentTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `HistoryScreen renders one Claude chart instead of separate 5h and 7d cards`() = runDesktopComposeUiTest {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T14:33:00Z"),
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "Claude 5h",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
+                            used = 4,
+                            total = 100,
+                            rawUsed = 180,
+                            rawTotal = 4500,
+                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 180,
+                    currentDisplayTotal = 4500,
+                    deltaDisplayUsed = 20,
+                    averageDisplayConsumptionPerHour = 5.0,
+                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = null
+                ),
+                UsageHistorySeries(
+                    quotaLabel = "Claude 7d",
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.PERCENTAGE,
+                    points = listOf(
+                        UsageHistoryPoint(
+                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
+                            used = 46,
+                            total = 100,
+                            rawUsed = 20700,
+                            rawTotal = 45000,
+                            periodEndAt = Instant.parse("2026-05-10T14:33:00Z")
+                        )
+                    ),
+                    currentDisplayUsed = 20700,
+                    currentDisplayTotal = 45000,
+                    deltaDisplayUsed = 900,
+                    averageDisplayConsumptionPerHour = 30.0,
+                    currentPeriodEndAt = Instant.parse("2026-05-10T14:33:00Z"),
+                    forecast = UsageForecast.ResetsBeforeExhaustion,
+                    riskSummary = null
+                )
+            )
+        )
+
+        val viewModel = HistoryViewModel(
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                    override suspend fun recordSnapshot(
+                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
+                        capturedAt: Instant
+                    ) = Unit
+
+                    override suspend fun getHistoryReport(
+                        source: ApiSource,
+                        range: HistoryRange,
+                        now: Instant
+                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
+                        return report
+                    }
+                }
+            ),
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    language = AppLanguage.PT,
+                    onBack = {},
+                    focusedSource = ApiSource.ANTHROPIC,
+                    showSourceSelector = false
+                )
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithText("Claude").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+
+        onNodeWithText("Claude").assertIsDisplayed()
+        onAllNodesWithText("Claude 5h").assertCountEquals(0)
+        onAllNodesWithText("Claude 7d").assertCountEquals(0)
+        onNodeWithText("Cota intervalar atual").assertIsDisplayed()
+        onNodeWithText("Cota semanal atual").assertIsDisplayed()
+        onAllNodesWithText("Início do recorte").assertCountEquals(0)
+        onAllNodesWithText("Arraste no gráfico para comparar dois pontos.").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
     // ── LanguageSelector ─────────────────────────────────────────────────
 
     @Test
@@ -1733,7 +1836,7 @@ class ComponentTest {
             }.getOrDefault(false)
         }
 
-        onAllNodesWithText("16/4", substring = true).assertCountEquals(3)
+        onAllNodesWithText("16/4", substring = true).assertCountEquals(1)
         onNodeWithText("0 req").assertIsDisplayed()
         onNodeWithText("0 req/h").assertIsDisplayed()
         onAllNodesWithText("0 / 100 %").assertCountEquals(0)

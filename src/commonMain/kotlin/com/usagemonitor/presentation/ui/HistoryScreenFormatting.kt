@@ -348,6 +348,70 @@ internal fun historySeriesDisplaySubtitle(
     }
 }
 
+internal data class GenericHistoryCardModel(
+    val baseLabel: String,
+    val chartSeries: UsageHistorySeries,
+    val weeklySummary: UsageHistorySeries?
+)
+
+private data class MutableGenericHistoryGroup(
+    val baseLabel: String,
+    var intervalSeries: UsageHistorySeries? = null,
+    var weeklySeries: UsageHistorySeries? = null,
+    var otherSeries: UsageHistorySeries? = null
+)
+
+/**
+ * Funde as séries INTERVAL (5h) e WEEKLY (7d) da mesma quota-família num único card:
+ * o gráfico usa sempre a série INTERVAL (mais granular), e a WEEKLY vira um resumo
+ * de métricas sem gráfico próprio (ver [GenericHistoryCardModel.weeklySummary]).
+ * Quando só existe uma das duas, o card renderiza normalmente, sem fusão.
+ */
+internal fun buildGenericHistoryGroups(series: List<UsageHistorySeries>): List<GenericHistoryCardModel> {
+    val grouped = linkedMapOf<String, MutableGenericHistoryGroup>()
+
+    series.forEach { item ->
+        val baseLabel = when {
+            item.quotaLabel.endsWith(" 5h") -> item.quotaLabel.removeSuffix(" 5h")
+            item.quotaLabel.endsWith(" 7d") -> item.quotaLabel.removeSuffix(" 7d")
+            else -> item.quotaLabel
+        }
+
+        val group = grouped.getOrPut(baseLabel) { MutableGenericHistoryGroup(baseLabel) }
+        when (item.periodType) {
+            PeriodType.INTERVAL -> group.intervalSeries = item
+            PeriodType.WEEKLY -> group.weeklySeries = item
+            PeriodType.REPORTED -> group.otherSeries = item
+        }
+    }
+
+    return grouped.values.map { group ->
+        val interval = group.intervalSeries
+        val weekly = group.weeklySeries
+        when {
+            interval != null -> GenericHistoryCardModel(group.baseLabel, interval, weekly)
+            weekly != null -> GenericHistoryCardModel(group.baseLabel, weekly, null)
+            else -> GenericHistoryCardModel(group.baseLabel, requireNotNull(group.otherSeries), null)
+        }
+    }
+}
+
+internal fun genericHistorySubtitle(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        "Consumo ao longo do intervalo selecionado"
+    } else {
+        "Consumption across the selected range"
+    }
+}
+
+internal fun weeklySummaryLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Cota semanal atual" else "Current weekly quota"
+}
+
+internal fun intervalSummaryLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Cota intervalar atual" else "Current interval quota"
+}
+
 internal fun buildQuotaChartSelectionKey(
     source: ApiSource,
     quotaLabel: String,
