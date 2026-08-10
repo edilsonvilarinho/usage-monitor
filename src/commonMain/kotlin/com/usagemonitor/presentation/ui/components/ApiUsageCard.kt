@@ -75,8 +75,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
@@ -236,7 +236,7 @@ fun ApiUsageCard(
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(AppShapes.large)
@@ -274,10 +274,19 @@ fun ApiUsageCard(
                     }
                 }
         ) {
+            val density = resolveApiUsageCardDensity(maxWidth)
+            val stackCompactQuotas = shouldStackCompactQuotas(
+                cardWidth = maxWidth,
+                quotaCount = orderedQuotas.size
+            )
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(
+                        horizontal = density.contentHorizontalPadding,
+                        vertical = density.contentVerticalPadding
+                    ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -286,19 +295,24 @@ fun ApiUsageCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(density.headerSpacing),
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = apiName,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        HoverTooltipBox(
+                            title = apiName,
+                            metrics = emptyList(),
                             modifier = Modifier.weight(1f, fill = false)
-                        )
+                        ) {
+                            Text(
+                                text = apiName,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                         source.statusBadgeLabel(language)?.let { badgeLabel ->
                             Text(
                                 text = badgeLabel,
@@ -313,7 +327,7 @@ fun ApiUsageCard(
                     }
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(density.actionSpacing),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         CardIconActionButton(
@@ -322,18 +336,19 @@ fun ApiUsageCard(
                                 language = language
                             ),
                             onClick = onRefresh,
+                            buttonSize = density.actionButtonSize,
                             enabled = !isRefreshing
                         ) {
                             if (isRefreshing) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(density.actionIconSize),
                                     strokeWidth = 2.dp
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Rounded.Refresh,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(density.actionIconSize),
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
@@ -341,12 +356,13 @@ fun ApiUsageCard(
 
                         CardIconActionButton(
                             label = historyActionLabel(language = language),
-                            onClick = onOpenHistory
+                            onClick = onOpenHistory,
+                            buttonSize = density.actionButtonSize
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.History,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(density.actionIconSize),
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
@@ -356,7 +372,8 @@ fun ApiUsageCard(
                                 isMinimized = isMinimized,
                                 language = language
                             ),
-                            onClick = onToggleMinimized
+                            onClick = onToggleMinimized,
+                            buttonSize = density.actionButtonSize
                         ) {
                             Icon(
                                 imageVector = if (isMinimized) {
@@ -365,7 +382,7 @@ fun ApiUsageCard(
                                     Icons.Rounded.Remove
                                 },
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(density.actionIconSize),
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
@@ -413,14 +430,17 @@ fun ApiUsageCard(
                             quotas = orderedQuotas,
                             showUsageDetails = showUsageDetails,
                             language = language,
-                            riskByQuotaKey = riskByQuotaKey
+                            riskByQuotaKey = riskByQuotaKey,
+                            density = density,
+                            stacked = stackCompactQuotas
                         )
                     } else {
                         ExpandedQuotaSummary(
                             quotas = orderedQuotas,
                             showUsageDetails = showUsageDetails,
                             language = language,
-                            riskByQuotaKey = riskByQuotaKey
+                            riskByQuotaKey = riskByQuotaKey,
+                            density = density
                         )
                     }
                 }
@@ -588,6 +608,44 @@ private fun OpenCodeUsageSummary(
 
 @Composable
 private fun OpenCodeModelRow(
+    source: ApiSource,
+    summary: OpenCodeModelSummary,
+    language: AppLanguage,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    // No modo compacto a linha não renderiza as barras internas (que já têm
+    // tooltip própria), então é seguro dar tooltip à linha inteira.
+    if (compact) {
+        HoverTooltipBox(
+            title = summary.modelName,
+            subtitle = if (language == AppLanguage.PT) "Atividade observada" else "Observed activity",
+            metrics = buildOpenCodeTooltipMetrics(summary = summary, language = language),
+            modifier = modifier
+        ) {
+            OpenCodeModelRowContent(
+                source = source,
+                summary = summary,
+                language = language,
+                compact = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        return
+    }
+
+    OpenCodeModelRowContent(
+        source = source,
+        summary = summary,
+        language = language,
+        compact = false,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun OpenCodeModelRowContent(
     source: ApiSource,
     summary: OpenCodeModelSummary,
     language: AppLanguage,
@@ -773,6 +831,7 @@ private fun OpenCodeInlineBar(
 private fun CardIconActionButton(
     label: String,
     onClick: () -> Unit,
+    buttonSize: Dp,
     enabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -784,7 +843,7 @@ private fun CardIconActionButton(
             onClick = onClick,
             enabled = enabled,
             modifier = Modifier
-                .size(34.dp)
+                .size(buttonSize)
                 .semantics {
                     contentDescription = label
                 }
@@ -801,6 +860,8 @@ private fun CompactQuotaSummary(
     showUsageDetails: Boolean,
     language: AppLanguage,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
+    density: ApiUsageCardDensity,
+    stacked: Boolean,
     modifier: Modifier = Modifier
 ) {
     if (quotas.size == 1) {
@@ -816,6 +877,7 @@ private fun CompactQuotaSummary(
                 showUsageDetails = showUsageDetails,
                 language = language,
                 risk = riskByQuotaKey[quotas.first().seriesKey],
+                density = density,
                 modifier = Modifier.fillMaxWidth(badgeWidthFraction)
             )
         }
@@ -823,9 +885,30 @@ private fun CompactQuotaSummary(
         return
     }
 
+    if (stacked) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(density.compactQuotaSpacing)
+        ) {
+            quotas.forEach { quota ->
+                CompactQuotaBadge(
+                    source = source,
+                    quota = quota,
+                    showUsageDetails = showUsageDetails,
+                    language = language,
+                    risk = riskByQuotaKey[quota.seriesKey],
+                    density = density,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        return
+    }
+
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(density.compactQuotaSpacing),
         verticalAlignment = Alignment.Top
     ) {
         quotas.forEach { quota ->
@@ -839,6 +922,7 @@ private fun CompactQuotaSummary(
                     showUsageDetails = showUsageDetails,
                     language = language,
                     risk = riskByQuotaKey[quota.seriesKey],
+                    density = density,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -853,22 +937,49 @@ private fun CompactQuotaBadge(
     showUsageDetails: Boolean,
     language: AppLanguage,
     risk: QuotaRiskSummary?,
+    density: ApiUsageCardDensity,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    HoverTooltipBox(
+        title = quota.label,
+        subtitle = expandedQuotaTitle(quota = quota, language = language),
+        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, risk = risk),
         modifier = modifier
-            .testTag(COMPACT_QUOTA_BADGE_TAG)
-            .clip(AppShapes.extraLarge)
-            .background(accentColorFor(source = source).copy(alpha = 0.12f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (risk != null) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RiskSemaphoreDot(risk = risk, quotaLabel = quota.label, language = language)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(COMPACT_QUOTA_BADGE_TAG)
+                .clip(AppShapes.extraLarge)
+                .background(accentColorFor(source = source).copy(alpha = 0.12f))
+                .padding(
+                    horizontal = density.badgeHorizontalPadding,
+                    vertical = density.badgeVerticalPadding
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (risk != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // A tooltip do ponto fica desligada: o badge inteiro já tem a
+                    // própria tooltip e dois TooltipBox aninhados disputam o hover.
+                    RiskSemaphoreDot(
+                        risk = risk,
+                        quotaLabel = quota.label,
+                        language = language,
+                        showTooltip = false
+                    )
+                    Text(
+                        text = quota.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else {
                 Text(
                     text = quota.label,
                     style = MaterialTheme.typography.labelSmall,
@@ -877,35 +988,27 @@ private fun CompactQuotaBadge(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        } else {
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             Text(
-                text = quota.label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                text = compactPercentageLabel(quota),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
-        }
 
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = compactPercentageLabel(quota),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
-
-        if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = formatUsage(quota),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
+            if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = formatUsage(quota),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
@@ -916,11 +1019,12 @@ private fun ExpandedQuotaSummary(
     showUsageDetails: Boolean,
     language: AppLanguage,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
+    density: ApiUsageCardDensity,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing),
         verticalAlignment = Alignment.Top
     ) {
         for (index in quotas.indices) {
@@ -933,7 +1037,8 @@ private fun ExpandedQuotaSummary(
                     quota = quota,
                     showUsageDetails = showUsageDetails,
                     language = language,
-                    risk = riskByQuotaKey[quota.seriesKey]
+                    risk = riskByQuotaKey[quota.seriesKey],
+                    density = density
                 )
             }
         }
@@ -946,6 +1051,7 @@ private fun QuotaColumn(
     showUsageDetails: Boolean,
     language: AppLanguage,
     risk: QuotaRiskSummary?,
+    density: ApiUsageCardDensity,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -962,10 +1068,10 @@ private fun QuotaColumn(
                 used = quota.used,
                 total = quota.total,
                 unit = quota.unit,
-                size = 92.dp,
-                strokeWidth = 10.dp,
+                size = density.arcSize,
+                strokeWidth = density.arcStrokeWidth,
                 percentageTextStyle = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 18.sp,
+                    fontSize = density.arcPercentageFontSize,
                     fontWeight = FontWeight.Bold
                 )
             )
