@@ -43,6 +43,22 @@ internal fun openCodeSecondaryWindowLabel(value: Long, language: AppLanguage): S
     }
 }
 
+internal fun buildOpenCodeTooltipMetrics(
+    summary: OpenCodeModelSummary,
+    language: AppLanguage
+): List<TooltipMetric> {
+    return listOf(
+        TooltipMetric(
+            label = openCodePrimaryWindowLabel(language),
+            value = "${summary.requestsFiveHours} req."
+        ),
+        TooltipMetric(
+            label = if (language == AppLanguage.PT) "Últimos 7d" else "Last 7d",
+            value = "${summary.requestsSevenDays} req."
+        )
+    )
+}
+
 internal fun buildOpenCodeModelSummaries(quotas: List<QuotaInfo>): List<OpenCodeModelSummary> {
     val grouped = linkedMapOf<String, OpenCodeModelSummary>()
 
@@ -241,7 +257,8 @@ internal fun riskDotTooltipSubtitle(risk: QuotaRiskSummary, language: AppLanguag
 
 internal fun buildQuotaTooltipMetrics(
     quota: QuotaInfo,
-    language: AppLanguage
+    language: AppLanguage,
+    risk: QuotaRiskSummary? = null
 ): List<TooltipMetric> {
     val metrics = mutableListOf<TooltipMetric>()
 
@@ -254,6 +271,7 @@ internal fun buildQuotaTooltipMetrics(
             label = if (language == AppLanguage.PT) "Status" else "Status",
             value = resetLabel(quota = quota, language = language)
         )
+        metrics.addProjectionMetric(risk = risk, language = language)
         return metrics
     }
 
@@ -277,7 +295,26 @@ internal fun buildQuotaTooltipMetrics(
         label = if (language == AppLanguage.PT) "Reset" else "Reset",
         value = resetLabel(quota = quota, language = language)
     )
+    metrics.addProjectionMetric(risk = risk, language = language)
     return metrics
+}
+
+// A projeção só entra na tooltip quando o card resumido suprime a tooltip própria
+// do RiskSemaphoreDot — evita TooltipBox aninhado dentro do badge.
+private fun MutableList<TooltipMetric>.addProjectionMetric(
+    risk: QuotaRiskSummary?,
+    language: AppLanguage
+) {
+    if (risk == null) {
+        return
+    }
+
+    add(
+        TooltipMetric(
+            label = riskDotTooltipTitle(language),
+            value = riskLevelLabel(risk.level, language)
+        )
+    )
 }
 
 internal fun quotaTooltipUsageValue(quota: QuotaInfo, language: AppLanguage): String {

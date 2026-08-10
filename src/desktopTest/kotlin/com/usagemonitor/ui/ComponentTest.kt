@@ -17,12 +17,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
@@ -386,6 +388,179 @@ class ComponentTest {
         onNodeWithContentDescription("Expandir card").assertIsDisplayed()
     }
 
+    @Test
+    fun `ApiUsageCard shows quota tooltip on hover while minimized`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS,
+                            rawUsed = 1800L,
+                            rawTotal = 4000L
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        // "Uso atual" só existe como rótulo de métrica da tooltip: no card resumido
+        // com quota INTERVAL o subtítulo é "Sessão 5h".
+        onAllNodesWithText("Uso atual").assertCountEquals(0)
+
+        onNodeWithText("Claude 5h").performMouseInput { moveTo(center) }
+
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithText("Uso atual").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        onNodeWithText("Restante").assertIsDisplayed()
+        onNodeWithText("Percentual").assertIsDisplayed()
+        onNodeWithText("Reset").assertIsDisplayed()
+        onNodeWithText("Reinício: Ter 14h40 BRT").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard tooltip includes projection row when risk is known while minimized`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 45L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.TOKENS
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.WILL_EXCEED,
+                            estimatedExhaustionAt = Instant.parse("2026-04-28T16:00:00Z")
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Claude 5h").performMouseInput { moveTo(center) }
+
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithText("Projeção de uso").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        onNodeWithText("Crítico").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard stacks compact quota badges on very narrow cards`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS
+                        ),
+                        QuotaInfo(
+                            label = "Claude 7d",
+                            used = 80L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.TOKENS
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    modifier = Modifier.width(200.dp)
+                )
+            }
+        }
+
+        val fiveHourTop = onNodeWithText("Claude 5h").getBoundsInRoot().top
+        val weeklyTop = onNodeWithText("Claude 7d").getBoundsInRoot().top
+
+        assertTrue(
+            weeklyTop > fiveHourTop,
+            "Badges deveriam empilhar: 5h em $fiveHourTop, 7d em $weeklyTop"
+        )
+    }
+
+    @Test
+    fun `ApiUsageCard keeps compact quota badges side by side on wide cards`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS
+                        ),
+                        QuotaInfo(
+                            label = "Claude 7d",
+                            used = 80L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.TOKENS
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    modifier = Modifier.width(400.dp)
+                )
+            }
+        }
+
+        val fiveHourTop = onNodeWithText("Claude 5h").getBoundsInRoot().top
+        val weeklyTop = onNodeWithText("Claude 7d").getBoundsInRoot().top
+
+        assertEquals(fiveHourTop, weeklyTop)
+    }
+
     // ── RiskSemaphoreDot ─────────────────────────────────────────────────
 
     @Test
@@ -526,7 +701,12 @@ class ComponentTest {
             }
         }
 
-        val badgeWidth = onNodeWithTag("compactQuotaBadge").fetchSemanticsNode().boundsInRoot.width
+        // O badge resumido passou a ser âncora de tooltip, que agrega os descendentes
+        // na árvore merged — a tag só é alcançável na árvore unmerged.
+        val badgeWidth = onNodeWithTag("compactQuotaBadge", useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .width
         val hostWidth = onNodeWithTag("cardHost").fetchSemanticsNode().boundsInRoot.width
 
         assertTrue(badgeWidth < hostWidth * 0.7f)
