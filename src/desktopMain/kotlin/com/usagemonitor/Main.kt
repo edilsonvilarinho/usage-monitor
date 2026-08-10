@@ -394,6 +394,14 @@ fun main() = application {
         }
     }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
+    val windowOpacitySupported = remember { isWindowOpacitySupported() }
+    var windowOpacityPercent by remember { mutableStateOf(readPersistedWindowOpacityPercent(settings)) }
+    LaunchedEffect(settings) {
+        snapshotFlow { windowOpacityPercent }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { percent -> persistWindowOpacityPercent(settings, percent) }
+    }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
@@ -423,6 +431,9 @@ fun main() = application {
         undecorated = true,
         alwaysOnTop = alwaysOnTopEnabled
     ) {
+        LaunchedEffect(windowOpacityPercent) {
+            applyWindowOpacity(window, windowOpacityPercent)
+        }
         AppTheme(isDark = isDark) {
             DesktopWindowFrame(
                 title = "Usage Monitor",
@@ -530,6 +541,8 @@ fun main() = application {
                         enabledApis = enabledApisState,
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
+                        windowOpacityPercent = windowOpacityPercent,
+                        windowOpacityEnabled = windowOpacitySupported,
                         onThemeToggle = {
                             isDark = !isDark
                             settings.putBoolean(IS_DARK_KEY, isDark)
@@ -550,6 +563,9 @@ fun main() = application {
                         onAlwaysOnTopChange = { enabled ->
                             alwaysOnTopEnabled = enabled
                             settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
+                        },
+                        onWindowOpacityChange = { percent ->
+                            windowOpacityPercent = clampWindowOpacityPercent(percent)
                         },
                         onApiToggle = { api, checked ->
                             val updatedApis = if (checked) {

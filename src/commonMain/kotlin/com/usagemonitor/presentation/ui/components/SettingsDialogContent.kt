@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -48,8 +49,11 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
+import com.usagemonitor.domain.entity.MAX_WINDOW_OPACITY_PERCENT
+import com.usagemonitor.domain.entity.MIN_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import kotlin.math.roundToInt
 
 enum class AnthropicProfileUiStatus { READY, INCOMPLETE, INVALID, DUPLICATE }
 
@@ -72,10 +76,13 @@ fun SettingsDialogContent(
     enabledApis: Set<ApiSource>,
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean = false,
+    windowOpacityPercent: Int = MAX_WINDOW_OPACITY_PERCENT,
+    windowOpacityEnabled: Boolean = true,
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit = {},
+    onWindowOpacityChange: (Int) -> Unit = {},
     onApiToggle: (ApiSource, Boolean) -> Unit,
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
@@ -119,6 +126,13 @@ fun SettingsDialogContent(
                         enabled = alwaysOnTopEnabled,
                         language = currentLanguage,
                         onToggle = onAlwaysOnTopChange
+                    )
+
+                    WindowOpacitySlider(
+                        percent = windowOpacityPercent,
+                        language = currentLanguage,
+                        enabled = windowOpacityEnabled,
+                        onPercentChange = onWindowOpacityChange
                     )
 
                     Text(
@@ -420,6 +434,56 @@ fun AlwaysOnTopToggle(
             checked = enabled,
             onCheckedChange = { onToggle(it) }
         )
+    }
+}
+
+@Composable
+fun WindowOpacitySlider(
+    percent: Int,
+    language: AppLanguage = AppLanguage.PT,
+    enabled: Boolean = true,
+    onPercentChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val label = if (language == AppLanguage.PT) "Opacidade da janela" else "Window opacity"
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "$percent%",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Slider(
+            value = percent.toFloat(),
+            onValueChange = { value -> onPercentChange(value.roundToInt()) },
+            valueRange = MIN_WINDOW_OPACITY_PERCENT.toFloat()..MAX_WINDOW_OPACITY_PERCENT.toFloat(),
+            // Sem steps: 51 tick marks desenhados na trilha só poluiriam. A granularidade
+            // de 1 ponto percentual já vem do roundToInt e do valor Int devolvido pelo estado.
+            steps = 0,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (!enabled) {
+            Text(
+                text = if (language == AppLanguage.PT) {
+                    "Transparência não suportada neste sistema."
+                } else {
+                    "Transparency is not supported on this system."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

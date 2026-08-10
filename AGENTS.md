@@ -94,6 +94,7 @@ Regras importantes:
   - `isDark`
   - `language`
   - `autoStart`
+  - `windowOpacityPercent`
 - `AutoStartManager` escreve em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 
 ## UI and presentation

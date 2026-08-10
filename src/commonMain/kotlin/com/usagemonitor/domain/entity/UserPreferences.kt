@@ -18,3 +18,10 @@ enum class AppLanguage { PT, EN }
 
 /** Identificador de cada API suportada. */
 enum class ApiSource { ANTHROPIC, MINIMAX, CODEX, DEEPSEEK, OPENCODE, KILO }
+
+/**
+ * Faixa de opacidade da janela principal, em pontos percentuais (100 = totalmente opaco).
+ * O piso evita que a janela fique inutilizável.
+ */
+const val MIN_WINDOW_OPACITY_PERCENT = 50
+const val MAX_WINDOW_OPACITY_PERCENT = 100

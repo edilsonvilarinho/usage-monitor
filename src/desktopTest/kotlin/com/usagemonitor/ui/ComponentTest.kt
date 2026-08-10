@@ -8,7 +8,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
@@ -20,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
@@ -49,6 +53,7 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
+import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
@@ -808,6 +813,7 @@ class ComponentTest {
                     currentLanguage = AppLanguage.EN,
                     enabledApis = setOf(ApiSource.ANTHROPIC, ApiSource.CODEX),
                     autoStartEnabled = false,
+                    windowOpacityPercent = 75,
                     onThemeToggle = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
@@ -828,6 +834,8 @@ class ComponentTest {
         }
 
         onNodeWithText("System Startup").assertIsDisplayed()
+        onNodeWithText("Window opacity").assertIsDisplayed()
+        onNodeWithText("75%").assertIsDisplayed()
         onNodeWithText("Language").assertIsDisplayed()
         onNodeWithText("Monitored APIs").assertIsDisplayed()
         onNodeWithText("Anthropic accounts").assertIsDisplayed()
@@ -835,6 +843,50 @@ class ComponentTest {
         onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
         onNodeWithText("Kilo Free").assertIsDisplayed()
         onAllNodesWithText("Close").assertCountEquals(0)
+    }
+
+    @Test
+    fun `WindowOpacitySlider reports the snapped percent and updates its label`() = runDesktopComposeUiTest {
+        var lastReportedPercent = -1
+
+        setContent {
+            AppTheme(isDark = true) {
+                var percent by remember { mutableStateOf(75) }
+                WindowOpacitySlider(
+                    percent = percent,
+                    language = AppLanguage.EN,
+                    onPercentChange = { updated ->
+                        lastReportedPercent = updated
+                        percent = updated
+                    }
+                )
+            }
+        }
+
+        onNodeWithText("75%").assertIsDisplayed()
+
+        // O slider é contínuo; a granularidade de 1 ponto percentual vem do roundToInt.
+        onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(62.4f) }
+
+        assertEquals(62, lastReportedPercent)
+        onNodeWithText("62%").assertIsDisplayed()
+    }
+
+    @Test
+    fun `WindowOpacitySlider explains why the control is unavailable when disabled`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                WindowOpacitySlider(
+                    percent = 100,
+                    language = AppLanguage.EN,
+                    enabled = false,
+                    onPercentChange = {}
+                )
+            }
+        }
+
+        onNodeWithText("Transparency is not supported on this system.").assertIsDisplayed()
     }
 
     @Test
