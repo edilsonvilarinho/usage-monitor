@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -123,6 +124,8 @@ fun ApiUsageCard(
     animationDelayMillis: Int,
     onRefresh: () -> Unit,
     onOpenHistory: () -> Unit = {},
+    /** Só os cards Anthropic recebem: sessões do Claude Code pertencem a uma conta. */
+    onOpenCliSessions: (() -> Unit)? = null,
     onToggleMinimized: () -> Unit = {},
     onDragStart: () -> Unit = {},
     onDrag: (Offset) -> Unit = {},
@@ -365,6 +368,21 @@ fun ApiUsageCard(
                                 modifier = Modifier.size(density.actionIconSize),
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer
                             )
+                        }
+
+                        if (onOpenCliSessions != null) {
+                            CardIconActionButton(
+                                label = cliSessionsActionLabel(language = language),
+                                onClick = onOpenCliSessions,
+                                buttonSize = density.actionButtonSize
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Terminal,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(density.actionIconSize),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
                         }
 
                         CardIconActionButton(

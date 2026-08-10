@@ -24,6 +24,7 @@ import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
+import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
@@ -34,11 +35,13 @@ import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
 import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
+import com.usagemonitor.data.repository.CliSessionRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -51,13 +54,18 @@ import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
+import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
+import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
+import com.usagemonitor.domain.usecase.SetCliSessionHiddenUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import com.usagemonitor.presentation.ui.DesktopDialogFrame
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
+import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
@@ -65,6 +73,7 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
@@ -190,6 +199,9 @@ fun main() = application {
     val persistedHistoryWindowState = remember(settings) {
         readPersistedHistoryWindowState(settings)
     }
+    val persistedCliSessionsWindowState = remember(settings) {
+        readPersistedCliSessionsWindowState(settings)
+    }
 
     val credentialDataSource = remember(httpClient, profileRegistry) {
         LocalCredentialDataSource(
@@ -203,6 +215,21 @@ fun main() = application {
         RemoteApiDataSource(httpClient, codexDiagnosticsRecorder)
     }
     val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
+    // Cada conta Anthropic tem seu próprio config dir do Claude Code, e cada um
+    // tem seu `projects/`. É daí que sai a atribuição de sessão para conta — os
+    // transcripts em si não carregam identidade nenhuma.
+    val cliSessionDataSource = remember(profileRegistry) {
+        LocalCliSessionDataSource(
+            projectRootsProvider = {
+                profileRegistry.profiles.value.map { record ->
+                    CliProjectRoot(
+                        profileId = record.id,
+                        directoryPath = File(record.configDirectory, "projects").absolutePath
+                    )
+                }
+            }
+        )
+    }
     val dashboardCacheDataSource = remember { LocalDashboardCacheDataSource() }
     val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
     val kiloUsageDataSource = remember { LocalKiloUsageDataSource() }
@@ -227,6 +254,9 @@ fun main() = application {
     }
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
+    }
+    val cliSessionRepository = remember(cliSessionDataSource) {
+        CliSessionRepositoryImpl(cliSessionDataSource)
     }
     val dashboardCacheRepository = remember(dashboardCacheDataSource) {
         DashboardCacheRepositoryImpl(dashboardCacheDataSource)
@@ -278,6 +308,16 @@ fun main() = application {
             enabledApis = enabledApis
         )
     }
+    // A indexação dos transcripts só começa quando a janela é aberta pela
+    // primeira vez: 87 MB de `.jsonl` não podem atrasar o arranque do app.
+    val cliSessionsViewModel = remember(cliSessionRepository) {
+        CliSessionsViewModel(
+            getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
+            getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
+            setCliSessionHidden = SetCliSessionHiddenUseCase(cliSessionRepository),
+            autoLoad = false
+        )
+    }
 
     val shutdownStarted = remember { AtomicBoolean(false) }
     DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource, profileRegistry) {
@@ -285,9 +325,11 @@ fun main() = application {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                cliSessionsViewModel.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
+                cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
@@ -303,9 +345,11 @@ fun main() = application {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                cliSessionsViewModel.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
+                cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
@@ -316,6 +360,7 @@ fun main() = application {
     val iconImage = remember { loadWindowIcon() }
     val mainWindowState = rememberPersistedMainWindowState(persistedMainWindowState)
     val historyWindowState = rememberPersistedHistoryWindowState(persistedHistoryWindowState)
+    val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(persistedCliSessionsWindowState)
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -359,6 +404,29 @@ fun main() = application {
                     placement = placement
                 )
             )
+            }
+    }
+    LaunchedEffect(cliSessionsWindowState, settings) {
+        snapshotFlow {
+            Triple(
+                cliSessionsWindowState.position,
+                cliSessionsWindowState.size,
+                cliSessionsWindowState.placement
+            )
+        }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { (position, size, placement) ->
+                persistCliSessionsWindowState(
+                    settings = settings,
+                    snapshot = CliSessionsWindowSnapshot(
+                        widthDp = size.width.value,
+                        heightDp = size.height.value,
+                        xDp = if (position.isSpecified) position.x.value else null,
+                        yDp = if (position.isSpecified) position.y.value else null,
+                        placement = placement
+                    )
+                )
             }
     }
     val enabledApisState by enabledApis.collectAsState()
@@ -406,13 +474,18 @@ fun main() = application {
     var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
     var historyOpenGeneration by remember { mutableStateOf(0) }
+    var isCliSessionsOpen by remember { mutableStateOf(false) }
+    var cliSessionsOpenGeneration by remember { mutableStateOf(0) }
+    var cliSessionsProfileLabel by remember { mutableStateOf<String?>(null) }
     val shutdownApplication = remember(viewModel, historyViewModel, httpClient, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                cliSessionsViewModel.onDestroy()
                 httpClient.close()
                 usageHistoryDataSource.close()
+                cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
@@ -480,6 +553,16 @@ fun main() = application {
                     onOpenSettings = {
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
+                    },
+                    onOpenCliSessions = { target ->
+                        val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+                        val label = profileRecords
+                            .firstOrNull { record -> record.id == profileId }
+                            ?.label
+                        cliSessionsProfileLabel = label
+                        isCliSessionsOpen = true
+                        cliSessionsOpenGeneration++
+                        cliSessionsViewModel.openForProfile(profileId, label)
                     }
                 )
             }
@@ -511,6 +594,36 @@ fun main() = application {
                         onBack = { historyDialogSource = null },
                         focusedSource = source,
                         showSourceSelector = false
+                    )
+                }
+            }
+        }
+    }
+
+    if (isCliSessionsOpen) {
+        val cliSessionsTitle = cliSessionsWindowTitle(language, cliSessionsProfileLabel)
+        Window(
+            onCloseRequest = { isCliSessionsOpen = false },
+            title = cliSessionsTitle,
+            icon = iconImage,
+            state = cliSessionsWindowState,
+            resizable = true,
+            undecorated = true
+        ) {
+            LaunchedEffect(cliSessionsOpenGeneration) {
+                activateWindow(window)
+            }
+            AppTheme(isDark = isDark) {
+                DesktopDialogFrame(
+                    title = cliSessionsTitle,
+                    iconPainter = iconImage,
+                    windowState = cliSessionsWindowState,
+                    onCloseRequest = { isCliSessionsOpen = false }
+                ) {
+                    CliSessionsScreen(
+                        viewModel = cliSessionsViewModel,
+                        language = language,
+                        onBack = { isCliSessionsOpen = false }
                     )
                 }
             }

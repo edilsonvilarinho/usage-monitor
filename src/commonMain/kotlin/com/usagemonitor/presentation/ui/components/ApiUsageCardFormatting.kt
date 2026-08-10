@@ -133,6 +133,10 @@ internal fun minimizeActionLabel(isMinimized: Boolean, language: AppLanguage): S
     return if (language == AppLanguage.PT) "Minimizar card" else "Minimize card"
 }
 
+internal fun cliSessionsActionLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Sessões CLI desta conta" else "CLI sessions for this account"
+}
+
 internal fun historyActionLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Abrir histórico" else "Open history"
 }

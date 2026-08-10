@@ -1,0 +1,51 @@
+package com.usagemonitor.presentation.viewmodel
+
+import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.usecase.CliSessionDetailResult
+
+sealed interface CliSessionsUiState {
+
+    data object Loading : CliSessionsUiState
+
+    data class Error(
+        val message: String,
+        val showHidden: Boolean = false,
+        val profileLabel: String? = null
+    ) : CliSessionsUiState
+
+    data class Success(
+        val sessions: List<CliSessionSummary>,
+        val showHidden: Boolean = false,
+        /** Conta Anthropic dona destas sessões; nula na visão agregada. */
+        val profileLabel: String? = null,
+        /** Falha de indexação que não impediu a leitura do índice já gravado. */
+        val indexWarning: String? = null,
+        /** `null` mostra a lista; qualquer outro valor mostra o detalhe. */
+        val detail: CliSessionDetailUiState? = null
+    ) : CliSessionsUiState {
+
+        val totalCostMicros: Long
+            get() = sessions.sumOf { session -> session.costMicros }
+
+        /** Ao menos uma sessão tem turnos sem preço: o total exibido é parcial. */
+        val isTotalCostComplete: Boolean
+            get() = sessions.all { session -> session.isCostComplete }
+    }
+}
+
+sealed interface CliSessionDetailUiState {
+
+    val sessionId: String
+
+    data class Loading(override val sessionId: String) : CliSessionDetailUiState
+
+    data class Error(
+        override val sessionId: String,
+        val message: String
+    ) : CliSessionDetailUiState
+
+    data class Ready(
+        override val sessionId: String,
+        val result: CliSessionDetailResult
+    ) : CliSessionDetailUiState
+}
