@@ -19,6 +19,7 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Modais de Historico e Configuracoes voltam ao topo automaticamente ao reabrir, mesmo se ficaram atras de outra janela.
 - Scrollbar com contraste ajustado para o tema escuro.
 - Modal de Configuracoes reorganizado em cartoes (Geral/Idioma, APIs monitoradas, Contas Anthropic).
+- Opacidade da janela principal ajustavel entre 50% e 100% nas Configuracoes, com persistencia local.
 
 ## Screenshots
 
@@ -184,6 +185,7 @@ Chaves persistidas:
 - `autoStart`
 - `cardOrder`
 - `minimizedCards`
+- `windowOpacityPercent`
 
 ## Arquitetura
 
