@@ -194,6 +194,23 @@ tasks.register<Exec>("buildNsisInstaller") {
     }
 }
 
+// O MSI do jpackage nao lanca a aplicacao no fim da instalacao. O script abaixo
+// acrescenta o checkbox "iniciar agora" ao ExitDialog do MSI ja gerado.
+tasks.register<Exec>("patchMsiLaunch") {
+    dependsOn("packageMsi")
+
+    onlyIf { org.gradle.internal.os.OperatingSystem.current().isWindows }
+
+    commandLine(
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", file("patch-msi-launch.ps1").absolutePath,
+        "-MsiDirectory", file("build/compose/binaries/main/msi").absolutePath,
+        "-MsiFileName", "Usage Monitor-$appVersion.msi"
+    )
+}
+
 tasks.register("packageInstaller") {
     dependsOn("buildNsisInstaller")
 

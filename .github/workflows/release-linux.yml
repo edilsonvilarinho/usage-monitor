@@ -181,9 +181,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat packageMsi packageInstaller
+          .\gradlew.bat packageMsi patchMsiLaunch packageInstaller
 
           $version = "${{ steps.version.outputs.VERSION }}"
+
+          # Gate: um MSI sem o launch no ExitDialog nao pode chegar ao release.
+          .\patch-msi-launch.ps1 -MsiDirectory build\compose\binaries\main\msi -MsiFileName "Usage Monitor-$version.msi" -VerifyOnly
+
           New-Item -ItemType Directory -Force -Path dist-build | Out-Null
           Get-ChildItem -Recurse -File build\compose\binaries -Filter *.msi | Copy-Item -Destination dist-build -Force
           Get-ChildItem -File build\installer -Filter "UsageMonitor-Setup-*.exe" | Copy-Item -Destination dist-build -Force
