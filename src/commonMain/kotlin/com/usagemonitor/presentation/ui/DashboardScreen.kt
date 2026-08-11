@@ -71,6 +71,7 @@ fun DashboardScreen(
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistory: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenCliSessions: (UsageTargetKey) -> Unit = {},
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -169,6 +170,7 @@ fun DashboardScreen(
                                     onMoveCardToIndex = onMoveCardToIndex,
                                     onToggleCardMinimized = onToggleCardMinimized,
                                     onOpenHistoryCard = onOpenHistory,
+                                    onOpenCliSessionsCard = onOpenCliSessions,
                                     onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -334,6 +336,7 @@ private fun SuccessContent(
     onMoveCardToIndex: (UsageTargetKey, Int) -> Unit,
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
+    onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onRetryAnthropic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -401,6 +404,7 @@ private fun SuccessContent(
                 onMoveCardToIndex = onMoveCardToIndex,
                 onToggleCardMinimized = onToggleCardMinimized,
                 onOpenHistoryCard = onOpenHistoryCard,
+                onOpenCliSessionsCard = onOpenCliSessionsCard,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)

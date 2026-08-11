@@ -343,6 +343,68 @@ class ComponentTest {
     }
 
     @Test
+    fun `ApiUsageCard opens CLI sessions when the account provides the action`() = runDesktopComposeUiTest {
+        var opened = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic — Padrão",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 56L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    onOpenCliSessions = { opened = true }
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Sessões CLI desta conta").performClick()
+        assertEquals(true, opened)
+    }
+
+    @Test
+    fun `ApiUsageCard hides the CLI action for non Anthropic sources`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex atual",
+                            used = 57L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.REPORTED,
+                            unit = UsageUnit.REQUESTS
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onAllNodesWithContentDescription("Sessões CLI desta conta").assertCountEquals(0)
+    }
+
+    @Test
     fun `ApiUsageCard shows compact quota labels when minimized`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {

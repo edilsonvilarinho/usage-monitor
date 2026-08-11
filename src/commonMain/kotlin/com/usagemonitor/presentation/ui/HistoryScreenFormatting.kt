@@ -188,6 +188,9 @@ internal fun formatPercentageOfTotal(value: Double, total: Long): String {
 
 internal fun formatQuantity(value: Long): String {
     return when {
+        // O total de tokens de sessões CLI passa de 10^9 com facilidade — cada
+        // turno relê o contexto inteiro. Sem esta faixa o número vira "1036.4M".
+        value >= 1_000_000_000L -> "${trimDecimal(value / 1_000_000_000.0)}B"
         value >= 1_000_000L -> "${trimDecimal(value / 1_000_000.0)}M"
         value >= 1_000L -> "${trimDecimal(value / 1_000.0)}K"
         else -> value.toString()

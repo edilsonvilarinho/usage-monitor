@@ -182,6 +182,10 @@ class LocalUsageHistoryDataSource(
             statement.execute("PRAGMA journal_mode = WAL;")
             statement.execute("PRAGMA synchronous = NORMAL;")
             statement.execute("PRAGMA foreign_keys = ON;")
+            // O índice de sessões CLI escreve no mesmo arquivo por outra conexão,
+            // em transações longas. Sem timeout, um snapshot que caia no meio de
+            // uma indexação falha na hora em vez de esperar o writer lock.
+            statement.execute("PRAGMA busy_timeout = 5000;")
             statement.execute(CREATE_ACCOUNTS_TABLE_SQL)
             statement.execute(CREATE_SNAPSHOTS_TABLE_SQL)
         }

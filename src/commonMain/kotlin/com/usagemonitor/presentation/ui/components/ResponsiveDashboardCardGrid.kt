@@ -53,6 +53,7 @@ internal fun ResponsiveDashboardCardGrid(
     onMoveCardToIndex: (UsageTargetKey, Int) -> Unit,
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
+    onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -113,6 +114,11 @@ internal fun ResponsiveDashboardCardGrid(
                             animationDelayMillis = index * 90,
                             onRefresh = { onRefreshCard(stats.targetKey) },
                             onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
+                            onOpenCliSessions = if (stats.source == ApiSource.ANTHROPIC) {
+                                { onOpenCliSessionsCard(stats.targetKey) }
+                            } else {
+                                null
+                            },
                             onToggleMinimized = { onToggleCardMinimized(stats.targetKey) },
                             onDragStart = {
                                 dragState = CardDragState(target = stats.targetKey)

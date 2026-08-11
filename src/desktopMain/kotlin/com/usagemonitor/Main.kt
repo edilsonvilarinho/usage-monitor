@@ -24,6 +24,7 @@ import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
+import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
@@ -34,11 +35,16 @@ import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
 import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
+import com.usagemonitor.data.repository.CliSessionRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.CliProjectRoot
+import com.usagemonitor.domain.entity.CliQuotaWindows
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -51,13 +57,18 @@ import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
+import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
+import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
+import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import com.usagemonitor.presentation.ui.DesktopDialogFrame
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
+import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
@@ -65,6 +76,8 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.UiState
+import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
@@ -91,6 +104,16 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+
+/** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
+private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
+
+/**
+ * Cadência da janela de sessões aberta. As sessões descrevem o Claude Code
+ * rodando neste instante, então a tela se atualiza sozinha; uma passada custa um
+ * `walk` sobre os `projects/` e um `SELECT` no índice.
+ */
+private const val CLI_SESSION_LIVE_INTERVAL_MILLIS = 5_000L
 private const val ENABLED_APIS_KEY = "enabledApis"
 private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
@@ -190,6 +213,9 @@ fun main() = application {
     val persistedHistoryWindowState = remember(settings) {
         readPersistedHistoryWindowState(settings)
     }
+    val persistedCliSessionsWindowState = remember(settings) {
+        readPersistedCliSessionsWindowState(settings)
+    }
 
     val credentialDataSource = remember(httpClient, profileRegistry) {
         LocalCredentialDataSource(
@@ -203,6 +229,21 @@ fun main() = application {
         RemoteApiDataSource(httpClient, codexDiagnosticsRecorder)
     }
     val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
+    // Cada conta Anthropic tem seu próprio config dir do Claude Code, e cada um
+    // tem seu `projects/`. É daí que sai a atribuição de sessão para conta — os
+    // transcripts em si não carregam identidade nenhuma.
+    val cliSessionDataSource = remember(profileRegistry) {
+        LocalCliSessionDataSource(
+            projectRootsProvider = {
+                profileRegistry.profiles.value.map { record ->
+                    CliProjectRoot(
+                        profileId = record.id,
+                        directoryPath = File(record.configDirectory, "projects").absolutePath
+                    )
+                }
+            }
+        )
+    }
     val dashboardCacheDataSource = remember { LocalDashboardCacheDataSource() }
     val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
     val kiloUsageDataSource = remember { LocalKiloUsageDataSource() }
@@ -227,6 +268,9 @@ fun main() = application {
     }
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
+    }
+    val cliSessionRepository = remember(cliSessionDataSource) {
+        CliSessionRepositoryImpl(cliSessionDataSource)
     }
     val dashboardCacheRepository = remember(dashboardCacheDataSource) {
         DashboardCacheRepositoryImpl(dashboardCacheDataSource)
@@ -278,6 +322,20 @@ fun main() = application {
             enabledApis = enabledApis
         )
     }
+    // A indexação corre em background desde o arranque, em `Dispatchers.IO`: o
+    // Claude Code apaga transcripts antigos, e depender de o usuário abrir a
+    // janela antes disso perderia o histórico. A lista em si só carrega quando a
+    // janela abre (`autoLoad = false`).
+    val cliSessionsViewModel = remember(cliSessionRepository) {
+        CliSessionsViewModel(
+            getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
+            getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
+            syncCliSessionIndex = SyncCliSessionIndexUseCase(cliSessionRepository),
+            autoLoad = false,
+            backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
+            liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
+        )
+    }
 
     val shutdownStarted = remember { AtomicBoolean(false) }
     DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource, profileRegistry) {
@@ -285,9 +343,11 @@ fun main() = application {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                cliSessionsViewModel.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
+                cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
@@ -303,9 +363,11 @@ fun main() = application {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                cliSessionsViewModel.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
+                cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
@@ -316,6 +378,7 @@ fun main() = application {
     val iconImage = remember { loadWindowIcon() }
     val mainWindowState = rememberPersistedMainWindowState(persistedMainWindowState)
     val historyWindowState = rememberPersistedHistoryWindowState(persistedHistoryWindowState)
+    val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(persistedCliSessionsWindowState)
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -359,6 +422,29 @@ fun main() = application {
                     placement = placement
                 )
             )
+            }
+    }
+    LaunchedEffect(cliSessionsWindowState, settings) {
+        snapshotFlow {
+            Triple(
+                cliSessionsWindowState.position,
+                cliSessionsWindowState.size,
+                cliSessionsWindowState.placement
+            )
+        }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { (position, size, placement) ->
+                persistCliSessionsWindowState(
+                    settings = settings,
+                    snapshot = CliSessionsWindowSnapshot(
+                        widthDp = size.width.value,
+                        heightDp = size.height.value,
+                        xDp = if (position.isSpecified) position.x.value else null,
+                        yDp = if (position.isSpecified) position.y.value else null,
+                        placement = placement
+                    )
+                )
             }
     }
     val enabledApisState by enabledApis.collectAsState()
@@ -406,13 +492,32 @@ fun main() = application {
     var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
     var historyOpenGeneration by remember { mutableStateOf(0) }
+    var isCliSessionsOpen by remember { mutableStateOf(false) }
+    var cliSessionsOpenGeneration by remember { mutableStateOf(0) }
+    var cliSessionsProfileLabel by remember { mutableStateOf<String?>(null) }
+    var cliSessionsProfileId by remember { mutableStateOf<String?>(null) }
+
+    // Os filtros de 5h e 7d da tela de sessões recortam a janela de quota da
+    // conta, não as últimas horas corridas. O reset vem do mesmo `resets_at` que
+    // alimenta os medidores do card.
+    val dashboardState by viewModel.uiState.collectAsState()
+    val cliSessionsQuotaWindows = remember(dashboardState, cliSessionsProfileId) {
+        quotaWindowsForProfile(dashboardState, cliSessionsProfileId)
+    }
+    LaunchedEffect(cliSessionsQuotaWindows, isCliSessionsOpen) {
+        if (isCliSessionsOpen) {
+            cliSessionsViewModel.setQuotaWindows(cliSessionsQuotaWindows)
+        }
+    }
     val shutdownApplication = remember(viewModel, historyViewModel, httpClient, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
+                cliSessionsViewModel.onDestroy()
                 httpClient.close()
                 usageHistoryDataSource.close()
+                cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
@@ -480,6 +585,21 @@ fun main() = application {
                     onOpenSettings = {
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
+                    },
+                    onOpenCliSessions = { target ->
+                        val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+                        val label = profileRecords
+                            .firstOrNull { record -> record.id == profileId }
+                            ?.label
+                        cliSessionsProfileLabel = label
+                        cliSessionsProfileId = profileId
+                        isCliSessionsOpen = true
+                        cliSessionsOpenGeneration++
+                        cliSessionsViewModel.openForProfile(
+                            profileId = profileId,
+                            profileLabel = label,
+                            quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
+                        )
                     }
                 )
             }
@@ -511,6 +631,41 @@ fun main() = application {
                         onBack = { historyDialogSource = null },
                         focusedSource = source,
                         showSourceSelector = false
+                    )
+                }
+            }
+        }
+    }
+
+    if (isCliSessionsOpen) {
+        val cliSessionsTitle = cliSessionsWindowTitle(language, cliSessionsProfileLabel)
+        // Sem avisar o ViewModel, o laço ao vivo continuaria indexando de cinco em
+        // cinco segundos com a janela fechada.
+        val closeCliSessions = {
+            isCliSessionsOpen = false
+            cliSessionsViewModel.closeWindow()
+        }
+        Window(
+            onCloseRequest = closeCliSessions,
+            title = cliSessionsTitle,
+            icon = iconImage,
+            state = cliSessionsWindowState,
+            resizable = true,
+            undecorated = true
+        ) {
+            LaunchedEffect(cliSessionsOpenGeneration) {
+                activateWindow(window)
+            }
+            AppTheme(isDark = isDark) {
+                DesktopDialogFrame(
+                    title = cliSessionsTitle,
+                    iconPainter = iconImage,
+                    windowState = cliSessionsWindowState,
+                    onCloseRequest = closeCliSessions
+                ) {
+                    CliSessionsScreen(
+                        viewModel = cliSessionsViewModel,
+                        language = language
                     )
                 }
             }
@@ -727,6 +882,33 @@ private fun buildAnthropicProfileUiModels(
             detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail
         )
     }
+}
+
+/**
+ * Resets de quota da conta aberta na tela de Sessões CLI.
+ *
+ * Devolve janelas vazias enquanto a conta não tiver coleta bem-sucedida — o
+ * filtro então cai para a janela corrida em vez de esvaziar a lista.
+ */
+private fun quotaWindowsForProfile(state: UiState, profileId: String?): CliQuotaWindows {
+    if (profileId == null || state !is UiState.Success) {
+        return CliQuotaWindows()
+    }
+
+    val stats = state.data.firstOrNull { item ->
+        item.source == ApiSource.ANTHROPIC && item.targetKey.profileId == profileId
+    } ?: return CliQuotaWindows()
+
+    return CliQuotaWindows(
+        fiveHourEndsAt = stats.quotaEndAt(PeriodType.INTERVAL),
+        sevenDayEndsAt = stats.quotaEndAt(PeriodType.WEEKLY)
+    )
+}
+
+private fun ApiUsageStats.quotaEndAt(periodType: PeriodType): Instant? {
+    return quotas
+        .firstOrNull { quota -> quota.periodType == periodType && quota.hasKnownResetAt }
+        ?.periodEndAt
 }
 
 private fun availableUsageTargets(records: List<AnthropicProfileRecord>): List<UsageTargetKey> {
