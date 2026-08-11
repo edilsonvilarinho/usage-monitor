@@ -73,17 +73,36 @@ internal object CliSessionsLabels {
     ): String {
         val window = rangeLabel(range, language)
         if (endsAt == null) {
-            return if (language == AppLanguage.PT) {
-                "custo estimado · últimas $window"
-            } else {
-                "estimated cost · last $window"
-            }
+            return "${estimatedTotal(language)} · ${lastRangeLabel(range, language)}"
         }
         return if (language == AppLanguage.PT) {
             "custo estimado · janela $window até ${formatInstant(endsAt)}"
         } else {
             "estimated cost · $window window until ${formatInstant(endsAt)}"
         }
+    }
+
+    /**
+     * Janela corrida por extenso: "últimas 5h", "últimos 7 dias".
+     *
+     * "5h" concorda no feminino (horas) e "7 dias"/"30 dias" no masculino — sem a
+     * flexão o rótulo saía como "últimas 7 dias".
+     */
+    private fun lastRangeLabel(range: CliSessionRange, language: AppLanguage): String {
+        val window = rangeLabel(range, language)
+        if (language != AppLanguage.PT) {
+            return "last $window"
+        }
+        return if (range == CliSessionRange.LAST_5H) "últimas $window" else "últimos $window"
+    }
+
+    /** Mesma flexão de [lastRangeLabel], já contraída com a preposição. */
+    private fun inLastRangeLabel(range: CliSessionRange, language: AppLanguage): String {
+        val window = rangeLabel(range, language)
+        if (language != AppLanguage.PT) {
+            return "in the last $window"
+        }
+        return if (range == CliSessionRange.LAST_5H) "nas últimas $window" else "nos últimos $window"
     }
 
     fun rangeLabel(range: CliSessionRange, language: AppLanguage): String {
@@ -144,9 +163,9 @@ internal object CliSessionsLabels {
             }
         }
         return if (language == AppLanguage.PT) {
-            "Nenhuma sessão com atividade nas últimas $window. Escolha uma janela maior."
+            "Nenhuma sessão com atividade ${inLastRangeLabel(range, language)}. Escolha uma janela maior."
         } else {
-            "No session active in the last $window. Pick a wider range."
+            "No session active ${inLastRangeLabel(range, language)}. Pick a wider range."
         }
     }
 

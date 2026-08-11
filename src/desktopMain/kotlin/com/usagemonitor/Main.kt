@@ -885,7 +885,7 @@ private fun buildAnthropicProfileUiModels(
 }
 
 /**
- * Resets de quota da conta aberta na tela de Sessões CLI.
+ * Reset da quota de 5h da conta aberta na tela de Sessões CLI.
  *
  * Devolve janelas vazias enquanto a conta não tiver coleta bem-sucedida — o
  * filtro então cai para a janela corrida em vez de esvaziar a lista.
@@ -899,10 +899,7 @@ private fun quotaWindowsForProfile(state: UiState, profileId: String?): CliQuota
         item.source == ApiSource.ANTHROPIC && item.targetKey.profileId == profileId
     } ?: return CliQuotaWindows()
 
-    return CliQuotaWindows(
-        fiveHourEndsAt = stats.quotaEndAt(PeriodType.INTERVAL),
-        sevenDayEndsAt = stats.quotaEndAt(PeriodType.WEEKLY)
-    )
+    return CliQuotaWindows(fiveHourEndsAt = stats.quotaEndAt(PeriodType.INTERVAL))
 }
 
 private fun ApiUsageStats.quotaEndAt(periodType: PeriodType): Instant? {
