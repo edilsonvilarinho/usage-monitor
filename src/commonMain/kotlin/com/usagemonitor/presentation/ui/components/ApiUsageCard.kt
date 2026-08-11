@@ -63,6 +63,7 @@ import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -92,13 +93,18 @@ import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.statusBadgeLabel
+import kotlinx.datetime.Clock
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
+
+/** Opacidade do número de uma janela já vencida — o dado é real, mas velho. */
+private const val STALE_QUOTA_ALPHA = 0.45f
 
 // Durações centralizadas das animações do card (em ms). Mantém legibilidade ao
 // alterar timing globalmente sem caçar literais espalhados pelo composable.
@@ -137,6 +143,13 @@ fun ApiUsageCard(
     onDragStart: () -> Unit = {},
     onDrag: (Offset) -> Unit = {},
     onDragEnd: () -> Unit = {},
+    /**
+     * Instante contra o qual o vencimento das janelas de cota é medido.
+     *
+     * É um valor, não um relógio: quem avança o tempo é a `DashboardScreen`, o
+     * único ponto stateful da tela. Assim o card segue sem corrotina própria.
+     */
+    now: Instant = Clock.System.now(),
     modifier: Modifier = Modifier
 ) {
     val orderedQuotas = buildList {
@@ -474,7 +487,8 @@ fun ApiUsageCard(
                             language = language,
                             riskByQuotaKey = riskByQuotaKey,
                             density = density,
-                            stacked = stackCompactQuotas
+                            stacked = stackCompactQuotas,
+                            now = now
                         )
                     } else {
                         ExpandedQuotaSummary(
@@ -482,7 +496,8 @@ fun ApiUsageCard(
                             showUsageDetails = showUsageDetails,
                             language = language,
                             riskByQuotaKey = riskByQuotaKey,
-                            density = density
+                            density = density,
+                            now = now
                         )
                     }
                 }
@@ -904,6 +919,7 @@ private fun CompactQuotaSummary(
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     density: ApiUsageCardDensity,
     stacked: Boolean,
+    now: Instant,
     modifier: Modifier = Modifier
 ) {
     if (quotas.size == 1) {
@@ -920,6 +936,7 @@ private fun CompactQuotaSummary(
                 language = language,
                 risk = riskByQuotaKey[quotas.first().seriesKey],
                 density = density,
+                now = now,
                 modifier = Modifier.fillMaxWidth(badgeWidthFraction)
             )
         }
@@ -940,6 +957,7 @@ private fun CompactQuotaSummary(
                     language = language,
                     risk = riskByQuotaKey[quota.seriesKey],
                     density = density,
+                    now = now,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -965,6 +983,7 @@ private fun CompactQuotaSummary(
                     language = language,
                     risk = riskByQuotaKey[quota.seriesKey],
                     density = density,
+                    now = now,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -980,12 +999,15 @@ private fun CompactQuotaBadge(
     language: AppLanguage,
     risk: QuotaRiskSummary?,
     density: ApiUsageCardDensity,
+    now: Instant,
     modifier: Modifier = Modifier
 ) {
+    val isExpired = quota.isExpiredAt(now)
+
     HoverTooltipBox(
         title = quota.label,
         subtitle = expandedQuotaTitle(quota = quota, language = language),
-        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, risk = risk),
+        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
         modifier = modifier
     ) {
         Column(
@@ -1037,7 +1059,9 @@ private fun CompactQuotaBadge(
                 text = compactPercentageLabel(quota),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                // Mesmo tratamento do arco: o numero e o da janela anterior.
+                modifier = Modifier.alpha(if (isExpired) STALE_QUOTA_ALPHA else 1f)
             )
 
             if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
@@ -1062,6 +1086,7 @@ private fun ExpandedQuotaSummary(
     language: AppLanguage,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     density: ApiUsageCardDensity,
+    now: Instant,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -1080,7 +1105,8 @@ private fun ExpandedQuotaSummary(
                     showUsageDetails = showUsageDetails,
                     language = language,
                     risk = riskByQuotaKey[quota.seriesKey],
-                    density = density
+                    density = density,
+                    now = now
                 )
             }
         }
@@ -1094,8 +1120,11 @@ private fun QuotaColumn(
     language: AppLanguage,
     risk: QuotaRiskSummary?,
     density: ApiUsageCardDensity,
+    now: Instant,
     modifier: Modifier = Modifier
 ) {
+    val isExpired = quota.isExpiredAt(now)
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1104,7 +1133,7 @@ private fun QuotaColumn(
         HoverTooltipBox(
             title = quota.label,
             subtitle = expandedQuotaTitle(quota = quota, language = language),
-            metrics = buildQuotaTooltipMetrics(quota = quota, language = language)
+            metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now)
         ) {
             UsageArcChart(
                 used = quota.used,
@@ -1112,6 +1141,9 @@ private fun QuotaColumn(
                 unit = quota.unit,
                 size = density.arcSize,
                 strokeWidth = density.arcStrokeWidth,
+                // Janela vencida: o arco continua sendo o ultimo dado real da
+                // fonte, so esmaecido para nao passar por leitura corrente.
+                modifier = Modifier.alpha(if (isExpired) STALE_QUOTA_ALPHA else 1f),
                 percentageTextStyle = MaterialTheme.typography.headlineMedium.copy(
                     fontSize = density.arcPercentageFontSize,
                     fontWeight = FontWeight.Bold
@@ -1159,7 +1191,7 @@ private fun QuotaColumn(
         }
 
         Text(
-            text = resetLabel(quota = quota, language = language),
+            text = resetLabel(quota = quota, language = language, now = now),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

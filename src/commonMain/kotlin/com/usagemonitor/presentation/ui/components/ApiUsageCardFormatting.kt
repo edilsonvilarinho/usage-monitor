@@ -145,9 +145,26 @@ internal fun historyActionLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Abrir histórico" else "Open history"
 }
 
-internal fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
+/**
+ * Linha de reset da cota.
+ *
+ * [now] existe para o rótulo saber que a janela já venceu. Sem essa comparação
+ * um reset passado era formatado como se fosse futuro e o card repetia o valor
+ * saturado da janela anterior como se fosse o atual.
+ */
+internal fun resetLabel(quota: QuotaInfo, language: AppLanguage, now: Instant): String {
     if (quota.unit == UsageUnit.CURRENCY_USD) {
         return if (language == AppLanguage.PT) "Saldo não expira" else "Balance never expires"
+    }
+
+    // Vencida: o número na tela ainda é o da janela anterior. Dizer isso é o
+    // máximo honesto — o valor novo só chega com a próxima coleta.
+    if (quota.isExpiredAt(now)) {
+        return if (language == AppLanguage.PT) {
+            "Janela reiniciada · coletando dados"
+        } else {
+            "Window reset · collecting data"
+        }
     }
 
     if (!quota.hasKnownResetAt) {
@@ -266,6 +283,7 @@ internal fun riskDotTooltipSubtitle(risk: QuotaRiskSummary, language: AppLanguag
 internal fun buildQuotaTooltipMetrics(
     quota: QuotaInfo,
     language: AppLanguage,
+    now: Instant,
     risk: QuotaRiskSummary? = null
 ): List<TooltipMetric> {
     val metrics = mutableListOf<TooltipMetric>()
@@ -277,7 +295,7 @@ internal fun buildQuotaTooltipMetrics(
         )
         metrics += TooltipMetric(
             label = if (language == AppLanguage.PT) "Status" else "Status",
-            value = resetLabel(quota = quota, language = language)
+            value = resetLabel(quota = quota, language = language, now = now)
         )
         metrics.addProjectionMetric(risk = risk, language = language)
         return metrics
@@ -301,7 +319,7 @@ internal fun buildQuotaTooltipMetrics(
 
     metrics += TooltipMetric(
         label = if (language == AppLanguage.PT) "Reset" else "Reset",
-        value = resetLabel(quota = quota, language = language)
+        value = resetLabel(quota = quota, language = language, now = now)
     )
     metrics.addProjectionMetric(risk = risk, language = language)
     return metrics
