@@ -1,5 +1,6 @@
 package com.usagemonitor.domain
 
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamMemberIdentity
@@ -21,6 +22,14 @@ private class CountingTeamRepository : TeamUsageRepository {
 
     override suspend fun fetch(accountKey: String, cutoffMillis: Long?): Result<TeamUsageSnapshot> {
         return Result.success(TeamUsageSnapshot())
+    }
+
+    override suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?> {
+        return Result.success(null)
     }
 
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {

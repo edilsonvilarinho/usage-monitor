@@ -15,21 +15,29 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.usecase.CliSessionDetailResult
+import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.TEAM_LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_REMOVE_CONFIRM_TAG
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 private val NOW = Instant.parse("2026-08-11T12:00:00Z")
+
+/** Janela de contexto de 1M — a única forma de a saturação ser conhecida. */
+private const val OPUS = "claude-opus-5"
 
 @OptIn(ExperimentalTestApi::class)
 class TeamUsageScreenTest {
@@ -288,13 +296,145 @@ class TeamUsageScreenTest {
         onNodeWithText("Não foi possível remover o integrante: HTTP 401").assertIsDisplayed()
     }
 
-    private fun ComposeUiTest.renderSuccess(
-        state: TeamUsageUiState.Success,
-        localDeviceId: String? = null
-    ) {
+    @Test
+    fun `clicar numa sessao do time abre o detalhe dela`() = runDesktopComposeUiTest {
+        var opened: Pair<String, String>? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Success(
+                            members = listOf(
+                                member(
+                                    "device-1",
+                                    "edilson",
+                                    "DESKTOP-A1",
+                                    listOf(session("abcdef0123", tokens = 500L))
+                                )
+                            ),
+                            expandedDeviceIds = setOf("device-1")
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onToggleMember = {},
+                        onOpenSession = { deviceId, sessionId -> opened = deviceId to sessionId }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("abcdef01").performClick()
+
+        // O transcript é de outra máquina, mas os turnos estão no servidor: o
+        // clique que antes era morto agora pede o detalhe daquela máquina.
+        assertEquals("device-1" to "abcdef0123", opened)
+    }
+
+    @Test
+    fun `o detalhe do time mostra o mesmo painel do modal local`() = runDesktopComposeUiTest {
+        val summary = session("abcdef0123", tokens = 40_000L, cost = 5_000_000L).copy(
+            hostName = "NOTE-B2",
+            cwd = "/home/dev/api-gateway",
+            gitBranch = "main",
+            primaryModel = OPUS
+        )
+        val detail = CliSessionDetail(
+            summary = summary,
+            turns = listOf(turn(seq = 0, cacheReadTokens = 10_000L), turn(seq = 1, cacheReadTokens = 30_000L))
+        )
+
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "NOTE-B2", listOf(summary))),
+                detail = TeamSessionDetailUiState.Ready(
+                    deviceId = "device-1",
+                    sessionId = summary.sessionId,
+                    result = CliSessionDetailResult(
+                        detail = detail,
+                        analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                    )
+                )
+            )
+        )
+
+        onNodeWithText("Sessão saudável").assertIsDisplayed()
+        // A máquina do integrante chega ao card de metadados do detalhe.
+        onNodeWithText("NOTE-B2").assertIsDisplayed()
+        onNodeWithText("/home/dev/api-gateway").assertIsDisplayed()
+        // Paridade total: o gráfico por turno é o mesmo do modal da própria máquina.
+        onNodeWithText("Contexto por turno").assertExists()
+        onNodeWithText("Avançado").assertExists()
+    }
+
+    @Test
+    fun `servidor sem os turnos avisa e esconde os graficos por turno`() = runDesktopComposeUiTest {
+        val summary = session("abcdef0123", tokens = 40_000L, cost = 5_000_000L).copy(primaryModel = OPUS)
+
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(summary))),
+                detail = TeamSessionDetailUiState.Ready(
+                    deviceId = "device-1",
+                    sessionId = summary.sessionId,
+                    result = CliSessionDetailResult(
+                        detail = CliSessionDetail(summary = summary, turns = emptyList()),
+                        analytics = ComputeCliSessionAnalyticsUseCase().fromSummary(summary)
+                    ),
+                    turnsUnavailable = true
+                )
+            )
+        )
+
+        // Um gráfico vazio se leria como sessão sem atividade; o aviso diz o que
+        // falta e o que fazer.
+        onNodeWithText("Contexto por turno").assertDoesNotExist()
+        onNodeWithText("Avançado").assertDoesNotExist()
+        onNodeWithText(
+            "Este servidor de time não devolve os turnos desta sessão (versão anterior a 0.2.0 " +
+                "ou sessão já expirada na retenção). Só os agregados do período estão disponíveis; " +
+                "os gráficos por turno voltam depois de atualizar o servidor."
+        ).assertIsDisplayed()
+        // O que o agregado prova continua na tela.
+        onNodeWithText("Sessão saudável").assertIsDisplayed()
+    }
+
+    @Test
+    fun `o botao voltar do detalhe fecha o painel`() = runDesktopComposeUiTest {
+        var closed = false
+
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Success(
+                            members = listOf(
+                                member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123")))
+                            ),
+                            detail = TeamSessionDetailUiState.Loading("device-1", "abcdef0123")
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onToggleMember = {},
+                        onCloseDetail = { closed = true }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Voltar").performClick()
+
+        assertEquals(true, closed)
+    }
+
+    private fun ComposeUiTest.renderSuccess(
+        state: TeamUsageUiState.Success,
+        localDeviceId: String? = null,
+        width: androidx.compose.ui.unit.Dp = 900.dp
+    ) {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(width).height(700.dp)) {
                     TeamUsageContent(
                         state = state,
                         language = AppLanguage.PT,
@@ -319,6 +459,17 @@ class TeamUsageScreenTest {
             lastTs = NOW,
             inputTokens = tokens,
             costMicros = cost
+        )
+    }
+
+    private fun turn(seq: Int, cacheReadTokens: Long): CliSessionTurn {
+        return CliSessionTurn(
+            sessionId = "abcdef0123",
+            seq = seq,
+            messageId = "msg-$seq",
+            ts = NOW,
+            model = OPUS,
+            cacheReadTokens = cacheReadTokens
         )
     }
 

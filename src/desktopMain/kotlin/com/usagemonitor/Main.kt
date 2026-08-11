@@ -65,6 +65,7 @@ import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
@@ -399,6 +400,7 @@ fun main() = application {
         TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(teamUsageRepository),
             removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
+            getTeamSessionDetail = GetTeamSessionDetailUseCase(teamUsageRepository),
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
         )
     }

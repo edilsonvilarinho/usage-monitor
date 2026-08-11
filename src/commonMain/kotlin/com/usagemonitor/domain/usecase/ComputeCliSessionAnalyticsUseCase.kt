@@ -3,6 +3,7 @@ package com.usagemonitor.domain.usecase
 import com.usagemonitor.domain.entity.CliSessionAnalytics
 import com.usagemonitor.domain.entity.CliSessionCostBreakdown
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.ModelPricingTable
@@ -51,6 +52,28 @@ class ComputeCliSessionAnalyticsUseCase {
             cacheWrite1hPerTurn = mainTurns.map { turn -> turn.cacheWrite1hTokens },
             cumulativeCostMicros = accumulate(turns) { turn -> turn.costMicros ?: 0L },
             cumulativeSavingsMicros = accumulate(turns) { turn -> turn.cacheSavingsMicros ?: 0L }
+        )
+    }
+
+    /**
+     * O que dá para afirmar sem os turnos.
+     *
+     * Existe para o detalhe de sessão do time contra um servidor que não expõe a
+     * rota de turnos: o veredito de contexto e a taxa de acerto de cache saem do
+     * resumo e são exatos. Tudo o que só um turno prova — séries por turno,
+     * distribuição do custo por componente, economia do cache — fica em zero e
+     * **não é exibido**. Estimar esses números a partir do modelo predominante
+     * seria inventá-los.
+     */
+    fun fromSummary(summary: CliSessionSummary): CliSessionAnalytics {
+        val status = summary.contextStatus
+
+        return CliSessionAnalytics(
+            cacheHitRate = summary.cacheHitRate,
+            liveContextTokens = status.liveContextTokens,
+            nextInteractionCostMicros = status.nextInteractionCostMicros,
+            contextSaturation = status.contextSaturation,
+            unpricedTurnCount = summary.unpricedTurnCount
         )
     }
 

@@ -76,6 +76,43 @@ export interface TeamSnapshot {
   rows: TeamUsageRow[];
 }
 
+/** Identificacao da sessao pedida, com a maquina que a reportou. */
+export interface TeamSessionRow {
+  deviceId: string;
+  sessionId: string;
+  hostName: string | null;
+  cwd: string | null;
+  gitBranch: string | null;
+  firstTs: number;
+  lastTs: number;
+  liveContextTokens: number;
+  liveContextModel: string | null;
+}
+
+/**
+ * Um turno cru, como o cliente o enviou.
+ *
+ * Nao ha `seq` gravado: a ordem e `(ts, message_id)` e o cliente a sintetiza na
+ * leitura. Sao contagens de token e o modelo — **nenhum conteudo de prompt ou
+ * resposta**, igual ao resto da API.
+ */
+export interface TeamSessionTurnRow {
+  messageId: string;
+  ts: number;
+  model: string | null;
+  isSidechain: boolean;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWrite5mTokens: number;
+  cacheWrite1hTokens: number;
+}
+
+export interface TeamSessionDetail {
+  session: TeamSessionRow;
+  turns: TeamSessionTurnRow[];
+}
+
 export interface DeleteMemberReport {
   deletedTurns: number;
   deletedSessions: number;
@@ -182,6 +219,60 @@ WHERE t.account_key = @accountKey
   AND (@since IS NULL OR t.ts >= @since)
 GROUP BY s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
+`;
+
+/**
+ * Sessao unica, escopada por `(conta, maquina)`.
+ *
+ * O `host_name` vem de `team_members` por `LEFT JOIN` para a resposta se bastar:
+ * o card de metadados do cliente mostra a maquina, e ela nao vive em
+ * `team_sessions`. `LEFT` porque a sessao sobrevive a remocao do membro ate a
+ * retencao passar, e uma sessao sem maquina conhecida ainda tem detalhe.
+ */
+const SELECT_SESSION_SQL = `
+SELECT s.device_id AS deviceId,
+       s.session_id AS sessionId,
+       m.host_name AS hostName,
+       s.cwd AS cwd,
+       s.git_branch AS gitBranch,
+       s.first_ts AS firstTs,
+       s.last_ts AS lastTs,
+       s.live_context_tokens AS liveContextTokens,
+       s.live_context_model AS liveContextModel
+FROM team_sessions s
+LEFT JOIN team_members m
+  ON m.account_key = s.account_key AND m.device_id = s.device_id
+WHERE s.account_key = @accountKey
+  AND s.session_id = @sessionId
+  AND s.device_id = @deviceId
+`;
+
+/**
+ * Turnos crus da sessao, na ordem em que aconteceram.
+ *
+ * Sem filtro de `device_id`: `team_turns` nao guarda a maquina, e nao precisa —
+ * `(account_key, session_id)` ja identifica a sessao, cujo dono foi conferido
+ * por [SELECT_SESSION_SQL] antes desta consulta rodar.
+ *
+ * O `WHERE` e prefixo da chave primaria `(account_key, session_id, message_id)`,
+ * entao a busca usa o indice da PK — nenhum indice novo e necessario.
+ *
+ * O desempate por `message_id` deixa a ordem estavel: dois turnos com o mesmo
+ * `ts` sairiam em ordem arbitraria e a serie por turno mudaria a cada leitura.
+ */
+const SELECT_SESSION_TURNS_SQL = `
+SELECT message_id AS messageId,
+       ts AS ts,
+       model AS model,
+       is_sidechain AS isSidechain,
+       input_tokens AS inputTokens,
+       output_tokens AS outputTokens,
+       cache_read_tokens AS cacheReadTokens,
+       cache_write_5m_tokens AS cacheWrite5mTokens,
+       cache_write_1h_tokens AS cacheWrite1hTokens
+FROM team_turns
+WHERE account_key = @accountKey AND session_id = @sessionId
+ORDER BY ts ASC, message_id ASC
 `;
 
 /**
@@ -303,5 +394,36 @@ export class TeamRepository {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
     const rows = this.db.prepare(SELECT_USAGE_SQL).all({ accountKey, since }) as TeamUsageRow[];
     return { members, rows };
+  }
+
+  /**
+   * Detalhe de uma sessao: os metadados dela e os turnos crus, em ordem.
+   *
+   * Sem recorte temporal, ao contrario de [readTeam]: o detalhe e sempre a
+   * sessao inteira, como no modal da propria maquina. Recorta-lo pela janela de
+   * quota daria graficos que comecam no meio da conversa.
+   *
+   * Devolve `null` quando a sessao nao existe **naquela conta e naquela
+   * maquina** — e a mesma resposta para conta errada e para sessao inexistente,
+   * de proposito: confirmar a existencia de uma sessao de outra conta ja seria
+   * vazamento.
+   */
+  readSession(accountKey: string, deviceId: string, sessionId: string): TeamSessionDetail | null {
+    const session = this.db
+      .prepare(SELECT_SESSION_SQL)
+      .get({ accountKey, deviceId, sessionId }) as TeamSessionRow | undefined;
+
+    if (session === undefined) {
+      return null;
+    }
+
+    const rows = this.db.prepare(SELECT_SESSION_TURNS_SQL).all({ accountKey, sessionId }) as Array<
+      Omit<TeamSessionTurnRow, 'isSidechain'> & { isSidechain: number }
+    >;
+
+    // `is_sidechain` e INTEGER no SQLite; o contrato HTTP e booleano.
+    const turns = rows.map((row) => ({ ...row, isSidechain: row.isSidechain !== 0 }));
+
+    return { session, turns };
   }
 }

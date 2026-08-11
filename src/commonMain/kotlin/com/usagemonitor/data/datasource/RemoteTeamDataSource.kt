@@ -3,6 +3,7 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.data.dto.TeamErrorDto
 import com.usagemonitor.data.dto.TeamIngestRequestDto
 import com.usagemonitor.data.dto.TeamIngestResponseDto
+import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -55,6 +56,34 @@ open class RemoteTeamDataSource(
                 }
             },
             operation = "leitura do time"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `GET /api/v1/session`. Turnos crus de uma sessão, sem recorte temporal.
+     *
+     * Existe a partir da versão 0.2.0 do servidor. Contra um servidor mais antigo
+     * a rota não existe e a resposta é `404` — quem chama trata isso como
+     * "sem detalhe disponível", não como falha.
+     */
+    open suspend fun fetchSessionDetail(
+        baseUrl: String,
+        apiKey: String,
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): TeamSessionDetailResponseDto {
+        val response = requireSuccess(
+            response = httpClient.get("$baseUrl/api/v1/session") {
+                header(TEAM_KEY_HEADER, apiKey)
+                header("Accept", "application/json")
+                parameter("accountKey", accountKey)
+                parameter("deviceId", deviceId)
+                parameter("sessionId", sessionId)
+            },
+            operation = "leitura da sessão do time"
         )
 
         return response.body()
