@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -21,6 +22,8 @@ import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
+import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
@@ -576,6 +579,60 @@ class CliSessionsScreenTest {
         onNodeWithText("Voltar").performClick()
 
         assertEquals(true, closed)
+    }
+
+    @Test
+    fun `the list carries a scroll indicator`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01"), summary("session-abcdef02"))
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // `assertExists` e não `assertIsDisplayed`: com pouco conteúdo o polegar
+        // da barra tem altura zero e não conta como exibido.
+        onNodeWithTag(LIST_SCROLLBAR_TAG, useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun `the detail carries a scroll indicator`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(DETAIL_SCROLLBAR_TAG, useUnmergedTree = true).assertExists()
     }
 
     @Test

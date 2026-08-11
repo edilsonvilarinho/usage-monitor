@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +63,12 @@ private val CACHE_WRITE_COLOR = Color(0xFFFFA726)
 private val SAVINGS_COLOR = Color(0xFF26C6DA)
 private val SATURATED_COLOR = Color(0xFFE05252)
 private val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
+
+/** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
+private val SCROLLBAR_GUTTER = 12.dp
+
+internal const val LIST_SCROLLBAR_TAG = "cliSessionsListScrollbar"
+internal const val DETAIL_SCROLLBAR_TAG = "cliSessionsDetailScrollbar"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -153,17 +163,32 @@ private fun CliSessionsList(
             return@Column
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(items = state.sessions, key = { session -> session.sessionId }) { session ->
-                CliSessionRow(
-                    session = session,
-                    language = language,
-                    onOpen = { onOpenSession(session.sessionId) }
-                )
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            val listState = rememberLazyListState()
+
+            LazyColumn(
+                state = listState,
+                // A barra fica por cima da área de conteúdo; sem a folga à direita
+                // ela cobriria a borda dos cards, que ocupam a largura inteira.
+                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(items = state.sessions, key = { session -> session.sessionId }) { session ->
+                    CliSessionRow(
+                        session = session,
+                        language = language,
+                        onOpen = { onOpenSession(session.sessionId) }
+                    )
+                }
             }
+
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(listState),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .testTag(LIST_SCROLLBAR_TAG)
+            )
         }
     }
 }
@@ -465,162 +490,196 @@ private fun CliSessionDetailPane(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CliSessionDetailBody(
     detail: CliSessionDetail,
     analytics: CliSessionAnalytics,
     language: AppLanguage
 ) {
-    val summary = detail.summary
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                // Mesma razão da lista: a barra flutua sobre o conteúdo.
+                .padding(end = SCROLLBAR_GUTTER),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CliSessionDetailSections(
+                detail = detail,
+                analytics = analytics,
+                language = language
+            )
+        }
+
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .testTag(DETAIL_SCROLLBAR_TAG)
+        )
+    }
+}
+
+/**
+ * As seções do detalhe, emitidas direto no `Column` rolável do chamador.
+ *
+ * Separado de [CliSessionDetailBody] para que a moldura de rolagem não fique
+ * envolvida por cento e tantas linhas de conteúdo.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CliSessionDetailSections(
+    detail: CliSessionDetail,
+    analytics: CliSessionAnalytics,
+    language: AppLanguage
+) {
+    val summary = detail.summary
+
+    SessionHealthBanner(analytics = analytics, language = language)
+
+    SessionMetadataCard(summary = summary, language = language)
+
+    if (summary.stale) {
+        NoticeText(CliSessionsLabels.staleNotice(language), MaterialTheme.colorScheme.error)
+    }
+    if (!analytics.isCostComplete) {
+        NoticeText(
+            CliSessionsLabels.unpricedNotice(analytics.unpricedTurnCount, language),
+            MaterialTheme.colorScheme.error
+        )
+    }
+    if (analytics.sidechainTurnCount > 0) {
+        NoticeText(
+            CliSessionsLabels.sidechainNotice(analytics.sidechainTurnCount, language),
+            MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        SessionHealthBanner(analytics = analytics, language = language)
+        MetricCard(CliSessionsLabels.input(language), formatQuantity(summary.inputTokens), INPUT_COLOR)
+        MetricCard(CliSessionsLabels.output(language), formatQuantity(summary.outputTokens), OUTPUT_COLOR)
+        MetricCard(CliSessionsLabels.cacheRead(language), formatQuantity(summary.cacheReadTokens), CACHE_READ_COLOR)
+        MetricCard(
+            CliSessionsLabels.cacheWrite(language),
+            formatQuantity(summary.cacheWriteTokens),
+            CACHE_WRITE_COLOR
+        )
+    }
 
-        SessionMetadataCard(summary = summary, language = language)
+    DetailSection(
+        title = CliSessionsLabels.cacheHitRate(language),
+        accent = CACHE_READ_COLOR,
+        trailing = formatPercent(analytics.cacheHitRate)
+    ) {
+        MeterBar(fraction = analytics.cacheHitRate, color = CACHE_READ_COLOR)
+    }
 
-        if (summary.stale) {
-            NoticeText(CliSessionsLabels.staleNotice(language), MaterialTheme.colorScheme.error)
-        }
-        if (!analytics.isCostComplete) {
-            NoticeText(
-                CliSessionsLabels.unpricedNotice(analytics.unpricedTurnCount, language),
-                MaterialTheme.colorScheme.error
-            )
-        }
-        if (analytics.sidechainTurnCount > 0) {
-            NoticeText(
-                CliSessionsLabels.sidechainNotice(analytics.sidechainTurnCount, language),
-                MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    DetailSection(
+        title = CliSessionsLabels.costDistribution(language),
+        accent = INPUT_COLOR,
+        trailing = formatMicrosUsd(analytics.costBreakdown.totalMicros)
+    ) {
+        CostDistributionBar(analytics = analytics)
+        Spacer(modifier = Modifier.height(8.dp))
+        CostDistributionLegend(analytics = analytics, language = language)
+    }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            MetricCard(CliSessionsLabels.input(language), formatQuantity(summary.inputTokens), INPUT_COLOR)
-            MetricCard(CliSessionsLabels.output(language), formatQuantity(summary.outputTokens), OUTPUT_COLOR)
-            MetricCard(CliSessionsLabels.cacheRead(language), formatQuantity(summary.cacheReadTokens), CACHE_READ_COLOR)
-            MetricCard(
-                CliSessionsLabels.cacheWrite(language),
-                formatQuantity(summary.cacheWriteTokens),
-                CACHE_WRITE_COLOR
-            )
-        }
+    DetailSection(
+        title = CliSessionsLabels.savings(language),
+        accent = SAVINGS_COLOR,
+        trailing = formatMicrosUsd(analytics.cacheSavingsMicros)
+    ) {
+        NoticeText(CliSessionsLabels.savingsExplanation(language), MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 
-        DetailSection(
-            title = CliSessionsLabels.cacheHitRate(language),
-            accent = CACHE_READ_COLOR,
-            trailing = formatPercent(analytics.cacheHitRate)
-        ) {
-            MeterBar(fraction = analytics.cacheHitRate, color = CACHE_READ_COLOR)
-        }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MetricCard(
+            CliSessionsLabels.averageContext(language),
+            formatQuantity(analytics.averageContextPerTurn),
+            CACHE_READ_COLOR
+        )
+        MetricCard(
+            CliSessionsLabels.liveContext(language),
+            formatQuantity(analytics.liveContextTokens),
+            CACHE_READ_COLOR
+        )
+        MetricCard(
+            CliSessionsLabels.nextInteraction(language),
+            formatMicrosUsd(analytics.nextInteractionCostMicros),
+            INPUT_COLOR
+        )
+        MetricCard(
+            label = CliSessionsLabels.saturation(language),
+            value = analytics.contextSaturation?.let { value -> formatPercent(value) } ?: "—",
+            accent = healthColor(analytics.health)
+        )
+    }
 
-        DetailSection(
-            title = CliSessionsLabels.costDistribution(language),
-            accent = INPUT_COLOR,
-            trailing = formatMicrosUsd(analytics.costBreakdown.totalMicros)
-        ) {
-            CostDistributionBar(analytics = analytics)
-            Spacer(modifier = Modifier.height(8.dp))
-            CostDistributionLegend(analytics = analytics, language = language)
-        }
+    DetailSection(
+        title = CliSessionsLabels.contextPerTurnChart(language),
+        accent = CACHE_READ_COLOR
+    ) {
+        TurnSeriesChart(
+            series = listOf(
+                TurnSeries(
+                    label = CliSessionsLabels.chartContextLegend(language),
+                    values = analytics.contextPerTurn,
+                    color = CACHE_READ_COLOR,
+                    binMode = BinMode.LAST
+                )
+            ),
+            valueFormatter = { value -> formatQuantity(value) },
+            highlightDrops = true
+        )
+    }
 
-        DetailSection(
-            title = CliSessionsLabels.savings(language),
-            accent = SAVINGS_COLOR,
-            trailing = formatMicrosUsd(analytics.cacheSavingsMicros)
-        ) {
-            NoticeText(CliSessionsLabels.savingsExplanation(language), MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    DetailSection(
+        title = CliSessionsLabels.cacheWritePerTurnChart(language),
+        accent = CACHE_WRITE_COLOR
+    ) {
+        TurnSeriesChart(
+            series = listOf(
+                TurnSeries("5m", analytics.cacheWrite5mPerTurn, CACHE_WRITE_COLOR, BinMode.SUM),
+                TurnSeries("1h", analytics.cacheWrite1hPerTurn, OUTPUT_COLOR, BinMode.SUM)
+            ),
+            stacked = true,
+            valueFormatter = { value -> formatQuantity(value) }
+        )
+    }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            MetricCard(
-                CliSessionsLabels.averageContext(language),
-                formatQuantity(analytics.averageContextPerTurn),
-                CACHE_READ_COLOR
-            )
-            MetricCard(
-                CliSessionsLabels.liveContext(language),
-                formatQuantity(analytics.liveContextTokens),
-                CACHE_READ_COLOR
-            )
-            MetricCard(
-                CliSessionsLabels.nextInteraction(language),
-                formatMicrosUsd(analytics.nextInteractionCostMicros),
-                INPUT_COLOR
-            )
-            MetricCard(
-                label = CliSessionsLabels.saturation(language),
-                value = analytics.contextSaturation?.let { value -> formatPercent(value) } ?: "—",
-                accent = healthColor(analytics.health)
-            )
-        }
-
-        DetailSection(
-            title = CliSessionsLabels.contextPerTurnChart(language),
-            accent = CACHE_READ_COLOR
-        ) {
-            TurnSeriesChart(
-                series = listOf(
-                    TurnSeries(
-                        label = CliSessionsLabels.chartContextLegend(language),
-                        values = analytics.contextPerTurn,
-                        color = CACHE_READ_COLOR,
-                        binMode = BinMode.LAST
-                    )
+    DetailSection(
+        title = CliSessionsLabels.costVersusSavingsChart(language),
+        accent = SAVINGS_COLOR
+    ) {
+        TurnSeriesChart(
+            series = listOf(
+                TurnSeries(
+                    label = CliSessionsLabels.chartCostLegend(language),
+                    values = analytics.cumulativeCostMicros,
+                    color = INPUT_COLOR,
+                    binMode = BinMode.MAX
                 ),
-                valueFormatter = { value -> formatQuantity(value) },
-                highlightDrops = true
-            )
-        }
-
-        DetailSection(
-            title = CliSessionsLabels.cacheWritePerTurnChart(language),
-            accent = CACHE_WRITE_COLOR
-        ) {
-            TurnSeriesChart(
-                series = listOf(
-                    TurnSeries("5m", analytics.cacheWrite5mPerTurn, CACHE_WRITE_COLOR, BinMode.SUM),
-                    TurnSeries("1h", analytics.cacheWrite1hPerTurn, OUTPUT_COLOR, BinMode.SUM)
-                ),
-                stacked = true,
-                valueFormatter = { value -> formatQuantity(value) }
-            )
-        }
-
-        DetailSection(
-            title = CliSessionsLabels.costVersusSavingsChart(language),
-            accent = SAVINGS_COLOR
-        ) {
-            TurnSeriesChart(
-                series = listOf(
-                    TurnSeries(
-                        label = CliSessionsLabels.chartCostLegend(language),
-                        values = analytics.cumulativeCostMicros,
-                        color = INPUT_COLOR,
-                        binMode = BinMode.MAX
-                    ),
-                    TurnSeries(
-                        label = CliSessionsLabels.chartSavingsLegend(language),
-                        values = analytics.cumulativeSavingsMicros,
-                        color = SAVINGS_COLOR,
-                        binMode = BinMode.MAX
-                    )
-                ),
-                valueFormatter = { value -> formatMicrosUsdShort(value) }
-            )
-        }
+                TurnSeries(
+                    label = CliSessionsLabels.chartSavingsLegend(language),
+                    values = analytics.cumulativeSavingsMicros,
+                    color = SAVINGS_COLOR,
+                    binMode = BinMode.MAX
+                )
+            ),
+            valueFormatter = { value -> formatMicrosUsdShort(value) }
+        )
     }
 }
 
