@@ -6,3 +6,9 @@ build/
 *.iml
 local.properties
 .DS_Store
+
+# Servidor de time (server/)
+server/node_modules/
+server/dist/
+server/data/
+server/.env

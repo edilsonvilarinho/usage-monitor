@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
@@ -25,8 +26,11 @@ import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
+import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
+import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
+import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.CodexRepositoryImpl
@@ -36,6 +40,7 @@ import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
+import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiSource
@@ -46,6 +51,7 @@ import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
@@ -59,7 +65,9 @@ import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
+import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
@@ -68,17 +76,22 @@ import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.TeamUsageScreen
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
+import com.usagemonitor.presentation.ui.teamUsageWindowTitle
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -91,6 +104,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
@@ -114,6 +128,15 @@ private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
  * `walk` sobre os `projects/` e um `SELECT` no índice.
  */
 private const val CLI_SESSION_LIVE_INTERVAL_MILLIS = 5_000L
+
+/**
+ * Cadência da leitura do servidor de time com a janela aberta.
+ *
+ * Igual à da janela de sessões da máquina: as duas telas fazem a mesma promessa
+ * ao usuário. A latência real com que um colega aparece é dominada pelo
+ * intervalo de envio da máquina dele, não por este.
+ */
+private const val TEAM_USAGE_LIVE_INTERVAL_MILLIS = 5_000L
 private const val ENABLED_APIS_KEY = "enabledApis"
 private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
@@ -216,6 +239,19 @@ fun main() = application {
     val persistedCliSessionsWindowState = remember(settings) {
         readPersistedCliSessionsWindowState(settings)
     }
+    val persistedTeamUsageWindowState = remember(settings) {
+        readPersistedTeamUsageWindowState(settings)
+    }
+
+    // A chave do servidor é segredo e vai para um arquivo com permissão restrita
+    // ao dono, não para as preferências — estas são gravadas em claro no registro.
+    val teamSettingsDataSource = remember { LocalTeamSettingsDataSource() }
+    // `StateFlow` e não `mutableStateOf`: o repositório e o serviço de envio leem
+    // as credenciais de fora da composição, e precisam sempre do valor corrente.
+    val teamSettingsFlow = remember(teamSettingsDataSource) {
+        MutableStateFlow(teamSettingsDataSource.load())
+    }
+    val teamSettings by teamSettingsFlow.collectAsState()
 
     val credentialDataSource = remember(httpClient, profileRegistry) {
         LocalCredentialDataSource(
@@ -244,6 +280,13 @@ fun main() = application {
             }
         )
     }
+    // Mesma conexão do índice de sessões, não uma segunda para o mesmo arquivo:
+    // `useConnection` é sincronizado, então o envio espera a indexação terminar
+    // em vez de disputar a escrita e receber `SQLITE_BUSY`.
+    val teamSyncStateDataSource = remember(cliSessionDataSource) {
+        LocalTeamSyncStateDataSource(cliSessionDataSource.sharedConnectionManager)
+    }
+    val remoteTeamDataSource = remember(httpClient) { RemoteTeamDataSource(httpClient) }
     val dashboardCacheDataSource = remember { LocalDashboardCacheDataSource() }
     val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
     val kiloUsageDataSource = remember { LocalKiloUsageDataSource() }
@@ -274,6 +317,12 @@ fun main() = application {
     }
     val dashboardCacheRepository = remember(dashboardCacheDataSource) {
         DashboardCacheRepositoryImpl(dashboardCacheDataSource)
+    }
+    val teamUsageRepository = remember(remoteTeamDataSource, teamSettingsFlow) {
+        TeamUsageRepositoryImpl(
+            remoteDataSource = remoteTeamDataSource,
+            settingsProvider = { teamSettingsFlow.value }
+        )
     }
     val appUpdateRepository = remember(remoteApiDataSource) {
         AppUpdateRepositoryImpl(remoteApiDataSource)
@@ -336,6 +385,29 @@ fun main() = application {
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
         )
     }
+    val teamUsageViewModel = remember(teamUsageRepository) {
+        TeamUsageViewModel(
+            getTeamUsage = GetTeamUsageUseCase(teamUsageRepository),
+            liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
+        )
+    }
+    // O envio roda com a janela do time fechada: se dependesse dela, o consumo de
+    // quem nunca abre a tela nunca chegaria aos colegas.
+    val teamSyncService = remember(teamSyncStateDataSource, teamUsageRepository, profileRegistry) {
+        TeamSyncService(
+            syncStateDataSource = teamSyncStateDataSource,
+            pushTeamUsage = PushTeamUsageUseCase(teamUsageRepository),
+            settingsProvider = { teamSettingsFlow.value },
+            targetsProvider = { buildTeamSyncTargets(profileRegistry) }
+        )
+    }
+    LaunchedEffect(teamSyncService, teamSettings.isActive) {
+        if (teamSettings.isActive) {
+            teamSyncService.start()
+        } else {
+            teamSyncService.stop()
+        }
+    }
 
     val shutdownStarted = remember { AtomicBoolean(false) }
     DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource, profileRegistry) {
@@ -344,6 +416,8 @@ fun main() = application {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
+                teamUsageViewModel.onDestroy()
+                teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
@@ -364,6 +438,8 @@ fun main() = application {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
+                teamUsageViewModel.onDestroy()
+                teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
                 usageHistoryDataSource.close()
@@ -379,6 +455,7 @@ fun main() = application {
     val mainWindowState = rememberPersistedMainWindowState(persistedMainWindowState)
     val historyWindowState = rememberPersistedHistoryWindowState(persistedHistoryWindowState)
     val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(persistedCliSessionsWindowState)
+    val teamUsageWindowState = rememberPersistedTeamUsageWindowState(persistedTeamUsageWindowState)
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -447,6 +524,29 @@ fun main() = application {
                 )
             }
     }
+    LaunchedEffect(teamUsageWindowState, settings) {
+        snapshotFlow {
+            Triple(
+                teamUsageWindowState.position,
+                teamUsageWindowState.size,
+                teamUsageWindowState.placement
+            )
+        }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { (position, size, placement) ->
+                persistTeamUsageWindowState(
+                    settings = settings,
+                    snapshot = TeamUsageWindowSnapshot(
+                        widthDp = size.width.value,
+                        heightDp = size.height.value,
+                        xDp = if (position.isSpecified) position.x.value else null,
+                        yDp = if (position.isSpecified) position.y.value else null,
+                        placement = placement
+                    )
+                )
+            }
+    }
     val enabledApisState by enabledApis.collectAsState()
     val profileUiModels = buildAnthropicProfileUiModels(
         records = profileRecords,
@@ -496,6 +596,12 @@ fun main() = application {
     var cliSessionsOpenGeneration by remember { mutableStateOf(0) }
     var cliSessionsProfileLabel by remember { mutableStateOf<String?>(null) }
     var cliSessionsProfileId by remember { mutableStateOf<String?>(null) }
+    var isTeamUsageOpen by remember { mutableStateOf(false) }
+    var teamUsageOpenGeneration by remember { mutableStateOf(0) }
+    var teamUsageAccountLabel by remember { mutableStateOf<String?>(null) }
+    var teamUsageProfileId by remember { mutableStateOf<String?>(null) }
+    var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
+    val teamScope = rememberCoroutineScope()
 
     // Os filtros de 5h e 7d da tela de sessões recortam a janela de quota da
     // conta, não as últimas horas corridas. O reset vem do mesmo `resets_at` que
@@ -509,12 +615,24 @@ fun main() = application {
             cliSessionsViewModel.setQuotaWindows(cliSessionsQuotaWindows)
         }
     }
+    // O time é uma conta Anthropic: a janela de 5h dele ancora no mesmo reset de
+    // quota que o card mede, senão os números do time não fecham com os locais.
+    val teamUsageQuotaWindows = remember(dashboardState, teamUsageProfileId) {
+        quotaWindowsForProfile(dashboardState, teamUsageProfileId)
+    }
+    LaunchedEffect(teamUsageQuotaWindows, isTeamUsageOpen) {
+        if (isTeamUsageOpen) {
+            teamUsageViewModel.setQuotaWindows(teamUsageQuotaWindows)
+        }
+    }
     val shutdownApplication = remember(viewModel, historyViewModel, httpClient, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
+                teamUsageViewModel.onDestroy()
+                teamSyncService.onDestroy()
                 httpClient.close()
                 usageHistoryDataSource.close()
                 cliSessionDataSource.close()
@@ -600,6 +718,32 @@ fun main() = application {
                             profileLabel = label,
                             quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
                         )
+                    },
+                    onOpenTeamUsage = { target ->
+                        val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+                        val accountContext = profileResolution.inspections[profileId]?.accountContext
+                        // Sem `accountUuid` não há como agrupar as máquinas — e o
+                        // botão nem deveria ter aparecido. Abortar é melhor que
+                        // consultar o servidor com uma chave inventada.
+                        val accountKey = accountContext?.key?.providerAccountId
+                        if (accountKey != null) {
+                            teamUsageAccountLabel = accountContext.displayLabel
+                            teamUsageProfileId = profileId
+                            isTeamUsageOpen = true
+                            teamUsageOpenGeneration++
+                            teamUsageViewModel.openForAccount(
+                                accountKey = accountKey,
+                                accountLabel = accountContext.displayLabel,
+                                quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
+                            )
+                        }
+                    },
+                    // Vazio quando a integração está desligada: o botão some de
+                    // todos os cards sem nenhuma outra condição espalhada na tela.
+                    teamEnabledProfileIds = if (teamSettings.isActive) {
+                        teamSettings.participatingProfileIds
+                    } else {
+                        emptySet()
                     }
                 )
             }
@@ -665,6 +809,41 @@ fun main() = application {
                 ) {
                     CliSessionsScreen(
                         viewModel = cliSessionsViewModel,
+                        language = language
+                    )
+                }
+            }
+        }
+    }
+
+    if (isTeamUsageOpen) {
+        val teamTitle = teamUsageWindowTitle(language, teamUsageAccountLabel)
+        // Sem avisar o ViewModel, o laço ao vivo continuaria consultando o
+        // servidor de cinco em cinco segundos com a janela fechada.
+        val closeTeamUsage = {
+            isTeamUsageOpen = false
+            teamUsageViewModel.closeWindow()
+        }
+        Window(
+            onCloseRequest = closeTeamUsage,
+            title = teamTitle,
+            icon = iconImage,
+            state = teamUsageWindowState,
+            resizable = true,
+            undecorated = true
+        ) {
+            LaunchedEffect(teamUsageOpenGeneration) {
+                activateWindow(window)
+            }
+            AppTheme(isDark = isDark) {
+                DesktopDialogFrame(
+                    title = teamTitle,
+                    iconPainter = iconImage,
+                    windowState = teamUsageWindowState,
+                    onCloseRequest = closeTeamUsage
+                ) {
+                    TeamUsageScreen(
+                        viewModel = teamUsageViewModel,
                         language = language
                     )
                 }
@@ -777,6 +956,71 @@ fun main() = application {
                             } else {
                                 profileId
                             }
+                        },
+                        teamSettings = teamSettings,
+                        teamConnection = teamConnectionState,
+                        onTeamEnabledChange = { enabled ->
+                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
+                                current.copy(enabled = enabled)
+                            }
+                            // Mudar de servidor ou religar a integração não pode
+                            // deixar um resultado antigo na tela como se fosse atual.
+                            teamConnectionState = TeamConnectionUiState()
+                        },
+                        onTeamServerUrlChange = { url ->
+                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
+                                current.copy(serverUrl = url)
+                            }
+                            teamConnectionState = TeamConnectionUiState()
+                        },
+                        onTeamApiKeyChange = { key ->
+                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
+                                current.copy(apiKey = key)
+                            }
+                            teamConnectionState = TeamConnectionUiState()
+                        },
+                        onTeamAliasChange = { alias ->
+                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
+                                current.copy(alias = alias)
+                            }
+                        },
+                        onTeamProfileParticipationChange = { profileId, participates ->
+                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
+                                val updated = if (participates) {
+                                    current.participatingProfileIds + profileId
+                                } else {
+                                    current.participatingProfileIds - profileId
+                                }
+                                current.copy(participatingProfileIds = updated)
+                            }
+                        },
+                        onTeamTestConnection = {
+                            teamConnectionState = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
+                            teamScope.launch {
+                                val result = teamUsageRepository.checkConnection()
+                                teamConnectionState = result.fold(
+                                    onSuccess = {
+                                        TeamConnectionUiState(
+                                            status = TeamConnectionUiStatus.OK,
+                                            message = if (language == AppLanguage.PT) {
+                                                "Conexão OK."
+                                            } else {
+                                                "Connection OK."
+                                            }
+                                        )
+                                    },
+                                    onFailure = { error ->
+                                        TeamConnectionUiState(
+                                            status = TeamConnectionUiStatus.FAILED,
+                                            message = error.message ?: if (language == AppLanguage.PT) {
+                                                "Falha desconhecida."
+                                            } else {
+                                                "Unknown failure."
+                                            }
+                                        )
+                                    }
+                                )
+                            }
                         }
                     )
                 }
@@ -880,6 +1124,46 @@ private fun buildAnthropicProfileUiModels(
             identityLabel = inspection?.accountContext?.displayLabel,
             status = status,
             detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail
+        )
+    }
+}
+
+/**
+ * Aplica uma mudança nas configurações de time e persiste.
+ *
+ * O `StateFlow` é atualizado antes da gravação: a UI reflete a digitação na hora
+ * e a escrita em disco vai atrás. Uma falha de gravação não pode derrubar o
+ * diálogo de configurações — pior caso, a mudança não sobrevive ao reinício.
+ */
+private fun updateTeamSettings(
+    settingsFlow: MutableStateFlow<TeamIntegrationSettings>,
+    dataSource: LocalTeamSettingsDataSource,
+    transform: (TeamIntegrationSettings) -> TeamIntegrationSettings
+) {
+    val updated = transform(settingsFlow.value)
+    settingsFlow.value = updated
+    runCatching { dataSource.save(updated) }
+}
+
+/**
+ * Contas Anthropic candidatas ao envio, com o `accountUuid` de cada perfil.
+ *
+ * A identidade é lida do disco a cada chamada (`inspect` lê `.credentials.json` e
+ * `.claude.json`) em vez de ser cacheada: o usuário pode trocar de conta no
+ * Claude Code com o app aberto, e um `accountUuid` velho mandaria o consumo dele
+ * para o time errado. A chamada roda no laço de envio, em `Dispatchers.IO`.
+ *
+ * Perfis sem identidade resolvida ficam de fora — sem `accountUuid` não há chave
+ * de agrupamento.
+ */
+private fun buildTeamSyncTargets(registry: AnthropicProfileRegistry): List<TeamSyncTarget> {
+    return registry.profiles.value.mapNotNull { record ->
+        val accountContext = registry.inspect(record).accountContext ?: return@mapNotNull null
+        TeamSyncTarget(
+            profileId = record.id,
+            accountKey = accountContext.key.providerAccountId,
+            organizationUuid = accountContext.key.workspaceId,
+            organizationName = accountContext.workspaceName
         )
     }
 }

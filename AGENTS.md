@@ -95,7 +95,40 @@ Regras importantes:
   - `language`
   - `autoStart`
   - `windowOpacityPercent`
+  - `teamUsageWindow*` (geometria da janela de Sessoes do time)
 - `AutoStartManager` escreve em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+- **A configuracao de time NAO vai para as preferencias.** Vive em
+  `~/.usage-monitor/team.json` (`LocalTeamSettingsDataSource`), com escrita atomica
+  e `restrictToOwnerReadWrite`: a chave do servidor e um segredo e as preferencias
+  sao gravadas em claro no registro do Windows.
+
+## Team integration (server/)
+
+Recurso opcional, desligado por default. Um servidor Node.js self-hosted pela
+empresa recebe os turnos indexados de cada maquina e devolve a visao agregada por
+conta Anthropic.
+
+- Codigo do servidor em `server/` — Express 4 + TypeScript ESM + SQLite
+  (`better-sqlite3`). `cd server && npm test`. Detalhes de contrato e deploy
+  Dokploy em `server/README.md`.
+- Build file: **`Dockerfile.dokploy` na raiz**, contexto na raiz (mesmo padrao do
+  `montador-pacote`). O `.dockerignore` da raiz nega tudo e reinclui so `server/` —
+  sem isso o `build/` do Gradle, com o runtime Java, entraria no contexto. Compose
+  em `docker/docker-compose.yml` (`context: ..`).
+- **Chave de agrupamento:** o `accountUuid` da conta (`UsageAccountKey.providerAccountId`),
+  sem o `organizationUuid` — este e nulo em parte das instalacoes e usa-lo na chave
+  quebraria o agrupamento entre maquinas da mesma conta.
+- **Envio:** `TeamSyncService` (desktopMain), laco de 30s, independente da janela.
+  Marcador de progresso em `team_sync_state` (mesmo `usage-history.db`), pela
+  conexao **compartilhada** do `LocalCliSessionDataSource`.
+- **Leitura:** `TeamUsageViewModel`, laco ao vivo de 5s, so com a janela aberta.
+- **Precificacao:** o servidor devolve tokens por `(deviceId, sessionId, model)` e
+  **nao** calcula custo. Quem aplica `ModelPricingTable` e o cliente, via
+  `WindowedSessionAccumulator` — a mesma classe que o indice local usa.
+- **Nao trafega conteudo de prompt ou resposta**, so metadados de uso
+  (`sessionId`, `messageId`, `ts`, `model`, tokens, `cwd`, `gitBranch`, `hostName`).
+- O botao no card so aparece com a integracao ligada **e** a conta marcada em
+  Configuracoes -> Integracao com time.
 
 ## UI and presentation
 

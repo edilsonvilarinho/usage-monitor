@@ -54,6 +54,14 @@ internal fun ResponsiveDashboardCardGrid(
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
+    onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
+    /**
+     * Perfis Anthropic marcados como parte do time nas Configurações.
+     *
+     * Vazio quando a integração está desligada, o que faz o botão de time sumir
+     * de todos os cards sem nenhuma outra condição espalhada pela tela.
+     */
+    teamEnabledProfileIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -116,6 +124,14 @@ internal fun ResponsiveDashboardCardGrid(
                             onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
                             onOpenCliSessions = if (stats.source == ApiSource.ANTHROPIC) {
                                 { onOpenCliSessionsCard(stats.targetKey) }
+                            } else {
+                                null
+                            },
+                            onOpenTeamUsage = if (
+                                stats.source == ApiSource.ANTHROPIC &&
+                                stats.targetKey.profileId in teamEnabledProfileIds
+                            ) {
+                                { onOpenTeamUsageCard(stats.targetKey) }
                             } else {
                                 null
                             },

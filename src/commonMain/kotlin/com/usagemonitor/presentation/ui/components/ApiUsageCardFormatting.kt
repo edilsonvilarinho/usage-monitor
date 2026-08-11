@@ -137,6 +137,10 @@ internal fun cliSessionsActionLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Sessões CLI desta conta" else "CLI sessions for this account"
 }
 
+internal fun teamUsageActionLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Sessões do time nesta conta" else "Team sessions in this account"
+}
+
 internal fun historyActionLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Abrir histórico" else "Open history"
 }

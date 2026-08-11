@@ -1,0 +1,18 @@
+# O contexto do build e a raiz do repositorio, mas a imagem so precisa de
+# `server/`. Negar tudo e reincluir e o unico jeito seguro: o repo carrega
+# `build/` com o runtime Java empacotado pelo Gradle (centenas de MB), alem de
+# `.gradle/`, `.kotlin/` e `.git/`. Listar exclusoes uma a uma deixaria passar
+# qualquer diretorio novo.
+*
+!server
+
+# Reexclusoes dentro de server/ — a ultima regra que casa vence.
+server/node_modules
+server/dist
+server/data
+server/.env
+server/test
+server/vitest.config.ts
+server/README.md
+# Gerado no Windows: omite dependencias opcionais de Linux (npm/cli#4828).
+server/package-lock.json

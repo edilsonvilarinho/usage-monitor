@@ -1,0 +1,142 @@
+package com.usagemonitor.presentation.ui
+
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionRange
+import kotlinx.datetime.Instant
+
+internal fun teamUsageTitle(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Sessões do time" else "Team sessions"
+}
+
+/** Título da janela nomeando a conta: um time é uma conta Anthropic. */
+internal fun teamUsageWindowTitle(language: AppLanguage, accountLabel: String?): String {
+    val base = teamUsageTitle(language)
+    if (accountLabel.isNullOrBlank()) {
+        return base
+    }
+    return "$base — $accountLabel"
+}
+
+/**
+ * Rótulos da tela de time.
+ *
+ * O que já existe em [CliSessionsLabels] é reaproveitado — janelas, pílula "ao
+ * vivo", carimbo de última alteração e as colunas da linha de sessão são os
+ * mesmos das duas telas, e traduzir duas vezes acabaria em textos divergentes.
+ */
+internal object TeamUsageLabels {
+
+    fun memberCount(count: Int, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            if (count == 1) "1 integrante" else "$count integrantes"
+        } else {
+            if (count == 1) "1 member" else "$count members"
+        }
+    }
+
+    fun sessionCount(count: Int, language: AppLanguage): String {
+        return CliSessionsLabels.sessionCount(count, language)
+    }
+
+    fun columnShare(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "do time" else "of team"
+    }
+
+    fun columnMachine(language: AppLanguage): String {
+        return CliSessionsLabels.machine(language)
+    }
+
+    fun columnTokens(language: AppLanguage): String {
+        return CliSessionsLabels.columnTokens(language)
+    }
+
+    fun columnCost(language: AppLanguage): String {
+        return CliSessionsLabels.columnCost(language)
+    }
+
+    fun rangeLabel(range: CliSessionRange, language: AppLanguage): String {
+        return CliSessionsLabels.rangeLabel(range, language)
+    }
+
+    fun live(language: AppLanguage): String {
+        return CliSessionsLabels.live(language)
+    }
+
+    fun lastChange(instantLabel: String?, language: AppLanguage): String {
+        return CliSessionsLabels.lastChange(instantLabel, language)
+    }
+
+    fun estimatedTotalInRange(
+        range: CliSessionRange,
+        endsAt: Instant?,
+        language: AppLanguage
+    ): String {
+        if (range == CliSessionRange.ALL) {
+            return CliSessionsLabels.estimatedTotal(language)
+        }
+        return CliSessionsLabels.estimatedTotalInRange(range, endsAt, language)
+    }
+
+    /** Integrante conhecido pelo servidor, mas sem nenhum turno na janela. */
+    fun noActivityInRange(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "sem uso no período" else "no usage in range"
+    }
+
+    /**
+     * Nenhum integrante consumiu na janela.
+     *
+     * Diferente de "ninguém configurou a integração": o time pode existir e
+     * simplesmente não ter usado o CLI nas últimas horas.
+     */
+    fun emptyInRange(range: CliSessionRange, isAnchored: Boolean, language: AppLanguage): String {
+        if (range == CliSessionRange.ALL) {
+            return if (language == AppLanguage.PT) {
+                "Nenhum integrante do time enviou dados ainda. Confira o servidor nas Configurações."
+            } else {
+                "No team member has reported data yet. Check the server in Settings."
+            }
+        }
+        val window = rangeLabel(range, language)
+        if (isAnchored) {
+            return if (language == AppLanguage.PT) {
+                "Nenhum uso do time nesta janela de quota ($window). Escolha uma janela maior."
+            } else {
+                "No team usage in the current quota window ($window). Pick a wider range."
+            }
+        }
+        return if (language == AppLanguage.PT) {
+            "Nenhum uso do time no período ($window). Escolha uma janela maior."
+        } else {
+            "No team usage in the last $window. Pick a wider range."
+        }
+    }
+
+    /** Prefixo do aviso de falha, para o usuário saber que o dado está velho. */
+    fun serverError(message: String, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Não foi possível falar com o servidor de time: $message"
+        } else {
+            "Could not reach the team server: $message"
+        }
+    }
+
+    fun expand(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Ver sessões" else "Show sessions"
+    }
+
+    fun collapse(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Ocultar sessões" else "Hide sessions"
+    }
+
+    /** Deixa explícito de onde vem o número, já que a fonte não é esta máquina. */
+    fun lastSeen(instantLabel: String?, language: AppLanguage): String {
+        if (instantLabel == null) {
+            return if (language == AppLanguage.PT) "nunca reportou" else "never reported"
+        }
+        return if (language == AppLanguage.PT) {
+            "último envio $instantLabel"
+        } else {
+            "last report $instantLabel"
+        }
+    }
+}

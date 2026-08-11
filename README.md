@@ -163,6 +163,19 @@ Observacoes:
 - O historico local fica em `~/.usage-monitor/usage-history.db`.
 - Novos snapshots nao sao mais podados automaticamente; o filtro `Total` usa todo o historico ainda existente no banco local.
 
+### Integracao com time
+
+Recurso **opcional**, desligado por default. Serve o caso em que a mesma conta Anthropic e usada por varios desenvolvedores em maquinas diferentes e a empresa quer ver o consumo agregado.
+
+- Um servidor Node.js self-hosted (codigo em [`server/`](server/README.md)) recebe os turnos indexados de cada maquina e devolve a visao do time. A empresa opera esse servidor; nao ha servico gerenciado.
+- Deploy pelo Dokploy com `Dockerfile.dokploy` na raiz (contexto `.`), compose em `docker/docker-compose.yml`. Passo a passo em [`server/README.md`](server/README.md).
+- Em **Configuracoes -> Integracao com time**: ligar, informar servidor e chave, definir o apelido e marcar quais contas Anthropic participam.
+- O card de cada conta marcada ganha um botao que abre **Sessoes do time**: uma linha por integrante (apelido, maquina, tokens, custo, fatia do time), expansivel para as sessoes daquele integrante.
+- Mesmos filtros `5h` / `7 dias` / `30 dias` / `Total` da tela de Sessoes CLI, com a janela de 5h ancorada no mesmo reset de quota — os numeros do time fecham com os locais.
+- Mesma cadencia de tempo real: leitura a cada 5s com a janela aberta; envio a cada 30s, independente da janela estar aberta.
+- **Nao trafega conteudo de prompt nem de resposta.** So metadados de uso: id de sessao, id de mensagem, timestamp, modelo, contagem de tokens, diretorio do projeto, branch e nome da maquina.
+- A chave do servidor fica em `~/.usage-monitor/team.json`, com permissao restrita ao dono — nao vai para as preferencias do registro.
+
 ### Update da app
 
 - A app consulta a release mais recente em `edilsonvilarinho/usage-monitor`.
@@ -186,6 +199,9 @@ Chaves persistidas:
 - `cardOrder`
 - `minimizedCards`
 - `windowOpacityPercent`
+- `teamUsageWindow*` (geometria da janela de Sessoes do time)
+
+A configuracao da integracao com time **nao** entra aqui: vive em `~/.usage-monitor/team.json`, porque a chave do servidor e um segredo e as preferencias sao gravadas em claro no registro do Windows.
 
 ## Arquitetura
 

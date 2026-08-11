@@ -1,0 +1,65 @@
+# syntax=docker/dockerfile:1
+# Dokploy build file. Build Type: Dockerfile · Dockerfile Path: Dockerfile.dokploy
+# Build context: raiz do repositorio (.)
+#
+# Sobe apenas o servidor de time (`server/`). A app desktop nao entra na imagem —
+# o `.dockerignore` da raiz mantem o contexto restrito a `server/`, senao o
+# `build/` do Gradle (com o runtime Java embutido) iria junto.
+#
+# Configurar no Dokploy:
+#   - Env vars: TEAM_API_KEY (obrigatoria, min. 32 chars), TRUST_PROXY_HOPS=1
+#   - Persistent volume: <vol> -> /data
+#   - Port: 3000
+#
+# Detalhes de contrato e passo a passo em server/README.md
+
+# --- Build stage: instala deps e compila o TypeScript ---
+FROM node:20-bookworm-slim AS build
+WORKDIR /app
+
+# better-sqlite3 tem prebuilds, mas compila do fonte quando nao ha um para a
+# plataforma. Sem toolchain o build falharia so nesse caso, e de forma opaca.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# O package.json vem antes do codigo para que a camada de dependencias seja
+# reaproveitada quando so o `src/` muda.
+# NAO copiar package-lock.json: ele e gerado no Windows e omite dependencias
+# opcionais especificas de Linux (npm/cli#4828). O `.dockerignore` o mantem fora.
+COPY server/package.json ./
+RUN npm install --no-audit --no-fund
+
+COPY server/tsconfig.json ./
+COPY server/src ./src
+
+RUN npm run build \
+    && npm prune --omit=dev
+
+# --- Runtime stage ---
+FROM node:20-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    DATA_DIR=/data \
+    PORT=3000
+
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/package.json ./package.json
+
+# O processo nao precisa de root. Com volume nomeado o Docker herda estas
+# permissoes; com bind mount, o dono do diretorio do host tem de ser uid 1000.
+RUN mkdir -p /data && chown -R node:node /data /app
+
+USER node
+
+EXPOSE 3000
+VOLUME ["/data"]
+
+# `fetch` nativo do Node 20 — evita instalar curl so para o healthcheck.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "dist/main.js"]

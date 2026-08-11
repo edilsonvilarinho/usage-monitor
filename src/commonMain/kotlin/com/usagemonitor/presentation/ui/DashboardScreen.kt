@@ -72,6 +72,9 @@ fun DashboardScreen(
     onOpenHistory: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCliSessions: (UsageTargetKey) -> Unit = {},
+    onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
+    /** Perfis que participam do time; vazio esconde o botão de todos os cards. */
+    teamEnabledProfileIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -171,6 +174,8 @@ fun DashboardScreen(
                                     onToggleCardMinimized = onToggleCardMinimized,
                                     onOpenHistoryCard = onOpenHistory,
                                     onOpenCliSessionsCard = onOpenCliSessions,
+                                    onOpenTeamUsageCard = onOpenTeamUsage,
+                                    teamEnabledProfileIds = teamEnabledProfileIds,
                                     onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -337,6 +342,8 @@ private fun SuccessContent(
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
+    onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
+    teamEnabledProfileIds: Set<String> = emptySet(),
     onRetryAnthropic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -405,6 +412,8 @@ private fun SuccessContent(
                 onToggleCardMinimized = onToggleCardMinimized,
                 onOpenHistoryCard = onOpenHistoryCard,
                 onOpenCliSessionsCard = onOpenCliSessionsCard,
+                onOpenTeamUsageCard = onOpenTeamUsageCard,
+                teamEnabledProfileIds = teamEnabledProfileIds,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
