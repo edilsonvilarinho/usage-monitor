@@ -14,11 +14,33 @@ import kotlin.test.assertTrue
 class AnthropicProfileRegistryTest {
     private val tempDir = createTempDirectory("anthropic-profiles").toFile()
     private val preferences = Preferences.userRoot().node("com.usagemonitor.test/${UUID.randomUUID()}")
+    private val registries = mutableListOf<AnthropicProfileRegistry>()
 
     @AfterTest
     fun cleanup() {
+        // Fechar antes de remover o nó é obrigatório: updateLabel agenda a
+        // gravação com debounce no ioScope, e uma coroutine que sobrevivesse ao
+        // removeNode() abaixo estouraria com "Node has been removed" já dentro
+        // de outra classe de teste, derrubando um teste inocente da suíte.
+        registries.forEach { registry -> registry.close() }
+        registries.clear()
         tempDir.deleteRecursively()
         runCatching { preferences.removeNode() }
+    }
+
+    private fun newRegistry(
+        defaultEnabled: Boolean = true,
+        homeDirProvider: () -> File = { tempDir },
+        environmentProvider: (String) -> String? = { null }
+    ): AnthropicProfileRegistry {
+        val registry = AnthropicProfileRegistry(
+            preferences = preferences,
+            defaultEnabled = defaultEnabled,
+            homeDirProvider = homeDirProvider,
+            environmentProvider = environmentProvider
+        )
+        registries += registry
+        return registry
     }
 
     @Test
@@ -28,10 +50,7 @@ class AnthropicProfileRegistryTest {
         writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
         writeProfileFiles(workDir, File(workDir, ".claude.json"), "work@example.com", "account-b")
 
-        val registry = AnthropicProfileRegistry(
-            preferences = preferences,
-            defaultEnabled = true,
-            homeDirProvider = { tempDir },
+        val registry = newRegistry(
             environmentProvider = { name -> if (name == "CLAUDE_CONFIG_DIR") workDir.absolutePath else null }
         )
 
@@ -50,7 +69,7 @@ class AnthropicProfileRegistryTest {
         val workDir = File(tempDir, ".claude-work").also { it.mkdirs() }
         writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
         writeProfileFiles(workDir, File(workDir, ".claude.json"), "work@example.com", "account-b")
-        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val registry = newRegistry()
         val work = registry.profiles.value.first { it.id != "default" }
 
         registry.setEnabled(work.id, true)
@@ -73,7 +92,7 @@ class AnthropicProfileRegistryTest {
         val workDir = File(tempDir, ".claude-work").also { it.mkdirs() }
         writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
         writeProfileFiles(workDir, File(workDir, ".claude.json"), "work@example.com", "account-b")
-        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val registry = newRegistry()
         val work = registry.profiles.value.first { it.id != "default" }
 
         registry.updateLabel(work.id, "Empresa")
@@ -90,7 +109,7 @@ class AnthropicProfileRegistryTest {
         writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
         writeProfileFiles(aDir, File(aDir, ".claude.json"), "alpha@example.com", "account-b")
         writeProfileFiles(bDir, File(bDir, ".claude.json"), "beta@example.com", "account-c")
-        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val registry = newRegistry()
         val alpha = registry.profiles.value.first { it.configDirectory == aDir.absolutePath }
         val beta = registry.profiles.value.first { it.configDirectory == bDir.absolutePath }
         val orderBefore = registry.profiles.value.map { it.id }
@@ -110,7 +129,7 @@ class AnthropicProfileRegistryTest {
         val workDir = File(tempDir, ".claude-work").also { it.mkdirs() }
         writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
         writeProfileFiles(workDir, File(workDir, ".claude.json"), "work@example.com", "account-b")
-        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val registry = newRegistry()
         val work = registry.profiles.value.first { it.id != "default" }
 
         // updateLabel atualiza a memória na hora, mas grava em disco de forma
@@ -118,7 +137,7 @@ class AnthropicProfileRegistryTest {
         registry.updateLabel(work.id, "Novo apelido")
         registry.flushPendingLabelWrite()
 
-        val reloaded = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val reloaded = newRegistry()
         assertEquals("Novo apelido", reloaded.profiles.value.first { it.id == work.id }.label)
     }
 
@@ -126,7 +145,7 @@ class AnthropicProfileRegistryTest {
     fun `marks profile with missing identity as incomplete`() {
         val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
         File(defaultDir, ".credentials.json").writeText("{\"claudeAiOauth\":{}}")
-        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val registry = newRegistry()
 
         val inspection = registry.inspect(registry.profiles.value.single())
 
@@ -140,7 +159,7 @@ class AnthropicProfileRegistryTest {
         val duplicateDir = File(tempDir, ".claude-copy").also { it.mkdirs() }
         writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "same@example.com", "same-account")
         writeProfileFiles(duplicateDir, File(duplicateDir, ".claude.json"), "same@example.com", "same-account")
-        val registry = AnthropicProfileRegistry(preferences, true, { tempDir }, { null })
+        val registry = newRegistry()
         val duplicate = registry.profiles.value.first { it.id != "default" }
         registry.setEnabled(duplicate.id, true)
 
