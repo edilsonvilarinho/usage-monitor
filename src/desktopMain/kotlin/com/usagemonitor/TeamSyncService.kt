@@ -39,9 +39,18 @@ internal data class TeamSyncReport(
  * Empurra os turnos indexados desta máquina para o servidor de time.
  *
  * Roda com a janela do time fechada: se o envio só acontecesse com o modal
- * aberto, o consumo de quem nunca abre a tela nunca chegaria ao time. O intervalo
- * é bem mais curto que o da indexação de background (30s contra 10min) porque é
- * ele que define a latência com que uma máquina aparece para as outras.
+ * aberto, o consumo de quem nunca abre a tela nunca chegaria ao time.
+ *
+ * Cada passada começa atualizando o índice por [ensureIndexFresh]. Sem isso a
+ * latência real não era o intervalo daqui, e sim o do laço de indexação de
+ * background (10min): este serviço só enxerga turno que já está no índice, então
+ * uma sessão nova levava mais de dez minutos para aparecer nas outras máquinas.
+ * Com a indexação na própria passada, a latência passa a ser o [intervalMillis].
+ *
+ * A indexação é incremental e barata — compara tamanho e data de cada transcript
+ * e só lê o trecho novo. Com a janela de Sessões CLI aberta, o laço ao vivo dela
+ * (5s) indexa em paralelo com esta passada: a conexão do índice é `synchronized`,
+ * então as duas se serializam e a passada redundante apenas lista os diretórios.
  *
  * O trabalho pesado é o **backfill inicial**: na primeira execução o índice pode
  * ter dezenas de milhares de turnos. Por isso cada passada envia no máximo
@@ -54,6 +63,11 @@ internal class TeamSyncService(
     private val pushTeamUsage: PushTeamUsageUseCase,
     private val settingsProvider: () -> TeamIntegrationSettings,
     private val targetsProvider: () -> List<TeamSyncTarget>,
+    /**
+     * Atualiza o índice antes de ler o lote. `null` desliga — a passada passa a
+     * enviar só o que outro laço já indexou.
+     */
+    private val ensureIndexFresh: (suspend () -> Unit)? = null,
     private val hostNameProvider: () -> String? = { defaultHostName() },
     private val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS,
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
@@ -64,6 +78,7 @@ internal class TeamSyncService(
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val passMutex = Mutex()
     private var loopJob: Job? = null
+    private var immediateJob: Job? = null
 
     /** Idempotente: chamar com o laço já rodando não abre um segundo. */
     fun start() {
@@ -83,8 +98,27 @@ internal class TeamSyncService(
         loopJob = null
     }
 
+    /**
+     * Antecipa uma passada, sem reiniciar o laço periódico.
+     *
+     * Serve ao momento em que o usuário abre a janela do time: esperar o próximo
+     * tique deixaria a tela abrir mostrando um estado até um intervalo atrasado.
+     * Chamadas repetidas enquanto a anterior corre devolvem o mesmo job, senão um
+     * clique repetido empilharia passadas na fila do [passMutex].
+     */
+    fun requestImmediateSync(): Job {
+        val running = immediateJob
+        if (running?.isActive == true) {
+            return running
+        }
+        val job = scope.launch { syncOnce() }
+        immediateJob = job
+        return job
+    }
+
     fun onDestroy() {
         stop()
+        immediateJob = null
         scope.cancel()
     }
 
@@ -105,6 +139,16 @@ internal class TeamSyncService(
             var pushedTurns = 0
             var batches = 0
             val failures = mutableListOf<Throwable>()
+
+            // Uma indexação por passada, nunca por conta: o índice é único e
+            // varrer os transcritos de novo a cada alvo seria trabalho repetido.
+            // Falhar aqui não cancela o envio — o que já está indexado ainda
+            // precisa sair, e o erro viaja no relatório.
+            val indexRefresh = ensureIndexFresh
+            if (indexRefresh != null) {
+                runCatching { indexRefresh() }
+                    .onFailure { error -> failures += error }
+            }
 
             for (target in targetsProvider()) {
                 if (!settings.participates(target.profileId)) {

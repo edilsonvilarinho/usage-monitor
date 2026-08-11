@@ -216,17 +216,105 @@ class TeamSyncServiceTest {
         }
     }
 
+    @Test
+    fun `indexa o transcript antes de enviar`() = runTest {
+        withFixture { root, indexer, syncState ->
+            // De proposito sem syncIndex(): e o servico que tem de indexar. Sem
+            // isso a latencia do time seria a do laco de background (10min).
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+
+            val repository = RecordingTeamRepository()
+            val service = newService(syncState, repository, ensureIndexFresh = { indexer.syncIndex() })
+
+            val report = service.syncOnce()
+
+            assertEquals(1, report.pushedTurns)
+            assertEquals("msg-1", repository.pushed.single().turns.single().messageId)
+        }
+    }
+
+    @Test
+    fun `falha na indexacao nao impede o envio do que ja esta indexado`() = runTest {
+        withFixture { root, indexer, syncState ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            indexer.syncIndex()
+
+            val repository = RecordingTeamRepository()
+            val service = newService(
+                syncState,
+                repository,
+                ensureIndexFresh = { throw IllegalStateException("disco indisponivel") }
+            )
+
+            val report = service.syncOnce()
+
+            assertTrue(report.hasFailure)
+            assertEquals(1, report.pushedTurns)
+            assertEquals("msg-1", repository.pushed.single().turns.single().messageId)
+        }
+    }
+
+    @Test
+    fun `indexa uma unica vez por passada mesmo com varias contas`() = runTest {
+        withFixture { root, indexer, syncState ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+
+            var indexCalls = 0
+            val repository = RecordingTeamRepository()
+            val service = newService(
+                syncState,
+                repository,
+                ensureIndexFresh = {
+                    indexCalls++
+                    indexer.syncIndex()
+                },
+                targets = listOf(
+                    TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY),
+                    TeamSyncTarget(profileId = PROFILE_ID, accountKey = "account-uuid-bbb")
+                )
+            )
+
+            service.syncOnce()
+
+            // O indice e um so: varrer os transcritos por conta seria trabalho repetido.
+            assertEquals(1, indexCalls)
+        }
+    }
+
+    @Test
+    fun `requestImmediateSync envia sem esperar o intervalo do laco`() = runTest {
+        withFixture { root, indexer, syncState ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+
+            val repository = RecordingTeamRepository()
+            val service = newService(syncState, repository, ensureIndexFresh = { indexer.syncIndex() })
+            try {
+                // Sem start(): o gatilho da janela sozinho tem de entregar o lote.
+                service.requestImmediateSync().join()
+
+                assertEquals("msg-1", repository.pushed.single().turns.single().messageId)
+            } finally {
+                service.onDestroy()
+            }
+        }
+    }
+
     private fun newService(
         syncState: LocalTeamSyncStateDataSource,
         repository: RecordingTeamRepository,
         settings: TeamIntegrationSettings = ACTIVE_SETTINGS,
-        batchSize: Int = 2_000
+        batchSize: Int = 2_000,
+        ensureIndexFresh: (suspend () -> Unit)? = null,
+        targets: List<TeamSyncTarget> = listOf(
+            TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY)
+        )
     ): TeamSyncService {
         return TeamSyncService(
             syncStateDataSource = syncState,
             pushTeamUsage = PushTeamUsageUseCase(repository),
             settingsProvider = { settings },
-            targetsProvider = { listOf(TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY)) },
+            targetsProvider = { targets },
+            ensureIndexFresh = ensureIndexFresh,
             hostNameProvider = { "DESKTOP-TEST" },
             batchSize = batchSize
         )

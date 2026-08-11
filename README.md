@@ -173,6 +173,7 @@ Recurso **opcional**, desligado por default. Serve o caso em que a mesma conta A
 - O card de cada conta marcada ganha um botao que abre **Sessoes do time**: uma linha por integrante (apelido, maquina, tokens, custo, fatia do time), expansivel para as sessoes daquele integrante.
 - Mesmos filtros `5h` / `7 dias` / `30 dias` / `Total` da tela de Sessoes CLI, com a janela de 5h ancorada no mesmo reset de quota — os numeros do time fecham com os locais.
 - Mesma cadencia de tempo real: leitura a cada 5s com a janela aberta; envio a cada 30s, independente da janela estar aberta.
+- Cada envio reindexa os transcripts antes de sair, entao uma sessao nova aparece para os colegas em cerca de 35s no pior caso, mesmo com todas as janelas fechadas. Abrir a janela de Sessoes do time antecipa um envio na hora.
 - **Nao trafega conteudo de prompt nem de resposta.** So metadados de uso: id de sessao, id de mensagem, timestamp, modelo, contagem de tokens, diretorio do projeto, branch e nome da maquina.
 - A chave do servidor fica em `~/.usage-monitor/team.json`, com permissao restrita ao dono — nao vai para as preferencias do registro.
 

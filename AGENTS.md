@@ -121,6 +121,11 @@ conta Anthropic.
 - **Envio:** `TeamSyncService` (desktopMain), laco de 30s, independente da janela.
   Marcador de progresso em `team_sync_state` (mesmo `usage-history.db`), pela
   conexao **compartilhada** do `LocalCliSessionDataSource`.
+- **Cada passada indexa antes de enviar** (`ensureIndexFresh`). O servico so ve
+  turno que ja esta no indice: sem indexar na propria passada, a latencia do time
+  seria a do laco de background (10min) e nao a dos 30s. Falha ao indexar entra no
+  relatorio mas nao cancela o envio do que ja estava indexado. Abrir o modal
+  chama `requestImmediateSync()`, que antecipa uma passada sem reiniciar o laco.
 - **Leitura:** `TeamUsageViewModel`, laco ao vivo de 5s, so com a janela aberta.
 - **Precificacao:** o servidor devolve tokens por `(deviceId, sessionId, model)` e
   **nao** calcula custo. Quem aplica `ModelPricingTable` e o cliente, via

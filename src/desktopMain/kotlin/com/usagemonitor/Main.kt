@@ -375,11 +375,16 @@ fun main() = application {
     // Claude Code apaga transcripts antigos, e depender de o usuário abrir a
     // janela antes disso perderia o histórico. A lista em si só carrega quando a
     // janela abre (`autoLoad = false`).
+    // Uma instância só: a tela de Sessões CLI e o envio para o time indexam o
+    // mesmo banco, e duas cópias do caso de uso não trariam nada.
+    val syncCliSessionIndex = remember(cliSessionRepository) {
+        SyncCliSessionIndexUseCase(cliSessionRepository)
+    }
     val cliSessionsViewModel = remember(cliSessionRepository) {
         CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
             getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
-            syncCliSessionIndex = SyncCliSessionIndexUseCase(cliSessionRepository),
+            syncCliSessionIndex = syncCliSessionIndex,
             autoLoad = false,
             backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
@@ -393,12 +398,16 @@ fun main() = application {
     }
     // O envio roda com a janela do time fechada: se dependesse dela, o consumo de
     // quem nunca abre a tela nunca chegaria aos colegas.
-    val teamSyncService = remember(teamSyncStateDataSource, teamUsageRepository, profileRegistry) {
+    val teamSyncService = remember(teamSyncStateDataSource, teamUsageRepository, profileRegistry, syncCliSessionIndex) {
         TeamSyncService(
             syncStateDataSource = teamSyncStateDataSource,
             pushTeamUsage = PushTeamUsageUseCase(teamUsageRepository),
             settingsProvider = { teamSettingsFlow.value },
-            targetsProvider = { buildTeamSyncTargets(profileRegistry) }
+            targetsProvider = { buildTeamSyncTargets(profileRegistry) },
+            // Sem indexar aqui, a latência do time não seria o intervalo deste
+            // serviço e sim o do laço de background (10min): ele só envia o que
+            // já está no índice.
+            ensureIndexFresh = { syncCliSessionIndex() }
         )
     }
     LaunchedEffect(teamSyncService, teamSettings.isActive) {
@@ -736,6 +745,10 @@ fun main() = application {
                                 accountLabel = accountContext.displayLabel,
                                 quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
                             )
+                            // Antecipa o envio desta máquina: sem isso a janela
+                            // abriria mostrando o time sem o que foi feito aqui
+                            // desde o último tique de 30s.
+                            teamSyncService.requestImmediateSync()
                         }
                     },
                     // Vazio quando a integração está desligada: o botão some de
