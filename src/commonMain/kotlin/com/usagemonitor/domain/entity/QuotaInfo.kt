@@ -22,7 +22,14 @@ data class QuotaInfo(
     val periodType: PeriodType = PeriodType.INTERVAL,
     val unit: UsageUnit,
     val rawUsed: Long = 0L,
-    val rawTotal: Long = 0L
+    val rawTotal: Long = 0L,
+    /**
+     * Moeda ISO-4217 dos valores monetários da cota (ex: "USD", "BRL").
+     *
+     * Campo com default para não quebrar caches e histórico já gravados. Só tem
+     * efeito nas cotas cujos valores são dinheiro — as demais o ignoram.
+     */
+    val currencyCode: String = "USD"
 ) {
     /**
      * Percentual de uso no período atual (valor entre 0.0 e 1.0).

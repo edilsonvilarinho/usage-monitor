@@ -39,5 +39,7 @@ data class QuotaInfoCacheDto(
     val periodType: String,
     val unit: String,
     val rawUsed: Long = 0L,
-    val rawTotal: Long = 0L
+    val rawTotal: Long = 0L,
+    // Default mantém legível o cache gravado antes da leitura de créditos.
+    val currencyCode: String = "USD"
 )

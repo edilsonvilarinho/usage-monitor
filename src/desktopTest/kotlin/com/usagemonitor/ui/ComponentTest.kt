@@ -326,6 +326,70 @@ class ComponentTest {
     }
 
     @Test
+    fun `ApiUsageCard shows anthropic extra credits in the account currency`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(420.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(
+                            QuotaInfo(
+                                label = "Claude 5h",
+                                used = 21L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                                periodType = PeriodType.INTERVAL,
+                                unit = UsageUnit.PERCENTAGE,
+                                rawUsed = 968L,
+                                rawTotal = 4500L
+                            ),
+                            QuotaInfo(
+                                label = "Claude 7d",
+                                used = 50L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2026-05-02T20:00:00Z"),
+                                periodType = PeriodType.WEEKLY,
+                                unit = UsageUnit.PERCENTAGE,
+                                rawUsed = 22500L,
+                                rawTotal = 45000L
+                            ),
+                            QuotaInfo(
+                                label = "Créditos",
+                                used = 60L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2100-01-01T00:00:00Z"),
+                                hasKnownResetAt = false,
+                                periodType = PeriodType.REPORTED,
+                                unit = UsageUnit.PERCENTAGE,
+                                rawUsed = 32784L,
+                                rawTotal = 55000L,
+                                currencyCode = "BRL"
+                            )
+                        ),
+                        // Igual ao dashboard: o card da Anthropic esconde os detalhes
+                        // de uso, e ainda assim os créditos precisam aparecer.
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Anthropic").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Semanal").assertIsDisplayed()
+        onNodeWithText("Créditos de uso").assertIsDisplayed()
+        onNodeWithText("60%").assertIsDisplayed()
+        onNodeWithText("R$327.84/R$550.00").assertIsDisplayed()
+        onNodeWithText("Reinicia no início do mês").assertIsDisplayed()
+        onAllNodesWithText("Uso atual").assertCountEquals(0)
+    }
+
+    @Test
     fun `ApiUsageCard opens history action`() = runDesktopComposeUiTest {
         var opened = false
 

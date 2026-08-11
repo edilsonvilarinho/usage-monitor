@@ -8,8 +8,12 @@ import androidx.compose.ui.unit.sp
 // Largura de card abaixo da qual o layout adota a densidade estreita.
 internal val NarrowCardWidthThreshold = 320.dp
 
-// Largura de card abaixo da qual os badges resumidos deixam de caber lado a lado.
-internal val StackedQuotaWidthThreshold = 210.dp
+// Largura mínima de cada badge resumido para caber lado a lado com os demais.
+internal val MinimumCompactQuotaWidth = 105.dp
+
+// Largura mínima de cada coluna expandida: o arco tem tamanho fixo (72dp na
+// densidade estreita) e ainda precisa de respiro lateral entre as colunas.
+internal val MinimumExpandedQuotaWidth = 96.dp
 
 /**
  * Dimensões do [ApiUsageCard] derivadas da largura real do card.
@@ -73,7 +77,17 @@ internal fun resolveApiUsageCardDensity(cardWidth: Dp): ApiUsageCardDensity {
     }
 }
 
-/** Badges resumidos empilham verticalmente quando não há largura para a linha. */
+/**
+ * Badges resumidos empilham verticalmente quando não há largura para a linha.
+ *
+ * O limite acompanha a quantidade de cotas: com a leitura de créditos o card da
+ * Anthropic passou a ter três, e um limite fixo deixaria as três espremidas.
+ */
 internal fun shouldStackCompactQuotas(cardWidth: Dp, quotaCount: Int): Boolean {
-    return quotaCount > 1 && cardWidth < StackedQuotaWidthThreshold
+    return quotaCount > 1 && cardWidth < MinimumCompactQuotaWidth * quotaCount
+}
+
+/** Mesma regra para as colunas expandidas, que carregam o arco de tamanho fixo. */
+internal fun shouldStackExpandedQuotas(cardWidth: Dp, quotaCount: Int): Boolean {
+    return quotaCount > 1 && cardWidth < MinimumExpandedQuotaWidth * quotaCount
 }

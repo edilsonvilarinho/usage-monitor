@@ -40,7 +40,8 @@ private fun QuotaInfo.toCacheDto(): QuotaInfoCacheDto {
         periodType = periodType.name,
         unit = unit.name,
         rawUsed = rawUsed,
-        rawTotal = rawTotal
+        rawTotal = rawTotal,
+        currencyCode = currencyCode
     )
 }
 
@@ -99,6 +100,7 @@ private fun QuotaInfoCacheDto.toDomainOrNull(): QuotaInfo? {
         periodType = parsedPeriodType,
         unit = parsedUnit,
         rawUsed = rawUsed,
-        rawTotal = rawTotal
+        rawTotal = rawTotal,
+        currencyCode = currencyCode
     )
 }

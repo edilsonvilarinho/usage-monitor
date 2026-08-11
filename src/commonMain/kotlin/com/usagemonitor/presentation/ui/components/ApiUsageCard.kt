@@ -82,11 +82,9 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
-import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.displayName
@@ -139,13 +137,7 @@ fun ApiUsageCard(
     onDragEnd: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val orderedQuotas = buildList {
-        quotas.firstOrNull { it.periodType == PeriodType.REPORTED }?.let(::add)
-        quotas.firstOrNull { it.periodType == PeriodType.INTERVAL }?.let(::add)
-        quotas.firstOrNull { it.periodType == PeriodType.WEEKLY }?.let(::add)
-        quotas.filterNot { quota -> quota in this }
-            .forEach(::add)
-    }
+    val orderedQuotas = orderQuotasForCard(quotas)
 
     var visible by remember(source) { mutableStateOf(false) }
     val hoverInteraction = remember { MutableInteractionSource() }
@@ -286,6 +278,10 @@ fun ApiUsageCard(
         ) {
             val density = resolveApiUsageCardDensity(maxWidth)
             val stackCompactQuotas = shouldStackCompactQuotas(
+                cardWidth = maxWidth,
+                quotaCount = orderedQuotas.size
+            )
+            val stackExpandedQuotas = shouldStackExpandedQuotas(
                 cardWidth = maxWidth,
                 quotaCount = orderedQuotas.size
             )
@@ -482,7 +478,8 @@ fun ApiUsageCard(
                             showUsageDetails = showUsageDetails,
                             language = language,
                             riskByQuotaKey = riskByQuotaKey,
-                            density = density
+                            density = density,
+                            stacked = stackExpandedQuotas
                         )
                     }
                 }
@@ -1040,10 +1037,11 @@ private fun CompactQuotaBadge(
                 fontWeight = FontWeight.Bold
             )
 
-            if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
+            val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
+            if (detailText != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = formatUsage(quota),
+                    text = detailText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -1062,8 +1060,31 @@ private fun ExpandedQuotaSummary(
     language: AppLanguage,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     density: ApiUsageCardDensity,
+    stacked: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // Cada coluna tem o arco em tamanho fixo: sem largura para todas lado a
+    // lado, a linha estouraria o card em vez de encolher.
+    if (stacked) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            quotas.forEach { quota ->
+                QuotaColumn(
+                    quota = quota,
+                    showUsageDetails = showUsageDetails,
+                    language = language,
+                    risk = riskByQuotaKey[quota.seriesKey],
+                    density = density
+                )
+            }
+        }
+
+        return
+    }
+
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing),
@@ -1110,6 +1131,7 @@ private fun QuotaColumn(
                 used = quota.used,
                 total = quota.total,
                 unit = quota.unit,
+                currencyCode = quota.currencyCode,
                 size = density.arcSize,
                 strokeWidth = density.arcStrokeWidth,
                 percentageTextStyle = MaterialTheme.typography.headlineMedium.copy(
@@ -1147,9 +1169,10 @@ private fun QuotaColumn(
             )
         }
 
-        if (showUsageDetails && quota.unit != UsageUnit.PERCENTAGE && quota.unit != UsageUnit.CURRENCY_USD) {
+        val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
+        if (detailText != null) {
             Text(
-                text = formatUsage(quota),
+                text = detailText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
