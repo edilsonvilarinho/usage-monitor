@@ -6,31 +6,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
@@ -46,13 +32,15 @@ data class TeamConnectionUiState(
 const val TEAM_SECTION_TEST_TAG = "teamIntegrationSection"
 const val TEAM_ENABLE_SWITCH_TEST_TAG = "teamIntegrationEnableSwitch"
 const val TEAM_TEST_CONNECTION_TEST_TAG = "teamIntegrationTestConnection"
+const val TEAM_ALIAS_FIELD_TEST_TAG = "teamIntegrationAliasField"
 
 /**
  * Seção "Integração com time" das Configurações.
  *
  * Stateless como o resto do diálogo: os valores chegam por [settings] e os
- * eventos saem pelas lambdas. Os campos de texto guardam o cursor localmente
- * (mesmo motivo do apelido do perfil, issue #19) e propagam o texto a cada tecla.
+ * eventos saem pelas lambdas. Os campos usam [DebouncedTextField], então o texto
+ * sobe numa pausa da digitação e não a cada tecla — ver o KDoc de lá para o
+ * porquê do estado local do cursor.
  *
  * A lista de contas é a mesma dos perfis Anthropic: a máquina costuma estar
  * logada em várias ao mesmo tempo e só as marcadas aqui empurram dados ao
@@ -110,26 +98,37 @@ fun TeamIntegrationSection(
             return@Column
         }
 
-        TeamTextField(
-            initialValue = settings.serverUrl,
+        DebouncedTextField(
+            value = settings.serverUrl,
             label = if (isPt) "Servidor" else "Server",
             placeholder = "https://usage.empresa.com",
-            onValueChange = onServerUrlChange
+            onCommit = onServerUrlChange
         )
 
-        TeamSecretField(
-            initialValue = settings.apiKey,
+        DebouncedSecretField(
+            value = settings.apiKey,
             label = if (isPt) "Chave do time" else "Team key",
             revealLabel = if (isPt) "Mostrar chave" else "Show key",
             hideLabel = if (isPt) "Ocultar chave" else "Hide key",
-            onValueChange = onApiKeyChange
+            onCommit = onApiKeyChange
         )
 
-        TeamTextField(
-            initialValue = settings.alias,
+        DebouncedTextField(
+            value = settings.alias,
             label = if (isPt) "Seu apelido" else "Your alias",
             placeholder = if (isPt) "como o time vai te ver" else "how the team sees you",
-            onValueChange = onAliasChange
+            onCommit = onAliasChange,
+            // Apagar o apelido derrubaria `isConfigured` e pararia o laço de
+            // envio sem nenhum aviso, e o servidor recusaria o ingest com 400.
+            // Um apelido já gravado nunca pode virar vazio por edição.
+            validate = { text ->
+                if (text.isBlank() && settings.alias.isNotBlank()) {
+                    if (isPt) "O apelido não pode ficar vazio." else "The alias cannot be empty."
+                } else {
+                    null
+                }
+            },
+            modifier = Modifier.testTag(TEAM_ALIAS_FIELD_TEST_TAG)
         )
 
         Text(
@@ -227,71 +226,3 @@ private fun TeamProfileCheckboxRow(
     }
 }
 
-/**
- * Campo de texto com o cursor guardado localmente.
- *
- * [initialValue] só semeia o estado na primeira composição; depois disso a
- * verdade do campo é local e o texto sobe por [onValueChange]. Controlar o campo
- * pelo valor que volta de fora atrasa o cursor em um caractere (issue #19).
- */
-@Composable
-private fun TeamTextField(
-    initialValue: String,
-    label: String,
-    placeholder: String,
-    onValueChange: (String) -> Unit
-) {
-    var fieldValue by remember {
-        mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
-    }
-    OutlinedTextField(
-        value = fieldValue,
-        onValueChange = { newValue ->
-            fieldValue = newValue
-            onValueChange(newValue.text)
-        },
-        singleLine = true,
-        label = { Text(label) },
-        placeholder = { Text(placeholder) },
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-/** Campo mascarado com alternância de visibilidade, para conferir o que foi colado. */
-@Composable
-private fun TeamSecretField(
-    initialValue: String,
-    label: String,
-    revealLabel: String,
-    hideLabel: String,
-    onValueChange: (String) -> Unit
-) {
-    var fieldValue by remember {
-        mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
-    }
-    var revealed by remember { mutableStateOf(false) }
-
-    OutlinedTextField(
-        value = fieldValue,
-        onValueChange = { newValue ->
-            fieldValue = newValue
-            onValueChange(newValue.text)
-        },
-        singleLine = true,
-        label = { Text(label) },
-        visualTransformation = if (revealed) {
-            VisualTransformation.None
-        } else {
-            PasswordVisualTransformation()
-        },
-        trailingIcon = {
-            IconButton(onClick = { revealed = !revealed }) {
-                Icon(
-                    imageVector = if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                    contentDescription = if (revealed) hideLabel else revealLabel
-                )
-            }
-        },
-        modifier = Modifier.fillMaxWidth()
-    )
-}

@@ -6,6 +6,7 @@ import com.usagemonitor.data.dto.TeamIngestResponseDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -76,6 +77,29 @@ open class RemoteTeamDataSource(
         )
 
         return response.body()
+    }
+
+    /**
+     * `DELETE /api/v1/member`. Apaga o integrante e tudo o que ele enviou.
+     *
+     * Parâmetros na query porque corpo em `DELETE` é mal suportado por proxy —
+     * o servidor fica atrás de um no deploy padrão.
+     */
+    open suspend fun deleteMember(
+        baseUrl: String,
+        apiKey: String,
+        accountKey: String,
+        deviceId: String
+    ) {
+        requireSuccess(
+            response = httpClient.delete("$baseUrl/api/v1/member") {
+                header(TEAM_KEY_HEADER, apiKey)
+                header("Accept", "application/json")
+                parameter("accountKey", accountKey)
+                parameter("deviceId", deviceId)
+            },
+            operation = "remoção de integrante"
+        )
     }
 
     /**

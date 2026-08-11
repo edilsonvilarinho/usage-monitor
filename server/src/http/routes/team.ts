@@ -2,8 +2,9 @@ import { Router } from 'express';
 import type { Config } from '../../config.js';
 import { ValidationError } from '../../domain/errors.js';
 import type { TeamRepository } from '../../repositories/teamRepository.js';
+import { logger } from '../../logger.js';
 import { requireTeamKey } from '../auth.js';
-import { teamQuerySchema } from '../dto.js';
+import { deleteMemberQuerySchema, teamQuerySchema } from '../dto.js';
 import { wrap } from '../errorHandler.js';
 
 export interface TeamRouterDeps {
@@ -34,6 +35,41 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
         );
 
         res.json(snapshot);
+      }),
+    ),
+  );
+
+  /**
+   * Remove um integrante da conta, com tudo o que ele enviou.
+   *
+   * Existe para desfazer duplicata: a mesma maquina que perdeu o `team.json`
+   * volta com outro `deviceId` e o antigo fica na lista sem atividade ate a
+   * retencao passar. Idempotente — device desconhecido responde 200 com zeros.
+   */
+  router.delete(
+    '/v1/member',
+    requireTeamKey(
+      deps.config.teamApiKey,
+      wrap((req, res) => {
+        const parsed = deleteMemberQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+          const first = parsed.error.issues[0];
+          throw new ValidationError(
+            `Query invalida — ${first ? `${first.path.join('.')}: ${first.message}` : 'parametros ausentes'}`,
+          );
+        }
+
+        const report = deps.repository.deleteMember(
+          parsed.data.accountKey,
+          parsed.data.deviceId,
+        );
+
+        logger.debug(
+          { accountKey: parsed.data.accountKey, deviceId: parsed.data.deviceId, ...report },
+          'integrante removido',
+        );
+
+        res.json(report);
       }),
     ),
   );

@@ -21,14 +21,27 @@ private const val ACCOUNT_KEY = "account-uuid-aaa"
 
 /** Captura os lotes enviados e permite forçar falha, sem tocar a rede. */
 private class RecordingTeamRepository(
-    var failure: Throwable? = null
+    var failure: Throwable? = null,
+    /** Recusa só o envio de identidade, para separá-lo do envio de lotes. */
+    private val rejectIdentityPush: Boolean = false
 ) : TeamUsageRepository {
     val pushed = mutableListOf<TeamIngestPayload>()
+
+    /** Lotes de verdade, sem os envios que só carregam a identidade. */
+    val turnBatches: List<TeamIngestPayload>
+        get() = pushed.filter { payload -> payload.turns.isNotEmpty() }
+
+    /** Envios de identidade: apelido novo sem turno para acompanhar. */
+    val identityPushes: List<TeamIngestPayload>
+        get() = pushed.filter { payload -> payload.turns.isEmpty() }
 
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
         val current = failure
         if (current != null) {
             return Result.failure(current)
+        }
+        if (rejectIdentityPush && payload.turns.isEmpty()) {
+            return Result.failure(IllegalStateException("identidade recusada"))
         }
         pushed += payload
         return Result.success(
@@ -41,6 +54,10 @@ private class RecordingTeamRepository(
 
     override suspend fun fetch(accountKey: String, cutoffMillis: Long?): Result<TeamUsageSnapshot> {
         return Result.success(TeamUsageSnapshot())
+    }
+
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
+        return Result.success(Unit)
     }
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
@@ -75,7 +92,7 @@ class TeamSyncServiceTest {
             assertEquals(2, first.pushedTurns)
             assertEquals(1, first.batches)
 
-            val payload = repository.pushed.single()
+            val payload = repository.turnBatches.single()
             assertEquals(ACCOUNT_KEY, payload.accountKey)
             assertEquals("edilson", payload.member.alias)
             assertEquals(2, payload.turns.size)
@@ -85,7 +102,7 @@ class TeamSyncServiceTest {
 
             val second = service.syncOnce()
             assertEquals(0, second.pushedTurns)
-            assertEquals(1, repository.pushed.size)
+            assertEquals(1, repository.turnBatches.size)
         }
     }
 
@@ -110,7 +127,7 @@ class TeamSyncServiceTest {
             val report = service.syncOnce()
 
             assertEquals(1, report.pushedTurns)
-            assertEquals("msg-2", repository.pushed.last().turns.single().messageId)
+            assertEquals("msg-2", repository.turnBatches.last().turns.single().messageId)
         }
     }
 
@@ -132,7 +149,7 @@ class TeamSyncServiceTest {
 
             // O lote que falhou volta inteiro na passada seguinte.
             assertEquals(1, recovered.pushedTurns)
-            assertEquals("msg-1", repository.pushed.single().turns.single().messageId)
+            assertEquals("msg-1", repository.turnBatches.single().turns.single().messageId)
         }
     }
 
@@ -184,7 +201,7 @@ class TeamSyncServiceTest {
 
             assertEquals(5, report.pushedTurns)
             assertEquals(3, report.batches)
-            assertEquals(listOf(2, 2, 1), repository.pushed.map { it.turns.size })
+            assertEquals(listOf(2, 2, 1), repository.turnBatches.map { it.turns.size })
         }
     }
 
@@ -212,7 +229,7 @@ class TeamSyncServiceTest {
 
             // Sem o reset do marcador o turno novo ficaria abaixo dele e nunca sairia.
             assertEquals(1, report.pushedTurns)
-            assertEquals("msg-9", repository.pushed.last().turns.single().messageId)
+            assertEquals("msg-9", repository.turnBatches.last().turns.single().messageId)
         }
     }
 
@@ -229,7 +246,7 @@ class TeamSyncServiceTest {
             val report = service.syncOnce()
 
             assertEquals(1, report.pushedTurns)
-            assertEquals("msg-1", repository.pushed.single().turns.single().messageId)
+            assertEquals("msg-1", repository.turnBatches.single().turns.single().messageId)
         }
     }
 
@@ -250,7 +267,7 @@ class TeamSyncServiceTest {
 
             assertTrue(report.hasFailure)
             assertEquals(1, report.pushedTurns)
-            assertEquals("msg-1", repository.pushed.single().turns.single().messageId)
+            assertEquals("msg-1", repository.turnBatches.single().turns.single().messageId)
         }
     }
 
@@ -282,6 +299,64 @@ class TeamSyncServiceTest {
     }
 
     @Test
+    fun `envia o apelido mesmo sem nenhum turno para mandar`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository()
+            val service = newService(syncState, repository)
+
+            val report = service.syncOnce()
+
+            // Sem isto o apelido só chegaria ao servidor de carona num lote de
+            // turnos, e quem renomeia e para de usar o CLI ficaria com o nome
+            // velho na tela do time indefinidamente.
+            assertEquals(0, report.pushedTurns)
+            val identity = repository.identityPushes.single()
+            assertEquals("edilson", identity.member.alias)
+            assertEquals("device-1", identity.member.deviceId)
+            assertEquals("DESKTOP-TEST", identity.member.hostName)
+            assertTrue(identity.sessions.isEmpty())
+        }
+    }
+
+    @Test
+    fun `nao repete o envio de identidade enquanto o apelido nao muda`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository()
+            var settings = ACTIVE_SETTINGS
+            val service = newService(syncState, repository, settingsProvider = { settings })
+
+            service.syncOnce()
+            service.syncOnce()
+            assertEquals(1, repository.identityPushes.size)
+
+            settings = settings.copy(alias = "edilson-2")
+            service.syncOnce()
+
+            assertEquals(2, repository.identityPushes.size)
+            assertEquals("edilson-2", repository.identityPushes.last().member.alias)
+        }
+    }
+
+    @Test
+    fun `falha no envio de identidade nao impede o envio dos lotes`() = runTest {
+        withFixture { root, indexer, syncState ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            indexer.syncIndex()
+
+            // Recusa só o envio sem turnos: o marcador do apelido não avança e o
+            // lote de verdade tem de sair na mesma passada.
+            val repository = RecordingTeamRepository(rejectIdentityPush = true)
+            val service = newService(syncState, repository)
+
+            val report = service.syncOnce()
+
+            assertTrue(report.hasFailure)
+            assertEquals(1, report.pushedTurns)
+            assertEquals("msg-1", repository.turnBatches.single().turns.single().messageId)
+        }
+    }
+
+    @Test
     fun `requestImmediateSync envia sem esperar o intervalo do laco`() = runTest {
         withFixture { root, indexer, syncState ->
             writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
@@ -292,7 +367,7 @@ class TeamSyncServiceTest {
                 // Sem start(): o gatilho da janela sozinho tem de entregar o lote.
                 service.requestImmediateSync().join()
 
-                assertEquals("msg-1", repository.pushed.single().turns.single().messageId)
+                assertEquals("msg-1", repository.turnBatches.single().turns.single().messageId)
             } finally {
                 service.onDestroy()
             }
@@ -307,12 +382,13 @@ class TeamSyncServiceTest {
         ensureIndexFresh: (suspend () -> Unit)? = null,
         targets: List<TeamSyncTarget> = listOf(
             TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY)
-        )
+        ),
+        settingsProvider: () -> TeamIntegrationSettings = { settings }
     ): TeamSyncService {
         return TeamSyncService(
             syncStateDataSource = syncState,
             pushTeamUsage = PushTeamUsageUseCase(repository),
-            settingsProvider = { settings },
+            settingsProvider = settingsProvider,
             targetsProvider = { targets },
             ensureIndexFresh = ensureIndexFresh,
             hostNameProvider = { "DESKTOP-TEST" },

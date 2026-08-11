@@ -61,6 +61,22 @@ class TeamUsageRepositoryImpl(
         }
     }
 
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
+        val settings = settingsProvider()
+        if (!settings.isActive) {
+            return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
+        }
+
+        return runCatching {
+            remoteDataSource.deleteMember(
+                baseUrl = settings.normalizedServerUrl,
+                apiKey = settings.apiKey,
+                accountKey = accountKey,
+                deviceId = deviceId
+            )
+        }
+    }
+
     override suspend fun checkConnection(): Result<Unit> {
         val settings = settingsProvider()
         if (!settings.isConfigured) {

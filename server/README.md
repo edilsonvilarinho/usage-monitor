@@ -161,6 +161,23 @@ Duas propriedades desenhadas de propósito:
 
 `members` traz todos os membros da conta, inclusive quem não teve atividade na janela — quem não consumiu é informação, não ruído.
 
+### `DELETE /api/v1/member`
+
+Remove um integrante e tudo o que ele enviou: turnos, sessões e a linha em `team_members`, numa transação.
+
+| Query | Obrigatório | Nota |
+|---|---|---|
+| `accountKey` | sim | Conta a que o integrante pertence. |
+| `deviceId` | sim | Integrante a remover. |
+
+```jsonc
+{ "deletedTurns": 1240, "deletedSessions": 8, "deletedMembers": 1 }
+```
+
+Idempotente: um `deviceId` desconhecido devolve `200` com zeros.
+
+**Destrutivo e irreversível.** A máquina daquele `deviceId` já marcou os turnos como enviados no próprio marcador local e não os reenvia — o histórico dela não volta. A rota existe para o caso de duplicata: uma instalação que perdeu o `~/.usage-monitor/team.json` volta com outro `deviceId` e o antigo fica na lista, sem atividade, até a retenção recolhê-lo.
+
 ### Erros
 
 `{ "error": "<mensagem>", "code": "<código>" }` com `400` (`validation_error`), `401` (`unauthorized`), `404` (`not_found`), `503` (`service_unavailable`) ou `500` (`internal_error`).

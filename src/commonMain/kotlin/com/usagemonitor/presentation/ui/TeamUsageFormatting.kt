@@ -128,6 +128,58 @@ internal object TeamUsageLabels {
         return if (language == AppLanguage.PT) "Ocultar sessões" else "Hide sessions"
     }
 
+    fun removeMember(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Remover do time" else "Remove from team"
+    }
+
+    fun removeMemberTitle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Remover integrante?" else "Remove member?"
+    }
+
+    /**
+     * Texto da confirmação, com o custo real da ação.
+     *
+     * A remoção apaga os turnos no servidor, e a máquina de origem não os
+     * reenvia — o marcador local dela já os considera entregues. Omitir isso
+     * transformaria um botão de limpeza em perda silenciosa de histórico.
+     */
+    fun removeMemberWarning(alias: String, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "\"$alias\" e todo o consumo já enviado por essa máquina serão apagados do " +
+                "servidor. A máquina de origem não reenvia o histórico: isto não tem volta. " +
+                "Use apenas para tirar da lista uma máquina que não existe mais."
+        } else {
+            "\"$alias\" and all usage already reported by that machine will be deleted from " +
+                "the server. The source machine does not resend its history: this cannot be " +
+                "undone. Use it only to drop a machine that no longer exists."
+        }
+    }
+
+    fun confirmRemoval(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Remover" else "Remove"
+    }
+
+    fun cancel(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Cancelar" else "Cancel"
+    }
+
+    /** Esta máquina não pode se remover: o próximo envio a recriaria. */
+    fun cannotRemoveSelf(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "esta máquina"
+        } else {
+            "this machine"
+        }
+    }
+
+    fun removalError(message: String, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Não foi possível remover o integrante: $message"
+        } else {
+            "Could not remove the member: $message"
+        }
+    }
+
     /** Deixa explícito de onde vem o número, já que a fonte não é esta máquina. */
     fun lastSeen(instantLabel: String?, language: AppLanguage): String {
         if (instantLabel == null) {

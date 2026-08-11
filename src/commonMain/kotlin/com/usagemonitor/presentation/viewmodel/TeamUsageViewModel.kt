@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
+import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ private const val UNKNOWN_ERROR_MESSAGE = "erro desconhecido"
  */
 class TeamUsageViewModel(
     private val getTeamUsage: GetTeamUsageUseCase,
+    private val removeTeamMember: RemoveTeamMemberUseCase,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
     private val clock: Clock = Clock.System
@@ -49,6 +51,15 @@ class TeamUsageViewModel(
 
     private val _uiState = MutableStateFlow<TeamUsageUiState>(TeamUsageUiState.Loading)
     val uiState: StateFlow<TeamUsageUiState> = _uiState.asStateFlow()
+
+    /**
+     * Erro da última tentativa de remoção, fora do [uiState].
+     *
+     * O laço ao vivo reescreve o `uiState` a cada 5s e apagaria a mensagem antes
+     * de o usuário ler.
+     */
+    private val _removalError = MutableStateFlow<String?>(null)
+    val removalError: StateFlow<String?> = _removalError.asStateFlow()
 
     private var range: CliSessionRange = CliSessionRange.DEFAULT
     private var quotaWindows: CliQuotaWindows = CliQuotaWindows()
@@ -114,6 +125,32 @@ class TeamUsageViewModel(
         _uiState.value = current.copy(
             expandedDeviceIds = if (deviceId in expanded) expanded - deviceId else expanded + deviceId
         )
+    }
+
+    /**
+     * Apaga um integrante no servidor e recarrega a lista.
+     *
+     * Recarregar em vez de remover da lista em memória: a resposta seguinte é a
+     * única prova de que o servidor apagou de fato. A falha vira aviso na tela e
+     * a lista fica intacta — não dá para mostrar como removido o que continua lá.
+     */
+    fun removeMember(deviceId: String) {
+        val targetAccountKey = accountKey ?: return
+
+        viewModelScope.launch {
+            val result = removeTeamMember(accountKey = targetAccountKey, deviceId = deviceId)
+            val error = result.exceptionOrNull()
+            if (error != null) {
+                _removalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
+                return@launch
+            }
+            _removalError.value = null
+            loadTeam()
+        }
+    }
+
+    fun clearRemovalError() {
+        _removalError.value = null
     }
 
     fun refresh() {

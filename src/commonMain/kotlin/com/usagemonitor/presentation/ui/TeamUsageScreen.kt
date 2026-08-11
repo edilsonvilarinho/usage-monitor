@@ -19,16 +19,23 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -47,21 +54,30 @@ import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 internal const val TEAM_LIST_SCROLLBAR_TAG = "teamUsageListScrollbar"
 internal const val TEAM_MEMBER_ROW_TAG_PREFIX = "teamMemberRow:"
 internal const val TEAM_MEMBER_SESSIONS_TAG_PREFIX = "teamMemberSessions:"
+internal const val TEAM_MEMBER_REMOVE_TAG_PREFIX = "teamMemberRemove:"
+internal const val TEAM_REMOVE_CONFIRM_TAG = "teamMemberRemoveConfirm"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
 fun TeamUsageScreen(
     viewModel: TeamUsageViewModel,
     language: AppLanguage,
+    /** `deviceId` desta instalação; a linha correspondente não ganha o botão. */
+    localDeviceId: String?,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val removalError by viewModel.removalError.collectAsState()
 
     TeamUsageContent(
         state = state,
         language = language,
+        localDeviceId = localDeviceId,
+        removalError = removalError,
         onSelectRange = { range -> viewModel.setRange(range) },
         onToggleMember = { deviceId -> viewModel.toggleMember(deviceId) },
+        onRemoveMember = { deviceId -> viewModel.removeMember(deviceId) },
+        onDismissRemovalError = { viewModel.clearRemovalError() },
         modifier = modifier
     )
 }
@@ -72,8 +88,17 @@ internal fun TeamUsageContent(
     language: AppLanguage,
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    localDeviceId: String? = null,
+    removalError: String? = null,
+    onRemoveMember: (String) -> Unit = {},
+    onDismissRemovalError: () -> Unit = {}
 ) {
+    // Qual integrante está aguardando confirmação. Estado de tela, não do
+    // servidor: o laço ao vivo recarrega a lista a cada 5s e não pode fechar o
+    // diálogo debaixo do usuário.
+    var pendingRemoval by remember { mutableStateOf<TeamMemberUsage?>(null) }
+
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (state) {
             is TeamUsageUiState.Loading -> CenteredMessage(
@@ -87,25 +112,95 @@ internal fun TeamUsageContent(
             is TeamUsageUiState.Success -> TeamUsageList(
                 state = state,
                 language = language,
+                localDeviceId = localDeviceId,
+                removalError = removalError,
                 onSelectRange = onSelectRange,
-                onToggleMember = onToggleMember
+                onToggleMember = onToggleMember,
+                onRequestRemoveMember = { member -> pendingRemoval = member },
+                onDismissRemovalError = onDismissRemovalError
             )
         }
     }
+
+    val memberToRemove = pendingRemoval
+    if (memberToRemove != null) {
+        RemoveMemberConfirmation(
+            member = memberToRemove,
+            language = language,
+            onConfirm = {
+                pendingRemoval = null
+                onRemoveMember(memberToRemove.deviceId)
+            },
+            onDismiss = { pendingRemoval = null }
+        )
+    }
+}
+
+/** Confirmação obrigatória: a remoção apaga dados e não tem desfazer. */
+@Composable
+private fun RemoveMemberConfirmation(
+    member: TeamMemberUsage,
+    language: AppLanguage,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(TeamUsageLabels.removeMemberTitle(language)) },
+        text = { Text(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag(TEAM_REMOVE_CONFIRM_TAG)
+            ) {
+                Text(
+                    text = TeamUsageLabels.confirmRemoval(language),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(TeamUsageLabels.cancel(language))
+            }
+        }
+    )
 }
 
 @Composable
 private fun TeamUsageList(
     state: TeamUsageUiState.Success,
     language: AppLanguage,
+    localDeviceId: String?,
+    removalError: String?,
     onSelectRange: (CliSessionRange) -> Unit,
-    onToggleMember: (String) -> Unit
+    onToggleMember: (String) -> Unit,
+    onRequestRemoveMember: (TeamMemberUsage) -> Unit,
+    onDismissRemovalError: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TeamUsageHeader(state = state, language = language, onSelectRange = onSelectRange)
+
+        if (removalError != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = TeamUsageLabels.removalError(removalError, language),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onDismissRemovalError) {
+                    Text(TeamUsageLabels.cancel(language))
+                }
+            }
+        }
 
         if (state.isEmpty) {
             CenteredMessage(
@@ -129,7 +224,12 @@ private fun TeamUsageList(
                             share = state.tokenShareOf(member),
                             expanded = member.deviceId in state.expandedDeviceIds,
                             language = language,
-                            onToggle = { onToggleMember(member.deviceId) }
+                            // Esta máquina volta no próximo envio, então oferecer
+                            // o botão só entregaria uma remoção que se desfaz
+                            // sozinha — e apagaria o histórico dela no caminho.
+                            removable = localDeviceId != null && member.deviceId != localDeviceId,
+                            onToggle = { onToggleMember(member.deviceId) },
+                            onRemove = { onRequestRemoveMember(member) }
                         )
                     }
 
@@ -286,7 +386,9 @@ private fun TeamMemberRow(
     share: Double,
     expanded: Boolean,
     language: AppLanguage,
-    onToggle: () -> Unit
+    removable: Boolean,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit
 ) {
     // Integrante sem uso no período fica neutro: destacá-lo com a mesma cor de
     // quem consumiu daria a impressão de atividade que não houve.
@@ -381,6 +483,19 @@ private fun TeamMemberRow(
                 MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
                 Spacer(modifier = Modifier.height(4.dp))
                 MeterBar(fraction = share, color = accent, height = 4.dp)
+            }
+
+            if (removable) {
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.testTag("$TEAM_MEMBER_REMOVE_TAG_PREFIX${member.deviceId}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = TeamUsageLabels.removeMember(language),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

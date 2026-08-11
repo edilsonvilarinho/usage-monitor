@@ -19,7 +19,9 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.TEAM_LIST_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
+import com.usagemonitor.presentation.ui.TEAM_REMOVE_CONFIRM_TAG
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
@@ -214,7 +216,82 @@ class TeamUsageScreenTest {
         onNodeWithTag(TEAM_LIST_SCROLLBAR_TAG).assertExists()
     }
 
-    private fun ComposeUiTest.renderSuccess(state: TeamUsageUiState.Success) {
+    @Test
+    fun `so o integrante de outra maquina ganha o botao de remover`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1", tokens = 10L))),
+                    member("device-2", "fantasma", "NOTE-C3", emptyList())
+                )
+            ),
+            localDeviceId = "device-1"
+        )
+
+        // Esta máquina voltaria no próximo envio: remover a si mesma só apagaria
+        // o próprio histórico sem tirar a linha da lista.
+        onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-1").assertDoesNotExist()
+        onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-2").assertExists()
+    }
+
+    @Test
+    fun `remover so emite depois da confirmacao`() = runDesktopComposeUiTest {
+        var removed: String? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Success(
+                            members = listOf(
+                                member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))),
+                                member("device-2", "fantasma", "NOTE-C3", emptyList())
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onToggleMember = {},
+                        localDeviceId = "device-1",
+                        onRemoveMember = { deviceId -> removed = deviceId }
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-2").performClick()
+        // A ação apaga dados no servidor e não tem desfazer.
+        assertEquals(null, removed)
+
+        onNodeWithTag(TEAM_REMOVE_CONFIRM_TAG).performClick()
+
+        assertEquals("device-2", removed)
+    }
+
+    @Test
+    fun `falha ao remover aparece na tela`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Success(
+                            members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onToggleMember = {},
+                        removalError = "HTTP 401"
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Não foi possível remover o integrante: HTTP 401").assertIsDisplayed()
+    }
+
+    private fun ComposeUiTest.renderSuccess(
+        state: TeamUsageUiState.Success,
+        localDeviceId: String? = null
+    ) {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
@@ -222,7 +299,8 @@ class TeamUsageScreenTest {
                         state = state,
                         language = AppLanguage.PT,
                         onSelectRange = {},
-                        onToggleMember = {}
+                        onToggleMember = {},
+                        localDeviceId = localDeviceId
                     )
                 }
             }

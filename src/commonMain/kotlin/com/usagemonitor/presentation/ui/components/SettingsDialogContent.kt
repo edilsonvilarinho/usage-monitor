@@ -27,23 +27,22 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -55,6 +54,8 @@ import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import kotlin.math.roundToInt
+
+const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 
 enum class AnthropicProfileUiStatus { READY, INCOMPLETE, INVALID, DUPLICATE }
 
@@ -101,9 +102,32 @@ fun SettingsDialogContent(
     onTeamAliasChange: (String) -> Unit = {},
     onTeamProfileParticipationChange: (String, Boolean) -> Unit = { _, _ -> },
     onTeamTestConnection: () -> Unit = {},
+    toastEvent: SettingsToastEvent? = null,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Evento que já existia quando o diálogo abriu é de uma edição anterior —
+    // reexibi-lo faria a tela abrir avisando algo que o usuário nem acabou de
+    // fazer.
+    val staleToastId = remember { toastEvent?.id }
+
+    // Host próprio: o diálogo é uma janela separada e o SnackbarHost do
+    // dashboard não desenha por cima dela. O `dismiss` antes de mostrar impede
+    // que mexer em vários controles seguidos enfileire avisos e o usuário fique
+    // assistindo à fila esvaziar depois de já ter parado.
+    LaunchedEffect(toastEvent?.id) {
+        val event = toastEvent ?: return@LaunchedEffect
+        if (event.id == staleToastId) {
+            return@LaunchedEffect
+        }
+        snackbarHostState.currentSnackbarData?.dismiss()
+        snackbarHostState.showSnackbar(
+            message = settingsToastMessage(event.toast, currentLanguage),
+            duration = SnackbarDuration.Short
+        )
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -247,6 +271,13 @@ fun SettingsDialogContent(
             adapter = rememberScrollbarAdapter(scrollState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
         )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .testTag(SETTINGS_TOAST_HOST_TEST_TAG)
+        )
         }
     }
 }
@@ -338,24 +369,10 @@ private fun AnthropicProfileRow(
             }
 
             if (expanded) {
-                // Estado do campo é local (não round-tripa por profile.label a cada tecla).
-                // O OutlinedTextField(String) controlado por um valor que volta via StateFlow
-                // reseta a seleção com base no texto externo a cada recomposição, e esse
-                // recálculo ficava um caractere atrasado em relação ao texto (issue #19).
-                // Mantendo o cursor só na memória local do campo, ele nunca depende do
-                // round-trip; onRename ainda propaga o texto pra cima a cada tecla.
-                var labelFieldValue by remember {
-                    mutableStateOf(TextFieldValue(profile.label, TextRange(profile.label.length)))
-                }
-                OutlinedTextField(
-                    value = labelFieldValue,
-                    onValueChange = { newValue ->
-                        labelFieldValue = newValue
-                        onRename(profile.id, newValue.text)
-                    },
-                    singleLine = true,
-                    label = { Text(if (language == AppLanguage.PT) "Apelido" else "Label") },
-                    modifier = Modifier.fillMaxWidth()
+                DebouncedTextField(
+                    value = profile.label,
+                    label = if (language == AppLanguage.PT) "Apelido" else "Label",
+                    onCommit = { newLabel -> onRename(profile.id, newLabel) }
                 )
                 Text(
                     text = profile.path,

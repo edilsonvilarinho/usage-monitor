@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import {
+  ACCOUNT_A,
   TEST_TEAM_KEY,
   createHarness,
   makePayload,
@@ -123,6 +124,57 @@ describe('POST /api/v1/ingest', () => {
     } finally {
       small.cleanup();
     }
+  });
+
+  it('aceita lote so com o membro e atualiza o apelido', async () => {
+    await post(makePayload());
+
+    // Contrato de que o cliente depende para propagar um apelido novo sem
+    // atividade nova: o alias so e gravado dentro de um ingest, e sem aceitar
+    // `sessions`/`turns` vazios a tela do time ficaria com o nome velho ate a
+    // maquina voltar a gerar turnos.
+    const response = await post({
+      accountKey: ACCOUNT_A,
+      member: {
+        deviceId: 'device-1',
+        alias: 'SUETONIO',
+        hostName: 'DESKTOP-A1',
+        organizationUuid: null,
+        organizationName: null,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ acceptedTurns: 0, ignoredTurns: 0, acceptedSessions: 0 });
+
+    const members = harness.db
+      .prepare('SELECT device_id AS deviceId, alias FROM team_members')
+      .all() as Array<{ deviceId: string; alias: string }>;
+
+    // Renomear nunca cria linha: a chave e (account_key, device_id).
+    expect(members).toEqual([{ deviceId: 'device-1', alias: 'SUETONIO' }]);
+
+    const turns = harness.db.prepare('SELECT COUNT(*) AS total FROM team_turns').get() as {
+      total: number;
+    };
+    expect(turns.total).toBe(1);
+  });
+
+  it('recusa apelido em branco', async () => {
+    const response = await post(
+      makePayload({
+        member: {
+          deviceId: 'device-1',
+          alias: '   ',
+          hostName: null,
+          organizationUuid: null,
+          organizationName: null,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('validation_error');
   });
 
   it('carimba last_seen_at com o relogio injetado', async () => {

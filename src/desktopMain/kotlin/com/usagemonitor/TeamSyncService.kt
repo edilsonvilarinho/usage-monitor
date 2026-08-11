@@ -52,6 +52,10 @@ internal data class TeamSyncReport(
  * (5s) indexa em paralelo com esta passada: a conexão do índice é `synchronized`,
  * então as duas se serializam e a passada redundante apenas lista os diretórios.
  *
+ * Cada passada também confere o apelido antes dos lotes: o servidor só grava o
+ * `alias` dentro de um ingest, então sem um envio dedicado quem renomeia e para
+ * de usar o Claude Code fica com o nome velho na tela do time indefinidamente.
+ *
  * O trabalho pesado é o **backfill inicial**: na primeira execução o índice pode
  * ter dezenas de milhares de turnos. Por isso cada passada envia no máximo
  * [maxBatchesPerPass] lotes — o histórico entra em poucas passadas em vez de
@@ -79,6 +83,16 @@ internal class TeamSyncService(
     private val passMutex = Mutex()
     private var loopJob: Job? = null
     private var immediateJob: Job? = null
+
+    /**
+     * Último apelido que o servidor confirmou, por conta.
+     *
+     * Só em memória: o custo de errar é uma requisição de ~200 bytes por conta a
+     * cada início do app, que ainda serve de heartbeat para o `last_seen_at`.
+     * Persistir isso ao lado de `team_sync_state` seria estado a mais para
+     * economizar esse POST. O acesso é sempre de dentro do [passMutex].
+     */
+    private val lastSentAliasByAccount = mutableMapOf<String, String>()
 
     /** Idempotente: chamar com o laço já rodando não abre um segundo. */
     fun start() {
@@ -171,16 +185,26 @@ internal class TeamSyncService(
     ): TeamSyncReport {
         var pushedTurns = 0
         var batches = 0
+        val failures = mutableListOf<Throwable>()
+
+        // Identidade primeiro, e independente de haver turnos: o apelido só vai
+        // ao servidor dentro de um ingest, então sem isto uma máquina que trocou
+        // de apelido e parou de usar o Claude Code ficaria com o nome velho na
+        // tela do time para sempre. Falhar aqui não impede o envio dos lotes.
+        val identityFailure = pushIdentityIfChanged(settings, target)
+        if (identityFailure != null) {
+            failures += identityFailure
+        }
 
         repeat(maxBatchesPerPass) {
             val batch = runCatching {
                 syncStateDataSource.readPendingBatch(target.profileId, batchSize)
             }.getOrElse { error ->
-                return TeamSyncReport(pushedTurns, batches, listOf(error))
+                return TeamSyncReport(pushedTurns, batches, failures + error)
             }
 
             if (batch.isEmpty) {
-                return TeamSyncReport(pushedTurns, batches)
+                return TeamSyncReport(pushedTurns, batches, failures)
             }
 
             val payload = TeamIngestPayload(
@@ -203,22 +227,66 @@ internal class TeamSyncService(
             val failure = pushResult.exceptionOrNull()
             if (failure != null) {
                 // Marcador não avança: o mesmo lote volta na próxima passada.
-                return TeamSyncReport(pushedTurns, batches, listOf(failure))
+                return TeamSyncReport(pushedTurns, batches, failures + failure)
             }
 
+            // O lote carrega a mesma identidade, então confirma o apelido tanto
+            // quanto o envio dedicado — e evita repeti-lo na próxima passada
+            // quando o envio de identidade falhou mas este aqui passou.
+            lastSentAliasByAccount[target.accountKey] = settings.alias
+
             runCatching { syncStateDataSource.markPushed(batch.turns, clock.now()) }
-                .onFailure { error -> return TeamSyncReport(pushedTurns, batches, listOf(error)) }
+                .onFailure { error -> return TeamSyncReport(pushedTurns, batches, failures + error) }
 
             pushedTurns += batch.turns.size
             batches += 1
 
             // Lote incompleto significa que o índice acabou: nada a fazer agora.
             if (batch.turns.size < batchSize) {
-                return TeamSyncReport(pushedTurns, batches)
+                return TeamSyncReport(pushedTurns, batches, failures)
             }
         }
 
-        return TeamSyncReport(pushedTurns, batches)
+        return TeamSyncReport(pushedTurns, batches, failures)
+    }
+
+    /**
+     * Manda só a identidade quando o apelido mudou desde a última confirmação.
+     *
+     * O `POST /v1/ingest` aceita `sessions` e `turns` vazios e faz o upsert do
+     * membro antes de qualquer laço, então este envio é barato e não depende de
+     * haver turno novo. O marcador só avança no sucesso: falhar aqui faz a
+     * próxima passada tentar de novo.
+     *
+     * Devolve a falha, ou `null` quando não havia o que enviar ou o envio passou.
+     */
+    private suspend fun pushIdentityIfChanged(
+        settings: TeamIntegrationSettings,
+        target: TeamSyncTarget
+    ): Throwable? {
+        if (lastSentAliasByAccount[target.accountKey] == settings.alias) {
+            return null
+        }
+
+        val payload = TeamIngestPayload(
+            accountKey = target.accountKey,
+            member = TeamMemberIdentity(
+                deviceId = settings.deviceId,
+                alias = settings.alias,
+                // Sem lote não há sessão de onde ler o hostname do índice.
+                hostName = hostNameProvider(),
+                organizationUuid = target.organizationUuid,
+                organizationName = target.organizationName
+            ),
+            sessions = emptyList(),
+            turns = emptyList()
+        )
+
+        val failure = pushTeamUsage(payload, force = true).exceptionOrNull()
+        if (failure == null) {
+            lastSentAliasByAccount[target.accountKey] = settings.alias
+        }
+        return failure
     }
 
     companion object {

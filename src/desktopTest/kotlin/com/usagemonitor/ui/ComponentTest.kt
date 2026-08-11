@@ -26,6 +26,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
@@ -42,6 +44,7 @@ import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
@@ -53,6 +56,10 @@ import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
@@ -66,6 +73,15 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+/** Integração ligada e completa: é o estado em que a seção mostra os campos. */
+private val ACTIVE_TEAM_SETTINGS = TeamIntegrationSettings(
+    enabled = true,
+    serverUrl = "http://localhost:3000",
+    apiKey = "chave-de-time-com-tamanho-suficiente",
+    alias = "EDILSON",
+    deviceId = "device-1"
+)
 
 /**
  * Testes de componente Compose para Desktop.
@@ -1172,6 +1188,96 @@ class ComponentTest {
 
         // Expandido após clicar em "Editar": campo de edição do apelido aparece.
         onNodeWithText("Label").assertIsDisplayed()
+    }
+
+    @Test
+    fun `SettingsDialogContent hosts its own toast area`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        // O diálogo é uma janela separada: o SnackbarHost do dashboard não
+        // desenha por cima dela, então o aviso de "salvo" precisa deste host.
+        // A exibição em si é do Material3 e não é reencenada aqui — o teste do
+        // conteúdo da mensagem é `SettingsToastMessageTest`, em commonTest.
+        onNodeWithTag(SETTINGS_TOAST_HOST_TEST_TAG).assertExists()
+    }
+
+    // ── TeamIntegrationSection ──────────────────────────────────────────
+
+    @Test
+    fun `TeamIntegrationSection commits the alias after the typing pause`() = runDesktopComposeUiTest {
+        var committed: String? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                TeamIntegrationSection(
+                    settings = ACTIVE_TEAM_SETTINGS,
+                    language = AppLanguage.PT,
+                    profiles = emptyList(),
+                    connection = TeamConnectionUiState(),
+                    onEnabledChange = {},
+                    onServerUrlChange = {},
+                    onApiKeyChange = {},
+                    onAliasChange = { alias -> committed = alias },
+                    onProfileParticipationChange = { _, _ -> },
+                    onTestConnection = {}
+                )
+            }
+        }
+
+        onNodeWithTag(TEAM_ALIAS_FIELD_TEST_TAG).performTextReplacement("SUETONIO")
+
+        // Gravar por tecla escreveria em disco a cada caractere e faria o aviso
+        // de "salvo" piscar oito vezes.
+        assertEquals(null, committed)
+
+        waitUntil(timeoutMillis = 5_000) { committed != null }
+        assertEquals("SUETONIO", committed)
+    }
+
+    @Test
+    fun `TeamIntegrationSection refuses to clear an alias already saved`() = runDesktopComposeUiTest {
+        var committed: String? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                TeamIntegrationSection(
+                    settings = ACTIVE_TEAM_SETTINGS,
+                    language = AppLanguage.PT,
+                    profiles = emptyList(),
+                    connection = TeamConnectionUiState(),
+                    onEnabledChange = {},
+                    onServerUrlChange = {},
+                    onApiKeyChange = {},
+                    onAliasChange = { alias -> committed = alias },
+                    onProfileParticipationChange = { _, _ -> },
+                    onTestConnection = {}
+                )
+            }
+        }
+
+        onNodeWithTag(TEAM_ALIAS_FIELD_TEST_TAG).performTextClearance()
+
+        // Apelido vazio derruba `isConfigured`, para o laço de envio e faz o
+        // servidor recusar o ingest com 400.
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithText("O apelido não pode ficar vazio.")
+                .fetchSemanticsNodes(atLeastOneRootRequired = false)
+                .isNotEmpty()
+        }
+        assertEquals(null, committed)
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
+import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,9 +40,18 @@ private class FakeTeamRepository(
     var lastCutoffMillis: Long? = null
     var lastAccountKey: String? = null
     var fetchResult: Result<TeamUsageSnapshot>? = null
+    val removedDeviceIds = mutableListOf<String>()
+    var removeResult: Result<Unit> = Result.success(Unit)
 
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
         return Result.success(TeamIngestReceipt())
+    }
+
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
+        if (removeResult.isSuccess) {
+            removedDeviceIds += deviceId
+        }
+        return removeResult
     }
 
     override suspend fun fetch(accountKey: String, cutoffMillis: Long?): Result<TeamUsageSnapshot> {
@@ -106,6 +116,57 @@ class TeamUsageViewModelTest {
         assertEquals(listOf("edilson", "maria"), state.members.map { it.alias })
         assertEquals(150L, state.totalTokens)
         assertEquals(ACCOUNT_KEY, repository.lastAccountKey)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `remover integrante apaga no servidor e recarrega a lista`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(
+                members = listOf(
+                    member("device-1", "edilson", listOf(session("s1", tokens = 100L))),
+                    member("device-2", "fantasma")
+                )
+            )
+        )
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        repository.snapshot = TeamUsageSnapshot(
+            members = listOf(member("device-1", "edilson", listOf(session("s1", tokens = 100L))))
+        )
+        viewModel.removeMember("device-2")
+        runCurrent()
+
+        assertEquals(listOf("device-2"), repository.removedDeviceIds)
+        // A lista só muda pelo que o servidor devolve depois: tirar da memória
+        // mostraria como removido quem ainda pode estar lá.
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(listOf("edilson"), state.members.map { it.alias })
+        assertEquals(null, viewModel.removalError.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `falha ao remover vira aviso e mantem a lista`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson")))
+        )
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        repository.removeResult = Result.failure(IllegalStateException("servidor fora do ar"))
+        viewModel.removeMember("device-1")
+        runCurrent()
+
+        assertEquals("servidor fora do ar", viewModel.removalError.value)
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(listOf("edilson"), state.members.map { it.alias })
+
+        viewModel.clearRemovalError()
+        assertEquals(null, viewModel.removalError.value)
         viewModel.onDestroy()
     }
 
@@ -352,6 +413,7 @@ class TeamUsageViewModelTest {
     private fun TestScope.buildViewModel(repository: FakeTeamRepository): TeamUsageViewModel {
         return TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(repository, TeamFixedClock(TEAM_FIXED_NOW)),
+            removeTeamMember = RemoveTeamMemberUseCase(repository),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = TEAM_LIVE_INTERVAL_MILLIS,
             clock = TeamFixedClock(TEAM_FIXED_NOW)

@@ -76,6 +76,12 @@ export interface TeamSnapshot {
   rows: TeamUsageRow[];
 }
 
+export interface DeleteMemberReport {
+  deletedTurns: number;
+  deletedSessions: number;
+  deletedMembers: number;
+}
+
 const UPSERT_MEMBER_SQL = `
 INSERT INTO team_members (
   account_key, device_id, alias, host_name, organization_uuid, organization_name, last_seen_at
@@ -178,6 +184,30 @@ GROUP BY s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
 `;
 
+/**
+ * Turnos das sessoes daquele device.
+ *
+ * `team_turns` nao guarda `device_id` — o dono do turno e a sessao. Por isso o
+ * `IN` sobre `team_sessions`, e por isso esta consulta tem de rodar **antes** de
+ * apagar as sessoes, ou nao sobraria de onde deduzir quais turnos remover.
+ */
+const DELETE_MEMBER_TURNS_SQL = `
+DELETE FROM team_turns
+ WHERE account_key = @accountKey
+   AND session_id IN (
+     SELECT session_id FROM team_sessions
+      WHERE account_key = @accountKey AND device_id = @deviceId
+   )
+`;
+
+const DELETE_MEMBER_SESSIONS_SQL = `
+DELETE FROM team_sessions WHERE account_key = @accountKey AND device_id = @deviceId
+`;
+
+const DELETE_MEMBER_SQL = `
+DELETE FROM team_members WHERE account_key = @accountKey AND device_id = @deviceId
+`;
+
 export class TeamRepository {
   private readonly db: Db;
 
@@ -239,6 +269,30 @@ export class TeamRepository {
         ignoredTurns: payload.turns.length - acceptedTurns,
         acceptedSessions: payload.sessions.length,
       };
+    });
+
+    return run();
+  }
+
+  /**
+   * Remove um integrante e tudo o que veio dele, numa transacao.
+   *
+   * Serve para o caso em que a mesma maquina aparece duas vezes: um `deviceId`
+   * novo (arquivo de configuracao perdido, reinstalacao) deixa o antigo como um
+   * integrante fantasma que a retencao so recolhe depois de 45 dias.
+   *
+   * Idempotente: apagar quem nao existe devolve zeros, nao erro. **Destrutivo e
+   * irreversivel** — o cliente daquele device ja marcou os turnos como enviados
+   * e nao os reenvia.
+   */
+  deleteMember(accountKey: string, deviceId: string): DeleteMemberReport {
+    const params = { accountKey, deviceId };
+
+    const run = this.db.transaction((): DeleteMemberReport => {
+      const deletedTurns = this.db.prepare(DELETE_MEMBER_TURNS_SQL).run(params).changes;
+      const deletedSessions = this.db.prepare(DELETE_MEMBER_SESSIONS_SQL).run(params).changes;
+      const deletedMembers = this.db.prepare(DELETE_MEMBER_SQL).run(params).changes;
+      return { deletedTurns, deletedSessions, deletedMembers };
     });
 
     return run();

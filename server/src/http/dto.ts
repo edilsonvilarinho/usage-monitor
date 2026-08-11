@@ -64,3 +64,12 @@ export const teamQuerySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
   since: z.coerce.number().int().nonnegative().optional(),
 });
+
+/**
+ * Parametros na query, e nao no corpo: `DELETE` com body e mal suportado por
+ * proxy reverso, e o deploy padrao daqui fica atras de um.
+ */
+export const deleteMemberQuerySchema = z.object({
+  accountKey: z.string().min(1).max(TEXT_MAX),
+  deviceId: z.string().min(1).max(TEXT_MAX),
+});

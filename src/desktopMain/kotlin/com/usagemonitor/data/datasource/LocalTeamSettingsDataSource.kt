@@ -40,7 +40,9 @@ internal class LocalTeamSettingsDataSource(
      * Lê a configuração, criando o `deviceId` se ainda não houver.
      *
      * Um arquivo corrompido devolve o default em vez de derrubar o boot: perder a
-     * configuração de time é ruim, mas não abrir o app é pior.
+     * configuração de time é ruim, mas não abrir o app é pior. A falha de
+     * gravação aqui também não sobe pelo mesmo motivo — ela reaparece na
+     * primeira edição das Configurações, que já reporta sucesso ou falha.
      */
     fun load(): TeamIntegrationSettings {
         val dto = readDto()
@@ -71,13 +73,30 @@ internal class LocalTeamSettingsDataSource(
         )
     }
 
+    /**
+     * Devolve o default quando o arquivo não dá para ler, guardando o original.
+     *
+     * O arquivo ilegível não pode simplesmente virar default: [load] gravaria os
+     * defaults por cima e, junto com o servidor, a chave e o apelido, levaria o
+     * `deviceId` — a máquina reapareceria como um integrante novo no time. Movê-lo
+     * para `.corrupt` mantém o conteúdo recuperável em vez de sobrescrevê-lo.
+     */
     private fun readDto(): TeamSettingsDto {
         if (!settingsFile.isFile) {
             return TeamSettingsDto()
         }
         return runCatching {
             json.decodeFromString(TeamSettingsDto.serializer(), settingsFile.readText())
-        }.getOrElse { TeamSettingsDto() }
+        }.getOrElse {
+            runCatching {
+                Files.move(
+                    settingsFile.toPath(),
+                    File(settingsFile.parentFile, "${settingsFile.name}.corrupt").toPath(),
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+            }
+            TeamSettingsDto()
+        }
     }
 
     private fun writeDto(dto: TeamSettingsDto) {
@@ -86,7 +105,10 @@ internal class LocalTeamSettingsDataSource(
         parentDir.mkdirs()
 
         val content = json.encodeToString(TeamSettingsDto.serializer(), dto)
-        val tempFile = File(parentDir, "${settingsFile.name}.tmp")
+        // Nome único: com um `.tmp` fixo, duas instâncias gravando ao mesmo tempo
+        // escrevem no mesmo intermediário e uma move o conteúdo da outra por cima
+        // do team.json — o arquivo resultante fica truncado e ilegível.
+        val tempFile = Files.createTempFile(parentDir.toPath(), settingsFile.name, ".tmp").toFile()
         try {
             Files.writeString(tempFile.toPath(), content)
             restrictToOwnerReadWrite(tempFile.toPath())

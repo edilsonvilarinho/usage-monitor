@@ -66,6 +66,7 @@ import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
+import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
@@ -84,6 +85,9 @@ import com.usagemonitor.presentation.ui.teamUsageWindowTitle
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.SettingsField
+import com.usagemonitor.presentation.ui.components.SettingsToast
+import com.usagemonitor.presentation.ui.components.SettingsToastEvent
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -104,6 +108,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
@@ -393,6 +398,7 @@ fun main() = application {
     val teamUsageViewModel = remember(teamUsageRepository) {
         TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(teamUsageRepository),
+            removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
         )
     }
@@ -591,11 +597,20 @@ fun main() = application {
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
     val windowOpacitySupported = remember { isWindowOpacitySupported() }
     var windowOpacityPercent by remember { mutableStateOf(readPersistedWindowOpacityPercent(settings)) }
+    var opacitySaveGeneration by remember { mutableStateOf(0) }
     LaunchedEffect(settings) {
         snapshotFlow { windowOpacityPercent }
             .distinctUntilChanged()
+            // A primeira emissão é o valor que acabou de ser lido do registro:
+            // regravá-lo não muda nada e faria o app subir avisando "salvo".
+            .drop(1)
             .debounce(250.milliseconds)
-            .collect { percent -> persistWindowOpacityPercent(settings, percent) }
+            .collect { percent ->
+                persistWindowOpacityPercent(settings, percent)
+                // O aviso sai daqui, depois da gravação: emiti-lo no callback do
+                // slider daria um toast por pixel arrastado.
+                opacitySaveGeneration += 1
+            }
     }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
@@ -611,6 +626,31 @@ fun main() = application {
     var teamUsageProfileId by remember { mutableStateOf<String?>(null) }
     var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     val teamScope = rememberCoroutineScope()
+
+    // Cada emissão precisa de um id próprio: dois avisos iguais em sequência —
+    // salvar o mesmo campo duas vezes — seriam o mesmo valor e o diálogo não
+    // reagiria ao segundo.
+    var settingsToastEvent by remember { mutableStateOf<SettingsToastEvent?>(null) }
+    var settingsToastGeneration by remember { mutableStateOf(0) }
+    val showSettingsToast: (SettingsToast) -> Unit = { toast ->
+        settingsToastGeneration += 1
+        settingsToastEvent = SettingsToastEvent(id = settingsToastGeneration, toast = toast)
+    }
+    /** Traduz o resultado da gravação no aviso correspondente. */
+    val reportSettingsSave: (SettingsField, Boolean) -> Unit = { field, saved ->
+        showSettingsToast(
+            if (saved) SettingsToast.Saved(field) else SettingsToast.SaveFailed(field)
+        )
+    }
+    // A opacidade é gravada pelo coletor com debounce declarado acima, que roda
+    // fora do diálogo; o aviso é emitido aqui, onde `showSettingsToast` existe.
+    // A geração inicial não conta: o `snapshotFlow` reemite o valor corrente
+    // quando o app sobe, sem que ninguém tenha mexido em nada.
+    LaunchedEffect(opacitySaveGeneration) {
+        if (opacitySaveGeneration > 0) {
+            showSettingsToast(SettingsToast.Saved(SettingsField.WINDOW_OPACITY))
+        }
+    }
 
     // Os filtros de 5h e 7d da tela de sessões recortam a janela de quota da
     // conta, não as últimas horas corridas. O reset vem do mesmo `resets_at` que
@@ -857,7 +897,8 @@ fun main() = application {
                 ) {
                     TeamUsageScreen(
                         viewModel = teamUsageViewModel,
-                        language = language
+                        language = language,
+                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
                     )
                 }
             }
@@ -893,25 +934,36 @@ fun main() = application {
                         onThemeToggle = {
                             isDark = !isDark
                             settings.putBoolean(IS_DARK_KEY, isDark)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.THEME))
                         },
                         onLanguageChange = { selectedLanguage ->
                             language = selectedLanguage
                             settings.putString(LANGUAGE_KEY, selectedLanguage.name)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.LANGUAGE))
                         },
                         onAutoStartChange = { enabled ->
-                            val updatedState = if (AutoStartManager.setAutoStart(enabled)) {
+                            // O registro do Windows pode recusar a escrita; nesse
+                            // caso o estado volta ao que o sistema realmente tem e
+                            // o aviso precisa dizer que falhou.
+                            val applied = AutoStartManager.setAutoStart(enabled)
+                            val updatedState = if (applied) {
                                 enabled
                             } else {
                                 AutoStartManager.isAutoStartEnabled()
                             }
                             autoStartEnabled = updatedState
                             settings.putBoolean(AUTO_START_KEY, updatedState)
+                            reportSettingsSave(SettingsField.AUTO_START, applied)
                         },
                         onAlwaysOnTopChange = { enabled ->
                             alwaysOnTopEnabled = enabled
                             settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.ALWAYS_ON_TOP))
                         },
                         onWindowOpacityChange = { percent ->
+                            // Aviso não sai daqui: quem persiste é o coletor com
+                            // debounce lá em cima, e arrastar o slider dispararia
+                            // um toast por pixel.
                             windowOpacityPercent = clampWindowOpacityPercent(percent)
                         },
                         onApiToggle = { api, checked ->
@@ -923,6 +975,7 @@ fun main() = application {
                             enabledApis.value = updatedApis
                             writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
                             viewModel.refresh(api)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.MONITORED_APIS))
                         },
                         anthropicProfiles = profileUiModels,
                         onAnthropicProfileToggle = { profileId, checked ->
@@ -932,9 +985,13 @@ fun main() = application {
                                 profileRegistry.profiles.value
                             ).enabledProfiles
                             viewModel.refresh(ApiSource.ANTHROPIC)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
                         },
                         onAnthropicProfileRename = { profileId, label ->
                             profileRegistry.updateLabel(profileId, label)
+                            showSettingsToast(
+                                SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILE_LABEL)
+                            )
                         },
                         onAddAnthropicProfile = {
                             val selectedDirectory = chooseAnthropicConfigDirectory()
@@ -953,6 +1010,7 @@ fun main() = application {
                                 profileRegistry.profiles.value
                             ).enabledProfiles
                             viewModel.refresh(ApiSource.ANTHROPIC)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
                         },
                         onRescanAnthropicProfiles = {
                             profileRegistry.rescan(restoreRemoved = true)
@@ -973,32 +1031,55 @@ fun main() = application {
                         teamSettings = teamSettings,
                         teamConnection = teamConnectionState,
                         onTeamEnabledChange = { enabled ->
-                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
-                                current.copy(enabled = enabled)
-                            }
+                            val saved = updateTeamSettings(
+                                teamSettingsFlow,
+                                teamSettingsDataSource
+                            ) { current -> current.copy(enabled = enabled) }
                             // Mudar de servidor ou religar a integração não pode
                             // deixar um resultado antigo na tela como se fosse atual.
                             teamConnectionState = TeamConnectionUiState()
+                            reportSettingsSave(SettingsField.TEAM_INTEGRATION, saved)
                         },
                         onTeamServerUrlChange = { url ->
-                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
-                                current.copy(serverUrl = url)
-                            }
+                            val saved = updateTeamSettings(
+                                teamSettingsFlow,
+                                teamSettingsDataSource
+                            ) { current -> current.copy(serverUrl = url) }
                             teamConnectionState = TeamConnectionUiState()
+                            reportSettingsSave(SettingsField.TEAM_SERVER, saved)
                         },
                         onTeamApiKeyChange = { key ->
-                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
-                                current.copy(apiKey = key)
-                            }
+                            val saved = updateTeamSettings(
+                                teamSettingsFlow,
+                                teamSettingsDataSource
+                            ) { current -> current.copy(apiKey = key) }
                             teamConnectionState = TeamConnectionUiState()
+                            reportSettingsSave(SettingsField.TEAM_KEY, saved)
                         },
                         onTeamAliasChange = { alias ->
-                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
-                                current.copy(alias = alias)
+                            // O campo já barra apagar um apelido gravado; esta é a
+                            // rede de baixo, para nenhum outro caminho zerá-lo.
+                            if (alias.isBlank() && teamSettings.alias.isNotBlank()) {
+                                showSettingsToast(SettingsToast.TeamAliasRequired)
+                            } else {
+                                val saved = updateTeamSettings(
+                                    teamSettingsFlow,
+                                    teamSettingsDataSource
+                                ) { current -> current.copy(alias = alias) }
+                                reportSettingsSave(SettingsField.TEAM_ALIAS, saved)
+                                // O apelido só chega ao servidor dentro de um
+                                // ingest: sem antecipar a passada, o nome novo
+                                // esperaria o tique de 30s para aparecer ao time.
+                                if (saved) {
+                                    teamSyncService.requestImmediateSync()
+                                }
                             }
                         },
                         onTeamProfileParticipationChange = { profileId, participates ->
-                            updateTeamSettings(teamSettingsFlow, teamSettingsDataSource) { current ->
+                            val saved = updateTeamSettings(
+                                teamSettingsFlow,
+                                teamSettingsDataSource
+                            ) { current ->
                                 val updated = if (participates) {
                                     current.participatingProfileIds + profileId
                                 } else {
@@ -1006,6 +1087,7 @@ fun main() = application {
                                 }
                                 current.copy(participatingProfileIds = updated)
                             }
+                            reportSettingsSave(SettingsField.TEAM_ACCOUNTS, saved)
                         },
                         onTeamTestConnection = {
                             teamConnectionState = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
@@ -1034,7 +1116,8 @@ fun main() = application {
                                     }
                                 )
                             }
-                        }
+                        },
+                        toastEvent = settingsToastEvent
                     )
                 }
             }
@@ -1148,14 +1231,21 @@ private fun buildAnthropicProfileUiModels(
  * e a escrita em disco vai atrás. Uma falha de gravação não pode derrubar o
  * diálogo de configurações — pior caso, a mudança não sobrevive ao reinício.
  */
+/**
+ * Aplica a alteração em memória e no disco.
+ *
+ * Devolve se a gravação passou: o aviso de "salvo" no diálogo não pode ser
+ * emitido a partir da intenção, só do resultado — antes disto a falha era
+ * engolida por um `runCatching` sem tratamento.
+ */
 private fun updateTeamSettings(
     settingsFlow: MutableStateFlow<TeamIntegrationSettings>,
     dataSource: LocalTeamSettingsDataSource,
     transform: (TeamIntegrationSettings) -> TeamIntegrationSettings
-) {
+): Boolean {
     val updated = transform(settingsFlow.value)
     settingsFlow.value = updated
-    runCatching { dataSource.save(updated) }
+    return runCatching { dataSource.save(updated) }.isSuccess
 }
 
 /**
