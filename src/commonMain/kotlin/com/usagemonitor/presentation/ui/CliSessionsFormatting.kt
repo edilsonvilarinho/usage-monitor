@@ -351,6 +351,10 @@ internal object CliSessionsLabels {
         }
     }
 
+    fun glossaryTitle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Como ler esta tela" else "How to read this screen"
+    }
+
     fun contextPerTurnChart(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Contexto por turno" else "Context per turn"
     }

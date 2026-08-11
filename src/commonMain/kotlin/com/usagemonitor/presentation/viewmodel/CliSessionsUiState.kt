@@ -46,7 +46,9 @@ sealed interface CliSessionsUiState {
          * é única e testável — desde que `loadSessions` a carregue do estado
          * anterior, ou o bloco fecharia sozinho a cada tique.
          */
-        val advancedExpanded: Boolean = false
+        val advancedExpanded: Boolean = false,
+        /** Painel "Como ler esta tela". Mesmo tratamento de [advancedExpanded]. */
+        val glossaryExpanded: Boolean = false
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long

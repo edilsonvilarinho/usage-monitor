@@ -474,6 +474,27 @@ class CliSessionsViewModelTest {
     }
 
     @Test
+    fun `the glossary panel survives a tick of the live loop`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            viewModel.toggleGlossary()
+
+            repository.sessions = listOf(summary("a"), summary("b"))
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+            assertEquals(listOf("a", "b"), state.sessions.map { session -> session.sessionId })
+            assertTrue(state.glossaryExpanded)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
     fun `closing the window stops the live loop`() = runTest {
         val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
         val viewModel = buildViewModel(repository, autoLoad = false)
