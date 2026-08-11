@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Terminal
@@ -126,6 +127,12 @@ fun ApiUsageCard(
     onOpenHistory: () -> Unit = {},
     /** Só os cards Anthropic recebem: sessões do Claude Code pertencem a uma conta. */
     onOpenCliSessions: (() -> Unit)? = null,
+    /**
+     * Só os cards Anthropic de contas marcadas como parte do time recebem, e só
+     * com a integração ligada. Nulo esconde o botão — quem não usa a integração
+     * não ganha um botão que não leva a lugar nenhum.
+     */
+    onOpenTeamUsage: (() -> Unit)? = null,
     onToggleMinimized: () -> Unit = {},
     onDragStart: () -> Unit = {},
     onDrag: (Offset) -> Unit = {},
@@ -378,6 +385,23 @@ fun ApiUsageCard(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Terminal,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(density.actionIconSize),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+
+                        // Só chega não-nulo quando a integração está ligada e esta
+                        // conta foi marcada como parte do time nas Configurações.
+                        if (onOpenTeamUsage != null) {
+                            CardIconActionButton(
+                                label = teamUsageActionLabel(language = language),
+                                onClick = onOpenTeamUsage,
+                                buttonSize = density.actionButtonSize
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Groups,
                                     contentDescription = null,
                                     modifier = Modifier.size(density.actionIconSize),
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer

@@ -51,6 +51,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
 import com.usagemonitor.domain.entity.MAX_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.domain.entity.MIN_WINDOW_OPACITY_PERCENT
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import kotlin.math.roundToInt
@@ -92,6 +93,14 @@ fun SettingsDialogContent(
     onRescanAnthropicProfiles: () -> Unit = {},
     expandedProfileId: String? = null,
     onToggleProfileExpanded: (String) -> Unit = {},
+    teamSettings: TeamIntegrationSettings = TeamIntegrationSettings(),
+    teamConnection: TeamConnectionUiState = TeamConnectionUiState(),
+    onTeamEnabledChange: (Boolean) -> Unit = {},
+    onTeamServerUrlChange: (String) -> Unit = {},
+    onTeamApiKeyChange: (String) -> Unit = {},
+    onTeamAliasChange: (String) -> Unit = {},
+    onTeamProfileParticipationChange: (String, Boolean) -> Unit = { _, _ -> },
+    onTeamTestConnection: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -217,6 +226,21 @@ fun SettingsDialogContent(
                         }
                     }
                 }
+            }
+
+            SettingsSectionCard {
+                TeamIntegrationSection(
+                    settings = teamSettings,
+                    language = currentLanguage,
+                    profiles = anthropicProfiles,
+                    connection = teamConnection,
+                    onEnabledChange = onTeamEnabledChange,
+                    onServerUrlChange = onTeamServerUrlChange,
+                    onApiKeyChange = onTeamApiKeyChange,
+                    onAliasChange = onTeamAliasChange,
+                    onProfileParticipationChange = onTeamProfileParticipationChange,
+                    onTestConnection = onTeamTestConnection
+                )
             }
         }
         VerticalScrollbar(

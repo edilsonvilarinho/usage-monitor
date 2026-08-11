@@ -58,16 +58,19 @@ import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 
-private val INPUT_COLOR = Color(0xFF4C8DFF)
+// Azul e verde são `internal` porque a tela de time usa a mesma codificação de
+// cor: custo em azul, tokens em verde. Duas paletas para o mesmo significado
+// fariam o usuário reaprender a ler ao trocar de janela.
+internal val INPUT_COLOR = Color(0xFF4C8DFF)
 private val OUTPUT_COLOR = Color(0xFFB07CFF)
-private val CACHE_READ_COLOR = Color(0xFF4CAF50)
+internal val CACHE_READ_COLOR = Color(0xFF4CAF50)
 private val CACHE_WRITE_COLOR = Color(0xFFFFA726)
 private val SAVINGS_COLOR = Color(0xFF26C6DA)
 private val SATURATED_COLOR = Color(0xFFE05252)
 private val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
 
 /** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
-private val SCROLLBAR_GUTTER = 12.dp
+internal val SCROLLBAR_GUTTER = 12.dp
 
 /**
  * Brilho quase apagado para os blocos do detalhe.
@@ -150,7 +153,7 @@ internal fun CliSessionsContent(
 }
 
 @Composable
-private fun CenteredMessage(message: String) {
+internal fun CenteredMessage(message: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             text = message,
@@ -347,7 +350,7 @@ private fun CliSessionsHeader(
 
 /** Sinal de que a tela se atualiza sozinha — o botão de atualizar não existe mais. */
 @Composable
-private fun LiveBadge(language: AppLanguage) {
+internal fun LiveBadge(language: AppLanguage) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -367,9 +370,16 @@ private fun LiveBadge(language: AppLanguage) {
     }
 }
 
+/**
+ * Linha de sessão da lista.
+ *
+ * `internal` porque o modal de time a reaproveita ao expandir um integrante: a
+ * sessão de um colega tem de ser lida exatamente como a sessão da própria
+ * máquina, com as mesmas colunas e o mesmo veredito de saturação.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CliSessionRow(
+internal fun CliSessionRow(
     session: CliSessionSummary,
     language: AppLanguage,
     onOpen: () -> Unit
@@ -987,7 +997,7 @@ private fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguag
     }
 }
 
-private fun healthColor(health: CliSessionHealth): Color {
+internal fun healthColor(health: CliSessionHealth): Color {
     return when (health) {
         CliSessionHealth.HEALTHY -> CACHE_READ_COLOR
         CliSessionHealth.ATTENTION -> CACHE_WRITE_COLOR
@@ -1101,8 +1111,10 @@ private fun MetricCard(
     }
 }
 
+// `internal`, e não `private`, porque a tela de time reaproveita estes blocos:
+// duas listas com a mesma anatomia não podem ter duas implementações de célula.
 @Composable
-private fun MetricText(
+internal fun MetricText(
     label: String,
     value: String,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
@@ -1124,7 +1136,7 @@ private fun MetricText(
 }
 
 @Composable
-private fun NoticeText(message: String, color: Color) {
+internal fun NoticeText(message: String, color: Color) {
     Text(text = message, style = MaterialTheme.typography.labelSmall, color = color)
 }
 
@@ -1222,7 +1234,7 @@ private fun GlossaryPanel(
 }
 
 @Composable
-private fun MeterBar(
+internal fun MeterBar(
     fraction: Double,
     color: Color,
     height: androidx.compose.ui.unit.Dp = 10.dp

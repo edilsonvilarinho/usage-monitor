@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ModelPricingTable
+import com.usagemonitor.domain.entity.WindowedSessionAccumulator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
@@ -37,6 +38,18 @@ class LocalCliSessionDataSource(
         databaseFile = databaseFile,
         onOpen = { connection -> initializeSchema(connection) }
     )
+
+    /**
+     * Conexão do índice, para quem precisa ler as mesmas tabelas.
+     *
+     * Compartilhar a instância em vez de abrir uma segunda conexão para o mesmo
+     * arquivo é deliberado: `useConnection` é `synchronized`, então a leitura
+     * espera a indexação terminar em vez de disputar o arquivo e receber
+     * `SQLITE_BUSY` — o mesmo problema que já apareceu entre este datasource e o
+     * histórico de uso.
+     */
+    internal val sharedConnectionManager: SqliteConnectionManager
+        get() = connectionManager
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -205,18 +218,32 @@ class LocalCliSessionDataSource(
             statement.executeQuery().use { rows ->
                 while (rows.next()) {
                     val sessionId = rows.getString("session_id")
+                    val filePath = rows.getString("file_path")
                     val accumulator = accumulators.getOrPut(sessionId) {
+                        val liveContext = liveContexts[sessionId]
                         WindowedSessionAccumulator(
                             sessionId = sessionId,
-                            filePath = rows.getString("file_path"),
+                            filePath = filePath,
                             profileId = rows.getString("profile_id"),
                             cwd = rows.getString("cwd"),
                             gitBranch = rows.getString("git_branch"),
                             hostName = rows.getString("host_name"),
-                            liveContext = liveContexts[sessionId]
+                            liveContextTokens = liveContext?.cacheReadTokens ?: 0L,
+                            liveContextModel = liveContext?.model,
+                            stale = !File(filePath).isFile
                         )
                     }
-                    accumulator.addModelGroup(rows)
+                    accumulator.addModelGroup(
+                        model = rows.getString("model"),
+                        turnCount = rows.getInt("turn_count"),
+                        firstTsMillis = rows.getLong("first_ts"),
+                        lastTsMillis = rows.getLong("last_ts"),
+                        inputTokens = rows.getLong("input_tokens"),
+                        outputTokens = rows.getLong("output_tokens"),
+                        cacheReadTokens = rows.getLong("cache_read_tokens"),
+                        cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
+                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                    )
                 }
             }
         }
@@ -674,97 +701,6 @@ class LocalCliSessionDataSource(
             statement.execute("ALTER TABLE $table ADD COLUMN $column TEXT;")
         }
         return true
-    }
-
-    /**
-     * Dobra as linhas por modelo de uma sessão num único resumo da janela.
-     *
-     * O custo é somado por modelo: `ModelPricing.costMicros` soma os produtos e
-     * divide uma única vez, então agregar tokens antes de precificar é exato.
-     */
-    private class WindowedSessionAccumulator(
-        val sessionId: String,
-        val filePath: String,
-        val profileId: String?,
-        val cwd: String?,
-        val gitBranch: String?,
-        val hostName: String?,
-        val liveContext: LiveContext?
-    ) {
-        private var turnCount = 0
-        private var firstTs = Long.MAX_VALUE
-        private var lastTs = Long.MIN_VALUE
-        private var inputTokens = 0L
-        private var outputTokens = 0L
-        private var cacheReadTokens = 0L
-        private var cacheWrite5mTokens = 0L
-        private var cacheWrite1hTokens = 0L
-        private var costMicros = 0L
-        private var unpricedTurnCount = 0
-        private var primaryModel: String? = null
-        private var primaryModelTurns = 0
-
-        fun addModelGroup(rows: ResultSet) {
-            val model = rows.getString("model")
-            val groupTurns = rows.getInt("turn_count")
-            val groupInput = rows.getLong("input_tokens")
-            val groupOutput = rows.getLong("output_tokens")
-            val groupCacheRead = rows.getLong("cache_read_tokens")
-            val groupCacheWrite5m = rows.getLong("cache_write_5m_tokens")
-            val groupCacheWrite1h = rows.getLong("cache_write_1h_tokens")
-
-            turnCount += groupTurns
-            inputTokens += groupInput
-            outputTokens += groupOutput
-            cacheReadTokens += groupCacheRead
-            cacheWrite5mTokens += groupCacheWrite5m
-            cacheWrite1hTokens += groupCacheWrite1h
-            firstTs = minOf(firstTs, rows.getLong("first_ts"))
-            lastTs = maxOf(lastTs, rows.getLong("last_ts"))
-
-            val pricing = ModelPricingTable.forModel(model)
-            if (pricing == null) {
-                unpricedTurnCount += groupTurns
-            } else {
-                costMicros += pricing.costMicros(
-                    inputTokens = groupInput,
-                    outputTokens = groupOutput,
-                    cacheReadTokens = groupCacheRead,
-                    cacheWrite5mTokens = groupCacheWrite5m,
-                    cacheWrite1hTokens = groupCacheWrite1h
-                )
-            }
-
-            if (model != null && groupTurns > primaryModelTurns) {
-                primaryModel = model
-                primaryModelTurns = groupTurns
-            }
-        }
-
-        fun toSummary(): CliSessionSummary {
-            return CliSessionSummary(
-                sessionId = sessionId,
-                filePath = filePath,
-                profileId = profileId,
-                cwd = cwd,
-                gitBranch = gitBranch,
-                hostName = hostName,
-                firstTs = Instant.fromEpochMilliseconds(firstTs),
-                lastTs = Instant.fromEpochMilliseconds(lastTs),
-                primaryModel = primaryModel,
-                turnCount = turnCount,
-                inputTokens = inputTokens,
-                outputTokens = outputTokens,
-                cacheReadTokens = cacheReadTokens,
-                cacheWrite5mTokens = cacheWrite5mTokens,
-                cacheWrite1hTokens = cacheWrite1hTokens,
-                costMicros = costMicros,
-                unpricedTurnCount = unpricedTurnCount,
-                liveContextTokens = liveContext?.cacheReadTokens ?: 0L,
-                liveContextModel = liveContext?.model,
-                stale = !File(filePath).isFile
-            )
-        }
     }
 
     /** Último turno da thread principal de uma sessão, base do status de contexto. */
