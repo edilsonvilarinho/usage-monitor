@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,6 +48,8 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.presentation.ui.components.BinMode
 import com.usagemonitor.presentation.ui.components.DepthSurface
+import com.usagemonitor.presentation.ui.components.HoverTooltipBox
+import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.components.TurnSeries
 import com.usagemonitor.presentation.ui.components.TurnSeriesChart
 import com.usagemonitor.presentation.ui.theme.AppElevation
@@ -60,6 +66,25 @@ private val SAVINGS_COLOR = Color(0xFF26C6DA)
 private val SATURATED_COLOR = Color(0xFFE05252)
 private val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
 
+/** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
+private val SCROLLBAR_GUTTER = 12.dp
+
+/**
+ * Brilho quase apagado para os blocos do detalhe.
+ *
+ * O default de `DepthSurface` (0.22) é o do dashboard, onde cada card é uma API
+ * distinta e a cor identifica. Aqui os blocos são a mesma sessão vista de
+ * ângulos diferentes: com o brilho cheio a tela vira uma pilha de retângulos
+ * coloridos e nada se destaca. A cor fica no dado, não no fundo.
+ */
+private const val QUIET_GLOW_ALPHA = 0.06f
+
+/** Mais baixo que o default de `TurnSeriesChart`: são vários numa página só. */
+private val DETAIL_CHART_HEIGHT = 120.dp
+
+internal const val LIST_SCROLLBAR_TAG = "cliSessionsListScrollbar"
+internal const val DETAIL_SCROLLBAR_TAG = "cliSessionsDetailScrollbar"
+
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
 fun CliSessionsScreen(
@@ -75,6 +100,8 @@ fun CliSessionsScreen(
         onSelectRange = { range -> viewModel.setRange(range) },
         onOpenSession = { sessionId -> viewModel.openSession(sessionId) },
         onCloseDetail = { viewModel.closeDetail() },
+        onToggleAdvanced = { viewModel.toggleAdvanced() },
+        onToggleGlossary = { viewModel.toggleGlossary() },
         modifier = modifier
     )
 }
@@ -86,6 +113,9 @@ internal fun CliSessionsContent(
     onSelectRange: (CliSessionRange) -> Unit,
     onOpenSession: (String) -> Unit,
     onCloseDetail: () -> Unit,
+    // Com default para não arrastar as chamadas que não exercitam os blocos.
+    onToggleAdvanced: () -> Unit = {},
+    onToggleGlossary: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -107,7 +137,11 @@ internal fun CliSessionsContent(
                     CliSessionDetailPane(
                         detail = detail,
                         language = language,
-                        onCloseDetail = onCloseDetail
+                        advancedExpanded = state.advancedExpanded,
+                        glossaryExpanded = state.glossaryExpanded,
+                        onCloseDetail = onCloseDetail,
+                        onToggleAdvanced = onToggleAdvanced,
+                        onToggleGlossary = onToggleGlossary
                     )
                 }
             }
@@ -153,17 +187,32 @@ private fun CliSessionsList(
             return@Column
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(items = state.sessions, key = { session -> session.sessionId }) { session ->
-                CliSessionRow(
-                    session = session,
-                    language = language,
-                    onOpen = { onOpenSession(session.sessionId) }
-                )
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            val listState = rememberLazyListState()
+
+            LazyColumn(
+                state = listState,
+                // A barra fica por cima da área de conteúdo; sem a folga à direita
+                // ela cobriria a borda dos cards, que ocupam a largura inteira.
+                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(items = state.sessions, key = { session -> session.sessionId }) { session ->
+                    CliSessionRow(
+                        session = session,
+                        language = language,
+                        onOpen = { onOpenSession(session.sessionId) }
+                    )
+                }
             }
+
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(listState),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .testTag(LIST_SCROLLBAR_TAG)
+            )
         }
     }
 }
@@ -439,7 +488,11 @@ private fun CliSessionRow(
 private fun CliSessionDetailPane(
     detail: CliSessionDetailUiState,
     language: AppLanguage,
-    onCloseDetail: () -> Unit
+    advancedExpanded: Boolean,
+    glossaryExpanded: Boolean,
+    onCloseDetail: () -> Unit,
+    onToggleAdvanced: () -> Unit,
+    onToggleGlossary: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -459,167 +512,383 @@ private fun CliSessionDetailPane(
             is CliSessionDetailUiState.Ready -> CliSessionDetailBody(
                 detail = detail.result.detail,
                 analytics = detail.result.analytics,
-                language = language
+                language = language,
+                advancedExpanded = advancedExpanded,
+                glossaryExpanded = glossaryExpanded,
+                onToggleAdvanced = onToggleAdvanced,
+                onToggleGlossary = onToggleGlossary
             )
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CliSessionDetailBody(
     detail: CliSessionDetail,
     analytics: CliSessionAnalytics,
-    language: AppLanguage
+    language: AppLanguage,
+    advancedExpanded: Boolean,
+    glossaryExpanded: Boolean,
+    onToggleAdvanced: () -> Unit,
+    onToggleGlossary: () -> Unit
 ) {
-    val summary = detail.summary
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                // Mesma razão da lista: a barra flutua sobre o conteúdo.
+                .padding(end = SCROLLBAR_GUTTER),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CliSessionDetailSections(
+                detail = detail,
+                analytics = analytics,
+                language = language,
+                advancedExpanded = advancedExpanded,
+                glossaryExpanded = glossaryExpanded,
+                onToggleAdvanced = onToggleAdvanced,
+                onToggleGlossary = onToggleGlossary
+            )
+        }
+
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .testTag(DETAIL_SCROLLBAR_TAG)
+        )
+    }
+}
+
+/**
+ * As seções do detalhe, emitidas direto no `Column` rolável do chamador.
+ *
+ * Divididas em duas camadas. A de cima responde à pergunta que traz o usuário
+ * aqui — *dá para continuar nesta sessão?* — com o veredito, a identificação e
+ * quatro números. A de baixo, recolhida, guarda a apuração: a composição dos
+ * tokens, a distribuição do custo e os gráficos por turno.
+ *
+ * Nada foi removido na divisão; a camada de baixo é a mesma de antes.
+ */
+@Composable
+private fun CliSessionDetailSections(
+    detail: CliSessionDetail,
+    analytics: CliSessionAnalytics,
+    language: AppLanguage,
+    advancedExpanded: Boolean,
+    glossaryExpanded: Boolean,
+    onToggleAdvanced: () -> Unit,
+    onToggleGlossary: () -> Unit
+) {
+    val summary = detail.summary
+
+    SessionHealthBanner(analytics = analytics, language = language)
+
+    SessionMetadataCard(summary = summary, language = language)
+
+    // Integridade do dado não é detalhe avançado: se o custo está incompleto,
+    // todo número desta tela está incompleto.
+    if (summary.stale) {
+        NoticeText(CliSessionsLabels.staleNotice(language), MaterialTheme.colorScheme.error)
+    }
+    if (!analytics.isCostComplete) {
+        NoticeText(
+            CliSessionsLabels.unpricedNotice(analytics.unpricedTurnCount, language),
+            MaterialTheme.colorScheme.error
+        )
+    }
+    if (analytics.sidechainTurnCount > 0) {
+        NoticeText(
+            CliSessionsLabels.sidechainNotice(analytics.sidechainTurnCount, language),
+            MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    SessionSummaryRow(summary = summary, analytics = analytics, language = language)
+
+    DetailSection(
+        title = CliSessionsLabels.contextPerTurnChart(language),
+        accent = CACHE_READ_COLOR,
+        // Duas dúvidas de uma vez: o que a curva mede e o que o ▼ marca.
+        help = listOf(GlossaryTerm.CONTEXT_PER_TURN, GlossaryTerm.COMPACTION),
+        language = language
     ) {
-        SessionHealthBanner(analytics = analytics, language = language)
+        TurnSeriesChart(
+            series = listOf(
+                TurnSeries(
+                    label = CliSessionsLabels.chartContextLegend(language),
+                    values = analytics.contextPerTurn,
+                    color = CACHE_READ_COLOR,
+                    binMode = BinMode.LAST
+                )
+            ),
+            height = DETAIL_CHART_HEIGHT,
+            valueFormatter = { value -> formatQuantity(value) },
+            highlightDrops = true
+        )
+    }
 
-        SessionMetadataCard(summary = summary, language = language)
+    AdvancedDisclosure(
+        expanded = advancedExpanded,
+        language = language,
+        onToggle = onToggleAdvanced
+    ) {
+        SessionAdvancedSections(
+            summary = summary,
+            analytics = analytics,
+            language = language
+        )
+    }
 
-        if (summary.stale) {
-            NoticeText(CliSessionsLabels.staleNotice(language), MaterialTheme.colorScheme.error)
-        }
-        if (!analytics.isCostComplete) {
-            NoticeText(
-                CliSessionsLabels.unpricedNotice(analytics.unpricedTurnCount, language),
-                MaterialTheme.colorScheme.error
-            )
-        }
-        if (analytics.sidechainTurnCount > 0) {
-            NoticeText(
-                CliSessionsLabels.sidechainNotice(analytics.sidechainTurnCount, language),
-                MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    GlossaryPanel(
+        expanded = glossaryExpanded,
+        language = language,
+        onToggle = onToggleGlossary
+    )
+}
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            MetricCard(CliSessionsLabels.input(language), formatQuantity(summary.inputTokens), INPUT_COLOR)
-            MetricCard(CliSessionsLabels.output(language), formatQuantity(summary.outputTokens), OUTPUT_COLOR)
-            MetricCard(CliSessionsLabels.cacheRead(language), formatQuantity(summary.cacheReadTokens), CACHE_READ_COLOR)
-            MetricCard(
-                CliSessionsLabels.cacheWrite(language),
-                formatQuantity(summary.cacheWriteTokens),
-                CACHE_WRITE_COLOR
-            )
-        }
-
-        DetailSection(
-            title = CliSessionsLabels.cacheHitRate(language),
-            accent = CACHE_READ_COLOR,
-            trailing = formatPercent(analytics.cacheHitRate)
-        ) {
-            MeterBar(fraction = analytics.cacheHitRate, color = CACHE_READ_COLOR)
-        }
-
-        DetailSection(
-            title = CliSessionsLabels.costDistribution(language),
+/**
+ * Os quatro números que decidem se vale continuar: quanto já custou, quanto
+ * volume passou, quanto disso o cache absorveu e quanto da janela do modelo já
+ * foi ocupada.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SessionSummaryRow(
+    summary: CliSessionSummary,
+    analytics: CliSessionAnalytics,
+    language: AppLanguage
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MetricCard(
+            label = CliSessionsLabels.columnCost(language),
+            value = formatMicrosUsd(analytics.costBreakdown.totalMicros),
             accent = INPUT_COLOR,
-            trailing = formatMicrosUsd(analytics.costBreakdown.totalMicros)
-        ) {
-            CostDistributionBar(analytics = analytics)
-            Spacer(modifier = Modifier.height(8.dp))
-            CostDistributionLegend(analytics = analytics, language = language)
-        }
+            help = GlossaryTerm.ESTIMATED_COST,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.columnTokens(language),
+            value = formatQuantity(summary.totalTokens),
+            accent = CACHE_READ_COLOR,
+            help = GlossaryTerm.TOTAL_TOKENS,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.cacheHitRate(language),
+            value = formatPercent(analytics.cacheHitRate),
+            accent = CACHE_READ_COLOR,
+            help = GlossaryTerm.CACHE_HIT_RATE,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.saturation(language),
+            value = analytics.contextSaturation?.let { value -> formatPercent(value) } ?: "—",
+            accent = healthColor(analytics.health),
+            help = GlossaryTerm.CONTEXT_WINDOW,
+            language = language
+        )
+    }
+}
 
-        DetailSection(
-            title = CliSessionsLabels.savings(language),
-            accent = SAVINGS_COLOR,
-            trailing = formatMicrosUsd(analytics.cacheSavingsMicros)
-        ) {
-            NoticeText(CliSessionsLabels.savingsExplanation(language), MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+/** Tudo o que estava na tela antes da divisão e que não cabe no resumo. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SessionAdvancedSections(
+    summary: CliSessionSummary,
+    analytics: CliSessionAnalytics,
+    language: AppLanguage
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MetricCard(
+            label = CliSessionsLabels.input(language),
+            value = formatQuantity(summary.inputTokens),
+            accent = INPUT_COLOR,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.output(language),
+            value = formatQuantity(summary.outputTokens),
+            accent = OUTPUT_COLOR,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.cacheRead(language),
+            value = formatQuantity(summary.cacheReadTokens),
+            accent = CACHE_READ_COLOR,
+            help = GlossaryTerm.CACHE_READ,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.cacheWrite(language),
+            value = formatQuantity(summary.cacheWriteTokens),
+            accent = CACHE_WRITE_COLOR,
+            help = GlossaryTerm.CACHE_WRITE,
+            language = language
+        )
+    }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            MetricCard(
-                CliSessionsLabels.averageContext(language),
-                formatQuantity(analytics.averageContextPerTurn),
-                CACHE_READ_COLOR
-            )
-            MetricCard(
-                CliSessionsLabels.liveContext(language),
-                formatQuantity(analytics.liveContextTokens),
-                CACHE_READ_COLOR
-            )
-            MetricCard(
-                CliSessionsLabels.nextInteraction(language),
-                formatMicrosUsd(analytics.nextInteractionCostMicros),
-                INPUT_COLOR
-            )
-            MetricCard(
-                label = CliSessionsLabels.saturation(language),
-                value = analytics.contextSaturation?.let { value -> formatPercent(value) } ?: "—",
-                accent = healthColor(analytics.health)
-            )
-        }
+    DetailSection(
+        title = CliSessionsLabels.cacheHitRate(language),
+        accent = CACHE_READ_COLOR,
+        trailing = formatPercent(analytics.cacheHitRate),
+        help = listOf(GlossaryTerm.CACHE_HIT_RATE),
+        language = language
+    ) {
+        MeterBar(fraction = analytics.cacheHitRate, color = CACHE_READ_COLOR)
+    }
 
-        DetailSection(
-            title = CliSessionsLabels.contextPerTurnChart(language),
-            accent = CACHE_READ_COLOR
-        ) {
-            TurnSeriesChart(
-                series = listOf(
-                    TurnSeries(
-                        label = CliSessionsLabels.chartContextLegend(language),
-                        values = analytics.contextPerTurn,
-                        color = CACHE_READ_COLOR,
-                        binMode = BinMode.LAST
-                    )
+    DetailSection(
+        title = CliSessionsLabels.costDistribution(language),
+        accent = INPUT_COLOR,
+        trailing = formatMicrosUsd(analytics.costBreakdown.totalMicros),
+        help = listOf(GlossaryTerm.COST_DISTRIBUTION),
+        language = language
+    ) {
+        CostDistributionBar(analytics = analytics)
+        Spacer(modifier = Modifier.height(8.dp))
+        CostDistributionLegend(analytics = analytics, language = language)
+    }
+
+    DetailSection(
+        title = CliSessionsLabels.savings(language),
+        accent = SAVINGS_COLOR,
+        trailing = formatMicrosUsd(analytics.cacheSavingsMicros),
+        help = listOf(GlossaryTerm.SAVINGS),
+        language = language
+    ) {
+        NoticeText(CliSessionsLabels.savingsExplanation(language), MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MetricCard(
+            label = CliSessionsLabels.averageContext(language),
+            value = formatQuantity(analytics.averageContextPerTurn),
+            accent = CACHE_READ_COLOR,
+            help = GlossaryTerm.AVERAGE_CONTEXT,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.liveContext(language),
+            value = formatQuantity(analytics.liveContextTokens),
+            accent = CACHE_READ_COLOR,
+            help = GlossaryTerm.LIVE_CONTEXT,
+            language = language
+        )
+        MetricCard(
+            label = CliSessionsLabels.nextInteraction(language),
+            value = formatMicrosUsd(analytics.nextInteractionCostMicros),
+            accent = INPUT_COLOR,
+            help = GlossaryTerm.NEXT_INTERACTION,
+            language = language
+        )
+    }
+
+    DetailSection(
+        title = CliSessionsLabels.cacheWritePerTurnChart(language),
+        accent = CACHE_WRITE_COLOR,
+        help = listOf(GlossaryTerm.CACHE_WRITE_PER_TURN),
+        language = language
+    ) {
+        TurnSeriesChart(
+            series = listOf(
+                TurnSeries("5m", analytics.cacheWrite5mPerTurn, CACHE_WRITE_COLOR, BinMode.SUM),
+                TurnSeries("1h", analytics.cacheWrite1hPerTurn, OUTPUT_COLOR, BinMode.SUM)
+            ),
+            stacked = true,
+            height = DETAIL_CHART_HEIGHT,
+            valueFormatter = { value -> formatQuantity(value) }
+        )
+    }
+
+    DetailSection(
+        title = CliSessionsLabels.costVersusSavingsChart(language),
+        accent = SAVINGS_COLOR,
+        help = listOf(GlossaryTerm.COST_VERSUS_SAVINGS),
+        language = language
+    ) {
+        TurnSeriesChart(
+            series = listOf(
+                TurnSeries(
+                    label = CliSessionsLabels.chartCostLegend(language),
+                    values = analytics.cumulativeCostMicros,
+                    color = INPUT_COLOR,
+                    binMode = BinMode.MAX
                 ),
-                valueFormatter = { value -> formatQuantity(value) },
-                highlightDrops = true
-            )
+                TurnSeries(
+                    label = CliSessionsLabels.chartSavingsLegend(language),
+                    values = analytics.cumulativeSavingsMicros,
+                    color = SAVINGS_COLOR,
+                    binMode = BinMode.MAX
+                )
+            ),
+            height = DETAIL_CHART_HEIGHT,
+            valueFormatter = { value -> formatMicrosUsdShort(value) }
+        )
+    }
+}
+
+/**
+ * Cabeçalho clicável que revela [content].
+ *
+ * O conteúdo não é composto enquanto está fechado — são dois gráficos e sete
+ * cards que não têm por que existir na árvore só para ficarem invisíveis.
+ */
+@Composable
+private fun AdvancedDisclosure(
+    expanded: Boolean,
+    language: AppLanguage,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        DepthSurface(
+            accent = NEUTRAL_ACCENT,
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
+            glowAlpha = QUIET_GLOW_ALPHA,
+            contentPadding = 14.dp
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (expanded) "▾" else "▸",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = CliSessionsLabels.advancedToggle(language),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = CliSessionsLabels.advancedHint(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
-        DetailSection(
-            title = CliSessionsLabels.cacheWritePerTurnChart(language),
-            accent = CACHE_WRITE_COLOR
-        ) {
-            TurnSeriesChart(
-                series = listOf(
-                    TurnSeries("5m", analytics.cacheWrite5mPerTurn, CACHE_WRITE_COLOR, BinMode.SUM),
-                    TurnSeries("1h", analytics.cacheWrite1hPerTurn, OUTPUT_COLOR, BinMode.SUM)
-                ),
-                stacked = true,
-                valueFormatter = { value -> formatQuantity(value) }
-            )
-        }
-
-        DetailSection(
-            title = CliSessionsLabels.costVersusSavingsChart(language),
-            accent = SAVINGS_COLOR
-        ) {
-            TurnSeriesChart(
-                series = listOf(
-                    TurnSeries(
-                        label = CliSessionsLabels.chartCostLegend(language),
-                        values = analytics.cumulativeCostMicros,
-                        color = INPUT_COLOR,
-                        binMode = BinMode.MAX
-                    ),
-                    TurnSeries(
-                        label = CliSessionsLabels.chartSavingsLegend(language),
-                        values = analytics.cumulativeSavingsMicros,
-                        color = SAVINGS_COLOR,
-                        binMode = BinMode.MAX
-                    )
-                ),
-                valueFormatter = { value -> formatMicrosUsdShort(value) }
-            )
+        if (expanded) {
+            content()
         }
     }
 }
@@ -730,12 +999,17 @@ private fun healthColor(health: CliSessionHealth): Color {
 private fun DetailSection(
     title: String,
     accent: Color,
+    // Sem default: um `help` acompanhado de um idioma implícito renderizaria
+    // português no meio da tela em inglês, e o compilador não reclamaria.
+    language: AppLanguage,
     trailing: String? = null,
+    help: List<GlossaryTerm> = emptyList(),
     content: @Composable () -> Unit
 ) {
     DepthSurface(
         accent = accent,
         modifier = Modifier.fillMaxWidth(),
+        glowAlpha = QUIET_GLOW_ALPHA,
         contentPadding = 14.dp
     ) {
         Row(
@@ -755,6 +1029,9 @@ private fun DetailSection(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
+                if (help.isNotEmpty()) {
+                    HelpDot(terms = help, language = language)
+                }
             }
             if (trailing != null) {
                 Text(
@@ -775,20 +1052,35 @@ private fun MetricCard(
     label: String,
     value: String,
     accent: Color,
-    footer: String? = null
+    // Mesma razão de [DetailSection]: idioma implícito vaza português.
+    language: AppLanguage,
+    footer: String? = null,
+    help: GlossaryTerm? = null
 ) {
     DepthSurface(
         accent = accent,
         modifier = Modifier.width(168.dp),
+        glowAlpha = QUIET_GLOW_ALPHA,
         contentPadding = 12.dp
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // O rótulo cede a largura ao `?`: truncado ele ainda se lê, mas o
+                // ícone empurrado para fora do card some.
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (help != null) {
+                HelpDot(terms = listOf(help), language = language)
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
@@ -834,6 +1126,99 @@ private fun MetricText(
 @Composable
 private fun NoticeText(message: String, color: Color) {
     Text(text = message, style = MaterialTheme.typography.labelSmall, color = color)
+}
+
+/**
+ * O `?` ao lado de um título, com a definição no hover.
+ *
+ * A tooltip é persistente (ver `HoverTooltipBox`): explicação de três linhas não
+ * se lê no tempo de uma tooltip que some sozinha.
+ */
+@Composable
+private fun HelpDot(terms: List<GlossaryTerm>, language: AppLanguage) {
+    val entries = terms.map { term -> CliSessionsGlossary.entry(term, language) }
+    val first = entries.first()
+
+    HoverTooltipBox(
+        title = first.title,
+        subtitle = first.explanation,
+        // Os termos seguintes entram como métricas para não empilhar tooltips:
+        // um gráfico pode carregar duas dúvidas, e são duas linhas, não dois `?`.
+        metrics = entries.drop(1).map { entry -> TooltipMetric(entry.title, entry.explanation) }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .clip(AppShapes.small)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "?",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * "Como ler esta tela": o glossário inteiro, recolhido.
+ *
+ * Existe porque o `?` só responde a quem já sabe onde tem dúvida. Quem não
+ * conhece o vocabulário precisa de um lugar único para lê-lo de ponta a ponta.
+ */
+@Composable
+private fun GlossaryPanel(
+    expanded: Boolean,
+    language: AppLanguage,
+    onToggle: () -> Unit
+) {
+    DepthSurface(
+        accent = NEUTRAL_ACCENT,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
+        glowAlpha = QUIET_GLOW_ALPHA,
+        contentPadding = 14.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (expanded) "▾" else "▸",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = CliSessionsLabels.glossaryTitle(language),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        if (!expanded) {
+            return@DepthSurface
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        for (term in CliSessionsGlossary.readingOrder) {
+            val entry = CliSessionsGlossary.entry(term, language)
+            Text(
+                text = entry.title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = entry.explanation,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+    }
 }
 
 @Composable

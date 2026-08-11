@@ -428,6 +428,73 @@ class CliSessionsViewModelTest {
     }
 
     @Test
+    fun `toggling the advanced block flips the flag`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+
+        try {
+            assertFalse(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).advancedExpanded)
+
+            viewModel.toggleAdvanced()
+            assertTrue(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).advancedExpanded)
+
+            viewModel.toggleAdvanced()
+            assertFalse(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).advancedExpanded)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    /**
+     * `loadSessions` reconstrói o `Success` do zero, e o laço ao vivo o chama de
+     * cinco em cinco segundos. Sem carregar a flag do estado anterior o bloco
+     * Avançado fecharia sozinho na cara de quem o abriu.
+     */
+    @Test
+    fun `the advanced block survives a tick of the live loop`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            viewModel.toggleAdvanced()
+
+            // Muda o conteúdo: um tique sem novidade não reemite o estado e o
+            // teste passaria por acidente.
+            repository.sessions = listOf(summary("a"), summary("b"))
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+            assertEquals(listOf("a", "b"), state.sessions.map { session -> session.sessionId })
+            assertTrue(state.advancedExpanded)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `the glossary panel survives a tick of the live loop`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            viewModel.toggleGlossary()
+
+            repository.sessions = listOf(summary("a"), summary("b"))
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+            assertEquals(listOf("a", "b"), state.sessions.map { session -> session.sessionId })
+            assertTrue(state.glossaryExpanded)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
     fun `closing the window stops the live loop`() = runTest {
         val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
         val viewModel = buildViewModel(repository, autoLoad = false)

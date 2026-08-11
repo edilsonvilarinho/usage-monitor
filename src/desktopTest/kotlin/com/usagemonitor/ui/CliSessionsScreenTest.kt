@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -21,6 +22,8 @@ import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
+import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
@@ -364,7 +367,49 @@ class CliSessionsScreenTest {
     }
 
     @Test
-    fun `detail renders the analytics sections`() = runDesktopComposeUiTest {
+    fun `detail renders the analytics sections once the advanced block is open`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01", costMicros = 5_000_000L)
+        val detail = CliSessionDetail(
+            summary = summary,
+            turns = listOf(
+                turn(seq = 1, cacheReadTokens = 10_000L, cacheWrite1hTokens = 4_000L),
+                turn(seq = 2, cacheReadTokens = 30_000L, cacheWrite5mTokens = 2_000L)
+            )
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            ),
+                            advancedExpanded = true
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Contexto por turno").assertExists()
+        onNodeWithText("Distribuição de custo").assertExists()
+        onNodeWithText("Economia do cache").assertExists()
+        onNodeWithText("Cache gravado por turno").assertExists()
+        onNodeWithText("Custo x economia acumulados").assertExists()
+    }
+
+    @Test
+    fun `detail opens with the essentials and hides the rest`() = runDesktopComposeUiTest {
         val summary = summary("session-abcdef01", costMicros = 5_000_000L)
         val detail = CliSessionDetail(
             summary = summary,
@@ -397,12 +442,52 @@ class CliSessionsScreenTest {
             }
         }
 
-        onNodeWithText("Taxa de acerto de cache").assertIsDisplayed()
-        onNodeWithText("Distribuição de custo").assertIsDisplayed()
-        // Abaixo da dobra na altura de teste: basta existirem na árvore.
-        onNodeWithText("Economia do cache").assertExists()
+        // O essencial: veredito, resumo e o único gráfico do primeiro nível.
+        onNodeWithText("Sessão saudável").assertIsDisplayed()
+        onNodeWithText("Custo").assertExists()
+        onNodeWithText("Tokens (com cache)").assertExists()
         onNodeWithText("Contexto por turno").assertExists()
-        onNodeWithText("Custo x economia acumulados").assertExists()
+        onNodeWithText("Avançado").assertExists()
+
+        // Fechado, o bloco avançado nem entra na árvore.
+        onNodeWithText("Distribuição de custo").assertDoesNotExist()
+        onNodeWithText("Cache gravado por turno").assertDoesNotExist()
+        onNodeWithText("Custo x economia acumulados").assertDoesNotExist()
+    }
+
+    @Test
+    fun `clicking the advanced header reports the toggle`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+        var toggled = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {},
+                        onToggleAdvanced = { toggled = true }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Avançado").performClick()
+
+        assertEquals(true, toggled)
     }
 
     @Test
@@ -576,6 +661,201 @@ class CliSessionsScreenTest {
         onNodeWithText("Voltar").performClick()
 
         assertEquals(true, closed)
+    }
+
+    @Test
+    fun `the glossary panel is collapsed until it is opened`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Como ler esta tela").assertExists()
+        onNodeWithText("Turno de subagente").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the open glossary explains the terms of the screen`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            ),
+                            glossaryExpanded = true
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Turno de subagente").assertExists()
+        onNodeWithText("Compactação").assertExists()
+    }
+
+    /**
+     * O idioma tem de chegar ao glossário. O teste de domínio garante que existe
+     * texto em inglês; este garante que a tela pede o inglês.
+     */
+    @Test
+    fun `the detail speaks english when the app does`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            ),
+                            glossaryExpanded = true
+                        ),
+                        language = AppLanguage.EN,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("How to read this screen").assertExists()
+        onNodeWithText("Subagent turn").assertExists()
+        onNodeWithText("Advanced").assertExists()
+        // O rótulo em português não pode sobreviver em lugar nenhum da tela.
+        onNodeWithText("Turno de subagente").assertDoesNotExist()
+        onNodeWithText("Como ler esta tela").assertDoesNotExist()
+    }
+
+    @Test
+    fun `clicking the glossary header reports the toggle`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+        var toggled = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {},
+                        onToggleGlossary = { toggled = true }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Como ler esta tela").performClick()
+
+        assertEquals(true, toggled)
+    }
+
+    @Test
+    fun `the list carries a scroll indicator`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01"), summary("session-abcdef02"))
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // `assertExists` e não `assertIsDisplayed`: com pouco conteúdo o polegar
+        // da barra tem altura zero e não conta como exibido.
+        onNodeWithTag(LIST_SCROLLBAR_TAG, useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun `the detail carries a scroll indicator`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(DETAIL_SCROLLBAR_TAG, useUnmergedTree = true).assertExists()
     }
 
     @Test

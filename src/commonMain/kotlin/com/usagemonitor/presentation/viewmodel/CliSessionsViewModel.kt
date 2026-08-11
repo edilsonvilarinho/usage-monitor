@@ -154,6 +154,27 @@ class CliSessionsViewModel(
         }
     }
 
+    /**
+     * Abre ou fecha o bloco Avançado do detalhe.
+     *
+     * A escolha vale para a janela toda, não para a sessão aberta: quem quer ver
+     * os gráficos de uma sessão quer vê-los na próxima também.
+     */
+    fun toggleAdvanced() {
+        val current = _uiState.value
+        if (current is CliSessionsUiState.Success) {
+            _uiState.value = current.copy(advancedExpanded = !current.advancedExpanded)
+        }
+    }
+
+    /** Abre ou fecha o painel "Como ler esta tela". */
+    fun toggleGlossary() {
+        val current = _uiState.value
+        if (current is CliSessionsUiState.Success) {
+            _uiState.value = current.copy(glossaryExpanded = !current.glossaryExpanded)
+        }
+    }
+
     fun onDestroy() {
         loadJob?.cancel()
         detailJob?.cancel()
@@ -224,7 +245,11 @@ class CliSessionsViewModel(
                     detail = current?.detail,
                     // Carimbo só anda quando o conteúdo muda. Marcar cada tique
                     // quebraria a igualdade do estado e recomporia a tela à toa.
-                    lastChangedAt = if (contentChanged) clock.now() else current?.lastChangedAt
+                    lastChangedAt = if (contentChanged) clock.now() else current?.lastChangedAt,
+                    // Estado da UI, não do índice: sem carregá-lo daqui os blocos
+                    // recolhíveis se fechariam sozinhos a cada tique do laço ao vivo.
+                    advancedExpanded = current?.advancedExpanded ?: false,
+                    glossaryExpanded = current?.glossaryExpanded ?: false
                 )
             },
             onFailure = { error ->
