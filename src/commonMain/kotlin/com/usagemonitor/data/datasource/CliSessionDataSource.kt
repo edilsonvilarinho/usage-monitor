@@ -18,15 +18,15 @@ interface CliSessionDataSource {
     /**
      * Sessões do índice, da mais recente para a mais antiga.
      * [profileId] nulo devolve todas as contas.
+     *
+     * [sinceEpochMillis] reagrega cada sessão somando só os turnos a partir
+     * desse instante; `null` devolve os agregados gravados na sessão.
      */
     suspend fun readSessions(
         profileId: String? = null,
-        includeHidden: Boolean = false
+        sinceEpochMillis: Long? = null
     ): List<CliSessionSummary>
 
     /** Sessão com os turnos, ou `null` se o identificador não estiver no índice. */
     suspend fun readSession(sessionId: String): CliSessionDetail?
-
-    /** Marca a sessão como oculta na lista. O transcript no disco não é tocado. */
-    suspend fun setHidden(sessionId: String, hidden: Boolean)
 }

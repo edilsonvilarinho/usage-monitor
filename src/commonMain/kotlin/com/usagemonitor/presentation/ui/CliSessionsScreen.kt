@@ -40,6 +40,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionAnalytics
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.presentation.ui.components.BinMode
 import com.usagemonitor.presentation.ui.components.DepthSurface
@@ -56,15 +57,14 @@ private val OUTPUT_COLOR = Color(0xFFB07CFF)
 private val CACHE_READ_COLOR = Color(0xFF4CAF50)
 private val CACHE_WRITE_COLOR = Color(0xFFFFA726)
 private val SAVINGS_COLOR = Color(0xFF26C6DA)
-private val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
 private val SATURATED_COLOR = Color(0xFFE05252)
+private val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
 fun CliSessionsScreen(
     viewModel: CliSessionsViewModel,
     language: AppLanguage,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -72,12 +72,10 @@ fun CliSessionsScreen(
     CliSessionsContent(
         state = state,
         language = language,
-        onBack = onBack,
         onRefresh = { viewModel.refresh() },
-        onToggleShowHidden = { viewModel.toggleShowHidden() },
+        onSelectRange = { range -> viewModel.setRange(range) },
         onOpenSession = { sessionId -> viewModel.openSession(sessionId) },
         onCloseDetail = { viewModel.closeDetail() },
-        onSetHidden = { sessionId, hidden -> viewModel.setSessionHidden(sessionId, hidden) },
         modifier = modifier
     )
 }
@@ -86,12 +84,10 @@ fun CliSessionsScreen(
 internal fun CliSessionsContent(
     state: CliSessionsUiState,
     language: AppLanguage,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onToggleShowHidden: () -> Unit,
+    onSelectRange: (CliSessionRange) -> Unit,
     onOpenSession: (String) -> Unit,
     onCloseDetail: () -> Unit,
-    onSetHidden: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -106,11 +102,9 @@ internal fun CliSessionsContent(
                     CliSessionsList(
                         state = state,
                         language = language,
-                        onBack = onBack,
                         onRefresh = onRefresh,
-                        onToggleShowHidden = onToggleShowHidden,
-                        onOpenSession = onOpenSession,
-                        onSetHidden = onSetHidden
+                        onSelectRange = onSelectRange,
+                        onOpenSession = onOpenSession
                     )
                 } else {
                     CliSessionDetailPane(
@@ -143,19 +137,16 @@ private fun CenteredMessage(message: String) {
 private fun CliSessionsList(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onToggleShowHidden: () -> Unit,
-    onOpenSession: (String) -> Unit,
-    onSetHidden: (String, Boolean) -> Unit
+    onSelectRange: (CliSessionRange) -> Unit,
+    onOpenSession: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         CliSessionsHeader(
             state = state,
             language = language,
-            onBack = onBack,
             onRefresh = onRefresh,
-            onToggleShowHidden = onToggleShowHidden
+            onSelectRange = onSelectRange
         )
 
         if (state.indexWarning != null) {
@@ -163,7 +154,7 @@ private fun CliSessionsList(
         }
 
         if (state.sessions.isEmpty()) {
-            CenteredMessage(CliSessionsLabels.empty(language))
+            CenteredMessage(CliSessionsLabels.emptyInRange(state.range, state.rangeAnchored, language))
             return@Column
         }
 
@@ -175,8 +166,7 @@ private fun CliSessionsList(
                 CliSessionRow(
                     session = session,
                     language = language,
-                    onOpen = { onOpenSession(session.sessionId) },
-                    onToggleHidden = { onSetHidden(session.sessionId, !session.hidden) }
+                    onOpen = { onOpenSession(session.sessionId) }
                 )
             }
         }
@@ -188,9 +178,8 @@ private fun CliSessionsList(
 private fun CliSessionsHeader(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onToggleShowHidden: () -> Unit
+    onSelectRange: (CliSessionRange) -> Unit
 ) {
     DepthSurface(
         accent = CACHE_READ_COLOR,
@@ -229,6 +218,20 @@ private fun CliSessionsHeader(
 
             Column {
                 Text(
+                    text = formatQuantity(state.totalTokens),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CACHE_READ_COLOR
+                )
+                Text(
+                    text = CliSessionsLabels.columnTokens(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Column {
+                Text(
                     text = if (state.isTotalCostComplete) {
                         formatMicrosUsdShort(state.totalCostMicros)
                     } else {
@@ -239,22 +242,25 @@ private fun CliSessionsHeader(
                     color = INPUT_COLOR
                 )
                 Text(
-                    text = CliSessionsLabels.estimatedTotal(language),
+                    text = if (state.range == CliSessionRange.ALL) {
+                        CliSessionsLabels.estimatedTotal(language)
+                    } else {
+                        CliSessionsLabels.estimatedTotalInRange(state.range, state.rangeEndsAt, language)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            FilterChip(
-                selected = state.showHidden,
-                onClick = onToggleShowHidden,
-                label = { Text(CliSessionsLabels.showHidden(language)) }
-            )
+            for (entry in CliSessionRange.entries) {
+                FilterChip(
+                    selected = state.range == entry,
+                    onClick = { onSelectRange(entry) },
+                    label = { Text(CliSessionsLabels.rangeLabel(entry, language)) }
+                )
+            }
             TextButton(onClick = onRefresh) {
                 Text(CliSessionsLabels.refresh(language))
-            }
-            TextButton(onClick = onBack) {
-                Text(CliSessionsLabels.back(language))
             }
         }
     }
@@ -265,13 +271,12 @@ private fun CliSessionsHeader(
 private fun CliSessionRow(
     session: CliSessionSummary,
     language: AppLanguage,
-    onOpen: () -> Unit,
-    onToggleHidden: () -> Unit
+    onOpen: () -> Unit
 ) {
     DepthSurface(
-        accent = if (session.hidden) NEUTRAL_ACCENT else CACHE_READ_COLOR,
+        accent = CACHE_READ_COLOR,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-        glowAlpha = if (session.hidden) 0.10f else 0.16f,
+        glowAlpha = 0.16f,
         contentPadding = 14.dp
     ) {
         FlowRow(
@@ -326,24 +331,6 @@ private fun CliSessionRow(
                 },
                 valueColor = INPUT_COLOR
             )
-
-            if (session.hidden) {
-                Text(
-                    text = CliSessionsLabels.hiddenBadge(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            TextButton(onClick = onToggleHidden) {
-                Text(
-                    text = if (session.hidden) {
-                        CliSessionsLabels.unhide(language)
-                    } else {
-                        CliSessionsLabels.hide(language)
-                    }
-                )
-            }
         }
     }
 }
@@ -397,6 +384,8 @@ private fun CliSessionDetailBody(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         SessionHealthBanner(analytics = analytics, language = language)
+
+        SessionMetadataCard(summary = summary, language = language)
 
         if (summary.stale) {
             NoticeText(CliSessionsLabels.staleNotice(language), MaterialTheme.colorScheme.error)
@@ -600,6 +589,35 @@ private fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLan
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
+        }
+    }
+}
+
+/**
+ * Onde a sessão rodou. A máquina não vem do transcript — o Claude Code não a
+ * registra — e sim de quem indexou o arquivo, que é a mesma máquina no uso normal.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguage) {
+    DepthSurface(
+        accent = NEUTRAL_ACCENT,
+        modifier = Modifier.fillMaxWidth(),
+        glowAlpha = 0.10f,
+        contentPadding = 14.dp
+    ) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MetricText(CliSessionsLabels.machine(language), summary.hostName ?: "—")
+            MetricText(CliSessionsLabels.projectPath(language), summary.cwd ?: "—")
+            MetricText(CliSessionsLabels.branch(language), summary.gitBranch ?: "—")
+            MetricText(
+                label = CliSessionsLabels.period(language),
+                value = "${formatInstant(summary.firstTs)} → ${formatInstant(summary.lastTs)}"
+            )
         }
     }
 }

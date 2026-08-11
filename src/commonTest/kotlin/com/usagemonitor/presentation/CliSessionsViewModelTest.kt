@@ -1,19 +1,24 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
-import com.usagemonitor.domain.usecase.SetCliSessionHiddenUseCase
+import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +26,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+
+private val FIXED_NOW = Instant.parse("2026-08-10T12:00:00Z")
+private const val FIVE_HOURS_MILLIS = 5L * 60 * 60 * 1_000
+private const val SEVEN_DAYS_MILLIS = 7L * 24 * 60 * 60 * 1_000
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CliSessionsViewModelTest {
@@ -78,6 +89,20 @@ class CliSessionsViewModelTest {
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
         assertEquals(2_000_000L, state.totalCostMicros)
         assertTrue(state.isTotalCostComplete)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `total tokens sums every component of the listed sessions`() = runTest {
+        val repository = FakeCliSessionRepository(
+            sessions = listOf(
+                summary("a", inputTokens = 100L, outputTokens = 200L, cacheReadTokens = 700L),
+                summary("b", inputTokens = 1L, cacheWrite5mTokens = 2L, cacheWrite1hTokens = 3L)
+            )
+        )
+        val viewModel = buildViewModel(repository)
+
+        assertEquals(1_006L, assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).totalTokens)
         viewModel.onDestroy()
     }
 
@@ -148,55 +173,147 @@ class CliSessionsViewModelTest {
     }
 
     @Test
-    fun `toggling hidden sessions reloads including them`() = runTest {
+    fun `the window defaults to the last five hours`() = runTest {
         val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
         val viewModel = buildViewModel(repository)
 
-        assertEquals(false, repository.lastIncludeHidden)
-
-        viewModel.toggleShowHidden()
-
-        assertEquals(true, repository.lastIncludeHidden)
-        assertTrue(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).showHidden)
+        assertEquals(
+            FIXED_NOW.toEpochMilliseconds() - FIVE_HOURS_MILLIS,
+            repository.lastSinceEpochMillis
+        )
+        assertEquals(
+            CliSessionRange.LAST_5H,
+            assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).range
+        )
         viewModel.onDestroy()
     }
 
     @Test
-    fun `hiding a session records the flag and reloads the list`() = runTest {
-        val repository = FakeCliSessionRepository(sessions = listOf(summary("a"), summary("b")))
+    fun `selecting a window reloads with the matching cutoff`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
         val viewModel = buildViewModel(repository)
 
-        repository.sessions = listOf(summary("b"))
-        viewModel.setSessionHidden("a", hidden = true)
+        viewModel.setRange(CliSessionRange.LAST_7D)
 
-        assertEquals(listOf("a" to true), repository.hiddenCalls)
+        assertEquals(
+            FIXED_NOW.toEpochMilliseconds() - SEVEN_DAYS_MILLIS,
+            repository.lastSinceEpochMillis
+        )
+        assertEquals(
+            CliSessionRange.LAST_7D,
+            assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).range
+        )
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `the total window asks the repository for every turn`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.setRange(CliSessionRange.ALL)
+
+        assertNull(repository.lastSinceEpochMillis)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `the 5h window anchors on the account quota reset`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+        val resetsAt = FIXED_NOW + 30.minutes
+
+        viewModel.openForProfile(
+            profileId = "conta2",
+            profileLabel = "INFORMATA2",
+            quotaWindows = CliQuotaWindows(fiveHourEndsAt = resetsAt)
+        )
+
+        assertEquals(
+            resetsAt.toEpochMilliseconds() - FIVE_HOURS_MILLIS,
+            repository.lastSinceEpochMillis
+        )
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
-        assertEquals(listOf("b"), state.sessions.map { session -> session.sessionId })
+        assertEquals(resetsAt, state.rangeEndsAt)
+        assertTrue(state.rangeAnchored)
         viewModel.onDestroy()
     }
 
     @Test
-    fun `hiding the open session drops the detail on reload`() = runTest {
-        val repository = FakeCliSessionRepository(sessions = listOf(summary("a"), summary("b")))
-        val viewModel = buildViewModel(repository)
-
-        viewModel.openSession("a")
-        repository.sessions = listOf(summary("b"))
-        viewModel.setSessionHidden("a", hidden = true)
-
-        assertNull(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).detail)
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `failing to hide a session surfaces an error`() = runTest {
+    fun `without a quota reset the state reports a sliding window`() = runTest {
         val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
-        repository.hiddenResult = Result.failure(IllegalStateException("banco travado"))
         val viewModel = buildViewModel(repository)
 
-        viewModel.setSessionHidden("a", hidden = true)
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertNull(state.rangeEndsAt)
+        assertFalse(state.rangeAnchored)
+        viewModel.onDestroy()
+    }
 
-        assertEquals("banco travado", assertIs<CliSessionsUiState.Error>(viewModel.uiState.value).message)
+    @Test
+    fun `a repeated quota reset does not reload the list`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val windows = CliQuotaWindows(fiveHourEndsAt = FIXED_NOW + 30.minutes)
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        viewModel.openForProfile("conta2", "INFORMATA2", windows)
+        val loadsAfterOpen = repository.syncCalls
+
+        // O dashboard reemite o mesmo `resets_at` a cada coleta.
+        viewModel.setQuotaWindows(windows)
+
+        assertEquals(loadsAfterOpen, repository.syncCalls)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a new quota reset reloads with the new cutoff`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+        viewModel.openForProfile(
+            profileId = "conta2",
+            profileLabel = "INFORMATA2",
+            quotaWindows = CliQuotaWindows(fiveHourEndsAt = FIXED_NOW + 30.minutes)
+        )
+
+        val rolledOver = FIXED_NOW + 5.hours
+        viewModel.setQuotaWindows(CliQuotaWindows(fiveHourEndsAt = rolledOver))
+
+        assertEquals(
+            rolledOver.toEpochMilliseconds() - FIVE_HOURS_MILLIS,
+            repository.lastSinceEpochMillis
+        )
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a quota reset does not reload while the total window is selected`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+        viewModel.setRange(CliSessionRange.ALL)
+        val syncCallsBefore = repository.syncCalls
+
+        viewModel.setQuotaWindows(CliQuotaWindows(fiveHourEndsAt = FIXED_NOW + 30.minutes))
+
+        assertEquals(syncCallsBefore, repository.syncCalls)
+        assertNull(repository.lastSinceEpochMillis)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `the selected window survives refresh and account switch`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.setRange(CliSessionRange.LAST_30D)
+        viewModel.refresh()
+        viewModel.openForProfile("conta3", "INFORMATA")
+
+        assertEquals("conta3", repository.lastProfileId)
+        assertEquals(
+            CliSessionRange.LAST_30D,
+            assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).range
+        )
         viewModel.onDestroy()
     }
 
@@ -210,19 +327,6 @@ class CliSessionsViewModelTest {
         assertEquals("conta2", repository.lastProfileId)
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
         assertEquals("INFORMATA2", state.profileLabel)
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `the selected account survives refresh and hidden toggle`() = runTest {
-        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
-        val viewModel = buildViewModel(repository, autoLoad = false)
-
-        viewModel.openForProfile("conta3", "INFORMATA")
-        viewModel.toggleShowHidden()
-
-        assertEquals("conta3", repository.lastProfileId)
-        assertEquals(true, repository.lastIncludeHidden)
         viewModel.onDestroy()
     }
 
@@ -253,23 +357,77 @@ class CliSessionsViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `background indexing runs at boot and again after the interval`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(
+            repository = repository,
+            autoLoad = false,
+            backgroundIndexIntervalMillis = 10 * 60 * 1_000L
+        )
+
+        try {
+            runCurrent()
+            // Índice sincronizado sem a lista carregada: a janela nem foi aberta.
+            assertEquals(1, repository.syncCalls)
+            assertIs<CliSessionsUiState.Loading>(viewModel.uiState.value)
+
+            advanceTimeBy(10 * 60 * 1_000L)
+            runCurrent()
+
+            assertEquals(2, repository.syncCalls)
+            assertIs<CliSessionsUiState.Loading>(viewModel.uiState.value)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `background indexing refreshes the list while it is visible`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(
+            repository = repository,
+            backgroundIndexIntervalMillis = 10 * 60 * 1_000L
+        )
+
+        try {
+            runCurrent()
+            repository.sessions = listOf(summary("a"), summary("b"))
+
+            advanceTimeBy(10 * 60 * 1_000L)
+            runCurrent()
+
+            val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+            assertEquals(listOf("a", "b"), state.sessions.map { session -> session.sessionId })
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
     private fun kotlinx.coroutines.test.TestScope.buildViewModel(
         repository: FakeCliSessionRepository,
-        autoLoad: Boolean = true
+        autoLoad: Boolean = true,
+        backgroundIndexIntervalMillis: Long? = null
     ): CliSessionsViewModel {
         return CliSessionsViewModel(
-            getCliSessions = GetCliSessionsUseCase(repository),
+            getCliSessions = GetCliSessionsUseCase(repository, FixedClock(FIXED_NOW)),
             getCliSessionDetail = GetCliSessionDetailUseCase(repository),
-            setCliSessionHidden = SetCliSessionHiddenUseCase(repository),
+            syncCliSessionIndex = SyncCliSessionIndexUseCase(repository),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
-            autoLoad = autoLoad
+            autoLoad = autoLoad,
+            backgroundIndexIntervalMillis = backgroundIndexIntervalMillis
         )
     }
 
     private fun summary(
         sessionId: String,
         costMicros: Long = 0L,
-        unpricedTurnCount: Int = 0
+        unpricedTurnCount: Int = 0,
+        inputTokens: Long = 0L,
+        outputTokens: Long = 0L,
+        cacheReadTokens: Long = 0L,
+        cacheWrite5mTokens: Long = 0L,
+        cacheWrite1hTokens: Long = 0L
     ): CliSessionSummary {
         return CliSessionSummary(
             sessionId = sessionId,
@@ -277,6 +435,11 @@ class CliSessionsViewModelTest {
             firstTs = Instant.fromEpochMilliseconds(0L),
             lastTs = Instant.fromEpochMilliseconds(1_000L),
             primaryModel = "claude-opus-5",
+            inputTokens = inputTokens,
+            outputTokens = outputTokens,
+            cacheReadTokens = cacheReadTokens,
+            cacheWrite5mTokens = cacheWrite5mTokens,
+            cacheWrite1hTokens = cacheWrite1hTokens,
             costMicros = costMicros,
             unpricedTurnCount = unpricedTurnCount
         )
@@ -294,20 +457,23 @@ class CliSessionsViewModelTest {
     }
 }
 
+/** Relógio parado: o corte da janela precisa ser conferível ao milissegundo. */
+private class FixedClock(private val fixedNow: Instant) : Clock {
+    override fun now(): Instant = fixedNow
+}
+
 private class FakeCliSessionRepository(
     var sessions: List<CliSessionSummary> = emptyList()
 ) : CliSessionRepository {
 
     val turnsBySession = mutableMapOf<String, List<CliSessionTurn>>()
-    val hiddenCalls = mutableListOf<Pair<String, Boolean>>()
 
     var syncResult: Result<CliSessionIndexReport> = Result.success(CliSessionIndexReport())
     var sessionsResult: Result<List<CliSessionSummary>>? = null
     var detailOverride: Result<CliSessionDetail?>? = null
-    var hiddenResult: Result<Unit> = Result.success(Unit)
 
     var syncCalls: Int = 0
-    var lastIncludeHidden: Boolean? = null
+    var lastSinceEpochMillis: Long? = null
     var lastProfileId: String? = null
 
     override suspend fun syncIndex(): Result<CliSessionIndexReport> {
@@ -317,9 +483,9 @@ private class FakeCliSessionRepository(
 
     override suspend fun getSessions(
         profileId: String?,
-        includeHidden: Boolean
+        sinceEpochMillis: Long?
     ): Result<List<CliSessionSummary>> {
-        lastIncludeHidden = includeHidden
+        lastSinceEpochMillis = sinceEpochMillis
         lastProfileId = profileId
         return sessionsResult ?: Result.success(sessions)
     }
@@ -332,10 +498,5 @@ private class FakeCliSessionRepository(
         return Result.success(
             CliSessionDetail(summary = summary, turns = turnsBySession[sessionId].orEmpty())
         )
-    }
-
-    override suspend fun setSessionHidden(sessionId: String, hidden: Boolean): Result<Unit> {
-        hiddenCalls.add(sessionId to hidden)
-        return hiddenResult
     }
 }

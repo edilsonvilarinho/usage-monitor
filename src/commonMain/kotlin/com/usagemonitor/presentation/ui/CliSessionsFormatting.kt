@@ -2,7 +2,9 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.MICROS_PER_USD
+import kotlinx.datetime.Instant
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
@@ -59,20 +61,42 @@ internal object CliSessionsLabels {
         return if (language == AppLanguage.PT) "custo estimado" else "estimated cost"
     }
 
-    fun showHidden(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Mostrar ocultas" else "Show hidden"
+    /**
+     * Deixa explícito que os totais do header são só do período selecionado — e,
+     * quando o corte está ancorado na quota, até quando essa janela vale. Sem o
+     * horário, "5h" seria confundido com as últimas cinco horas corridas.
+     */
+    fun estimatedTotalInRange(
+        range: CliSessionRange,
+        endsAt: Instant?,
+        language: AppLanguage
+    ): String {
+        val window = rangeLabel(range, language)
+        if (endsAt == null) {
+            return if (language == AppLanguage.PT) {
+                "custo estimado · últimas $window"
+            } else {
+                "estimated cost · last $window"
+            }
+        }
+        return if (language == AppLanguage.PT) {
+            "custo estimado · janela $window até ${formatInstant(endsAt)}"
+        } else {
+            "estimated cost · $window window until ${formatInstant(endsAt)}"
+        }
+    }
+
+    fun rangeLabel(range: CliSessionRange, language: AppLanguage): String {
+        return when (range) {
+            CliSessionRange.LAST_5H -> "5h"
+            CliSessionRange.LAST_7D -> if (language == AppLanguage.PT) "7 dias" else "7 days"
+            CliSessionRange.LAST_30D -> if (language == AppLanguage.PT) "30 dias" else "30 days"
+            CliSessionRange.ALL -> if (language == AppLanguage.PT) "Total" else "All time"
+        }
     }
 
     fun refresh(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Atualizar" else "Refresh"
-    }
-
-    fun hide(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Ocultar" else "Hide"
-    }
-
-    fun unhide(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Reexibir" else "Unhide"
     }
 
     fun back(language: AppLanguage): String {
@@ -85,6 +109,45 @@ internal object CliSessionsLabels {
         } else {
             "No Claude Code sessions found in ~/.claude/projects."
         }
+    }
+
+    /**
+     * Lista vazia com filtro ativo não significa índice vazio — dizer que não há
+     * nada em `~/.claude/projects` seria falso na maioria das vezes.
+     */
+    fun emptyInRange(range: CliSessionRange, isAnchored: Boolean, language: AppLanguage): String {
+        if (range == CliSessionRange.ALL) {
+            return empty(language)
+        }
+        val window = rangeLabel(range, language)
+        if (isAnchored) {
+            return if (language == AppLanguage.PT) {
+                "Nenhuma sessão nesta janela de quota ($window). Escolha uma janela maior."
+            } else {
+                "No session in the current quota window ($window). Pick a wider range."
+            }
+        }
+        return if (language == AppLanguage.PT) {
+            "Nenhuma sessão com atividade nas últimas $window. Escolha uma janela maior."
+        } else {
+            "No session active in the last $window. Pick a wider range."
+        }
+    }
+
+    fun machine(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Máquina" else "Machine"
+    }
+
+    fun projectPath(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Projeto" else "Project"
+    }
+
+    fun branch(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Branch" else "Branch"
+    }
+
+    fun period(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Período" else "Period"
     }
 
     fun loading(language: AppLanguage): String {
@@ -274,9 +337,5 @@ internal object CliSessionsLabels {
 
     fun turnsLabel(count: Int, language: AppLanguage): String {
         return if (language == AppLanguage.PT) "$count turnos" else "$count turns"
-    }
-
-    fun hiddenBadge(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "oculta" else "hidden"
     }
 }

@@ -1,7 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
+import kotlinx.datetime.Instant
 
 sealed interface CliSessionsUiState {
 
@@ -9,13 +11,18 @@ sealed interface CliSessionsUiState {
 
     data class Error(
         val message: String,
-        val showHidden: Boolean = false,
+        val range: CliSessionRange = CliSessionRange.DEFAULT,
         val profileLabel: String? = null
     ) : CliSessionsUiState
 
     data class Success(
+        /** Sessões já recortadas por [range]: os agregados são os da janela. */
         val sessions: List<CliSessionSummary>,
-        val showHidden: Boolean = false,
+        val range: CliSessionRange = CliSessionRange.DEFAULT,
+        /** Fim da janela de quota quando o corte está ancorado nela. */
+        val rangeEndsAt: Instant? = null,
+        /** `true` quando o corte veio do reset da quota, não do relógio. */
+        val rangeAnchored: Boolean = false,
         /** Conta Anthropic dona destas sessões; nula na visão agregada. */
         val profileLabel: String? = null,
         /** Falha de indexação que não impediu a leitura do índice já gravado. */
@@ -26,6 +33,9 @@ sealed interface CliSessionsUiState {
 
         val totalCostMicros: Long
             get() = sessions.sumOf { session -> session.costMicros }
+
+        val totalTokens: Long
+            get() = sessions.sumOf { session -> session.totalTokens }
 
         /** Ao menos uma sessão tem turnos sem preço: o total exibido é parcial. */
         val isTotalCostComplete: Boolean

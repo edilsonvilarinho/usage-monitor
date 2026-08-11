@@ -41,7 +41,10 @@ import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliProjectRoot
+import com.usagemonitor.domain.entity.CliQuotaWindows
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -57,7 +60,7 @@ import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
-import com.usagemonitor.domain.usecase.SetCliSessionHiddenUseCase
+import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import com.usagemonitor.presentation.ui.DesktopDialogFrame
@@ -73,6 +76,7 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
@@ -100,6 +104,9 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+
+/** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
+private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
 private const val ENABLED_APIS_KEY = "enabledApis"
 private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
@@ -308,14 +315,17 @@ fun main() = application {
             enabledApis = enabledApis
         )
     }
-    // A indexação dos transcripts só começa quando a janela é aberta pela
-    // primeira vez: 87 MB de `.jsonl` não podem atrasar o arranque do app.
+    // A indexação corre em background desde o arranque, em `Dispatchers.IO`: o
+    // Claude Code apaga transcripts antigos, e depender de o usuário abrir a
+    // janela antes disso perderia o histórico. A lista em si só carrega quando a
+    // janela abre (`autoLoad = false`).
     val cliSessionsViewModel = remember(cliSessionRepository) {
         CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
             getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
-            setCliSessionHidden = SetCliSessionHiddenUseCase(cliSessionRepository),
-            autoLoad = false
+            syncCliSessionIndex = SyncCliSessionIndexUseCase(cliSessionRepository),
+            autoLoad = false,
+            backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS
         )
     }
 
@@ -477,6 +487,20 @@ fun main() = application {
     var isCliSessionsOpen by remember { mutableStateOf(false) }
     var cliSessionsOpenGeneration by remember { mutableStateOf(0) }
     var cliSessionsProfileLabel by remember { mutableStateOf<String?>(null) }
+    var cliSessionsProfileId by remember { mutableStateOf<String?>(null) }
+
+    // Os filtros de 5h e 7d da tela de sessões recortam a janela de quota da
+    // conta, não as últimas horas corridas. O reset vem do mesmo `resets_at` que
+    // alimenta os medidores do card.
+    val dashboardState by viewModel.uiState.collectAsState()
+    val cliSessionsQuotaWindows = remember(dashboardState, cliSessionsProfileId) {
+        quotaWindowsForProfile(dashboardState, cliSessionsProfileId)
+    }
+    LaunchedEffect(cliSessionsQuotaWindows, isCliSessionsOpen) {
+        if (isCliSessionsOpen) {
+            cliSessionsViewModel.setQuotaWindows(cliSessionsQuotaWindows)
+        }
+    }
     val shutdownApplication = remember(viewModel, historyViewModel, httpClient, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         {
             if (shutdownStarted.compareAndSet(false, true)) {
@@ -560,9 +584,14 @@ fun main() = application {
                             .firstOrNull { record -> record.id == profileId }
                             ?.label
                         cliSessionsProfileLabel = label
+                        cliSessionsProfileId = profileId
                         isCliSessionsOpen = true
                         cliSessionsOpenGeneration++
-                        cliSessionsViewModel.openForProfile(profileId, label)
+                        cliSessionsViewModel.openForProfile(
+                            profileId = profileId,
+                            profileLabel = label,
+                            quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
+                        )
                     }
                 )
             }
@@ -622,8 +651,7 @@ fun main() = application {
                 ) {
                     CliSessionsScreen(
                         viewModel = cliSessionsViewModel,
-                        language = language,
-                        onBack = { isCliSessionsOpen = false }
+                        language = language
                     )
                 }
             }
@@ -840,6 +868,33 @@ private fun buildAnthropicProfileUiModels(
             detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail
         )
     }
+}
+
+/**
+ * Resets de quota da conta aberta na tela de Sessões CLI.
+ *
+ * Devolve janelas vazias enquanto a conta não tiver coleta bem-sucedida — o
+ * filtro então cai para a janela corrida em vez de esvaziar a lista.
+ */
+private fun quotaWindowsForProfile(state: UiState, profileId: String?): CliQuotaWindows {
+    if (profileId == null || state !is UiState.Success) {
+        return CliQuotaWindows()
+    }
+
+    val stats = state.data.firstOrNull { item ->
+        item.source == ApiSource.ANTHROPIC && item.targetKey.profileId == profileId
+    } ?: return CliQuotaWindows()
+
+    return CliQuotaWindows(
+        fiveHourEndsAt = stats.quotaEndAt(PeriodType.INTERVAL),
+        sevenDayEndsAt = stats.quotaEndAt(PeriodType.WEEKLY)
+    )
+}
+
+private fun ApiUsageStats.quotaEndAt(periodType: PeriodType): Instant? {
+    return quotas
+        .firstOrNull { quota -> quota.periodType == periodType && quota.hasKnownResetAt }
+        ?.periodEndAt
 }
 
 private fun availableUsageTargets(records: List<AnthropicProfileRecord>): List<UsageTargetKey> {

@@ -3,6 +3,7 @@ package com.usagemonitor.data
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.domain.entity.CliProjectRoot
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Instant
 import java.io.File
 import java.sql.DriverManager
 import kotlin.io.path.createTempDirectory
@@ -304,34 +305,259 @@ class LocalCliSessionDataSourceTest {
     }
 
     @Test
-    fun `hiding a session removes it from the default listing and keeps the transcript`() = runTest {
+    fun `turns older than the window are left out of the aggregates`() = runTest {
         withFixture { root, dataSource ->
-            val file = writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 1_000L),
+                assistantLine("session-a", "msg-2", "2026-08-01T20:00:00Z", outputTokens = 300L)
+            )
             dataSource.syncIndex()
 
-            dataSource.setHidden("session-a", hidden = true)
+            val windowed = dataSource.readSessions(
+                sinceEpochMillis = epochMillis("2026-08-01T15:00:00Z")
+            ).single()
 
-            assertTrue(dataSource.readSessions().isEmpty())
-            assertEquals(1, dataSource.readSessions(includeHidden = true).size)
-            assertTrue(dataSource.readSessions(includeHidden = true).single().hidden)
-            assertTrue(file.exists())
-
-            dataSource.setHidden("session-a", hidden = false)
-            assertEquals(1, dataSource.readSessions().size)
+            assertEquals(1, windowed.turnCount)
+            assertEquals(300L, windowed.outputTokens)
+            assertEquals(epochMillis("2026-08-01T20:00:00Z"), windowed.firstTs.toEpochMilliseconds())
+            assertEquals(epochMillis("2026-08-01T20:00:00Z"), windowed.lastTs.toEpochMilliseconds())
+            // 300 tokens de output a 25 USD/M.
+            assertEquals(7_500L, windowed.costMicros)
+            assertTrue(windowed.isCostComplete)
         }
     }
 
     @Test
-    fun `hidden flag survives reindexing`() = runTest {
+    fun `session without turns in the window is not listed`() = runTest {
         withFixture { root, dataSource ->
-            val file = writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
-            dataSource.syncIndex()
-            dataSource.setHidden("session-a", hidden = true)
-
-            file.appendText(assistantLine("session-a", "msg-2", "2026-08-01T10:01:00Z") + "\n")
+            writeTranscript(root, "session-old", assistantLine("session-old", "msg-1", "2026-07-01T10:00:00Z"))
+            writeTranscript(root, "session-new", assistantLine("session-new", "msg-1", "2026-08-01T10:00:00Z"))
             dataSource.syncIndex()
 
-            assertTrue(dataSource.readSessions(includeHidden = true).single().hidden)
+            val windowed = dataSource.readSessions(sinceEpochMillis = epochMillis("2026-07-15T00:00:00Z"))
+
+            assertEquals(listOf("session-new"), windowed.map { session -> session.sessionId })
+        }
+    }
+
+    @Test
+    fun `a model switch inside the window is priced per stretch`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine(
+                    "session-a",
+                    "msg-1",
+                    "2026-08-01T10:00:00Z",
+                    model = "claude-opus-5",
+                    outputTokens = 1_000L
+                ),
+                assistantLine(
+                    "session-a",
+                    "msg-2",
+                    "2026-08-01T10:05:00Z",
+                    model = "claude-haiku-4-5-20251001",
+                    outputTokens = 1_000L
+                ),
+                assistantLine(
+                    "session-a",
+                    "msg-3",
+                    "2026-08-01T10:06:00Z",
+                    model = "claude-haiku-4-5-20251001",
+                    outputTokens = 1_000L
+                )
+            )
+            dataSource.syncIndex()
+
+            val windowed = dataSource.readSessions(
+                sinceEpochMillis = epochMillis("2026-08-01T09:00:00Z")
+            ).single()
+
+            // 1K de output a 25 USD/M (opus) + 2K a 5 USD/M (haiku).
+            assertEquals(25_000L + 10_000L, windowed.costMicros)
+            assertEquals(3, windowed.turnCount)
+            // O modelo dominante da janela é o que aparece na lista.
+            assertEquals("claude-haiku-4-5-20251001", windowed.primaryModel)
+        }
+    }
+
+    @Test
+    fun `turns with an unknown model are counted as unpriced inside the window`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", model = "modelo-fantasma"),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:01:00Z", outputTokens = 1_000L)
+            )
+            dataSource.syncIndex()
+
+            val windowed = dataSource.readSessions(
+                sinceEpochMillis = epochMillis("2026-08-01T09:00:00Z")
+            ).single()
+
+            assertEquals(1, windowed.unpricedTurnCount)
+            assertFalse(windowed.isCostComplete)
+            assertEquals(25_000L, windowed.costMicros)
+        }
+    }
+
+    @Test
+    fun `a window covering the whole session matches the stored aggregates`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine(
+                    "session-a",
+                    "msg-1",
+                    "2026-08-01T10:00:00Z",
+                    inputTokens = 137L,
+                    outputTokens = 991L,
+                    cacheReadTokens = 33_333L,
+                    cacheWrite5mTokens = 777L
+                ),
+                assistantLine(
+                    "session-a",
+                    "msg-2",
+                    "2026-08-01T10:05:00Z",
+                    inputTokens = 41L,
+                    outputTokens = 613L,
+                    cacheReadTokens = 12_345L,
+                    cacheWrite1hTokens = 99L
+                )
+            )
+            dataSource.syncIndex()
+
+            val stored = dataSource.readSessions().single()
+            val windowed = dataSource.readSessions(
+                sinceEpochMillis = epochMillis("2026-07-01T00:00:00Z")
+            ).single()
+
+            assertEquals(stored.turnCount, windowed.turnCount)
+            assertEquals(stored.totalTokens, windowed.totalTokens)
+            assertEquals(stored.firstTs, windowed.firstTs)
+            assertEquals(stored.lastTs, windowed.lastTs)
+            assertEquals(stored.primaryModel, windowed.primaryModel)
+            // O agregado gravado trunca o custo turno a turno; a janela divide uma
+            // única vez. A diferença é de micros e nunca a favor do erro.
+            assertTrue(
+                windowed.costMicros - stored.costMicros in 0L..2L,
+                "custo janelado ${windowed.costMicros} destoa do gravado ${stored.costMicros}"
+            )
+        }
+    }
+
+    @Test
+    fun `a session whose transcript is gone stays listed inside the window`() = runTest {
+        withFixture { root, dataSource ->
+            val file = writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L)
+            )
+            dataSource.syncIndex()
+
+            assertTrue(file.delete())
+            dataSource.syncIndex()
+
+            val windowed = dataSource.readSessions(
+                sinceEpochMillis = epochMillis("2026-08-01T09:00:00Z")
+            ).single()
+
+            assertEquals(1, windowed.turnCount)
+            assertTrue(windowed.stale)
+        }
+    }
+
+    @Test
+    fun `the window respects the account filter`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val rootA = File(tempDir, "claude/projects").also { it.mkdirs() }
+        val rootB = File(tempDir, "claude-conta2/projects").also { it.mkdirs() }
+        val dataSource = LocalCliSessionDataSource(
+            projectRootsProvider = {
+                listOf(
+                    CliProjectRoot(PROFILE_A, rootA.absolutePath),
+                    CliProjectRoot(PROFILE_B, rootB.absolutePath)
+                )
+            },
+            databaseFile = File(tempDir, "cli.db")
+        )
+        try {
+            writeTranscript(rootA, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            writeTranscript(rootB, "session-b", assistantLine("session-b", "msg-1", "2026-08-01T11:00:00Z"))
+            dataSource.syncIndex()
+
+            val since = epochMillis("2026-08-01T09:00:00Z")
+
+            assertEquals(
+                listOf("session-a"),
+                dataSource.readSessions(profileId = PROFILE_A, sinceEpochMillis = since)
+                    .map { session -> session.sessionId }
+            )
+            assertEquals(2, dataSource.readSessions(profileId = null, sinceEpochMillis = since).size)
+        } finally {
+            dataSource.close()
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `windowed sessions are listed from newest to oldest`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(root, "session-old", assistantLine("session-old", "msg-1", "2026-08-01T10:00:00Z"))
+            writeTranscript(root, "session-new", assistantLine("session-new", "msg-1", "2026-08-02T10:00:00Z"))
+            dataSource.syncIndex()
+
+            assertEquals(
+                listOf("session-new", "session-old"),
+                dataSource.readSessions(sinceEpochMillis = epochMillis("2026-07-01T00:00:00Z"))
+                    .map { session -> session.sessionId }
+            )
+        }
+    }
+
+    @Test
+    fun `the indexing machine is recorded and served by both read paths`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            dataSource.syncIndex()
+
+            // O transcript não carrega máquina: o valor é o hostname de quem indexou.
+            val expected = expectedHostName()
+            assertEquals(expected, dataSource.readSessions().single().hostName)
+            assertEquals(
+                expected,
+                dataSource.readSessions(sinceEpochMillis = epochMillis("2026-08-01T09:00:00Z"))
+                    .single().hostName
+            )
+            assertEquals(expected, dataSource.readSession("session-a")?.summary?.hostName)
+        }
+    }
+
+    @Test
+    fun `sessions indexed before the column existed are backfilled`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val root = File(tempDir, "projects").also { it.mkdirs() }
+        val databaseFile = File(tempDir, "legacy.db")
+        writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+        createLegacySchema(databaseFile)
+        seedLegacySession(databaseFile, "session-a", File(root, "-workspace-usage-monitor/session-a.jsonl").absolutePath)
+
+        val dataSource = LocalCliSessionDataSource(
+            projectRootsProvider = { listOf(CliProjectRoot(PROFILE_A, root.absolutePath)) },
+            databaseFile = databaseFile
+        )
+        try {
+            // Sem reindexar: o backfill roda na migração do schema.
+            assertEquals(expectedHostName(), dataSource.readSessions().single().hostName)
+        } finally {
+            dataSource.close()
+            tempDir.deleteRecursively()
         }
     }
 
@@ -406,7 +632,7 @@ class LocalCliSessionDataSourceTest {
     }
 
     @Test
-    fun `legacy schema is migrated preserving the hidden flag`() = runTest {
+    fun `legacy schema is migrated assigning the account to indexed sessions`() = runTest {
         val tempDir = createTempDirectory().toFile()
         val root = File(tempDir, "projects").also { it.mkdirs() }
         val databaseFile = File(tempDir, "legacy.db")
@@ -419,15 +645,38 @@ class LocalCliSessionDataSourceTest {
         )
         try {
             dataSource.syncIndex()
-            dataSource.setHidden("session-a", hidden = true)
             dataSource.syncIndex()
 
-            val session = dataSource.readSessions(profileId = PROFILE_A, includeHidden = true).single()
-            assertTrue(session.hidden)
+            val session = dataSource.readSessions(profileId = PROFILE_A).single()
             assertEquals(PROFILE_A, session.profileId)
         } finally {
             dataSource.close()
             tempDir.deleteRecursively()
+        }
+    }
+
+    /** Mesma cadeia de resolução usada pelo datasource. */
+    private fun expectedHostName(): String? {
+        val fromEnvironment = System.getenv("COMPUTERNAME")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("HOSTNAME")?.takeIf { it.isNotBlank() }
+        if (fromEnvironment != null) {
+            return fromEnvironment
+        }
+        return runCatching { java.net.InetAddress.getLocalHost().hostName }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    /** Linha gravada por uma versão anterior, sem `host_name`. */
+    private fun seedLegacySession(databaseFile: File, sessionId: String, filePath: String) {
+        DriverManager.getConnection("jdbc:sqlite:" + databaseFile.absolutePath).use { connection ->
+            connection.prepareStatement(
+                "INSERT INTO cli_sessions (session_id, file_path, first_ts, last_ts) VALUES (?, ?, 0, 0);"
+            ).use { statement ->
+                statement.setString(1, sessionId)
+                statement.setString(2, filePath)
+                statement.executeUpdate()
+            }
         }
     }
 
@@ -456,6 +705,8 @@ class LocalCliSessionDataSourceTest {
             tempDir.deleteRecursively()
         }
     }
+
+    private fun epochMillis(timestamp: String): Long = Instant.parse(timestamp).toEpochMilliseconds()
 
     private fun writeTranscript(root: File, sessionId: String, vararg lines: String): File {
         val projectDir = File(root, "-workspace-usage-monitor").also { it.mkdirs() }

@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
@@ -28,7 +32,7 @@ import kotlin.test.assertEquals
 class CliSessionsScreenTest {
 
     @Test
-    fun `list shows session count and total cost`() = runDesktopComposeUiTest {
+    fun `list shows session count total tokens and total cost`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
@@ -37,12 +41,10 @@ class CliSessionsScreenTest {
                             sessions = listOf(summary("session-abcdef01", costMicros = 1_230_000L))
                         ),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = {}
                     )
                 }
             }
@@ -51,7 +53,80 @@ class CliSessionsScreenTest {
         onNodeWithText("1 sessão").assertIsDisplayed()
         onNodeWithText("session-").assertIsDisplayed()
         onNodeWithText("\$1.23").assertIsDisplayed()
-        onNodeWithText("custo estimado").assertIsDisplayed()
+        onNodeWithText("custo estimado · últimas 5h").assertIsDisplayed()
+    }
+
+    @Test
+    fun `header names the end of the quota window when the cutoff is anchored`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            rangeEndsAt = Instant.parse("2026-08-11T03:30:00Z"),
+                            rangeAnchored = true
+                        ),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // 03:30 UTC = 00:30 BRT, o reinício mostrado no card do dashboard.
+        onNodeWithText("custo estimado · janela 5h até 11/08 00:30 BRT").assertIsDisplayed()
+    }
+
+    @Test
+    fun `empty list inside a quota window says so`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = emptyList(),
+                            rangeEndsAt = Instant.parse("2026-08-11T03:30:00Z"),
+                            rangeAnchored = true
+                        ),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Nenhuma sessão nesta janela de quota (5h). Escolha uma janela maior.")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `header totals the tokens of the listed sessions`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01"), summary("session-abcdef02"))
+                        ),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // 41K por sessão nas linhas; só o header mostra a soma das duas.
+        onNodeWithText("82K").assertIsDisplayed()
     }
 
     @Test
@@ -65,12 +140,10 @@ class CliSessionsScreenTest {
                             profileLabel = "INFORMATA2"
                         ),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = {}
                     )
                 }
             }
@@ -80,8 +153,34 @@ class CliSessionsScreenTest {
     }
 
     @Test
-    fun `clicking hide reports the session and the new flag`() = runDesktopComposeUiTest {
-        val hideCalls = mutableListOf<Pair<String, Boolean>>()
+    fun `header offers every window with the active one selected`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            range = CliSessionRange.LAST_7D
+                        ),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("5h").assertIsDisplayed()
+        onNodeWithText("30 dias").assertIsDisplayed()
+        onNodeWithText("Total").assertIsDisplayed()
+        onNodeWithText("7 dias").assertIsSelected()
+    }
+
+    @Test
+    fun `clicking a window chip reports the selection`() = runDesktopComposeUiTest {
+        val selected = mutableListOf<CliSessionRange>()
 
         setContent {
             AppTheme(isDark = true) {
@@ -89,36 +188,78 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = { range -> selected.add(range) },
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { sessionId, hidden -> hideCalls.add(sessionId to hidden) }
+                        onCloseDetail = {}
                     )
                 }
             }
         }
 
-        onNodeWithText("Ocultar").performClick()
+        onNodeWithText("Total").performClick()
 
-        assertEquals(listOf("session-abcdef01" to true), hideCalls)
+        assertEquals(listOf(CliSessionRange.ALL), selected)
     }
 
     @Test
-    fun `empty list explains where transcripts are read from`() = runDesktopComposeUiTest {
+    fun `the list header has no back button`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // O fechamento da janela é do title bar; um "Voltar" aqui não teria destino.
+        onNodeWithText("Voltar").assertDoesNotExist()
+        onNodeWithText("Atualizar").assertIsDisplayed()
+    }
+
+    @Test
+    fun `empty list with an active window points at the filter`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = emptyList()),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Nenhuma sessão com atividade nas últimas 5h. Escolha uma janela maior.")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `empty list without a window explains where transcripts are read from`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = emptyList(),
+                            range = CliSessionRange.ALL
+                        ),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
                     )
                 }
             }
@@ -153,12 +294,10 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = {}
                     )
                 }
             }
@@ -170,6 +309,80 @@ class CliSessionsScreenTest {
         onNodeWithText("Economia do cache").assertExists()
         onNodeWithText("Contexto por turno").assertExists()
         onNodeWithText("Custo x economia acumulados").assertExists()
+    }
+
+    @Test
+    fun `detail shows where the session ran`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01").copy(
+            hostName = "DESKTOP-EDILS",
+            gitBranch = "feat/cli-sessions-per-account"
+        )
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Máquina").assertIsDisplayed()
+        onNodeWithText("DESKTOP-EDILS").assertIsDisplayed()
+        // Caminho completo do projeto, não só o último segmento da lista.
+        onNodeWithText("/workspace/usage-monitor").assertIsDisplayed()
+        onNodeWithText("feat/cli-sessions-per-account").assertIsDisplayed()
+        onNodeWithText("01/08 07:00 BRT → 01/08 08:00 BRT").assertIsDisplayed()
+    }
+
+    @Test
+    fun `detail shows a dash when the machine is unknown`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onRefresh = {},
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Máquina").assertIsDisplayed()
+        // Máquina e branch desconhecidas neste resumo; projeto e período têm valor.
+        onAllNodesWithText("—").assertCountEquals(2)
     }
 
     @Test
@@ -196,12 +409,10 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = {}
                     )
                 }
             }
@@ -238,12 +449,10 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = {}
                     )
                 }
             }
@@ -266,12 +475,10 @@ class CliSessionsScreenTest {
                             detail = CliSessionDetailUiState.Loading(summary.sessionId)
                         ),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = { closed = true },
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = { closed = true }
                     )
                 }
             }
@@ -290,12 +497,10 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Error("índice indisponível"),
                         language = AppLanguage.PT,
-                        onBack = {},
                         onRefresh = {},
-                        onToggleShowHidden = {},
+                        onSelectRange = {},
                         onOpenSession = {},
-                        onCloseDetail = {},
-                        onSetHidden = { _, _ -> }
+                        onCloseDetail = {}
                     )
                 }
             }

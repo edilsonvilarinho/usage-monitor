@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
+import com.usagemonitor.domain.entity.ModelPricingTable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
@@ -41,6 +42,12 @@ class LocalCliSessionDataSource(
         ignoreUnknownKeys = true
         isLenient = true
     }
+
+    /**
+     * Máquina desta instância, resolvida uma única vez: `InetAddress` consulta DNS
+     * e não pode entrar no laço de indexação.
+     */
+    private val hostName: String? by lazy { resolveHostName() }
 
     override suspend fun syncIndex(): CliSessionIndexReport = withContext(Dispatchers.IO) {
         val discovered = projectRootsProvider().flatMap { root -> listTranscriptFiles(root) }
@@ -92,20 +99,13 @@ class LocalCliSessionDataSource(
         )
     }
 
-    override suspend fun readSessions(profileId: String?, includeHidden: Boolean): List<CliSessionSummary> {
+    override suspend fun readSessions(profileId: String?, sinceEpochMillis: Long?): List<CliSessionSummary> {
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
-                connection.prepareStatement(SELECT_SESSIONS_SQL).use { statement ->
-                    statement.setInt(1, if (includeHidden) 1 else 0)
-                    statement.setInt(2, if (profileId == null) 1 else 0)
-                    statement.setString(3, profileId)
-                    statement.executeQuery().use { rows ->
-                        buildList {
-                            while (rows.next()) {
-                                add(readSummary(rows))
-                            }
-                        }
-                    }
+                if (sinceEpochMillis == null) {
+                    readStoredSessions(connection, profileId)
+                } else {
+                    readWindowedSessions(connection, profileId, sinceEpochMillis)
                 }
             }
         }
@@ -126,20 +126,65 @@ class LocalCliSessionDataSource(
         }
     }
 
-    override suspend fun setHidden(sessionId: String, hidden: Boolean) {
-        withContext(Dispatchers.IO) {
-            connectionManager.useConnection { connection ->
-                connection.prepareStatement(UPDATE_HIDDEN_SQL).use { statement ->
-                    statement.setInt(1, if (hidden) 1 else 0)
-                    statement.setString(2, sessionId)
-                    statement.executeUpdate()
+    override fun close() {
+        connectionManager.close()
+    }
+
+    /** Agregados históricos completos, lidos direto de `cli_sessions`. */
+    private fun readStoredSessions(connection: Connection, profileId: String?): List<CliSessionSummary> {
+        return connection.prepareStatement(SELECT_SESSIONS_SQL).use { statement ->
+            statement.setInt(1, if (profileId == null) 1 else 0)
+            statement.setString(2, profileId)
+            statement.executeQuery().use { rows ->
+                buildList {
+                    while (rows.next()) {
+                        add(readSummary(rows))
+                    }
                 }
             }
         }
     }
 
-    override fun close() {
-        connectionManager.close()
+    /**
+     * Reagrega cada sessão somando apenas os turnos a partir de [sinceEpochMillis].
+     *
+     * A query agrupa por `(session_id, model)` porque uma sessão que trocou de
+     * modelo no meio precisa ser precificada com a tarifa de cada trecho; as
+     * linhas são dobradas por sessão aqui. Sessões sem turno na janela não
+     * aparecem — é o recorte pedido, não uma perda de dado.
+     */
+    private fun readWindowedSessions(
+        connection: Connection,
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): List<CliSessionSummary> {
+        val accumulators = linkedMapOf<String, WindowedSessionAccumulator>()
+
+        connection.prepareStatement(SELECT_SESSIONS_SINCE_SQL).use { statement ->
+            statement.setLong(1, sinceEpochMillis)
+            statement.setInt(2, if (profileId == null) 1 else 0)
+            statement.setString(3, profileId)
+            statement.executeQuery().use { rows ->
+                while (rows.next()) {
+                    val sessionId = rows.getString("session_id")
+                    val accumulator = accumulators.getOrPut(sessionId) {
+                        WindowedSessionAccumulator(
+                            sessionId = sessionId,
+                            filePath = rows.getString("file_path"),
+                            profileId = rows.getString("profile_id"),
+                            cwd = rows.getString("cwd"),
+                            gitBranch = rows.getString("git_branch"),
+                            hostName = rows.getString("host_name")
+                        )
+                    }
+                    accumulator.addModelGroup(rows)
+                }
+            }
+        }
+
+        return accumulators.values
+            .map { accumulator -> accumulator.toSummary() }
+            .sortedByDescending { summary -> summary.lastTs }
     }
 
     private fun listTranscriptFiles(root: CliProjectRoot): List<DiscoveredTranscript> {
@@ -341,6 +386,7 @@ class LocalCliSessionDataSource(
                 statement.setString(1, sessionId)
                 statement.setString(2, filePath)
                 statement.setString(3, profileId)
+                statement.setString(4, hostName)
                 statement.addBatch()
             }
             statement.executeBatch()
@@ -411,6 +457,7 @@ class LocalCliSessionDataSource(
             statement.setLong(14, costMicros)
             statement.setInt(15, unpricedTurns)
             statement.setString(16, profileId)
+            statement.setString(17, hostName)
             statement.executeUpdate()
         }
     }
@@ -450,6 +497,7 @@ class LocalCliSessionDataSource(
             profileId = rows.getString("profile_id"),
             cwd = rows.getString("cwd"),
             gitBranch = rows.getString("git_branch"),
+            hostName = rows.getString("host_name"),
             firstTs = Instant.fromEpochMilliseconds(rows.getLong("first_ts")),
             lastTs = Instant.fromEpochMilliseconds(rows.getLong("last_ts")),
             primaryModel = rows.getString("primary_model"),
@@ -461,7 +509,6 @@ class LocalCliSessionDataSource(
             cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens"),
             costMicros = rows.getLong("cost_micros"),
             unpricedTurnCount = rows.getInt("unpriced_turns"),
-            hidden = rows.getInt("hidden") == 1,
             stale = !File(filePath).isFile
         )
     }
@@ -525,26 +572,48 @@ class LocalCliSessionDataSource(
         connection.createStatement().use { statement ->
             statement.execute("PRAGMA journal_mode = WAL;")
             statement.execute("PRAGMA synchronous = NORMAL;")
+            // O histórico de uso vive no mesmo arquivo por outra conexão. Sem
+            // timeout, uma escrita que encontra o writer lock ocupado falha na
+            // hora — e a indexação de background segura o lock por transações
+            // longas.
+            statement.execute("PRAGMA busy_timeout = 5000;")
             statement.execute(CREATE_FILES_TABLE_SQL)
             statement.execute(CREATE_SESSIONS_TABLE_SQL)
             statement.execute(CREATE_TURNS_TABLE_SQL)
         }
 
         // Bases criadas antes do suporte a múltiplas contas não têm `profile_id`.
-        // Recriar as tabelas perderia o `hidden`, que é escolha do usuário — por
-        // isso a coluna é acrescentada e as linhas antigas ficam nulas até a
-        // próxima sincronização reatribuí-las pelo caminho do arquivo.
+        // Recriar as tabelas descartaria o índice já construído, então a coluna é
+        // acrescentada e as linhas antigas ficam nulas até a próxima sincronização
+        // reatribuí-las pelo caminho do arquivo.
         addColumnIfMissing(connection, "cli_session_files", "profile_id")
         addColumnIfMissing(connection, "cli_sessions", "profile_id")
+
+        // Tudo que já está no índice foi lido de um transcript desta máquina, então
+        // atribuir o hostname atual às linhas antigas é factual — e é a única
+        // chance de preenchê-las: `syncIndex` só reprocessa arquivos alterados.
+        if (addColumnIfMissing(connection, "cli_sessions", "host_name")) {
+            backfillHostName(connection)
+        }
 
         connection.createStatement().use { statement ->
             statement.execute(CREATE_SESSIONS_INDEX_SQL)
             statement.execute(CREATE_TURNS_INDEX_SQL)
             statement.execute(CREATE_SESSIONS_PROFILE_INDEX_SQL)
+            statement.execute(CREATE_TURNS_TS_INDEX_SQL)
         }
     }
 
-    private fun addColumnIfMissing(connection: Connection, table: String, column: String) {
+    private fun backfillHostName(connection: Connection) {
+        val host = hostName ?: return
+        connection.prepareStatement(BACKFILL_HOST_NAME_SQL).use { statement ->
+            statement.setString(1, host)
+            statement.executeUpdate()
+        }
+    }
+
+    /** Devolve `true` quando a coluna acabou de ser criada. */
+    private fun addColumnIfMissing(connection: Connection, table: String, column: String): Boolean {
         val existing = connection.prepareStatement("PRAGMA table_info($table);").use { statement ->
             statement.executeQuery().use { rows ->
                 buildSet {
@@ -555,11 +624,100 @@ class LocalCliSessionDataSource(
             }
         }
         if (column in existing) {
-            return
+            return false
         }
 
         connection.createStatement().use { statement ->
             statement.execute("ALTER TABLE $table ADD COLUMN $column TEXT;")
+        }
+        return true
+    }
+
+    /**
+     * Dobra as linhas por modelo de uma sessão num único resumo da janela.
+     *
+     * O custo é somado por modelo: `ModelPricing.costMicros` soma os produtos e
+     * divide uma única vez, então agregar tokens antes de precificar é exato.
+     */
+    private class WindowedSessionAccumulator(
+        val sessionId: String,
+        val filePath: String,
+        val profileId: String?,
+        val cwd: String?,
+        val gitBranch: String?,
+        val hostName: String?
+    ) {
+        private var turnCount = 0
+        private var firstTs = Long.MAX_VALUE
+        private var lastTs = Long.MIN_VALUE
+        private var inputTokens = 0L
+        private var outputTokens = 0L
+        private var cacheReadTokens = 0L
+        private var cacheWrite5mTokens = 0L
+        private var cacheWrite1hTokens = 0L
+        private var costMicros = 0L
+        private var unpricedTurnCount = 0
+        private var primaryModel: String? = null
+        private var primaryModelTurns = 0
+
+        fun addModelGroup(rows: ResultSet) {
+            val model = rows.getString("model")
+            val groupTurns = rows.getInt("turn_count")
+            val groupInput = rows.getLong("input_tokens")
+            val groupOutput = rows.getLong("output_tokens")
+            val groupCacheRead = rows.getLong("cache_read_tokens")
+            val groupCacheWrite5m = rows.getLong("cache_write_5m_tokens")
+            val groupCacheWrite1h = rows.getLong("cache_write_1h_tokens")
+
+            turnCount += groupTurns
+            inputTokens += groupInput
+            outputTokens += groupOutput
+            cacheReadTokens += groupCacheRead
+            cacheWrite5mTokens += groupCacheWrite5m
+            cacheWrite1hTokens += groupCacheWrite1h
+            firstTs = minOf(firstTs, rows.getLong("first_ts"))
+            lastTs = maxOf(lastTs, rows.getLong("last_ts"))
+
+            val pricing = ModelPricingTable.forModel(model)
+            if (pricing == null) {
+                unpricedTurnCount += groupTurns
+            } else {
+                costMicros += pricing.costMicros(
+                    inputTokens = groupInput,
+                    outputTokens = groupOutput,
+                    cacheReadTokens = groupCacheRead,
+                    cacheWrite5mTokens = groupCacheWrite5m,
+                    cacheWrite1hTokens = groupCacheWrite1h
+                )
+            }
+
+            if (model != null && groupTurns > primaryModelTurns) {
+                primaryModel = model
+                primaryModelTurns = groupTurns
+            }
+        }
+
+        fun toSummary(): CliSessionSummary {
+            return CliSessionSummary(
+                sessionId = sessionId,
+                filePath = filePath,
+                profileId = profileId,
+                cwd = cwd,
+                gitBranch = gitBranch,
+                hostName = hostName,
+                firstTs = Instant.fromEpochMilliseconds(firstTs),
+                lastTs = Instant.fromEpochMilliseconds(lastTs),
+                primaryModel = primaryModel,
+                turnCount = turnCount,
+                inputTokens = inputTokens,
+                outputTokens = outputTokens,
+                cacheReadTokens = cacheReadTokens,
+                cacheWrite5mTokens = cacheWrite5mTokens,
+                cacheWrite1hTokens = cacheWrite1hTokens,
+                costMicros = costMicros,
+                unpricedTurnCount = unpricedTurnCount,
+                stale = !File(filePath).isFile
+            )
         }
     }
 
@@ -617,6 +775,21 @@ class LocalCliSessionDataSource(
             )
         }
 
+        /**
+         * Nome da máquina local. As variáveis de ambiente cobrem Windows e Linux
+         * sem tocar em DNS; `InetAddress` fica como último recurso.
+         */
+        private fun resolveHostName(): String? {
+            val fromEnvironment = System.getenv("COMPUTERNAME")?.takeIf { it.isNotBlank() }
+                ?: System.getenv("HOSTNAME")?.takeIf { it.isNotBlank() }
+            if (fromEnvironment != null) {
+                return fromEnvironment
+            }
+            return runCatching { java.net.InetAddress.getLocalHost().hostName }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() }
+        }
+
         fun defaultDatabaseFile(): File {
             val homeDir = System.getProperty("user.home")
                 ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
@@ -651,6 +824,10 @@ class LocalCliSessionDataSource(
               cache_write_1h_tokens INTEGER NOT NULL DEFAULT 0,
               cost_micros INTEGER NOT NULL DEFAULT 0,
               unpriced_turns INTEGER NOT NULL DEFAULT 0,
+              host_name TEXT,
+              -- Resquício do recurso de ocultar sessões, removido da aplicação.
+              -- A coluna fica: derrubá-la em SQLite exige recriar a tabela e os
+              -- índices legados a referenciam.
               hidden INTEGER NOT NULL DEFAULT 0
             );
         """
@@ -687,6 +864,12 @@ class LocalCliSessionDataSource(
             ON cli_turns(session_id, seq);
         """
 
+        /** Sem ele o recorte temporal varre a tabela inteira de turnos. */
+        private val CREATE_TURNS_TS_INDEX_SQL = """
+            CREATE INDEX IF NOT EXISTS idx_cli_turns_ts
+            ON cli_turns(ts DESC);
+        """
+
         private val SELECT_FILES_SQL = """
             SELECT path, profile_id, last_modified, size_bytes, last_offset FROM cli_session_files;
         """
@@ -710,18 +893,21 @@ class LocalCliSessionDataSource(
         """
 
         private val INSERT_SESSION_SHELL_SQL = """
-            INSERT OR IGNORE INTO cli_sessions (session_id, file_path, profile_id) VALUES (?, ?, ?);
+            INSERT OR IGNORE INTO cli_sessions (session_id, file_path, profile_id, host_name)
+            VALUES (?, ?, ?, ?);
         """
 
         private val UPSERT_SESSION_SQL = """
             INSERT INTO cli_sessions (
               session_id, file_path, cwd, git_branch, first_ts, last_ts, primary_model,
               turn_count, input_tokens, output_tokens, cache_read_tokens,
-              cache_write_5m_tokens, cache_write_1h_tokens, cost_micros, unpriced_turns, profile_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              cache_write_5m_tokens, cache_write_1h_tokens, cost_micros, unpriced_turns,
+              profile_id, host_name
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id) DO UPDATE SET
               file_path = excluded.file_path,
               profile_id = excluded.profile_id,
+              host_name = COALESCE(excluded.host_name, cli_sessions.host_name),
               cwd = COALESCE(excluded.cwd, cli_sessions.cwd),
               git_branch = COALESCE(excluded.git_branch, cli_sessions.git_branch),
               first_ts = excluded.first_ts,
@@ -751,16 +937,19 @@ class LocalCliSessionDataSource(
         """
 
         private val SESSION_COLUMNS = """
-            session_id, file_path, profile_id, cwd, git_branch, first_ts, last_ts, primary_model,
-            turn_count, input_tokens, output_tokens, cache_read_tokens,
-            cache_write_5m_tokens, cache_write_1h_tokens, cost_micros, unpriced_turns, hidden
+            session_id, file_path, profile_id, cwd, git_branch, host_name, first_ts, last_ts,
+            primary_model, turn_count, input_tokens, output_tokens, cache_read_tokens,
+            cache_write_5m_tokens, cache_write_1h_tokens, cost_micros, unpriced_turns
+        """
+
+        private val BACKFILL_HOST_NAME_SQL = """
+            UPDATE cli_sessions SET host_name = ? WHERE host_name IS NULL;
         """
 
         private val SELECT_SESSIONS_SQL = """
             SELECT $SESSION_COLUMNS
             FROM cli_sessions
-            WHERE (? = 1 OR hidden = 0)
-              AND (? = 1 OR profile_id = ?)
+            WHERE (? = 1 OR profile_id = ?)
             ORDER BY last_ts DESC;
         """
 
@@ -768,8 +957,33 @@ class LocalCliSessionDataSource(
             SELECT $SESSION_COLUMNS FROM cli_sessions WHERE session_id = ?;
         """
 
-        private val UPDATE_HIDDEN_SQL = """
-            UPDATE cli_sessions SET hidden = ? WHERE session_id = ?;
+        /**
+         * Agregados de uma janela temporal, calculados a partir dos turnos.
+         * O `GROUP BY` por modelo é o que permite precificar cada trecho com a
+         * sua própria tarifa; `model` nulo agrupa junto e cai em unpriced.
+         */
+        private val SELECT_SESSIONS_SINCE_SQL = """
+            SELECT s.session_id AS session_id,
+                   s.file_path AS file_path,
+                   s.profile_id AS profile_id,
+                   s.cwd AS cwd,
+                   s.git_branch AS git_branch,
+                   s.host_name AS host_name,
+                   t.model AS model,
+                   COUNT(*) AS turn_count,
+                   MIN(t.ts) AS first_ts,
+                   MAX(t.ts) AS last_ts,
+                   SUM(t.input_tokens) AS input_tokens,
+                   SUM(t.output_tokens) AS output_tokens,
+                   SUM(t.cache_read_tokens) AS cache_read_tokens,
+                   SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
+                   SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+            FROM cli_turns t
+            JOIN cli_sessions s ON s.session_id = t.session_id
+            WHERE t.ts >= ?
+              AND (? = 1 OR s.profile_id = ?)
+            GROUP BY t.session_id, t.model
+            ORDER BY last_ts DESC;
         """
 
         private val DELETE_TURNS_BY_FILE_SQL = """

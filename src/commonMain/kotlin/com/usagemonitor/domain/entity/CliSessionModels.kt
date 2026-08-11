@@ -65,7 +65,12 @@ data class CliProjectRoot(
     val directoryPath: String
 )
 
-/** Agregados de uma sessão, servidos direto do índice SQLite. */
+/**
+ * Agregados de uma sessão, servidos direto do índice SQLite.
+ *
+ * Quando a leitura usa uma janela temporal, todos os valores são os da janela —
+ * não os totais históricos da sessão.
+ */
 data class CliSessionSummary(
     val sessionId: String,
     val filePath: String,
@@ -73,6 +78,13 @@ data class CliSessionSummary(
     val profileId: String? = null,
     val cwd: String? = null,
     val gitBranch: String? = null,
+    /**
+     * Máquina onde o transcript foi indexado. Os transcripts do Claude Code não
+     * carregam identidade de máquina, então o valor é o hostname de quem leu o
+     * arquivo — na prática a máquina onde a sessão rodou, já que a leitura é do
+     * filesystem local.
+     */
+    val hostName: String? = null,
     val firstTs: Instant,
     val lastTs: Instant,
     val primaryModel: String? = null,
@@ -85,7 +97,6 @@ data class CliSessionSummary(
     val costMicros: Long = 0L,
     /** Turnos cujo modelo não está na tabela de preços: o custo exibido está incompleto. */
     val unpricedTurnCount: Int = 0,
-    val hidden: Boolean = false,
     /** O `.jsonl` de origem não existe mais (retenção do CLI); só o resumo sobrevive. */
     val stale: Boolean = false
 ) {

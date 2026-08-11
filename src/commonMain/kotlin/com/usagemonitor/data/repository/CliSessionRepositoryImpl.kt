@@ -16,16 +16,12 @@ class CliSessionRepositoryImpl(
 
     override suspend fun getSessions(
         profileId: String?,
-        includeHidden: Boolean
+        sinceEpochMillis: Long?
     ): Result<List<CliSessionSummary>> {
-        return runCatching { dataSource.readSessions(profileId, includeHidden) }
+        return runCatching { dataSource.readSessions(profileId, sinceEpochMillis) }
     }
 
     override suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?> {
         return runCatching { dataSource.readSession(sessionId) }
-    }
-
-    override suspend fun setSessionHidden(sessionId: String, hidden: Boolean): Result<Unit> {
-        return runCatching { dataSource.setHidden(sessionId, hidden) }
     }
 }
