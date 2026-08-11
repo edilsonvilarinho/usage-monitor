@@ -1,7 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
 
@@ -74,6 +76,16 @@ sealed interface TeamUsageUiState {
 
         val isEmpty: Boolean
             get() = members.none { member -> member.hasActivity }
+
+        /**
+         * Quantas sessões do time estão saturadas ou em atenção.
+         *
+         * Vai para o cabeçalho porque o veredito por sessão vive dois níveis
+         * abaixo — dentro de um integrante recolhido — e ninguém expande cinco
+         * integrantes para descobrir que há uma sessão saturada.
+         */
+        val healthTally: CliSessionHealthTally
+            get() = members.flatMap { member -> member.sessions }.tallyHealth()
 
         /** Fatia do integrante no total de tokens do time. */
         fun tokenShareOf(member: TeamMemberUsage): Double {

@@ -23,6 +23,7 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.TEAM_LIST_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_REMOVE_CONFIRM_TAG
@@ -427,6 +428,114 @@ class TeamUsageScreenTest {
         assertEquals(true, closed)
     }
 
+    @Test
+    fun `a linha do integrante recolhido mostra o pior status das sessoes dele`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(
+                            // 650K de contexto vivo numa janela de 1M e 10K noutra.
+                            ratedSession("s1", liveContextTokens = 650_000L),
+                            ratedSession("s2", liveContextTokens = 10_000L)
+                        )
+                    )
+                )
+            ),
+            width = 1_400.dp
+        )
+
+        // Recolhido: sem isso a sessão saturada ficaria atrás de um clique que
+        // ninguém dá, porque nada na linha indicaria que vale a pena.
+        //
+        // Árvore não mesclada: a linha do integrante é clicável e absorve a
+        // semântica dos filhos, então o tag interno só existe aqui.
+        onNodeWithTag("${TEAM_MEMBER_HEALTH_TAG_PREFIX}device-1", useUnmergedTree = true).assertExists()
+        onNodeWithText("Saturada").assertIsDisplayed()
+        assertEquals(0, onAllNodesWithTextCount("Saudável"))
+    }
+
+    @Test
+    fun `integrante so com sessao de janela desconhecida nao ganha status`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(
+                            session("s1").copy(
+                                primaryModel = "claude-3-5-sonnet",
+                                liveContextModel = "claude-3-5-sonnet",
+                                liveContextTokens = 10_000L
+                            )
+                        )
+                    )
+                ),
+                range = CliSessionRange.LAST_5H
+            ),
+            width = 1_400.dp
+        )
+
+        // Sem a janela do modelo não há fração, e chutar um veredito seria pior
+        // que não dar nenhum.
+        onNodeWithTag("${TEAM_MEMBER_HEALTH_TAG_PREFIX}device-1", useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun `o cabecalho conta as sessoes saturadas e em atencao do time`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(
+                            ratedSession("s1", liveContextTokens = 650_000L),
+                            ratedSession("s2", liveContextTokens = 450_000L)
+                        )
+                    ),
+                    member(
+                        "device-2",
+                        "maria",
+                        "NOTE-B2",
+                        listOf(ratedSession("s3", liveContextTokens = 450_000L))
+                    )
+                )
+            ),
+            width = 1_400.dp
+        )
+
+        onNodeWithText("1 saturada · 2 em atenção").assertIsDisplayed()
+    }
+
+    @Test
+    fun `cabecalho sem sessao problematica nao mostra contagem`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(ratedSession("s1", liveContextTokens = 10_000L))
+                    )
+                )
+            ),
+            width = 1_400.dp
+        )
+
+        // Um alerta que não existe não deve ocupar linha no cabeçalho.
+        assertEquals(0, onAllNodesWithTextCount("0 saturadas"))
+        assertEquals(0, onAllNodesWithTextCount("0 em atenção"))
+    }
+
     private fun ComposeUiTest.renderSuccess(
         state: TeamUsageUiState.Success,
         localDeviceId: String? = null,
@@ -459,6 +568,15 @@ class TeamUsageScreenTest {
             lastTs = NOW,
             inputTokens = tokens,
             costMicros = cost
+        )
+    }
+
+    /** Sessão com janela de contexto conhecida: só assim há veredito de saúde. */
+    private fun ratedSession(id: String, liveContextTokens: Long): CliSessionSummary {
+        return session(id, tokens = 10L).copy(
+            primaryModel = OPUS,
+            liveContextModel = OPUS,
+            liveContextTokens = liveContextTokens
         )
     }
 

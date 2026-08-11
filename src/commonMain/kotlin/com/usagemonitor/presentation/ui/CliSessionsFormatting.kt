@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import kotlinx.datetime.Instant
@@ -331,6 +332,42 @@ internal object CliSessionsLabels {
 
     fun columnStatus(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Status" else "Status"
+    }
+
+    /**
+     * "1 saturada · 2 em atenção" para o cabeçalho. `null` quando não há alerta.
+     *
+     * Nulo, e não string vazia: um alerta que não existe não deve ocupar linha
+     * no cabeçalho. Sessão com janela de contexto desconhecida não entra na
+     * contagem — quem filtra é [tallyHealth], que se recusa a chutar a fração.
+     */
+    fun healthTally(tally: CliSessionHealthTally, language: AppLanguage): String? {
+        if (!tally.hasWarnings) {
+            return null
+        }
+
+        val parts = mutableListOf<String>()
+        if (tally.saturated > 0) {
+            parts += saturatedCount(tally.saturated, language)
+        }
+        if (tally.attention > 0) {
+            parts += attentionCount(tally.attention, language)
+        }
+        return parts.joinToString(" · ")
+    }
+
+    private fun saturatedCount(count: Int, language: AppLanguage): String {
+        if (language != AppLanguage.PT) {
+            return "$count saturated"
+        }
+        return if (count == 1) "1 saturada" else "$count saturadas"
+    }
+
+    private fun attentionCount(count: Int, language: AppLanguage): String {
+        if (language != AppLanguage.PT) {
+            return "$count needing attention"
+        }
+        return "$count em atenção"
     }
 
     /** Explicita por que o status foi atribuído — sem isso o alerta é opaco. */

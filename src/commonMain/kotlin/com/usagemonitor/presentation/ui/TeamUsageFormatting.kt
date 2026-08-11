@@ -1,6 +1,8 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import kotlinx.datetime.Instant
 
@@ -52,6 +54,14 @@ internal object TeamUsageLabels {
 
     fun columnCost(language: AppLanguage): String {
         return CliSessionsLabels.columnCost(language)
+    }
+
+    fun columnStatus(language: AppLanguage): String {
+        return CliSessionsLabels.columnStatus(language)
+    }
+
+    fun healthShort(health: CliSessionHealth, language: AppLanguage): String {
+        return CliSessionsLabels.healthShort(health, language)
     }
 
     fun back(language: AppLanguage): String {
@@ -208,6 +218,11 @@ internal object TeamUsageLabels {
         } else {
             "Could not remove the member: $message"
         }
+    }
+
+    /** Mesma contagem do modal local: "1 saturada · 2 em atenção". */
+    fun healthTally(tally: CliSessionHealthTally, language: AppLanguage): String? {
+        return CliSessionsLabels.healthTally(tally, language)
     }
 
     /** Deixa explícito de onde vem o número, já que a fonte não é esta máquina. */

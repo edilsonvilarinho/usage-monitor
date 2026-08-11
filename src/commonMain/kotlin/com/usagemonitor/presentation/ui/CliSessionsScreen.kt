@@ -44,6 +44,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionAnalytics
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.presentation.ui.components.BinMode
@@ -271,6 +272,10 @@ private fun CliSessionsHeader(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                // O veredito por sessão está na linha, mas some da vista assim que
+                // a lista rola. Aqui ele responde de uma vez se há sessão pedindo
+                // /compact, sem varrer a lista inteira.
+                HealthTallyText(tally = state.healthTally, language = language)
                 Text(
                     text = CliSessionsLabels.estimatedCostNotice(language),
                     style = MaterialTheme.typography.labelSmall,
@@ -1016,6 +1021,32 @@ internal fun SessionMetadataCard(summary: CliSessionSummary, language: AppLangua
             )
         }
     }
+}
+
+/**
+ * "1 saturada · 2 em atenção" no cabeçalho, ou nada quando não há o que alertar.
+ *
+ * A cor é a do pior caso presente: um "em atenção" laranja ao lado de um
+ * "saturada" vermelho diluiria o segundo.
+ *
+ * `internal` porque os dois modais têm o mesmo problema — o do time ainda pior,
+ * já que lá o veredito vive dois níveis abaixo, dentro de um integrante recolhido.
+ */
+@Composable
+internal fun HealthTallyText(tally: CliSessionHealthTally, language: AppLanguage) {
+    val label = CliSessionsLabels.healthTally(tally, language) ?: return
+    val accent = if (tally.saturated > 0) {
+        healthColor(CliSessionHealth.SATURATED)
+    } else {
+        healthColor(CliSessionHealth.ATTENTION)
+    }
+
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = accent
+    )
 }
 
 internal fun healthColor(health: CliSessionHealth): Color {

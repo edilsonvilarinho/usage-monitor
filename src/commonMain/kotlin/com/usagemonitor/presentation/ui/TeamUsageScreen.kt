@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -40,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +62,7 @@ internal const val TEAM_DETAIL_SCROLLBAR_TAG = "teamUsageDetailScrollbar"
 internal const val TEAM_MEMBER_ROW_TAG_PREFIX = "teamMemberRow:"
 internal const val TEAM_MEMBER_SESSIONS_TAG_PREFIX = "teamMemberSessions:"
 internal const val TEAM_MEMBER_REMOVE_TAG_PREFIX = "teamMemberRemove:"
+internal const val TEAM_MEMBER_HEALTH_TAG_PREFIX = "teamMemberHealth:"
 internal const val TEAM_REMOVE_CONFIRM_TAG = "teamMemberRemoveConfirm"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
@@ -358,6 +362,9 @@ private fun TeamUsageHeader(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // O veredito por sessão vive dois níveis abaixo, dentro de um
+                // integrante recolhido. Aqui ele aparece sem nenhum clique.
+                HealthTallyText(tally = state.healthTally, language = language)
             }
 
             Column {
@@ -515,6 +522,33 @@ private fun TeamMemberRow(
                 MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
                 Spacer(modifier = Modifier.height(4.dp))
                 MeterBar(fraction = share, color = accent, height = 4.dp)
+            }
+
+            // Pior status entre as sessões deste integrante. Sem ele, a única
+            // sessão saturada de um time fica escondida atrás de um clique que
+            // ninguém dá — nada na linha recolhida indicaria que vale a pena.
+            val worstHealth = member.worstHealth
+            if (worstHealth != null) {
+                val healthAccent = healthColor(worstHealth)
+                Row(
+                    modifier = Modifier
+                        .width(112.dp)
+                        .testTag("$TEAM_MEMBER_HEALTH_TAG_PREFIX${member.deviceId}"),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(AppShapes.small)
+                            .background(healthAccent)
+                    )
+                    MetricText(
+                        label = TeamUsageLabels.columnStatus(language),
+                        value = TeamUsageLabels.healthShort(worstHealth, language),
+                        valueColor = healthAccent
+                    )
+                }
             }
 
             if (removable) {
