@@ -82,6 +82,52 @@ class CliSessionsScreenTest {
         onNodeWithText("custo estimado · janela 5h até 11/08 00:30 BRT").assertIsDisplayed()
     }
 
+    /** 7 dias é janela corrida desde a issue #28: sem "até", e no masculino. */
+    @Test
+    fun `header names the 7d window as a sliding one`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            range = CliSessionRange.LAST_7D
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("custo estimado · últimos 7 dias").assertIsDisplayed()
+    }
+
+    @Test
+    fun `empty list in the 7d window points at the filter`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = emptyList(),
+                            range = CliSessionRange.LAST_7D
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Nenhuma sessão com atividade nos últimos 7 dias. Escolha uma janela maior.")
+            .assertIsDisplayed()
+    }
+
     @Test
     fun `empty list inside a quota window says so`() = runDesktopComposeUiTest {
         setContent {
