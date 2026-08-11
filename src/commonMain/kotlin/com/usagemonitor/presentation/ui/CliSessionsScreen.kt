@@ -67,6 +67,19 @@ private val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
 /** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
 private val SCROLLBAR_GUTTER = 12.dp
 
+/**
+ * Brilho quase apagado para os blocos do detalhe.
+ *
+ * O default de `DepthSurface` (0.22) é o do dashboard, onde cada card é uma API
+ * distinta e a cor identifica. Aqui os blocos são a mesma sessão vista de
+ * ângulos diferentes: com o brilho cheio a tela vira uma pilha de retângulos
+ * coloridos e nada se destaca. A cor fica no dado, não no fundo.
+ */
+private const val QUIET_GLOW_ALPHA = 0.06f
+
+/** Mais baixo que o default de `TurnSeriesChart`: são vários numa página só. */
+private val DETAIL_CHART_HEIGHT = 120.dp
+
 internal const val LIST_SCROLLBAR_TAG = "cliSessionsListScrollbar"
 internal const val DETAIL_SCROLLBAR_TAG = "cliSessionsDetailScrollbar"
 
@@ -85,6 +98,7 @@ fun CliSessionsScreen(
         onSelectRange = { range -> viewModel.setRange(range) },
         onOpenSession = { sessionId -> viewModel.openSession(sessionId) },
         onCloseDetail = { viewModel.closeDetail() },
+        onToggleAdvanced = { viewModel.toggleAdvanced() },
         modifier = modifier
     )
 }
@@ -96,6 +110,8 @@ internal fun CliSessionsContent(
     onSelectRange: (CliSessionRange) -> Unit,
     onOpenSession: (String) -> Unit,
     onCloseDetail: () -> Unit,
+    // Com default para não arrastar as chamadas que não exercitam o bloco.
+    onToggleAdvanced: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -117,7 +133,9 @@ internal fun CliSessionsContent(
                     CliSessionDetailPane(
                         detail = detail,
                         language = language,
-                        onCloseDetail = onCloseDetail
+                        advancedExpanded = state.advancedExpanded,
+                        onCloseDetail = onCloseDetail,
+                        onToggleAdvanced = onToggleAdvanced
                     )
                 }
             }
@@ -464,7 +482,9 @@ private fun CliSessionRow(
 private fun CliSessionDetailPane(
     detail: CliSessionDetailUiState,
     language: AppLanguage,
-    onCloseDetail: () -> Unit
+    advancedExpanded: Boolean,
+    onCloseDetail: () -> Unit,
+    onToggleAdvanced: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -484,7 +504,9 @@ private fun CliSessionDetailPane(
             is CliSessionDetailUiState.Ready -> CliSessionDetailBody(
                 detail = detail.result.detail,
                 analytics = detail.result.analytics,
-                language = language
+                language = language,
+                advancedExpanded = advancedExpanded,
+                onToggleAdvanced = onToggleAdvanced
             )
         }
     }
@@ -494,7 +516,9 @@ private fun CliSessionDetailPane(
 private fun CliSessionDetailBody(
     detail: CliSessionDetail,
     analytics: CliSessionAnalytics,
-    language: AppLanguage
+    language: AppLanguage,
+    advancedExpanded: Boolean,
+    onToggleAdvanced: () -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -510,7 +534,9 @@ private fun CliSessionDetailBody(
             CliSessionDetailSections(
                 detail = detail,
                 analytics = analytics,
-                language = language
+                language = language,
+                advancedExpanded = advancedExpanded,
+                onToggleAdvanced = onToggleAdvanced
             )
         }
 
@@ -527,15 +553,20 @@ private fun CliSessionDetailBody(
 /**
  * As seções do detalhe, emitidas direto no `Column` rolável do chamador.
  *
- * Separado de [CliSessionDetailBody] para que a moldura de rolagem não fique
- * envolvida por cento e tantas linhas de conteúdo.
+ * Divididas em duas camadas. A de cima responde à pergunta que traz o usuário
+ * aqui — *dá para continuar nesta sessão?* — com o veredito, a identificação e
+ * quatro números. A de baixo, recolhida, guarda a apuração: a composição dos
+ * tokens, a distribuição do custo e os gráficos por turno.
+ *
+ * Nada foi removido na divisão; a camada de baixo é a mesma de antes.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CliSessionDetailSections(
     detail: CliSessionDetail,
     analytics: CliSessionAnalytics,
-    language: AppLanguage
+    language: AppLanguage,
+    advancedExpanded: Boolean,
+    onToggleAdvanced: () -> Unit
 ) {
     val summary = detail.summary
 
@@ -543,6 +574,8 @@ private fun CliSessionDetailSections(
 
     SessionMetadataCard(summary = summary, language = language)
 
+    // Integridade do dado não é detalhe avançado: se o custo está incompleto,
+    // todo número desta tela está incompleto.
     if (summary.stale) {
         NoticeText(CliSessionsLabels.staleNotice(language), MaterialTheme.colorScheme.error)
     }
@@ -559,6 +592,88 @@ private fun CliSessionDetailSections(
         )
     }
 
+    SessionSummaryRow(summary = summary, analytics = analytics, language = language)
+
+    DetailSection(
+        title = CliSessionsLabels.contextPerTurnChart(language),
+        accent = CACHE_READ_COLOR
+    ) {
+        TurnSeriesChart(
+            series = listOf(
+                TurnSeries(
+                    label = CliSessionsLabels.chartContextLegend(language),
+                    values = analytics.contextPerTurn,
+                    color = CACHE_READ_COLOR,
+                    binMode = BinMode.LAST
+                )
+            ),
+            height = DETAIL_CHART_HEIGHT,
+            valueFormatter = { value -> formatQuantity(value) },
+            highlightDrops = true
+        )
+    }
+
+    AdvancedDisclosure(
+        expanded = advancedExpanded,
+        language = language,
+        onToggle = onToggleAdvanced
+    ) {
+        SessionAdvancedSections(
+            summary = summary,
+            analytics = analytics,
+            language = language
+        )
+    }
+}
+
+/**
+ * Os quatro números que decidem se vale continuar: quanto já custou, quanto
+ * volume passou, quanto disso o cache absorveu e quanto da janela do modelo já
+ * foi ocupada.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SessionSummaryRow(
+    summary: CliSessionSummary,
+    analytics: CliSessionAnalytics,
+    language: AppLanguage
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MetricCard(
+            label = CliSessionsLabels.columnCost(language),
+            value = formatMicrosUsd(analytics.costBreakdown.totalMicros),
+            accent = INPUT_COLOR
+        )
+        MetricCard(
+            label = CliSessionsLabels.columnTokens(language),
+            value = formatQuantity(summary.totalTokens),
+            accent = CACHE_READ_COLOR
+        )
+        MetricCard(
+            label = CliSessionsLabels.cacheHitRate(language),
+            value = formatPercent(analytics.cacheHitRate),
+            accent = CACHE_READ_COLOR
+        )
+        MetricCard(
+            label = CliSessionsLabels.saturation(language),
+            value = analytics.contextSaturation?.let { value -> formatPercent(value) } ?: "—",
+            accent = healthColor(analytics.health)
+        )
+    }
+}
+
+/** Tudo o que estava na tela antes da divisão e que não cabe no resumo. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SessionAdvancedSections(
+    summary: CliSessionSummary,
+    analytics: CliSessionAnalytics,
+    language: AppLanguage
+) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -620,29 +735,6 @@ private fun CliSessionDetailSections(
             formatMicrosUsd(analytics.nextInteractionCostMicros),
             INPUT_COLOR
         )
-        MetricCard(
-            label = CliSessionsLabels.saturation(language),
-            value = analytics.contextSaturation?.let { value -> formatPercent(value) } ?: "—",
-            accent = healthColor(analytics.health)
-        )
-    }
-
-    DetailSection(
-        title = CliSessionsLabels.contextPerTurnChart(language),
-        accent = CACHE_READ_COLOR
-    ) {
-        TurnSeriesChart(
-            series = listOf(
-                TurnSeries(
-                    label = CliSessionsLabels.chartContextLegend(language),
-                    values = analytics.contextPerTurn,
-                    color = CACHE_READ_COLOR,
-                    binMode = BinMode.LAST
-                )
-            ),
-            valueFormatter = { value -> formatQuantity(value) },
-            highlightDrops = true
-        )
     }
 
     DetailSection(
@@ -655,6 +747,7 @@ private fun CliSessionDetailSections(
                 TurnSeries("1h", analytics.cacheWrite1hPerTurn, OUTPUT_COLOR, BinMode.SUM)
             ),
             stacked = true,
+            height = DETAIL_CHART_HEIGHT,
             valueFormatter = { value -> formatQuantity(value) }
         )
     }
@@ -678,8 +771,58 @@ private fun CliSessionDetailSections(
                     binMode = BinMode.MAX
                 )
             ),
+            height = DETAIL_CHART_HEIGHT,
             valueFormatter = { value -> formatMicrosUsdShort(value) }
         )
+    }
+}
+
+/**
+ * Cabeçalho clicável que revela [content].
+ *
+ * O conteúdo não é composto enquanto está fechado — são dois gráficos e sete
+ * cards que não têm por que existir na árvore só para ficarem invisíveis.
+ */
+@Composable
+private fun AdvancedDisclosure(
+    expanded: Boolean,
+    language: AppLanguage,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        DepthSurface(
+            accent = NEUTRAL_ACCENT,
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
+            glowAlpha = QUIET_GLOW_ALPHA,
+            contentPadding = 14.dp
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (expanded) "▾" else "▸",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = CliSessionsLabels.advancedToggle(language),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = CliSessionsLabels.advancedHint(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (expanded) {
+            content()
+        }
     }
 }
 
@@ -795,6 +938,7 @@ private fun DetailSection(
     DepthSurface(
         accent = accent,
         modifier = Modifier.fillMaxWidth(),
+        glowAlpha = QUIET_GLOW_ALPHA,
         contentPadding = 14.dp
     ) {
         Row(
@@ -839,6 +983,7 @@ private fun MetricCard(
     DepthSurface(
         accent = accent,
         modifier = Modifier.width(168.dp),
+        glowAlpha = QUIET_GLOW_ALPHA,
         contentPadding = 12.dp
     ) {
         Text(

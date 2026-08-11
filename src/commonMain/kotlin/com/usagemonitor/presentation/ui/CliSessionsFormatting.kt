@@ -334,6 +334,23 @@ internal object CliSessionsLabels {
         }
     }
 
+    /**
+     * O bloco recolhido não é "mais do mesmo": é a apuração por trás dos quatro
+     * números do resumo. O rótulo evita prometer novidade onde há detalhamento.
+     */
+    fun advancedToggle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Avançado" else "Advanced"
+    }
+
+    /** Diz o que está lá dentro para que abrir não seja aposta. */
+    fun advancedHint(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "composição dos tokens, distribuição do custo e gráficos por turno"
+        } else {
+            "token breakdown, cost distribution and per-turn charts"
+        }
+    }
+
     fun contextPerTurnChart(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Contexto por turno" else "Context per turn"
     }

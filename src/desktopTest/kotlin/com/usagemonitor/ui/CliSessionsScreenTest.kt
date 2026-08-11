@@ -367,7 +367,49 @@ class CliSessionsScreenTest {
     }
 
     @Test
-    fun `detail renders the analytics sections`() = runDesktopComposeUiTest {
+    fun `detail renders the analytics sections once the advanced block is open`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01", costMicros = 5_000_000L)
+        val detail = CliSessionDetail(
+            summary = summary,
+            turns = listOf(
+                turn(seq = 1, cacheReadTokens = 10_000L, cacheWrite1hTokens = 4_000L),
+                turn(seq = 2, cacheReadTokens = 30_000L, cacheWrite5mTokens = 2_000L)
+            )
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            ),
+                            advancedExpanded = true
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Contexto por turno").assertExists()
+        onNodeWithText("Distribuição de custo").assertExists()
+        onNodeWithText("Economia do cache").assertExists()
+        onNodeWithText("Cache gravado por turno").assertExists()
+        onNodeWithText("Custo x economia acumulados").assertExists()
+    }
+
+    @Test
+    fun `detail opens with the essentials and hides the rest`() = runDesktopComposeUiTest {
         val summary = summary("session-abcdef01", costMicros = 5_000_000L)
         val detail = CliSessionDetail(
             summary = summary,
@@ -400,12 +442,52 @@ class CliSessionsScreenTest {
             }
         }
 
-        onNodeWithText("Taxa de acerto de cache").assertIsDisplayed()
-        onNodeWithText("Distribuição de custo").assertIsDisplayed()
-        // Abaixo da dobra na altura de teste: basta existirem na árvore.
-        onNodeWithText("Economia do cache").assertExists()
+        // O essencial: veredito, resumo e o único gráfico do primeiro nível.
+        onNodeWithText("Sessão saudável").assertIsDisplayed()
+        onNodeWithText("Custo").assertExists()
+        onNodeWithText("Tokens (com cache)").assertExists()
         onNodeWithText("Contexto por turno").assertExists()
-        onNodeWithText("Custo x economia acumulados").assertExists()
+        onNodeWithText("Avançado").assertExists()
+
+        // Fechado, o bloco avançado nem entra na árvore.
+        onNodeWithText("Distribuição de custo").assertDoesNotExist()
+        onNodeWithText("Cache gravado por turno").assertDoesNotExist()
+        onNodeWithText("Custo x economia acumulados").assertDoesNotExist()
+    }
+
+    @Test
+    fun `clicking the advanced header reports the toggle`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+        var toggled = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {},
+                        onToggleAdvanced = { toggled = true }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Avançado").performClick()
+
+        assertEquals(true, toggled)
     }
 
     @Test

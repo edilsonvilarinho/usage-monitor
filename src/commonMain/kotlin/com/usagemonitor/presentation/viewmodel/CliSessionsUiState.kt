@@ -36,7 +36,17 @@ sealed interface CliSessionsUiState {
          * varredura acontece de segundos em segundos e carimbá-la aqui quebraria a
          * igualdade do estado, recompondo a tela sem nada ter mudado.
          */
-        val lastChangedAt: Instant? = null
+        val lastChangedAt: Instant? = null,
+        /**
+         * Se o bloco Avançado do detalhe está aberto.
+         *
+         * Mora no estado, e não num `remember` da tela, porque o laço ao vivo
+         * republica o `Success` a cada poucos segundos: um `remember` continuaria
+         * de pé, mas então a escolha do usuário viveria em dois lugares. Aqui ela
+         * é única e testável — desde que `loadSessions` a carregue do estado
+         * anterior, ou o bloco fecharia sozinho a cada tique.
+         */
+        val advancedExpanded: Boolean = false
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long
