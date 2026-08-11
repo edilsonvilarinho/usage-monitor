@@ -715,12 +715,14 @@ private fun SessionAdvancedSections(
         MetricCard(
             label = CliSessionsLabels.input(language),
             value = formatQuantity(summary.inputTokens),
-            accent = INPUT_COLOR
+            accent = INPUT_COLOR,
+            language = language
         )
         MetricCard(
             label = CliSessionsLabels.output(language),
             value = formatQuantity(summary.outputTokens),
-            accent = OUTPUT_COLOR
+            accent = OUTPUT_COLOR,
+            language = language
         )
         MetricCard(
             label = CliSessionsLabels.cacheRead(language),
@@ -997,9 +999,11 @@ private fun healthColor(health: CliSessionHealth): Color {
 private fun DetailSection(
     title: String,
     accent: Color,
+    // Sem default: um `help` acompanhado de um idioma implícito renderizaria
+    // português no meio da tela em inglês, e o compilador não reclamaria.
+    language: AppLanguage,
     trailing: String? = null,
     help: List<GlossaryTerm> = emptyList(),
-    language: AppLanguage = AppLanguage.PT,
     content: @Composable () -> Unit
 ) {
     DepthSurface(
@@ -1048,9 +1052,10 @@ private fun MetricCard(
     label: String,
     value: String,
     accent: Color,
+    // Mesma razão de [DetailSection]: idioma implícito vaza português.
+    language: AppLanguage,
     footer: String? = null,
-    help: GlossaryTerm? = null,
-    language: AppLanguage = AppLanguage.PT
+    help: GlossaryTerm? = null
 ) {
     DepthSurface(
         accent = accent,

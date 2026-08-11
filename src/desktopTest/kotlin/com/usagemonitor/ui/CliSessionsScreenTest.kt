@@ -728,6 +728,47 @@ class CliSessionsScreenTest {
         onNodeWithText("Compactação").assertExists()
     }
 
+    /**
+     * O idioma tem de chegar ao glossário. O teste de domínio garante que existe
+     * texto em inglês; este garante que a tela pede o inglês.
+     */
+    @Test
+    fun `the detail speaks english when the app does`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01")
+        val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            ),
+                            glossaryExpanded = true
+                        ),
+                        language = AppLanguage.EN,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("How to read this screen").assertExists()
+        onNodeWithText("Subagent turn").assertExists()
+        onNodeWithText("Advanced").assertExists()
+        // O rótulo em português não pode sobreviver em lugar nenhum da tela.
+        onNodeWithText("Turno de subagente").assertDoesNotExist()
+        onNodeWithText("Como ler esta tela").assertDoesNotExist()
+    }
+
     @Test
     fun `clicking the glossary header reports the toggle`() = runDesktopComposeUiTest {
         val summary = summary("session-abcdef01")
