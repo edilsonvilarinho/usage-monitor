@@ -28,7 +28,15 @@ sealed interface CliSessionsUiState {
         /** Falha de indexação que não impediu a leitura do índice já gravado. */
         val indexWarning: String? = null,
         /** `null` mostra a lista; qualquer outro valor mostra o detalhe. */
-        val detail: CliSessionDetailUiState? = null
+        val detail: CliSessionDetailUiState? = null,
+        /**
+         * Quando o conteúdo da lista mudou pela última vez.
+         *
+         * Não é o instante da última varredura: com a atualização ao vivo a
+         * varredura acontece de segundos em segundos e carimbá-la aqui quebraria a
+         * igualdade do estado, recompondo a tela sem nada ter mudado.
+         */
+        val lastChangedAt: Instant? = null
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long
@@ -36,6 +44,18 @@ sealed interface CliSessionsUiState {
 
         val totalTokens: Long
             get() = sessions.sumOf { session -> session.totalTokens }
+
+        val totalInputTokens: Long
+            get() = sessions.sumOf { session -> session.inputTokens }
+
+        val totalOutputTokens: Long
+            get() = sessions.sumOf { session -> session.outputTokens }
+
+        val totalCacheReadTokens: Long
+            get() = sessions.sumOf { session -> session.cacheReadTokens }
+
+        val totalCacheWriteTokens: Long
+            get() = sessions.sumOf { session -> session.cacheWriteTokens }
 
         /** Ao menos uma sessão tem turnos sem preço: o total exibido é parcial. */
         val isTotalCostComplete: Boolean

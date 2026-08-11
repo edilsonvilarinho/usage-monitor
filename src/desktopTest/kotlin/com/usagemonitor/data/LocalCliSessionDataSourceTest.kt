@@ -2,6 +2,7 @@ package com.usagemonitor.data
 
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.domain.entity.CliProjectRoot
+import com.usagemonitor.domain.entity.CliSessionHealth
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
 import java.io.File
@@ -263,6 +264,74 @@ class LocalCliSessionDataSourceTest {
             assertEquals(2, detail.turns.size)
             assertFalse(detail.turns[0].isSidechain)
             assertTrue(detail.turns[1].isSidechain)
+        }
+    }
+
+    @Test
+    fun `live context comes from the last main turn`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", cacheReadTokens = 10_000L),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:01:00Z", cacheReadTokens = 90_000L),
+                // Subagente depois do último turno principal: tem contexto próprio.
+                assistantLine(
+                    "session-a",
+                    "msg-3",
+                    "2026-08-01T10:02:00Z",
+                    model = "claude-haiku-4-5",
+                    cacheReadTokens = 3_000L,
+                    isSidechain = true
+                )
+            )
+            dataSource.syncIndex()
+
+            val session = dataSource.readSessions().single()
+            assertEquals(90_000L, session.liveContextTokens)
+            assertEquals("claude-opus-5", session.liveContextModel)
+            assertEquals(90_000L, assertNotNull(dataSource.readSession("session-a")).summary.liveContextTokens)
+        }
+    }
+
+    @Test
+    fun `a session with only sidechain turns has no live context`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", cacheReadTokens = 7_000L, isSidechain = true)
+            )
+            dataSource.syncIndex()
+
+            val session = dataSource.readSessions().single()
+            assertEquals(0L, session.liveContextTokens)
+            assertNull(session.liveContextModel)
+            assertEquals(CliSessionHealth.HEALTHY, session.contextStatus.health)
+        }
+    }
+
+    /**
+     * O contexto vivo é o estado atual da sessão, não o do recorte: recortá-lo
+     * pela janela de quota daria um número sem significado.
+     */
+    @Test
+    fun `live context ignores the time window`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", cacheReadTokens = 10_000L),
+                assistantLine("session-a", "msg-2", "2026-08-01T20:00:00Z", cacheReadTokens = 90_000L)
+            )
+            dataSource.syncIndex()
+
+            val windowed = dataSource.readSessions(
+                sinceEpochMillis = epochMillis("2026-08-01T15:00:00Z")
+            ).single()
+
+            assertEquals(1, windowed.turnCount)
+            assertEquals(90_000L, windowed.liveContextTokens)
         }
     }
 

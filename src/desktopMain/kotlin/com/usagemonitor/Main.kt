@@ -107,6 +107,13 @@ private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
+
+/**
+ * Cadência da janela de sessões aberta. As sessões descrevem o Claude Code
+ * rodando neste instante, então a tela se atualiza sozinha; uma passada custa um
+ * `walk` sobre os `projects/` e um `SELECT` no índice.
+ */
+private const val CLI_SESSION_LIVE_INTERVAL_MILLIS = 5_000L
 private const val ENABLED_APIS_KEY = "enabledApis"
 private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
@@ -325,7 +332,8 @@ fun main() = application {
             getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
             syncCliSessionIndex = SyncCliSessionIndexUseCase(cliSessionRepository),
             autoLoad = false,
-            backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS
+            backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
+            liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
         )
     }
 
@@ -631,8 +639,14 @@ fun main() = application {
 
     if (isCliSessionsOpen) {
         val cliSessionsTitle = cliSessionsWindowTitle(language, cliSessionsProfileLabel)
+        // Sem avisar o ViewModel, o laço ao vivo continuaria indexando de cinco em
+        // cinco segundos com a janela fechada.
+        val closeCliSessions = {
+            isCliSessionsOpen = false
+            cliSessionsViewModel.closeWindow()
+        }
         Window(
-            onCloseRequest = { isCliSessionsOpen = false },
+            onCloseRequest = closeCliSessions,
             title = cliSessionsTitle,
             icon = iconImage,
             state = cliSessionsWindowState,
@@ -647,7 +661,7 @@ fun main() = application {
                     title = cliSessionsTitle,
                     iconPainter = iconImage,
                     windowState = cliSessionsWindowState,
-                    onCloseRequest = { isCliSessionsOpen = false }
+                    onCloseRequest = closeCliSessions
                 ) {
                     CliSessionsScreen(
                         viewModel = cliSessionsViewModel,

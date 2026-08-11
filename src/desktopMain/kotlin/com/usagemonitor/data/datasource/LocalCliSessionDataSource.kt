@@ -102,10 +102,11 @@ class LocalCliSessionDataSource(
     override suspend fun readSessions(profileId: String?, sinceEpochMillis: Long?): List<CliSessionSummary> {
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
+                val liveContexts = readLiveContexts(connection)
                 if (sinceEpochMillis == null) {
-                    readStoredSessions(connection, profileId)
+                    readStoredSessions(connection, profileId, liveContexts)
                 } else {
-                    readWindowedSessions(connection, profileId, sinceEpochMillis)
+                    readWindowedSessions(connection, profileId, sinceEpochMillis, liveContexts)
                 }
             }
         }
@@ -114,10 +115,11 @@ class LocalCliSessionDataSource(
     override suspend fun readSession(sessionId: String): CliSessionDetail? {
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
+                val liveContexts = readLiveContexts(connection, sessionId)
                 val summary = connection.prepareStatement(SELECT_SESSION_BY_ID_SQL).use { statement ->
                     statement.setString(1, sessionId)
                     statement.executeQuery().use { rows ->
-                        if (rows.next()) readSummary(rows) else null
+                        if (rows.next()) readSummary(rows, liveContexts) else null
                     }
                 } ?: return@useConnection null
 
@@ -131,14 +133,49 @@ class LocalCliSessionDataSource(
     }
 
     /** Agregados históricos completos, lidos direto de `cli_sessions`. */
-    private fun readStoredSessions(connection: Connection, profileId: String?): List<CliSessionSummary> {
+    private fun readStoredSessions(
+        connection: Connection,
+        profileId: String?,
+        liveContexts: Map<String, LiveContext>
+    ): List<CliSessionSummary> {
         return connection.prepareStatement(SELECT_SESSIONS_SQL).use { statement ->
             statement.setInt(1, if (profileId == null) 1 else 0)
             statement.setString(2, profileId)
             statement.executeQuery().use { rows ->
                 buildList {
                     while (rows.next()) {
-                        add(readSummary(rows))
+                        add(readSummary(rows, liveContexts))
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Contexto vivo de cada sessão: o `cache_read` e o modelo do último turno da
+     * thread principal.
+     *
+     * Fica fora do recorte temporal de propósito — é o estado atual da sessão que
+     * diz quanto custa a próxima mensagem, não o que aconteceu dentro da janela.
+     * Turnos de subagente ficam de fora: o subagente tem contexto próprio.
+     */
+    private fun readLiveContexts(connection: Connection, sessionId: String? = null): Map<String, LiveContext> {
+        val sql = if (sessionId == null) SELECT_LIVE_CONTEXTS_SQL else SELECT_LIVE_CONTEXT_BY_SESSION_SQL
+        return connection.prepareStatement(sql).use { statement ->
+            if (sessionId != null) {
+                statement.setString(1, sessionId)
+                statement.setString(2, sessionId)
+            }
+            statement.executeQuery().use { rows ->
+                buildMap {
+                    while (rows.next()) {
+                        put(
+                            rows.getString("session_id"),
+                            LiveContext(
+                                cacheReadTokens = rows.getLong("cache_read_tokens"),
+                                model = rows.getString("model")
+                            )
+                        )
                     }
                 }
             }
@@ -156,7 +193,8 @@ class LocalCliSessionDataSource(
     private fun readWindowedSessions(
         connection: Connection,
         profileId: String?,
-        sinceEpochMillis: Long
+        sinceEpochMillis: Long,
+        liveContexts: Map<String, LiveContext>
     ): List<CliSessionSummary> {
         val accumulators = linkedMapOf<String, WindowedSessionAccumulator>()
 
@@ -174,7 +212,8 @@ class LocalCliSessionDataSource(
                             profileId = rows.getString("profile_id"),
                             cwd = rows.getString("cwd"),
                             gitBranch = rows.getString("git_branch"),
-                            hostName = rows.getString("host_name")
+                            hostName = rows.getString("host_name"),
+                            liveContext = liveContexts[sessionId]
                         )
                     }
                     accumulator.addModelGroup(rows)
@@ -489,10 +528,12 @@ class LocalCliSessionDataSource(
         }
     }
 
-    private fun readSummary(rows: ResultSet): CliSessionSummary {
+    private fun readSummary(rows: ResultSet, liveContexts: Map<String, LiveContext>): CliSessionSummary {
         val filePath = rows.getString("file_path")
+        val sessionId = rows.getString("session_id")
+        val liveContext = liveContexts[sessionId]
         return CliSessionSummary(
-            sessionId = rows.getString("session_id"),
+            sessionId = sessionId,
             filePath = filePath,
             profileId = rows.getString("profile_id"),
             cwd = rows.getString("cwd"),
@@ -509,6 +550,8 @@ class LocalCliSessionDataSource(
             cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens"),
             costMicros = rows.getLong("cost_micros"),
             unpricedTurnCount = rows.getInt("unpriced_turns"),
+            liveContextTokens = liveContext?.cacheReadTokens ?: 0L,
+            liveContextModel = liveContext?.model,
             stale = !File(filePath).isFile
         )
     }
@@ -645,7 +688,8 @@ class LocalCliSessionDataSource(
         val profileId: String?,
         val cwd: String?,
         val gitBranch: String?,
-        val hostName: String?
+        val hostName: String?,
+        val liveContext: LiveContext?
     ) {
         private var turnCount = 0
         private var firstTs = Long.MAX_VALUE
@@ -716,10 +760,18 @@ class LocalCliSessionDataSource(
                 cacheWrite1hTokens = cacheWrite1hTokens,
                 costMicros = costMicros,
                 unpricedTurnCount = unpricedTurnCount,
+                liveContextTokens = liveContext?.cacheReadTokens ?: 0L,
+                liveContextModel = liveContext?.model,
                 stale = !File(filePath).isFile
             )
         }
     }
+
+    /** Último turno da thread principal de uma sessão, base do status de contexto. */
+    private data class LiveContext(
+        val cacheReadTokens: Long,
+        val model: String?
+    )
 
     private data class DiscoveredTranscript(
         val file: File,
@@ -984,6 +1036,38 @@ class LocalCliSessionDataSource(
               AND (? = 1 OR s.profile_id = ?)
             GROUP BY t.session_id, t.model
             ORDER BY last_ts DESC;
+        """
+
+        /**
+         * Último turno da thread principal de cada sessão, por `MAX(seq)` — a ordem
+         * de inserção é a ordem do transcript, e `seq` não empata como `ts` pode
+         * empatar. O `idx_cli_turns_session_seq` cobre a agregação.
+         */
+        private val SELECT_LIVE_CONTEXTS_SQL = """
+            SELECT t.session_id AS session_id,
+                   t.cache_read_tokens AS cache_read_tokens,
+                   t.model AS model
+            FROM cli_turns t
+            JOIN (
+              SELECT session_id, MAX(seq) AS max_seq
+              FROM cli_turns
+              WHERE is_sidechain = 0
+              GROUP BY session_id
+            ) m ON m.session_id = t.session_id AND t.seq = m.max_seq;
+        """
+
+        private val SELECT_LIVE_CONTEXT_BY_SESSION_SQL = """
+            SELECT t.session_id AS session_id,
+                   t.cache_read_tokens AS cache_read_tokens,
+                   t.model AS model
+            FROM cli_turns t
+            JOIN (
+              SELECT session_id, MAX(seq) AS max_seq
+              FROM cli_turns
+              WHERE is_sidechain = 0 AND session_id = ?
+              GROUP BY session_id
+            ) m ON m.session_id = t.session_id AND t.seq = m.max_seq
+            WHERE t.session_id = ?;
         """
 
         private val DELETE_TURNS_BY_FILE_SQL = """

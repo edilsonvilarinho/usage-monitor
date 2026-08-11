@@ -95,8 +95,24 @@ internal object CliSessionsLabels {
         }
     }
 
-    fun refresh(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Atualizar" else "Refresh"
+    /** A tela se atualiza sozinha; a pílula existe para o usuário saber disso. */
+    fun live(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "AO VIVO" else "LIVE"
+    }
+
+    /**
+     * Marca a última **mudança**, não a última varredura. Se nada mudou o carimbo
+     * não anda — e é exatamente isso que aconteceu.
+     */
+    fun lastChange(instantLabel: String?, language: AppLanguage): String {
+        if (instantLabel == null) {
+            return if (language == AppLanguage.PT) "sem alterações ainda" else "no changes yet"
+        }
+        return if (language == AppLanguage.PT) {
+            "última alteração $instantLabel"
+        } else {
+            "last change $instantLabel"
+        }
     }
 
     fun back(language: AppLanguage): String {
@@ -166,7 +182,28 @@ internal object CliSessionsLabels {
         return if (language == AppLanguage.PT) "Quando" else "When"
     }
 
-    fun columnTokens(language: AppLanguage): String = "Tokens"
+    /**
+     * O total inclui o cache lido, que costuma responder por mais de 95% dele —
+     * cada turno relê o contexto inteiro. Sem o qualificador o número é lido como
+     * volume de conteúdo produzido, que ele não é.
+     */
+    fun columnTokens(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Tokens (com cache)" else "Tokens (with cache)"
+    }
+
+    /** Composição do total, para o número grande poder ser conferido. */
+    fun tokensBreakdown(
+        inputTokens: Long,
+        outputTokens: Long,
+        cacheReadTokens: Long,
+        cacheWriteTokens: Long,
+        language: AppLanguage
+    ): String {
+        val read = if (language == AppLanguage.PT) "cache lido" else "cache read"
+        val write = if (language == AppLanguage.PT) "cache gravado" else "cache write"
+        return "in ${formatQuantity(inputTokens)} · out ${formatQuantity(outputTokens)} · " +
+            "$read ${formatQuantity(cacheReadTokens)} · $write ${formatQuantity(cacheWriteTokens)}"
+    }
 
     fun columnCache(language: AppLanguage): String = "Cache"
 
@@ -261,17 +298,39 @@ internal object CliSessionsLabels {
         }
     }
 
+    /** Versão de uma palavra para a linha da lista; o detalhe usa [healthTitle]. */
+    fun healthShort(health: CliSessionHealth, language: AppLanguage): String {
+        return when (health) {
+            CliSessionHealth.HEALTHY ->
+                if (language == AppLanguage.PT) "Saudável" else "Healthy"
+            CliSessionHealth.ATTENTION ->
+                if (language == AppLanguage.PT) "Atenção" else "Attention"
+            CliSessionHealth.SATURATED ->
+                if (language == AppLanguage.PT) "Saturada" else "Saturated"
+        }
+    }
+
+    fun columnStatus(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Status" else "Status"
+    }
+
     /** Explicita por que o status foi atribuído — sem isso o alerta é opaco. */
     fun healthReason(
         saturationLabel: String?,
         nextCostLabel: String,
         language: AppLanguage
     ): String {
-        val window = saturationLabel ?: (if (language == AppLanguage.PT) "janela desconhecida" else "unknown window")
-        return if (language == AppLanguage.PT) {
-            "$window da janela · $nextCostLabel por mensagem"
+        // Sem a janela do modelo não há fração para mostrar; dizer isso é melhor
+        // que emendar o rótulo de erro na frase da fração.
+        val window = if (saturationLabel == null) {
+            if (language == AppLanguage.PT) "janela do modelo desconhecida" else "unknown model window"
         } else {
-            "$window of the window · $nextCostLabel per message"
+            if (language == AppLanguage.PT) "$saturationLabel da janela" else "$saturationLabel of the window"
+        }
+        return if (language == AppLanguage.PT) {
+            "$window · $nextCostLabel por mensagem"
+        } else {
+            "$window · $nextCostLabel per message"
         }
     }
 

@@ -5,8 +5,8 @@ import com.usagemonitor.domain.entity.CliSessionCostBreakdown
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.MICROS_PER_USD
-import com.usagemonitor.domain.entity.ModelContextWindowTable
 import com.usagemonitor.domain.entity.ModelPricingTable
+import com.usagemonitor.domain.entity.computeContextStatus
 
 /**
  * Deriva as métricas do detalhe de uma sessão. Puro: sem I/O, sem relógio.
@@ -26,18 +26,22 @@ class ComputeCliSessionAnalyticsUseCase {
 
         val mainTurns = turns.filter { turn -> !turn.isSidechain }
         val breakdown = computeBreakdown(turns)
-        val liveContext = mainTurns.lastOrNull()?.cacheReadTokens ?: 0L
-        val contextWindow = ModelContextWindowTable.forModel(detail.summary.primaryModel)
+        val lastMainTurn = mainTurns.lastOrNull()
+        // Mesmo cálculo que a lista faz a partir do índice: um único caminho para
+        // que os dois nunca divirjam.
+        val contextStatus = computeContextStatus(
+            liveContextTokens = lastMainTurn?.cacheReadTokens ?: 0L,
+            windowModel = detail.summary.primaryModel,
+            lastTurnModel = lastMainTurn?.model
+        )
 
         return CliSessionAnalytics(
             cacheHitRate = detail.summary.cacheHitRate,
             cacheSavingsMicros = turns.sumOf { turn -> turn.cacheSavingsMicros ?: 0L },
             averageContextPerTurn = averageContext(mainTurns),
-            liveContextTokens = liveContext,
-            nextInteractionCostMicros = nextInteractionCost(mainTurns.lastOrNull()),
-            contextSaturation = contextWindow
-                ?.takeIf { window -> window > 0L }
-                ?.let { window -> liveContext.toDouble() / window.toDouble() },
+            liveContextTokens = contextStatus.liveContextTokens,
+            nextInteractionCostMicros = contextStatus.nextInteractionCostMicros,
+            contextSaturation = contextStatus.contextSaturation,
             costBreakdown = breakdown,
             mainTurnCount = mainTurns.size,
             sidechainTurnCount = turns.size - mainTurns.size,
@@ -79,16 +83,6 @@ class ComputeCliSessionAnalyticsUseCase {
             return 0L
         }
         return mainTurns.sumOf { turn -> turn.cacheReadTokens } / mainTurns.size
-    }
-
-    /**
-     * O `cache_read` do último turno é o tamanho do contexto vivo: reenviá-lo
-     * na próxima mensagem custa esse volume à tarifa de cache read do modelo.
-     */
-    private fun nextInteractionCost(lastMainTurn: CliSessionTurn?): Long {
-        val turn = lastMainTurn ?: return 0L
-        val pricing = turn.pricing ?: return 0L
-        return turn.cacheReadTokens * pricing.cacheReadMicrosPerMillion / MICROS_PER_USD
     }
 
     private fun accumulate(turns: List<CliSessionTurn>, selector: (CliSessionTurn) -> Long): List<Long> {

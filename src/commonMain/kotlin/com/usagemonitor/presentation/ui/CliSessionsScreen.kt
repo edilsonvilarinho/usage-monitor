@@ -72,7 +72,6 @@ fun CliSessionsScreen(
     CliSessionsContent(
         state = state,
         language = language,
-        onRefresh = { viewModel.refresh() },
         onSelectRange = { range -> viewModel.setRange(range) },
         onOpenSession = { sessionId -> viewModel.openSession(sessionId) },
         onCloseDetail = { viewModel.closeDetail() },
@@ -84,7 +83,6 @@ fun CliSessionsScreen(
 internal fun CliSessionsContent(
     state: CliSessionsUiState,
     language: AppLanguage,
-    onRefresh: () -> Unit,
     onSelectRange: (CliSessionRange) -> Unit,
     onOpenSession: (String) -> Unit,
     onCloseDetail: () -> Unit,
@@ -102,7 +100,6 @@ internal fun CliSessionsContent(
                     CliSessionsList(
                         state = state,
                         language = language,
-                        onRefresh = onRefresh,
                         onSelectRange = onSelectRange,
                         onOpenSession = onOpenSession
                     )
@@ -137,7 +134,6 @@ private fun CenteredMessage(message: String) {
 private fun CliSessionsList(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
-    onRefresh: () -> Unit,
     onSelectRange: (CliSessionRange) -> Unit,
     onOpenSession: (String) -> Unit
 ) {
@@ -145,7 +141,6 @@ private fun CliSessionsList(
         CliSessionsHeader(
             state = state,
             language = language,
-            onRefresh = onRefresh,
             onSelectRange = onSelectRange
         )
 
@@ -178,7 +173,6 @@ private fun CliSessionsList(
 private fun CliSessionsHeader(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
-    onRefresh: () -> Unit,
     onSelectRange: (CliSessionRange) -> Unit
 ) {
     DepthSurface(
@@ -188,15 +182,30 @@ private fun CliSessionsHeader(
         elevation = AppElevation.dialog,
         contentPadding = 16.dp
     ) {
-        if (state.profileLabel != null) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (state.profileLabel != null) {
+                Text(
+                    text = state.profileLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = CACHE_READ_COLOR,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            LiveBadge(language = language)
             Text(
-                text = state.profileLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = CACHE_READ_COLOR,
-                fontWeight = FontWeight.SemiBold
+                text = CliSessionsLabels.lastChange(
+                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
+                    language = language
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(2.dp))
         }
+        Spacer(modifier = Modifier.height(6.dp))
 
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -228,6 +237,19 @@ private fun CliSessionsHeader(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Sem a composição o total parece volume de conteúdo, quando é
+                // dominado por cache lido: cada turno relê o contexto inteiro.
+                Text(
+                    text = CliSessionsLabels.tokensBreakdown(
+                        inputTokens = state.totalInputTokens,
+                        outputTokens = state.totalOutputTokens,
+                        cacheReadTokens = state.totalCacheReadTokens,
+                        cacheWriteTokens = state.totalCacheWriteTokens,
+                        language = language
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Column {
@@ -252,6 +274,17 @@ private fun CliSessionsHeader(
                 )
             }
 
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Linha própria: junto das métricas, a quebra do FlowRow dependia da
+        // largura dos números, então os chips mudavam de lugar conforme os dados.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             for (entry in CliSessionRange.entries) {
                 FilterChip(
                     selected = state.range == entry,
@@ -259,10 +292,29 @@ private fun CliSessionsHeader(
                     label = { Text(CliSessionsLabels.rangeLabel(entry, language)) }
                 )
             }
-            TextButton(onClick = onRefresh) {
-                Text(CliSessionsLabels.refresh(language))
-            }
         }
+    }
+}
+
+/** Sinal de que a tela se atualiza sozinha — o botão de atualizar não existe mais. */
+@Composable
+private fun LiveBadge(language: AppLanguage) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(AppShapes.small)
+                .background(CACHE_READ_COLOR)
+        )
+        Text(
+            text = CliSessionsLabels.live(language),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = CACHE_READ_COLOR
+        )
     }
 }
 
@@ -273,8 +325,11 @@ private fun CliSessionRow(
     language: AppLanguage,
     onOpen: () -> Unit
 ) {
+    val status = session.contextStatus
+    val statusColor = healthColor(status.health)
+
     DepthSurface(
-        accent = CACHE_READ_COLOR,
+        accent = statusColor,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
         glowAlpha = 0.16f,
         contentPadding = 14.dp
@@ -284,19 +339,31 @@ private fun CliSessionRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(modifier = Modifier.width(158.dp)) {
-                Text(
-                    text = shortSessionId(session.sessionId),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            Row(
+                modifier = Modifier.width(170.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(AppShapes.small)
+                        .background(statusColor)
                 )
-                Text(
-                    text = formatInstant(session.lastTs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column {
+                    Text(
+                        text = shortSessionId(session.sessionId),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = formatInstant(session.lastTs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Column(modifier = Modifier.width(140.dp)) {
@@ -314,7 +381,13 @@ private fun CliSessionRow(
                 )
             }
 
-            MetricText(CliSessionsLabels.columnTokens(language), formatQuantity(session.totalTokens))
+            // Larguras fixas: sem elas cada linha dimensiona pelo próprio número e
+            // as colunas deixam de alinhar entre as sessões.
+            MetricText(
+                label = CliSessionsLabels.columnTokens(language),
+                value = formatQuantity(session.totalTokens),
+                modifier = Modifier.width(118.dp)
+            )
 
             Column(modifier = Modifier.width(84.dp)) {
                 MetricText(CliSessionsLabels.columnCache(language), formatPercent(session.cacheHitRate))
@@ -329,8 +402,31 @@ private fun CliSessionRow(
                 } else {
                     "${formatMicrosUsd(session.costMicros)}+"
                 },
-                valueColor = INPUT_COLOR
+                valueColor = INPUT_COLOR,
+                modifier = Modifier.width(96.dp)
             )
+
+            // O veredito que antes exigia abrir o detalhe. Vem com o número que o
+            // gerou: status sem a evidência não dá para conferir nem para confiar.
+            Column(modifier = Modifier.width(210.dp)) {
+                Text(
+                    text = CliSessionsLabels.healthShort(status.health, language),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = statusColor
+                )
+                Text(
+                    text = CliSessionsLabels.healthReason(
+                        saturationLabel = status.contextSaturation?.let { value -> formatPercent(value) },
+                        nextCostLabel = formatMicrosUsd(status.nextInteractionCostMicros),
+                        language = language
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -717,9 +813,10 @@ private fun MetricCard(
 private fun MetricText(
     label: String,
     value: String,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    modifier: Modifier = Modifier
 ) {
-    Column {
+    Column(modifier = modifier) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,

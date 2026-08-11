@@ -97,6 +97,18 @@ data class CliSessionSummary(
     val costMicros: Long = 0L,
     /** Turnos cujo modelo não está na tabela de preços: o custo exibido está incompleto. */
     val unpricedTurnCount: Int = 0,
+    /**
+     * `cache_read` do último turno da thread principal — o tamanho do contexto que
+     * a próxima mensagem vai reenviar.
+     *
+     * Ao contrário dos demais agregados, este valor é sempre da sessão inteira, mesmo
+     * numa leitura com janela temporal: "continuar esta sessão custa X" é uma
+     * propriedade do estado atual dela, e recortá-la por janela de quota daria um
+     * número sem significado.
+     */
+    val liveContextTokens: Long = 0L,
+    /** Modelo desse último turno principal; define a tarifa da próxima mensagem. */
+    val liveContextModel: String? = null,
     /** O `.jsonl` de origem não existe mais (retenção do CLI); só o resumo sobrevive. */
     val stale: Boolean = false
 ) {
@@ -119,6 +131,17 @@ data class CliSessionSummary(
     /** O custo cobre todos os turnos apenas quando nenhum modelo ficou sem preço. */
     val isCostComplete: Boolean
         get() = unpricedTurnCount == 0
+
+    /**
+     * Mesmo veredito que o detalhe apresenta, sem carregar os turnos: a lista só
+     * precisa do contexto vivo, que o índice já entrega pronto.
+     */
+    val contextStatus: CliSessionContextStatus
+        get() = computeContextStatus(
+            liveContextTokens = liveContextTokens,
+            windowModel = primaryModel,
+            lastTurnModel = liveContextModel
+        )
 
     /** Último segmento do `cwd`, usado como nome do projeto na lista. */
     val projectName: String?
@@ -187,26 +210,20 @@ data class CliSessionAnalytics(
     val cumulativeCostMicros: List<Long> = emptyList(),
     val cumulativeSavingsMicros: List<Long> = emptyList()
 ) {
+    /** As três métricas de contexto agrupadas, na mesma forma que a lista usa. */
+    val contextStatus: CliSessionContextStatus
+        get() = CliSessionContextStatus(
+            liveContextTokens = liveContextTokens,
+            contextSaturation = contextSaturation,
+            nextInteractionCostMicros = nextInteractionCostMicros
+        )
+
     /**
-     * Status da sessão: quanto da janela de contexto já está ocupado e quanto
-     * custa continuar. As duas dimensões são avaliadas em paralelo — numa
-     * janela pequena a fração pode ser modesta e a mensagem ainda sair cara.
+     * Status da sessão. Delega em [CliSessionContextStatus] para que o detalhe e a
+     * lista deem sempre o mesmo veredito a partir dos mesmos insumos.
      */
     val health: CliSessionHealth
-        get() {
-            val saturation = contextSaturation ?: 0.0
-            return when {
-                saturation >= CliSessionHealthThresholds.SATURATED_WINDOW_FRACTION ||
-                    nextInteractionCostMicros >= CliSessionHealthThresholds.SATURATED_NEXT_COST_MICROS ->
-                    CliSessionHealth.SATURATED
-
-                saturation >= CliSessionHealthThresholds.ATTENTION_WINDOW_FRACTION ||
-                    nextInteractionCostMicros >= CliSessionHealthThresholds.ATTENTION_NEXT_COST_MICROS ->
-                    CliSessionHealth.ATTENTION
-
-                else -> CliSessionHealth.HEALTHY
-            }
-        }
+        get() = contextStatus.health
 
     val isSaturated: Boolean
         get() = health == CliSessionHealth.SATURATED

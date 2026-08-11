@@ -41,7 +41,6 @@ class CliSessionsScreenTest {
                             sessions = listOf(summary("session-abcdef01", costMicros = 1_230_000L))
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -68,7 +67,6 @@ class CliSessionsScreenTest {
                             rangeAnchored = true
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -93,7 +91,6 @@ class CliSessionsScreenTest {
                             rangeAnchored = true
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -116,7 +113,6 @@ class CliSessionsScreenTest {
                             sessions = listOf(summary("session-abcdef01"), summary("session-abcdef02"))
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -140,7 +136,6 @@ class CliSessionsScreenTest {
                             profileLabel = "INFORMATA2"
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -163,7 +158,6 @@ class CliSessionsScreenTest {
                             range = CliSessionRange.LAST_7D
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -188,7 +182,6 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = { range -> selected.add(range) },
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -203,14 +196,16 @@ class CliSessionsScreenTest {
     }
 
     @Test
-    fun `the list header has no back button`() = runDesktopComposeUiTest {
+    fun `the list header has no back button and no refresh button`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
-                        state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            lastChangedAt = Instant.parse("2026-08-10T21:04:37Z")
+                        ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -221,7 +216,109 @@ class CliSessionsScreenTest {
 
         // O fechamento da janela é do title bar; um "Voltar" aqui não teria destino.
         onNodeWithText("Voltar").assertDoesNotExist()
-        onNodeWithText("Atualizar").assertIsDisplayed()
+        // A tela se atualiza sozinha: o botão saiu e a pílula ocupou o lugar dele.
+        onNodeWithText("Atualizar").assertDoesNotExist()
+        onNodeWithText("AO VIVO").assertIsDisplayed()
+        onNodeWithText("última alteração 10/08 18:04 BRT").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the list header says so when nothing has changed yet`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("sem alterações ainda").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the list row carries the session status with the number behind it`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(
+                                // 650K de contexto vivo numa janela de 1M.
+                                summary("session-abcdef01").copy(
+                                    liveContextTokens = 650_000L,
+                                    liveContextModel = "claude-opus-5"
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // O status que antes exigia abrir o detalhe, com a evidência que o gerou.
+        onNodeWithText("Saturada").assertIsDisplayed()
+        onNodeWithText("65% da janela · \$0.3250 por mensagem").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the list row reports an unknown window instead of guessing one`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(
+                                summary("session-abcdef01").copy(
+                                    primaryModel = "claude-3-5-sonnet",
+                                    liveContextTokens = 10_000L,
+                                    liveContextModel = "claude-3-5-sonnet"
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("janela do modelo desconhecida · \$0.0000 por mensagem").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the header breaks the token total into its components`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01"))
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // Sem a composição o total parece volume de conteúdo, quando é cache lido.
+        // O rótulo aparece duas vezes: no total do header e na linha da sessão.
+        onAllNodesWithText("Tokens (com cache)").assertCountEquals(2)
+        onNodeWithText("in 0 · out 1K · cache lido 40K · cache gravado 0").assertIsDisplayed()
     }
 
     @Test
@@ -232,7 +329,6 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = emptyList()),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -256,7 +352,6 @@ class CliSessionsScreenTest {
                             range = CliSessionRange.ALL
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -294,7 +389,6 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -334,7 +428,6 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -371,7 +464,6 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -409,7 +501,6 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -449,7 +540,6 @@ class CliSessionsScreenTest {
                             )
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}
@@ -475,7 +565,6 @@ class CliSessionsScreenTest {
                             detail = CliSessionDetailUiState.Loading(summary.sessionId)
                         ),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = { closed = true }
@@ -497,7 +586,6 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Error("índice indisponível"),
                         language = AppLanguage.PT,
-                        onRefresh = {},
                         onSelectRange = {},
                         onOpenSession = {},
                         onCloseDetail = {}

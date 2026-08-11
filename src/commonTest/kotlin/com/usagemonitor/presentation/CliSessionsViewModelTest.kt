@@ -28,10 +28,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 private val FIXED_NOW = Instant.parse("2026-08-10T12:00:00Z")
 private const val FIVE_HOURS_MILLIS = 5L * 60 * 60 * 1_000
 private const val SEVEN_DAYS_MILLIS = 7L * 24 * 60 * 60 * 1_000
+private const val LIVE_INTERVAL_MILLIS = 5_000L
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CliSessionsViewModelTest {
@@ -383,7 +385,7 @@ class CliSessionsViewModelTest {
     }
 
     @Test
-    fun `background indexing refreshes the list while it is visible`() = runTest {
+    fun `background indexing alone never touches the list`() = runTest {
         val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
         val viewModel = buildViewModel(
             repository = repository,
@@ -397,8 +399,155 @@ class CliSessionsViewModelTest {
             advanceTimeBy(10 * 60 * 1_000L)
             runCurrent()
 
+            // Com a janela fechada basta o índice estar em dia; recarregar a lista
+            // é trabalho do laço ao vivo.
+            val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+            assertEquals(listOf("a"), state.sessions.map { session -> session.sessionId })
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `the live loop reloads the list while the window is open`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            repository.sessions = listOf(summary("a"), summary("b"))
+
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
             val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
             assertEquals(listOf("a", "b"), state.sessions.map { session -> session.sessionId })
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `closing the window stops the live loop`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            viewModel.closeWindow()
+            val syncCallsAtClose = repository.syncCalls
+
+            advanceTimeBy(10 * LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            assertEquals(syncCallsAtClose, repository.syncCalls)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `the live loop refreshes the open detail without going back to Loading`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        repository.turnsBySession["a"] = listOf(turn(seq = 1, cacheReadTokens = 20_000L))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            viewModel.openSession("a")
+
+            val states = mutableListOf<CliSessionDetailUiState?>()
+            repository.turnsBySession["a"] = listOf(
+                turn(seq = 1, cacheReadTokens = 20_000L),
+                turn(seq = 2, cacheReadTokens = 90_000L)
+            )
+
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+            states.add((viewModel.uiState.value as? CliSessionsUiState.Success)?.detail)
+
+            val detail = assertIs<CliSessionDetailUiState.Ready>(states.last())
+            assertEquals(2, detail.result.detail.turns.size)
+            assertEquals(90_000L, detail.result.analytics.liveContextTokens)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `a failed detail reload keeps the last good detail on screen`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        repository.turnsBySession["a"] = listOf(turn(seq = 1, cacheReadTokens = 20_000L))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            viewModel.openSession("a")
+            repository.detailOverride = Result.failure(IllegalStateException("io"))
+
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            val detail = assertIs<CliSessionDetailUiState.Ready>(
+                assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).detail
+            )
+            assertEquals(20_000L, detail.result.analytics.liveContextTokens)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `the open detail survives a session leaving the time window`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            viewModel.openSession("a")
+
+            // A sessão sai do recorte da lista; o detalhe é a sessão inteira.
+            repository.sessions = emptyList()
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+            assertTrue(state.sessions.isEmpty())
+            assertIs<CliSessionDetailUiState.Ready>(state.detail)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `the change stamp only moves when the content actually changes`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val clock = MovingClock(FIXED_NOW)
+        val viewModel = buildViewModel(repository, autoLoad = false, clock = clock)
+
+        try {
+            viewModel.openForProfile("conta2", "INFORMATA2")
+            val firstStamp = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).lastChangedAt
+            val stateAfterOpen = viewModel.uiState.value
+
+            advanceTimeBy(3 * LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            // Nada mudou: o carimbo fica parado e o estado continua igual, então o
+            // StateFlow não reemite e a tela não recompõe.
+            val stateAfterIdleTicks = viewModel.uiState.value
+            assertEquals(firstStamp, assertIs<CliSessionsUiState.Success>(stateAfterIdleTicks).lastChangedAt)
+            assertEquals(stateAfterOpen, stateAfterIdleTicks)
+
+            repository.sessions = listOf(summary("a"), summary("b"))
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            val movedStamp = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).lastChangedAt
+            assertTrue(movedStamp != null && firstStamp != null && movedStamp > firstStamp)
         } finally {
             viewModel.onDestroy()
         }
@@ -407,7 +556,8 @@ class CliSessionsViewModelTest {
     private fun kotlinx.coroutines.test.TestScope.buildViewModel(
         repository: FakeCliSessionRepository,
         autoLoad: Boolean = true,
-        backgroundIndexIntervalMillis: Long? = null
+        backgroundIndexIntervalMillis: Long? = null,
+        clock: Clock = FixedClock(FIXED_NOW)
     ): CliSessionsViewModel {
         return CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(repository, FixedClock(FIXED_NOW)),
@@ -415,7 +565,9 @@ class CliSessionsViewModelTest {
             syncCliSessionIndex = SyncCliSessionIndexUseCase(repository),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             autoLoad = autoLoad,
-            backgroundIndexIntervalMillis = backgroundIndexIntervalMillis
+            backgroundIndexIntervalMillis = backgroundIndexIntervalMillis,
+            liveIntervalMillis = LIVE_INTERVAL_MILLIS,
+            clock = clock
         )
     }
 
@@ -460,6 +612,16 @@ class CliSessionsViewModelTest {
 /** Relógio parado: o corte da janela precisa ser conferível ao milissegundo. */
 private class FixedClock(private val fixedNow: Instant) : Clock {
     override fun now(): Instant = fixedNow
+}
+
+/** Avança um segundo por leitura, para distinguir dois carimbos de alteração. */
+private class MovingClock(start: Instant) : Clock {
+    private var current = start
+
+    override fun now(): Instant {
+        current += 1.seconds
+        return current
+    }
 }
 
 private class FakeCliSessionRepository(
