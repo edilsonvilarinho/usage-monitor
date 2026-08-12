@@ -306,7 +306,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
 }
 
 /** Versão exibida no rodapé; a real vem do build e mudaria a imagem a cada release. */
-private const val APP_VERSION = "27.0.0"
+internal const val APP_VERSION = "27.0.0"
 
 /**
  * `HistoryScreen` recebe o ViewModel, não o estado.
@@ -315,7 +315,7 @@ private const val APP_VERSION = "27.0.0"
  * sem esperar o `Success`, a captura pegaria o spinner. Daí o bloqueio até o
  * estado chegar, com prazo para não travar o build se algo mudar.
  */
-private fun fixedHistoryViewModel(): HistoryViewModel {
+internal fun fixedHistoryViewModel(): HistoryViewModel {
     val repository = object : UsageHistoryRepository {
         override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
 

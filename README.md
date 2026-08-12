@@ -1,5 +1,7 @@
 # Usage Monitor
 
+![Tour da aplicacao](img/tour.gif)
+
 Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo, saldo e quotas de ferramentas/APIs de IA em um unico painel.
 
 Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLite, oferece refresh automatico a cada 10 minutos, suporta reorder/minimizacao de cards, tema claro/escuro, idioma PT/EN, auto-start em Windows/Linux e verificacao de updates via GitHub Releases.
@@ -37,7 +39,11 @@ Para regerar depois de mudar a UI:
 
 ```bat
 gradlew.bat generateScreenshots
+gradlew.bat generateTourGif
 ```
+
+O GIF do topo passeia por dashboard, historico, sessoes CLI, detalhe da sessao,
+visao do time e configuracoes, na mesma ordem em que a app abre cada uma.
 
 ### Dashboard com varias contas
 
