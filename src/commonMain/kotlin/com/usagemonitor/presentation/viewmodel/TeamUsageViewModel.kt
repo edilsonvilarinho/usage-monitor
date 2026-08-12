@@ -1,7 +1,12 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.CliQuotaWindows
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.usecase.CliSessionDetailResult
+import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
+import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import kotlinx.coroutines.CoroutineDispatcher
@@ -21,6 +26,9 @@ import kotlinx.datetime.Clock
 
 private const val UNKNOWN_ERROR_MESSAGE = "erro desconhecido"
 
+private const val SESSION_GONE_MESSAGE =
+    "Sessão não encontrada no servidor de time."
+
 /**
  * Estado da janela de Sessões do time.
  *
@@ -37,13 +45,16 @@ private const val UNKNOWN_ERROR_MESSAGE = "erro desconhecido"
 class TeamUsageViewModel(
     private val getTeamUsage: GetTeamUsageUseCase,
     private val removeTeamMember: RemoveTeamMemberUseCase,
+    private val getTeamSessionDetail: GetTeamSessionDetailUseCase,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    private val computeAnalytics: ComputeCliSessionAnalyticsUseCase = ComputeCliSessionAnalyticsUseCase()
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private var loadJob: Job? = null
+    private var detailJob: Job? = null
     private var liveJob: Job? = null
 
     /** Evita empilhar consultas quando a rede está mais lenta que o intervalo. */
@@ -90,6 +101,7 @@ class TeamUsageViewModel(
     fun closeWindow() {
         liveJob?.cancel()
         liveJob = null
+        closeDetail()
     }
 
     /**
@@ -153,6 +165,64 @@ class TeamUsageViewModel(
         _removalError.value = null
     }
 
+    /**
+     * Abre o detalhe de uma sessão de outra máquina.
+     *
+     * O `deviceId` acompanha o `sessionId` porque a leitura no servidor é
+     * escopada por `(conta, máquina)` — o id da sessão sozinho não identifica o
+     * dono dela.
+     */
+    fun openSession(deviceId: String, sessionId: String) {
+        val current = _uiState.value
+        if (current !is TeamUsageUiState.Success) {
+            return
+        }
+        val targetAccountKey = accountKey ?: return
+
+        _uiState.value = current.copy(
+            detail = TeamSessionDetailUiState.Loading(deviceId = deviceId, sessionId = sessionId)
+        )
+
+        detailJob?.cancel()
+        detailJob = viewModelScope.launch {
+            val loaded = loadDetailState(
+                accountKey = targetAccountKey,
+                deviceId = deviceId,
+                sessionId = sessionId
+            )
+            publishDetail(deviceId = deviceId, sessionId = sessionId, detailState = loaded)
+        }
+    }
+
+    fun closeDetail() {
+        detailJob?.cancel()
+        val current = _uiState.value
+        if (current is TeamUsageUiState.Success) {
+            _uiState.value = current.copy(detail = null)
+        }
+    }
+
+    /**
+     * Abre ou fecha o bloco Avançado do detalhe.
+     *
+     * A escolha vale para a janela toda, não para a sessão aberta — mesmo
+     * comportamento do modal da própria máquina.
+     */
+    fun toggleAdvanced() {
+        val current = _uiState.value
+        if (current is TeamUsageUiState.Success) {
+            _uiState.value = current.copy(advancedExpanded = !current.advancedExpanded)
+        }
+    }
+
+    /** Abre ou fecha o painel "Como ler esta tela". */
+    fun toggleGlossary() {
+        val current = _uiState.value
+        if (current is TeamUsageUiState.Success) {
+            _uiState.value = current.copy(glossaryExpanded = !current.glossaryExpanded)
+        }
+    }
+
     fun refresh() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -162,6 +232,7 @@ class TeamUsageViewModel(
 
     fun onDestroy() {
         loadJob?.cancel()
+        detailJob?.cancel()
         liveJob?.cancel()
         viewModelScope.cancel()
     }
@@ -181,6 +252,7 @@ class TeamUsageViewModel(
             while (true) {
                 delay(liveIntervalMillis)
                 loadTeam()
+                reloadOpenDetail()
             }
         }
     }
@@ -212,7 +284,13 @@ class TeamUsageViewModel(
                             ?: emptySet(),
                         // Carimbo só anda quando o conteúdo muda. Marcá-lo a cada
                         // tique quebraria a igualdade do estado e recomporia a tela.
-                        lastChangedAt = if (contentChanged) clock.now() else current?.lastChangedAt
+                        lastChangedAt = if (contentChanged) clock.now() else current?.lastChangedAt,
+                        // O detalhe é sempre a sessão inteira, então o recorte da
+                        // lista não se aplica a ele: sem carregá-lo daqui, o tique
+                        // de 5s fecharia o painel na cara de quem está lendo.
+                        detail = current?.detail,
+                        advancedExpanded = current?.advancedExpanded ?: false,
+                        glossaryExpanded = current?.glossaryExpanded ?: false
                     )
                 },
                 onFailure = { error ->
@@ -229,6 +307,108 @@ class TeamUsageViewModel(
                 }
             )
         }
+    }
+
+    /**
+     * Recarrega o detalhe aberto no lugar. Nunca volta para `Loading` e mantém o
+     * último resultado bom se a leitura falhar: no tempo real o usuário está
+     * lendo a tela, não esperando por ela.
+     */
+    private suspend fun reloadOpenDetail() {
+        val current = _uiState.value as? TeamUsageUiState.Success ?: return
+        val open = current.detail as? TeamSessionDetailUiState.Ready ?: return
+        val targetAccountKey = accountKey ?: return
+
+        val reloaded = loadDetailState(
+            accountKey = targetAccountKey,
+            deviceId = open.deviceId,
+            sessionId = open.sessionId
+        )
+        if (reloaded is TeamSessionDetailUiState.Ready) {
+            publishDetail(deviceId = open.deviceId, sessionId = open.sessionId, detailState = reloaded)
+        }
+    }
+
+    private suspend fun loadDetailState(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): TeamSessionDetailUiState {
+        return getTeamSessionDetail(
+            accountKey = accountKey,
+            deviceId = deviceId,
+            sessionId = sessionId
+        ).fold(
+            onSuccess = { loaded ->
+                if (loaded == null) {
+                    // Servidor sem a rota de detalhe, ou sessão fora da retenção.
+                    aggregatedDetail(deviceId, sessionId)
+                } else {
+                    TeamSessionDetailUiState.Ready(
+                        deviceId = deviceId,
+                        sessionId = sessionId,
+                        result = loaded
+                    )
+                }
+            },
+            onFailure = { error ->
+                TeamSessionDetailUiState.Error(
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    message = error.message ?: UNKNOWN_ERROR_MESSAGE
+                )
+            }
+        )
+    }
+
+    /**
+     * Detalhe possível sem os turnos: só o que o agregado da lista já prova.
+     *
+     * É o que a tela mostra contra um servidor anterior à rota `/v1/session`.
+     * Sem turno não há série nem distribuição de custo, e a tela deixa isso
+     * explícito em vez de desenhar gráfico vazio. Só vira erro quando nem o
+     * agregado existe — aí não há nada a apresentar.
+     */
+    private fun aggregatedDetail(deviceId: String, sessionId: String): TeamSessionDetailUiState {
+        val summary = findSessionSummary(deviceId, sessionId)
+            ?: return TeamSessionDetailUiState.Error(
+                deviceId = deviceId,
+                sessionId = sessionId,
+                message = SESSION_GONE_MESSAGE
+            )
+
+        return TeamSessionDetailUiState.Ready(
+            deviceId = deviceId,
+            sessionId = sessionId,
+            result = CliSessionDetailResult(
+                detail = CliSessionDetail(summary = summary, turns = emptyList()),
+                analytics = computeAnalytics.fromSummary(summary)
+            ),
+            turnsUnavailable = true
+        )
+    }
+
+    private fun findSessionSummary(deviceId: String, sessionId: String): CliSessionSummary? {
+        val current = _uiState.value as? TeamUsageUiState.Success ?: return null
+        val member = current.members.firstOrNull { entry -> entry.deviceId == deviceId } ?: return null
+        return member.sessions.firstOrNull { session -> session.sessionId == sessionId }
+    }
+
+    /** Descarta o resultado se o usuário já voltou à lista ou abriu outra sessão. */
+    private fun publishDetail(
+        deviceId: String,
+        sessionId: String,
+        detailState: TeamSessionDetailUiState
+    ) {
+        val current = _uiState.value
+        if (current !is TeamUsageUiState.Success) {
+            return
+        }
+        val open = current.detail
+        if (open == null || open.deviceId != deviceId || open.sessionId != sessionId) {
+            return
+        }
+        _uiState.value = current.copy(detail = detailState)
     }
 
     companion object {

@@ -3,6 +3,7 @@ package com.usagemonitor.data
 import com.usagemonitor.data.mapper.toCacheDto
 import com.usagemonitor.data.mapper.toDomain
 import com.usagemonitor.data.dto.DashboardCacheDto
+import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -86,6 +87,64 @@ class DashboardCacheMapperTest {
 
         assertEquals(1, restored.size)
         assertEquals(original, restored.first())
+    }
+
+    @Test
+    fun `round trip preserves the quota currency code`() {
+        val original = ApiUsageStats(
+            source = ApiSource.ANTHROPIC,
+            targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "default"),
+            apiName = "Anthropic",
+            quotas = listOf(
+                QuotaInfo(
+                    label = AnthropicQuotaLabels.EXTRA_CREDITS,
+                    used = 60L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    hasKnownResetAt = false,
+                    periodType = PeriodType.REPORTED,
+                    unit = UsageUnit.PERCENTAGE,
+                    rawUsed = 32784L,
+                    rawTotal = 55000L,
+                    currencyCode = "BRL"
+                )
+            )
+        )
+
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(original.toCacheDto())
+        ).toDomain()
+
+        assertEquals(1, restored.size)
+        assertEquals(original, restored.first())
+        assertEquals("BRL", restored.first().quotas.first().currencyCode)
+    }
+
+    @Test
+    fun `quotas cached before the currency code default to USD`() {
+        val dto = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(
+                com.usagemonitor.data.dto.ApiUsageStatsCacheDto(
+                    targetKey = "DEEPSEEK",
+                    source = "DEEPSEEK",
+                    apiName = "DeepSeek",
+                    quotas = listOf(
+                        com.usagemonitor.data.dto.QuotaInfoCacheDto(
+                            label = "Saldo",
+                            used = 0L,
+                            total = 385L,
+                            periodEndAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+                            periodType = "INTERVAL",
+                            unit = "CURRENCY_USD"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals("USD", dto.toDomain().first().quotas.first().currencyCode)
     }
 
     @Test

@@ -11,6 +11,13 @@ data class DashboardViewModelConfig(
     val pollInterval: Duration = 600.seconds,
     val updateCheckIntervalWhileRunning: Duration = 10.minutes,
     val perSourceTimeout: Duration = 20.seconds,
+    /**
+     * Folga somada ao `periodEndAt` antes de coletar por causa de um reset.
+     *
+     * O reset da Anthropic não é instantâneo: bater no endpoint no milissegundo
+     * exato do vencimento tende a devolver ainda a janela velha.
+     */
+    val quotaResetGrace: Duration = 20.seconds,
     val maxConcurrentSourceFetches: Int = 3,
     val autoStartInitialFetch: Boolean = true,
     val autoStartCountdown: Boolean = true,

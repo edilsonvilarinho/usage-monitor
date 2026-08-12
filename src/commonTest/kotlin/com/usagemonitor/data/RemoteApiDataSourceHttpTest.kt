@@ -16,6 +16,8 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class RemoteApiDataSourceHttpTest {
 
@@ -43,6 +45,59 @@ class RemoteApiDataSourceHttpTest {
 
         assertEquals(21.5, response.fiveHour.utilization)
         assertEquals("2026-06-10T20:00:00Z", response.sevenDay.resetsAt)
+    }
+
+    @Test
+    fun `fetchAnthropicUsage parses extra usage credits from the real payload`() = runTest {
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel(ANTHROPIC_USAGE_WITH_CREDITS_BODY),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            },
+            codexDiagnosticsRecorder = NoOpCodexDiagnosticsRecorder
+        )
+
+        val response = dataSource.fetchAnthropicUsage("token")
+        val extraUsage = assertNotNull(response.extraUsage)
+
+        assertEquals(true, extraUsage.isEnabled)
+        assertEquals(55000L, extraUsage.monthlyLimit)
+        assertEquals(32784.0, extraUsage.usedCredits)
+        assertEquals(59.60727272727273, extraUsage.utilization)
+        assertEquals("BRL", extraUsage.currency)
+        assertEquals(2, extraUsage.decimalPlaces)
+        assertEquals(true, extraUsage.creditsEverEnabled)
+
+        val spendUsed = assertNotNull(response.spend?.used)
+        assertEquals(32784L, spendUsed.amountMinor)
+        assertEquals("BRL", spendUsed.currency)
+        assertEquals(2, spendUsed.exponent)
+    }
+
+    @Test
+    fun `fetchAnthropicUsage parses disabled extra usage credits`() = runTest {
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel(ANTHROPIC_USAGE_WITHOUT_CREDITS_BODY),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            },
+            codexDiagnosticsRecorder = NoOpCodexDiagnosticsRecorder
+        )
+
+        val response = dataSource.fetchAnthropicUsage("token")
+        val extraUsage = assertNotNull(response.extraUsage)
+
+        assertEquals(false, extraUsage.isEnabled)
+        assertNull(extraUsage.monthlyLimit)
+        assertNull(extraUsage.usedCredits)
+        assertNull(extraUsage.currency)
+        assertEquals(false, extraUsage.creditsEverEnabled)
     }
 
     @Test
@@ -211,5 +266,86 @@ class RemoteApiDataSourceHttpTest {
                 json(Json { ignoreUnknownKeys = true })
             }
         }
+    }
+
+    private companion object {
+        // Corpo real de GET /api/oauth/usage numa conta com créditos ligados.
+        const val ANTHROPIC_USAGE_WITH_CREDITS_BODY = """
+            {
+              "five_hour": { "utilization": 21.5, "resets_at": "2026-08-11T20:00:00Z" },
+              "seven_day": { "utilization": 50.0, "resets_at": "2026-08-15T20:00:00Z" },
+              "seven_day_oauth_apps": { "utilization": 0.0, "resets_at": null },
+              "seven_day_opus": { "utilization": 12.0, "resets_at": "2026-08-15T20:00:00Z" },
+              "extra_usage": {
+                "is_enabled": true,
+                "monthly_limit": 55000,
+                "used_credits": 32784.0,
+                "utilization": 59.60727272727273,
+                "currency": "BRL",
+                "decimal_places": 2,
+                "disabled_reason": null,
+                "user_disabled": false,
+                "spend_limit_reached": false,
+                "credits_ever_enabled": true,
+                "daily": null,
+                "weekly": null
+              },
+              "spend": {
+                "used": { "amount_minor": 32784, "currency": "BRL", "exponent": 2 },
+                "limit": { "amount_minor": 55000, "currency": "BRL", "exponent": 2 },
+                "percent": 60,
+                "severity": "normal",
+                "enabled": true,
+                "disabled_reason": null,
+                "cap": { "money": { "amount_minor": 55000, "currency": "BRL", "exponent": 2 }, "credits": null },
+                "balance": null,
+                "auto_reload": null,
+                "can_purchase_credits": false,
+                "can_toggle": false
+              },
+              "limits": [
+                {
+                  "kind": "five_hour",
+                  "group": "default",
+                  "percent": 21,
+                  "severity": "normal",
+                  "resets_at": "2026-08-11T20:00:00Z",
+                  "scope": "account",
+                  "is_active": true
+                }
+              ],
+              "member_dashboard_available": false
+            }
+        """
+
+        // Corpo real de uma conta sem créditos: o servidor devolve a moeda
+        // default "USD" em `spend`, por isso `extra_usage` é a fonte primária.
+        const val ANTHROPIC_USAGE_WITHOUT_CREDITS_BODY = """
+            {
+              "five_hour": { "utilization": 3.0, "resets_at": "2026-08-11T20:00:00Z" },
+              "seven_day": { "utilization": 8.0, "resets_at": "2026-08-15T20:00:00Z" },
+              "extra_usage": {
+                "is_enabled": false,
+                "monthly_limit": null,
+                "used_credits": null,
+                "utilization": null,
+                "currency": null,
+                "decimal_places": null,
+                "disabled_reason": null,
+                "user_disabled": false,
+                "spend_limit_reached": false,
+                "credits_ever_enabled": false,
+                "daily": null,
+                "weekly": null
+              },
+              "spend": {
+                "used": { "amount_minor": 0, "currency": "USD", "exponent": 2 },
+                "limit": null,
+                "percent": 0,
+                "enabled": false,
+                "cap": null
+              }
+            }
+        """
     }
 }

@@ -1,7 +1,10 @@
 package com.usagemonitor.data
 
 import com.usagemonitor.data.dto.TeamMemberRowDto
+import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
+import com.usagemonitor.data.dto.TeamSessionRowDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
+import com.usagemonitor.data.dto.TeamTurnRowDto
 import com.usagemonitor.data.dto.TeamUsageRowDto
 import com.usagemonitor.data.mapper.toDomain
 import com.usagemonitor.data.mapper.toDto
@@ -13,6 +16,7 @@ import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private const val OPUS = "claude-opus-4-5-20251101"
@@ -58,6 +62,50 @@ private fun member(
     alias = alias,
     hostName = hostName,
     lastSeenAt = lastSeenAt
+)
+
+private fun detailTurn(
+    messageId: String = "msg-1",
+    ts: Long = 1_000L,
+    model: String? = OPUS,
+    isSidechain: Boolean = false,
+    inputTokens: Long = 0L,
+    outputTokens: Long = 0L,
+    cacheReadTokens: Long = 0L,
+    cacheWrite5mTokens: Long = 0L,
+    cacheWrite1hTokens: Long = 0L
+) = TeamTurnRowDto(
+    messageId = messageId,
+    ts = ts,
+    model = model,
+    isSidechain = isSidechain,
+    inputTokens = inputTokens,
+    outputTokens = outputTokens,
+    cacheReadTokens = cacheReadTokens,
+    cacheWrite5mTokens = cacheWrite5mTokens,
+    cacheWrite1hTokens = cacheWrite1hTokens
+)
+
+private fun detailResponse(
+    hostName: String? = "DESKTOP-A1",
+    firstTs: Long = 1_000L,
+    lastTs: Long = 2_000L,
+    liveContextTokens: Long = 0L,
+    liveContextModel: String? = null,
+    turns: List<TeamTurnRowDto> = listOf(detailTurn())
+) = TeamSessionDetailResponseDto(
+    session = TeamSessionRowDto(
+        deviceId = "device-1",
+        sessionId = "session-1",
+        hostName = hostName,
+        cwd = "/home/dev/api-gateway",
+        gitBranch = "main",
+        firstTs = firstTs,
+        lastTs = lastTs,
+        liveContextTokens = liveContextTokens,
+        liveContextModel = liveContextModel
+    ),
+    turns = turns
 )
 
 class TeamUsageMapperTest {
@@ -210,6 +258,111 @@ class TeamUsageMapperTest {
         assertEquals(120_000L, session.liveContextTokens)
         assertEquals(OPUS, session.liveContextModel)
         assertEquals("api-gateway", session.projectName)
+    }
+
+    @Test
+    fun `propaga a maquina do integrante para as sessoes da lista`() {
+        val snapshot = TeamSnapshotDto(
+            members = listOf(member(hostName = "DESKTOP-A1")),
+            rows = listOf(row(inputTokens = MILLION))
+        ).toDomain()
+
+        // Sem isso o card de metadados do detalhe mostraria "Máquina —" para uma
+        // máquina que o servidor conhece: o hostname é do integrante, não da linha.
+        assertEquals("DESKTOP-A1", snapshot.members.single().sessions.single().hostName)
+    }
+
+    @Test
+    fun `sessao de maquina sem linha de membro fica sem hostname em vez de chutar`() {
+        val snapshot = TeamSnapshotDto(
+            members = listOf(member()),
+            rows = listOf(row(deviceId = "device-fantasma", sessionId = "s9", inputTokens = MILLION))
+        ).toDomain()
+
+        val ghost = snapshot.members.first { it.deviceId == "device-fantasma" }
+        assertNull(ghost.sessions.single().hostName)
+    }
+
+    @Test
+    fun `monta o detalhe da sessao a partir dos turnos crus`() {
+        val detail = detailResponse(
+            turns = listOf(
+                detailTurn(messageId = "a", ts = 1_000L, inputTokens = 10L, cacheReadTokens = 100L),
+                detailTurn(messageId = "b", ts = 4_000L, outputTokens = 20L, cacheReadTokens = 300L)
+            )
+        ).toDomain()
+
+        assertEquals(2, detail.turns.size)
+        // O `seq` é sintetizado da ordem da resposta: o servidor não o guarda.
+        assertEquals(listOf(0, 1), detail.turns.map { turn -> turn.seq })
+        assertEquals(listOf("a", "b"), detail.turns.map { turn -> turn.messageId })
+        assertEquals(Instant.fromEpochMilliseconds(4_000L), detail.turns.last().ts)
+
+        val summary = detail.summary
+        assertEquals("session-1", summary.sessionId)
+        assertEquals(2, summary.turnCount)
+        assertEquals(10L, summary.inputTokens)
+        assertEquals(20L, summary.outputTokens)
+        assertEquals(400L, summary.cacheReadTokens)
+        // A janela do resumo é a união dos turnos, não a declarada pela sessão.
+        assertEquals(Instant.fromEpochMilliseconds(1_000L), summary.firstTs)
+        assertEquals(Instant.fromEpochMilliseconds(4_000L), summary.lastTs)
+        assertEquals(OPUS, summary.primaryModel)
+    }
+
+    @Test
+    fun `o detalhe carrega a maquina de origem e o contexto vivo`() {
+        val detail = detailResponse(
+            hostName = "NOTE-B2",
+            liveContextTokens = 120_000L,
+            liveContextModel = OPUS
+        ).toDomain()
+
+        val summary = detail.summary
+        assertEquals("NOTE-B2", summary.hostName)
+        assertEquals("/home/dev/api-gateway", summary.cwd)
+        assertEquals("main", summary.gitBranch)
+        assertEquals(120_000L, summary.liveContextTokens)
+        assertEquals(OPUS, summary.liveContextModel)
+        // O caminho do transcript é local e não trafega: não há o que preencher.
+        assertEquals("", summary.filePath)
+    }
+
+    @Test
+    fun `o detalhe preserva o marcador de subagente`() {
+        val detail = detailResponse(
+            turns = listOf(
+                detailTurn(messageId = "a", isSidechain = false),
+                detailTurn(messageId = "b", isSidechain = true)
+            )
+        ).toDomain()
+
+        assertEquals(listOf(false, true), detail.turns.map { turn -> turn.isSidechain })
+    }
+
+    @Test
+    fun `o detalhe precifica cada turno pela tarifa do modelo dele`() {
+        val detail = detailResponse(
+            turns = listOf(
+                detailTurn(messageId = "a", model = OPUS, inputTokens = MILLION),
+                detailTurn(messageId = "b", model = HAIKU, inputTokens = MILLION)
+            )
+        ).toDomain()
+
+        // Opus a 5 USD/M + Haiku a 1 USD/M: a mesma conta do resumo da lista.
+        assertEquals(6 * MILLION, detail.summary.costMicros)
+        assertTrue(detail.summary.isCostComplete)
+    }
+
+    @Test
+    fun `sessao sem turno mantem a janela declarada pelo servidor`() {
+        val detail = detailResponse(firstTs = 7_000L, lastTs = 9_000L, turns = emptyList()).toDomain()
+
+        // O acumulador vazio devolveria época zero e o card de período mostraria
+        // 01/01/1970 para uma sessão cujo intervalo o servidor conhece.
+        assertTrue(detail.turns.isEmpty())
+        assertEquals(Instant.fromEpochMilliseconds(7_000L), detail.summary.firstTs)
+        assertEquals(Instant.fromEpochMilliseconds(9_000L), detail.summary.lastTs)
     }
 
     @Test

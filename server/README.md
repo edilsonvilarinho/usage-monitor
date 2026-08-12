@@ -161,6 +161,49 @@ Duas propriedades desenhadas de propósito:
 
 `members` traz todos os membros da conta, inclusive quem não teve atividade na janela — quem não consumiu é informação, não ruído.
 
+### `GET /api/v1/session`
+
+Turnos crus de **uma** sessão. É o que alimenta o painel de detalhe dentro do modal **Sessões do time** — o transcript é de outra máquina e não está no disco de quem consulta, mas os turnos estão aqui desde o primeiro ingest.
+
+Disponível a partir da versão **0.2.0** do servidor.
+
+| Query | Obrigatório | Nota |
+|---|---|---|
+| `accountKey` | sim | Escopo da resposta. Uma resposta nunca mistura contas. |
+| `sessionId` | sim | |
+| `deviceId` | sim | O escopo é sempre `(conta, máquina)`, como no resto da API. |
+
+```jsonc
+{
+  "session": {
+    "deviceId": "device-1",
+    "sessionId": "a3f9c1e2-...",
+    "hostName": "DESKTOP-A1",
+    "cwd": "/home/dev/api-gateway",
+    "gitBranch": "main",
+    "firstTs": 1786000000000,
+    "lastTs": 1786003600000,
+    "liveContextTokens": 120000,
+    "liveContextModel": "claude-opus-4-20250514"
+  },
+  "turns": [
+    { "messageId": "msg_01ABC", "ts": 1786003600000, "model": "claude-opus-4-20250514",
+      "isSidechain": false, "inputTokens": 100, "outputTokens": 200,
+      "cacheReadTokens": 300, "cacheWrite5mTokens": 400, "cacheWrite1hTokens": 0 }
+  ]
+}
+```
+
+Três propriedades desenhadas de propósito:
+
+- **Sem recorte temporal.** O detalhe é sempre a sessão inteira, ao contrário de `/v1/team`. Recortá-lo pela janela de quota daria gráficos que começam no meio da conversa.
+- **Turnos ordenados por `(ts, messageId)`.** Não há coluna de sequência: o cliente sintetiza a ordem na leitura. O desempate pelo `messageId` deixa a série estável entre leituras.
+- **O servidor continua sem precificar.** Devolve tokens e modelo por turno; o cliente aplica `ModelPricingTable`.
+
+Sessão inexistente, de outra conta ou de outra máquina devolve `404` — a mesma resposta nos três casos, porque confirmar que uma sessão existe em outra conta já seria vazamento.
+
+**Nada de conteúdo de prompt ou resposta.** Um turno aqui é contagem de token e nome de modelo, exatamente o que o `POST /v1/ingest` recebeu.
+
 ### `DELETE /api/v1/member`
 
 Remove um integrante e tudo o que ele enviou: turnos, sessões e a linha em `team_members`, numa transação.
@@ -235,6 +278,8 @@ O `HEALTHCHECK` está no Dockerfile e no compose. O processo roda como `node` (u
 6. **Ports / Domains:** porta interna `3000`. Publique um domínio e deixe o Traefik do Dokploy terminar o TLS.
 7. **Deploy.** Confira `GET https://<dominio>/api/health`.
 8. **Auto Deploy:** ative o webhook na branch `main` se quiser redeploy a cada push.
+
+**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. Um redeploy resolve; não há migração de banco entre 0.1.x e 0.2.0.
 
 Rodando em **Docker Swarm**, mantenha **1 réplica**: o SQLite é um arquivo local e duas réplicas em nós diferentes veriam bancos distintos. Se o cluster tiver mais de um nó, fixe uma constraint de nó para o volume seguir o serviço.
 

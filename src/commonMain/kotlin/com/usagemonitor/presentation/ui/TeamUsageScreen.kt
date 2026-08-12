@@ -14,8 +14,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.icons.Icons
@@ -38,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,13 +53,16 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 
 internal const val TEAM_LIST_SCROLLBAR_TAG = "teamUsageListScrollbar"
+internal const val TEAM_DETAIL_SCROLLBAR_TAG = "teamUsageDetailScrollbar"
 internal const val TEAM_MEMBER_ROW_TAG_PREFIX = "teamMemberRow:"
 internal const val TEAM_MEMBER_SESSIONS_TAG_PREFIX = "teamMemberSessions:"
 internal const val TEAM_MEMBER_REMOVE_TAG_PREFIX = "teamMemberRemove:"
+internal const val TEAM_MEMBER_HEALTH_TAG_PREFIX = "teamMemberHealth:"
 internal const val TEAM_REMOVE_CONFIRM_TAG = "teamMemberRemoveConfirm"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
@@ -78,6 +86,10 @@ fun TeamUsageScreen(
         onToggleMember = { deviceId -> viewModel.toggleMember(deviceId) },
         onRemoveMember = { deviceId -> viewModel.removeMember(deviceId) },
         onDismissRemovalError = { viewModel.clearRemovalError() },
+        onOpenSession = { deviceId, sessionId -> viewModel.openSession(deviceId, sessionId) },
+        onCloseDetail = { viewModel.closeDetail() },
+        onToggleAdvanced = { viewModel.toggleAdvanced() },
+        onToggleGlossary = { viewModel.toggleGlossary() },
         modifier = modifier
     )
 }
@@ -92,7 +104,12 @@ internal fun TeamUsageContent(
     localDeviceId: String? = null,
     removalError: String? = null,
     onRemoveMember: (String) -> Unit = {},
-    onDismissRemovalError: () -> Unit = {}
+    onDismissRemovalError: () -> Unit = {},
+    // Com default para não arrastar as chamadas que não exercitam o detalhe.
+    onOpenSession: (String, String) -> Unit = { _, _ -> },
+    onCloseDetail: () -> Unit = {},
+    onToggleAdvanced: () -> Unit = {},
+    onToggleGlossary: () -> Unit = {}
 ) {
     // Qual integrante está aguardando confirmação. Estado de tela, não do
     // servidor: o laço ao vivo recarrega a lista a cada 5s e não pode fechar o
@@ -109,16 +126,32 @@ internal fun TeamUsageContent(
                 TeamUsageLabels.serverError(state.message, language)
             )
 
-            is TeamUsageUiState.Success -> TeamUsageList(
-                state = state,
-                language = language,
-                localDeviceId = localDeviceId,
-                removalError = removalError,
-                onSelectRange = onSelectRange,
-                onToggleMember = onToggleMember,
-                onRequestRemoveMember = { member -> pendingRemoval = member },
-                onDismissRemovalError = onDismissRemovalError
-            )
+            is TeamUsageUiState.Success -> {
+                val detail = state.detail
+                if (detail == null) {
+                    TeamUsageList(
+                        state = state,
+                        language = language,
+                        localDeviceId = localDeviceId,
+                        removalError = removalError,
+                        onSelectRange = onSelectRange,
+                        onToggleMember = onToggleMember,
+                        onOpenSession = onOpenSession,
+                        onRequestRemoveMember = { member -> pendingRemoval = member },
+                        onDismissRemovalError = onDismissRemovalError
+                    )
+                } else {
+                    TeamSessionDetailPane(
+                        detail = detail,
+                        language = language,
+                        advancedExpanded = state.advancedExpanded,
+                        glossaryExpanded = state.glossaryExpanded,
+                        onCloseDetail = onCloseDetail,
+                        onToggleAdvanced = onToggleAdvanced,
+                        onToggleGlossary = onToggleGlossary
+                    )
+                }
+            }
         }
     }
 
@@ -175,6 +208,7 @@ private fun TeamUsageList(
     removalError: String?,
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
+    onOpenSession: (String, String) -> Unit,
     onRequestRemoveMember: (TeamMemberUsage) -> Unit,
     onDismissRemovalError: () -> Unit
 ) {
@@ -247,12 +281,14 @@ private fun TeamUsageList(
                                     .padding(start = 24.dp)
                                     .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
                             ) {
+                                val session = member.sessions[index]
                                 CliSessionRow(
-                                    session = member.sessions[index],
+                                    session = session,
                                     language = language,
-                                    // A sessão é de outra máquina: o transcript
-                                    // não está aqui, então não há detalhe a abrir.
-                                    onOpen = {}
+                                    // O transcript é de outra máquina, mas os
+                                    // turnos estão no servidor desde o primeiro
+                                    // envio: o detalhe vem de lá.
+                                    onOpen = { onOpenSession(member.deviceId, session.sessionId) }
                                 )
                             }
                         }
@@ -326,6 +362,9 @@ private fun TeamUsageHeader(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // O veredito por sessão vive dois níveis abaixo, dentro de um
+                // integrante recolhido. Aqui ele aparece sem nenhum clique.
+                HealthTallyText(tally = state.healthTally, language = language)
             }
 
             Column {
@@ -354,7 +393,12 @@ private fun TeamUsageHeader(
                     color = INPUT_COLOR
                 )
                 Text(
-                    text = TeamUsageLabels.estimatedTotalInRange(state.range, state.rangeEndsAt, language),
+                    text = TeamUsageLabels.estimatedTotalInRange(
+                        range = state.range,
+                        endsAt = state.rangeEndsAt,
+                        isAnchored = state.rangeAnchored,
+                        language = language
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -485,6 +529,33 @@ private fun TeamMemberRow(
                 MeterBar(fraction = share, color = accent, height = 4.dp)
             }
 
+            // Pior status entre as sessões deste integrante. Sem ele, a única
+            // sessão saturada de um time fica escondida atrás de um clique que
+            // ninguém dá — nada na linha recolhida indicaria que vale a pena.
+            val worstHealth = member.worstHealth
+            if (worstHealth != null) {
+                val healthAccent = healthColor(worstHealth)
+                Row(
+                    modifier = Modifier
+                        .width(112.dp)
+                        .testTag("$TEAM_MEMBER_HEALTH_TAG_PREFIX${member.deviceId}"),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(AppShapes.small)
+                            .background(healthAccent)
+                    )
+                    MetricText(
+                        label = TeamUsageLabels.columnStatus(language),
+                        value = TeamUsageLabels.healthShort(worstHealth, language),
+                        valueColor = healthAccent
+                    )
+                }
+            }
+
             if (removable) {
                 IconButton(
                     onClick = onRemove,
@@ -498,5 +569,111 @@ private fun TeamMemberRow(
                 }
             }
         }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Detalhe da sessão
+// ----------------------------------------------------------------------------
+
+/**
+ * O mesmo painel do modal de Sessões CLI, para uma sessão de outra máquina.
+ *
+ * As seções vêm de `CliSessionsScreen` — a sessão de um colega tem de ser lida
+ * exatamente como a da própria máquina. Aqui só se orquestra a rolagem e o
+ * estado de carga; nenhuma métrica é recalculada.
+ */
+@Composable
+private fun TeamSessionDetailPane(
+    detail: TeamSessionDetailUiState,
+    language: AppLanguage,
+    advancedExpanded: Boolean,
+    glossaryExpanded: Boolean,
+    onCloseDetail: () -> Unit,
+    onToggleAdvanced: () -> Unit,
+    onToggleGlossary: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onCloseDetail) {
+                Text(TeamUsageLabels.back(language))
+            }
+            Text(
+                text = shortSessionId(detail.sessionId),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        when (detail) {
+            is TeamSessionDetailUiState.Loading -> CenteredMessage(
+                TeamUsageLabels.detailLoading(language)
+            )
+
+            is TeamSessionDetailUiState.Error -> CenteredMessage(
+                TeamUsageLabels.serverError(detail.message, language)
+            )
+
+            is TeamSessionDetailUiState.Ready -> TeamSessionDetailBody(
+                detail = detail,
+                language = language,
+                advancedExpanded = advancedExpanded,
+                glossaryExpanded = glossaryExpanded,
+                onToggleAdvanced = onToggleAdvanced,
+                onToggleGlossary = onToggleGlossary
+            )
+        }
+    }
+}
+
+@Composable
+private fun TeamSessionDetailBody(
+    detail: TeamSessionDetailUiState.Ready,
+    language: AppLanguage,
+    advancedExpanded: Boolean,
+    glossaryExpanded: Boolean,
+    onToggleAdvanced: () -> Unit,
+    onToggleGlossary: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                // Mesma razão da lista: a barra flutua sobre o conteúdo.
+                .padding(end = SCROLLBAR_GUTTER),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CliSessionDetailSections(
+                detail = detail.result.detail,
+                analytics = detail.result.analytics,
+                language = language,
+                advancedExpanded = advancedExpanded,
+                glossaryExpanded = glossaryExpanded,
+                onToggleAdvanced = onToggleAdvanced,
+                onToggleGlossary = onToggleGlossary,
+                missingTurnsNotice = if (detail.turnsUnavailable) {
+                    TeamUsageLabels.missingTurnsNotice(language)
+                } else {
+                    null
+                }
+            )
+        }
+
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .testTag(TEAM_DETAIL_SCROLLBAR_TAG)
+        )
     }
 }

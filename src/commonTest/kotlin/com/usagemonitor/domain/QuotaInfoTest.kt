@@ -5,7 +5,10 @@ import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Testes unitários para QuotaInfo.
@@ -84,6 +87,39 @@ class QuotaInfoTest {
 
         assertTrue(quota.remaining >= 0L)
         assertEquals(0L, quota.remaining)
+    }
+
+    @Test
+    fun `isExpiredAt turns true from the reset instant on`() {
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 100L,
+            total = 100L,
+            periodEndAt = fixedInstant,
+            unit = UsageUnit.PERCENTAGE
+        )
+
+        assertFalse(quota.isExpiredAt(fixedInstant - 1.seconds))
+        assertTrue(quota.isExpiredAt(fixedInstant))
+        assertTrue(quota.isExpiredAt(fixedInstant + 1.seconds))
+    }
+
+    /**
+     * Sem reset conhecido o `periodEndAt` é o sentinela distante do mapper —
+     * tratá-lo como janela real faria o card mentir a partir de 2100.
+     */
+    @Test
+    fun `isExpiredAt is always false without a known reset`() {
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 100L,
+            total = 100L,
+            periodEndAt = fixedInstant,
+            hasKnownResetAt = false,
+            unit = UsageUnit.PERCENTAGE
+        )
+
+        assertFalse(quota.isExpiredAt(fixedInstant + 365.days))
     }
 
     @Test

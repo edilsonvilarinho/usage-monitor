@@ -73,3 +73,16 @@ export const deleteMemberQuerySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
   deviceId: z.string().min(1).max(TEXT_MAX),
 });
+
+/**
+ * Detalhe de uma sessao.
+ *
+ * O `deviceId` e obrigatorio junto do `sessionId`: o escopo de uma leitura e
+ * sempre `(conta, maquina)`, como no resto da API. Sem ele a rota responderia a
+ * sessao de outra maquina da mesma conta a partir do id sozinho.
+ */
+export const sessionQuerySchema = z.object({
+  accountKey: z.string().min(1).max(TEXT_MAX),
+  sessionId: z.string().min(1).max(TEXT_MAX),
+  deviceId: z.string().min(1).max(TEXT_MAX),
+});

@@ -82,6 +82,34 @@ class CliSessionsScreenTest {
         onNodeWithText("custo estimado · janela 5h até 11/08 00:30 BRT").assertIsDisplayed()
     }
 
+    /**
+     * Issue #35: reset vencido ancora a janela nova no próprio reset, mas o fim
+     * dela só existe quando a API publicar o `resets_at` seguinte. Dizer "até
+     * HH:MM" ali seria inventar um horário.
+     */
+    @Test
+    fun `header names the window opened by the reset when its end is unknown`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            rangeEndsAt = null,
+                            rangeAnchored = true
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("custo estimado · janela 5h desde o reinício").assertIsDisplayed()
+    }
+
     /** 7 dias é janela corrida desde a issue #28: sem "até", e no masculino. */
     @Test
     fun `header names the 7d window as a sliding one`() = runDesktopComposeUiTest {
@@ -344,6 +372,100 @@ class CliSessionsScreenTest {
         }
 
         onNodeWithText("janela do modelo desconhecida · \$0.0000 por mensagem").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the header counts the saturated and attention sessions`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(
+                                // 650K, 450K e 10K de contexto vivo numa janela de 1M.
+                                summary("session-a").copy(
+                                    liveContextTokens = 650_000L,
+                                    liveContextModel = "claude-opus-5"
+                                ),
+                                summary("session-b").copy(
+                                    liveContextTokens = 450_000L,
+                                    liveContextModel = "claude-opus-5"
+                                ),
+                                summary("session-c").copy(
+                                    liveContextTokens = 10_000L,
+                                    liveContextModel = "claude-opus-5"
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // O veredito por sessão já está na linha, mas some da vista assim que a
+        // lista rola.
+        onNodeWithText("1 saturada · 1 em atenção").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the header omits the tally when every session is healthy`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(
+                                summary("session-a").copy(
+                                    liveContextTokens = 10_000L,
+                                    liveContextModel = "claude-opus-5"
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onAllNodesWithText("0 saturadas").assertCountEquals(0)
+        onAllNodesWithText("0 em atenção").assertCountEquals(0)
+    }
+
+    @Test
+    fun `the header tally skips sessions whose model window is unknown`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(
+                                summary("session-a").copy(
+                                    primaryModel = "claude-3-5-sonnet",
+                                    liveContextTokens = 900_000L,
+                                    liveContextModel = "claude-3-5-sonnet"
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // Sem a janela do modelo não há fração; contá-la seria afirmar o que não
+        // se sabe. O mesmo cuidado que a linha da lista já tem.
+        onAllNodesWithText("1 saturada").assertCountEquals(0)
+        onAllNodesWithText("1 em atenção").assertCountEquals(0)
     }
 
     @Test

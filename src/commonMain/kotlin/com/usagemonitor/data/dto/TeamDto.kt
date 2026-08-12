@@ -102,6 +102,46 @@ data class TeamSnapshotDto(
     val rows: List<TeamUsageRowDto> = emptyList()
 )
 
+/** Metadados da sessão pedida em `GET /api/v1/session`, já com a máquina de origem. */
+@Serializable
+data class TeamSessionRowDto(
+    val deviceId: String = "",
+    val sessionId: String = "",
+    val hostName: String? = null,
+    val cwd: String? = null,
+    val gitBranch: String? = null,
+    val firstTs: Long = 0L,
+    val lastTs: Long = 0L,
+    val liveContextTokens: Long = 0L,
+    val liveContextModel: String? = null
+)
+
+/**
+ * Um turno cru devolvido pelo servidor.
+ *
+ * Não tem `seq`, ao contrário de [TeamTurnUploadDto] — o servidor não guarda a
+ * sequência. A ordem é a da resposta, `(ts, messageId)`, e o `seq` do domínio é
+ * sintetizado dela na leitura.
+ */
+@Serializable
+data class TeamTurnRowDto(
+    val messageId: String,
+    val ts: Long,
+    val model: String? = null,
+    val isSidechain: Boolean = false,
+    val inputTokens: Long = 0L,
+    val outputTokens: Long = 0L,
+    val cacheReadTokens: Long = 0L,
+    val cacheWrite5mTokens: Long = 0L,
+    val cacheWrite1hTokens: Long = 0L
+)
+
+@Serializable
+data class TeamSessionDetailResponseDto(
+    val session: TeamSessionRowDto = TeamSessionRowDto(),
+    val turns: List<TeamTurnRowDto> = emptyList()
+)
+
 /** Corpo de erro do servidor: `{ "error": "...", "code": "..." }`. */
 @Serializable
 data class TeamErrorDto(

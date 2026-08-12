@@ -44,6 +44,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionAnalytics
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.presentation.ui.components.BinMode
@@ -58,16 +59,17 @@ import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 
-// Azul e verde são `internal` porque a tela de time usa a mesma codificação de
-// cor: custo em azul, tokens em verde. Duas paletas para o mesmo significado
-// fariam o usuário reaprender a ler ao trocar de janela.
+// A paleta inteira é `internal` porque a tela de time usa a mesma codificação de
+// cor: custo em azul, tokens em verde, cache gravado em laranja, economia em
+// ciano. Duas paletas para o mesmo significado fariam o usuário reaprender a ler
+// ao trocar de janela — e o painel de detalhe agora é o mesmo nas duas.
 internal val INPUT_COLOR = Color(0xFF4C8DFF)
-private val OUTPUT_COLOR = Color(0xFFB07CFF)
+internal val OUTPUT_COLOR = Color(0xFFB07CFF)
 internal val CACHE_READ_COLOR = Color(0xFF4CAF50)
-private val CACHE_WRITE_COLOR = Color(0xFFFFA726)
-private val SAVINGS_COLOR = Color(0xFF26C6DA)
+internal val CACHE_WRITE_COLOR = Color(0xFFFFA726)
+internal val SAVINGS_COLOR = Color(0xFF26C6DA)
 private val SATURATED_COLOR = Color(0xFFE05252)
-private val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
+internal val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
 
 /** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
 internal val SCROLLBAR_GUTTER = 12.dp
@@ -270,6 +272,10 @@ private fun CliSessionsHeader(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                // O veredito por sessão está na linha, mas some da vista assim que
+                // a lista rola. Aqui ele responde de uma vez se há sessão pedindo
+                // /compact, sem varrer a lista inteira.
+                HealthTallyText(tally = state.healthTally, language = language)
                 Text(
                     text = CliSessionsLabels.estimatedCostNotice(language),
                     style = MaterialTheme.typography.labelSmall,
@@ -319,7 +325,12 @@ private fun CliSessionsHeader(
                     text = if (state.range == CliSessionRange.ALL) {
                         CliSessionsLabels.estimatedTotal(language)
                     } else {
-                        CliSessionsLabels.estimatedTotalInRange(state.range, state.rangeEndsAt, language)
+                        CliSessionsLabels.estimatedTotalInRange(
+                            range = state.range,
+                            endsAt = state.rangeEndsAt,
+                            isAnchored = state.rangeAnchored,
+                            language = language
+                        )
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -583,22 +594,36 @@ private fun CliSessionDetailBody(
  * tokens, a distribuição do custo e os gráficos por turno.
  *
  * Nada foi removido na divisão; a camada de baixo é a mesma de antes.
+ *
+ * `internal` porque o modal de time monta o mesmo painel para a sessão de um
+ * colega: dois detalhes com a mesma anatomia não podem ter duas implementações.
  */
 @Composable
-private fun CliSessionDetailSections(
+internal fun CliSessionDetailSections(
     detail: CliSessionDetail,
     analytics: CliSessionAnalytics,
     language: AppLanguage,
     advancedExpanded: Boolean,
     glossaryExpanded: Boolean,
     onToggleAdvanced: () -> Unit,
-    onToggleGlossary: () -> Unit
+    onToggleGlossary: () -> Unit,
+    /**
+     * Aviso de que os turnos não vieram — servidor de time anterior à rota de
+     * detalhe. Preenchido, as seções que dependem de turno **não** são compostas:
+     * um gráfico vazio se leria como sessão sem atividade, e a distribuição de
+     * custo estimada a partir do modelo predominante seria número inventado.
+     */
+    missingTurnsNotice: String? = null
 ) {
     val summary = detail.summary
 
     SessionHealthBanner(analytics = analytics, language = language)
 
     SessionMetadataCard(summary = summary, language = language)
+
+    if (missingTurnsNotice != null) {
+        NoticeText(missingTurnsNotice, MaterialTheme.colorScheme.error)
+    }
 
     // Integridade do dado não é detalhe avançado: se o custo está incompleto,
     // todo número desta tela está incompleto.
@@ -620,38 +645,40 @@ private fun CliSessionDetailSections(
 
     SessionSummaryRow(summary = summary, analytics = analytics, language = language)
 
-    DetailSection(
-        title = CliSessionsLabels.contextPerTurnChart(language),
-        accent = CACHE_READ_COLOR,
-        // Duas dúvidas de uma vez: o que a curva mede e o que o ▼ marca.
-        help = listOf(GlossaryTerm.CONTEXT_PER_TURN, GlossaryTerm.COMPACTION),
-        language = language
-    ) {
-        TurnSeriesChart(
-            series = listOf(
-                TurnSeries(
-                    label = CliSessionsLabels.chartContextLegend(language),
-                    values = analytics.contextPerTurn,
-                    color = CACHE_READ_COLOR,
-                    binMode = BinMode.LAST
-                )
-            ),
-            height = DETAIL_CHART_HEIGHT,
-            valueFormatter = { value -> formatQuantity(value) },
-            highlightDrops = true
-        )
-    }
-
-    AdvancedDisclosure(
-        expanded = advancedExpanded,
-        language = language,
-        onToggle = onToggleAdvanced
-    ) {
-        SessionAdvancedSections(
-            summary = summary,
-            analytics = analytics,
+    if (missingTurnsNotice == null) {
+        DetailSection(
+            title = CliSessionsLabels.contextPerTurnChart(language),
+            accent = CACHE_READ_COLOR,
+            // Duas dúvidas de uma vez: o que a curva mede e o que o ▼ marca.
+            help = listOf(GlossaryTerm.CONTEXT_PER_TURN, GlossaryTerm.COMPACTION),
             language = language
-        )
+        ) {
+            TurnSeriesChart(
+                series = listOf(
+                    TurnSeries(
+                        label = CliSessionsLabels.chartContextLegend(language),
+                        values = analytics.contextPerTurn,
+                        color = CACHE_READ_COLOR,
+                        binMode = BinMode.LAST
+                    )
+                ),
+                height = DETAIL_CHART_HEIGHT,
+                valueFormatter = { value -> formatQuantity(value) },
+                highlightDrops = true
+            )
+        }
+
+        AdvancedDisclosure(
+            expanded = advancedExpanded,
+            language = language,
+            onToggle = onToggleAdvanced
+        ) {
+            SessionAdvancedSections(
+                summary = summary,
+                analytics = analytics,
+                language = language
+            )
+        }
     }
 
     GlossaryPanel(
@@ -668,7 +695,7 @@ private fun CliSessionDetailSections(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SessionSummaryRow(
+internal fun SessionSummaryRow(
     summary: CliSessionSummary,
     analytics: CliSessionAnalytics,
     language: AppLanguage
@@ -678,9 +705,13 @@ private fun SessionSummaryRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // O custo vem do resumo, e não da apuração por turno: é o mesmo número
+        // que a linha da lista mostra para esta sessão, e existe mesmo quando os
+        // turnos não estão disponíveis. A distribuição por componente, que só o
+        // turno prova, continua saindo do `costBreakdown`, no bloco Avançado.
         MetricCard(
             label = CliSessionsLabels.columnCost(language),
-            value = formatMicrosUsd(analytics.costBreakdown.totalMicros),
+            value = formatMicrosUsd(summary.costMicros),
             accent = INPUT_COLOR,
             help = GlossaryTerm.ESTIMATED_COST,
             language = language
@@ -712,7 +743,7 @@ private fun SessionSummaryRow(
 /** Tudo o que estava na tela antes da divisão e que não cabe no resumo. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SessionAdvancedSections(
+internal fun SessionAdvancedSections(
     summary: CliSessionSummary,
     analytics: CliSessionAnalytics,
     language: AppLanguage
@@ -861,7 +892,7 @@ private fun SessionAdvancedSections(
  * cards que não têm por que existir na árvore só para ficarem invisíveis.
  */
 @Composable
-private fun AdvancedDisclosure(
+internal fun AdvancedDisclosure(
     expanded: Boolean,
     language: AppLanguage,
     onToggle: () -> Unit,
@@ -915,7 +946,7 @@ private fun AdvancedDisclosure(
  * sem o número que o gerou não dá para conferir nem para confiar.
  */
 @Composable
-private fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLanguage) {
+internal fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLanguage) {
     val health = analytics.health
     val accent = healthColor(health)
 
@@ -974,7 +1005,7 @@ private fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLan
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguage) {
+internal fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguage) {
     DepthSurface(
         accent = NEUTRAL_ACCENT,
         modifier = Modifier.fillMaxWidth(),
@@ -997,6 +1028,32 @@ private fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguag
     }
 }
 
+/**
+ * "1 saturada · 2 em atenção" no cabeçalho, ou nada quando não há o que alertar.
+ *
+ * A cor é a do pior caso presente: um "em atenção" laranja ao lado de um
+ * "saturada" vermelho diluiria o segundo.
+ *
+ * `internal` porque os dois modais têm o mesmo problema — o do time ainda pior,
+ * já que lá o veredito vive dois níveis abaixo, dentro de um integrante recolhido.
+ */
+@Composable
+internal fun HealthTallyText(tally: CliSessionHealthTally, language: AppLanguage) {
+    val label = CliSessionsLabels.healthTally(tally, language) ?: return
+    val accent = if (tally.saturated > 0) {
+        healthColor(CliSessionHealth.SATURATED)
+    } else {
+        healthColor(CliSessionHealth.ATTENTION)
+    }
+
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = accent
+    )
+}
+
 internal fun healthColor(health: CliSessionHealth): Color {
     return when (health) {
         CliSessionHealth.HEALTHY -> CACHE_READ_COLOR
@@ -1006,7 +1063,7 @@ internal fun healthColor(health: CliSessionHealth): Color {
 }
 
 @Composable
-private fun DetailSection(
+internal fun DetailSection(
     title: String,
     accent: Color,
     // Sem default: um `help` acompanhado de um idioma implícito renderizaria
@@ -1058,7 +1115,7 @@ private fun DetailSection(
 }
 
 @Composable
-private fun MetricCard(
+internal fun MetricCard(
     label: String,
     value: String,
     accent: Color,
@@ -1147,7 +1204,7 @@ internal fun NoticeText(message: String, color: Color) {
  * se lê no tempo de uma tooltip que some sozinha.
  */
 @Composable
-private fun HelpDot(terms: List<GlossaryTerm>, language: AppLanguage) {
+internal fun HelpDot(terms: List<GlossaryTerm>, language: AppLanguage) {
     val entries = terms.map { term -> CliSessionsGlossary.entry(term, language) }
     val first = entries.first()
 
@@ -1182,7 +1239,7 @@ private fun HelpDot(terms: List<GlossaryTerm>, language: AppLanguage) {
  * conhece o vocabulário precisa de um lugar único para lê-lo de ponta a ponta.
  */
 @Composable
-private fun GlossaryPanel(
+internal fun GlossaryPanel(
     expanded: Boolean,
     language: AppLanguage,
     onToggle: () -> Unit
@@ -1260,7 +1317,7 @@ internal fun MeterBar(
 }
 
 @Composable
-private fun CostDistributionBar(analytics: CliSessionAnalytics) {
+internal fun CostDistributionBar(analytics: CliSessionAnalytics) {
     val breakdown = analytics.costBreakdown
 
     Row(
@@ -1287,7 +1344,7 @@ private fun CostDistributionBar(analytics: CliSessionAnalytics) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CostDistributionLegend(analytics: CliSessionAnalytics, language: AppLanguage) {
+internal fun CostDistributionLegend(analytics: CliSessionAnalytics, language: AppLanguage) {
     val breakdown = analytics.costBreakdown
     val labels = listOf(
         CliSessionsLabels.input(language),

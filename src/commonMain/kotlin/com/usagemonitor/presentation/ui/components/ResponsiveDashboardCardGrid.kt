@@ -27,6 +27,7 @@ import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
+import kotlinx.datetime.Instant
 import com.usagemonitor.presentation.ui.resolveDropTargetIndex
 
 // Threshold de largura (em dp) acima do qual o grid alterna de 1 para 2 colunas.
@@ -62,6 +63,8 @@ internal fun ResponsiveDashboardCardGrid(
      * de todos os cards sem nenhuma outra condição espalhada pela tela.
      */
     teamEnabledProfileIds: Set<String> = emptySet(),
+    /** Instante contra o qual o vencimento das janelas de cota é medido. */
+    now: Instant,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -135,6 +138,7 @@ internal fun ResponsiveDashboardCardGrid(
                             } else {
                                 null
                             },
+                            now = now,
                             onToggleMinimized = { onToggleCardMinimized(stats.targetKey) },
                             onDragStart = {
                                 dragState = CardDragState(target = stats.targetKey)

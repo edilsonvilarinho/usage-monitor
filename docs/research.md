@@ -5,18 +5,19 @@ Gerado na Tarefa 1 com auxílio do servidor MCP Context7.
 
 ---
 
-## 1. Anthropic — Rate Limit Headers
+## 1. Anthropic — Endpoint de uso OAuth
 
 ### Estratégia de monitoramento
 
-Não existe um endpoint dedicado de "saldo de tokens" para o OAuth token do Claude.ai.
-A abordagem adotada é fazer uma chamada mínima à API e ler os headers de rate limit
-que a Anthropic retorna em **toda** resposta da API.
+Existe um endpoint dedicado de uso para o token OAuth do Claude.ai. A estratégia
+antiga — `POST /v1/messages` com payload mínimo só para ler os headers
+`anthropic-ratelimit-*` — foi substituída no commit `d305af3` e **não é mais usada**:
+consumia token a cada poll e não expunha os créditos de uso.
 
 ### Endpoint
 
 ```
-POST https://api.anthropic.com/v1/messages
+GET https://api.anthropic.com/api/oauth/usage
 ```
 
 ### Autenticação
@@ -27,35 +28,52 @@ O token OAuth do Claude.ai é lido dinamicamente do ficheiro de credenciais loca
 ~/.claude/.credentials.json  →  claudeAiOauth.accessToken
 ```
 
-Header HTTP da requisição:
+Headers HTTP da requisição:
 ```
 Authorization: Bearer <accessToken>
-anthropic-version: 2023-06-01
-Content-Type: application/json
+User-Agent: claude-code/1.0.0
+anthropic-beta: oauth-2025-04-20
+Accept: application/json
 ```
 
-### Payload mínimo (consome ~1 token)
+### Response JSON (campos consumidos pelo app)
 
 ```json
 {
-  "model": "claude-haiku-4-5-20251001",
-  "max_tokens": 1,
-  "messages": [
-    { "role": "user", "content": "hi" }
-  ]
+  "five_hour": { "utilization": 21.5, "resets_at": "2026-08-11T20:00:00Z" },
+  "seven_day": { "utilization": 50.0, "resets_at": "2026-08-15T20:00:00Z" },
+  "extra_usage": {
+    "is_enabled": true,
+    "monthly_limit": 55000,
+    "used_credits": 32784.0,
+    "utilization": 59.60727272727273,
+    "currency": "BRL",
+    "decimal_places": 2,
+    "credits_ever_enabled": true
+  },
+  "spend": {
+    "used":  { "amount_minor": 32784, "currency": "BRL", "exponent": 2 },
+    "limit": { "amount_minor": 55000, "currency": "BRL", "exponent": 2 },
+    "percent": 60,
+    "enabled": true
+  }
 }
 ```
 
-### Headers de rate limit retornados na resposta
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `five_hour.utilization` | Double | Percentual (0–100) usado na janela de 5h |
+| `five_hour.resets_at` | ISO 8601 String ou null | Reinício da janela; nulo enquanto a Anthropic não materializa |
+| `seven_day.*` | idem | Mesma semântica na janela semanal |
+| `extra_usage.is_enabled` | Boolean | `false` zera todos os demais campos do bloco |
+| `extra_usage.monthly_limit` | Long (unidade menor) | Limite mensal de créditos: 55000 = R$ 550,00 |
+| `extra_usage.used_credits` | Double (unidade menor) | Créditos consumidos: 32784.0 = R$ 327,84 |
+| `extra_usage.utilization` | Double | Percentual já pronto e mais preciso que `spend.percent` (arredondado) |
+| `extra_usage.currency` | String | Moeda real da conta — **pode não ser USD** |
+| `spend.used/limit` | Objeto | Reforço monetário (`amount_minor` + `exponent`); com o recurso desligado a moeda cai para o default "USD" |
 
-| Header | Tipo | Descrição |
-|--------|------|-----------|
-| `anthropic-ratelimit-tokens-limit` | Long | Limite total de tokens na janela atual |
-| `anthropic-ratelimit-tokens-remaining` | Long | Tokens restantes na janela atual |
-| `anthropic-ratelimit-tokens-reset` | ISO 8601 String | Timestamp de reset da janela |
-| `anthropic-ratelimit-requests-limit` | Long | Limite de requisições na janela |
-| `anthropic-ratelimit-requests-remaining` | Long | Requisições restantes na janela |
-| `anthropic-ratelimit-requests-reset` | ISO 8601 String | Timestamp de reset de requisições |
+A resposta ainda traz `seven_day_opus`, `seven_day_sonnet`, `seven_day_cowork`,
+`limits[]` e outros blocos, ignorados pelo DTO (`ignoreUnknownKeys`).
 
 ### Estrutura do `.credentials.json`
 
@@ -84,10 +102,10 @@ val path = "$home/.claude/.credentials.json"
 
 ### ⚠️ Pontos de atenção
 
-- Cada poll consome ~1 token de input (chamada mínima ao claude-haiku)
-- A janela de rate limit é tipicamente de **1 minuto** para tokens
+- O poll é somente leitura: não consome token do plano
 - O `accessToken` pode expirar — `expiresAt` deve ser verificado; se expirado, usar `refreshToken`
 - Esta estratégia usa o tier do plano do usuário, não uma API key de developer
+- Os valores de crédito são monetários em unidade menor; a moeda vem em `extra_usage.currency` e não pode ser assumida como USD
 
 ---
 
@@ -185,8 +203,8 @@ curl --location 'https://www.minimax.io/v1/token_plan/remains' \
 |---------|---------------|
 | OAuth token para Anthropic | Único token disponível no `.credentials.json`; não é uma API key de developer |
 | MINIMAX_API_KEY via env var | Segurança — proibido hardcode por protocolo do projeto |
-| Modelo `claude-haiku-4-5-20251001` para poll | Menor custo de tokens para chamada de sondagem |
-| Polling a cada 10 minutos | Equilíbrio entre atualização e consumo de tokens |
+| `GET /api/oauth/usage` para Anthropic | Leitura direta das janelas e dos créditos, sem consumir token do plano |
+| Polling a cada 10 minutos | Equilíbrio entre atualização e carga na API |
 | Timezone `America/Sao_Paulo` | Requisito explícito do projeto; label "BRT" em PT-BR |
 
 ---

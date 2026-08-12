@@ -1,7 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
 
@@ -72,6 +74,16 @@ sealed interface CliSessionsUiState {
         /** Ao menos uma sessão tem turnos sem preço: o total exibido é parcial. */
         val isTotalCostComplete: Boolean
             get() = sessions.all { session -> session.isCostComplete }
+
+        /**
+         * Quantas sessões estão saturadas ou em atenção.
+         *
+         * Vai para o cabeçalho: o veredito por sessão já está na linha, mas com
+         * a lista rolada ele some da vista, e a pergunta "tem alguma sessão
+         * pedindo /compact?" não deveria exigir varrer a lista inteira.
+         */
+        val healthTally: CliSessionHealthTally
+            get() = sessions.tallyHealth()
     }
 }
 

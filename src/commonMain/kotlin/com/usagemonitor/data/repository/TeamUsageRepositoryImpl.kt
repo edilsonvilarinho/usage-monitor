@@ -1,8 +1,10 @@
 package com.usagemonitor.data.repository
 
 import com.usagemonitor.data.datasource.RemoteTeamDataSource
+import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.data.mapper.toDomain
 import com.usagemonitor.data.mapper.toDto
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
@@ -19,6 +21,8 @@ private const val CONNECTION_CHECK_ACCOUNT_KEY = "__connection_check__"
 
 private const val NOT_CONFIGURED_MESSAGE =
     "Integração com time incompleta: informe servidor, chave e apelido nas Configurações."
+
+private const val NOT_FOUND_STATUS = 404
 
 /**
  * As credenciais chegam por [settingsProvider] em vez de pelo construtor: o
@@ -59,6 +63,42 @@ class TeamUsageRepositoryImpl(
                 sinceEpochMillis = cutoffMillis
             ).toDomain()
         }
+    }
+
+    /**
+     * O `404` vira `success(null)`, e não falha.
+     *
+     * São dois casos indistinguíveis do lado do cliente: a sessão não existe mais
+     * no servidor, ou o servidor é anterior à rota `/v1/session` e nem a conhece.
+     * Nos dois o desfecho é o mesmo — não há turno a mostrar — e nenhum deles
+     * pode virar erro na tela: nem todo time atualiza servidor e app juntos, e
+     * essa janela é real.
+     */
+    override suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?> {
+        val settings = settingsProvider()
+        if (!settings.isActive) {
+            return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
+        }
+
+        val result = runCatching {
+            remoteDataSource.fetchSessionDetail(
+                baseUrl = settings.normalizedServerUrl,
+                apiKey = settings.apiKey,
+                accountKey = accountKey,
+                deviceId = deviceId,
+                sessionId = sessionId
+            ).toDomain()
+        }
+
+        val error = result.exceptionOrNull()
+        if (error is TeamServerException && error.statusCode == NOT_FOUND_STATUS) {
+            return Result.success(null)
+        }
+        return result
     }
 
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {

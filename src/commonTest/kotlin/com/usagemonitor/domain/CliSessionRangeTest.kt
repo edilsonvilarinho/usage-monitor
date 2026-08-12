@@ -9,7 +9,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 private val NOW = Instant.parse("2026-08-10T23:00:00Z")
 private const val FIVE_HOURS_MILLIS = 5L * 60 * 60 * 1_000
@@ -87,13 +89,80 @@ class CliSessionRangeTest {
         assertFalse(window.isAnchored)
     }
 
+    /**
+     * Regressão da issue #35: com o reset vencido o corte voltava a ser corrido
+     * (`now − 5h`) e alcançava turnos de antes do reset, misturando a janela de
+     * quota anterior com a nova.
+     */
     @Test
-    fun `an expired reset falls back to the sliding window`() {
-        // Quota vencida sem uso novo: não existe janela corrente para ancorar.
+    fun `an expired reset cuts at the reset itself`() {
+        val expiredResetAt = Instant.parse("2026-08-10T20:00:00Z")
+
         val window = CliSessionRange.LAST_5H.resolve(
             now = NOW,
-            windows = CliQuotaWindows(fiveHourEndsAt = Instant.parse("2026-08-10T20:00:00Z"))
+            windows = CliQuotaWindows(fiveHourEndsAt = expiredResetAt)
         )
+
+        assertEquals(expiredResetAt.toEpochMilliseconds(), window.cutoffMillis)
+        // A janela nova começa em algum ponto a partir do reset e só ganha fim
+        // quando a API publicar o `resets_at` seguinte.
+        assertNull(window.endsAt)
+        assertTrue(window.isAnchored)
+    }
+
+    /** Nada de antes do reset entra na janela nova. */
+    @Test
+    fun `an expired reset never reaches turns from the previous window`() {
+        val expiredResetAt = Instant.parse("2026-08-10T20:00:00Z")
+
+        val window = CliSessionRange.LAST_5H.resolve(
+            now = NOW,
+            windows = CliQuotaWindows(fiveHourEndsAt = expiredResetAt)
+        )
+
+        val turnJustBeforeTheReset = expiredResetAt.toEpochMilliseconds() - 1
+        assertTrue(turnJustBeforeTheReset < window.cutoffMillis!!)
+    }
+
+    /**
+     * Âncora velha demais (dashboard parado, app reaberto dias depois) não pode
+     * esticar a janela de "5h": o corte corrido é o piso, senão `5h ⊆ 7d` cai.
+     */
+    @Test
+    fun `a stale expired reset never widens the 5h window past the sliding cutoff`() {
+        val staleResetAt = NOW - 20.days
+
+        val window = CliSessionRange.LAST_5H.resolve(
+            now = NOW,
+            windows = CliQuotaWindows(fiveHourEndsAt = staleResetAt)
+        )
+
+        assertEquals(NOW.toEpochMilliseconds() - FIVE_HOURS_MILLIS, window.cutoffMillis)
+        assertNull(window.endsAt)
+        assertFalse(window.isAnchored)
+    }
+
+    /** O invariante de aninhamento vale também com o reset já vencido. */
+    @Test
+    fun `a wider range never cuts more than a narrower one after the reset expires`() {
+        val windows = CliQuotaWindows(fiveHourEndsAt = NOW - 10.minutes)
+
+        val fiveHour = CliSessionRange.LAST_5H.resolve(NOW, windows)
+        val sevenDay = CliSessionRange.LAST_7D.resolve(NOW, windows)
+        val thirtyDay = CliSessionRange.LAST_30D.resolve(NOW, windows)
+
+        assertNotNull(fiveHour.cutoffMillis)
+        assertNotNull(sevenDay.cutoffMillis)
+        assertNotNull(thirtyDay.cutoffMillis)
+        assertTrue(sevenDay.cutoffMillis!! < fiveHour.cutoffMillis!!)
+        assertTrue(thirtyDay.cutoffMillis!! < sevenDay.cutoffMillis!!)
+        assertNull(CliSessionRange.ALL.resolve(NOW, windows).cutoffMillis)
+    }
+
+    /** Sem reset conhecido nada muda: o corte segue corrido. */
+    @Test
+    fun `the sliding window stays when no reset is known`() {
+        val window = CliSessionRange.LAST_5H.resolve(NOW, CliQuotaWindows(fiveHourEndsAt = null))
 
         assertEquals(NOW.toEpochMilliseconds() - FIVE_HOURS_MILLIS, window.cutoffMillis)
         assertFalse(window.isAnchored)

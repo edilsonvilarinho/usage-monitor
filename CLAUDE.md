@@ -12,7 +12,8 @@ gradlew.bat run
 gradlew.bat desktopJar
 
 # Todos os testes (domain + data + ViewModel + UI)
-gradlew.bat test
+# A task raiz `test` não existe neste projeto KMP — use `allTests`.
+gradlew.bat allTests
 
 # Apenas testes do commonTest (domain, mappers, ViewModel)
 gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"
@@ -56,7 +57,7 @@ KMP Desktop (JVM único alvo). Código organizado em três camadas com dependên
 
 Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
 
-- `QuotaInfo`: entidade com `percentageUsed` e `remaining` calculados. `UsageUnit` diferencia `TOKENS` (Anthropic) de `REQUESTS` (MiniMax).
+- `QuotaInfo`: entidade com `percentageUsed` e `remaining` calculados. `UsageUnit` diferencia `TOKENS`, `REQUESTS` (MiniMax), `PERCENTAGE` (Anthropic/Codex) e `CURRENCY_USD` (saldo DeepSeek). `currencyCode` (default `"USD"`) diz em que moeda os valores monetários estão. **Não crie valores novos em `UsageUnit`**: os `when` exaustivos do card, do histórico e do gráfico quebram; campo novo com default é retrocompatível, valor de enum novo não é.
 - `ApiUsageStats`: agrega lista de `QuotaInfo` por API.
 - Interfaces `AnthropicRepository` / `MiniMaxRepository`: o domain define o contrato; `data` implementa.
 - Use cases usam `operator fun invoke()` — chamados como `useCase()`.
@@ -64,9 +65,9 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
 ### Camada data (`commonMain/data/` + `desktopMain/data/`)
 
 - DTOs com `@Serializable` + `@SerialName` para mapear snake_case do JSON.
-- `AnthropicRateLimitDto` **não é JSON** — populado manualmente dos headers HTTP.
 - `LocalCredentialDataSource` em **desktopMain** (usa `java.io.File`). Lê `~/.claude/.credentials.json` → `claudeAiOauth.accessToken`. Valida `expiresAt`.
-- `RemoteApiDataSource`: Anthropic faz `POST /v1/messages` com payload mínimo (claude-haiku, max_tokens=1) só para ler os headers de rate limit. MiniMax faz `GET /v1/token_plan/remains`.
+- `RemoteApiDataSource`: Anthropic faz `GET /api/oauth/usage` (headers `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-code/1.0.0`) e lê a utilização das janelas direto do corpo JSON. MiniMax faz `GET /v1/token_plan/remains`.
+- **Créditos de uso (Anthropic)**: `extra_usage` é a fonte primária — `monthly_limit` e `used_credits` vêm em unidades menores da moeda (55000 = R$ 550,00) e `currency` traz a moeda real da conta, que **não é sempre USD**. `spend` só reforça (o `percent` dele vem arredondado; a moeda cai para "USD" quando o recurso está desligado). `AnthropicMapper` só cria a terceira `QuotaInfo` quando `is_enabled` é `true`; o rótulo `AnthropicQuotaLabels.EXTRA_CREDITS` é chave da série histórica e não pode ser renomeado.
 - `MiniMaxRepositoryImpl` lê `System.getenv("MINIMAX_API_KEY")` — nunca hardcode.
 - Ambos os repos usam `Result.runCatching { }` para encapsular falhas.
 
@@ -105,7 +106,9 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 
 | API | Endpoint | Auth |
 |---|---|---|
-| Anthropic | `POST https://api.anthropic.com/v1/messages` | `Authorization: Bearer {accessToken}` do credentials.json |
+| Anthropic | `GET https://api.anthropic.com/api/oauth/usage` | `Authorization: Bearer {accessToken}` do credentials.json + `anthropic-beta: oauth-2025-04-20` |
 | MiniMax | `GET https://www.minimax.io/v1/token_plan/remains` | `Authorization: Bearer {MINIMAX_API_KEY}` |
+
+Response Anthropic retorna `five_hour`/`seven_day` com `utilization` em **percentual** (0–100) e `resets_at` em ISO 8601 (pode ser nulo), mais `extra_usage`/`spend` com os créditos de uso em unidades menores da moeda da conta.
 
 Response MiniMax retorna `model_remains[]` com cotas em **requests** (não tokens), timestamps em epoch milliseconds.

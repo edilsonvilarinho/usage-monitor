@@ -59,6 +59,37 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
+import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+
+/**
+ * Folga somada à espera para o relógio já ter cruzado o `periodEndAt` ao acordar.
+ * O reset da fonte não é instantâneo; acordar no milissegundo exato não ajuda.
+ */
+private const val QUOTA_EXPIRY_MARGIN_MILLIS = 1_000L
+
+/**
+ * Próximo `periodEndAt` ainda no futuro entre as cotas na tela.
+ *
+ * Cotas sem reset conhecido ficam de fora: o `periodEndAt` delas é o sentinela
+ * distante que o mapper usa na ausência de `resets_at`.
+ */
+private fun nextQuotaExpiry(stats: List<ApiUsageStats>, now: Instant): Instant? {
+    var earliest: Instant? = null
+    for (item in stats) {
+        for (quota in item.quotas) {
+            if (!quota.hasKnownResetAt || quota.periodEndAt <= now) {
+                continue
+            }
+            val currentEarliest = earliest
+            if (currentEarliest == null || quota.periodEndAt < currentEarliest) {
+                earliest = quota.periodEndAt
+            }
+        }
+    }
+    return earliest
+}
 
 @Composable
 fun DashboardScreen(
@@ -85,6 +116,24 @@ fun DashboardScreen(
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingRefreshAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    // O vencimento de uma janela de cota é uma virada de relógio, não de dados:
+    // sem este laço o card repetiria o reset já passado como se fosse futuro até
+    // alguma coleta trazer números diferentes. A espera é até o próximo
+    // `periodEndAt`, não um tique periódico — nada recompõe à toa.
+    var quotaClock by remember { mutableStateOf(Clock.System.now()) }
+    LaunchedEffect(uiState, countdownUpdatesEnabled) {
+        if (!countdownUpdatesEnabled) {
+            return@LaunchedEffect
+        }
+        val visibleStats = (uiState as? UiState.Success)?.data ?: return@LaunchedEffect
+        while (true) {
+            val current = Clock.System.now()
+            quotaClock = current
+            val nextExpiry = nextQuotaExpiry(visibleStats, current) ?: return@LaunchedEffect
+            delay((nextExpiry - current).inWholeMilliseconds + QUOTA_EXPIRY_MARGIN_MILLIS)
+        }
+    }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let { toast ->
@@ -163,6 +212,7 @@ fun DashboardScreen(
                                 )
                                 is UiState.Success -> SuccessContent(
                                     apiStatsList = state.data,
+                                    now = quotaClock,
                                     partialErrors = state.errors,
                                     riskSummaries = state.riskSummaries,
                                     refreshingTargets = refreshingTargets,
@@ -331,6 +381,8 @@ private fun ErrorContent(
 @Composable
 private fun SuccessContent(
     apiStatsList: List<ApiUsageStats>,
+    /** Instante contra o qual o vencimento das janelas de cota é medido. */
+    now: Instant,
     partialErrors: List<UiApiError>,
     riskSummaries: Map<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>,
     refreshingTargets: Set<UsageTargetKey>,
@@ -414,6 +466,7 @@ private fun SuccessContent(
                 onOpenCliSessionsCard = onOpenCliSessionsCard,
                 onOpenTeamUsageCard = onOpenTeamUsageCard,
                 teamEnabledProfileIds = teamEnabledProfileIds,
+                now = now,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)

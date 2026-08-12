@@ -1,7 +1,10 @@
 package com.usagemonitor.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +72,7 @@ import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Instant
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -161,7 +165,10 @@ class ComponentTest {
                     isRefreshing = false,
                     language = AppLanguage.PT,
                     animationDelayMillis = 0,
-                    onRefresh = {}
+                    onRefresh = {},
+                    // Relogio antes dos dois resets: sem ele o rotulo dependeria
+                    // da data em que a suite roda.
+                    now = Instant.parse("2026-04-28T10:00:00Z")
                 )
             }
         }
@@ -275,7 +282,8 @@ class ComponentTest {
                     isRefreshing = false,
                     language = AppLanguage.PT,
                     animationDelayMillis = 0,
-                    onRefresh = {}
+                    onRefresh = {},
+                    now = Instant.parse("2026-04-28T10:00:00Z")
                 )
             }
         }
@@ -323,6 +331,70 @@ class ComponentTest {
         onNodeWithText("Saldo").assertIsDisplayed()
         onNodeWithText("\$3.85").assertIsDisplayed()
         onNodeWithText("Saldo não expira").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard shows anthropic extra credits in the account currency`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(420.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(
+                            QuotaInfo(
+                                label = "Claude 5h",
+                                used = 21L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                                periodType = PeriodType.INTERVAL,
+                                unit = UsageUnit.PERCENTAGE,
+                                rawUsed = 968L,
+                                rawTotal = 4500L
+                            ),
+                            QuotaInfo(
+                                label = "Claude 7d",
+                                used = 50L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2026-05-02T20:00:00Z"),
+                                periodType = PeriodType.WEEKLY,
+                                unit = UsageUnit.PERCENTAGE,
+                                rawUsed = 22500L,
+                                rawTotal = 45000L
+                            ),
+                            QuotaInfo(
+                                label = "Créditos",
+                                used = 60L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2100-01-01T00:00:00Z"),
+                                hasKnownResetAt = false,
+                                periodType = PeriodType.REPORTED,
+                                unit = UsageUnit.PERCENTAGE,
+                                rawUsed = 32784L,
+                                rawTotal = 55000L,
+                                currencyCode = "BRL"
+                            )
+                        ),
+                        // Igual ao dashboard: o card da Anthropic esconde os detalhes
+                        // de uso, e ainda assim os créditos precisam aparecer.
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Anthropic").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Semanal").assertIsDisplayed()
+        onNodeWithText("Créditos de uso").assertIsDisplayed()
+        onNodeWithText("60%").assertIsDisplayed()
+        onNodeWithText("R$327.84/R$550.00").assertIsDisplayed()
+        onNodeWithText("Reinicia no início do mês").assertIsDisplayed()
+        onAllNodesWithText("Uso atual").assertCountEquals(0)
     }
 
     @Test
@@ -490,7 +562,8 @@ class ComponentTest {
                     isMinimized = true,
                     language = AppLanguage.PT,
                     animationDelayMillis = 0,
-                    onRefresh = {}
+                    onRefresh = {},
+                    now = Instant.parse("2026-04-28T10:00:00Z")
                 )
             }
         }
@@ -509,6 +582,93 @@ class ComponentTest {
         onNodeWithText("Percentual").assertIsDisplayed()
         onNodeWithText("Reset").assertIsDisplayed()
         onNodeWithText("Reinício: Ter 14h40 BRT").assertIsDisplayed()
+    }
+
+    /**
+     * Issue #36: com o reset já vencido o card mostrava o horário passado como se
+     * fosse futuro, ao lado do percentual saturado da janela anterior.
+     */
+    @Test
+    fun `ApiUsageCard marks an expired quota window instead of showing a past reset`() = runDesktopComposeUiTest {
+        val resetsAt = Instant.parse("2026-04-28T17:40:00Z")
+
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 100L,
+                            total = 100L,
+                            periodEndAt = resetsAt,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = resetsAt + 3.minutes
+                )
+            }
+        }
+
+        onNodeWithText("Janela reiniciada · coletando dados").assertIsDisplayed()
+        onAllNodesWithText("Reinício: Ter 14h40 BRT").assertCountEquals(0)
+        // O número continua na tela: zerá-lo seria inventar um dado que só a
+        // próxima coleta pode trazer.
+        onNodeWithText("100%").assertIsDisplayed()
+    }
+
+    /** A virada é temporal: nada nos dados muda quando a janela vence. */
+    @Test
+    fun `ApiUsageCard flips to the expired label when the clock crosses the reset`() = runDesktopComposeUiTest {
+        val resetsAt = Instant.parse("2026-04-28T17:40:00Z")
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 100L,
+            total = 100L,
+            periodEndAt = resetsAt,
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.PERCENTAGE
+        )
+
+        setContent {
+            var now by remember { mutableStateOf(resetsAt - 1.minutes) }
+
+            AppTheme(isDark = true) {
+                Column {
+                    // Só para o teste mover o relógio; na app quem move é a
+                    // DashboardScreen, que dorme até o próximo periodEndAt.
+                    Text(
+                        text = "avançar relógio",
+                        modifier = Modifier.clickable { now = resetsAt + 1.minutes }
+                    )
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(quota),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {},
+                        now = now
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Reinício: Ter 14h40 BRT").assertIsDisplayed()
+
+        onNodeWithText("avançar relógio").performClick()
+
+        onNodeWithText("Janela reiniciada · coletando dados").assertIsDisplayed()
+        onAllNodesWithText("Reinício: Ter 14h40 BRT").assertCountEquals(0)
     }
 
     @Test

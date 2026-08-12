@@ -1,5 +1,10 @@
 import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
-import { ServiceUnavailableError, UnauthorizedError, ValidationError } from '../domain/errors.js';
+import {
+  NotFoundError,
+  ServiceUnavailableError,
+  UnauthorizedError,
+  ValidationError,
+} from '../domain/errors.js';
 import { logger } from '../logger.js';
 
 /**
@@ -21,6 +26,10 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   }
   if (error instanceof UnauthorizedError) {
     res.status(401).json({ error: error.message, code: error.code });
+    return;
+  }
+  if (error instanceof NotFoundError) {
+    res.status(404).json({ error: error.message, code: error.code });
     return;
   }
   if (error instanceof ServiceUnavailableError) {

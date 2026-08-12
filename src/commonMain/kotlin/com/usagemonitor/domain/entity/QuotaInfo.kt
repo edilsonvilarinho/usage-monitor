@@ -22,7 +22,14 @@ data class QuotaInfo(
     val periodType: PeriodType = PeriodType.INTERVAL,
     val unit: UsageUnit,
     val rawUsed: Long = 0L,
-    val rawTotal: Long = 0L
+    val rawTotal: Long = 0L,
+    /**
+     * Moeda ISO-4217 dos valores monetários da cota (ex: "USD", "BRL").
+     *
+     * Campo com default para não quebrar caches e histórico já gravados. Só tem
+     * efeito nas cotas cujos valores são dinheiro — as demais o ignoram.
+     */
+    val currencyCode: String = "USD"
 ) {
     /**
      * Percentual de uso no período atual (valor entre 0.0 e 1.0).
@@ -39,6 +46,20 @@ data class QuotaInfo(
 
     val remaining: Long
         get() = if (total > 0L) (total - used).coerceAtLeast(0L) else 0L
+
+    /**
+     * A janela desta cota já venceu em [now].
+     *
+     * Vencida significa apenas que [used] e [total] descrevem uma janela que não
+     * existe mais — não que o consumo seja zero. O valor novo só vem da fonte;
+     * zerar aqui seria inventar dado.
+     *
+     * Cotas sem reset conhecido nunca vencem: nesse caso [periodEndAt] é o
+     * sentinela distante que o mapper usa na ausência de `resets_at`.
+     */
+    fun isExpiredAt(now: Instant): Boolean {
+        return hasKnownResetAt && periodEndAt <= now
+    }
 }
 
 /**
