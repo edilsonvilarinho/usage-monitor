@@ -3,6 +3,7 @@ package com.usagemonitor
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AutoStartManagerTest {
 
@@ -68,6 +69,44 @@ class AutoStartManagerTest {
         } finally {
             tempDir.deleteRecursively()
         }
+    }
+
+    @Test
+    fun `resolve executable path finds macOS bundle launcher inside app directory`() {
+        val tempDir = createTempDir()
+        try {
+            val launcher = createFile(tempDir, "Usage Monitor.app/Contents/MacOS/Usage Monitor")
+
+            val resolved = AutoStartManager.resolveExecutablePath(
+                AutoStartManager.RuntimeEnvironment(
+                    platform = AutoStartManager.Platform.MACOS,
+                    processCommand = createFile(tempDir, "java").absolutePath,
+                    jpackageAppPath = null,
+                    appDirectories = listOf(tempDir.absolutePath)
+                )
+            )
+
+            assertEquals(launcher.absolutePath, resolved)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `launch agent plist carries label program and run at load`() {
+        val plist = AutoStartManager.buildLaunchAgentPlist("/Applications/Usage Monitor.app/Contents/MacOS/Usage Monitor")
+
+        assertTrue(plist.contains("<string>com.usagemonitor.app</string>"))
+        assertTrue(plist.contains("<string>/Applications/Usage Monitor.app/Contents/MacOS/Usage Monitor</string>"))
+        assertTrue(plist.contains("<key>RunAtLoad</key>"))
+        assertTrue(plist.contains("<true/>"))
+    }
+
+    @Test
+    fun `launch agent plist escapes xml sensitive characters in the path`() {
+        val plist = AutoStartManager.buildLaunchAgentPlist("/Users/dev & co/Usage Monitor")
+
+        assertTrue(plist.contains("<string>/Users/dev &amp; co/Usage Monitor</string>"))
     }
 
     private fun createTempDir(): File {

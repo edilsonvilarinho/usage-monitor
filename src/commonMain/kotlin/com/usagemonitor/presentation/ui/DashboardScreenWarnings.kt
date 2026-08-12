@@ -94,14 +94,14 @@ internal fun warningFor(
             DashboardWarning(
                 source = error.source,
                 title = "Anthropic precisa de autenticação",
-                description = "Faça login no Claude Code para recriar ou renovar `~/.claude/.credentials.json` e depois tente novamente.",
+                description = "Faça login no Claude Code para recriar ou renovar a credencial (`~/.claude/.credentials.json`; no macOS, a entrada `Claude Code-credentials` do Keychain) e depois tente novamente.",
                 actionLabel = "Tentar novamente"
             )
         } else {
             DashboardWarning(
                 source = error.source,
                 title = "Anthropic needs authentication",
-                description = "Sign in with Claude Code to recreate or renew `~/.claude/.credentials.json`, then try again.",
+                description = "Sign in with Claude Code to recreate or renew the credential (`~/.claude/.credentials.json`; on macOS the `Claude Code-credentials` Keychain entry), then try again.",
                 actionLabel = "Retry"
             )
         }
@@ -112,14 +112,14 @@ internal fun warningFor(
             DashboardWarning(
                 source = error.source,
                 title = "MiniMax precisa de MINIMAX_API_KEY",
-                description = "Defina `MINIMAX_API_KEY` antes de abrir o app e reinicie o monitor. Exemplo no Windows: `set MINIMAX_API_KEY=sua_chave`.",
+                description = "Defina `MINIMAX_API_KEY` antes de abrir o app e reinicie o monitor. Windows: `set MINIMAX_API_KEY=sua_chave`. No macOS, o app aberto pelo Finder não herda o `export` do shell: use `launchctl setenv MINIMAX_API_KEY sua_chave`.",
                 actionLabel = null
             )
         } else {
             DashboardWarning(
                 source = error.source,
                 title = "MiniMax needs MINIMAX_API_KEY",
-                description = "Set `MINIMAX_API_KEY` before opening the app and restart the monitor. Example on Windows: `set MINIMAX_API_KEY=your_key`.",
+                description = "Set `MINIMAX_API_KEY` before opening the app and restart the monitor. Windows: `set MINIMAX_API_KEY=your_key`. On macOS the app launched from Finder does not inherit the shell `export`: use `launchctl setenv MINIMAX_API_KEY your_key`.",
                 actionLabel = null
             )
         }

@@ -1,5 +1,6 @@
 package com.usagemonitor.data
 
+import com.usagemonitor.data.datasource.AnthropicCredentialStore
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -220,6 +221,57 @@ class LocalCredentialDataSourceTest {
     }
 
     @Test
+    fun `reads from the injected store when there is no credentials file`() = runTest {
+        val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
+        val store = InMemoryCredentialStore(credentialsJson("keychain-token", "rt", futureExpiry))
+        val dataSource = LocalCredentialDataSource(
+            httpClient = throwingHttpClient(),
+            homeDirProvider = homeDirProvider,
+            credentialStoreProvider = { store }
+        )
+
+        val session = dataSource.loadAnthropicSession()
+
+        assertEquals("keychain-token", session.accessToken)
+        assertEquals(false, credentialsFile.exists())
+    }
+
+    @Test
+    fun `refresh writes back to the injected store`() = runTest {
+        val nearExpiry = System.currentTimeMillis() + 60 * 1000L
+        val store = InMemoryCredentialStore(credentialsJson("old-token", "old-rt", nearExpiry))
+        val dataSource = LocalCredentialDataSource(
+            httpClient = refreshingHttpClient(
+                accessToken = "rotated-token",
+                refreshToken = "new-rt",
+                expiresIn = 3600
+            ),
+            homeDirProvider = homeDirProvider,
+            credentialStoreProvider = { store }
+        )
+
+        dataSource.loadAnthropicSession()
+
+        val oauth = Json.parseToJsonElement(store.read()!!).jsonObject["claudeAiOauth"]!!.jsonObject
+        assertEquals("rotated-token", oauth["accessToken"]!!.jsonPrimitive.content)
+        assertEquals("new-rt", oauth["refreshToken"]!!.jsonPrimitive.content)
+        assertEquals(false, credentialsFile.exists())
+    }
+
+    @Test
+    fun `surfaces the store message when the store has no credentials`() = runTest {
+        val store = InMemoryCredentialStore(content = null)
+        val dataSource = LocalCredentialDataSource(
+            httpClient = throwingHttpClient(),
+            homeDirProvider = homeDirProvider,
+            credentialStoreProvider = { store }
+        )
+
+        val error = assertFailsWith<IllegalStateException> { dataSource.loadAnthropicSession() }
+        assertTrue(error.message.orEmpty().contains("sem credenciais"))
+    }
+
+    @Test
     fun `detects account switch without recreating datasource`() = runTest {
         val futureExpiry = System.currentTimeMillis() + 60 * 60 * 1000L
         writeCredentials(accessToken = "token-a", refreshToken = "rt-a", expiresAt = futureExpiry)
@@ -260,8 +312,11 @@ class LocalCredentialDataSourceTest {
     }
 
     private fun writeCredentials(accessToken: String, refreshToken: String, expiresAt: Long) {
-        credentialsFile.writeText(
-            """
+        credentialsFile.writeText(credentialsJson(accessToken, refreshToken, expiresAt))
+    }
+
+    private fun credentialsJson(accessToken: String, refreshToken: String, expiresAt: Long): String {
+        return """
             {
               "claudeAiOauth": {
                 "accessToken": "$accessToken",
@@ -269,8 +324,22 @@ class LocalCredentialDataSourceTest {
                 "expiresAt": $expiresAt
               }
             }
-            """.trimIndent()
-        )
+        """.trimIndent()
+    }
+
+    /** Substitui o Keychain nos testes: a origem real do macOS não existe no Windows/Linux. */
+    private class InMemoryCredentialStore(
+        private var content: String?
+    ) : AnthropicCredentialStore {
+        override fun read(): String? = content
+
+        override fun write(content: String) {
+            this.content = content
+        }
+
+        override fun missingCredentialsMessage(profileLabel: String): String {
+            return "Origem sem credenciais para o perfil '$profileLabel'."
+        }
     }
 
     private fun readCredentialsJson(): JsonObject {

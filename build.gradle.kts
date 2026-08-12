@@ -102,7 +102,8 @@ compose.desktop {
                 TargetFormat.Exe,
                 TargetFormat.Msi,
                 TargetFormat.Deb,
-                TargetFormat.Rpm
+                TargetFormat.Rpm,
+                TargetFormat.Dmg
             )
             packageName = "Usage Monitor"
             packageVersion = appVersion
@@ -121,6 +122,10 @@ compose.desktop {
             }
             macOS {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.icns"))
+                bundleID = "com.usagemonitor.app"
+                dockName = "Usage Monitor"
+                // Distribuicao sem Developer ID: o jpackage aplica assinatura ad-hoc,
+                // exigida pelo Apple Silicon. O Gatekeeper ainda pede liberacao manual.
             }
         }
     }
