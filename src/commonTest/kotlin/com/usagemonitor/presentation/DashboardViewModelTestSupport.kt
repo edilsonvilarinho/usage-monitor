@@ -29,6 +29,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.yield
@@ -87,9 +89,13 @@ abstract class DashboardViewModelTestSupport {
     }
 
     protected fun historyUseCase(recordedSnapshots: MutableList<ApiUsageStats>): RecordUsageSnapshotUseCase {
+        // Um perfil por coroutine grava aqui ao mesmo tempo. `MutableList` é
+        // `ArrayList`: duas escritas concorrentes perdem um elemento e o teste
+        // falha sem que a coleta tenha nada de errado.
+        val recordMutex = Mutex()
         val historyRepository = object : UsageHistoryRepository {
             override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
-                recordedSnapshots += stats
+                recordMutex.withLock { recordedSnapshots += stats }
             }
 
             override suspend fun getHistoryReport(

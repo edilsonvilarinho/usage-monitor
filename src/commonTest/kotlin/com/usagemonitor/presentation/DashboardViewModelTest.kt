@@ -30,6 +30,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -748,7 +749,12 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     fun `collects and refreshes multiple Anthropic profiles independently`() = runTest {
         val profileA = AnthropicProfileRef("profile-a", "Pessoal")
         val profileB = AnthropicProfileRef("profile-b", "Empresa")
-        val calls = mutableListOf<String>()
+        // Os dois perfis são coletados em paralelo: um `MutableList` aqui é
+        // gravado por duas coroutines e percorrido pela thread do teste ao mesmo
+        // tempo, o que perdia entradas ou estourava `ConcurrentModificationException`.
+        // O `StateFlow` publica uma lista imutável a cada `update` atômico, então
+        // ler e escrever ao mesmo tempo deixa de ser um problema.
+        val calls = MutableStateFlow<List<String>>(emptyList())
         val snapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
@@ -756,7 +762,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             }
 
             override suspend fun getUsage(profile: AnthropicProfileRef): Result<ApiUsageStats> {
-                calls += profile.id
+                calls.update { previous -> previous + profile.id }
                 val account = sampleAnthropicStats.accountContext!!.copy(
                     key = sampleAnthropicStats.accountContext!!.key.copy(
                         providerAccountId = "account-${profile.id}",
@@ -794,11 +800,11 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         awaitCondition { snapshots.size == 2 }
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(setOf("profile-a", "profile-b"), state.data.map { it.targetKey.profileId }.toSet())
-        assertEquals(setOf("profile-a", "profile-b"), calls.toSet())
+        assertEquals(setOf("profile-a", "profile-b"), calls.value.toSet())
 
         viewModel.refresh(UsageTargetKey(ApiSource.ANTHROPIC, profileA.id))
-        awaitCondition { calls.count { it == profileA.id } == 2 }
-        assertEquals(1, calls.count { it == profileB.id })
+        awaitCondition { calls.value.count { it == profileA.id } == 2 }
+        assertEquals(1, calls.value.count { it == profileB.id })
         viewModel.onDestroy()
     }
 
