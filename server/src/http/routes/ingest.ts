@@ -2,25 +2,35 @@ import { Router } from 'express';
 import type { Config } from '../../config.js';
 import { ValidationError } from '../../domain/errors.js';
 import { logger } from '../../logger.js';
+import type { TeamKeyRepository } from '../../repositories/teamKeyRepository.js';
 import type { TeamRepository } from '../../repositories/teamRepository.js';
-import { requireTeamKey } from '../auth.js';
+import { readTeamAccess, requireTeamAccess, type AccessDeps } from '../access.js';
 import { createIngestSchema } from '../dto.js';
 import { wrap } from '../errorHandler.js';
 
 export interface IngestRouterDeps {
   config: Config;
   repository: TeamRepository;
+  keyRepository: TeamKeyRepository;
   now: () => number;
 }
 
 export function createIngestRouter(deps: IngestRouterDeps): Router {
   const router = Router();
   const schema = createIngestSchema(deps.config.maxTurnsPerRequest);
+  const access: AccessDeps = {
+    config: deps.config,
+    keyRepository: deps.keyRepository,
+    now: deps.now,
+  };
 
   router.post(
     '/v1/ingest',
-    requireTeamKey(
-      deps.config.teamApiKey,
+    requireTeamAccess(
+      access,
+      // O corpo ja foi desserializado pelo `express.json` antes do roteamento;
+      // a autorizacao le o campo cru e o zod confere o formato logo abaixo.
+      (req) => (req.body as { accountKey?: unknown } | undefined)?.accountKey,
       wrap((req, res) => {
         const parsed = schema.safeParse(req.body);
         if (!parsed.success) {
@@ -37,7 +47,16 @@ export function createIngestRouter(deps: IngestRouterDeps): Router {
           );
         }
 
-        const receipt = deps.repository.ingest(payload, deps.now());
+        const now = deps.now();
+        const receipt = deps.repository.ingest(payload, now);
+
+        // Marcador de uso da chave. So aqui, e nao nas leituras: o ingest ja e
+        // caminho de escrita, enquanto marcar na leitura custaria uma escrita em
+        // WAL a cada tique de 5s de cada janela de time aberta.
+        const granted = readTeamAccess(res);
+        if (granted?.keyId != null) {
+          deps.keyRepository.touch(granted.keyId, now);
+        }
 
         logger.debug(
           {
@@ -51,6 +70,7 @@ export function createIngestRouter(deps: IngestRouterDeps): Router {
 
         res.json(receipt);
       }),
+      { allowClaim: true },
     ),
   );
 

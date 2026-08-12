@@ -1,11 +1,15 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.CliQuotaWindows
+import com.usagemonitor.domain.entity.CliRangeWindow
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.TeamAccountUsage
+import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
+import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
@@ -46,6 +50,13 @@ class TeamUsageViewModel(
     private val getTeamUsage: GetTeamUsageUseCase,
     private val removeTeamMember: RemoveTeamMemberUseCase,
     private val getTeamSessionDetail: GetTeamSessionDetailUseCase,
+    /**
+     * Leitura de todas as contas, para o administrador.
+     *
+     * `null` desliga a visão global — é o que acontece numa instalação sem
+     * administração, onde a janela só existe por conta.
+     */
+    private val getAdminOverview: GetAdminTeamOverviewUseCase? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
     private val clock: Clock = Clock.System,
@@ -77,20 +88,53 @@ class TeamUsageViewModel(
     private var accountKey: String? = null
     private var accountLabel: String? = null
 
+    /** `true` enquanto a janela mostra todas as contas do servidor. */
+    private var adminOverview: Boolean = false
+
     /** Aponta a janela para uma conta Anthropic e liga o tempo real. */
     fun openForAccount(
         accountKey: String,
         accountLabel: String?,
         quotaWindows: CliQuotaWindows = CliQuotaWindows()
     ) {
-        val accountChanged = this.accountKey != accountKey
+        val scopeChanged = this.accountKey != accountKey || adminOverview
         this.accountKey = accountKey
         this.accountLabel = accountLabel
         this.quotaWindows = quotaWindows
+        this.adminOverview = false
 
         // Trocar de conta zera a lista: manter os integrantes da conta anterior
         // na tela enquanto a nova carrega mostraria dados de outro time.
-        if (accountChanged) {
+        if (scopeChanged) {
+            _uiState.value = TeamUsageUiState.Loading
+        }
+
+        refresh()
+        startLiveLoop()
+    }
+
+    /**
+     * Aponta a janela para **todas** as contas do servidor e liga o tempo real.
+     *
+     * É o modo de quem administra: ele não participa necessariamente de nenhuma
+     * das contas que administra, então a lista não pode depender de credencial de
+     * conta. Sem [getAdminOverview] configurado a chamada não faz nada — a
+     * instalação não tem administração.
+     */
+    fun openForAllAccounts() {
+        if (getAdminOverview == null) {
+            return
+        }
+
+        val scopeChanged = !adminOverview
+        this.accountKey = null
+        this.accountLabel = null
+        // Sem âncora de reset: cada conta reseta numa hora, e escolher uma delas
+        // daria um recorte que não corresponde a conta nenhuma.
+        this.quotaWindows = CliQuotaWindows()
+        this.adminOverview = true
+
+        if (scopeChanged) {
             _uiState.value = TeamUsageUiState.Loading
         }
 
@@ -112,7 +156,9 @@ class TeamUsageViewModel(
      * piscar de dez em dez minutos.
      */
     fun setQuotaWindows(quotaWindows: CliQuotaWindows) {
-        if (quotaWindows == this.quotaWindows) {
+        // Na visão global não há âncora a atualizar: aceitar a de uma conta faria
+        // o recorte de 5h de todas elas seguir o reset de uma só.
+        if (adminOverview || quotaWindows == this.quotaWindows) {
             return
         }
         this.quotaWindows = quotaWindows
@@ -126,16 +172,20 @@ class TeamUsageViewModel(
         refresh()
     }
 
-    /** Abre ou fecha as sessões de um integrante. */
-    fun toggleMember(deviceId: String) {
+    /** Abre ou fecha as sessões de um integrante, por `memberKey`. */
+    fun toggleMember(memberKey: String) {
         val current = _uiState.value
         if (current !is TeamUsageUiState.Success) {
             return
         }
 
-        val expanded = current.expandedDeviceIds
+        val expanded = current.expandedMemberKeys
         _uiState.value = current.copy(
-            expandedDeviceIds = if (deviceId in expanded) expanded - deviceId else expanded + deviceId
+            expandedMemberKeys = if (memberKey in expanded) {
+                expanded - memberKey
+            } else {
+                expanded + memberKey
+            }
         )
     }
 
@@ -146,11 +196,17 @@ class TeamUsageViewModel(
      * única prova de que o servidor apagou de fato. A falha vira aviso na tela e
      * a lista fica intacta — não dá para mostrar como removido o que continua lá.
      */
-    fun removeMember(deviceId: String) {
-        val targetAccountKey = accountKey ?: return
+    fun removeMember(memberKey: String) {
+        val member = findMember(memberKey) ?: return
+        // Na visão global a conta é a do integrante, não a da janela: usar a da
+        // janela apagaria o histórico da conta errada.
+        val targetAccountKey = member.accountKey ?: accountKey ?: return
 
         viewModelScope.launch {
-            val result = removeTeamMember(accountKey = targetAccountKey, deviceId = deviceId)
+            val result = removeTeamMember(
+                accountKey = targetAccountKey,
+                deviceId = member.deviceId
+            )
             val error = result.exceptionOrNull()
             if (error != null) {
                 _removalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
@@ -172,15 +228,21 @@ class TeamUsageViewModel(
      * escopada por `(conta, máquina)` — o id da sessão sozinho não identifica o
      * dono dela.
      */
-    fun openSession(deviceId: String, sessionId: String) {
+    fun openSession(memberKey: String, sessionId: String) {
         val current = _uiState.value
         if (current !is TeamUsageUiState.Success) {
             return
         }
-        val targetAccountKey = accountKey ?: return
+        val member = findMember(memberKey) ?: return
+        val targetAccountKey = member.accountKey ?: accountKey ?: return
+        val deviceId = member.deviceId
 
         _uiState.value = current.copy(
-            detail = TeamSessionDetailUiState.Loading(deviceId = deviceId, sessionId = sessionId)
+            detail = TeamSessionDetailUiState.Loading(
+                deviceId = deviceId,
+                sessionId = sessionId,
+                accountKey = member.accountKey
+            )
         )
 
         detailJob?.cancel()
@@ -188,9 +250,15 @@ class TeamUsageViewModel(
             val loaded = loadDetailState(
                 accountKey = targetAccountKey,
                 deviceId = deviceId,
-                sessionId = sessionId
+                sessionId = sessionId,
+                scopedAccountKey = member.accountKey
             )
-            publishDetail(deviceId = deviceId, sessionId = sessionId, detailState = loaded)
+            publishDetail(
+                deviceId = deviceId,
+                sessionId = sessionId,
+                scopedAccountKey = member.accountKey,
+                detailState = loaded
+            )
         }
     }
 
@@ -257,15 +325,72 @@ class TeamUsageViewModel(
         }
     }
 
-    private suspend fun loadTeam() {
-        val targetAccountKey = accountKey ?: return
+    /** Membros já rotulados e a janela aplicada, vindos de um dos dois escopos. */
+    private data class LoadedTeam(
+        val members: List<TeamMemberUsage>,
+        val window: CliRangeWindow
+    )
 
+    /**
+     * Lê o escopo ativo, ou `null` quando não há nenhum apontado.
+     *
+     * As duas leituras convergem para a mesma forma: a visão global achata as
+     * contas numa lista só de integrantes, cada um carimbado com a conta de
+     * origem. É o que permite a tela e o resto do ViewModel não saberem em qual
+     * dos dois modos estão, exceto onde a diferença importa de fato.
+     */
+    private suspend fun fetchScope(): Result<LoadedTeam>? {
+        if (adminOverview) {
+            val overview = getAdminOverview ?: return null
+            return overview(range = range).map { result ->
+                LoadedTeam(members = flattenAccounts(result.accounts), window = result.window)
+            }
+        }
+
+        val targetAccountKey = accountKey ?: return null
+        return getTeamUsage(
+            accountKey = targetAccountKey,
+            range = range,
+            windows = quotaWindows
+        ).map { result ->
+            LoadedTeam(members = result.snapshot.members, window = result.window)
+        }
+    }
+
+    /**
+     * Junta os integrantes de todas as contas numa lista só.
+     *
+     * A ordenação repete a do snapshot por conta — quem mais consumiu primeiro,
+     * sem atividade no fim em ordem alfabética — mas agora sobre o time inteiro,
+     * que é a pergunta que esta tela responde.
+     */
+    private fun flattenAccounts(accounts: List<TeamAccountUsage>): List<TeamMemberUsage> {
+        return accounts
+            .flatMap { account ->
+                account.snapshot.members.map { member ->
+                    member.copy(accountKey = account.accountKey, accountLabel = account.label)
+                }
+            }
+            .sortedWith(
+                compareByDescending<TeamMemberUsage> { member -> member.totalTokens }
+                    .thenBy { member -> member.accountLabel ?: member.accountKey.orEmpty() }
+                    .thenBy { member -> member.alias.lowercase() }
+            )
+    }
+
+    private fun findMember(memberKey: String): TeamMemberUsage? {
+        val current = _uiState.value as? TeamUsageUiState.Success ?: return null
+        return current.members.firstOrNull { member -> member.memberKey == memberKey }
+    }
+
+    private suspend fun loadTeam() {
         loadMutex.withLock {
             val current = _uiState.value as? TeamUsageUiState.Success
+            val overview = adminOverview
 
-            getTeamUsage(accountKey = targetAccountKey, range = range, windows = quotaWindows).fold(
+            (fetchScope() ?: return@withLock).fold(
                 onSuccess = { result ->
-                    val members = result.snapshot.members
+                    val members = result.members
                     val contentChanged = current == null || current.members != members
 
                     _uiState.value = TeamUsageUiState.Success(
@@ -274,12 +399,13 @@ class TeamUsageViewModel(
                         rangeEndsAt = result.window.endsAt,
                         rangeAnchored = result.window.isAnchored,
                         accountLabel = accountLabel,
+                        isAdminOverview = overview,
                         // Estado de UI, não do servidor: sem carregá-lo daqui os
                         // grupos abertos se fechariam sozinhos a cada tique.
                         // Integrantes que sumiram da resposta saem do conjunto.
-                        expandedDeviceIds = current?.expandedDeviceIds
-                            ?.filterTo(mutableSetOf()) { deviceId ->
-                                members.any { member -> member.deviceId == deviceId }
+                        expandedMemberKeys = current?.expandedMemberKeys
+                            ?.filterTo(mutableSetOf()) { key ->
+                                members.any { member -> member.memberKey == key }
                             }
                             ?: emptySet(),
                         // Carimbo só anda quando o conteúdo muda. Marcá-lo a cada
@@ -317,22 +443,29 @@ class TeamUsageViewModel(
     private suspend fun reloadOpenDetail() {
         val current = _uiState.value as? TeamUsageUiState.Success ?: return
         val open = current.detail as? TeamSessionDetailUiState.Ready ?: return
-        val targetAccountKey = accountKey ?: return
+        val targetAccountKey = open.accountKey ?: accountKey ?: return
 
         val reloaded = loadDetailState(
             accountKey = targetAccountKey,
             deviceId = open.deviceId,
-            sessionId = open.sessionId
+            sessionId = open.sessionId,
+            scopedAccountKey = open.accountKey
         )
         if (reloaded is TeamSessionDetailUiState.Ready) {
-            publishDetail(deviceId = open.deviceId, sessionId = open.sessionId, detailState = reloaded)
+            publishDetail(
+                deviceId = open.deviceId,
+                sessionId = open.sessionId,
+                scopedAccountKey = open.accountKey,
+                detailState = reloaded
+            )
         }
     }
 
     private suspend fun loadDetailState(
         accountKey: String,
         deviceId: String,
-        sessionId: String
+        sessionId: String,
+        scopedAccountKey: String?
     ): TeamSessionDetailUiState {
         return getTeamSessionDetail(
             accountKey = accountKey,
@@ -342,11 +475,12 @@ class TeamUsageViewModel(
             onSuccess = { loaded ->
                 if (loaded == null) {
                     // Servidor sem a rota de detalhe, ou sessão fora da retenção.
-                    aggregatedDetail(deviceId, sessionId)
+                    aggregatedDetail(deviceId, sessionId, scopedAccountKey)
                 } else {
                     TeamSessionDetailUiState.Ready(
                         deviceId = deviceId,
                         sessionId = sessionId,
+                        accountKey = scopedAccountKey,
                         result = loaded
                     )
                 }
@@ -355,7 +489,8 @@ class TeamUsageViewModel(
                 TeamSessionDetailUiState.Error(
                     deviceId = deviceId,
                     sessionId = sessionId,
-                    message = error.message ?: UNKNOWN_ERROR_MESSAGE
+                    message = error.message ?: UNKNOWN_ERROR_MESSAGE,
+                    accountKey = scopedAccountKey
                 )
             }
         )
@@ -369,17 +504,23 @@ class TeamUsageViewModel(
      * explícito em vez de desenhar gráfico vazio. Só vira erro quando nem o
      * agregado existe — aí não há nada a apresentar.
      */
-    private fun aggregatedDetail(deviceId: String, sessionId: String): TeamSessionDetailUiState {
-        val summary = findSessionSummary(deviceId, sessionId)
+    private fun aggregatedDetail(
+        deviceId: String,
+        sessionId: String,
+        scopedAccountKey: String?
+    ): TeamSessionDetailUiState {
+        val summary = findSessionSummary(deviceId, sessionId, scopedAccountKey)
             ?: return TeamSessionDetailUiState.Error(
                 deviceId = deviceId,
                 sessionId = sessionId,
-                message = SESSION_GONE_MESSAGE
+                message = SESSION_GONE_MESSAGE,
+                accountKey = scopedAccountKey
             )
 
         return TeamSessionDetailUiState.Ready(
             deviceId = deviceId,
             sessionId = sessionId,
+            accountKey = scopedAccountKey,
             result = CliSessionDetailResult(
                 detail = CliSessionDetail(summary = summary, turns = emptyList()),
                 analytics = computeAnalytics.fromSummary(summary)
@@ -388,9 +529,15 @@ class TeamUsageViewModel(
         )
     }
 
-    private fun findSessionSummary(deviceId: String, sessionId: String): CliSessionSummary? {
+    private fun findSessionSummary(
+        deviceId: String,
+        sessionId: String,
+        scopedAccountKey: String?
+    ): CliSessionSummary? {
         val current = _uiState.value as? TeamUsageUiState.Success ?: return null
-        val member = current.members.firstOrNull { entry -> entry.deviceId == deviceId } ?: return null
+        val member = current.members.firstOrNull { entry ->
+            entry.deviceId == deviceId && entry.accountKey == scopedAccountKey
+        } ?: return null
         return member.sessions.firstOrNull { session -> session.sessionId == sessionId }
     }
 
@@ -398,6 +545,7 @@ class TeamUsageViewModel(
     private fun publishDetail(
         deviceId: String,
         sessionId: String,
+        scopedAccountKey: String?,
         detailState: TeamSessionDetailUiState
     ) {
         val current = _uiState.value
@@ -405,7 +553,14 @@ class TeamUsageViewModel(
             return
         }
         val open = current.detail
-        if (open == null || open.deviceId != deviceId || open.sessionId != sessionId) {
+        // A conta entra na comparação porque a visão global pode ter a mesma
+        // máquina em duas contas: sem ela a resposta de uma seria publicada no
+        // painel da outra.
+        if (open == null ||
+            open.deviceId != deviceId ||
+            open.sessionId != sessionId ||
+            open.accountKey != scopedAccountKey
+        ) {
             return
         }
         _uiState.value = current.copy(detail = detailState)

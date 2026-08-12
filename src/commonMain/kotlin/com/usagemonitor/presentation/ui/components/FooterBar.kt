@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +42,8 @@ import com.usagemonitor.presentation.ui.theme.AppShapes
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+
+const val FOOTER_ADMIN_OVERVIEW_TEST_TAG = "footerAdminOverview"
 
 @Composable
 fun FooterBar(
@@ -51,7 +55,15 @@ fun FooterBar(
     modifier: Modifier = Modifier,
     nowProvider: () -> Instant = { Clock.System.now() },
     countdownUpdatesEnabled: Boolean = true,
-    waitNextTick: suspend () -> Unit = { delay(1_000L) }
+    waitNextTick: suspend () -> Unit = { delay(1_000L) },
+    /**
+     * Abre a visão de todas as contas do servidor.
+     *
+     * `null` esconde o botão — é o estado de quem não administra, que é a
+     * maioria. O componente segue sem saber o que é modo admin: quem decide é o
+     * `Main`, a partir das configurações de time.
+     */
+    onOpenAdminOverview: (() -> Unit)? = null
 ) {
     val initialRemaining = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
     var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(initialRemaining) }
@@ -95,7 +107,8 @@ fun FooterBar(
                 language = language,
                 onRefresh = onRefresh,
                 onOpenSettings = onOpenSettings,
-                iconOnly = true
+                iconOnly = true,
+                onOpenAdminOverview = onOpenAdminOverview
             )
         }
     }
@@ -174,13 +187,32 @@ private fun FooterActionGroup(
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
     iconOnly: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenAdminOverview: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (onOpenAdminOverview != null) {
+            FooterIconActionButton(
+                label = if (language == AppLanguage.PT) {
+                    "Ver todas as contas do time"
+                } else {
+                    "View all team accounts"
+                },
+                onClick = onOpenAdminOverview,
+                testTag = FOOTER_ADMIN_OVERVIEW_TEST_TAG
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Groups,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+
         FooterIconActionButton(
             label = if (language == AppLanguage.PT) "Atualizar agora" else "Refresh now",
             onClick = onRefresh
@@ -222,6 +254,7 @@ private fun FooterActionGroup(
 private fun FooterIconActionButton(
     label: String,
     onClick: () -> Unit,
+    testTag: String? = null,
     content: @Composable () -> Unit
 ) {
     TooltipBox(
@@ -241,6 +274,7 @@ private fun FooterIconActionButton(
                 .semantics {
                     contentDescription = label
                 }
+                .let { base -> if (testTag == null) base else base.testTag(testTag) }
         ) {
             content()
         }

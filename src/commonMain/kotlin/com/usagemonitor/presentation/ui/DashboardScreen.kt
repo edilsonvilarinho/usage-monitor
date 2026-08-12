@@ -106,6 +106,8 @@ fun DashboardScreen(
     onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
     /** Perfis que participam do time; vazio esconde o botão de todos os cards. */
     teamEnabledProfileIds: Set<String> = emptySet(),
+    /** `null` esconde o botão de todas as contas — só quem administra o recebe. */
+    onOpenAdminOverview: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -151,7 +153,8 @@ fun DashboardScreen(
                 nextRefreshAt = nextRefreshAt,
                 onRefresh = { pendingRefreshAction = { viewModel.refresh() } },
                 onOpenSettings = onOpenSettings,
-                countdownUpdatesEnabled = countdownUpdatesEnabled
+                countdownUpdatesEnabled = countdownUpdatesEnabled,
+                onOpenAdminOverview = onOpenAdminOverview
             )
         },
         containerColor = MaterialTheme.colorScheme.background

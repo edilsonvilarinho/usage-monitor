@@ -44,11 +44,14 @@ curl http://localhost:3000/api/health
 
 ## Configuração
 
-Todas as variáveis estão documentadas em [`.env.example`](.env.example). As duas que importam:
+Todas as variáveis estão documentadas em [`.env.example`](.env.example).
 
 | Variável | Obrigatória | Default | Nota |
 |---|---|---|---|
-| `TEAM_API_KEY` | sim | — | Mínimo 32 caracteres. Boot falha abaixo disso. |
+| `TEAM_ADMIN_TOKEN` | ver nota | — | Mínimo 32 caracteres. Presente, monta `/api/admin/*` e vale como credencial de leitura de qualquer conta. |
+| `TEAM_KEY_SECRET` | com admin | — | Mínimo 32 caracteres. Cifra as chaves emitidas em repouso. |
+| `TEAM_API_KEY` | ver nota | — | Mínimo 32 caracteres. Chave única **legada**. |
+| `TEAM_LEGACY_KEY_MODE` | não | `open` | `open` mantém a chave legada lendo tudo; `off` a rejeita. |
 | `DATA_DIR` | não | `./data` | `/data` no container. |
 | `PORT` | não | `3000` | |
 | `TEAM_RETENTION_DAYS` | não | `45` | |
@@ -56,17 +59,49 @@ Todas as variáveis estão documentadas em [`.env.example`](.env.example). As du
 | `TRUST_PROXY_HOPS` | não | `0` | `1` atrás do Traefik do Dokploy. |
 | `LOG_LEVEL` | não | `info` | |
 
-Gerar a chave:
+**O boot falha se `TEAM_ADMIN_TOKEN` e `TEAM_API_KEY` estiverem ambos ausentes** — sem nenhum dos dois o servidor não teria como autenticar cliente nem como emitir a primeira chave.
+
+Gerar qualquer um dos segredos:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
+## Chaves por time
+
+Disponível a partir da versão **0.3.0**.
+
+Cada pessoa recebe uma chave própria, emitida pelo app desktop de quem administra. A chave nasce **sem conta** e se amarra à primeira conta Anthropic que ela usar num ingest. É o que permite emitir sem antes descobrir o `accountUuid` de ninguém — o app só expõe o e-mail da conta.
+
+Fluxo:
+
+1. No app do administrador: **Configurações → Integração com time** → ligar → informar o **servidor** → **Eu sou admin do servidor** → colar o `TEAM_ADMIN_TOKEN` → **Validar**. Não é preciso chave de time, apelido nem conta marcada: quem administra não participa necessariamente de nenhum time.
+2. **Configurar chaves das contas** → emitir uma chave por pessoa. O **rótulo** é texto livre (use o e-mail) e o servidor **não o verifica** — quem prova o vínculo é o `accountUuid` que aparece ao lado depois do primeiro envio.
+3. Entregar a chave à pessoa por canal fechado. Ela cola em **Chave do time** e marca a conta. O app confere na hora, por `GET /v1/verify`.
+4. Máquina logada em duas contas da empresa: subir `maxAccounts` daquela chave para `2`. A segunda conta se reivindica sozinha na passada seguinte.
+5. Depois que todos migrarem, definir `TEAM_LEGACY_KEY_MODE=off`. **É este passo que efetiva o isolamento.**
+
+**Uma conta pertence a no máximo uma chave**, garantido por índice único. Se a chave errada reivindicar a conta, use `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` (botão **Desvincular** no painel) para liberá-la.
+
+**Regerar** troca a chave crua mantendo os vínculos — serve para chave perdida ou vazada, e a antiga para de valer na requisição seguinte. **Revogar** tira o acesso e **não apaga** nada: remover histórico continua sendo `DELETE /api/v1/member`.
+
+O `label` é PII quando você digita um e-mail nele. Ele é gravado no banco por decisão de quem administra — **nenhum e-mail vem do cliente**.
+
 ## API
 
-Base `/api`. Todas as rotas exigem o header `x-team-key`, exceto o healthcheck.
+Base `/api`. Todas as rotas exigem credencial, exceto o healthcheck.
 
-A comparação da chave é em tempo constante (SHA-256 + `timingSafeEqual`).
+| Credencial | Header | Alcance |
+|---|---|---|
+| Chave de time | `x-team-key` | As contas daquela chave. Única aceita no ingest. |
+| Chave legada | `x-team-key` | Todas as contas, **enquanto** `TEAM_LEGACY_KEY_MODE=open`. |
+| Token de admin | `x-admin-token` | Todas as contas, **só leitura** — recusado no ingest. |
+
+O `x-admin-token` ser aceito nas rotas `/v1/*` é o que evita uma família `/admin/v1/team`, `/admin/v1/session` e `/admin/v1/member` paralela: é a mesma leitura, com outra credencial.
+
+A comparação da chave legada e do token de admin é em tempo constante (SHA-256 + `timingSafeEqual`). As chaves emitidas são localizadas por hash SHA-256 indexado — são 32 bytes aleatórios, sem prefixo a descobrir incrementalmente.
+
+Credencial válida para a conta errada devolve **`403` `forbidden_account`**, e não `401`: são consertos diferentes — conferir se copiou a chave certa, ou pedir ao administrador o vínculo certo.
 
 ### `GET /api/health`
 
@@ -221,9 +256,43 @@ Idempotente: um `deviceId` desconhecido devolve `200` com zeros.
 
 **Destrutivo e irreversível.** A máquina daquele `deviceId` já marcou os turnos como enviados no próprio marcador local e não os reenvia — o histórico dela não volta. A rota existe para o caso de duplicata: uma instalação que perdeu o `~/.usage-monitor/team.json` volta com outro `deviceId` e o antigo fica na lista, sem atividade, até a retenção recolhê-lo.
 
+### `GET /api/v1/verify`
+
+Disponível a partir da versão **0.3.0**. Responde se a chave apresentada cobre — ou pode cobrir — uma conta. **Não cria vínculo**: o vínculo continua nascendo só no ingest, porque uma rota de leitura que amarrasse conta permitiria adotar contas alheias varrendo `accountUuid`, sem nunca provar uso.
+
+| Query | Obrigatório |
+|---|---|
+| `accountKey` | sim |
+
+```jsonc
+{ "authorized": true, "claimed": false, "label": "fulano@empresa.com",
+  "maxAccounts": 1, "claimedAccounts": 0 }
+```
+
+`claimed: false` com `authorized: true` é o estado normal de quem acabou de colar a chave e ainda não sincronizou. Conta de outra chave, ou limite atingido, devolve `403`.
+
+### Rotas administrativas
+
+Disponíveis a partir da versão **0.3.0**, e **só quando `TEAM_ADMIN_TOKEN` está definida** — sem ela caem no `404` de rota desconhecida. Header `x-admin-token`.
+
+| Rota | Efeito |
+|---|---|
+| `GET /api/admin/v1/ping` | `{"status":"ok"}`. É o que o botão **Validar** do app chama. |
+| `GET /api/admin/v1/overview?since=` | Todas as contas: `{ accounts: [{ accountKey, label, members[], rows[] }] }`. Mesmo formato de `/v1/team`, uma entrada por conta. |
+| `POST /api/admin/v1/keys` | `{ label, maxAccounts? }` → `201` com a chave crua. |
+| `GET /api/admin/v1/keys` | Lista **com a chave crua**, mais `keyPrefix`, `maxAccounts`, `accounts[]` e as datas. |
+| `PATCH /api/admin/v1/keys/:id` | `{ label?, maxAccounts? }`. Teto abaixo do já reivindicado → `400`. |
+| `POST /api/admin/v1/keys/:id/regenerate` | Nova chave crua, vínculos mantidos, antiga invalidada na hora. |
+| `DELETE /api/admin/v1/keys/:id` | Revoga. **Não apaga dados.** |
+| `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` | Desfaz um vínculo errado. |
+
+Conta que entrou pela chave legada aparece no `overview` com `label: null` — existe nos dados e não tem chave dona.
+
+A chave crua vem no corpo do `GET` de propósito: o painel é a lista de "quem tem qual chave", e mostrá-la só na criação obrigaria o administrador a guardá-la fora do sistema ou a regerar a cada consulta. O preço está em [Modelo de segurança](#modelo-de-segurança).
+
 ### Erros
 
-`{ "error": "<mensagem>", "code": "<código>" }` com `400` (`validation_error`), `401` (`unauthorized`), `404` (`not_found`), `503` (`service_unavailable`) ou `500` (`internal_error`).
+`{ "error": "<mensagem>", "code": "<código>" }` com `400` (`validation_error`), `401` (`unauthorized`), `403` (`forbidden_account`), `404` (`not_found`), `503` (`service_unavailable`) ou `500` (`internal_error`).
 
 ## Retenção
 
@@ -231,11 +300,20 @@ Idempotente: um `deviceId` desconhecido devolve `200` com zeros.
 
 ## Modelo de segurança
 
-Chave **compartilhada** por todo o time, validada em tempo constante. O escopo de leitura é o `accountKey` que o cliente declara.
+O isolamento entre times vem das **chaves por conta**: cada chave só lê e escreve as contas que ela reivindicou, uma conta pertence a no máximo uma chave, e a autorização é conferida em toda rota.
 
-**Limite aceito e conhecido:** quem tem a chave pode consultar qualquer `accountUuid` que conheça. Não há prova de posse do token OAuth da conta. É adequado a um servidor interno; não exponha este serviço na internet aberta sem uma camada de rede na frente.
+**Enquanto `TEAM_LEGACY_KEY_MODE=open` esse isolamento não existe.** A chave legada de ambiente continua lendo qualquer `accountUuid` que se conheça, exatamente como antes. Emita as chaves, atualize os clientes e então mude para `off`.
 
-Trocar a chave invalida todos os clientes de uma vez — não há revogação individual por dispositivo.
+Limites aceitos e conhecidos:
+
+- **`TEAM_ADMIN_TOKEN` lê todas as contas.** É o objetivo — quem administra não participa dos times que administra — mas vazá-lo entrega o servidor inteiro. Não há rotação nem rate limit.
+- **`TEAM_KEY_SECRET` + banco entregam todas as chaves em claro.** É o preço de o painel poder re-exibir a chave depois de criada. Vazamento só do banco, sem o segredo, não expõe chave nenhuma.
+- **Janela de reivindicação.** Uma chave interceptada antes do primeiro uso pode ser amarrada à conta de quem a interceptou. É detectável — o time legítimo passa a receber `403` — e reversível pelo `DELETE .../accounts/:accountKey`. Confira no painel que o `accountUuid` reivindicado é o esperado.
+- **Não há prova de posse do token OAuth da conta.** A reivindicação prova uso, não propriedade.
+
+Adequado a um servidor interno; não exponha este serviço na internet aberta sem uma camada de rede na frente.
+
+Revogação é por chave, e portanto por pessoa. A chave legada continua sendo tudo ou nada: trocá-la invalida todos os clientes que ainda dependem dela.
 
 ## Docker
 
@@ -279,13 +357,19 @@ O `HEALTHCHECK` está no Dockerfile e no compose. O processo roda como `node` (u
 7. **Deploy.** Confira `GET https://<dominio>/api/health`.
 8. **Auto Deploy:** ative o webhook na branch `main` se quiser redeploy a cada push.
 
-**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. Um redeploy resolve; não há migração de banco entre 0.1.x e 0.2.0.
+**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. Um redeploy resolve.
+
+Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
 
 Rodando em **Docker Swarm**, mantenha **1 réplica**: o SQLite é um arquivo local e duas réplicas em nós diferentes veriam bancos distintos. Se o cluster tiver mais de um nó, fixe uma constraint de nó para o volume seguir o serviço.
 
 ### Configurar os clientes
 
-Em cada máquina, no app desktop: **Configurações → Integração com time** → ligar, informar a URL (`https://<dominio>`), colar a `TEAM_API_KEY`, definir o alias e marcar as contas Anthropic que participam.
+Em cada máquina, no app desktop: **Configurações → Integração com time** → ligar, informar a URL (`https://<dominio>`), colar a chave que o administrador emitiu, definir o alias e marcar as contas Anthropic que participam. O app confere o vínculo na hora e mostra a mensagem do servidor se a chave não cobrir a conta marcada.
+
+Quem administra acrescenta **Eu sou admin do servidor** e o `TEAM_ADMIN_TOKEN`. A partir daí ganha o botão de **todas as contas** na barra inferior do dashboard, que abre a tela de Sessões do time com as contas agrupadas.
+
+Nessa visão o recorte de **5h é deslizante**, e não ancorado no reset de quota: cada conta reseta numa hora diferente e ancorar numa delas daria um número que não corresponde a nenhuma. A tela avisa isso quando o filtro está em 5h.
 
 ## Inspecionar os dados
 

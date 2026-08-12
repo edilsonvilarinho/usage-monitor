@@ -6,12 +6,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.components.FOOTER_ADMIN_OVERVIEW_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.coroutines.channels.Channel
@@ -48,6 +51,57 @@ class FooterBarTest {
         onNodeWithText("02:05").assertIsDisplayed()
         onNodeWithContentDescription("Abrir configurações").assertIsDisplayed()
         onAllNodesWithText("Histórico").assertCountEquals(0)
+    }
+
+    @Test
+    fun `FooterBar esconde a visao de todas as contas sem callback`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
+                    )
+                }
+            }
+        }
+
+        // Quem não administra é a maioria: o botão nem existe.
+        onAllNodesWithTag(FOOTER_ADMIN_OVERVIEW_TEST_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun `FooterBar mostra e aciona a visao de todas as contas`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+        var opened = 0
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false,
+                        onOpenAdminOverview = { opened += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(FOOTER_ADMIN_OVERVIEW_TEST_TAG).performClick()
+
+        assertEquals(1, opened)
     }
 
     @Test

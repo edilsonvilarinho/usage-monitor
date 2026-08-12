@@ -25,17 +25,28 @@ sealed interface TeamUsageUiState {
         val rangeEndsAt: Instant? = null,
         /** `true` quando o corte veio do reset da quota, não do relógio. */
         val rangeAnchored: Boolean = false,
-        /** Conta Anthropic a que este time pertence. */
+        /** Conta Anthropic a que este time pertence; `null` na visão global. */
         val accountLabel: String? = null,
         /**
-         * Integrantes com a lista de sessões aberta.
+         * `true` quando a janela mostra todas as contas do servidor.
+         *
+         * A tela usa isto para agrupar por conta e para avisar que o recorte de
+         * 5h aqui é deslizante: contas diferentes resetam em horas diferentes, e
+         * ancorar numa delas daria um número que não corresponde a nenhuma.
+         */
+        val isAdminOverview: Boolean = false,
+        /**
+         * Integrantes com a lista de sessões aberta, por [TeamMemberUsage.memberKey].
          *
          * Mora no estado, e não num `remember` da tela, porque o laço ao vivo
          * republica o `Success` a cada poucos segundos — e `loadTeam` tem de
          * carregá-lo do estado anterior, ou os grupos abertos se fechariam
          * sozinhos a cada tique.
+         *
+         * A chave é o `memberKey` e não o `deviceId` porque a visão global mistura
+         * contas: a mesma máquina em duas delas expandiria as duas de uma vez.
          */
-        val expandedDeviceIds: Set<String> = emptySet(),
+        val expandedMemberKeys: Set<String> = emptySet(),
         /**
          * Quando o conteúdo mudou pela última vez.
          *
@@ -95,7 +106,54 @@ sealed interface TeamUsageUiState {
             }
             return member.totalTokens.toDouble() / total.toDouble()
         }
+
+        /**
+         * Integrantes agrupados por conta, na ordem em que a conta aparece.
+         *
+         * Fora da visão global sai um grupo só, com [accountKey] nulo, e a tela
+         * nem desenha cabeçalho — assim ela percorre uma estrutura única nos dois
+         * modos, em vez de ter dois laços que precisam concordar.
+         *
+         * A ordem dos grupos vem da lista já ordenada por consumo: a conta do
+         * integrante que mais gastou vem primeiro.
+         */
+        val memberGroups: List<TeamAccountGroup>
+            get() {
+                val grouped = LinkedHashMap<String?, MutableList<TeamMemberUsage>>()
+                for (member in members) {
+                    grouped.getOrPut(member.accountKey) { mutableListOf() }.add(member)
+                }
+                return grouped.map { (accountKey, groupMembers) ->
+                    TeamAccountGroup(
+                        accountKey = accountKey,
+                        accountLabel = groupMembers.firstNotNullOfOrNull { it.accountLabel },
+                        members = groupMembers
+                    )
+                }
+            }
     }
+}
+
+/**
+ * Uma conta e os integrantes dela dentro da lista.
+ *
+ * [accountLabel] é o rótulo que o administrador digitou ao emitir a chave —
+ * costuma ser o e-mail da pessoa, mas o servidor não o verifica. Quando é nulo a
+ * conta não tem chave emitida e só o [accountKey] a identifica.
+ */
+data class TeamAccountGroup(
+    val accountKey: String?,
+    val accountLabel: String?,
+    val members: List<TeamMemberUsage>
+) {
+    val totalTokens: Long
+        get() = members.sumOf { member -> member.totalTokens }
+
+    val totalCostMicros: Long
+        get() = members.sumOf { member -> member.totalCostMicros }
+
+    val activeMemberCount: Int
+        get() = members.count { member -> member.hasActivity }
 }
 
 /**
@@ -110,20 +168,32 @@ sealed interface TeamSessionDetailUiState {
     val deviceId: String
     val sessionId: String
 
+    /**
+     * Conta da sessão aberta; `null` no modal de uma conta só.
+     *
+     * Compõe a identidade do painel junto com `(deviceId, sessionId)`: na visão
+     * global a mesma máquina pode aparecer em duas contas, e sem isto a resposta
+     * de uma delas seria publicada no painel da outra.
+     */
+    val accountKey: String?
+
     data class Loading(
         override val deviceId: String,
-        override val sessionId: String
+        override val sessionId: String,
+        override val accountKey: String? = null
     ) : TeamSessionDetailUiState
 
     data class Error(
         override val deviceId: String,
         override val sessionId: String,
-        val message: String
+        val message: String,
+        override val accountKey: String? = null
     ) : TeamSessionDetailUiState
 
     data class Ready(
         override val deviceId: String,
         override val sessionId: String,
+        override val accountKey: String? = null,
         val result: CliSessionDetailResult,
         /**
          * `true` quando o servidor não devolveu os turnos — versão anterior à

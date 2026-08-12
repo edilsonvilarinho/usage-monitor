@@ -56,6 +56,36 @@ class LocalTeamSettingsDataSourceTest {
     }
 
     @Test
+    fun `guarda o token de administracao`() {
+        withSettingsFile { file ->
+            val dataSource = LocalTeamSettingsDataSource(file)
+
+            dataSource.save(dataSource.load().copy(adminToken = "  token-de-admin  "))
+
+            val reloaded = dataSource.load()
+            assertEquals("token-de-admin", reloaded.adminToken)
+            // Administrar não exige participar de time: o token sozinho não pode
+            // fazer a integração parecer configurada.
+            assertEquals(false, reloaded.isConfigured)
+        }
+    }
+
+    @Test
+    fun `arquivo sem o campo de admin continua legivel`() {
+        withSettingsFile { file ->
+            file.writeText(
+                """{"enabled":true,"serverUrl":"https://time.empresa.com",""" +
+                    """"apiKey":"k","alias":"edilson","deviceId":"device-1"}"""
+            )
+
+            val loaded = LocalTeamSettingsDataSource(file).load()
+
+            assertEquals("device-1", loaded.deviceId)
+            assertEquals("", loaded.adminToken)
+        }
+    }
+
+    @Test
     fun `arquivo ilegivel vai para corrupt em vez de ser sobrescrito`() {
         withSettingsFile { file ->
             val previousDeviceId = LocalTeamSettingsDataSource(file).load().deviceId

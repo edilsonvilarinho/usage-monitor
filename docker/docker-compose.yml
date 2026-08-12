@@ -10,8 +10,15 @@ services:
       - "${PORT:-3000}:3000"
     environment:
       DATA_DIR: /data
-      # Sem a chave o boot falha de proposito — nao existe modo aberto.
-      TEAM_API_KEY: ${TEAM_API_KEY:?TEAM_API_KEY obrigatoria (minimo 32 caracteres)}
+      # Sem nenhum segredo o boot falha de proposito — nao existe modo aberto.
+      # TEAM_ADMIN_TOKEN e o caminho recomendado: e ele que permite emitir chaves
+      # por conta pelo app. A chave unica abaixo e o modo legado.
+      TEAM_ADMIN_TOKEN: ${TEAM_ADMIN_TOKEN:-}
+      TEAM_KEY_SECRET: ${TEAM_KEY_SECRET:-}
+      TEAM_API_KEY: ${TEAM_API_KEY:-}
+      # open (default) mantem a chave legada lendo todas as contas; off a rejeita
+      # e deixa valendo so as chaves emitidas por conta.
+      TEAM_LEGACY_KEY_MODE: ${TEAM_LEGACY_KEY_MODE:-open}
       TEAM_RETENTION_DAYS: ${TEAM_RETENTION_DAYS:-45}
       TEAM_MAX_TURNS_PER_REQUEST: ${TEAM_MAX_TURNS_PER_REQUEST:-5000}
       # 1 quando ha exatamente um proxy reverso na frente (caso do Dokploy).

@@ -156,7 +156,7 @@ private fun recordTour(recorder: TourRecorder, state: TourState) {
     recorder.moveCursor(state, x = 300.dp, y = 218.dp, durationMillis = 400)
     recorder.click(state) {
         state.teamState = state.teamState.copy(
-            expandedDeviceIds = setOf(ScreenshotFixtures.LOCAL_DEVICE_ID)
+            expandedMemberKeys = setOf(ScreenshotFixtures.LOCAL_DEVICE_ID)
         )
     }
     recorder.animate(400) {}

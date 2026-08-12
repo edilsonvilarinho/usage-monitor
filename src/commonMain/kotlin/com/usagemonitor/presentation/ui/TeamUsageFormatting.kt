@@ -40,6 +40,36 @@ internal object TeamUsageLabels {
         return CliSessionsLabels.sessionCount(count, language)
     }
 
+    fun allAccounts(count: Int, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            if (count == 1) "Todas as contas (1)" else "Todas as contas ($count)"
+        } else {
+            if (count == 1) "All accounts (1)" else "All accounts ($count)"
+        }
+    }
+
+    /** Conta que ainda não tem chave emitida — só o uuid a identifica. */
+    fun unlabeledAccount(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Conta sem chave" else "Account without key"
+    }
+
+    /**
+     * Aviso do recorte de 5h na visão global.
+     *
+     * Sem ele o número diverge do que cada pessoa vê no próprio modal, e a
+     * diferença parece defeito: lá a janela começa no reset de quota da conta,
+     * aqui ela não pode começar no reset de nenhuma, porque são várias.
+     */
+    fun slidingWindowNotice(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Nesta visão o recorte de 5h é deslizante: cada conta reseta a quota " +
+                "numa hora diferente, então os números podem não bater com o modal de uma conta."
+        } else {
+            "In this view the 5h range is sliding: each account resets its quota at a " +
+                "different time, so numbers may differ from a single-account modal."
+        }
+    }
+
     fun columnShare(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "do time" else "of team"
     }

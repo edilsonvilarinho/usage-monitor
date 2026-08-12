@@ -51,7 +51,19 @@ data class TeamMemberUsage(
     val hostName: String? = null,
     val organizationName: String? = null,
     val lastSeenAt: Instant? = null,
-    val sessions: List<CliSessionSummary> = emptyList()
+    val sessions: List<CliSessionSummary> = emptyList(),
+    /**
+     * Conta a que este integrante pertence.
+     *
+     * `null` no modal de uma conta só, onde a conta é a da janela inteira e
+     * repeti-la em cada integrante seria ruído. Preenchido na visão global do
+     * administrador, que mistura contas na mesma lista — e é dele que saem o
+     * agrupamento na tela e o escopo do detalhe e da remoção, já que ali não
+     * existe "a conta da janela".
+     */
+    val accountKey: String? = null,
+    /** Rótulo da conta; `null` quando ela não tem chave emitida. */
+    val accountLabel: String? = null
 ) {
     val sessionCount: Int
         get() = sessions.size
@@ -91,6 +103,17 @@ data class TeamMemberUsage(
     /** Rótulo da máquina para a lista; cai no alias quando o host é desconhecido. */
     val machineLabel: String
         get() = hostName?.takeIf { it.isNotBlank() } ?: alias
+
+    /**
+     * Identidade desta linha na tela.
+     *
+     * O `deviceId` sozinho não serve na visão global: a mesma máquina logada em
+     * duas contas da empresa aparece duas vezes, com o mesmo `deviceId` e
+     * números diferentes. Usá-lo como chave faria as duas linhas expandirem
+     * juntas e a remoção acertar a conta errada.
+     */
+    val memberKey: String
+        get() = if (accountKey == null) deviceId else "$accountKey/$deviceId"
 }
 
 /** Resposta do servidor já dobrada em sessões e agrupada por integrante. */

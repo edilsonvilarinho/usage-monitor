@@ -19,7 +19,16 @@ data class TeamIntegrationSettings(
     val alias: String = "",
     /** UUID gerado uma vez por instalação; separa duas máquinas do mesmo alias. */
     val deviceId: String = "",
-    val participatingProfileIds: Set<String> = emptySet()
+    val participatingProfileIds: Set<String> = emptySet(),
+    /**
+     * Token de administração do servidor, opcional.
+     *
+     * Quem administra não é necessariamente integrante de nenhuma conta: o token
+     * dá acesso de leitura a todas elas e à emissão de chaves, e por isso vive
+     * fora de [isConfigured] — exigir apelido e chave de time para administrar
+     * obrigaria o admin a se inscrever num time do qual ele não participa.
+     */
+    val adminToken: String = ""
 ) {
     /** Sem a barra final, para concatenar o caminho sem gerar `//`. */
     val normalizedServerUrl: String
@@ -34,6 +43,15 @@ data class TeamIntegrationSettings(
     /** Ligada e com tudo o que a chamada de rede precisa. */
     val isActive: Boolean
         get() = enabled && isConfigured
+
+    /**
+     * Ligada e com token de administração informado.
+     *
+     * Deliberadamente independente de [isActive]: administrar e sincronizar são
+     * caminhos separados, e a mesma instalação pode fazer só um dos dois.
+     */
+    val isAdminMode: Boolean
+        get() = enabled && normalizedServerUrl.isNotEmpty() && adminToken.isNotBlank()
 
     /** `true` quando o perfil participa do time e a integração está utilizável. */
     fun participates(profileId: String?): Boolean {

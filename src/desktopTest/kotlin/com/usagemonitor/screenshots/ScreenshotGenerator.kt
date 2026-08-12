@@ -294,7 +294,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
                 rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
                 rangeAnchored = true,
                 accountLabel = "dev@example.com — Example Org",
-                expandedDeviceIds = setOf("device-a1"),
+                expandedMemberKeys = setOf("device-a1"),
                 lastChangedAt = ScreenshotFixtures.NOW
             ),
             language = AppLanguage.PT,

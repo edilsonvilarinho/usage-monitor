@@ -1,24 +1,36 @@
 import { Router } from 'express';
 import type { Config } from '../../config.js';
 import { NotFoundError, ValidationError } from '../../domain/errors.js';
+import type { TeamKeyRepository } from '../../repositories/teamKeyRepository.js';
 import type { TeamRepository } from '../../repositories/teamRepository.js';
 import { logger } from '../../logger.js';
-import { requireTeamKey } from '../auth.js';
+import { requireTeamAccess, type AccessDeps } from '../access.js';
 import { deleteMemberQuerySchema, sessionQuerySchema, teamQuerySchema } from '../dto.js';
 import { wrap } from '../errorHandler.js';
 
 export interface TeamRouterDeps {
   config: Config;
   repository: TeamRepository;
+  keyRepository: TeamKeyRepository;
+  now: () => number;
 }
+
+/** A conta alvo destas rotas vem sempre da query. */
+const accountFromQuery = (req: { query: Record<string, unknown> }): unknown => req.query.accountKey;
 
 export function createTeamRouter(deps: TeamRouterDeps): Router {
   const router = Router();
+  const access: AccessDeps = {
+    config: deps.config,
+    keyRepository: deps.keyRepository,
+    now: deps.now,
+  };
 
   router.get(
     '/v1/team',
-    requireTeamKey(
-      deps.config.teamApiKey,
+    requireTeamAccess(
+      access,
+      accountFromQuery,
       wrap((req, res) => {
         const parsed = teamQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -52,8 +64,9 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
    */
   router.get(
     '/v1/session',
-    requireTeamKey(
-      deps.config.teamApiKey,
+    requireTeamAccess(
+      access,
+      accountFromQuery,
       wrap((req, res) => {
         const parsed = sessionQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -88,8 +101,9 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
    */
   router.delete(
     '/v1/member',
-    requireTeamKey(
-      deps.config.teamApiKey,
+    requireTeamAccess(
+      access,
+      accountFromQuery,
       wrap((req, res) => {
         const parsed = deleteMemberQuerySchema.safeParse(req.query);
         if (!parsed.success) {

@@ -142,6 +142,70 @@ data class TeamSessionDetailResponseDto(
     val turns: List<TeamTurnRowDto> = emptyList()
 )
 
+/** Resposta de `GET /api/v1/verify`. */
+@Serializable
+data class TeamVerificationDto(
+    val authorized: Boolean = false,
+    val claimed: Boolean = false,
+    val label: String? = null,
+    val maxAccounts: Int = 0,
+    val claimedAccounts: Int = 0
+)
+
+/**
+ * Chave de time nas rotas administrativas.
+ *
+ * `key` vem crua: o painel é a lista de "quem tem qual chave", e o servidor a
+ * guarda cifrada justamente para poder devolvê-la aqui.
+ */
+@Serializable
+data class TeamKeyDto(
+    val id: String,
+    val label: String = "",
+    val key: String = "",
+    val keyPrefix: String = "",
+    val maxAccounts: Int = 1,
+    val accounts: List<String> = emptyList(),
+    val createdAt: Long? = null,
+    val revokedAt: Long? = null,
+    val lastUsedAt: Long? = null
+)
+
+@Serializable
+data class TeamKeyListDto(
+    val keys: List<TeamKeyDto> = emptyList()
+)
+
+@Serializable
+data class CreateTeamKeyRequestDto(
+    val label: String,
+    val maxAccounts: Int = 1
+)
+
+/**
+ * Campos nulos são omitidos na serialização por default do kotlinx, e é disso
+ * que o `PATCH` parcial depende: mandar `label: null` reescreveria o rótulo.
+ */
+@Serializable
+data class UpdateTeamKeyRequestDto(
+    val label: String? = null,
+    val maxAccounts: Int? = null
+)
+
+/** Uma conta dentro de `GET /api/admin/v1/overview`. */
+@Serializable
+data class TeamAccountSnapshotDto(
+    val accountKey: String,
+    val label: String? = null,
+    val members: List<TeamMemberRowDto> = emptyList(),
+    val rows: List<TeamUsageRowDto> = emptyList()
+)
+
+@Serializable
+data class TeamOverviewDto(
+    val accounts: List<TeamAccountSnapshotDto> = emptyList()
+)
+
 /** Corpo de erro do servidor: `{ "error": "...", "code": "..." }`. */
 @Serializable
 data class TeamErrorDto(

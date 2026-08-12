@@ -12,8 +12,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -33,6 +38,10 @@ const val TEAM_SECTION_TEST_TAG = "teamIntegrationSection"
 const val TEAM_ENABLE_SWITCH_TEST_TAG = "teamIntegrationEnableSwitch"
 const val TEAM_TEST_CONNECTION_TEST_TAG = "teamIntegrationTestConnection"
 const val TEAM_ALIAS_FIELD_TEST_TAG = "teamIntegrationAliasField"
+const val TEAM_ADMIN_SWITCH_TEST_TAG = "teamIntegrationAdminSwitch"
+const val TEAM_ADMIN_VALIDATE_TEST_TAG = "teamIntegrationAdminValidate"
+const val TEAM_ADMIN_KEYS_TEST_TAG = "teamIntegrationAdminKeys"
+const val TEAM_ADMIN_EXIT_TEST_TAG = "teamIntegrationAdminExit"
 
 /**
  * Seção "Integração com time" das Configurações.
@@ -58,7 +67,13 @@ fun TeamIntegrationSection(
     onAliasChange: (String) -> Unit,
     onProfileParticipationChange: (String, Boolean) -> Unit,
     onTestConnection: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Resultado da última validação do token; separado do teste da chave de time. */
+    adminConnection: TeamConnectionUiState = TeamConnectionUiState(),
+    onAdminTokenChange: (String) -> Unit = {},
+    onValidateAdminToken: () -> Unit = {},
+    onOpenKeysManager: () -> Unit = {},
+    onExitAdminMode: () -> Unit = {}
 ) {
     val isPt = language == AppLanguage.PT
 
@@ -193,6 +208,137 @@ fun TeamIntegrationSection(
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+
+        TeamAdminBlock(
+            settings = settings,
+            isPt = isPt,
+            connection = adminConnection,
+            onAdminTokenChange = onAdminTokenChange,
+            onValidateAdminToken = onValidateAdminToken,
+            onOpenKeysManager = onOpenKeysManager,
+            onExitAdminMode = onExitAdminMode
+        )
+    }
+}
+
+/**
+ * Bloco "Eu sou admin".
+ *
+ * Fica abaixo dos campos de participação de propósito, e não depende deles:
+ * quem administra o servidor não é necessariamente integrante de nenhuma conta,
+ * então basta servidor e token para o bloco funcionar — sem chave de time, sem
+ * apelido e sem conta marcada.
+ *
+ * A marca de "validado" não é persistida: o botão de gerenciar chaves aparece
+ * assim que há token gravado, e uma credencial que deixou de valer se denuncia
+ * na primeira chamada, com a mensagem do servidor.
+ */
+@Composable
+private fun TeamAdminBlock(
+    settings: TeamIntegrationSettings,
+    isPt: Boolean,
+    connection: TeamConnectionUiState,
+    onAdminTokenChange: (String) -> Unit,
+    onValidateAdminToken: () -> Unit,
+    onOpenKeysManager: () -> Unit,
+    onExitAdminMode: () -> Unit
+) {
+    var adminExpanded by remember(settings.adminToken.isNotBlank()) {
+        mutableStateOf(settings.adminToken.isNotBlank())
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (isPt) "Eu sou admin do servidor" else "I administer the server",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            checked = adminExpanded,
+            onCheckedChange = { checked ->
+                adminExpanded = checked
+                if (!checked) {
+                    onExitAdminMode()
+                }
+            },
+            modifier = Modifier.testTag(TEAM_ADMIN_SWITCH_TEST_TAG)
+        )
+    }
+
+    if (!adminExpanded) {
+        return
+    }
+
+    Text(
+        text = if (isPt) {
+            "O token de administração dá acesso de leitura a todas as contas do servidor e " +
+                "permite emitir chaves. Não é preciso participar de nenhum time."
+        } else {
+            "The admin token grants read access to every account on the server and allows " +
+                "issuing keys. You do not need to belong to any team."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    DebouncedSecretField(
+        value = settings.adminToken,
+        label = if (isPt) "Token de administração" else "Admin token",
+        revealLabel = if (isPt) "Mostrar token" else "Show token",
+        hideLabel = if (isPt) "Ocultar token" else "Hide token",
+        onCommit = onAdminTokenChange
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Button(
+            onClick = onValidateAdminToken,
+            enabled = settings.isAdminMode && connection.status != TeamConnectionUiStatus.CHECKING,
+            modifier = Modifier.testTag(TEAM_ADMIN_VALIDATE_TEST_TAG)
+        ) {
+            Text(if (isPt) "Validar" else "Validate")
+        }
+
+        Button(
+            onClick = onOpenKeysManager,
+            enabled = settings.isAdminMode,
+            modifier = Modifier.testTag(TEAM_ADMIN_KEYS_TEST_TAG)
+        ) {
+            Text(if (isPt) "Configurar chaves das contas" else "Manage account keys")
+        }
+
+        if (connection.status == TeamConnectionUiStatus.CHECKING) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        }
+    }
+
+    val adminMessage = connection.message
+    if (adminMessage != null) {
+        Text(
+            text = adminMessage,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (connection.status == TeamConnectionUiStatus.FAILED) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            }
+        )
+    }
+
+    if (settings.adminToken.isNotBlank()) {
+        TextButton(
+            onClick = onExitAdminMode,
+            modifier = Modifier.testTag(TEAM_ADMIN_EXIT_TEST_TAG)
+        ) {
+            Text(if (isPt) "Sair do modo admin" else "Leave admin mode")
         }
     }
 }

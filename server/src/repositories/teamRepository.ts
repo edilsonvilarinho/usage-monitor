@@ -76,6 +76,13 @@ export interface TeamSnapshot {
   rows: TeamUsageRow[];
 }
 
+/** Uma conta dentro da visao global do admin. */
+export interface TeamAccountSnapshot extends TeamSnapshot {
+  accountKey: string;
+  /** Rotulo da chave dona da conta, ou `null` para conta sem chave emitida. */
+  label: string | null;
+}
+
 /** Identificacao da sessao pedida, com a maquina que a reportou. */
 export interface TeamSessionRow {
   deviceId: string;
@@ -218,6 +225,47 @@ JOIN team_sessions s
 WHERE t.account_key = @accountKey
   AND (@since IS NULL OR t.ts >= @since)
 GROUP BY s.device_id, t.session_id, t.model
+ORDER BY MAX(t.ts) DESC
+`;
+
+/**
+ * Mesmas duas consultas acima, sem o recorte por conta.
+ *
+ * Existem para a visao global do admin. Nao da para reaproveitar as de cima com
+ * um `@accountKey` nulo: o `WHERE account_key = @accountKey` deixaria de casar
+ * com tudo e passaria a casar com nada. O `account_key` sobe para o `SELECT` e
+ * para o `GROUP BY`, e quem separa as contas e o agrupamento em memoria.
+ */
+const SELECT_ALL_MEMBERS_SQL = `
+SELECT account_key AS accountKey, device_id AS deviceId, alias, host_name AS hostName,
+       organization_uuid AS organizationUuid, organization_name AS organizationName,
+       last_seen_at AS lastSeenAt
+FROM team_members
+ORDER BY alias COLLATE NOCASE ASC
+`;
+
+const SELECT_ALL_USAGE_SQL = `
+SELECT t.account_key AS accountKey,
+       s.device_id AS deviceId,
+       t.session_id AS sessionId,
+       s.cwd AS cwd,
+       s.git_branch AS gitBranch,
+       s.live_context_tokens AS liveContextTokens,
+       s.live_context_model AS liveContextModel,
+       t.model AS model,
+       COUNT(*) AS turnCount,
+       MIN(t.ts) AS firstTs,
+       MAX(t.ts) AS lastTs,
+       SUM(t.input_tokens) AS inputTokens,
+       SUM(t.output_tokens) AS outputTokens,
+       SUM(t.cache_read_tokens) AS cacheReadTokens,
+       SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+FROM team_turns t
+JOIN team_sessions s
+  ON s.account_key = t.account_key AND s.session_id = t.session_id
+WHERE (@since IS NULL OR t.ts >= @since)
+GROUP BY t.account_key, s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
 `;
 
@@ -394,6 +442,55 @@ export class TeamRepository {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
     const rows = this.db.prepare(SELECT_USAGE_SQL).all({ accountKey, since }) as TeamUsageRow[];
     return { members, rows };
+  }
+
+  /**
+   * Todas as contas de uma vez, para a visao global do admin.
+   *
+   * Duas consultas e o agrupamento em memoria, em vez de uma consulta por conta:
+   * o numero de contas de um servidor interno e pequeno, mas o laco viraria N+1
+   * e cresceria justamente no cenario que a tela existe para atender.
+   *
+   * Uma conta que so tem membro e nenhum turno na janela continua aparecendo,
+   * com `rows` vazia — e a mesma promessa de `readTeam`, onde quem nao consumiu
+   * e informacao e nao ruido.
+   */
+  readOverview(since: number | null, labels: Map<string, string>): TeamAccountSnapshot[] {
+    const memberRows = this.db.prepare(SELECT_ALL_MEMBERS_SQL).all() as Array<
+      TeamMemberRow & { accountKey: string }
+    >;
+    const usageRows = this.db.prepare(SELECT_ALL_USAGE_SQL).all({ since }) as Array<
+      TeamUsageRow & { accountKey: string }
+    >;
+
+    const byAccount = new Map<string, TeamAccountSnapshot>();
+
+    const ensure = (accountKey: string): TeamAccountSnapshot => {
+      const existing = byAccount.get(accountKey);
+      if (existing !== undefined) {
+        return existing;
+      }
+      const created: TeamAccountSnapshot = {
+        accountKey,
+        label: labels.get(accountKey) ?? null,
+        members: [],
+        rows: [],
+      };
+      byAccount.set(accountKey, created);
+      return created;
+    };
+
+    for (const row of memberRows) {
+      const { accountKey, ...member } = row;
+      ensure(accountKey).members.push(member);
+    }
+
+    for (const row of usageRows) {
+      const { accountKey, ...usage } = row;
+      ensure(accountKey).rows.push(usage);
+    }
+
+    return [...byAccount.values()];
   }
 
   /**

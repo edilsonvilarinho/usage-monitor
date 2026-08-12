@@ -7,7 +7,9 @@
 # `build/` do Gradle (com o runtime Java embutido) iria junto.
 #
 # Configurar no Dokploy:
-#   - Env vars: TEAM_API_KEY (obrigatoria, min. 32 chars), TRUST_PROXY_HOPS=1
+#   - Env vars: TEAM_ADMIN_TOKEN + TEAM_KEY_SECRET (min. 32 chars cada) para
+#     emitir chaves por conta pelo app; ou TEAM_API_KEY para o modo legado de
+#     chave unica. Pelo menos um dos dois caminhos e obrigatorio. TRUST_PROXY_HOPS=1
 #   - Persistent volume: <vol> -> /data
 #   - Port: 3000
 #

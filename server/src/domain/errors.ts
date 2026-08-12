@@ -27,6 +27,19 @@ export class UnauthorizedError extends DomainError {
 }
 
 /**
+ * Credencial valida, mas nao para a conta pedida.
+ *
+ * Separado de [UnauthorizedError] de proposito: 401 diz "sua chave nao vale" e
+ * leva o usuario a conferir se copiou certo; 403 diz "sua chave vale, mas nao
+ * cobre esta conta", que e outro conserto — pedir ao admin o vinculo certo.
+ */
+export class ForbiddenError extends DomainError {
+  constructor(message = 'Chave de time nao autorizada para esta conta.') {
+    super(message, 'forbidden_account');
+  }
+}
+
+/**
  * Recurso pedido nao existe dentro do escopo da conta.
  *
  * Mesmo `code` que o handler de rota desconhecida ja usa: para o cliente, uma
