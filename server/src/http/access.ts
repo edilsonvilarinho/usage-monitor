@@ -136,10 +136,42 @@ function authorize(
     if (claimed) {
       return { keyId: resolved.id, kind: 'team-key' };
     }
-    throw new ForbiddenError('Esta conta ja pertence a outra chave de time.');
+    throw new ForbiddenError(OTHER_KEY_MESSAGE);
   }
 
-  throw new ForbiddenError();
+  throw new ForbiddenError(describeRefusal(deps, resolved, accountKey));
+}
+
+export const OTHER_KEY_MESSAGE = 'Esta conta ja pertence a outra chave de time.';
+
+export const NOT_CLAIMED_MESSAGE =
+  'Esta conta ainda nao foi vinculada a esta chave. O vinculo nasce no primeiro envio: ' +
+  'use "Testar conexao" nas Configuracoes para vincular agora.';
+
+export const MAX_ACCOUNTS_MESSAGE =
+  'Esta chave ja atingiu o limite de contas. Peca ao administrador para aumentar o limite ' +
+  'ou emitir outra chave.';
+
+/**
+ * Explica **por que** a leitura foi recusada.
+ *
+ * Os tres casos tem consertos diferentes e a mensagem generica anterior nao
+ * distinguia nenhum deles: quem colou a chave certa e ainda nao sincronizou lia
+ * o mesmo texto de quem colou a chave de outra pessoa.
+ */
+function describeRefusal(
+  deps: AccessDeps,
+  resolved: { id: string; maxAccounts: number; accounts: string[] },
+  accountKey: string,
+): string {
+  const owner = deps.keyRepository.ownerOf(accountKey);
+  if (owner !== null && owner !== resolved.id) {
+    return OTHER_KEY_MESSAGE;
+  }
+  if (resolved.accounts.length >= resolved.maxAccounts) {
+    return MAX_ACCOUNTS_MESSAGE;
+  }
+  return NOT_CLAIMED_MESSAGE;
 }
 
 function readAccountKey(value: unknown): string | null {

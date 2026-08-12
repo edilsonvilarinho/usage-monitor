@@ -79,6 +79,11 @@ export const verifyQuerySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
 });
 
+/** Mesmo escopo do verify, mas no corpo: `POST /v1/claim` cria vinculo. */
+export const claimBodySchema = z.object({
+  accountKey: z.string().min(1).max(TEXT_MAX),
+});
+
 /** Recorte opcional da visao global. Mesma semantica do `since` de `/v1/team`. */
 export const overviewQuerySchema = z.object({
   since: z.coerce.number().int().nonnegative().optional(),

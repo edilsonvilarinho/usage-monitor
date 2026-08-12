@@ -45,4 +45,13 @@ interface TeamAdminRepository {
      * verificação de credencial — mas usa a chave de time, não o token de admin.
      */
     suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification>
+
+    /**
+     * Amarra a conta à chave de time configurada. Idempotente.
+     *
+     * Diferente de [verifyKeyForAccount], que só informa: esta é a ação que
+     * resolve. O vínculo antes só nascia dentro de um envio de turnos, e uma
+     * máquina sem turno pendente nunca o criava.
+     */
+    suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification>
 }

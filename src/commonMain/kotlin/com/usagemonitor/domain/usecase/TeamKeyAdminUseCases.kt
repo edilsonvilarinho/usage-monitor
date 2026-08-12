@@ -102,3 +102,17 @@ class VerifyTeamKeyForAccountUseCase(
     suspend operator fun invoke(accountKey: String): Result<TeamKeyVerification> =
         repository.verifyKeyForAccount(accountKey)
 }
+
+/**
+ * Amarra a conta à chave configurada, e é o que o "Testar conexão" dispara.
+ *
+ * Verificar sem vincular deixava o usuário num beco: o botão aprovava a chave e
+ * a tela do time recusava a leitura, porque o vínculo só nascia num envio de
+ * turnos que numa máquina já sincronizada nunca acontecia.
+ */
+class ClaimTeamKeyForAccountUseCase(
+    private val repository: TeamAdminRepository
+) {
+    suspend operator fun invoke(accountKey: String): Result<TeamKeyVerification> =
+        repository.claimKeyForAccount(accountKey)
+}

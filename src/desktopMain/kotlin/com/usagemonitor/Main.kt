@@ -75,8 +75,8 @@ import com.usagemonitor.domain.usecase.RegenerateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.RevokeTeamKeyUseCase
 import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
 import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
+import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
-import com.usagemonitor.domain.usecase.VerifyTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
@@ -436,8 +436,8 @@ fun main() = application {
     val validateAdminToken = remember(teamAdminRepository) {
         ValidateAdminTokenUseCase(teamAdminRepository)
     }
-    val verifyTeamKeyForAccount = remember(teamAdminRepository) {
-        VerifyTeamKeyForAccountUseCase(teamAdminRepository)
+    val claimTeamKeyForAccount = remember(teamAdminRepository) {
+        ClaimTeamKeyForAccountUseCase(teamAdminRepository)
     }
     // O envio roda com a janela do time fechada: se dependesse dela, o consumo de
     // quem nunca abre a tela nunca chegaria aos colegas.
@@ -664,6 +664,7 @@ fun main() = application {
     var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var teamAdminConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var isTeamKeysOpen by remember { mutableStateOf(false) }
+    val teamSyncStatus by teamSyncService.syncStatus.collectAsState()
     val teamScope = rememberCoroutineScope()
 
     /**
@@ -708,7 +709,10 @@ fun main() = application {
                 val label = profileUiModels.firstOrNull { profile -> profile.id == target.profileId }
                     ?.label
                     ?: target.profileId
-                val result = verifyTeamKeyForAccount(target.accountKey)
+                // Vincula, e não apenas confere: o vínculo antes só nascia dentro
+                // de um envio de turnos, então numa máquina já sincronizada ele
+                // nunca acontecia e a leitura ficava recusada indefinidamente.
+                val result = claimTeamKeyForAccount(target.accountKey)
                 val error = result.exceptionOrNull()
                 if (error != null) {
                     failures += "$label: ${error.message.orEmpty()}"
@@ -725,9 +729,9 @@ fun main() = application {
                 TeamConnectionUiState(
                     status = TeamConnectionUiStatus.OK,
                     message = if (language == AppLanguage.PT) {
-                        "Conexão OK e chave válida para as contas marcadas."
+                        "Conexão OK e conta vinculada a esta chave."
                     } else {
-                        "Connection OK and key valid for the selected accounts."
+                        "Connection OK and account linked to this key."
                     }
                 )
             } else {
@@ -1208,11 +1212,15 @@ fun main() = application {
                                 teamSettingsDataSource
                             ) { current -> current.copy(apiKey = key) }
                             reportSettingsSave(SettingsField.TEAM_KEY, saved)
-                            // Confere na hora: uma chave que não cobre a conta
+                            // Vincula na hora: uma chave que não cobre a conta
                             // marcada faria o envio falhar em silêncio a cada 30s,
                             // e o usuário só descobriria pela ausência dos dados.
                             if (saved) {
                                 checkTeamConnection()
+                                // A identidade tem de sair com a chave nova, senão
+                                // o servidor continua sem saber a quem ela pertence
+                                // até surgir turno novo no Claude Code.
+                                teamSyncService.requestImmediateSync()
                             } else {
                                 teamConnectionState = TeamConnectionUiState()
                             }
@@ -1256,6 +1264,9 @@ fun main() = application {
                             }
                         },
                         onTeamTestConnection = checkTeamConnection,
+                        teamSyncFailureMessage = teamSyncStatus
+                            .takeIf { status -> status.isFailing }
+                            ?.lastFailureMessage,
                         teamAdminConnection = teamAdminConnectionState,
                         onTeamAdminTokenChange = { token ->
                             val saved = updateTeamSettings(

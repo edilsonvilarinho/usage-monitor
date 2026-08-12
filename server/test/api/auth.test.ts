@@ -127,6 +127,53 @@ describe('isolamento por chave de time', () => {
     expect(response.body.code).toBe('forbidden_account');
   });
 
+  it('diz que falta vincular quando a conta esta livre', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+
+    const response = await request(harness.app)
+      .get('/api/v1/team')
+      .set('x-team-key', created.key)
+      .query({ accountKey: ACCOUNT_A });
+
+    // Quem colou a chave certa e ainda nao sincronizou precisa de instrucao, nao
+    // da mesma recusa generica de quem colou a chave de outra pessoa.
+    expect(response.status).toBe(403);
+    expect(response.body.error).toMatch(/ainda nao foi vinculada/);
+  });
+
+  it('diz que a conta e de outra chave', async () => {
+    const dona = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    const outra = await createKeyViaAdmin(harness, 'sicrano@empresa.com');
+    await request(harness.app)
+      .post('/api/v1/claim')
+      .set('x-team-key', dona.key)
+      .send({ accountKey: ACCOUNT_A });
+
+    const response = await request(harness.app)
+      .get('/api/v1/team')
+      .set('x-team-key', outra.key)
+      .query({ accountKey: ACCOUNT_A });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toMatch(/outra chave/);
+  });
+
+  it('diz que o limite de contas foi atingido', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    await request(harness.app)
+      .post('/api/v1/claim')
+      .set('x-team-key', created.key)
+      .send({ accountKey: ACCOUNT_A });
+
+    const response = await request(harness.app)
+      .get('/api/v1/team')
+      .set('x-team-key', created.key)
+      .query({ accountKey: ACCOUNT_B });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toMatch(/limite/);
+  });
+
   it('nao vincula conta nova pela leitura', async () => {
     const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
 

@@ -142,7 +142,13 @@ data class TeamSessionDetailResponseDto(
     val turns: List<TeamTurnRowDto> = emptyList()
 )
 
-/** Resposta de `GET /api/v1/verify`. */
+/** Corpo de `POST /api/v1/claim`. A credencial vai no header. */
+@Serializable
+data class TeamClaimRequestDto(
+    val accountKey: String
+)
+
+/** Resposta de `GET /api/v1/verify` e de `POST /api/v1/claim`. */
 @Serializable
 data class TeamVerificationDto(
     val authorized: Boolean = false,

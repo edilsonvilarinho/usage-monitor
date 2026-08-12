@@ -1,28 +1,43 @@
 import { Router } from 'express';
 import type { Config } from '../../config.js';
 import { ForbiddenError, UnauthorizedError, ValidationError } from '../../domain/errors.js';
-import { hashKey, type TeamKeyRepository } from '../../repositories/teamKeyRepository.js';
-import { ADMIN_TOKEN_HEADER } from '../access.js';
+import { hashKey, type ResolvedTeamKey, type TeamKeyRepository } from '../../repositories/teamKeyRepository.js';
+import { ADMIN_TOKEN_HEADER, MAX_ACCOUNTS_MESSAGE, OTHER_KEY_MESSAGE } from '../access.js';
 import { isValidTeamKey, TEAM_KEY_HEADER } from '../auth.js';
-import { verifyQuerySchema } from '../dto.js';
+import { claimBodySchema, verifyQuerySchema } from '../dto.js';
 import { wrap } from '../errorHandler.js';
 
 export interface VerifyRouterDeps {
   config: Config;
   keyRepository: TeamKeyRepository;
+  now: () => number;
 }
 
 /**
- * Responde se a chave apresentada cobre — ou pode cobrir — uma conta.
+ * Resposta de quem tem acesso amplo — administrador ou chave legada aberta.
  *
- * Existe porque o "Testar conexao" do app precisa de um alvo real. Ate aqui ele
- * consultava uma conta inventada, o que funcionava enquanto qualquer chave lia
- * qualquer conta; com autorizacao por conta aquilo passaria a responder 403 e o
- * botao mentiria sobre uma configuracao correta.
+ * Nenhum dos dois pertence a uma conta, entao nao ha vinculo a criar nem a
+ * informar; `claimed: true` aqui significa "voce le esta conta", que e verdade.
+ */
+const WIDE_ACCESS_RESPONSE = {
+  authorized: true,
+  claimed: true,
+  label: null,
+  maxAccounts: 0,
+  claimedAccounts: 0,
+};
+
+/**
+ * Verificacao e vinculo da chave de time com uma conta.
  *
- * **Nao reivindica nada.** O vinculo continua nascendo so no ingest: uma rota de
- * leitura que amarrasse conta permitiria adotar contas alheias por varredura de
- * UUID, sem nunca provar que aquela maquina usa a conta.
+ * `GET /v1/verify` responde se a chave cobre — ou pode cobrir — a conta, **sem
+ * criar vinculo**. `POST /v1/claim` cria.
+ *
+ * A separacao existe porque leitura que reivindica seria varredura: bastaria uma
+ * chave nova consultar `accountUuid` conhecidos para adotar contas alheias. Um
+ * `POST` explicito, disparado por clique do usuario, tem a mesma forca do ingest
+ * — que tambem carrega o `accountKey` auto-declarado no corpo — e resolve o
+ * problema de o vinculo depender de haver atividade nova no Claude Code.
  */
 export function createVerifyRouter(deps: VerifyRouterDeps): Router {
   const router = Router();
@@ -32,80 +47,131 @@ export function createVerifyRouter(deps: VerifyRouterDeps): Router {
     wrap((req, res) => {
       const parsed = verifyQuerySchema.safeParse(req.query);
       if (!parsed.success) {
-        const first = parsed.error.issues[0];
-        throw new ValidationError(
-          `Query invalida — ${first ? `${first.path.join('.')}: ${first.message}` : 'parametros ausentes'}`,
-        );
+        throw new ValidationError(describeIssue(parsed.error.issues[0]));
+      }
+
+      const resolution = resolveCredential(deps, req.header(ADMIN_TOKEN_HEADER), req.header(TEAM_KEY_HEADER));
+      if (resolution === 'wide') {
+        res.json(WIDE_ACCESS_RESPONSE);
+        return;
       }
 
       const accountKey = parsed.data.accountKey;
-      const adminToken = deps.config.adminToken;
-      const presentedAdmin = req.header(ADMIN_TOKEN_HEADER);
-      if (adminToken !== null && presentedAdmin !== undefined && isValidTeamKey(presentedAdmin, adminToken)) {
-        res.json({
-          authorized: true,
-          claimed: true,
-          label: null,
-          maxAccounts: 0,
-          claimedAccounts: 0,
-        });
+      if (!resolution.accounts.includes(accountKey)) {
+        requireClaimable(deps, resolution, accountKey);
+      }
+
+      res.json(describeKey(deps, resolution, accountKey));
+    }),
+  );
+
+  /**
+   * Vincula a conta a chave apresentada. Idempotente.
+   *
+   * E o que o botao "Testar conexao" do app chama: sem ele o vinculo so nascia
+   * dentro de um ingest, e trocar a chave numa maquina sem turno pendente nao
+   * gerava requisicao nenhuma — a conta ficava sem dona indefinidamente.
+   */
+  router.post(
+    '/v1/claim',
+    wrap((req, res) => {
+      const parsed = claimBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new ValidationError(describeIssue(parsed.error.issues[0]));
+      }
+
+      const resolution = resolveCredential(deps, req.header(ADMIN_TOKEN_HEADER), req.header(TEAM_KEY_HEADER));
+      if (resolution === 'wide') {
+        // Administrador e chave legada leem tudo e nao representam conta: nao ha
+        // vinculo a criar em nome de ninguem.
+        res.json(WIDE_ACCESS_RESPONSE);
         return;
       }
 
-      const presentedKey = req.header(TEAM_KEY_HEADER);
-      if (presentedKey === undefined || presentedKey === '') {
-        throw new UnauthorizedError();
-      }
+      const accountKey = parsed.data.accountKey;
+      if (!resolution.accounts.includes(accountKey)) {
+        requireClaimable(deps, resolution, accountKey);
 
-      // A chave legada continua respondendo "autorizada" enquanto o modo aberto
-      // valer: ela de fato le tudo, e informar o contrario faria o app avisar de
-      // um problema que nao existe naquele deploy.
-      if (
-        deps.config.teamApiKey !== null &&
-        deps.config.legacyKeyMode === 'open' &&
-        isValidTeamKey(presentedKey, deps.config.teamApiKey)
-      ) {
-        res.json({
-          authorized: true,
-          claimed: true,
-          label: null,
-          maxAccounts: 0,
-          claimedAccounts: 0,
-        });
-        return;
-      }
-
-      const resolved = deps.keyRepository.resolve(hashKey(presentedKey));
-      if (resolved === null) {
-        throw new UnauthorizedError();
-      }
-
-      const claimed = resolved.accounts.includes(accountKey);
-      if (!claimed) {
-        // Dona diferente e recusa imediata: dizer "autorizada" aqui e falhar no
-        // ingest seguinte transformaria um erro de configuracao numa sincronia
-        // silenciosamente parada.
-        const owner = deps.keyRepository.ownerOf(accountKey);
-        if (owner !== null) {
-          throw new ForbiddenError('Esta conta ja pertence a outra chave de time.');
-        }
-        if (resolved.accounts.length >= resolved.maxAccounts) {
-          throw new ForbiddenError(
-            'Esta chave ja atingiu o limite de contas. Peca ao administrador para aumentar o limite ou emitir outra chave.',
-          );
+        const claimed = deps.keyRepository.claimAccount(resolution.id, accountKey, deps.now());
+        if (!claimed) {
+          // Perdeu a corrida para outra chave entre a checagem e o insert.
+          throw new ForbiddenError(OTHER_KEY_MESSAGE);
         }
       }
 
-      const record = deps.keyRepository.findById(resolved.id);
-      res.json({
-        authorized: true,
-        claimed,
-        label: record?.label ?? null,
-        maxAccounts: resolved.maxAccounts,
-        claimedAccounts: resolved.accounts.length,
-      });
+      const refreshed = deps.keyRepository.resolve(hashKey(req.header(TEAM_KEY_HEADER) ?? ''));
+      res.json(describeKey(deps, refreshed ?? resolution, accountKey));
     }),
   );
 
   return router;
+}
+
+/** `'wide'` para acesso amplo; senao a chave de time resolvida. */
+function resolveCredential(
+  deps: VerifyRouterDeps,
+  adminHeader: string | undefined,
+  teamKeyHeader: string | undefined,
+): ResolvedTeamKey | 'wide' {
+  const adminToken = deps.config.adminToken;
+  if (adminToken !== null && adminHeader !== undefined && isValidTeamKey(adminHeader, adminToken)) {
+    return 'wide';
+  }
+
+  if (teamKeyHeader === undefined || teamKeyHeader === '') {
+    throw new UnauthorizedError();
+  }
+
+  // A chave legada continua respondendo "autorizada" enquanto o modo aberto
+  // valer: ela de fato le tudo, e informar o contrario faria o app avisar de um
+  // problema que nao existe naquele deploy.
+  if (
+    deps.config.teamApiKey !== null &&
+    deps.config.legacyKeyMode === 'open' &&
+    isValidTeamKey(teamKeyHeader, deps.config.teamApiKey)
+  ) {
+    return 'wide';
+  }
+
+  const resolved = deps.keyRepository.resolve(hashKey(teamKeyHeader));
+  if (resolved === null) {
+    throw new UnauthorizedError();
+  }
+  return resolved;
+}
+
+/**
+ * Recusa quando a conta nao esta vinculada **e** nao pode ser.
+ *
+ * Dona diferente e recusa imediata: dizer "autorizada" aqui e falhar no vinculo
+ * seguinte transformaria um erro de configuracao numa sincronia parada em
+ * silencio.
+ */
+function requireClaimable(
+  deps: VerifyRouterDeps,
+  resolved: ResolvedTeamKey,
+  accountKey: string,
+): void {
+  const owner = deps.keyRepository.ownerOf(accountKey);
+  if (owner !== null && owner !== resolved.id) {
+    throw new ForbiddenError(OTHER_KEY_MESSAGE);
+  }
+  if (resolved.accounts.length >= resolved.maxAccounts) {
+    throw new ForbiddenError(MAX_ACCOUNTS_MESSAGE);
+  }
+}
+
+function describeKey(deps: VerifyRouterDeps, resolved: ResolvedTeamKey, accountKey: string) {
+  const record = deps.keyRepository.findById(resolved.id);
+  return {
+    authorized: true,
+    claimed: resolved.accounts.includes(accountKey),
+    label: record?.label ?? null,
+    maxAccounts: resolved.maxAccounts,
+    claimedAccounts: resolved.accounts.length,
+  };
+}
+
+function describeIssue(issue: { path: Array<string | number>; message: string } | undefined): string {
+  return `Requisicao invalida — ${issue ? `${issue.path.join('.')}: ${issue.message}` : 'parametros ausentes'}`;
 }
