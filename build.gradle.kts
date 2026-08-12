@@ -148,6 +148,20 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     dependsOn(generateAppVersionSource)
 }
 
+// Capturas do README: renderizadas offscreen a partir dos composables reais com
+// dados sinteticos. O gerador vive em desktopTest para nao entrar no JAR
+// distribuido e ainda enxergar os composables `internal`.
+val desktopTestCompilation = kotlin.jvm("desktop").compilations.getByName("test")
+
+tasks.register<JavaExec>("generateScreenshots") {
+    group = "documentation"
+    description = "Renderiza offscreen os prints do README com dados sinteticos."
+
+    mainClass.set("com.usagemonitor.screenshots.ScreenshotGeneratorKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(layout.projectDirectory.dir("img").asFile.absolutePath)
+}
+
 // Adicionar manifest ao desktopJar para tornÃƒÆ’Ã‚Â¡-lo executÃƒÆ’Ã‚Â¡vel
 tasks.named<Jar>("desktopJar") {
     manifest {

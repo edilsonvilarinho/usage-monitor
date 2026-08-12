@@ -11,6 +11,14 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Refresh manual global ou por integracao.
 - Estado parcial: se uma fonte falhar, as outras continuam a aparecer.
 - Historico local com tendencia, consumo medio e forecast.
+- Sessoes CLI do Claude Code por conta, com custo estimado, veredito de saude da
+  sessao e atualizacao ao vivo.
+- Creditos de uso da Anthropic (`extra_usage`) como terceira cota do card, na
+  moeda real da conta.
+- Integracao opcional com servidor de time self-hosted para ver o consumo
+  agregado da mesma conta em varias maquinas.
+- Janela de 5h ancorada no reset de quota da conta, tanto nos cards quanto nos
+  filtros de sessao.
 - Reordenacao e minimizacao de cards com persistencia local.
 - Auto-start em Windows e Linux.
 - Verificacao de novas releases com banner manual e link para a pagina publicada no GitHub Releases.
@@ -23,17 +31,58 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 
 ## Screenshots
 
-### Dashboard
+As imagens abaixo sao renderizadas offscreen a partir dos proprios componentes da
+app, com dados sinteticos. Nenhuma conta, maquina ou chave real aparece nelas.
+Para regerar depois de mudar a UI:
 
-![Dashboard](img/1.png)
+```bat
+gradlew.bat generateScreenshots
+```
 
-### Historico
+### Dashboard com varias contas
 
-![Historico](img/2.png)
+Um card por conta/integracao. O card Anthropic mostra as tres cotas — sessao 5h,
+semanal e creditos de uso — com o semaforo de risco no canto da cota em perigo.
+
+![Dashboard](img/dashboard.png)
+
+### Historico e previsao
+
+Consumo ao longo do intervalo, com os reinicios de janela marcados, media por
+hora e previsao de esgotamento.
+
+![Historico](img/history.png)
+
+### Sessoes CLI do Claude Code
+
+Uma linha por sessao, com veredito de saude, custo estimado e filtros de janela.
+O cabecalho conta quantas sessoes estao saturadas ou em atencao.
+
+![Sessoes CLI](img/cli-sessions.png)
+
+### Detalhe da sessao
+
+Recomendacao de `/compact`, crescimento do contexto turno a turno e, no bloco
+Avancado, composicao dos tokens, distribuicao do custo e economia do cache.
+
+![Detalhe da sessao CLI](img/cli-session-detail.png)
+
+### Sessoes do time
+
+Consumo agregado da conta por integrante: apelido, maquina, tokens, custo e
+fatia do time. Cada integrante expande para as sessoes dele.
+
+![Sessoes do time](img/team-usage.png)
 
 ### Configuracoes
 
-![Configuracoes](img/3.png)
+![Configuracoes](img/settings.png)
+
+### Integracao com time
+
+Servidor, chave, apelido e quais contas Anthropic participam.
+
+![Integracao com time](img/settings-team.png)
 
 ## Integracoes suportadas
 
@@ -137,6 +186,7 @@ gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*"
 gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"
 gradlew.bat createDistributable
 gradlew.bat packageInstaller
+gradlew.bat generateScreenshots
 gradlew.bat clean
 ```
 
@@ -162,6 +212,27 @@ Observacoes:
 - O repositorio de historico calcula consumo acumulado, media por hora e forecast de esgotamento.
 - O historico local fica em `~/.usage-monitor/usage-history.db`.
 - Novos snapshots nao sao mais podados automaticamente; o filtro `Total` usa todo o historico ainda existente no banco local.
+
+### Sessoes CLI
+
+Cada card Anthropic abre a tela de **Sessoes CLI** daquela conta: uma linha por
+sessao do Claude Code, lida dos transcripts locais em `~/.claude/projects`.
+
+- Nao chama API. O indice fica em `~/.usage-monitor/usage-history.db`, alimentado
+  por varredura incremental dos `.jsonl`.
+- Filtros `5h` / `7 dias` / `30 dias` / `Total`. O recorte incide sobre os
+  **turnos**: uma sessao antiga com atividade recente aparece com os numeros
+  dessa atividade, nao com o total historico.
+- A janela de 5h ancora no reset de quota da conta — a mesma que o card do
+  dashboard mede — e nao nas ultimas cinco horas corridas.
+- Atualizacao ao vivo a cada 5 segundos com a janela aberta.
+- **Saude da sessao** na propria lista: `Saudavel`, `Atencao` ou `Saturada`,
+  derivada do contexto vivo contra a janela do modelo. O cabecalho totaliza
+  quantas pedem atencao. Sessao cujo modelo nao tem janela conhecida fica sem
+  veredito em vez de receber um chute.
+- O detalhe mostra o crescimento do contexto por turno e, no bloco Avancado, a
+  composicao dos tokens, a distribuicao do custo e a economia gerada pelo cache.
+- Custo estimado a preco de tabela (`ModelPricingTable`), nao e fatura.
 
 ### Integracao com time
 
