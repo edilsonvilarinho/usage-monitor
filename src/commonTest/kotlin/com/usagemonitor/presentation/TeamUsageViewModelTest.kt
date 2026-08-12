@@ -5,11 +5,16 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
+import com.usagemonitor.domain.entity.TeamKeyEntry
+import com.usagemonitor.domain.entity.TeamKeyVerification
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
+import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
@@ -48,6 +53,9 @@ private class FakeTeamRepository(
     var lastAccountKey: String? = null
     var fetchResult: Result<TeamUsageSnapshot>? = null
     val removedDeviceIds = mutableListOf<String>()
+
+    /** Conta e máquina de cada remoção; a conta importa na visão global. */
+    val removedTargets = mutableListOf<Pair<String, String>>()
     var removeResult: Result<Unit> = Result.success(Unit)
 
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
@@ -57,6 +65,7 @@ private class FakeTeamRepository(
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
         if (removeResult.isSuccess) {
             removedDeviceIds += deviceId
+            removedTargets += accountKey to deviceId
         }
         return removeResult
     }
@@ -73,6 +82,7 @@ private class FakeTeamRepository(
     var detailCalls = 0
     var lastDetailDeviceId: String? = null
     var lastDetailSessionId: String? = null
+    var lastDetailAccountKey: String? = null
 
     override suspend fun fetchSessionDetail(
         accountKey: String,
@@ -82,6 +92,7 @@ private class FakeTeamRepository(
         detailCalls += 1
         lastDetailDeviceId = deviceId
         lastDetailSessionId = sessionId
+        lastDetailAccountKey = accountKey
         return detailResult
     }
 
@@ -380,7 +391,7 @@ class TeamUsageViewModelTest {
         runCurrent()
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        assertEquals(setOf("device-1"), state.expandedDeviceIds)
+        assertEquals(setOf("device-1"), state.expandedMemberKeys)
         viewModel.onDestroy()
     }
 
@@ -406,7 +417,7 @@ class TeamUsageViewModelTest {
         runCurrent()
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        assertEquals(setOf("device-1"), state.expandedDeviceIds)
+        assertEquals(setOf("device-1"), state.expandedMemberKeys)
         viewModel.onDestroy()
     }
 
@@ -517,7 +528,7 @@ class TeamUsageViewModelTest {
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s1")
         runCurrent()
 
         assertEquals("device-1", repository.lastDetailDeviceId)
@@ -540,7 +551,7 @@ class TeamUsageViewModelTest {
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s1")
         runCurrent()
         advanceTimeBy(3 * TEAM_LIVE_INTERVAL_MILLIS + 1)
         runCurrent()
@@ -563,7 +574,7 @@ class TeamUsageViewModelTest {
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s1")
         runCurrent()
         viewModel.toggleAdvanced()
         viewModel.toggleGlossary()
@@ -598,7 +609,7 @@ class TeamUsageViewModelTest {
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s1")
         runCurrent()
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
@@ -623,7 +634,7 @@ class TeamUsageViewModelTest {
         runCurrent()
 
         // Sem agregado na lista não há nada a apresentar no lugar dos turnos.
-        viewModel.openSession(deviceId = "device-1", sessionId = "s-que-nao-existe")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s-que-nao-existe")
         runCurrent()
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
@@ -641,7 +652,7 @@ class TeamUsageViewModelTest {
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s1")
         runCurrent()
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
@@ -661,7 +672,7 @@ class TeamUsageViewModelTest {
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s1")
         runCurrent()
         viewModel.closeDetail()
 
@@ -680,7 +691,7 @@ class TeamUsageViewModelTest {
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        viewModel.openSession(memberKey = "device-1", sessionId = "s1")
         runCurrent()
         viewModel.closeWindow()
 
@@ -694,15 +705,173 @@ class TeamUsageViewModelTest {
         repository: FakeTeamRepository,
         // O corte da janela é resolvido dentro do caso de uso; separá-lo do
         // relógio do carimbo permite mover o tempo só onde interessa.
-        useCaseClock: Clock = TeamFixedClock(TEAM_FIXED_NOW)
+        useCaseClock: Clock = TeamFixedClock(TEAM_FIXED_NOW),
+        adminRepository: FakeAdminOverviewRepository? = null
     ): TeamUsageViewModel {
         return TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(repository, useCaseClock),
             removeTeamMember = RemoveTeamMemberUseCase(repository),
             getTeamSessionDetail = GetTeamSessionDetailUseCase(repository),
+            getAdminOverview = adminRepository?.let { admin ->
+                GetAdminTeamOverviewUseCase(admin, useCaseClock)
+            },
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = TEAM_LIVE_INTERVAL_MILLIS,
             clock = TeamFixedClock(TEAM_FIXED_NOW)
         )
     }
+
+    @Test
+    fun `visao global agrupa contas e carimba cada integrante`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10),
+                overviewAccount(OTHER_ACCOUNT_KEY, null, "device-2", tokens = 30)
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertTrue(state.isAdminOverview)
+        // Ordena pelo consumo do time inteiro, não por conta.
+        assertEquals("device-2", state.members.first().deviceId)
+        assertEquals(OTHER_ACCOUNT_KEY, state.members.first().accountKey)
+        assertEquals(2, state.memberGroups.size)
+        assertEquals("fulano@empresa.com", state.memberGroups.last().accountLabel)
+        assertEquals(0, repository.fetchCalls)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `visao global remove o integrante na conta dele`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10),
+                overviewAccount(OTHER_ACCOUNT_KEY, null, "device-1", tokens = 30)
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        // Mesma máquina em duas contas: o `deviceId` sozinho não identifica a
+        // linha, e usar a conta da janela apagaria o histórico da conta errada.
+        viewModel.removeMember("$OTHER_ACCOUNT_KEY/device-1")
+        runCurrent()
+
+        assertEquals(listOf(OTHER_ACCOUNT_KEY to "device-1"), repository.removedTargets)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `visao global abre o detalhe na conta do integrante`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10),
+                overviewAccount(OTHER_ACCOUNT_KEY, null, "device-1", tokens = 30)
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        viewModel.openSession(memberKey = "$ACCOUNT_KEY/device-1", sessionId = "s1")
+        runCurrent()
+
+        assertEquals(ACCOUNT_KEY, repository.lastDetailAccountKey)
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(ACCOUNT_KEY, state.detail?.accountKey)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `trocar da visao global para uma conta zera a lista`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-9")))
+        )
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1"))
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertFalse(state.isAdminOverview)
+        assertEquals(listOf("device-9"), state.members.map { entry -> entry.deviceId })
+        assertNull(state.members.first().accountKey)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `sem caso de uso de administracao a visao global nao abre`() = runTest {
+        val repository = FakeTeamRepository()
+        val viewModel = buildViewModel(repository)
+
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        assertIs<TeamUsageUiState.Loading>(viewModel.uiState.value)
+        assertEquals(0, repository.fetchCalls)
+        viewModel.onDestroy()
+    }
+}
+
+private const val OTHER_ACCOUNT_KEY = "account-uuid-bbb"
+
+/** Só o que a visão global precisa; o resto do contrato não é exercitado aqui. */
+private class FakeAdminOverviewRepository(
+    private val accounts: List<TeamAccountUsage>
+) : TeamAdminRepository {
+    override suspend fun validateToken(): Result<Unit> = Result.success(Unit)
+
+    override suspend fun listKeys(): Result<List<TeamKeyEntry>> = Result.success(emptyList())
+
+    override suspend fun createKey(label: String, maxAccounts: Int): Result<TeamKeyEntry> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun updateKey(
+        id: String,
+        label: String?,
+        maxAccounts: Int?
+    ): Result<TeamKeyEntry> = Result.failure(UnsupportedOperationException())
+
+    override suspend fun regenerateKey(id: String): Result<TeamKeyEntry> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun revokeKey(id: String): Result<TeamKeyEntry> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun unclaimAccount(id: String, accountKey: String): Result<TeamKeyEntry> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> =
+        Result.success(accounts)
+
+    override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> =
+        Result.success(TeamKeyVerification(authorized = true, claimed = true))
+}
+
+private fun overviewAccount(
+    accountKey: String,
+    label: String?,
+    deviceId: String,
+    tokens: Long = 0L
+): TeamAccountUsage {
+    return TeamAccountUsage(
+        accountKey = accountKey,
+        label = label,
+        snapshot = TeamUsageSnapshot(
+            members = listOf(member(deviceId, sessions = listOf(session("s1", tokens = tokens))))
+        )
+    )
 }

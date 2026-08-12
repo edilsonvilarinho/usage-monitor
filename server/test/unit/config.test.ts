@@ -13,8 +13,54 @@ describe('loadConfigFromEnv', () => {
     expect(config.trustProxyHops).toBe(0);
   });
 
-  it('falha sem TEAM_API_KEY', () => {
-    expect(() => loadConfigFromEnv({} as NodeJS.ProcessEnv)).toThrow(/TEAM_API_KEY/);
+  it('falha sem nenhum segredo', () => {
+    expect(() => loadConfigFromEnv({} as NodeJS.ProcessEnv)).toThrow(/TEAM_ADMIN_TOKEN/);
+  });
+
+  it('sobe so com administracao, sem a chave legada', () => {
+    const config = loadConfigFromEnv({
+      TEAM_ADMIN_TOKEN: VALID_KEY,
+      TEAM_KEY_SECRET: VALID_KEY,
+    } as NodeJS.ProcessEnv);
+
+    expect(config.teamApiKey).toBeNull();
+    expect(config.adminToken).toBe(VALID_KEY);
+    // Sem escolha explicita o modo legado nasce aberto: um deploy que so
+    // acrescenta administracao nao pode cortar os clientes que ja existiam.
+    expect(config.legacyKeyMode).toBe('open');
+  });
+
+  it('falha com TEAM_ADMIN_TOKEN curto', () => {
+    expect(() =>
+      loadConfigFromEnv({
+        TEAM_ADMIN_TOKEN: 'curto',
+        TEAM_KEY_SECRET: VALID_KEY,
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/TEAM_ADMIN_TOKEN/);
+  });
+
+  it('falha com administracao sem TEAM_KEY_SECRET', () => {
+    expect(() =>
+      loadConfigFromEnv({ TEAM_ADMIN_TOKEN: VALID_KEY } as NodeJS.ProcessEnv),
+    ).toThrow(/TEAM_KEY_SECRET/);
+  });
+
+  it('falha com TEAM_LEGACY_KEY_MODE invalido', () => {
+    expect(() =>
+      loadConfigFromEnv({
+        TEAM_API_KEY: VALID_KEY,
+        TEAM_LEGACY_KEY_MODE: 'talvez',
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/TEAM_LEGACY_KEY_MODE/);
+  });
+
+  it('aceita TEAM_LEGACY_KEY_MODE=off', () => {
+    const config = loadConfigFromEnv({
+      TEAM_API_KEY: VALID_KEY,
+      TEAM_LEGACY_KEY_MODE: 'off',
+    } as NodeJS.ProcessEnv);
+
+    expect(config.legacyKeyMode).toBe('off');
   });
 
   it('falha com TEAM_API_KEY curta', () => {

@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -22,7 +24,9 @@ import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
+import com.usagemonitor.presentation.ui.TEAM_ACCOUNT_GROUP_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_LIST_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.TEAM_SLIDING_WINDOW_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
@@ -164,7 +168,7 @@ class TeamUsageScreenTest {
                 members = listOf(
                     member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123", tokens = 500L)))
                 ),
-                expandedDeviceIds = setOf("device-1")
+                expandedMemberKeys = setOf("device-1")
             )
         )
 
@@ -333,7 +337,7 @@ class TeamUsageScreenTest {
                                     listOf(session("abcdef0123", tokens = 500L))
                                 )
                             ),
-                            expandedDeviceIds = setOf("device-1")
+                            expandedMemberKeys = setOf("device-1")
                         ),
                         language = AppLanguage.PT,
                         onSelectRange = {},
@@ -614,14 +618,120 @@ class TeamUsageScreenTest {
         deviceId: String,
         alias: String,
         hostName: String,
-        sessions: List<CliSessionSummary>
+        sessions: List<CliSessionSummary>,
+        accountKey: String? = null,
+        accountLabel: String? = null
     ): TeamMemberUsage {
         return TeamMemberUsage(
             deviceId = deviceId,
             alias = alias,
             hostName = hostName,
             lastSeenAt = NOW,
-            sessions = sessions
+            sessions = sessions,
+            accountKey = accountKey,
+            accountLabel = accountLabel
         )
+    }
+
+    @Test
+    fun `visao global agrupa por conta e mostra o uuid ao lado do rotulo`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = listOf(
+                        member(
+                            "device-1",
+                            "edilson",
+                            "DESKTOP-A1",
+                            listOf(session("abcdef0123", tokens = 500L)),
+                            accountKey = "account-a",
+                            accountLabel = "fulano@empresa.com"
+                        ),
+                        member(
+                            "device-2",
+                            "helio",
+                            "DESKTOP-B1",
+                            listOf(session("bbbbbb0123", tokens = 100L)),
+                            accountKey = "account-b"
+                        )
+                    ),
+                    isAdminOverview = true
+                )
+            )
+
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a").assertIsDisplayed()
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-b").assertIsDisplayed()
+            // O rótulo é texto que o admin digitou; o uuid ao lado é o que prova.
+            onNodeWithText("fulano@empresa.com").assertIsDisplayed()
+            onNodeWithText("account-a").assertIsDisplayed()
+            // Conta sem chave emitida não fica sem identificação na tela.
+            onNodeWithText("Conta sem chave").assertIsDisplayed()
+        }
+
+    @Test
+    fun `modal de uma conta nao desenha cabecalho de grupo`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123")))
+                )
+            )
+        )
+
+        onAllNodesWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}").assertCountEquals(0)
+    }
+
+    @Test
+    fun `visao global avisa que o recorte de 5h e deslizante`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(session("abcdef0123", tokens = 500L)),
+                        accountKey = "account-a",
+                        accountLabel = "fulano@empresa.com"
+                    )
+                ),
+                range = CliSessionRange.LAST_5H,
+                isAdminOverview = true
+            )
+        )
+
+        onNodeWithTag(TEAM_SLIDING_WINDOW_NOTICE_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `mesma maquina em duas contas expande so a linha clicada`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(session("aaaaaa0123", tokens = 500L)),
+                        accountKey = "account-a",
+                        accountLabel = "fulano@empresa.com"
+                    ),
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(session("bbbbbb0123", tokens = 100L)),
+                        accountKey = "account-b",
+                        accountLabel = "sicrano@empresa.com"
+                    )
+                ),
+                // A chave é `accountKey/deviceId`: só a linha da conta A abre.
+                expandedMemberKeys = setOf("account-a/device-1"),
+                isAdminOverview = true
+            )
+        )
+
+        onNodeWithText("aaaaaa01").assertIsDisplayed()
+        onAllNodesWithText("bbbbbb01").assertCountEquals(0)
     }
 }

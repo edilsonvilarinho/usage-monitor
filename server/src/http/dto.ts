@@ -74,6 +74,44 @@ export const deleteMemberQuerySchema = z.object({
   deviceId: z.string().min(1).max(TEXT_MAX),
 });
 
+/** A conta e o unico parametro: a credencial vem no header. */
+export const verifyQuerySchema = z.object({
+  accountKey: z.string().min(1).max(TEXT_MAX),
+});
+
+/** Recorte opcional da visao global. Mesma semantica do `since` de `/v1/team`. */
+export const overviewQuerySchema = z.object({
+  since: z.coerce.number().int().nonnegative().optional(),
+});
+
+/**
+ * Teto de contas por chave.
+ *
+ * O default `1` implementa "uma chave, um time" sem obrigar o admin a pensar
+ * nisso; subir para 2 e o caminho da maquina logada em duas contas da empresa,
+ * que usa a mesma chave para as duas.
+ */
+const maxAccounts = z.number().int().min(1).max(50);
+
+export const createKeyBodySchema = z.object({
+  label: z.string().trim().min(1).max(TEXT_MAX),
+  maxAccounts: maxAccounts.default(1),
+});
+
+/**
+ * `refine` em vez de campos opcionais soltos: um `PATCH` sem nenhum campo
+ * passaria na validacao e responderia 200 sem ter mudado nada.
+ */
+export const updateKeyBodySchema = z
+  .object({
+    label: z.string().trim().min(1).max(TEXT_MAX).optional(),
+    maxAccounts: maxAccounts.optional(),
+  })
+  .refine(
+    (value) => value.label !== undefined || value.maxAccounts !== undefined,
+    'informe label ou maxAccounts',
+  );
+
 /**
  * Detalhe de uma sessao.
  *

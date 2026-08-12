@@ -5,6 +5,8 @@ import type { Express } from 'express';
 import { buildApp } from '../../src/app.js';
 import type { Config } from '../../src/config.js';
 import type { Db } from '../../src/db/openDatabase.js';
+import request from 'supertest';
+import type { TeamKeyRepository } from '../../src/repositories/teamKeyRepository.js';
 import type {
   IngestPayload,
   IngestSession,
@@ -14,6 +16,8 @@ import type {
 
 /** 32 caracteres: o minimo que `validateConfig` exige. */
 export const TEST_TEAM_KEY = 'test-team-key-0123456789abcdefgh';
+export const TEST_ADMIN_TOKEN = 'test-admin-token-0123456789abcdef';
+export const TEST_KEY_SECRET = 'test-key-secret-0123456789abcdefg';
 
 export const ACCOUNT_A = 'account-uuid-aaa';
 export const ACCOUNT_B = 'account-uuid-bbb';
@@ -22,6 +26,7 @@ export interface Harness {
   app: Express;
   db: Db;
   repository: TeamRepository;
+  keyRepository: TeamKeyRepository;
   config: Config;
   /** Relogio mutavel: os testes movem `now` sem esperar o tempo real passar. */
   setNow(value: number): void;
@@ -35,6 +40,9 @@ export function createHarness(configOverrides: Partial<Config> = {}): Harness {
     port: 3000,
     dataDir,
     teamApiKey: TEST_TEAM_KEY,
+    adminToken: TEST_ADMIN_TOKEN,
+    keySecret: TEST_KEY_SECRET,
+    legacyKeyMode: 'open',
     retentionDays: 45,
     maxTurnsPerRequest: 5000,
     trustProxyHops: 0,
@@ -48,6 +56,7 @@ export function createHarness(configOverrides: Partial<Config> = {}): Harness {
     app: built.app,
     db: built.db,
     repository: built.repository,
+    keyRepository: built.keyRepository,
     config,
     setNow(value: number) {
       now = value;
@@ -57,6 +66,40 @@ export function createHarness(configOverrides: Partial<Config> = {}): Harness {
       rmSync(dataDir, { recursive: true, force: true });
     },
   };
+}
+
+/** Resposta de chave como as rotas admin a devolvem. */
+export interface CreatedKey {
+  id: string;
+  label: string;
+  key: string;
+  keyPrefix: string;
+  maxAccounts: number;
+  accounts: string[];
+}
+
+/**
+ * Emite uma chave pela propria rota admin.
+ *
+ * Passar pelo HTTP em vez de chamar o repositorio direto e proposital: e assim
+ * que o app faz, entao o teste exercita a rota de emissao de graca em todo
+ * cenario que precisa de uma chave.
+ */
+export async function createKeyViaAdmin(
+  harness: Harness,
+  label: string,
+  maxAccounts = 1,
+): Promise<CreatedKey> {
+  const response = await request(harness.app)
+    .post('/api/admin/v1/keys')
+    .set('x-admin-token', TEST_ADMIN_TOKEN)
+    .send({ label, maxAccounts });
+
+  if (response.status !== 201) {
+    throw new Error(`falha ao criar chave de teste: ${response.status} ${response.text}`);
+  }
+
+  return response.body as CreatedKey;
 }
 
 export function makeSession(overrides: Partial<IngestSession> = {}): IngestSession {

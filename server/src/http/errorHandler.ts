@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
 import {
+  ForbiddenError,
   NotFoundError,
   ServiceUnavailableError,
   UnauthorizedError,
@@ -26,6 +27,10 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   }
   if (error instanceof UnauthorizedError) {
     res.status(401).json({ error: error.message, code: error.code });
+    return;
+  }
+  if (error instanceof ForbiddenError) {
+    res.status(403).json({ error: error.message, code: error.code });
     return;
   }
   if (error instanceof NotFoundError) {

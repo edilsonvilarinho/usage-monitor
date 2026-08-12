@@ -16,7 +16,14 @@ private data class TeamSettingsDto(
     val apiKey: String = "",
     val alias: String = "",
     val deviceId: String = "",
-    val participatingProfileIds: List<String> = emptyList()
+    val participatingProfileIds: List<String> = emptyList(),
+    /**
+     * Token de administração, quando esta máquina administra o servidor.
+     *
+     * Campo novo com default: um `team.json` gravado por versão anterior continua
+     * legível, e o `ignoreUnknownKeys` cobre o caminho de volta.
+     */
+    val adminToken: String = ""
 )
 
 /**
@@ -68,7 +75,8 @@ internal class LocalTeamSettingsDataSource(
                 apiKey = settings.apiKey.trim(),
                 alias = settings.alias.trim(),
                 deviceId = deviceId,
-                participatingProfileIds = settings.participatingProfileIds.sorted()
+                participatingProfileIds = settings.participatingProfileIds.sorted(),
+                adminToken = settings.adminToken.trim()
             )
         )
     }
@@ -141,7 +149,8 @@ internal class LocalTeamSettingsDataSource(
             apiKey = apiKey,
             alias = alias,
             deviceId = deviceId,
-            participatingProfileIds = participatingProfileIds.toSet()
+            participatingProfileIds = participatingProfileIds.toSet(),
+            adminToken = adminToken
         )
     }
 

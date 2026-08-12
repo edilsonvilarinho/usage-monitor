@@ -9,6 +9,10 @@
  * torna o ingest idempotente: o cliente pode reenviar o mesmo lote (retry, push
  * duplicado, watermark perdido) que o `INSERT OR IGNORE` descarta os repetidos.
  * E a mesma chave de deduplicacao que o indexador local ja usa.
+ *
+ * `team_keys` e `team_key_accounts` sao o que transforma esse escopo em
+ * isolamento de verdade: sem elas o `account_key` apenas evita que consultas se
+ * cruzem, mas qualquer portador da chave unica de ambiente le qualquer conta.
  */
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS team_members (
@@ -53,4 +57,49 @@ CREATE TABLE IF NOT EXISTS team_turns (
 -- Sem este indice o filtro temporal varre a tabela inteira de turnos.
 CREATE INDEX IF NOT EXISTS idx_team_turns_window ON team_turns(account_key, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_team_sessions_device ON team_sessions(account_key, device_id);
+
+-- Estado interno do proprio servidor. Hoje guarda so o salt de derivacao da
+-- cifra das chaves, que precisa sobreviver a reinicio sem virar variavel de
+-- ambiente: quem opera ja tem segredo demais para gerenciar.
+CREATE TABLE IF NOT EXISTS server_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- Chaves de time emitidas pelo admin.
+--
+-- key_hash e o que a autenticacao consulta: a chave crua e aleatoria de 32
+-- bytes, entao um SHA-256 indexado basta e nao ha prefixo a descobrir
+-- incrementalmente. key_cipher/key_iv/key_tag existem apenas para o modal do
+-- admin reler a chave depois de criada; a autenticacao nunca decifra nada.
+--
+-- label e texto livre de quem administra (normalmente o e-mail da pessoa) e o
+-- servidor NAO o verifica. A verdade de quem e aquela chave esta em
+-- team_key_accounts.
+CREATE TABLE IF NOT EXISTS team_keys (
+  id           TEXT    PRIMARY KEY,
+  key_hash     TEXT    NOT NULL UNIQUE,
+  key_prefix   TEXT    NOT NULL,
+  key_cipher   TEXT    NOT NULL,
+  key_iv       TEXT    NOT NULL,
+  key_tag      TEXT    NOT NULL,
+  label        TEXT    NOT NULL,
+  max_accounts INTEGER NOT NULL DEFAULT 1,
+  created_at   INTEGER NOT NULL,
+  revoked_at   INTEGER,
+  last_used_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS team_key_accounts (
+  key_id      TEXT    NOT NULL REFERENCES team_keys(id) ON DELETE CASCADE,
+  account_key TEXT    NOT NULL,
+  claimed_at  INTEGER NOT NULL,
+  PRIMARY KEY (key_id, account_key)
+);
+
+-- Invariante do isolamento: uma conta pertence a no maximo uma chave. E tambem
+-- a rede contra corrida no vinculo por primeiro uso — em dois ingests
+-- simultaneos um grava e o outro falha na constraint em vez de duplicar.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_team_key_accounts_account
+  ON team_key_accounts(account_key);
 `;

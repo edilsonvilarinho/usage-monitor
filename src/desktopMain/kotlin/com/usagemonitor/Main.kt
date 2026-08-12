@@ -40,6 +40,7 @@ import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
+import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.displayName
@@ -66,7 +67,16 @@ import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
+import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
+import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
+import com.usagemonitor.domain.usecase.ListTeamKeysUseCase
+import com.usagemonitor.domain.usecase.RegenerateTeamKeyUseCase
+import com.usagemonitor.domain.usecase.RevokeTeamKeyUseCase
+import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
+import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
+import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
+import com.usagemonitor.domain.usecase.VerifyTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
@@ -78,6 +88,7 @@ import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.TeamKeysAdminScreen
 import com.usagemonitor.presentation.ui.TeamUsageScreen
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
@@ -96,6 +107,7 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
@@ -330,6 +342,12 @@ fun main() = application {
             settingsProvider = { teamSettingsFlow.value }
         )
     }
+    val teamAdminRepository = remember(remoteTeamDataSource, teamSettingsFlow) {
+        TeamAdminRepositoryImpl(
+            remoteDataSource = remoteTeamDataSource,
+            settingsProvider = { teamSettingsFlow.value }
+        )
+    }
     val appUpdateRepository = remember(remoteApiDataSource) {
         AppUpdateRepositoryImpl(remoteApiDataSource)
     }
@@ -396,13 +414,30 @@ fun main() = application {
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
         )
     }
-    val teamUsageViewModel = remember(teamUsageRepository) {
+    val teamUsageViewModel = remember(teamUsageRepository, teamAdminRepository) {
         TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(teamUsageRepository),
             removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
             getTeamSessionDetail = GetTeamSessionDetailUseCase(teamUsageRepository),
+            getAdminOverview = GetAdminTeamOverviewUseCase(teamAdminRepository),
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
         )
+    }
+    val teamKeysViewModel = remember(teamAdminRepository) {
+        TeamKeysAdminViewModel(
+            listKeys = ListTeamKeysUseCase(teamAdminRepository),
+            createKey = CreateTeamKeyUseCase(teamAdminRepository),
+            updateKey = UpdateTeamKeyUseCase(teamAdminRepository),
+            regenerateKey = RegenerateTeamKeyUseCase(teamAdminRepository),
+            revokeKey = RevokeTeamKeyUseCase(teamAdminRepository),
+            unclaimAccount = UnclaimTeamKeyAccountUseCase(teamAdminRepository)
+        )
+    }
+    val validateAdminToken = remember(teamAdminRepository) {
+        ValidateAdminTokenUseCase(teamAdminRepository)
+    }
+    val verifyTeamKeyForAccount = remember(teamAdminRepository) {
+        VerifyTeamKeyForAccountUseCase(teamAdminRepository)
     }
     // O envio roda com a janela do time fechada: se dependesse dela, o consumo de
     // quem nunca abre a tela nunca chegaria aos colegas.
@@ -627,7 +662,82 @@ fun main() = application {
     var teamUsageAccountLabel by remember { mutableStateOf<String?>(null) }
     var teamUsageProfileId by remember { mutableStateOf<String?>(null) }
     var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
+    var teamAdminConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
+    var isTeamKeysOpen by remember { mutableStateOf(false) }
     val teamScope = rememberCoroutineScope()
+
+    /**
+     * Confere o servidor e o vínculo da chave com **cada** conta marcada.
+     *
+     * O teste antigo consultava uma conta inventada só para exercitar a chave.
+     * Isso funcionava enquanto qualquer chave lia qualquer conta; com autorização
+     * por conta aquela consulta passaria a ser recusada e o botão reprovaria uma
+     * configuração correta. Agora o alvo é real, e o erro aponta qual conta falhou.
+     */
+    val checkTeamConnection: () -> Unit = {
+        teamConnectionState = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
+        teamScope.launch {
+            val healthError = teamUsageRepository.checkConnection().exceptionOrNull()
+            if (healthError != null) {
+                teamConnectionState = TeamConnectionUiState(
+                    status = TeamConnectionUiStatus.FAILED,
+                    message = healthError.message
+                        ?: if (language == AppLanguage.PT) "Falha desconhecida." else "Unknown failure."
+                )
+                return@launch
+            }
+
+            val current = teamSettingsFlow.value
+            val targets = buildTeamSyncTargets(profileRegistry)
+                .filter { target -> current.participates(target.profileId) }
+
+            if (targets.isEmpty()) {
+                teamConnectionState = TeamConnectionUiState(
+                    status = TeamConnectionUiStatus.OK,
+                    message = if (language == AppLanguage.PT) {
+                        "Servidor OK. Marque uma conta para conferir a chave."
+                    } else {
+                        "Server OK. Select an account to check the key."
+                    }
+                )
+                return@launch
+            }
+
+            val failures = mutableListOf<String>()
+            for (target in targets) {
+                val label = profileUiModels.firstOrNull { profile -> profile.id == target.profileId }
+                    ?.label
+                    ?: target.profileId
+                val result = verifyTeamKeyForAccount(target.accountKey)
+                val error = result.exceptionOrNull()
+                if (error != null) {
+                    failures += "$label: ${error.message.orEmpty()}"
+                } else if (result.getOrNull()?.authorized != true) {
+                    failures += if (language == AppLanguage.PT) {
+                        "$label: a chave não cobre esta conta."
+                    } else {
+                        "$label: the key does not cover this account."
+                    }
+                }
+            }
+
+            teamConnectionState = if (failures.isEmpty()) {
+                TeamConnectionUiState(
+                    status = TeamConnectionUiStatus.OK,
+                    message = if (language == AppLanguage.PT) {
+                        "Conexão OK e chave válida para as contas marcadas."
+                    } else {
+                        "Connection OK and key valid for the selected accounts."
+                    }
+                )
+            } else {
+                TeamConnectionUiState(
+                    status = TeamConnectionUiStatus.FAILED,
+                    message = failures.joinToString(" • ")
+                )
+            }
+        }
+    }
 
     // Cada emissão precisa de um id próprio: dois avisos iguais em sequência —
     // salvar o mesmo campo duas vezes — seriam o mesmo valor e o diálogo não
@@ -754,6 +864,20 @@ fun main() = application {
                     onOpenSettings = {
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
+                    },
+                    // Só quem administra recebe o botão; `null` esconde. A conta
+                    // não entra na condição de propósito: administrar o servidor
+                    // não exige participar de nenhum time.
+                    onOpenAdminOverview = if (teamSettings.isAdminMode) {
+                        {
+                            teamUsageAccountLabel = null
+                            teamUsageProfileId = null
+                            isTeamUsageOpen = true
+                            teamUsageOpenGeneration++
+                            teamUsageViewModel.openForAllAccounts()
+                        }
+                    } else {
+                        null
                     },
                     onOpenCliSessions = { target ->
                         val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
@@ -901,6 +1025,34 @@ fun main() = application {
                         viewModel = teamUsageViewModel,
                         language = language,
                         localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
+                    )
+                }
+            }
+        }
+    }
+
+    if (isTeamKeysOpen) {
+        val keysTitle = if (language == AppLanguage.PT) {
+            "Chaves das contas"
+        } else {
+            "Account keys"
+        }
+        DialogWindow(
+            onCloseRequest = { isTeamKeysOpen = false },
+            title = keysTitle,
+            icon = iconImage,
+            state = rememberDialogState(width = 760.dp, height = 640.dp),
+            undecorated = true
+        ) {
+            AppTheme(isDark = isDark) {
+                DesktopDialogFrame(
+                    title = keysTitle,
+                    iconPainter = iconImage,
+                    onCloseRequest = { isTeamKeysOpen = false }
+                ) {
+                    TeamKeysAdminScreen(
+                        viewModel = teamKeysViewModel,
+                        language = language
                     )
                 }
             }
@@ -1055,8 +1207,15 @@ fun main() = application {
                                 teamSettingsFlow,
                                 teamSettingsDataSource
                             ) { current -> current.copy(apiKey = key) }
-                            teamConnectionState = TeamConnectionUiState()
                             reportSettingsSave(SettingsField.TEAM_KEY, saved)
+                            // Confere na hora: uma chave que não cobre a conta
+                            // marcada faria o envio falhar em silêncio a cada 30s,
+                            // e o usuário só descobriria pela ausência dos dados.
+                            if (saved) {
+                                checkTeamConnection()
+                            } else {
+                                teamConnectionState = TeamConnectionUiState()
+                            }
                         },
                         onTeamAliasChange = { alias ->
                             // O campo já barra apagar um apelido gravado; esta é a
@@ -1090,34 +1249,61 @@ fun main() = application {
                                 current.copy(participatingProfileIds = updated)
                             }
                             reportSettingsSave(SettingsField.TEAM_ACCOUNTS, saved)
+                            // Marcar uma conta é justamente o momento em que o
+                            // vínculo da chave passa a importar.
+                            if (saved && participates) {
+                                checkTeamConnection()
+                            }
                         },
-                        onTeamTestConnection = {
-                            teamConnectionState = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
+                        onTeamTestConnection = checkTeamConnection,
+                        teamAdminConnection = teamAdminConnectionState,
+                        onTeamAdminTokenChange = { token ->
+                            val saved = updateTeamSettings(
+                                teamSettingsFlow,
+                                teamSettingsDataSource
+                            ) { current -> current.copy(adminToken = token) }
+                            teamAdminConnectionState = TeamConnectionUiState()
+                            reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
+                        },
+                        onTeamValidateAdminToken = {
+                            teamAdminConnectionState =
+                                TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
                             teamScope.launch {
-                                val result = teamUsageRepository.checkConnection()
-                                teamConnectionState = result.fold(
-                                    onSuccess = {
-                                        TeamConnectionUiState(
-                                            status = TeamConnectionUiStatus.OK,
-                                            message = if (language == AppLanguage.PT) {
-                                                "Conexão OK."
-                                            } else {
-                                                "Connection OK."
-                                            }
-                                        )
-                                    },
-                                    onFailure = { error ->
-                                        TeamConnectionUiState(
-                                            status = TeamConnectionUiStatus.FAILED,
-                                            message = error.message ?: if (language == AppLanguage.PT) {
+                                val error = validateAdminToken().exceptionOrNull()
+                                teamAdminConnectionState = if (error == null) {
+                                    TeamConnectionUiState(
+                                        status = TeamConnectionUiStatus.OK,
+                                        message = if (language == AppLanguage.PT) {
+                                            "Token válido."
+                                        } else {
+                                            "Token is valid."
+                                        }
+                                    )
+                                } else {
+                                    TeamConnectionUiState(
+                                        status = TeamConnectionUiStatus.FAILED,
+                                        message = error.message
+                                            ?: if (language == AppLanguage.PT) {
                                                 "Falha desconhecida."
                                             } else {
                                                 "Unknown failure."
                                             }
-                                        )
-                                    }
-                                )
+                                    )
+                                }
                             }
+                        },
+                        onTeamOpenKeysManager = {
+                            isTeamKeysOpen = true
+                            teamKeysViewModel.open()
+                        },
+                        onTeamExitAdminMode = {
+                            val saved = updateTeamSettings(
+                                teamSettingsFlow,
+                                teamSettingsDataSource
+                            ) { current -> current.copy(adminToken = "") }
+                            teamAdminConnectionState = TeamConnectionUiState()
+                            isTeamKeysOpen = false
+                            reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
                         },
                         toastEvent = settingsToastEvent
                     )

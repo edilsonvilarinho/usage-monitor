@@ -53,6 +53,7 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
@@ -64,6 +65,9 @@ internal const val TEAM_MEMBER_SESSIONS_TAG_PREFIX = "teamMemberSessions:"
 internal const val TEAM_MEMBER_REMOVE_TAG_PREFIX = "teamMemberRemove:"
 internal const val TEAM_MEMBER_HEALTH_TAG_PREFIX = "teamMemberHealth:"
 internal const val TEAM_REMOVE_CONFIRM_TAG = "teamMemberRemoveConfirm"
+internal const val TEAM_ADMIN_OVERVIEW_TAG = "teamAdminOverviewBadge"
+internal const val TEAM_ACCOUNT_GROUP_TAG_PREFIX = "teamAccountGroup:"
+internal const val TEAM_SLIDING_WINDOW_NOTICE_TAG = "teamSlidingWindowNotice"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -83,10 +87,10 @@ fun TeamUsageScreen(
         localDeviceId = localDeviceId,
         removalError = removalError,
         onSelectRange = { range -> viewModel.setRange(range) },
-        onToggleMember = { deviceId -> viewModel.toggleMember(deviceId) },
-        onRemoveMember = { deviceId -> viewModel.removeMember(deviceId) },
+        onToggleMember = { memberKey -> viewModel.toggleMember(memberKey) },
+        onRemoveMember = { memberKey -> viewModel.removeMember(memberKey) },
         onDismissRemovalError = { viewModel.clearRemovalError() },
-        onOpenSession = { deviceId, sessionId -> viewModel.openSession(deviceId, sessionId) },
+        onOpenSession = { memberKey, sessionId -> viewModel.openSession(memberKey, sessionId) },
         onCloseDetail = { viewModel.closeDetail() },
         onToggleAdvanced = { viewModel.toggleAdvanced() },
         onToggleGlossary = { viewModel.toggleGlossary() },
@@ -162,7 +166,7 @@ internal fun TeamUsageContent(
             language = language,
             onConfirm = {
                 pendingRemoval = null
-                onRemoveMember(memberToRemove.deviceId)
+                onRemoveMember(memberToRemove.memberKey)
             },
             onDismiss = { pendingRemoval = null }
         )
@@ -218,6 +222,18 @@ private fun TeamUsageList(
     ) {
         TeamUsageHeader(state = state, language = language, onSelectRange = onSelectRange)
 
+        // Sem este aviso a diferença para o modal de uma conta parece defeito:
+        // lá a janela de 5h começa no reset da quota daquela conta, e aqui não
+        // pode começar no reset de nenhuma, porque são várias.
+        if (state.isAdminOverview && state.range == CliSessionRange.LAST_5H) {
+            Text(
+                text = TeamUsageLabels.slidingWindowNotice(language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().testTag(TEAM_SLIDING_WINDOW_NOTICE_TAG)
+            )
+        }
+
         if (removalError != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -251,45 +267,59 @@ private fun TeamUsageList(
                 modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                for (member in state.members) {
-                    item(key = member.deviceId) {
-                        TeamMemberRow(
-                            member = member,
-                            share = state.tokenShareOf(member),
-                            expanded = member.deviceId in state.expandedDeviceIds,
-                            language = language,
-                            // Esta máquina volta no próximo envio, então oferecer
-                            // o botão só entregaria uma remoção que se desfaz
-                            // sozinha — e apagaria o histórico dela no caminho.
-                            removable = localDeviceId != null && member.deviceId != localDeviceId,
-                            onToggle = { onToggleMember(member.deviceId) },
-                            onRemove = { onRequestRemoveMember(member) }
-                        )
+                for (group in state.memberGroups) {
+                    // Cabeçalho só na visão global: no modal de uma conta só, a
+                    // conta já é a da janela e repeti-la aqui seria ruído.
+                    if (state.isAdminOverview) {
+                        item(key = "account:${group.accountKey}") {
+                            TeamAccountGroupHeader(group = group, language = language)
+                        }
                     }
 
-                    if (member.deviceId in state.expandedDeviceIds) {
-                        // As sessões entram como itens irmãos, e não dentro da
-                        // linha: aninhar uma lista rolável em outra quebra a
-                        // rolagem e desliga o reaproveitamento de itens.
-                        items(
-                            count = member.sessions.size,
-                            key = { index -> "${member.deviceId}:${member.sessions[index].sessionId}" }
-                        ) { index ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 24.dp)
-                                    .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
-                            ) {
-                                val session = member.sessions[index]
-                                CliSessionRow(
-                                    session = session,
-                                    language = language,
-                                    // O transcript é de outra máquina, mas os
-                                    // turnos estão no servidor desde o primeiro
-                                    // envio: o detalhe vem de lá.
-                                    onOpen = { onOpenSession(member.deviceId, session.sessionId) }
-                                )
+                    for (member in group.members) {
+                        item(key = member.memberKey) {
+                            TeamMemberRow(
+                                member = member,
+                                share = state.tokenShareOf(member),
+                                expanded = member.memberKey in state.expandedMemberKeys,
+                                language = language,
+                                // Esta máquina volta no próximo envio, então oferecer
+                                // o botão só entregaria uma remoção que se desfaz
+                                // sozinha — e apagaria o histórico dela no caminho.
+                                removable = localDeviceId != null && member.deviceId != localDeviceId,
+                                onToggle = { onToggleMember(member.memberKey) },
+                                onRemove = { onRequestRemoveMember(member) }
+                            )
+                        }
+
+                        if (member.memberKey in state.expandedMemberKeys) {
+                            // As sessões entram como itens irmãos, e não dentro da
+                            // linha: aninhar uma lista rolável em outra quebra a
+                            // rolagem e desliga o reaproveitamento de itens.
+                            items(
+                                count = member.sessions.size,
+                                key = { index ->
+                                    "${member.memberKey}:${member.sessions[index].sessionId}"
+                                }
+                            ) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 24.dp)
+                                        .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
+                                ) {
+                                    val session = member.sessions[index]
+                                    CliSessionRow(
+                                        session = session,
+                                        language = language,
+                                        // O transcript é de outra máquina, mas os
+                                        // turnos estão no servidor desde o primeiro
+                                        // envio: o detalhe vem de lá.
+                                        onOpen = {
+                                            onOpenSession(member.memberKey, session.sessionId)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -304,6 +334,48 @@ private fun TeamUsageList(
                     .testTag(TEAM_LIST_SCROLLBAR_TAG)
             )
         }
+    }
+}
+
+/**
+ * Faixa que separa uma conta da seguinte na visão global.
+ *
+ * Mostra o rótulo **e** o `accountUuid`: o rótulo é texto que o administrador
+ * digitou ao emitir a chave e o servidor não o verifica, então ele orienta mas
+ * não prova. Conta sem chave emitida aparece só pelo uuid.
+ */
+@Composable
+private fun TeamAccountGroupHeader(
+    group: TeamAccountGroup,
+    language: AppLanguage
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .testTag("$TEAM_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
+            style = MaterialTheme.typography.titleSmall,
+            color = CACHE_READ_COLOR,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = group.accountKey.orEmpty(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = TeamUsageLabels.memberCount(group.activeMemberCount, language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -332,6 +404,15 @@ private fun TeamUsageHeader(
                     style = MaterialTheme.typography.labelMedium,
                     color = CACHE_READ_COLOR,
                     fontWeight = FontWeight.SemiBold
+                )
+            }
+            if (state.isAdminOverview) {
+                Text(
+                    text = TeamUsageLabels.allAccounts(state.memberGroups.size, language),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = CACHE_READ_COLOR,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.testTag(TEAM_ADMIN_OVERVIEW_TAG)
                 )
             }
             LiveBadge(language = language)

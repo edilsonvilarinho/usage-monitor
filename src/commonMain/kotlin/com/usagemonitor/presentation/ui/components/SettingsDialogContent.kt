@@ -102,6 +102,11 @@ fun SettingsDialogContent(
     onTeamAliasChange: (String) -> Unit = {},
     onTeamProfileParticipationChange: (String, Boolean) -> Unit = { _, _ -> },
     onTeamTestConnection: () -> Unit = {},
+    teamAdminConnection: TeamConnectionUiState = TeamConnectionUiState(),
+    onTeamAdminTokenChange: (String) -> Unit = {},
+    onTeamValidateAdminToken: () -> Unit = {},
+    onTeamOpenKeysManager: () -> Unit = {},
+    onTeamExitAdminMode: () -> Unit = {},
     toastEvent: SettingsToastEvent? = null,
     modifier: Modifier = Modifier
 ) {
@@ -263,7 +268,12 @@ fun SettingsDialogContent(
                     onApiKeyChange = onTeamApiKeyChange,
                     onAliasChange = onTeamAliasChange,
                     onProfileParticipationChange = onTeamProfileParticipationChange,
-                    onTestConnection = onTeamTestConnection
+                    onTestConnection = onTeamTestConnection,
+                    adminConnection = teamAdminConnection,
+                    onAdminTokenChange = onTeamAdminTokenChange,
+                    onValidateAdminToken = onTeamValidateAdminToken,
+                    onOpenKeysManager = onTeamOpenKeysManager,
+                    onExitAdminMode = onTeamExitAdminMode
                 )
             }
         }
