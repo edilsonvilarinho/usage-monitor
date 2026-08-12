@@ -162,6 +162,15 @@ tasks.register<JavaExec>("generateScreenshots") {
     args(layout.projectDirectory.dir("img").asFile.absolutePath)
 }
 
+tasks.register<JavaExec>("generateTourGif") {
+    group = "documentation"
+    description = "Renderiza offscreen o GIF de tour do README com dados sinteticos."
+
+    mainClass.set("com.usagemonitor.screenshots.TourGifGeneratorKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(layout.projectDirectory.dir("img").asFile.absolutePath)
+}
+
 // Adicionar manifest ao desktopJar para tornÃƒÆ’Ã‚Â¡-lo executÃƒÆ’Ã‚Â¡vel
 tasks.named<Jar>("desktopJar") {
     manifest {
