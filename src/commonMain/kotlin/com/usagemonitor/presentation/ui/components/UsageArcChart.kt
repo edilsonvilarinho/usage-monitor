@@ -45,6 +45,7 @@ fun UsageArcChart(
     total: Long,
     unit: UsageUnit,
     modifier: Modifier = Modifier,
+    currencyCode: String = "USD",
     size: Dp = 80.dp,
     strokeWidth: Dp = 10.dp,
     percentageTextStyle: TextStyle? = null
@@ -69,7 +70,11 @@ fun UsageArcChart(
     val usedColor = if (isCurrency) arcColor(0f) else arcColor(percentage)
     val resolvedTextStyle = percentageTextStyle ?: MaterialTheme.typography.headlineMedium
 
-    val centerText = if (isCurrency) formatCents(total) else "${(percentage * 100).toInt()}%"
+    val centerText = if (isCurrency) {
+        formatCents(total, currencyCode)
+    } else {
+        "${(percentage * 100).toInt()}%"
+    }
 
     Box(
         contentAlignment = Alignment.Center,

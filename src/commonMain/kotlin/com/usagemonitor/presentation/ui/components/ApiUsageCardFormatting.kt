@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import kotlinx.datetime.Instant
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
@@ -85,6 +86,12 @@ internal fun buildOpenCodeModelSummaries(quotas: List<QuotaInfo>): List<OpenCode
 }
 
 internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String {
+    // Vem antes do periodType: a cota de créditos é REPORTED e seria rotulada
+    // como "Uso atual", que não diz nada sobre créditos.
+    if (quota.isExtraCreditsQuota) {
+        return if (language == AppLanguage.PT) "Créditos de uso" else "Usage credits"
+    }
+
     if (quota.unit == UsageUnit.CURRENCY_USD) {
         return quota.label
     }
@@ -146,6 +153,16 @@ internal fun historyActionLabel(language: AppLanguage): String {
 }
 
 internal fun resetLabel(quota: QuotaInfo, language: AppLanguage): String {
+    // Os créditos reiniciam junto com o ciclo mensal de cobrança. A resposta da
+    // Anthropic não traz a data desse reinício, então o texto não cita data.
+    if (quota.isExtraCreditsQuota) {
+        return if (language == AppLanguage.PT) {
+            "Reinicia no início do mês"
+        } else {
+            "Resets at the start of the month"
+        }
+    }
+
     if (quota.unit == UsageUnit.CURRENCY_USD) {
         return if (language == AppLanguage.PT) "Saldo não expira" else "Balance never expires"
     }
@@ -270,10 +287,31 @@ internal fun buildQuotaTooltipMetrics(
 ): List<TooltipMetric> {
     val metrics = mutableListOf<TooltipMetric>()
 
+    if (quota.isExtraCreditsQuota) {
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Créditos usados" else "Credits used",
+            value = formatCurrencyAmount(quota.rawUsed, quota.currencyCode)
+        )
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Limite mensal" else "Monthly limit",
+            value = formatCurrencyAmount(quota.rawTotal, quota.currencyCode)
+        )
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Percentual" else "Percentage",
+            value = "${quota.used}%"
+        )
+        metrics += TooltipMetric(
+            label = if (language == AppLanguage.PT) "Reset" else "Reset",
+            value = resetLabel(quota = quota, language = language)
+        )
+        metrics.addProjectionMetric(risk = risk, language = language)
+        return metrics
+    }
+
     if (quota.unit == UsageUnit.CURRENCY_USD) {
         metrics += TooltipMetric(
             label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
-            value = formatCurrencyAmount(quota.total)
+            value = formatCurrencyAmount(quota.total, quota.currencyCode)
         )
         metrics += TooltipMetric(
             label = if (language == AppLanguage.PT) "Status" else "Status",
@@ -327,7 +365,7 @@ private fun MutableList<TooltipMetric>.addProjectionMetric(
 
 internal fun quotaTooltipUsageValue(quota: QuotaInfo, language: AppLanguage): String {
     return when (quota.unit) {
-        UsageUnit.CURRENCY_USD -> formatCurrencyAmount(quota.total)
+        UsageUnit.CURRENCY_USD -> formatCurrencyAmount(quota.total, quota.currencyCode)
         UsageUnit.PERCENTAGE -> {
             if (quota.total > 0L) {
                 "${quota.used}/${quota.total} %"
@@ -359,30 +397,50 @@ internal fun quotaTooltipRemainingValue(quota: QuotaInfo): String {
         UsageUnit.REQUESTS -> "${quota.remaining} req"
         UsageUnit.TOKENS -> "${quota.remaining} tok"
         UsageUnit.PERCENTAGE -> "${quota.remaining} %"
-        UsageUnit.CURRENCY_USD -> formatCurrencyAmount(quota.remaining)
+        UsageUnit.CURRENCY_USD -> formatCurrencyAmount(quota.remaining, quota.currencyCode)
     }
 }
 
-internal fun formatCurrencyAmount(cents: Long): String {
+/**
+ * Símbolo da moeda. Códigos sem símbolo conhecido caem no próprio código, para
+ * nunca exibir um valor em BRL com cifrão de dólar.
+ */
+internal fun currencySymbol(currencyCode: String): String {
+    return when (currencyCode.uppercase()) {
+        "USD" -> "$"
+        "BRL" -> "R$"
+        "EUR" -> "€"
+        "GBP" -> "£"
+        else -> "${currencyCode.uppercase()} "
+    }
+}
+
+// Assume duas casas decimais (`exponent`/`decimal_places` = 2 nas moedas que as
+// fontes atuais devolvem). Moeda com outro expoente exigiria propagá-lo.
+internal fun formatCurrencyAmount(cents: Long, currencyCode: String = "USD"): String {
     val sign = if (cents < 0L) "-" else ""
     val absoluteCents = kotlin.math.abs(cents)
-    val dollars = absoluteCents / 100
+    val units = absoluteCents / 100
     val remainder = absoluteCents % 100
-    return "${sign}\$${dollars}.${remainder.toString().padStart(2, '0')}"
+    return "$sign${currencySymbol(currencyCode)}${units}.${remainder.toString().padStart(2, '0')}"
 }
 
 internal fun compactPercentageLabel(quota: QuotaInfo): String {
     return when (quota.unit) {
-        UsageUnit.CURRENCY_USD -> formatCents(quota.total)
+        UsageUnit.CURRENCY_USD -> formatCents(quota.total, quota.currencyCode)
         UsageUnit.PERCENTAGE -> "${quota.used}%"
         else -> "${(quota.percentageUsed * 100).roundToInt()}%"
     }
 }
 
 internal fun formatUsage(quota: QuotaInfo): String {
+    if (quota.isExtraCreditsQuota) {
+        return formatCreditsUsage(quota)
+    }
+
     return when (quota.unit) {
         UsageUnit.PERCENTAGE -> "${quota.used}%"
-        UsageUnit.CURRENCY_USD -> formatCents(quota.total)
+        UsageUnit.CURRENCY_USD -> formatCents(quota.total, quota.currencyCode)
         UsageUnit.TOKENS -> {
             val displayUsed = if (quota.rawUsed > 0L) quota.rawUsed else quota.used
             val displayTotal = if (quota.rawTotal > 0L) quota.rawTotal else quota.total
@@ -392,10 +450,60 @@ internal fun formatUsage(quota: QuotaInfo): String {
     }
 }
 
-internal fun formatCents(cents: Long): String {
-    val dollars = cents / 100
+/** Créditos consumidos sobre o limite mensal, na moeda da conta. */
+internal fun formatCreditsUsage(quota: QuotaInfo): String {
+    val used = formatCents(quota.rawUsed, quota.currencyCode)
+    val total = formatCents(quota.rawTotal, quota.currencyCode)
+    return "$used/$total"
+}
+
+/**
+ * Texto da linha de detalhe da cota, ou nulo quando não há detalhe a exibir.
+ *
+ * Os créditos ignoram [showUsageDetails]: o interruptor existe para esconder as
+ * estimativas de tokens da Anthropic, e os valores de crédito vêm prontos da API.
+ */
+internal fun quotaDetailText(quota: QuotaInfo, showUsageDetails: Boolean): String? {
+    if (quota.isExtraCreditsQuota) {
+        return formatCreditsUsage(quota)
+    }
+
+    if (!showUsageDetails) {
+        return null
+    }
+
+    if (quota.unit == UsageUnit.PERCENTAGE || quota.unit == UsageUnit.CURRENCY_USD) {
+        return null
+    }
+
+    return formatUsage(quota)
+}
+
+/**
+ * Ordem de exibição das cotas no card.
+ *
+ * Os créditos entram sempre por último: são leitura acessória e a posição não
+ * pode sair do `periodType`, que os colocaria à frente das janelas de uso.
+ */
+internal fun orderQuotasForCard(quotas: List<QuotaInfo>): List<QuotaInfo> {
+    val creditsQuota = quotas.firstOrNull { quota -> quota.isExtraCreditsQuota }
+    val windowQuotas = quotas.filterNot { quota -> quota.isExtraCreditsQuota }
+
+    return buildList {
+        windowQuotas.firstOrNull { quota -> quota.periodType == PeriodType.REPORTED }?.let(::add)
+        windowQuotas.firstOrNull { quota -> quota.periodType == PeriodType.INTERVAL }?.let(::add)
+        windowQuotas.firstOrNull { quota -> quota.periodType == PeriodType.WEEKLY }?.let(::add)
+        windowQuotas.filterNot { quota -> quota in this }.forEach(::add)
+        if (creditsQuota != null) {
+            add(creditsQuota)
+        }
+    }
+}
+
+internal fun formatCents(cents: Long, currencyCode: String = "USD"): String {
+    val units = cents / 100
     val remainder = cents % 100
-    return "\$${dollars}.${remainder.toString().padStart(2, '0')}"
+    return "${currencySymbol(currencyCode)}${units}.${remainder.toString().padStart(2, '0')}"
 }
 
 internal fun abbreviate(n: Long): String {

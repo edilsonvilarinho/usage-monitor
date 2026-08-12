@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.usagemonitor.presentation.ui.components.resolveApiUsageCardDensity
 import com.usagemonitor.presentation.ui.components.shouldStackCompactQuotas
+import com.usagemonitor.presentation.ui.components.shouldStackExpandedQuotas
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -59,5 +60,34 @@ class ApiUsageCardDensityTest {
         assertFalse(shouldStackCompactQuotas(cardWidth = 200.dp, quotaCount = 1))
         assertFalse(shouldStackCompactQuotas(cardWidth = 260.dp, quotaCount = 2))
         assertFalse(shouldStackCompactQuotas(cardWidth = 210.dp, quotaCount = 2))
+    }
+
+    @Test
+    fun `three compact quotas need more width than two`() {
+        // Card da Anthropic com a cota de créditos: o limite acompanha a
+        // quantidade de badges em vez de ficar preso no valor de duas cotas.
+        assertTrue(shouldStackCompactQuotas(cardWidth = 300.dp, quotaCount = 3))
+        assertFalse(shouldStackCompactQuotas(cardWidth = 315.dp, quotaCount = 3))
+        assertFalse(shouldStackCompactQuotas(cardWidth = 300.dp, quotaCount = 2))
+    }
+
+    @Test
+    fun `expanded quotas stack when the arcs do not fit side by side`() {
+        assertFalse(shouldStackExpandedQuotas(cardWidth = 288.dp, quotaCount = 3))
+        assertTrue(shouldStackExpandedQuotas(cardWidth = 287.dp, quotaCount = 3))
+        assertFalse(shouldStackExpandedQuotas(cardWidth = 287.dp, quotaCount = 2))
+        assertFalse(shouldStackExpandedQuotas(cardWidth = 100.dp, quotaCount = 1))
+    }
+
+    @Test
+    fun `narrow density fits three expanded arcs at the stacking threshold`() {
+        val density = resolveApiUsageCardDensity(288.dp)
+        val contentWidth = 288.dp - density.contentHorizontalPadding * 2
+        val columnsWidth = density.arcSize * 3 + density.expandedQuotaSpacing * 2
+
+        assertTrue(
+            contentWidth >= columnsWidth,
+            "Faltou ${columnsWidth - contentWidth} para as três colunas"
+        )
     }
 }
