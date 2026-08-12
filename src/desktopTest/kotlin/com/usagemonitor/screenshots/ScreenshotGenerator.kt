@@ -1,0 +1,355 @@
+package com.usagemonitor.screenshots
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageHistoryReport
+import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.repository.UsageHistoryRepository
+import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
+import com.usagemonitor.domain.usecase.CliSessionDetailResult
+import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
+import com.usagemonitor.presentation.ui.CliSessionsContent
+import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.TeamUsageContent
+import com.usagemonitor.presentation.ui.components.FooterBar
+import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
+import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
+import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
+import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.HistoryUiState
+import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.datetime.Instant
+import org.jetbrains.skia.EncodedImageFormat
+import java.io.File
+import kotlin.time.Duration.Companion.seconds
+import com.usagemonitor.domain.entity.AppTheme as AppThemePreference
+
+/**
+ * Gera as capturas de tela do README a partir dos composables reais, com os
+ * dados sintéticos de [ScreenshotFixtures].
+ *
+ * A alternativa — fotografar a app rodando — colocaria e-mail, organização e
+ * caminho de projeto reais em imagem publicada num repositório público. Aqui não
+ * há o que censurar: o dado nunca existe.
+ *
+ * Rodar com `gradlew.bat generateScreenshots`.
+ */
+
+/** Fator de supersampling: 2 deixa o texto legível no README em telas HiDPI. */
+private const val SCALE = 2
+
+/**
+ * Aquecimento antes do frame publicado.
+ *
+ * `ApiUsageCard` só aparece depois de `delay(index * 90)` seguido de
+ * `AnimatedVisibility`, e são dois relógios diferentes: o `delay` roda em
+ * `Dispatchers.Unconfined`, que espera **tempo real**, enquanto a animação
+ * consome o `nanoTime` passado a `render`. Avançar só um dos dois deixa a cena
+ * em branco — foi o que aconteceu na primeira versão deste gerador.
+ *
+ * Por isso o laço dorme de verdade entre frames e ainda adianta o relógio da
+ * cena. Um segundo real cobre com folga o maior `delay` da grade (270ms), e dois
+ * segundos de tempo de cena encerram qualquer fade de entrada.
+ */
+private const val WARMUP_FRAMES = 20
+private const val WARMUP_SLEEP_MILLIS = 50L
+private const val FRAME_STEP_NANOS = 100_000_000L
+
+fun main(args: Array<String>) {
+    val outputDir = File(args.firstOrNull() ?: "img")
+    outputDir.mkdirs()
+
+    val generator = ScreenshotGenerator(outputDir)
+
+    generator.dashboard()
+    generator.history()
+    generator.settings()
+    generator.settingsTeam()
+    generator.cliSessions()
+    generator.cliSessionDetail()
+    generator.teamUsage()
+
+    println("Capturas geradas em ${outputDir.absolutePath}")
+}
+
+private class ScreenshotGenerator(private val outputDir: File) {
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun capture(name: String, widthDp: Int, heightDp: Int, content: @Composable () -> Unit) {
+        val scene = ImageComposeScene(
+            width = widthDp * SCALE,
+            height = heightDp * SCALE,
+            density = Density(SCALE.toFloat())
+        )
+
+        try {
+            scene.setContent {
+                AppTheme(isDark = true) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        content()
+                    }
+                }
+            }
+
+            // A primeira passada dispara os efeitos; o laço deixa o tempo real e
+            // o da cena avançarem juntos até tudo estar assentado.
+            scene.render(0L)
+            var sceneNanos = 0L
+            repeat(WARMUP_FRAMES) {
+                Thread.sleep(WARMUP_SLEEP_MILLIS)
+                sceneNanos += FRAME_STEP_NANOS
+                scene.render(sceneNanos)
+            }
+
+            val image = scene.render(sceneNanos + FRAME_STEP_NANOS)
+            val data = image.encodeToData(EncodedImageFormat.PNG)
+                ?: error("Falha ao codificar $name em PNG.")
+
+            val file = File(outputDir, "$name.png")
+            file.writeBytes(data.bytes)
+            println("  ${file.name} (${widthDp * SCALE}x${heightDp * SCALE})")
+        } finally {
+            scene.close()
+        }
+    }
+
+    fun dashboard() = capture("dashboard", widthDp = 1_040, heightDp = 690) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                ResponsiveDashboardCardGrid(
+                    items = ScreenshotFixtures.dashboardStats,
+                    refreshingTargets = emptySet(),
+                    minimizedCards = emptySet(),
+                    riskSummaries = ScreenshotFixtures.dashboardRiskSummaries,
+                    language = AppLanguage.PT,
+                    onRefreshCard = {},
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistoryCard = { _, _ -> },
+                    teamEnabledProfileIds = setOf("default"),
+                    now = ScreenshotFixtures.NOW,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            FooterBar(
+                appVersion = APP_VERSION,
+                language = AppLanguage.PT,
+                nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(437),
+                onRefresh = {},
+                onOpenSettings = {},
+                nowProvider = { ScreenshotFixtures.NOW },
+                // O contador só precisa do valor inicial; o laço de um segundo
+                // por tique só produziria frames diferentes a cada execução.
+                countdownUpdatesEnabled = false
+            )
+        }
+    }
+
+    fun history() = capture("history", widthDp = 880, heightDp = 840) {
+        HistoryScreen(
+            viewModel = fixedHistoryViewModel(),
+            language = AppLanguage.PT,
+            onBack = {},
+            focusedSource = ApiSource.ANTHROPIC
+        )
+    }
+
+    // Altura escolhida para o corte cair entre cartões: a seção de time começa
+    // logo abaixo e entraria pela metade, com o título cortado ao meio.
+    fun settings() = capture("settings", widthDp = 640, heightDp = 872) {
+        SettingsDialogContent(
+            currentTheme = AppThemePreference.DARK,
+            currentLanguage = AppLanguage.PT,
+            enabledApis = ScreenshotFixtures.enabledApis,
+            autoStartEnabled = true,
+            alwaysOnTopEnabled = false,
+            windowOpacityPercent = 92,
+            onThemeToggle = {},
+            onLanguageChange = {},
+            onAutoStartChange = {},
+            onAlwaysOnTopChange = {},
+            onApiToggle = { _, _ -> },
+            anthropicProfiles = ScreenshotFixtures.anthropicProfiles
+        )
+    }
+
+    /**
+     * A seção de time isolada, e não o diálogo inteiro.
+     *
+     * `SettingsDialogContent` rola internamente e a cena nasce no topo: pedir o
+     * diálogo aqui devolveria de novo a captura de [settings], com a seção de
+     * time fora do quadro.
+     */
+    fun settingsTeam() = capture("settings-team", widthDp = 620, heightDp = 610) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                TeamIntegrationSection(
+                    settings = ScreenshotFixtures.teamSettings,
+                    language = AppLanguage.PT,
+                    profiles = ScreenshotFixtures.anthropicProfiles,
+                    connection = ScreenshotFixtures.teamConnection,
+                    onEnabledChange = {},
+                    onServerUrlChange = {},
+                    onApiKeyChange = {},
+                    onAliasChange = {},
+                    onProfileParticipationChange = { _, _ -> },
+                    onTestConnection = {},
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+    }
+
+    fun cliSessions() = capture("cli-sessions", widthDp = 1_060, heightDp = 440) {
+        CliSessionsContent(
+            state = CliSessionsUiState.Success(
+                sessions = ScreenshotFixtures.cliSessions,
+                range = CliSessionRange.LAST_5H,
+                rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
+                rangeAnchored = true,
+                profileLabel = "Padrão",
+                lastChangedAt = ScreenshotFixtures.NOW
+            ),
+            language = AppLanguage.PT,
+            onSelectRange = {},
+            onOpenSession = {},
+            onCloseDetail = {}
+        )
+    }
+
+    fun cliSessionDetail() = capture("cli-session-detail", widthDp = 1_060, heightDp = 980) {
+        val detail = ScreenshotFixtures.saturatedSessionDetail
+
+        CliSessionsContent(
+            state = CliSessionsUiState.Success(
+                sessions = ScreenshotFixtures.cliSessions,
+                range = CliSessionRange.LAST_5H,
+                profileLabel = "Padrão",
+                lastChangedAt = ScreenshotFixtures.NOW,
+                detail = CliSessionDetailUiState.Ready(
+                    sessionId = detail.summary.sessionId,
+                    result = CliSessionDetailResult(
+                        detail = detail,
+                        analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                    )
+                ),
+                advancedExpanded = true
+            ),
+            language = AppLanguage.PT,
+            onSelectRange = {},
+            onOpenSession = {},
+            onCloseDetail = {}
+        )
+    }
+
+    fun teamUsage() = capture("team-usage", widthDp = 1_060, heightDp = 600) {
+        TeamUsageContent(
+            state = TeamUsageUiState.Success(
+                members = ScreenshotFixtures.teamMembers,
+                range = CliSessionRange.LAST_5H,
+                rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
+                rangeAnchored = true,
+                accountLabel = "dev@example.com — Example Org",
+                expandedDeviceIds = setOf("device-a1"),
+                lastChangedAt = ScreenshotFixtures.NOW
+            ),
+            language = AppLanguage.PT,
+            onSelectRange = {},
+            onToggleMember = {},
+            localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID
+        )
+    }
+}
+
+/** Versão exibida no rodapé; a real vem do build e mudaria a imagem a cada release. */
+private const val APP_VERSION = "27.0.0"
+
+/**
+ * `HistoryScreen` recebe o ViewModel, não o estado.
+ *
+ * O repositório falso responde na hora, mas a carga roda em `Dispatchers.Default`:
+ * sem esperar o `Success`, a captura pegaria o spinner. Daí o bloqueio até o
+ * estado chegar, com prazo para não travar o build se algo mudar.
+ */
+private fun fixedHistoryViewModel(): HistoryViewModel {
+    val repository = object : UsageHistoryRepository {
+        override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+        override suspend fun listAccounts(source: ApiSource): List<UsageAccountContext> {
+            return ScreenshotFixtures.historyAccounts
+        }
+
+        override suspend fun getHistoryReport(
+            source: ApiSource,
+            range: HistoryRange,
+            now: Instant
+        ): ApiUsageHistoryReport = ScreenshotFixtures.historyReport
+
+        override suspend fun getHistoryReport(
+            source: ApiSource,
+            accountKey: UsageAccountKey?,
+            range: HistoryRange,
+            now: Instant
+        ): ApiUsageHistoryReport = ScreenshotFixtures.historyReport
+    }
+
+    val viewModel = HistoryViewModel(
+        getUsageHistory = GetUsageHistoryUseCase(repository),
+        enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC, ApiSource.CODEX, ApiSource.DEEPSEEK))
+    )
+
+    runBlocking {
+        withTimeout(10.seconds) {
+            viewModel.uiState.first { state -> state is HistoryUiState.Success }
+        }
+    }
+
+    return viewModel
+}
+
+private fun Instant.plusSeconds(seconds: Long): Instant =
+    Instant.fromEpochMilliseconds(toEpochMilliseconds() + seconds * 1_000L)
