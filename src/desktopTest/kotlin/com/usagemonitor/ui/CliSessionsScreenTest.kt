@@ -82,6 +82,34 @@ class CliSessionsScreenTest {
         onNodeWithText("custo estimado · janela 5h até 11/08 00:30 BRT").assertIsDisplayed()
     }
 
+    /**
+     * Issue #35: reset vencido ancora a janela nova no próprio reset, mas o fim
+     * dela só existe quando a API publicar o `resets_at` seguinte. Dizer "até
+     * HH:MM" ali seria inventar um horário.
+     */
+    @Test
+    fun `header names the window opened by the reset when its end is unknown`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            rangeEndsAt = null,
+                            rangeAnchored = true
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("custo estimado · janela 5h desde o reinício").assertIsDisplayed()
+    }
+
     /** 7 dias é janela corrida desde a issue #28: sem "até", e no masculino. */
     @Test
     fun `header names the 7d window as a sliding one`() = runDesktopComposeUiTest {

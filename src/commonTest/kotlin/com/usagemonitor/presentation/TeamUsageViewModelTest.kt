@@ -24,7 +24,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 private val TEAM_FIXED_NOW = Instant.parse("2026-08-11T12:00:00Z")
@@ -66,6 +69,14 @@ private class FakeTeamRepository(
 
 private class TeamFixedClock(private val fixedNow: Instant) : Clock {
     override fun now(): Instant = fixedNow
+}
+
+/** Anda junto com o tempo virtual: avançar o laço e avançar o relógio viram um gesto só. */
+private class TeamSchedulerClock(
+    private val origin: Instant,
+    private val scheduler: kotlinx.coroutines.test.TestCoroutineScheduler
+) : Clock {
+    override fun now(): Instant = origin + scheduler.currentTime.milliseconds
 }
 
 private fun session(id: String, tokens: Long = 0L, cost: Long = 0L): CliSessionSummary {
@@ -215,6 +226,53 @@ class TeamUsageViewModelTest {
         // time não fecham com os locais.
         assertEquals(resetAt.toEpochMilliseconds() - TEAM_FIVE_HOURS_MILLIS, repository.lastCutoffMillis)
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertTrue(state.rangeAnchored)
+        viewModel.onDestroy()
+    }
+
+    /**
+     * Issue #35: com o reset vencido o corte voltava a `now - 5h` e a tela do
+     * time listava sessões de antes do reset junto com a janela nova.
+     */
+    @Test
+    fun `um reset vencido corta no proprio reset`() = runTest {
+        val repository = FakeTeamRepository()
+        val viewModel = buildViewModel(repository)
+        val expiredResetAt = TEAM_FIXED_NOW.minus(30.minutes)
+
+        viewModel.openForAccount(ACCOUNT_KEY, null, CliQuotaWindows(fiveHourEndsAt = expiredResetAt))
+        runCurrent()
+
+        assertEquals(expiredResetAt.toEpochMilliseconds(), repository.lastCutoffMillis)
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertNull(state.rangeEndsAt)
+        assertTrue(state.rangeAnchored)
+        viewModel.onDestroy()
+    }
+
+    /**
+     * `setQuotaWindows` só recarrega quando o valor muda, e o `fiveHourEndsAt`
+     * não muda ao vencer: quem vira a chave é o tique do laço ao vivo.
+     */
+    @Test
+    fun `o laco ao vivo reancora a janela quando o reset vence`() = runTest {
+        val repository = FakeTeamRepository()
+        val resetAt = TEAM_FIXED_NOW.plus(2.seconds)
+        val viewModel = buildViewModel(
+            repository = repository,
+            useCaseClock = TeamSchedulerClock(TEAM_FIXED_NOW, testScheduler)
+        )
+
+        viewModel.openForAccount(ACCOUNT_KEY, null, CliQuotaWindows(fiveHourEndsAt = resetAt))
+        runCurrent()
+        assertEquals(resetAt.toEpochMilliseconds() - TEAM_FIVE_HOURS_MILLIS, repository.lastCutoffMillis)
+
+        advanceTimeBy(TEAM_LIVE_INTERVAL_MILLIS)
+        runCurrent()
+
+        assertEquals(resetAt.toEpochMilliseconds(), repository.lastCutoffMillis)
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertNull(state.rangeEndsAt)
         assertTrue(state.rangeAnchored)
         viewModel.onDestroy()
     }
@@ -410,9 +468,14 @@ class TeamUsageViewModelTest {
     }
 
     /** Compartilha o `testScheduler` do `runTest`, senão `advanceTimeBy` não move o laço. */
-    private fun TestScope.buildViewModel(repository: FakeTeamRepository): TeamUsageViewModel {
+    private fun TestScope.buildViewModel(
+        repository: FakeTeamRepository,
+        // O corte da janela é resolvido dentro do caso de uso; separá-lo do
+        // relógio do carimbo permite mover o tempo só onde interessa.
+        useCaseClock: Clock = TeamFixedClock(TEAM_FIXED_NOW)
+    ): TeamUsageViewModel {
         return TeamUsageViewModel(
-            getTeamUsage = GetTeamUsageUseCase(repository, TeamFixedClock(TEAM_FIXED_NOW)),
+            getTeamUsage = GetTeamUsageUseCase(repository, useCaseClock),
             removeTeamMember = RemoveTeamMemberUseCase(repository),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = TEAM_LIVE_INTERVAL_MILLIS,

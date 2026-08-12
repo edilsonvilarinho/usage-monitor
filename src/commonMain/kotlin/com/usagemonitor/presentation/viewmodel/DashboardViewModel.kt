@@ -164,6 +164,9 @@ class DashboardViewModel(
                 }
                 publishUiState(enabled)
             }
+            // O snapshot de disco pode trazer um reset que vence antes do poll —
+            // inclusive um já vencido enquanto o app esteve fechado.
+            nudgeCountdown()
         }
     }
 
@@ -177,20 +180,37 @@ class DashboardViewModel(
         }
     }
 
+    /**
+     * Laço único de despertar, com dois gatilhos.
+     *
+     * O ciclo de dez minutos continua sendo o normal, mas ele sozinho deixava o
+     * card repetindo a janela anterior por até um poll inteiro depois do reset —
+     * o app só descobria o vencimento quando a API era chamada de novo. Agora o
+     * alvo da espera é o que vier primeiro: o poll agendado ou o próximo
+     * `periodEndAt` conhecido.
+     */
     private fun startCountdown() {
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
             while (true) {
-                val currentTarget = scheduledRefreshAt
-                _nextRefreshAt.value = currentTarget
-                val waitMillis = (currentTarget - clock.now()).inWholeMilliseconds.coerceAtLeast(0L)
+                val pollTarget = scheduledRefreshAt
+                val resetTarget = nextQuotaResetTarget()
+                val wakeUpAt = if (resetTarget != null && resetTarget < pollTarget) resetTarget else pollTarget
+                val wokeUpForReset = wakeUpAt < pollTarget
+                // O rodapé continua contando para o poll: o despertar por reset é
+                // uma antecipação, não um novo prazo a anunciar.
+                _nextRefreshAt.value = pollTarget
+                val waitMillis = (wakeUpAt - clock.now()).inWholeMilliseconds.coerceAtLeast(0L)
                 val rescheduled = withTimeoutOrNull(waitMillis) {
                     pollWakeUpSignal.receive()
                 } != null
                 if (rescheduled) {
                     continue
                 }
-                if (!isAppVisible.value) {
+                // A janela minimizada é justamente o caso do bug: esperar a
+                // visibilidade deixaria o card congelado no valor da janela que
+                // já venceu. Só o ciclo normal de poll respeita a visibilidade.
+                if (!wokeUpForReset && !isAppVisible.value) {
                     isAppVisible.first { it }
                 }
                 viewModelScope.launch {
@@ -199,6 +219,45 @@ class DashboardViewModel(
                 scheduleNextRefresh()
             }
         }
+    }
+
+    /**
+     * Instante em que vale a pena coletar por causa de um reset de cota.
+     *
+     * Só entram cotas com reset conhecido e ainda no futuro: sem reset conhecido
+     * o `periodEndAt` é o sentinela distante do mapper, e um reset já vencido
+     * viraria espera de zero milissegundo — um laço que bateria na API sem parar.
+     */
+    private suspend fun nextQuotaResetTarget(): Instant? {
+        val now = clock.now()
+        val snapshot = stateMutex.withLock { cachedStatsByTarget.values.toList() }
+
+        var earliest: Instant? = null
+        for (stats in snapshot) {
+            for (quota in stats.quotas) {
+                if (!quota.hasKnownResetAt || quota.periodEndAt <= now) {
+                    continue
+                }
+                val currentEarliest = earliest
+                if (currentEarliest == null || quota.periodEndAt < currentEarliest) {
+                    earliest = quota.periodEndAt
+                }
+            }
+        }
+
+        val resolvedEarliest = earliest ?: return null
+        return resolvedEarliest + config.quotaResetGrace
+    }
+
+    /**
+     * Faz o laço recalcular o alvo sem mexer no agendamento do poll.
+     *
+     * Uma coleta pode trazer um `periodEndAt` mais próximo que o alvo em que o
+     * laço já está dormindo; sem este empurrão o reset novo só seria visto no
+     * poll seguinte.
+     */
+    private fun nudgeCountdown() {
+        pollWakeUpSignal.trySend(Unit)
     }
 
     private suspend fun requestFetch(
@@ -344,6 +403,10 @@ class DashboardViewModel(
 
                 publishUiState(latestEnabledTargets)
             }
+
+            // Os resets recém-coletados podem ser anteriores ao alvo em que o
+            // laço já está dormindo; sem isto ele só os leria no poll seguinte.
+            nudgeCountdown()
 
             persistDashboardCache()
         } finally {

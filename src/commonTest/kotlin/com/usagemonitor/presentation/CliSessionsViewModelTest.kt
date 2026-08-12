@@ -27,6 +27,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -239,6 +240,66 @@ class CliSessionsViewModelTest {
         assertEquals(resetsAt, state.rangeEndsAt)
         assertTrue(state.rangeAnchored)
         viewModel.onDestroy()
+    }
+
+    /**
+     * Issue #35: com o reset vencido o corte voltava a `now - 5h` e a lista
+     * continuava mostrando turnos da janela de quota anterior.
+     */
+    @Test
+    fun `an expired quota reset cuts at the reset`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository, autoLoad = false)
+        val expiredResetAt = FIXED_NOW - 30.minutes
+
+        viewModel.openForProfile(
+            profileId = "conta2",
+            profileLabel = "INFORMATA2",
+            quotaWindows = CliQuotaWindows(fiveHourEndsAt = expiredResetAt)
+        )
+
+        assertEquals(expiredResetAt.toEpochMilliseconds(), repository.lastSinceEpochMillis)
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertNull(state.rangeEndsAt)
+        assertTrue(state.rangeAnchored)
+        viewModel.onDestroy()
+    }
+
+    /**
+     * `setQuotaWindows` só recarrega quando o valor muda, e o `fiveHourEndsAt`
+     * não muda ao vencer: quem vira a chave é o tique do laço ao vivo.
+     */
+    @Test
+    fun `the live loop re-anchors the window when the reset expires`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val resetsAt = FIXED_NOW + 2.seconds
+        val viewModel = buildViewModel(
+            repository = repository,
+            autoLoad = false,
+            useCaseClock = SchedulerClock(FIXED_NOW, testScheduler)
+        )
+
+        try {
+            viewModel.openForProfile(
+                profileId = "conta2",
+                profileLabel = "INFORMATA2",
+                quotaWindows = CliQuotaWindows(fiveHourEndsAt = resetsAt)
+            )
+            assertEquals(
+                resetsAt.toEpochMilliseconds() - FIVE_HOURS_MILLIS,
+                repository.lastSinceEpochMillis
+            )
+
+            advanceTimeBy(LIVE_INTERVAL_MILLIS)
+            runCurrent()
+
+            assertEquals(resetsAt.toEpochMilliseconds(), repository.lastSinceEpochMillis)
+            val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+            assertNull(state.rangeEndsAt)
+            assertTrue(state.rangeAnchored)
+        } finally {
+            viewModel.onDestroy()
+        }
     }
 
     @Test
@@ -624,10 +685,13 @@ class CliSessionsViewModelTest {
         repository: FakeCliSessionRepository,
         autoLoad: Boolean = true,
         backgroundIndexIntervalMillis: Long? = null,
-        clock: Clock = FixedClock(FIXED_NOW)
+        clock: Clock = FixedClock(FIXED_NOW),
+        // O corte da janela é resolvido dentro do caso de uso; separá-lo do
+        // relógio do carimbo permite mover o tempo só onde interessa.
+        useCaseClock: Clock = FixedClock(FIXED_NOW)
     ): CliSessionsViewModel {
         return CliSessionsViewModel(
-            getCliSessions = GetCliSessionsUseCase(repository, FixedClock(FIXED_NOW)),
+            getCliSessions = GetCliSessionsUseCase(repository, useCaseClock),
             getCliSessionDetail = GetCliSessionDetailUseCase(repository),
             syncCliSessionIndex = SyncCliSessionIndexUseCase(repository),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
@@ -679,6 +743,14 @@ class CliSessionsViewModelTest {
 /** Relógio parado: o corte da janela precisa ser conferível ao milissegundo. */
 private class FixedClock(private val fixedNow: Instant) : Clock {
     override fun now(): Instant = fixedNow
+}
+
+/** Anda junto com o tempo virtual: avançar o laço e avançar o relógio viram um gesto só. */
+private class SchedulerClock(
+    private val origin: Instant,
+    private val scheduler: kotlinx.coroutines.test.TestCoroutineScheduler
+) : Clock {
+    override fun now(): Instant = origin + scheduler.currentTime.milliseconds
 }
 
 /** Avança um segundo por leitura, para distinguir dois carimbos de alteração. */

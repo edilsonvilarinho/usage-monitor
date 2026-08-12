@@ -69,12 +69,13 @@ internal object TeamUsageLabels {
     fun estimatedTotalInRange(
         range: CliSessionRange,
         endsAt: Instant?,
+        isAnchored: Boolean,
         language: AppLanguage
     ): String {
         if (range == CliSessionRange.ALL) {
             return CliSessionsLabels.estimatedTotal(language)
         }
-        return CliSessionsLabels.estimatedTotalInRange(range, endsAt, language)
+        return CliSessionsLabels.estimatedTotalInRange(range, endsAt, isAnchored, language)
     }
 
     /** Integrante conhecido pelo servidor, mas sem nenhum turno na janela. */

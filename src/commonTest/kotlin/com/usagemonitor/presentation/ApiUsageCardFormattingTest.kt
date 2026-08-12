@@ -97,8 +97,11 @@ class ApiUsageCardFormattingTest {
 
     @Test
     fun `credits quota resets monthly instead of never expiring`() {
-        assertEquals("Reinicia no início do mês", resetLabel(creditsQuota, AppLanguage.PT))
-        assertEquals("Resets at the start of the month", resetLabel(creditsQuota, AppLanguage.EN))
+        // `now` depois do `periodEndAt`: os créditos não têm janela de quota, então
+        // o rótulo deles precisa ganhar do ramo de janela vencida.
+        val afterPeriodEnd = Instant.parse("2026-08-11T21:00:00Z")
+        assertEquals("Reinicia no início do mês", resetLabel(creditsQuota, AppLanguage.PT, afterPeriodEnd))
+        assertEquals("Resets at the start of the month", resetLabel(creditsQuota, AppLanguage.EN, afterPeriodEnd))
     }
 
     @Test

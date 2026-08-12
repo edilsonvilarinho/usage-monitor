@@ -354,7 +354,12 @@ private fun TeamUsageHeader(
                     color = INPUT_COLOR
                 )
                 Text(
-                    text = TeamUsageLabels.estimatedTotalInRange(state.range, state.rangeEndsAt, language),
+                    text = TeamUsageLabels.estimatedTotalInRange(
+                        range = state.range,
+                        endsAt = state.rangeEndsAt,
+                        isAnchored = state.rangeAnchored,
+                        language = language
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
