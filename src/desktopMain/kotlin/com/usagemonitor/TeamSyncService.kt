@@ -12,10 +12,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 /** Conta Anthropic que participa do time, resolvida a partir de um perfil local. */
 internal data class TeamSyncTarget(
@@ -33,6 +37,44 @@ internal data class TeamSyncReport(
 ) {
     val hasFailure: Boolean
         get() = failures.isNotEmpty()
+}
+
+/**
+ * Identidade já confirmada pelo servidor para uma conta.
+ *
+ * Carrega a chave junto do apelido porque as duas definem o que o servidor sabe:
+ * o apelido é o que ele grava, e a chave é o que amarra a conta a um time.
+ */
+internal data class ConfirmedIdentity(
+    val alias: String,
+    val apiKey: String
+)
+
+private fun TeamIntegrationSettings.confirmedIdentity(): ConfirmedIdentity {
+    return ConfirmedIdentity(alias = alias, apiKey = apiKey)
+}
+
+/**
+ * O que a última passada de envio produziu, para a tela poder mostrar.
+ *
+ * Antes o [TeamSyncReport] era montado e descartado: uma máquina que falhava em
+ * todo envio não dava nenhum sinal, e o usuário só percebia pela ausência dos
+ * próprios dados na tela dos colegas — sem nada que apontasse a causa.
+ */
+data class TeamSyncStatus(
+    val lastSuccessAt: Instant? = null,
+    val lastFailureAt: Instant? = null,
+    val lastFailureMessage: String? = null
+) {
+    /**
+     * Há falha pendente, e o aviso deve aparecer.
+     *
+     * A pendência é apagada no sucesso em vez de deduzida da ordem dos
+     * carimbos: duas passadas no mesmo milissegundo — comum quando o envio não
+     * tem nada a fazer — empatariam, e o aviso ficaria preso na tela.
+     */
+    val isFailing: Boolean
+        get() = lastFailureMessage != null
 }
 
 /**
@@ -85,14 +127,25 @@ internal class TeamSyncService(
     private var immediateJob: Job? = null
 
     /**
-     * Último apelido que o servidor confirmou, por conta.
+     * Última identidade que o servidor confirmou, por conta.
      *
      * Só em memória: o custo de errar é uma requisição de ~200 bytes por conta a
      * cada início do app, que ainda serve de heartbeat para o `last_seen_at`.
      * Persistir isso ao lado de `team_sync_state` seria estado a mais para
      * economizar esse POST. O acesso é sempre de dentro do [passMutex].
+     *
+     * A **chave de time entra na comparação** junto do apelido. Guardar só o
+     * apelido fazia trocar a chave não gerar requisição nenhuma: numa máquina sem
+     * turno pendente — o caso normal de quem já sincronizou tudo — nada era
+     * enviado, e o vínculo da chave nova com a conta, que só nasce num ingest,
+     * nunca acontecia. O time inteiro ficava sem conseguir ler.
      */
-    private val lastSentAliasByAccount = mutableMapOf<String, String>()
+    private val confirmedIdentityByAccount = mutableMapOf<String, ConfirmedIdentity>()
+
+    private val _syncStatus = MutableStateFlow(TeamSyncStatus())
+
+    /** Desfecho da última passada, para as Configurações mostrarem. */
+    val syncStatus: StateFlow<TeamSyncStatus> = _syncStatus.asStateFlow()
 
     /** Idempotente: chamar com o laço já rodando não abre um segundo. */
     fun start() {
@@ -175,7 +228,36 @@ internal class TeamSyncService(
                 failures += result.failures
             }
 
-            TeamSyncReport(pushedTurns = pushedTurns, batches = batches, failures = failures)
+            val report = TeamSyncReport(
+                pushedTurns = pushedTurns,
+                batches = batches,
+                failures = failures
+            )
+            publishStatus(report)
+            report
+        }
+    }
+
+    /**
+     * Publica o desfecho da passada para a tela de Configurações.
+     *
+     * A primeira falha é a que fica: as seguintes costumam ser a mesma causa, e
+     * trocar a mensagem a cada tique de 30s faria o aviso piscar sem informar
+     * nada novo.
+     */
+    private fun publishStatus(report: TeamSyncReport) {
+        val now = clock.now()
+        val current = _syncStatus.value
+        _syncStatus.value = if (report.hasFailure) {
+            current.copy(
+                lastFailureAt = now,
+                lastFailureMessage = report.failures.first().message ?: UNKNOWN_FAILURE_MESSAGE
+            )
+        } else {
+            // Passada limpa apaga a falha: o aviso é sobre o estado atual, e uma
+            // mensagem que sobrevive ao conserto manda o usuário atrás de um
+            // problema que já não existe.
+            TeamSyncStatus(lastSuccessAt = now)
         }
     }
 
@@ -230,10 +312,10 @@ internal class TeamSyncService(
                 return TeamSyncReport(pushedTurns, batches, failures + failure)
             }
 
-            // O lote carrega a mesma identidade, então confirma o apelido tanto
-            // quanto o envio dedicado — e evita repeti-lo na próxima passada
-            // quando o envio de identidade falhou mas este aqui passou.
-            lastSentAliasByAccount[target.accountKey] = settings.alias
+            // O lote carrega a mesma identidade e vai com a mesma chave, então
+            // confirma tanto quanto o envio dedicado — e evita repeti-lo na
+            // próxima passada quando o envio de identidade falhou mas este passou.
+            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity()
 
             runCatching { syncStateDataSource.markPushed(batch.turns, clock.now()) }
                 .onFailure { error -> return TeamSyncReport(pushedTurns, batches, failures + error) }
@@ -251,12 +333,17 @@ internal class TeamSyncService(
     }
 
     /**
-     * Manda só a identidade quando o apelido mudou desde a última confirmação.
+     * Manda só a identidade quando o apelido **ou a chave** mudaram desde a
+     * última confirmação.
      *
      * O `POST /v1/ingest` aceita `sessions` e `turns` vazios e faz o upsert do
      * membro antes de qualquer laço, então este envio é barato e não depende de
      * haver turno novo. O marcador só avança no sucesso: falhar aqui faz a
      * próxima passada tentar de novo.
+     *
+     * A chave entra na condição porque é ela que amarra a conta no servidor: sem
+     * isso, quem trocasse de chave sem ter turno pendente não emitia requisição
+     * nenhuma e a conta ficava sem dona.
      *
      * Devolve a falha, ou `null` quando não havia o que enviar ou o envio passou.
      */
@@ -264,7 +351,7 @@ internal class TeamSyncService(
         settings: TeamIntegrationSettings,
         target: TeamSyncTarget
     ): Throwable? {
-        if (lastSentAliasByAccount[target.accountKey] == settings.alias) {
+        if (confirmedIdentityByAccount[target.accountKey] == settings.confirmedIdentity()) {
             return null
         }
 
@@ -284,12 +371,14 @@ internal class TeamSyncService(
 
         val failure = pushTeamUsage(payload, force = true).exceptionOrNull()
         if (failure == null) {
-            lastSentAliasByAccount[target.accountKey] = settings.alias
+            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity()
         }
         return failure
     }
 
     companion object {
+        private const val UNKNOWN_FAILURE_MESSAGE = "falha desconhecida no envio ao time"
+
         /** Latência com que uma máquina aparece para as outras. */
         const val DEFAULT_INTERVAL_MILLIS = 30_000L
 

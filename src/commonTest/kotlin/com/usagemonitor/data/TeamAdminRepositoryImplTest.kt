@@ -1,0 +1,129 @@
+package com.usagemonitor.data
+
+import com.usagemonitor.data.datasource.RemoteTeamDataSource
+import com.usagemonitor.data.datasource.TeamCredential
+import com.usagemonitor.data.datasource.TeamServerException
+import com.usagemonitor.data.dto.TeamVerificationDto
+import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import io.ktor.client.HttpClient
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+private val CONFIGURED = TeamIntegrationSettings(
+    enabled = true,
+    serverUrl = "http://localhost:3000",
+    apiKey = "chave-de-time-com-tamanho-suficiente",
+    alias = "edilson",
+    deviceId = "device-1"
+)
+
+private const val ACCOUNT_KEY = "account-uuid-aaa"
+
+/** Fake do data source: nenhuma das chamadas abaixo toca a rede. */
+private class FakeRemoteTeamDataSource(
+    private val claimResult: Result<TeamVerificationDto>,
+    private val verifyResult: Result<TeamVerificationDto>
+) : RemoteTeamDataSource(HttpClient()) {
+    var claimCalls = 0
+    var verifyCalls = 0
+
+    override suspend fun claimKey(
+        baseUrl: String,
+        credential: TeamCredential,
+        accountKey: String
+    ): TeamVerificationDto {
+        claimCalls += 1
+        return claimResult.getOrThrow()
+    }
+
+    override suspend fun verifyKey(
+        baseUrl: String,
+        credential: TeamCredential,
+        accountKey: String
+    ): TeamVerificationDto {
+        verifyCalls += 1
+        return verifyResult.getOrThrow()
+    }
+}
+
+class TeamAdminRepositoryImplTest {
+
+    @Test
+    fun `vincula quando o servidor tem a rota`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.success(TeamVerificationDto(authorized = true, claimed = true)),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
+
+        val result = repository.claimKeyForAccount(ACCOUNT_KEY)
+
+        assertEquals(true, result.getOrThrow().claimed)
+        assertEquals(1, remote.claimCalls)
+        assertEquals(0, remote.verifyCalls)
+    }
+
+    @Test
+    fun `cai na verificacao contra servidor sem a rota de vinculo`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(TeamServerException(404, "rota inexistente")),
+            verifyResult = Result.success(TeamVerificationDto(authorized = true, claimed = false))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
+
+        val result = repository.claimKeyForAccount(ACCOUNT_KEY)
+
+        // Servidor 0.3.0 não conhece o vínculo explícito; informar ainda é melhor
+        // que reprovar uma configuração correta.
+        assertTrue(result.isSuccess)
+        assertEquals(false, result.getOrThrow().claimed)
+        assertEquals(1, remote.verifyCalls)
+    }
+
+    @Test
+    fun `servidor sem a rota de verificacao nao reprova a configuracao`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(TeamServerException(404, "rota inexistente")),
+            verifyResult = Result.failure(TeamServerException(404, "rota inexistente"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
+
+        val result = repository.claimKeyForAccount(ACCOUNT_KEY)
+
+        // Servidor 0.2.x: o app não pode declarar inválida uma configuração
+        // correta só porque o servidor da empresa ficou para trás.
+        assertTrue(result.isSuccess)
+        assertEquals(true, result.getOrThrow().authorized)
+    }
+
+    @Test
+    fun `403 continua sendo falha`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(TeamServerException(403, "conta de outra chave")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
+
+        val result = repository.claimKeyForAccount(ACCOUNT_KEY)
+
+        assertTrue(result.isFailure)
+        assertEquals(0, remote.verifyCalls)
+    }
+
+    @Test
+    fun `sem servidor configurado nem tenta a rede`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { TeamIntegrationSettings() }
+
+        val result = repository.claimKeyForAccount(ACCOUNT_KEY)
+
+        assertTrue(result.isFailure)
+        assertEquals(0, remote.claimCalls)
+    }
+}

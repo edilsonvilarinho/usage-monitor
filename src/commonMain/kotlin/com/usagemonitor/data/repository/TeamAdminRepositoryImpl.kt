@@ -2,6 +2,7 @@ package com.usagemonitor.data.repository
 
 import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.datasource.TeamCredential
+import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.data.dto.CreateTeamKeyRequestDto
 import com.usagemonitor.data.dto.UpdateTeamKeyRequestDto
 import com.usagemonitor.data.mapper.toDomain
@@ -124,18 +125,15 @@ class TeamAdminRepositoryImpl(
      * O admin também pode chamar isto, e nesse caso o servidor responde
      * autorizado para qualquer conta — o que é a verdade: ele lê todas. Mas o
      * caso que importa é o do usuário comum conferindo a própria chave.
+     *
+     * `404` significa servidor anterior à rota. Não vira falha: o app não pode
+     * reprovar uma configuração correta porque o servidor da empresa ficou para
+     * trás — mesmo tratamento que `fetchSessionDetail` já dá ao detalhe ausente.
      */
     override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
         val settings = settingsProvider()
-        val credential = when {
-            settings.apiKey.isNotBlank() -> TeamCredential.TeamKey(settings.apiKey)
-            settings.isAdminMode -> TeamCredential.AdminToken(settings.adminToken)
-            else -> return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
-        }
-
-        if (settings.normalizedServerUrl.isEmpty()) {
-            return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
-        }
+        val credential = settings.readCredential()
+            ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
 
         return runCatching {
             remoteDataSource.verifyKey(
@@ -143,6 +141,46 @@ class TeamAdminRepositoryImpl(
                 credential = credential,
                 accountKey = accountKey
             ).toDomain()
+        }.recoverIfMissingRoute()
+    }
+
+    /**
+     * Amarra a conta à chave, e só cai na verificação se a rota não existir.
+     *
+     * É o que faz "Testar conexão" resolver o problema em vez de apenas
+     * descrevê-lo: até aqui o vínculo só nascia dentro de um ingest, então quem
+     * trocava a chave numa máquina sem turno pendente não emitia requisição
+     * nenhuma e a conta ficava sem dona — com a leitura recusada o tempo todo.
+     */
+    override suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+        val settings = settingsProvider()
+        val credential = settings.readCredential()
+            ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
+
+        val result = runCatching {
+            remoteDataSource.claimKey(
+                baseUrl = settings.normalizedServerUrl,
+                credential = credential,
+                accountKey = accountKey
+            ).toDomain()
+        }
+
+        if (result.isMissingRoute()) {
+            // Servidor 0.3.0: sem rota de vínculo, resta informar.
+            return verifyKeyForAccount(accountKey)
+        }
+        return result
+    }
+
+    /** Credencial para conferir a conta: a chave de time primeiro, senão o admin. */
+    private fun TeamIntegrationSettings.readCredential(): TeamCredential? {
+        if (normalizedServerUrl.isEmpty()) {
+            return null
+        }
+        return when {
+            apiKey.isNotBlank() -> TeamCredential.TeamKey(apiKey)
+            isAdminMode -> TeamCredential.AdminToken(adminToken)
+            else -> null
         }
     }
 
@@ -155,4 +193,24 @@ class TeamAdminRepositoryImpl(
         }
         return runCatching { block(settings) }
     }
+}
+
+private const val NOT_FOUND_STATUS = 404
+
+private fun Result<*>.isMissingRoute(): Boolean {
+    val error = exceptionOrNull()
+    return error is TeamServerException && error.statusCode == NOT_FOUND_STATUS
+}
+
+/**
+ * Rota ausente vira "autorizado, sem verificação disponível".
+ *
+ * Um servidor anterior à rota não sabe responder sobre vínculo, e isso não é
+ * motivo para o app declarar a configuração do usuário inválida.
+ */
+private fun Result<TeamKeyVerification>.recoverIfMissingRoute(): Result<TeamKeyVerification> {
+    if (!isMissingRoute()) {
+        return this
+    }
+    return Result.success(TeamKeyVerification(authorized = true, claimed = true))
 }

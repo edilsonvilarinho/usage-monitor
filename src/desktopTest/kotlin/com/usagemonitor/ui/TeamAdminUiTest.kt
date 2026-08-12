@@ -30,6 +30,7 @@ import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_EXIT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_KEYS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_VALIDATE_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TEAM_SYNC_STATUS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -97,9 +98,41 @@ class TeamAdminSectionTest {
         assertEquals(1, exits)
     }
 
+    @Test
+    fun `falha do envio em background aparece na secao`() = runDesktopComposeUiTest {
+        renderSection(
+            settings = TeamIntegrationSettings(
+                enabled = true,
+                serverUrl = "https://time.local",
+                apiKey = "chave",
+                alias = "edilson",
+                deviceId = "device-1"
+            ),
+            syncFailureMessage = "Chave de time nao autorizada para esta conta."
+        )
+
+        onNodeWithTag(TEAM_SYNC_STATUS_TEST_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `sem falha nao ha aviso de envio`() = runDesktopComposeUiTest {
+        renderSection(
+            TeamIntegrationSettings(
+                enabled = true,
+                serverUrl = "https://time.local",
+                apiKey = "chave",
+                alias = "edilson",
+                deviceId = "device-1"
+            )
+        )
+
+        onAllNodesWithTag(TEAM_SYNC_STATUS_TEST_TAG).assertCountEquals(0)
+    }
+
     private fun ComposeUiTest.renderSection(
         settings: TeamIntegrationSettings,
-        onExitAdminMode: () -> Unit = {}
+        onExitAdminMode: () -> Unit = {},
+        syncFailureMessage: String? = null
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -115,6 +148,7 @@ class TeamAdminSectionTest {
                         onAliasChange = {},
                         onProfileParticipationChange = { _, _ -> },
                         onTestConnection = {},
+                        syncFailureMessage = syncFailureMessage,
                         onExitAdminMode = onExitAdminMode
                     )
                 }

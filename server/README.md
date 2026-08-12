@@ -76,8 +76,8 @@ Cada pessoa recebe uma chave própria, emitida pelo app desktop de quem administ
 Fluxo:
 
 1. No app do administrador: **Configurações → Integração com time** → ligar → informar o **servidor** → **Eu sou admin do servidor** → colar o `TEAM_ADMIN_TOKEN` → **Validar**. Não é preciso chave de time, apelido nem conta marcada: quem administra não participa necessariamente de nenhum time.
-2. **Configurar chaves das contas** → emitir uma chave por pessoa. O **rótulo** é texto livre (use o e-mail) e o servidor **não o verifica** — quem prova o vínculo é o `accountUuid` que aparece ao lado depois do primeiro envio.
-3. Entregar a chave à pessoa por canal fechado. Ela cola em **Chave do time** e marca a conta. O app confere na hora, por `GET /v1/verify`.
+2. **Configurar chaves das contas** → emitir uma chave por pessoa. O **rótulo** é texto livre (use o e-mail) e o servidor **não o verifica** — quem prova o vínculo é o `accountUuid` que aparece ao lado depois que a chave é usada.
+3. Entregar a chave à pessoa por canal fechado. Ela cola em **Chave do time**, marca a conta e clica em **Testar conexão** — é esse clique que cria o vínculo, por `POST /v1/claim`. Contra um servidor 0.3.0 o app cai no `GET /v1/verify`, que só informa, e o vínculo volta a depender do próximo envio de turnos.
 4. Máquina logada em duas contas da empresa: subir `maxAccounts` daquela chave para `2`. A segunda conta se reivindica sozinha na passada seguinte.
 5. Depois que todos migrarem, definir `TEAM_LEGACY_KEY_MODE=off`. **É este passo que efetiva o isolamento.**
 
@@ -270,6 +270,20 @@ Disponível a partir da versão **0.3.0**. Responde se a chave apresentada cobre
 ```
 
 `claimed: false` com `authorized: true` é o estado normal de quem acabou de colar a chave e ainda não sincronizou. Conta de outra chave, ou limite atingido, devolve `403`.
+
+### `POST /api/v1/claim`
+
+Disponível a partir da versão **0.3.1**. Amarra a conta à chave apresentada e devolve o mesmo corpo do `verify`. Idempotente: repetir com a conta já vinculada responde `200`.
+
+```jsonc
+{ "accountKey": "<accountUuid da conta Anthropic>" }
+```
+
+É o que o botão **Testar conexão** do app chama. Existe porque o vínculo, até a 0.3.0, só nascia dentro de um `POST /v1/ingest` — e numa máquina que já tinha enviado todo o histórico, trocar a chave não gerava requisição nenhuma: a conta ficava sem dona e a leitura era recusada indefinidamente.
+
+**Não enfraquece o isolamento.** O `accountKey` do ingest também é auto-declarado no corpo, então reivindicar por um `POST` explícito tem exatamente a mesma força. O que continua valendo é que **nenhum `GET` reivindica**: uma leitura que amarrasse conta permitiria adotar contas alheias varrendo `accountUuid`.
+
+Token de admin e chave legada em modo `open` respondem `200` **sem criar vínculo** — nenhum dos dois representa uma conta.
 
 ### Rotas administrativas
 

@@ -38,6 +38,7 @@ const val TEAM_SECTION_TEST_TAG = "teamIntegrationSection"
 const val TEAM_ENABLE_SWITCH_TEST_TAG = "teamIntegrationEnableSwitch"
 const val TEAM_TEST_CONNECTION_TEST_TAG = "teamIntegrationTestConnection"
 const val TEAM_ALIAS_FIELD_TEST_TAG = "teamIntegrationAliasField"
+const val TEAM_SYNC_STATUS_TEST_TAG = "teamIntegrationSyncStatus"
 const val TEAM_ADMIN_SWITCH_TEST_TAG = "teamIntegrationAdminSwitch"
 const val TEAM_ADMIN_VALIDATE_TEST_TAG = "teamIntegrationAdminValidate"
 const val TEAM_ADMIN_KEYS_TEST_TAG = "teamIntegrationAdminKeys"
@@ -68,6 +69,13 @@ fun TeamIntegrationSection(
     onProfileParticipationChange: (String, Boolean) -> Unit,
     onTestConnection: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Aviso do envio em background, em texto já pronto.
+     *
+     * `null` quando não há o que dizer. A seção não conhece o `TeamSyncService` —
+     * quem traduz o estado é o `Main`.
+     */
+    syncFailureMessage: String? = null,
     /** Resultado da última validação do token; separado do teste da chave de time. */
     adminConnection: TeamConnectionUiState = TeamConnectionUiState(),
     onAdminTokenChange: (String) -> Unit = {},
@@ -208,6 +216,22 @@ fun TeamIntegrationSection(
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+
+        // O envio roda em background e falhava calado: quem estava com a chave
+        // errada só percebia pela ausência dos próprios dados na tela dos
+        // colegas, sem nada que apontasse a causa.
+        if (syncFailureMessage != null) {
+            Text(
+                text = if (isPt) {
+                    "Último envio ao time falhou: $syncFailureMessage"
+                } else {
+                    "Last team upload failed: $syncFailureMessage"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth().testTag(TEAM_SYNC_STATUS_TEST_TAG)
+            )
         }
 
         TeamAdminBlock(

@@ -60,7 +60,7 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
   app.use('/api', createHealthRouter(db));
   app.use('/api', createIngestRouter({ config, repository, keyRepository, now }));
   app.use('/api', createTeamRouter({ config, repository, keyRepository, now }));
-  app.use('/api', createVerifyRouter({ config, keyRepository }));
+  app.use('/api', createVerifyRouter({ config, keyRepository, now }));
 
   // Sem token de administracao as rotas nem existem: caem na coringa 404 abaixo,
   // e um deploy que nunca pediu administracao nao ganha superficie nova.

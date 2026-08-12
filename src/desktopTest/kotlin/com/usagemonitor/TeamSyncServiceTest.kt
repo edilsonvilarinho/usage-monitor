@@ -15,6 +15,7 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private const val PROFILE_ID = "default"
@@ -343,6 +344,59 @@ class TeamSyncServiceTest {
 
             assertEquals(2, repository.identityPushes.size)
             assertEquals("edilson-2", repository.identityPushes.last().member.alias)
+        }
+    }
+
+    @Test
+    fun `trocar a chave de time reenvia a identidade mesmo sem turno novo`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository()
+            var settings = ACTIVE_SETTINGS
+            val service = newService(syncState, repository, settingsProvider = { settings })
+
+            service.syncOnce()
+            assertEquals(1, repository.identityPushes.size)
+
+            // Sem isto o vínculo da chave nova com a conta — que no servidor só
+            // nasce dentro de um ingest — nunca aconteceria numa máquina que já
+            // enviou tudo, e o time inteiro ficaria sem conseguir ler.
+            settings = settings.copy(apiKey = "chave-nova-com-tamanho-suficiente")
+            service.syncOnce()
+
+            assertEquals(2, repository.identityPushes.size)
+            assertEquals("edilson", repository.identityPushes.last().member.alias)
+        }
+    }
+
+    @Test
+    fun `publica a falha da passada para a tela`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository(failure = IllegalStateException("servidor fora"))
+            val service = newService(syncState, repository)
+
+            service.syncOnce()
+
+            val status = service.syncStatus.value
+            assertTrue(status.isFailing)
+            assertEquals("servidor fora", status.lastFailureMessage)
+        }
+    }
+
+    @Test
+    fun `sucesso posterior encerra o aviso de falha`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository(failure = IllegalStateException("servidor fora"))
+            val service = newService(syncState, repository)
+            service.syncOnce()
+            assertTrue(service.syncStatus.value.isFailing)
+
+            repository.failure = null
+            service.syncOnce()
+
+            // O aviso é sobre o estado atual: uma mensagem que sobrevive ao
+            // conserto manda o usuário atrás de um problema que já não existe.
+            assertFalse(service.syncStatus.value.isFailing)
+            assertEquals(null, service.syncStatus.value.lastFailureMessage)
         }
     }
 

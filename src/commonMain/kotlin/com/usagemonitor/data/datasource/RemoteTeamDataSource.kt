@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CreateTeamKeyRequestDto
+import com.usagemonitor.data.dto.TeamClaimRequestDto
 import com.usagemonitor.data.dto.TeamErrorDto
 import com.usagemonitor.data.dto.TeamIngestRequestDto
 import com.usagemonitor.data.dto.TeamIngestResponseDto
@@ -178,6 +179,30 @@ open class RemoteTeamDataSource(
                 parameter("accountKey", accountKey)
             },
             operation = "verificação da chave"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `POST /api/v1/claim`. Amarra a conta à chave apresentada. Idempotente.
+     *
+     * Existe a partir da versão 0.3.1 do servidor. Contra um servidor anterior a
+     * rota responde `404`, e quem chama cai no [verifyKey] — que informa, mas não
+     * vincula.
+     */
+    open suspend fun claimKey(
+        baseUrl: String,
+        credential: TeamCredential,
+        accountKey: String
+    ): TeamVerificationDto {
+        val response = requireSuccess(
+            response = httpClient.post("$baseUrl/api/v1/claim") {
+                authenticate(credential)
+                contentType(ContentType.Application.Json)
+                setBody(TeamClaimRequestDto(accountKey = accountKey))
+            },
+            operation = "vínculo da chave com a conta"
         )
 
         return response.body()
