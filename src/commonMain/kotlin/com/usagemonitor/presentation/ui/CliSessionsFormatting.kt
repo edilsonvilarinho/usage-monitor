@@ -65,13 +65,25 @@ internal object CliSessionsLabels {
      * Deixa explícito que os totais do header são só do período selecionado — e,
      * quando o corte está ancorado na quota, até quando essa janela vale. Sem o
      * horário, "5h" seria confundido com as últimas cinco horas corridas.
+     *
+     * Ancorado sem [endsAt] é a janela recém-aberta: o reset venceu, o corte já é
+     * o dele, mas o fim novo só existe quando a API o publicar. Dizer "até
+     * HH:MM" ali seria inventar um horário.
      */
     fun estimatedTotalInRange(
         range: CliSessionRange,
         endsAt: Instant?,
+        isAnchored: Boolean,
         language: AppLanguage
     ): String {
         val window = rangeLabel(range, language)
+        if (endsAt == null && isAnchored) {
+            return if (language == AppLanguage.PT) {
+                "custo estimado · janela $window desde o reinício"
+            } else {
+                "estimated cost · $window window since the reset"
+            }
+        }
         if (endsAt == null) {
             return "${estimatedTotal(language)} · ${lastRangeLabel(range, language)}"
         }
@@ -155,6 +167,8 @@ internal object CliSessionsLabels {
             return empty(language)
         }
         val window = rangeLabel(range, language)
+        // Vale tanto para a janela em curso quanto para a que acabou de abrir no
+        // reset: nos dois casos o vazio é da janela de quota, não do índice.
         if (isAnchored) {
             return if (language == AppLanguage.PT) {
                 "Nenhuma sessão nesta janela de quota ($window). Escolha uma janela maior."

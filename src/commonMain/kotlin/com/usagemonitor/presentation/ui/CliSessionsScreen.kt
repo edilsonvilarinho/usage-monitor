@@ -319,7 +319,12 @@ private fun CliSessionsHeader(
                     text = if (state.range == CliSessionRange.ALL) {
                         CliSessionsLabels.estimatedTotal(language)
                     } else {
-                        CliSessionsLabels.estimatedTotalInRange(state.range, state.rangeEndsAt, language)
+                        CliSessionsLabels.estimatedTotalInRange(
+                            range = state.range,
+                            endsAt = state.rangeEndsAt,
+                            isAnchored = state.rangeAnchored,
+                            language = language
+                        )
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

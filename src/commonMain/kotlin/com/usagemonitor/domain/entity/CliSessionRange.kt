@@ -14,6 +14,11 @@ import kotlinx.datetime.Instant
  * dashboard mede — e não as últimas cinco horas corridas. Sem isso, uma sessão de
  * uma janela de quota já expirada continuaria contando junto com a atual.
  *
+ * Isso vale também depois do reset vencer: o corte passa a ser o próprio reset,
+ * porque a janela nova começa a partir dele. O corte corrido (`now − 5h`)
+ * alcançava turnos de antes do reset e os misturava com a janela nova (issue
+ * #35).
+ *
  * As demais janelas são corridas. A de 7d já ancorou no reset semanal e não pode
  * voltar a fazê-lo: logo depois de um reset semanal o corte ancorado (`reset − 7d`)
  * fica mais recente que o corte de 5h, e sessões visíveis em "5h" sumiam ao trocar
@@ -27,7 +32,7 @@ enum class CliSessionRange(val durationMillis: Long?) {
 
     /**
      * Resolve o corte para [now], ancorando no fim da janela de quota quando há um
-     * conhecido e ainda no futuro.
+     * conhecido.
      */
     fun resolve(now: Instant, windows: CliQuotaWindows = CliQuotaWindows()): CliRangeWindow {
         val duration = durationMillis ?: return CliRangeWindow(null, null, false)
@@ -39,8 +44,8 @@ enum class CliSessionRange(val durationMillis: Long?) {
             LAST_7D, LAST_30D, ALL -> null
         }
 
-        // Âncora no passado significa janela de quota expirada sem uso novo: não há
-        // janela corrente para ancorar, então volta ao corte corrido.
+        val slidingCutoffMillis = now.toEpochMilliseconds() - duration
+
         if (anchorEndsAt != null && anchorEndsAt > now) {
             return CliRangeWindow(
                 cutoffMillis = anchorEndsAt.toEpochMilliseconds() - duration,
@@ -49,8 +54,28 @@ enum class CliSessionRange(val durationMillis: Long?) {
             )
         }
 
+        // Reset já vencido: a janela de quota corrente começa em algum ponto a
+        // partir dele — a Anthropic abre a janela nova na primeira mensagem depois
+        // do reset, não em ciclos contíguos. Cortar no próprio reset é o único
+        // corte que nunca traz turno da janela anterior, e o corte corrido
+        // (`now - 5h`) trazia: era o bug da issue #35.
+        //
+        // O corte corrido continua sendo o piso: uma âncora velha demais (dado de
+        // dashboard parado, app reaberto dias depois) faria a janela de "5h"
+        // abranger mais que cinco horas e romper `5h ⊆ 7d ⊆ 30d ⊆ Total`.
+        val expiredAnchorMillis = anchorEndsAt?.toEpochMilliseconds()
+        if (expiredAnchorMillis != null && expiredAnchorMillis > slidingCutoffMillis) {
+            return CliRangeWindow(
+                cutoffMillis = expiredAnchorMillis,
+                // Fim desconhecido: a janela nova só ganha `resets_at` quando a
+                // conta volta a consumir e a API o materializa.
+                endsAt = null,
+                isAnchored = true
+            )
+        }
+
         return CliRangeWindow(
-            cutoffMillis = now.toEpochMilliseconds() - duration,
+            cutoffMillis = slidingCutoffMillis,
             endsAt = null,
             isAnchored = false
         )
@@ -76,7 +101,12 @@ data class CliQuotaWindows(
 data class CliRangeWindow(
     /** Epoch millis do início da janela; `null` não corta nada. */
     val cutoffMillis: Long? = null,
-    /** Fim da janela de quota, quando ancorada. */
+    /**
+     * Fim da janela de quota, quando conhecido.
+     *
+     * Nulo com [isAnchored] verdadeiro significa janela nova, aberta no reset que
+     * acabou de vencer e ainda sem `resets_at` publicado pela API.
+     */
     val endsAt: Instant? = null,
     /** `true` quando o corte veio do reset da quota, não do relógio. */
     val isAnchored: Boolean = false

@@ -49,6 +49,25 @@ class TeamUsageScreenTest {
         onNodeWithText("custo estimado · últimas 5h").assertIsDisplayed()
     }
 
+    /**
+     * Issue #35: reset vencido ancora a janela nova no próprio reset, e o fim
+     * dela só existe quando a API publicar o `resets_at` seguinte.
+     */
+    @Test
+    fun `header nomeia a janela aberta pelo reset quando o fim e desconhecido`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1", tokens = 2_000L)))
+                ),
+                rangeEndsAt = null,
+                rangeAnchored = true
+            )
+        )
+
+        onNodeWithText("custo estimado · janela 5h desde o reinício").assertIsDisplayed()
+    }
+
     @Test
     fun `lista mostra alias maquina e tokens de cada integrante`() = runDesktopComposeUiTest {
         renderSuccess(
