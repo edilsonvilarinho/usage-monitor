@@ -1,6 +1,8 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import kotlinx.datetime.Instant
 
@@ -52,6 +54,44 @@ internal object TeamUsageLabels {
 
     fun columnCost(language: AppLanguage): String {
         return CliSessionsLabels.columnCost(language)
+    }
+
+    fun columnStatus(language: AppLanguage): String {
+        return CliSessionsLabels.columnStatus(language)
+    }
+
+    fun healthShort(health: CliSessionHealth, language: AppLanguage): String {
+        return CliSessionsLabels.healthShort(health, language)
+    }
+
+    fun back(language: AppLanguage): String {
+        return CliSessionsLabels.back(language)
+    }
+
+    fun detailLoading(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Consultando a sessão no servidor do time…"
+        } else {
+            "Querying the session on the team server…"
+        }
+    }
+
+    /**
+     * Servidor sem a rota de detalhe, ou sessão fora da retenção dele.
+     *
+     * Diz o que falta e o que fazer: o app não quebra contra um servidor antigo,
+     * mas quem lê a tela precisa saber por que os gráficos não estão lá.
+     */
+    fun missingTurnsNotice(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Este servidor de time não devolve os turnos desta sessão (versão anterior a 0.2.0 " +
+                "ou sessão já expirada na retenção). Só os agregados do período estão disponíveis; " +
+                "os gráficos por turno voltam depois de atualizar o servidor."
+        } else {
+            "This team server does not return the turns for this session (older than 0.2.0 or " +
+                "the session already fell out of retention). Only the period aggregates are " +
+                "available; the per-turn charts come back once the server is updated."
+        }
     }
 
     fun rangeLabel(range: CliSessionRange, language: AppLanguage): String {
@@ -179,6 +219,11 @@ internal object TeamUsageLabels {
         } else {
             "Could not remove the member: $message"
         }
+    }
+
+    /** Mesma contagem do modal local: "1 saturada · 2 em atenção". */
+    fun healthTally(tally: CliSessionHealthTally, language: AppLanguage): String? {
+        return CliSessionsLabels.healthTally(tally, language)
     }
 
     /** Deixa explícito de onde vem o número, já que a fonte não é esta máquina. */

@@ -58,6 +58,7 @@ exatamente a dedup que o índice local já faz em `cli_turns`: reenviar um lote 
 | `GET /api/health` | Toca o banco (`SELECT 1`). Sem autenticação. |
 | `POST /api/v1/ingest` | Idempotente. Rejeita turno cuja sessão não veio no lote. |
 | `GET /api/v1/team` | `accountKey` + `since`. Uma linha por `(deviceId, sessionId, model)`. |
+| `GET /api/v1/session` | `accountKey` + `deviceId` + `sessionId`. Turnos crus da sessão inteira, sem recorte. Servidor 0.2.0+. |
 
 **O servidor não calcula custo.** Devolve tokens por modelo; o cliente aplica a própria
 `ModelPricingTable`. Evita duplicar a tabela de preços em TypeScript e mantém o custo do
@@ -86,6 +87,13 @@ Duas implementações divergiriam com o tempo.
 Componentes de UI que eram `private` em `CliSessionsScreen.kt` viraram `internal` para o
 modal de time reaproveitar: `CliSessionRow`, `MetricText`, `MeterBar`, `LiveBadge`,
 `CenteredMessage`, `NoticeText`, `healthColor` e as cores `INPUT_COLOR`/`CACHE_READ_COLOR`.
+
+A issue #34 estendeu a mesma promoção ao painel de detalhe inteiro —
+`CliSessionDetailSections`, `SessionHealthBanner`, `SessionMetadataCard`,
+`SessionSummaryRow`, `SessionAdvancedSections`, `AdvancedDisclosure`, `DetailSection`,
+`MetricCard`, `GlossaryPanel`, `HelpDot`, `CostDistributionBar`,
+`CostDistributionLegend` e o resto da paleta. Duplicar o painel para o time faria os dois
+divergirem no primeiro ajuste de layout.
 
 ### Arquivos novos
 
@@ -186,8 +194,16 @@ mudanças deste plano: 3 falhas em `HistoryViewModelTest`. Não é regressão de
 - Prova de posse do token OAuth (o cliente declara o `accountUuid`; risco aceito e
   documentado em `server/README.md`).
 - Sessões de outros CLIs (Codex, OpenCode, Kilo) na visão de time.
-- Detalhe completo de sessão (analytics, gráficos por turno) dentro do modal de time — o
-  transcript é de outra máquina e não está disponível localmente.
+- ~~Detalhe completo de sessão (analytics, gráficos por turno) dentro do modal de time — o
+  transcript é de outra máquina e não está disponível localmente.~~ **Entregue (issue #34).**
+  A premissa estava errada: verdadeira para o cliente, falsa para o servidor. `team_turns`
+  guarda o turno cru desde o primeiro ingest — é a decisão *"Granularidade do sync: turnos
+  crus"* travada no topo deste documento. Só faltava expor a leitura: `GET /api/v1/session`
+  devolve os turnos ordenados por `(ts, messageId)` e o cliente sintetiza o `seq`, reagrega
+  pelo `WindowedSessionAccumulator` e reusa as mesmas seções de `CliSessionsScreen`.
+  Nenhuma migração de schema foi necessária. Contra servidor anterior à 0.2.0 a rota
+  responde `404`, o painel cai no agregado e avisa — atualizar app e servidor no mesmo dia
+  não é garantido.
 - Exportação, alertas de orçamento, ranking histórico.
 - CI de testes no GitHub Actions (não existe hoje para o desktop; não foi criado para o
   servidor).

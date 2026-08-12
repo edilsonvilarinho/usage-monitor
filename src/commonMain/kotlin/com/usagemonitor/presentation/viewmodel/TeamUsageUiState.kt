@@ -1,7 +1,10 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.tallyHealth
+import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
 
 sealed interface TeamUsageUiState {
@@ -40,7 +43,19 @@ sealed interface TeamUsageUiState {
          * acontece de segundos em segundos, e carimbá-la aqui quebraria a
          * igualdade do estado, recompondo a tela sem nada ter mudado.
          */
-        val lastChangedAt: Instant? = null
+        val lastChangedAt: Instant? = null,
+        /**
+         * `null` mostra a lista; qualquer outro valor mostra o detalhe da sessão.
+         *
+         * Mesmo tratamento de [expandedDeviceIds]: mora no estado e `loadTeam`
+         * tem de carregá-lo do valor anterior, ou o tique do laço ao vivo
+         * fecharia o painel na cara de quem está lendo.
+         */
+        val detail: TeamSessionDetailUiState? = null,
+        /** Bloco Avançado do detalhe. Mesmo tratamento de [detail]. */
+        val advancedExpanded: Boolean = false,
+        /** Painel "Como ler esta tela". Mesmo tratamento de [detail]. */
+        val glossaryExpanded: Boolean = false
     ) : TeamUsageUiState {
 
         val totalTokens: Long
@@ -62,6 +77,16 @@ sealed interface TeamUsageUiState {
         val isEmpty: Boolean
             get() = members.none { member -> member.hasActivity }
 
+        /**
+         * Quantas sessões do time estão saturadas ou em atenção.
+         *
+         * Vai para o cabeçalho porque o veredito por sessão vive dois níveis
+         * abaixo — dentro de um integrante recolhido — e ninguém expande cinco
+         * integrantes para descobrir que há uma sessão saturada.
+         */
+        val healthTally: CliSessionHealthTally
+            get() = members.flatMap { member -> member.sessions }.tallyHealth()
+
         /** Fatia do integrante no total de tokens do time. */
         fun tokenShareOf(member: TeamMemberUsage): Double {
             val total = totalTokens
@@ -71,4 +96,43 @@ sealed interface TeamUsageUiState {
             return member.totalTokens.toDouble() / total.toDouble()
         }
     }
+}
+
+/**
+ * Painel de detalhe de uma sessão do time.
+ *
+ * Espelha [CliSessionDetailUiState] e carrega também o `deviceId`: o `sessionId`
+ * identifica a sessão dentro de uma máquina, e a leitura no servidor é escopada
+ * por `(conta, máquina)`.
+ */
+sealed interface TeamSessionDetailUiState {
+
+    val deviceId: String
+    val sessionId: String
+
+    data class Loading(
+        override val deviceId: String,
+        override val sessionId: String
+    ) : TeamSessionDetailUiState
+
+    data class Error(
+        override val deviceId: String,
+        override val sessionId: String,
+        val message: String
+    ) : TeamSessionDetailUiState
+
+    data class Ready(
+        override val deviceId: String,
+        override val sessionId: String,
+        val result: CliSessionDetailResult,
+        /**
+         * `true` quando o servidor não devolveu os turnos — versão anterior à
+         * rota `/v1/session`, ou sessão que já saiu da retenção.
+         *
+         * O painel então mostra só o que o agregado da lista prova, sem os
+         * gráficos por turno, e diz isso ao usuário. Não vira erro: o modal não
+         * pode quebrar porque o servidor da empresa ficou para trás do app.
+         */
+        val turnsUnavailable: Boolean = false
+    ) : TeamSessionDetailUiState
 }

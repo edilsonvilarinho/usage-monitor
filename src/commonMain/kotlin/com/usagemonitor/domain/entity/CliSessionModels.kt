@@ -232,7 +232,12 @@ data class CliSessionAnalytics(
         get() = unpricedTurnCount == 0
 }
 
-/** Recomendação sobre continuar a sessão ou recomeçar com o contexto enxuto. */
+/**
+ * Recomendação sobre continuar a sessão ou recomeçar com o contexto enxuto.
+ *
+ * A ordem de declaração é a da severidade — é dela que sai a precedência
+ * `SATURATED > ATTENTION > HEALTHY` em [worstHealth] e em [tallyHealth].
+ */
 enum class CliSessionHealth {
     /** Contexto pequeno para a janela do modelo e mensagem barata. */
     HEALTHY,
@@ -242,4 +247,39 @@ enum class CliSessionHealth {
 
     /** Continuar sai caro e a janela está perto do limite. */
     SATURATED
+}
+
+/** Quantas sessões de um conjunto pedem atenção, para um cabeçalho resumir. */
+data class CliSessionHealthTally(
+    val saturated: Int = 0,
+    val attention: Int = 0
+) {
+    val hasWarnings: Boolean
+        get() = saturated > 0 || attention > 0
+}
+
+/**
+ * Sessões com janela de contexto conhecida, na ordem em que estão.
+ *
+ * Sessão cujo modelo não está em [ModelContextWindowTable] fica de fora de
+ * qualquer contagem de saúde: sem a janela não há fração, e
+ * [CliSessionContextStatus] se recusa a chutar uma. Contá-la como saudável
+ * afirmaria o que não se sabe.
+ */
+private fun Iterable<CliSessionSummary>.withKnownWindow(): List<CliSessionSummary> {
+    return filter { session -> session.contextStatus.contextSaturation != null }
+}
+
+/** Conta saturadas e em atenção, ignorando as de janela desconhecida. */
+fun Iterable<CliSessionSummary>.tallyHealth(): CliSessionHealthTally {
+    val rated = withKnownWindow()
+    return CliSessionHealthTally(
+        saturated = rated.count { session -> session.contextStatus.health == CliSessionHealth.SATURATED },
+        attention = rated.count { session -> session.contextStatus.health == CliSessionHealth.ATTENTION }
+    )
+}
+
+/** Pior veredito do conjunto, ou `null` quando nenhuma sessão pôde ser avaliada. */
+fun Iterable<CliSessionSummary>.worstHealth(): CliSessionHealth? {
+    return withKnownWindow().maxOfOrNull { session -> session.contextStatus.health }
 }

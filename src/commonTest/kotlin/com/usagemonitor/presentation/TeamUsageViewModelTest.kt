@@ -1,15 +1,19 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliQuotaWindows
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
+import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,6 +68,23 @@ private class FakeTeamRepository(
         return fetchResult ?: Result.success(snapshot)
     }
 
+    /** `success(null)` é o que o repositório real devolve num `404` do servidor. */
+    var detailResult: Result<CliSessionDetail?> = Result.success(null)
+    var detailCalls = 0
+    var lastDetailDeviceId: String? = null
+    var lastDetailSessionId: String? = null
+
+    override suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?> {
+        detailCalls += 1
+        lastDetailDeviceId = deviceId
+        lastDetailSessionId = sessionId
+        return detailResult
+    }
+
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
 }
 
@@ -96,6 +117,25 @@ private fun member(
     sessions: List<CliSessionSummary> = emptyList()
 ): TeamMemberUsage {
     return TeamMemberUsage(deviceId = deviceId, alias = alias, sessions = sessions)
+}
+
+private const val OPUS = "claude-opus-5-20260201"
+
+/** Detalhe como o servidor de time o entrega, já mapeado para o domínio. */
+private fun detail(sessionId: String, cacheReadTokens: Long = 0L): CliSessionDetail {
+    return CliSessionDetail(
+        summary = session(sessionId).copy(primaryModel = OPUS, turnCount = 1),
+        turns = listOf(
+            CliSessionTurn(
+                sessionId = sessionId,
+                seq = 0,
+                messageId = "msg-1",
+                ts = TEAM_FIXED_NOW,
+                model = OPUS,
+                cacheReadTokens = cacheReadTokens
+            )
+        )
+    )
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -467,6 +507,188 @@ class TeamUsageViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `abrir uma sessao carrega o detalhe daquela maquina`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.success(detail("s1", cacheReadTokens = 10_000L))
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        runCurrent()
+
+        assertEquals("device-1", repository.lastDetailDeviceId)
+        assertEquals("s1", repository.lastDetailSessionId)
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        assertFalse(ready.turnsUnavailable)
+        assertEquals(1, ready.result.detail.turns.size)
+        assertEquals(listOf(10_000L), ready.result.analytics.contextPerTurn)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `o detalhe aberto sobrevive aos tiques do tempo real`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.success(detail("s1"))
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        runCurrent()
+        advanceTimeBy(3 * TEAM_LIVE_INTERVAL_MILLIS + 1)
+        runCurrent()
+
+        // Sem carregar o detalhe do estado anterior em `loadTeam`, o tique de 5s
+        // fecharia o painel na cara de quem está lendo.
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        assertEquals("s1", ready.sessionId)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `os blocos recolhiveis do detalhe sobrevivem aos tiques`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.success(detail("s1"))
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        runCurrent()
+        viewModel.toggleAdvanced()
+        viewModel.toggleGlossary()
+        advanceTimeBy(2 * TEAM_LIVE_INTERVAL_MILLIS + 1)
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertTrue(state.advancedExpanded)
+        assertTrue(state.glossaryExpanded)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `servidor sem a rota de detalhe cai no agregado em vez de quebrar`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(
+                members = listOf(
+                    member(
+                        "device-1",
+                        sessions = listOf(
+                            session("s1", tokens = 400L, cost = 1_000L)
+                                .copy(liveContextTokens = 650_000L, liveContextModel = OPUS, primaryModel = OPUS)
+                        )
+                    )
+                )
+            )
+        )
+        // O repositório real converte o 404 do servidor em `success(null)`: para o
+        // cliente, rota ausente e sessão ausente são o mesmo desfecho.
+        repository.detailResult = Result.success(null)
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        assertTrue(ready.turnsUnavailable)
+        assertTrue(ready.result.detail.turns.isEmpty())
+        // O veredito de contexto sai do resumo e continua exato.
+        assertEquals(0.65, ready.result.analytics.contextSaturation)
+        // O que só o turno prova fica em zero e não é exibido.
+        assertTrue(ready.result.analytics.contextPerTurn.isEmpty())
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `sessao desconhecida e sem detalhe no servidor vira erro`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.success(null)
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        // Sem agregado na lista não há nada a apresentar no lugar dos turnos.
+        viewModel.openSession(deviceId = "device-1", sessionId = "s-que-nao-existe")
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertIs<TeamSessionDetailUiState.Error>(state.detail)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `falha de rede no detalhe vira erro do painel e nao da lista`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.failure(IllegalStateException("timeout"))
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        val error = assertIs<TeamSessionDetailUiState.Error>(state.detail)
+        assertEquals("timeout", error.message)
+        assertEquals(1, state.members.size)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `fechar o detalhe volta para a lista`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.success(detail("s1"))
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        runCurrent()
+        viewModel.closeDetail()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(null, state.detail)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `fechar a janela descarta o detalhe aberto`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.success(detail("s1"))
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.openSession(deviceId = "device-1", sessionId = "s1")
+        runCurrent()
+        viewModel.closeWindow()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(null, state.detail)
+        viewModel.onDestroy()
+    }
+
     /** Compartilha o `testScheduler` do `runTest`, senão `advanceTimeBy` não move o laço. */
     private fun TestScope.buildViewModel(
         repository: FakeTeamRepository,
@@ -477,6 +699,7 @@ class TeamUsageViewModelTest {
         return TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(repository, useCaseClock),
             removeTeamMember = RemoveTeamMemberUseCase(repository),
+            getTeamSessionDetail = GetTeamSessionDetailUseCase(repository),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = TEAM_LIVE_INTERVAL_MILLIS,
             clock = TeamFixedClock(TEAM_FIXED_NOW)

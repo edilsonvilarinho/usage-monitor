@@ -3,9 +3,12 @@ package com.usagemonitor.data.mapper
 import com.usagemonitor.data.dto.TeamIngestRequestDto
 import com.usagemonitor.data.dto.TeamIngestResponseDto
 import com.usagemonitor.data.dto.TeamMemberDto
+import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSessionUploadDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamTurnUploadDto
+import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamMemberUsage
@@ -74,6 +77,11 @@ fun TeamIngestResponseDto.toDomain(): TeamIngestReceipt {
 fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
     val accumulatorsByDevice = LinkedHashMap<String, LinkedHashMap<String, WindowedSessionAccumulator>>()
 
+    // A máquina é do integrante, não da linha de uso: `team_sessions` não guarda
+    // hostname. Sem este índice a sessão chegaria com `hostName` nulo e o card de
+    // metadados do detalhe mostraria "Máquina —" para uma máquina conhecida.
+    val hostNamesByDevice = members.associate { member -> member.deviceId to member.hostName }
+
     for (row in rows) {
         val sessionsOfDevice = accumulatorsByDevice.getOrPut(row.deviceId) { LinkedHashMap() }
         val accumulator = sessionsOfDevice.getOrPut(row.sessionId) {
@@ -81,6 +89,7 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
                 sessionId = row.sessionId,
                 cwd = row.cwd,
                 gitBranch = row.gitBranch,
+                hostName = hostNamesByDevice[row.deviceId],
                 liveContextTokens = row.liveContextTokens,
                 liveContextModel = row.liveContextModel
             )
@@ -135,4 +144,74 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
     )
 
     return TeamUsageSnapshot(members = allMembers)
+}
+
+/**
+ * Monta o detalhe de uma sessão do time a partir dos turnos crus do servidor.
+ *
+ * O resumo não vem pronto na resposta: ele é reagregado aqui pelo
+ * [WindowedSessionAccumulator], a mesma classe que o índice local usa, para o
+ * custo do detalhe do time sair do mesmo cálculo do detalhe da própria máquina.
+ * Um turno por grupo de modelo — cada turno tem o seu, e é a tarifa dele que
+ * vale.
+ *
+ * O `seq` é sintetizado da ordem da resposta (`ts`, depois `messageId`): o
+ * servidor não guarda sequência, e o que o cálculo de analytics precisa é
+ * apenas de uma ordem estável entre leituras.
+ *
+ * `filePath` fica vazio de propósito — o transcript está na máquina do colega e
+ * o caminho dele não tem valor aqui.
+ */
+fun TeamSessionDetailResponseDto.toDomain(): CliSessionDetail {
+    val accumulator = WindowedSessionAccumulator(
+        sessionId = session.sessionId,
+        cwd = session.cwd,
+        gitBranch = session.gitBranch,
+        hostName = session.hostName,
+        liveContextTokens = session.liveContextTokens,
+        liveContextModel = session.liveContextModel
+    )
+
+    for (turn in turns) {
+        accumulator.addModelGroup(
+            model = turn.model,
+            turnCount = 1,
+            firstTsMillis = turn.ts,
+            lastTsMillis = turn.ts,
+            inputTokens = turn.inputTokens,
+            outputTokens = turn.outputTokens,
+            cacheReadTokens = turn.cacheReadTokens,
+            cacheWrite5mTokens = turn.cacheWrite5mTokens,
+            cacheWrite1hTokens = turn.cacheWrite1hTokens
+        )
+    }
+
+    val domainTurns = turns.mapIndexed { index, turn ->
+        CliSessionTurn(
+            sessionId = session.sessionId,
+            seq = index,
+            messageId = turn.messageId,
+            ts = Instant.fromEpochMilliseconds(turn.ts),
+            model = turn.model,
+            isSidechain = turn.isSidechain,
+            inputTokens = turn.inputTokens,
+            outputTokens = turn.outputTokens,
+            cacheReadTokens = turn.cacheReadTokens,
+            cacheWrite5mTokens = turn.cacheWrite5mTokens,
+            cacheWrite1hTokens = turn.cacheWrite1hTokens
+        )
+    }
+
+    // Sessão sem turno mantém a janela declarada pelo servidor: o acumulador
+    // vazio devolveria época zero e o card de período mostraria 01/01/1970.
+    val summary = if (turns.isEmpty()) {
+        accumulator.toSummary().copy(
+            firstTs = Instant.fromEpochMilliseconds(session.firstTs),
+            lastTs = Instant.fromEpochMilliseconds(session.lastTs)
+        )
+    } else {
+        accumulator.toSummary()
+    }
+
+    return CliSessionDetail(summary = summary, turns = domainTurns)
 }

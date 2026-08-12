@@ -69,6 +69,21 @@ data class TeamMemberUsage(
     val hasActivity: Boolean
         get() = sessions.isNotEmpty()
 
+    /**
+     * Pior veredito entre as sessões, ou `null` sem nenhuma avaliável.
+     *
+     * Fica aqui, junto dos outros campos derivados, e não na tela: é o que
+     * permite ler o status de um integrante **recolhido** — sem isso a única
+     * sessão saturada de um time fica escondida atrás de um clique que ninguém
+     * dá porque nada indica que valha a pena.
+     */
+    val worstHealth: CliSessionHealth?
+        get() = sessions.worstHealth()
+
+    /** Saturadas e em atenção deste integrante, na mesma regra do cabeçalho. */
+    val healthTally: CliSessionHealthTally
+        get() = sessions.tallyHealth()
+
     /** Instante do turno mais recente na janela, ou `null` sem atividade. */
     val lastActivityAt: Instant?
         get() = sessions.maxOfOrNull { session -> session.lastTs }
