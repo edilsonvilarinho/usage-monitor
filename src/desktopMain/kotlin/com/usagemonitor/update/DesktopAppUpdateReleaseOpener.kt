@@ -6,24 +6,31 @@ import java.io.File
 import java.net.URI
 
 class DesktopAppUpdateReleaseOpener(
-    private val processLauncher: (List<String>, File?) -> Process = ::launchProcess
+    private val processLauncher: (List<String>, File?) -> Process = ::launchProcess,
+    // Costuras de teste: o browse nativo abriria um navegador real durante os testes.
+    private val desktopBrowser: (URI) -> Boolean = ::browseWithDesktop,
+    private val osNameProvider: () -> String = { System.getProperty("os.name").orEmpty() }
 ) : AppUpdateReleaseOpener {
     override fun open(releasePageUrl: String): Result<Unit> {
         return Result.runCatching {
             val releaseUri = URI(releasePageUrl)
             validateReleaseUri(releaseUri)
 
-            if (Desktop.isDesktopSupported()) {
-                val desktop = Desktop.getDesktop()
-                if (desktop.isSupported(Desktop.Action.BROWSE)) {
-                    desktop.browse(releaseUri)
-                    return@runCatching
-                }
+            if (desktopBrowser(releaseUri)) {
+                return@runCatching
             }
 
+            val osName = osNameProvider()
             val command = when {
-                isWindows() -> listOf("rundll32", "url.dll,FileProtocolHandler", releasePageUrl)
-                isLinux() -> listOf("xdg-open", releasePageUrl)
+                osName.contains("windows", ignoreCase = true) ->
+                    listOf("rundll32", "url.dll,FileProtocolHandler", releasePageUrl)
+
+                osName.contains("linux", ignoreCase = true) ->
+                    listOf("xdg-open", releasePageUrl)
+
+                osName.contains("mac", ignoreCase = true) ->
+                    listOf("open", releasePageUrl)
+
                 else -> throw IllegalStateException("No browser opener is available for this platform.")
             }
 
@@ -51,14 +58,17 @@ class DesktopAppUpdateReleaseOpener(
     }
 }
 
-private fun isWindows(): Boolean {
-    return System.getProperty("os.name")
-        ?.contains("windows", ignoreCase = true) == true
-}
-
-private fun isLinux(): Boolean {
-    return System.getProperty("os.name")
-        ?.contains("linux", ignoreCase = true) == true
+/** Devolve `true` quando o browse nativo tratou a URI. */
+private fun browseWithDesktop(releaseUri: URI): Boolean {
+    if (!Desktop.isDesktopSupported()) {
+        return false
+    }
+    val desktop = Desktop.getDesktop()
+    if (!desktop.isSupported(Desktop.Action.BROWSE)) {
+        return false
+    }
+    desktop.browse(releaseUri)
+    return true
 }
 
 private fun launchProcess(command: List<String>, directory: File?): Process {

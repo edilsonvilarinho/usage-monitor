@@ -9,6 +9,8 @@ object AutoStartManager {
     private const val WINDOWS_VALUE_NAME = "UsageMonitor"
     private const val WINDOWS_INSTALL_LOCATION_VALUE = "InstallLocation"
     private const val LINUX_AUTOSTART_FILE = "usage-monitor.desktop"
+    private const val MACOS_LAUNCH_AGENT_LABEL = "com.usagemonitor.app"
+    private const val MACOS_LAUNCH_AGENT_FILE = "$MACOS_LAUNCH_AGENT_LABEL.plist"
     private const val APP_DISPLAY_NAME = "Usage Monitor"
 
     fun isAutoStartSupported(): Boolean {
@@ -19,6 +21,7 @@ object AutoStartManager {
         return when (currentPlatform()) {
             Platform.WINDOWS -> isWindowsAutoStartEnabled()
             Platform.LINUX -> linuxAutostartFile().exists()
+            Platform.MACOS -> macAutostartFile().exists()
             Platform.OTHER -> false
         }
     }
@@ -27,6 +30,7 @@ object AutoStartManager {
         return when (currentPlatform()) {
             Platform.WINDOWS -> setWindowsAutoStart(enabled)
             Platform.LINUX -> setLinuxAutoStart(enabled)
+            Platform.MACOS -> setMacAutoStart(enabled)
             Platform.OTHER -> false
         }
     }
@@ -40,6 +44,7 @@ object AutoStartManager {
         return when {
             osName.contains("win") -> Platform.WINDOWS
             osName.contains("linux") -> Platform.LINUX
+            osName.contains("mac") || osName.contains("darwin") -> Platform.MACOS
             else -> Platform.OTHER
         }
     }
@@ -105,6 +110,68 @@ object AutoStartManager {
         }.getOrDefault(false)
     }
 
+    private fun setMacAutoStart(enabled: Boolean): Boolean {
+        val launchAgentFile = macAutostartFile()
+
+        if (!enabled) {
+            if (!launchAgentFile.exists()) {
+                return true
+            }
+            // O unload é best effort: o que define o estado é a presença do plist.
+            runCommand(listOf("launchctl", "unload", "-w", launchAgentFile.absolutePath))
+            return launchAgentFile.delete()
+        }
+
+        val executablePath = resolveExecutablePath() ?: return false
+
+        val written = runCatching {
+            launchAgentFile.parentFile.mkdirs()
+            launchAgentFile.writeText(buildLaunchAgentPlist(executablePath))
+            true
+        }.getOrDefault(false)
+
+        if (!written) {
+            return false
+        }
+
+        runCommand(listOf("launchctl", "load", "-w", launchAgentFile.absolutePath))
+        return true
+    }
+
+    internal fun buildLaunchAgentPlist(executablePath: String): String {
+        return buildString {
+            appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
+            appendLine(
+                """<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" """ +
+                    """"http://www.apple.com/DTDs/PropertyList-1.0.dtd">"""
+            )
+            appendLine("""<plist version="1.0">""")
+            appendLine("<dict>")
+            appendLine("    <key>Label</key>")
+            appendLine("    <string>$MACOS_LAUNCH_AGENT_LABEL</string>")
+            appendLine("    <key>ProgramArguments</key>")
+            appendLine("    <array>")
+            appendLine("        <string>${escapeXml(executablePath)}</string>")
+            appendLine("    </array>")
+            appendLine("    <key>RunAtLoad</key>")
+            appendLine("    <true/>")
+            appendLine("</dict>")
+            appendLine("</plist>")
+        }
+    }
+
+    private fun escapeXml(value: String): String {
+        return value
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+    }
+
+    private fun macAutostartFile(): File {
+        val homeDir = System.getProperty("user.home")
+        return File(homeDir, "Library/LaunchAgents/$MACOS_LAUNCH_AGENT_FILE")
+    }
+
     private fun linuxAutostartFile(): File {
         val configHome = System.getenv("XDG_CONFIG_HOME")
             ?.takeIf { it.isNotBlank() }
@@ -147,6 +214,18 @@ object AutoStartManager {
             }
         }
 
+        if (environment.platform == Platform.MACOS) {
+            val homeDir = System.getProperty("user.home")
+            listOfNotNull(
+                "/Applications/$APP_DISPLAY_NAME.app/Contents/MacOS/$APP_DISPLAY_NAME",
+                homeDir?.let {
+                    File(it, "Applications/$APP_DISPLAY_NAME.app/Contents/MacOS/$APP_DISPLAY_NAME").path
+                }
+            ).forEach { path ->
+                addDirectCandidate(candidates, path)
+            }
+        }
+
         return candidates.toList()
     }
 
@@ -162,6 +241,12 @@ object AutoStartManager {
                 "Usage Monitor",
                 "bin/usage-monitor",
                 "bin/Usage Monitor"
+            )
+
+            Platform.MACOS -> listOf(
+                "$APP_DISPLAY_NAME.app/Contents/MacOS/$APP_DISPLAY_NAME",
+                "Contents/MacOS/$APP_DISPLAY_NAME",
+                APP_DISPLAY_NAME
             )
 
             Platform.OTHER -> emptyList()
@@ -236,6 +321,7 @@ object AutoStartManager {
     internal enum class Platform {
         WINDOWS,
         LINUX,
+        MACOS,
         OTHER
     }
 

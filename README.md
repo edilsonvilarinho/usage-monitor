@@ -4,7 +4,7 @@
 
 Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo, saldo e quotas de ferramentas/APIs de IA em um unico painel.
 
-Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLite, oferece refresh automatico a cada 10 minutos, suporta reorder/minimizacao de cards, tema claro/escuro, idioma PT/EN, auto-start em Windows/Linux e verificacao de updates via GitHub Releases.
+Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLite, oferece refresh automatico a cada 10 minutos, suporta reorder/minimizacao de cards, tema claro/escuro, idioma PT/EN, auto-start em Windows/Linux/macOS e verificacao de updates via GitHub Releases.
 
 ## Visao geral
 
@@ -22,7 +22,7 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Janela de 5h ancorada no reset de quota da conta, tanto nos cards quanto nos
   filtros de sessao.
 - Reordenacao e minimizacao de cards com persistencia local.
-- Auto-start em Windows e Linux.
+- Auto-start em Windows (registro `Run`), Linux (`.desktop` em autostart) e macOS (LaunchAgent).
 - Verificacao de novas releases com banner manual e link para a pagina publicada no GitHub Releases.
 - Sinalizador semaforo de risco de overage nos cards de uso.
 - Contagem regressiva de refresh persiste entre reinicios da app e avisa antes de um refresh manual.
@@ -152,7 +152,7 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 
 ## Requisitos
 
-- Windows ou Linux para o fluxo principal da app desktop.
+- Windows, Linux ou macOS para o fluxo principal da app desktop.
 - JDK 17.
 - Credenciais validas apenas para as integracoes que voce quiser habilitar.
 
@@ -167,10 +167,12 @@ Importante:
 
 - Se a MiniMax estiver habilitada e `MINIMAX_API_KEY` nao existir, a app falha explicitamente.
 - Se a DeepSeek estiver habilitada e `DEEPSEEK_API_KEY` nao existir, a app falha explicitamente.
+- No macOS, app aberta pelo Finder nao herda `export` do shell. Defina as chaves com `launchctl setenv MINIMAX_API_KEY sua_chave` (vale ate reiniciar a sessao) ou abra a app pelo terminal.
 
 ### Ficheiros locais esperados
 
 - Anthropic padrão: `~/.claude/.credentials.json` + `~/.claude.json`
+- Anthropic no macOS: o Claude Code guarda o token na entrada `Claude Code-credentials` do Keychain; o ficheiro so existe como fallback. A app le o ficheiro quando ele existe e cai no Keychain caso contrario.
 - Anthropic personalizado: `<CLAUDE_CONFIG_DIR>/.credentials.json` + `<CLAUDE_CONFIG_DIR>/.claude.json`
 - Codex token: `~/.codex/auth.json`
 - Codex cookie: `~/.codex/cap_sid`
@@ -347,11 +349,21 @@ Dependencias principais do bootstrap:
 
 - `desktopJar` gera o JAR executavel.
 - `createDistributable` gera a distribuicao desktop em `build/compose/binaries/main/app/Usage Monitor`.
-- O projeto configura `TargetFormat.Exe`, `TargetFormat.Msi`, `TargetFormat.Deb` e `TargetFormat.Rpm`.
+- O projeto configura `TargetFormat.Exe`, `TargetFormat.Msi`, `TargetFormat.Deb`, `TargetFormat.Rpm` e `TargetFormat.Dmg`.
 - `packageInstaller` empacota o instalador NSIS quando o NSIS estiver instalado.
 - `build-with-icon.ps1` e um fluxo auxiliar Windows para gerar distributable, aplicar icone com `rcedit` e chamar o NSIS manualmente.
+- `packageDmg` so roda em macOS: o jpackage nao faz cross-compile.
 - A versao da app vem de `build.gradle.kts` e e propagada para `CURRENT_APP_VERSION`.
-- Tags `v*` disparam `.github/workflows/release-linux.yml`, que publica artefatos Linux e Windows no GitHub Release.
+- Tags `v*` disparam `.github/workflows/release-linux.yml`, que publica artefatos Linux, Windows e macOS no GitHub Release.
+
+### Instalacao no macOS
+
+Os DMGs (`usage-monitor_X.Y.Z_macos_arm64.dmg` e `..._x64.dmg`) sao publicados **sem assinatura Apple**. Na primeira abertura o Gatekeeper bloqueia. Duas saidas:
+
+- Clique com o botao direito no app dentro de `/Applications` e escolha **Abrir**, confirmando o aviso.
+- Ou remova a quarentena: `xattr -dr com.apple.quarantine "/Applications/Usage Monitor.app"`.
+
+O auto-start no macOS grava `~/Library/LaunchAgents/com.usagemonitor.app.plist` e carrega o agente com `launchctl`.
 
 ## Testes
 
@@ -390,7 +402,8 @@ Sintomas conhecidos:
 - `src/commonMain/kotlin/com/usagemonitor/data/datasource/RemoteApiDataSource.kt`: chamadas HTTP remotas.
 - `src/desktopMain/kotlin/com/usagemonitor/data/datasource/LocalObservedModelUsageReader.kt`: leitura das bases locais de OpenCode e Kilo.
 - `src/installer/UsageMonitor.nsi`: script do instalador NSIS.
-- `.github/workflows/release-linux.yml`: pipeline de release.
+- `src/desktopMain/kotlin/com/usagemonitor/data/datasource/AnthropicCredentialStore.kt`: origem das credenciais Anthropic (ficheiro ou Keychain no macOS).
+- `.github/workflows/release-linux.yml`: pipeline de release (Linux, Windows e macOS).
 
 ## Convencao de commit
 

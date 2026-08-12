@@ -19,9 +19,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L  // renova se expira em menos de 5 min
 private const val OAUTH_REFRESH_URL = "https://console.anthropic.com/v1/oauth/token"
@@ -46,6 +43,10 @@ internal class LocalCredentialDataSource(
         } else {
             null
         }
+    },
+    // Costura de teste: permite trocar a origem das credenciais (ficheiro ou Keychain).
+    private val credentialStoreProvider: (AnthropicProfileLocation) -> AnthropicCredentialStore = { location ->
+        defaultCredentialStore(location)
     }
 ) : CredentialDataSource {
 
@@ -63,20 +64,15 @@ internal class LocalCredentialDataSource(
         return mutex.withLock {
             val location = resolveLocation(profile)
             val now = System.currentTimeMillis()
-            val credentialsFile = location.credentialsFile
-            if (!credentialsFile.exists()) {
-                throw IllegalStateException(
-                    "Credenciais não encontradas para o perfil '${profile.label}': ${credentialsFile.absolutePath}. " +
-                        "Execute o Claude Code CLI com esse CLAUDE_CONFIG_DIR para autenticar."
-                )
-            }
+            val store = credentialStoreProvider(location)
+            val originalContent = store.read()
+                ?: throw IllegalStateException(store.missingCredentialsMessage(profile.label))
 
-            val originalContent = credentialsFile.readText()
             var creds = json.decodeFromString<CredentialsFileDto>(originalContent)
             val needsRefresh = creds.claudeAiOauth.expiresAt - now < REFRESH_MARGIN_MS
 
             if (needsRefresh && creds.claudeAiOauth.refreshToken.isNotEmpty()) {
-                creds = refreshToken(credentialsFile, originalContent, creds)
+                creds = refreshToken(store, originalContent, creds)
             }
 
             val accessToken = creds.claudeAiOauth.accessToken.ifBlank {
@@ -95,13 +91,10 @@ internal class LocalCredentialDataSource(
         session: AnthropicSession
     ): Boolean {
         val location = resolveLocation(profile)
-        val credentialsFile = location.credentialsFile
-        if (!credentialsFile.exists()) {
-            return false
-        }
+        val storedContent = credentialStoreProvider(location).read() ?: return false
 
         return try {
-            val creds = json.decodeFromString<CredentialsFileDto>(credentialsFile.readText())
+            val creds = json.decodeFromString<CredentialsFileDto>(storedContent)
             val currentAccount = loadAccountContext(location)
             creds.claudeAiOauth.accessToken == session.accessToken &&
                 currentAccount.key == session.accountContext.key
@@ -150,7 +143,7 @@ internal class LocalCredentialDataSource(
     }
 
     private suspend fun refreshToken(
-        credentialsFile: File,
+        store: AnthropicCredentialStore,
         originalContent: String,
         creds: CredentialsFileDto
     ): CredentialsFileDto {
@@ -171,43 +164,12 @@ internal class LocalCredentialDataSource(
                 else creds.claudeAiOauth.expiresAt
             )
         )
-        if (!credentialsFile.exists() || credentialsFile.readText() != originalContent) {
+        if (store.read() != originalContent) {
             throw IllegalStateException("As credenciais do Claude Code mudaram durante a renovação; a coleta será repetida.")
         }
 
-        atomicWriteText(
-            target = credentialsFile,
-            content = json.encodeToString(CredentialsFileDto.serializer(), updated)
-        )
+        store.write(json.encodeToString(CredentialsFileDto.serializer(), updated))
         return updated
-    }
-
-    private fun atomicWriteText(target: File, content: String) {
-        val parentDir = target.parentFile ?: throw IllegalStateException("Diretório pai do ficheiro de credenciais não encontrado.")
-        parentDir.mkdirs()
-        val tempFile = File(parentDir, "${target.name}.tmp")
-        try {
-            Files.writeString(tempFile.toPath(), content)
-            try {
-                Files.move(
-                    tempFile.toPath(),
-                    target.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(
-                    tempFile.toPath(),
-                    target.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING
-                )
-            }
-            restrictToOwnerReadWrite(target.toPath())
-        } finally {
-            if (tempFile.exists()) {
-                tempFile.delete()
-            }
-        }
     }
 
     @Serializable
