@@ -46,6 +46,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
@@ -106,6 +107,14 @@ fun DashboardScreen(
     onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
     /** Perfis que participam do time; vazio esconde o botão de todos os cards. */
     teamEnabledProfileIds: Set<String> = emptySet(),
+    /**
+     * Semáforo de saúde das sessões em curso, por card.
+     *
+     * Faz o botão correspondente piscar na cor da severidade enquanto houver
+     * sessão com interação recente pedindo atenção. Vazio deixa tudo em repouso.
+     */
+    cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
+    teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     /** `null` esconde o botão de todas as contas — só quem administra o recebe. */
     onOpenAdminOverview: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -229,6 +238,8 @@ fun DashboardScreen(
                                     onOpenCliSessionsCard = onOpenCliSessions,
                                     onOpenTeamUsageCard = onOpenTeamUsage,
                                     teamEnabledProfileIds = teamEnabledProfileIds,
+                                    cliSessionPulses = cliSessionPulses,
+                                    teamSessionPulses = teamSessionPulses,
                                     onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -399,6 +410,8 @@ private fun SuccessContent(
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
     teamEnabledProfileIds: Set<String> = emptySet(),
+    cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
+    teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     onRetryAnthropic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -469,6 +482,8 @@ private fun SuccessContent(
                 onOpenCliSessionsCard = onOpenCliSessionsCard,
                 onOpenTeamUsageCard = onOpenTeamUsageCard,
                 teamEnabledProfileIds = teamEnabledProfileIds,
+                cliSessionPulses = cliSessionPulses,
+                teamSessionPulses = teamSessionPulses,
                 now = now,
                 modifier = Modifier
                     .fillMaxWidth()

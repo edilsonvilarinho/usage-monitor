@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,9 +33,12 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import com.usagemonitor.domain.entity.ActiveSessionAlert
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -223,6 +227,67 @@ class ComponentTest {
         onNodeWithTag("usageAccountLabel", useUnmergedTree = true).assertIsDisplayed()
         onNodeWithText(account.displayLabel).assertIsDisplayed()
         onNodeWithContentDescription("Conta da última coleta: ${account.displayLabel}").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ApiUsageCard keeps the session buttons plain without a pulse`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                AnthropicCardWithSessionButtons(
+                    cliPulse = SessionPulse.EMPTY,
+                    teamPulse = SessionPulse.EMPTY
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Sessões CLI desta conta").assertIsDisplayed()
+        onNodeWithContentDescription("Sessões do time nesta conta").assertIsDisplayed()
+    }
+
+    /**
+     * O `autoAdvance` fica desligado porque o pisca é uma animação infinita: com
+     * ele ligado o `waitForIdle` do teste nunca retornaria.
+     */
+    @Test
+    fun `ApiUsageCard explains why a session button is pulsing`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        val activity = Instant.parse("2026-04-28T10:00:00Z")
+        setContent {
+            AppTheme(isDark = true) {
+                AnthropicCardWithSessionButtons(
+                    cliPulse = SessionPulse(
+                        listOf(
+                            ActiveSessionAlert(
+                                sessionId = "2991339c",
+                                health = CliSessionHealth.SATURATED,
+                                lastActivityAt = activity,
+                                projectName = "usage-monitor"
+                            )
+                        )
+                    ),
+                    teamPulse = SessionPulse(
+                        listOf(
+                            ActiveSessionAlert(
+                                sessionId = "aaaa1111",
+                                health = CliSessionHealth.ATTENTION,
+                                lastActivityAt = activity,
+                                projectName = "mdlog-web-compras",
+                                memberAlias = "SUETONIO",
+                                machineLabel = "devmachine"
+                            )
+                        )
+                    )
+                )
+            }
+        }
+
+        onNodeWithContentDescription(
+            "Sessões CLI desta conta — 1 sessão ativa agora pede atenção:\n• Saturada — usage-monitor"
+        ).assertIsDisplayed()
+        onNodeWithContentDescription(
+            "Sessões do time nesta conta — 1 sessão ativa agora pede atenção:" +
+                "\n• SUETONIO · devmachine — Atenção (mdlog-web-compras)"
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -2402,4 +2467,36 @@ class ComponentTest {
         onAllNodesWithText("0 / 100 %").assertCountEquals(0)
         viewModel.onDestroy()
     }
+}
+
+/** Card Anthropic com os dois botões de sessão, o alvo do semáforo. */
+@Composable
+private fun AnthropicCardWithSessionButtons(
+    cliPulse: SessionPulse,
+    teamPulse: SessionPulse
+) {
+    ApiUsageCard(
+        source = ApiSource.ANTHROPIC,
+        apiName = "Anthropic",
+        quotas = listOf(
+            QuotaInfo(
+                label = "Claude 5h",
+                used = 20L,
+                total = 100L,
+                periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                periodType = PeriodType.INTERVAL,
+                unit = UsageUnit.PERCENTAGE
+            )
+        ),
+        showUsageDetails = false,
+        isRefreshing = false,
+        language = AppLanguage.PT,
+        animationDelayMillis = 0,
+        onRefresh = {},
+        onOpenCliSessions = {},
+        onOpenTeamUsage = {},
+        cliSessionPulse = cliPulse,
+        teamSessionPulse = teamPulse,
+        now = Instant.parse("2026-04-28T10:00:00Z")
+    )
 }
