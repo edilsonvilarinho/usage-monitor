@@ -696,6 +696,9 @@ fun main() = application {
     var teamUsageOpenGeneration by remember { mutableStateOf(0) }
     var teamUsageAccountLabel by remember { mutableStateOf<String?>(null) }
     var teamUsageProfileId by remember { mutableStateOf<String?>(null) }
+    // Quem abriu a janela é quem sabe se ela é a visão global; o rótulo nulo da
+    // conta não prova isso — conta sem rótulo cairia no mesmo ramo.
+    var teamUsageIsAdminOverview by remember { mutableStateOf(false) }
     var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var teamAdminConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var isTeamKeysOpen by remember { mutableStateOf(false) }
@@ -912,6 +915,7 @@ fun main() = application {
                         {
                             teamUsageAccountLabel = null
                             teamUsageProfileId = null
+                            teamUsageIsAdminOverview = true
                             isTeamUsageOpen = true
                             teamUsageOpenGeneration++
                             teamUsageViewModel.openForAllAccounts()
@@ -944,6 +948,7 @@ fun main() = application {
                         if (accountKey != null) {
                             teamUsageAccountLabel = accountContext.displayLabel
                             teamUsageProfileId = profileId
+                            teamUsageIsAdminOverview = false
                             isTeamUsageOpen = true
                             teamUsageOpenGeneration++
                             teamUsageViewModel.openForAccount(
@@ -1038,7 +1043,11 @@ fun main() = application {
     }
 
     if (isTeamUsageOpen) {
-        val teamTitle = teamUsageWindowTitle(language, teamUsageAccountLabel)
+        val teamTitle = teamUsageWindowTitle(
+            language = language,
+            accountLabel = teamUsageAccountLabel,
+            isAdminOverview = teamUsageIsAdminOverview
+        )
         // Sem avisar o ViewModel, o laço ao vivo continuaria consultando o
         // servidor de cinco em cinco segundos com a janela fechada.
         val closeTeamUsage = {

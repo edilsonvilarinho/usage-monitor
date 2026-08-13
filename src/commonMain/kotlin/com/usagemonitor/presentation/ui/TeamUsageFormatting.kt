@@ -6,13 +6,33 @@ import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import kotlinx.datetime.Instant
 
-internal fun teamUsageTitle(language: AppLanguage): String {
+/**
+ * Nome da janela.
+ *
+ * Um time é uma conta Anthropic, então a visão global do administrador mostra
+ * vários times e o título vai no plural — no singular ele diria que a janela é
+ * de um time só, que é justamente o que ela não é.
+ */
+internal fun teamUsageTitle(language: AppLanguage, isAdminOverview: Boolean = false): String {
+    if (isAdminOverview) {
+        return if (language == AppLanguage.PT) "Sessões dos times" else "All team sessions"
+    }
     return if (language == AppLanguage.PT) "Sessões do time" else "Team sessions"
 }
 
-/** Título da janela nomeando a conta: um time é uma conta Anthropic. */
-internal fun teamUsageWindowTitle(language: AppLanguage, accountLabel: String?): String {
-    val base = teamUsageTitle(language)
+/**
+ * Título da janela nomeando a conta.
+ *
+ * [isAdminOverview] vem de quem abriu a janela e não é inferido de
+ * [accountLabel] em branco: rótulo vazio numa conta só cairia no mesmo ramo e
+ * daria o plural para um time só.
+ */
+internal fun teamUsageWindowTitle(
+    language: AppLanguage,
+    accountLabel: String?,
+    isAdminOverview: Boolean = false
+): String {
+    val base = teamUsageTitle(language, isAdminOverview)
     if (accountLabel.isNullOrBlank()) {
         return base
     }
@@ -38,6 +58,11 @@ internal object TeamUsageLabels {
 
     fun sessionCount(count: Int, language: AppLanguage): String {
         return CliSessionsLabels.sessionCount(count, language)
+    }
+
+    /** Cabeçalho da coluna de integrantes no totalizador da conta. */
+    fun columnMembers(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Integrantes" else "Members"
     }
 
     fun allAccounts(count: Int, language: AppLanguage): String {
@@ -197,6 +222,14 @@ internal object TeamUsageLabels {
 
     fun collapse(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Ocultar sessões" else "Hide sessions"
+    }
+
+    fun expandAccount(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Ver integrantes" else "Show members"
+    }
+
+    fun collapseAccount(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Ocultar integrantes" else "Hide members"
     }
 
     fun removeMember(language: AppLanguage): String {

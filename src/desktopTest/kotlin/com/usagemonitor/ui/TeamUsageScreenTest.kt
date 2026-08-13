@@ -9,6 +9,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -562,7 +563,8 @@ class TeamUsageScreenTest {
     private fun ComposeUiTest.renderSuccess(
         state: TeamUsageUiState.Success,
         localDeviceId: String? = null,
-        width: androidx.compose.ui.unit.Dp = 900.dp
+        width: androidx.compose.ui.unit.Dp = 900.dp,
+        onToggleAccount: (String) -> Unit = {}
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -572,6 +574,7 @@ class TeamUsageScreenTest {
                         language = AppLanguage.PT,
                         onSelectRange = {},
                         onToggleMember = {},
+                        onToggleAccount = onToggleAccount,
                         localDeviceId = localDeviceId
                     )
                 }
@@ -591,6 +594,38 @@ class TeamUsageScreenTest {
             lastTs = NOW,
             inputTokens = tokens,
             costMicros = cost
+        )
+    }
+
+    /** Duas contas na visão global: A com duas máquinas, B com uma. */
+    private fun twoAccountMembers(): List<TeamMemberUsage> {
+        return listOf(
+            member(
+                "device-1",
+                "edilson",
+                "DESKTOP-A1",
+                listOf(
+                    session("aaaaaa0123", tokens = 300L, cost = 1_000_000L),
+                    session("aaaaaa0456", tokens = 200L, cost = 500_000L)
+                ),
+                accountKey = "account-a",
+                accountLabel = "fulano@empresa.com"
+            ),
+            member(
+                "device-2",
+                "romero",
+                "NOTE-LAT-015",
+                listOf(session("aaaaaa0789", tokens = 500L, cost = 2_500_000L)),
+                accountKey = "account-a",
+                accountLabel = "fulano@empresa.com"
+            ),
+            member(
+                "device-3",
+                "helio",
+                "DESKTOP-B1",
+                listOf(session("bbbbbb0123", tokens = 100L, cost = 100_000L)),
+                accountKey = "account-b"
+            )
         )
     }
 
@@ -668,6 +703,85 @@ class TeamUsageScreenTest {
             onNodeWithText("Conta sem chave").assertIsDisplayed()
         }
 
+    /**
+     * Issue #45: sem o totalizador, comparar duas contas exige somar as linhas
+     * de cada uma na mão — o único total da tela é o do cabeçalho, que já
+     * mistura todas as contas.
+     */
+    @Test
+    fun `faixa da conta totaliza os integrantes dela na visao global`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = twoAccountMembers(),
+                    isAdminOverview = true
+                ),
+                width = 1_200.dp
+            )
+
+            // Números da conta A: 2 das 3 máquinas, 3 das 4 sessões e o custo
+            // somado delas. A asserção é sobre a faixa, não sobre a tela: é ela
+            // que prova que o número está na conta certa.
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
+                .assertIsDisplayed()
+                .assertTextContains("2")
+                .assertTextContains("3 sessões")
+                .assertTextContains("$4.0000")
+
+            // Conta B tem uma máquina só; o total dela não some no da conta A.
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-b")
+                .assertIsDisplayed()
+                .assertTextContains("1")
+                .assertTextContains("$0.1000")
+
+            // O cabeçalho continua somando tudo: nenhuma faixa o substitui.
+            onNodeWithText("3 integrantes").assertIsDisplayed()
+            onNodeWithText("4 sessões").assertIsDisplayed()
+        }
+
+    /**
+     * Issue #45: a visão global nasce recolhida — a faixa de cada conta é a
+     * lista inteira até alguém pedir o detalhe de uma delas.
+     */
+    @Test
+    fun `visao global nasce recolhida e a faixa abre a conta clicada`() =
+        runDesktopComposeUiTest {
+            val toggled = mutableListOf<String>()
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = twoAccountMembers(),
+                    isAdminOverview = true
+                ),
+                width = 1_200.dp,
+                onToggleAccount = { groupKey -> toggled += groupKey }
+            )
+
+            // Nenhum integrante na tela; só as duas faixas.
+            onAllNodesWithText("edilson").assertCountEquals(0)
+            onAllNodesWithText("helio").assertCountEquals(0)
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a").assertIsDisplayed()
+
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a").performClick()
+            assertEquals(listOf("account-a"), toggled)
+        }
+
+    @Test
+    fun `conta expandida mostra so os integrantes dela`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = twoAccountMembers(),
+                expandedAccountKeys = setOf("account-a"),
+                isAdminOverview = true
+            ),
+            width = 1_200.dp
+        )
+
+        onNodeWithText("edilson").assertIsDisplayed()
+        // A conta B continua recolhida: a faixa dela aparece, a máquina não.
+        onAllNodesWithText("helio").assertCountEquals(0)
+        onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-b").assertIsDisplayed()
+    }
+
     @Test
     fun `modal de uma conta nao desenha cabecalho de grupo`() = runDesktopComposeUiTest {
         renderSuccess(
@@ -727,6 +841,7 @@ class TeamUsageScreenTest {
                 ),
                 // A chave é `accountKey/deviceId`: só a linha da conta A abre.
                 expandedMemberKeys = setOf("account-a/device-1"),
+                expandedAccountKeys = setOf("account-a", "account-b"),
                 isAdminOverview = true
             )
         )
