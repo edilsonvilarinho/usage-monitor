@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
@@ -70,6 +71,21 @@ internal const val TEAM_ADMIN_OVERVIEW_TAG = "teamAdminOverviewBadge"
 internal const val TEAM_ACCOUNT_GROUP_TAG_PREFIX = "teamAccountGroup:"
 internal const val TEAM_SLIDING_WINDOW_NOTICE_TAG = "teamSlidingWindowNotice"
 
+// Larguras das colunas da lista, num lugar só: a faixa da conta e a linha do
+// integrante têm de cair no mesmo x, e dois conjuntos de literais seriam dois
+// números que precisam concordar em arquivos diferentes.
+private val TEAM_COLUMN_IDENTITY = 210.dp
+private val TEAM_COLUMN_MACHINE = 140.dp
+private val TEAM_COLUMN_TOKENS = 140.dp
+private val TEAM_COLUMN_COST = 96.dp
+private val TEAM_COLUMN_SHARE = 96.dp
+private val TEAM_COLUMN_STATUS = 112.dp
+
+// A linha do integrante mora dentro de um `DepthSurface`, e a faixa da conta
+// não. Sem repetir aqui o `contentPadding` dele, as colunas da faixa nasceriam
+// deslocadas das colunas de baixo.
+private val TEAM_ROW_CONTENT_PADDING = 14.dp
+
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
 fun TeamUsageScreen(
@@ -89,6 +105,7 @@ fun TeamUsageScreen(
         removalError = removalError,
         onSelectRange = { range -> viewModel.setRange(range) },
         onToggleMember = { memberKey -> viewModel.toggleMember(memberKey) },
+        onToggleAccount = { groupKey -> viewModel.toggleAccount(groupKey) },
         onRemoveMember = { memberKey -> viewModel.removeMember(memberKey) },
         onDismissRemovalError = { viewModel.clearRemovalError() },
         onOpenSession = { memberKey, sessionId -> viewModel.openSession(memberKey, sessionId) },
@@ -106,6 +123,9 @@ internal fun TeamUsageContent(
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // Com default para não arrastar as chamadas que só exercitam o modal de uma
+    // conta, onde não existe faixa a recolher.
+    onToggleAccount: (String) -> Unit = {},
     localDeviceId: String? = null,
     removalError: String? = null,
     onRemoveMember: (String) -> Unit = {},
@@ -141,6 +161,7 @@ internal fun TeamUsageContent(
                         removalError = removalError,
                         onSelectRange = onSelectRange,
                         onToggleMember = onToggleMember,
+                        onToggleAccount = onToggleAccount,
                         onOpenSession = onOpenSession,
                         onRequestRemoveMember = { member -> pendingRemoval = member },
                         onDismissRemovalError = onDismissRemovalError
@@ -213,6 +234,7 @@ private fun TeamUsageList(
     removalError: String?,
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
+    onToggleAccount: (String) -> Unit,
     onOpenSession: (String, String) -> Unit,
     onRequestRemoveMember: (TeamMemberUsage) -> Unit,
     onDismissRemovalError: () -> Unit
@@ -273,8 +295,18 @@ private fun TeamUsageList(
                     // conta já é a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
                         item(key = "account:${group.accountKey}") {
-                            TeamAccountGroupHeader(group = group, language = language)
+                            TeamAccountGroupHeader(
+                                group = group,
+                                share = state.tokenShareOf(group),
+                                expanded = state.isAccountExpanded(group),
+                                language = language,
+                                onToggle = { onToggleAccount(group.groupKey) }
+                            )
                         }
+                    }
+
+                    if (!state.isAccountExpanded(group)) {
+                        continue
                     }
 
                     for (member in group.members) {
@@ -345,38 +377,133 @@ private fun TeamUsageList(
  * Mostra o rótulo **e** o `accountUuid`: o rótulo é texto que o administrador
  * digitou ao emitir a chave e o servidor não o verifica, então ele orienta mas
  * não prova. Conta sem chave emitida aparece só pelo uuid.
+ *
+ * Os totais repetem as colunas da linha de integrante, nas mesmas larguras: sem
+ * eles, comparar duas contas exige somar as linhas de cada uma na mão — o único
+ * total da tela é o do cabeçalho, que já mistura todas as contas.
+ *
+ * É por ela que a conta abre e fecha. A visão global nasce recolhida, então esta
+ * faixa é a lista inteira até alguém pedir o detalhe de uma conta.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TeamAccountGroupHeader(
     group: TeamAccountGroup,
-    language: AppLanguage
+    share: Double,
+    expanded: Boolean,
+    language: AppLanguage,
+    onToggle: () -> Unit
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 6.dp)
+            .clickable(onClick = onToggle)
+            .padding(horizontal = TEAM_ROW_CONTENT_PADDING)
             .testTag("$TEAM_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Ícone dentro da coluna de identidade, como na linha do integrante: é o
+        // que mantém as colunas seguintes no mesmo x nas duas.
+        Row(
+            modifier = Modifier.width(TEAM_COLUMN_IDENTITY),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) {
+                    TeamUsageLabels.collapseAccount(language)
+                } else {
+                    TeamUsageLabels.expandAccount(language)
+                },
+                tint = CACHE_READ_COLOR
+            )
+            Column {
+                Text(
+                    text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = CACHE_READ_COLOR,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = group.accountKey.orEmpty(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Só o número: o rótulo da coluna já diz o que ele conta, e repetir
+        // "integrantes" no valor deixaria a célula diferente de todas as outras.
+        MetricText(
+            label = TeamUsageLabels.columnMembers(language),
+            value = group.activeMemberCount.toString(),
+            modifier = Modifier.width(TEAM_COLUMN_MACHINE)
+        )
+
+        MetricText(
+            label = TeamUsageLabels.sessionCount(group.sessionCount, language),
+            value = formatQuantity(group.totalTokens),
+            modifier = Modifier.width(TEAM_COLUMN_TOKENS)
+        )
+
+        MetricText(
+            label = TeamUsageLabels.columnCost(language),
+            value = if (group.isCostComplete) {
+                formatMicrosUsd(group.totalCostMicros)
+            } else {
+                "${formatMicrosUsd(group.totalCostMicros)}+"
+            },
+            valueColor = INPUT_COLOR,
+            modifier = Modifier.width(TEAM_COLUMN_COST)
+        )
+
+        Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
+            MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
+            Spacer(modifier = Modifier.height(4.dp))
+            MeterBar(fraction = share, color = CACHE_READ_COLOR, height = 4.dp)
+        }
+
+        val worstHealth = group.worstHealth
+        if (worstHealth != null) {
+            TeamHealthCell(
+                health = worstHealth,
+                language = language,
+                modifier = Modifier.width(TEAM_COLUMN_STATUS)
+            )
+        }
+    }
+}
+
+/** Ponto colorido + veredito, igual na faixa da conta e na linha do integrante. */
+@Composable
+private fun TeamHealthCell(
+    health: CliSessionHealth,
+    language: AppLanguage,
+    modifier: Modifier = Modifier
+) {
+    val healthAccent = healthColor(health)
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
-            style = MaterialTheme.typography.titleSmall,
-            color = CACHE_READ_COLOR,
-            fontWeight = FontWeight.SemiBold
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(AppShapes.small)
+                .background(healthAccent)
         )
-        Text(
-            text = group.accountKey.orEmpty(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = TeamUsageLabels.memberCount(group.activeMemberCount, language),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        MetricText(
+            label = TeamUsageLabels.columnStatus(language),
+            value = TeamUsageLabels.healthShort(health, language),
+            valueColor = healthAccent
         )
     }
 }
@@ -536,7 +663,7 @@ private fun TeamMemberRow(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
-                modifier = Modifier.width(210.dp),
+                modifier = Modifier.width(TEAM_COLUMN_IDENTITY),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -577,7 +704,7 @@ private fun TeamMemberRow(
             MetricText(
                 label = TeamUsageLabels.columnMachine(language),
                 value = member.machineLabel,
-                modifier = Modifier.width(140.dp)
+                modifier = Modifier.width(TEAM_COLUMN_MACHINE)
             )
 
             MetricText(
@@ -592,7 +719,7 @@ private fun TeamMemberRow(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                modifier = Modifier.width(140.dp)
+                modifier = Modifier.width(TEAM_COLUMN_TOKENS)
             )
 
             MetricText(
@@ -603,10 +730,10 @@ private fun TeamMemberRow(
                     "${formatMicrosUsd(member.totalCostMicros)}+"
                 },
                 valueColor = INPUT_COLOR,
-                modifier = Modifier.width(96.dp)
+                modifier = Modifier.width(TEAM_COLUMN_COST)
             )
 
-            Column(modifier = Modifier.width(96.dp)) {
+            Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
                 MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
                 Spacer(modifier = Modifier.height(4.dp))
                 MeterBar(fraction = share, color = accent, height = 4.dp)
@@ -617,26 +744,13 @@ private fun TeamMemberRow(
             // ninguém dá — nada na linha recolhida indicaria que vale a pena.
             val worstHealth = member.worstHealth
             if (worstHealth != null) {
-                val healthAccent = healthColor(worstHealth)
-                Row(
+                TeamHealthCell(
+                    health = worstHealth,
+                    language = language,
                     modifier = Modifier
-                        .width(112.dp)
-                        .testTag("$TEAM_MEMBER_HEALTH_TAG_PREFIX${member.deviceId}"),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(AppShapes.small)
-                            .background(healthAccent)
-                    )
-                    MetricText(
-                        label = TeamUsageLabels.columnStatus(language),
-                        value = TeamUsageLabels.healthShort(worstHealth, language),
-                        valueColor = healthAccent
-                    )
-                }
+                        .width(TEAM_COLUMN_STATUS)
+                        .testTag("$TEAM_MEMBER_HEALTH_TAG_PREFIX${member.deviceId}")
+                )
             }
 
             if (removable) {

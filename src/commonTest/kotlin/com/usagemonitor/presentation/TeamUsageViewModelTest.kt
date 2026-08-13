@@ -746,6 +746,72 @@ class TeamUsageViewModelTest {
         viewModel.onDestroy()
     }
 
+    /** Issue #45: dezenas de máquinas de uma vez escondem a comparação entre contas. */
+    @Test
+    fun `visao global abre com as contas recolhidas`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10),
+                overviewAccount(OTHER_ACCOUNT_KEY, null, "device-2", tokens = 30)
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(emptySet(), state.expandedAccountKeys)
+        assertTrue(state.memberGroups.none { group -> state.isAccountExpanded(group) })
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `conta expandida sobrevive aos tiques do tempo real`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10),
+                overviewAccount(OTHER_ACCOUNT_KEY, null, "device-2", tokens = 30)
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        viewModel.toggleAccount(ACCOUNT_KEY)
+        advanceTimeBy(3 * TEAM_LIVE_INTERVAL_MILLIS + 1)
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(setOf(ACCOUNT_KEY), state.expandedAccountKeys)
+        val expandedGroup = state.memberGroups.first { group -> group.accountKey == ACCOUNT_KEY }
+        assertTrue(state.isAccountExpanded(expandedGroup))
+
+        viewModel.toggleAccount(ACCOUNT_KEY)
+        runCurrent()
+        val collapsed = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(emptySet(), collapsed.expandedAccountKeys)
+        viewModel.onDestroy()
+    }
+
+    /** O modal de uma conta não tem faixa para clicar: recolher não existe lá. */
+    @Test
+    fun `modal de uma conta mostra os integrantes sem depender do conjunto expandido`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(emptySet(), state.expandedAccountKeys)
+        assertTrue(state.memberGroups.all { group -> state.isAccountExpanded(group) })
+        viewModel.onDestroy()
+    }
+
     @Test
     fun `visao global remove o integrante na conta dele`() = runTest {
         val repository = FakeTeamRepository()

@@ -1,9 +1,11 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.tallyHealth
+import com.usagemonitor.domain.entity.worstHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
 
@@ -47,6 +49,19 @@ sealed interface TeamUsageUiState {
          * contas: a mesma máquina em duas delas expandiria as duas de uma vez.
          */
         val expandedMemberKeys: Set<String> = emptySet(),
+        /**
+         * Contas com os integrantes à mostra, por [TeamAccountGroup.groupKey].
+         *
+         * Vazio por padrão: a visão global abre recolhida, com uma linha por
+         * conta. Com todas as contas abertas de uma vez a lista nasce com dezenas
+         * de máquinas e a comparação entre contas — a pergunta desta tela — fica
+         * a rolagens de distância.
+         *
+         * Mora no estado pela mesma razão de [expandedMemberKeys]: o laço ao vivo
+         * republica o `Success` a cada poucos segundos e fecharia sozinho o que o
+         * usuário abriu.
+         */
+        val expandedAccountKeys: Set<String> = emptySet(),
         /**
          * Quando o conteúdo mudou pela última vez.
          *
@@ -100,11 +115,39 @@ sealed interface TeamUsageUiState {
 
         /** Fatia do integrante no total de tokens do time. */
         fun tokenShareOf(member: TeamMemberUsage): Double {
+            return shareOf(member.totalTokens)
+        }
+
+        /**
+         * Fatia da conta no total de tokens da janela.
+         *
+         * Mesmo denominador da fatia do integrante — o total de tudo o que a
+         * janela mostra. Com isso as contas da visão global somam 100% e a barra
+         * da faixa é comparável com a das linhas abaixo dela.
+         */
+        fun tokenShareOf(group: TeamAccountGroup): Double {
+            return shareOf(group.totalTokens)
+        }
+
+        /**
+         * Se os integrantes desta conta aparecem na lista.
+         *
+         * Fora da visão global não há faixa para clicar, então recolher não é
+         * uma possibilidade — sempre visível.
+         */
+        fun isAccountExpanded(group: TeamAccountGroup): Boolean {
+            if (!isAdminOverview) {
+                return true
+            }
+            return group.groupKey in expandedAccountKeys
+        }
+
+        private fun shareOf(tokens: Long): Double {
             val total = totalTokens
             if (total <= 0L) {
                 return 0.0
             }
-            return member.totalTokens.toDouble() / total.toDouble()
+            return tokens.toDouble() / total.toDouble()
         }
 
         /**
@@ -146,6 +189,16 @@ data class TeamAccountGroup(
     val accountLabel: String?,
     val members: List<TeamMemberUsage>
 ) {
+    /**
+     * Identidade do grupo na tela, já normalizada.
+     *
+     * O `accountKey` é nulo fora da visão global, onde a conta é a da janela
+     * inteira. Um `Set<String?>` no estado só para carregar esse nulo seria pior
+     * que normalizá-lo aqui, junto do lugar onde ele nasce.
+     */
+    val groupKey: String
+        get() = accountKey.orEmpty()
+
     val totalTokens: Long
         get() = members.sumOf { member -> member.totalTokens }
 
@@ -154,6 +207,23 @@ data class TeamAccountGroup(
 
     val activeMemberCount: Int
         get() = members.count { member -> member.hasActivity }
+
+    val sessionCount: Int
+        get() = members.sumOf { member -> member.sessionCount }
+
+    /** O custo da conta só fecha quando nenhum integrante tem modelo sem preço. */
+    val isCostComplete: Boolean
+        get() = members.all { member -> member.isCostComplete }
+
+    /**
+     * Pior veredito entre todas as sessões da conta, ou `null` sem nenhuma.
+     *
+     * Mesma razão do campo equivalente do integrante: sem ele a sessão saturada
+     * de uma conta inteira só apareceria depois de percorrer as linhas dela uma
+     * a uma.
+     */
+    val worstHealth: CliSessionHealth?
+        get() = members.flatMap { member -> member.sessions }.worstHealth()
 }
 
 /**

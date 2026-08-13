@@ -189,6 +189,23 @@ class TeamUsageViewModel(
         )
     }
 
+    /** Abre ou fecha os integrantes de uma conta, por `TeamAccountGroup.groupKey`. */
+    fun toggleAccount(groupKey: String) {
+        val current = _uiState.value
+        if (current !is TeamUsageUiState.Success) {
+            return
+        }
+
+        val expanded = current.expandedAccountKeys
+        _uiState.value = current.copy(
+            expandedAccountKeys = if (groupKey in expanded) {
+                expanded - groupKey
+            } else {
+                expanded + groupKey
+            }
+        )
+    }
+
     /**
      * Apaga um integrante no servidor e recarrega a lista.
      *
@@ -406,6 +423,14 @@ class TeamUsageViewModel(
                         expandedMemberKeys = current?.expandedMemberKeys
                             ?.filterTo(mutableSetOf()) { key ->
                                 members.any { member -> member.memberKey == key }
+                            }
+                            ?: emptySet(),
+                        // Mesmo tratamento das linhas abertas. Conta que sumiu da
+                        // resposta sai do conjunto, senão ela reapareceria aberta
+                        // se voltasse horas depois.
+                        expandedAccountKeys = current?.expandedAccountKeys
+                            ?.filterTo(mutableSetOf()) { key ->
+                                members.any { member -> member.accountKey.orEmpty() == key }
                             }
                             ?: emptySet(),
                         // Carimbo só anda quando o conteúdo muda. Marcá-lo a cada
