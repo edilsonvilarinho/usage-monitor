@@ -35,6 +35,18 @@ internal fun shortSessionId(sessionId: String): String {
     return sessionId.take(8)
 }
 
+/**
+ * Comando que retoma a sessão no Claude Code.
+ *
+ * Leva o id **inteiro**: o `--resume` só retoma direto quando recebe o session ID
+ * completo — com um prefixo ele cai no seletor interativo usando o texto como
+ * busca. Os oito caracteres que a tela mostra ([shortSessionId]) não servem para
+ * isso, e é justamente por isso que existe o botão de copiar.
+ */
+internal fun resumeSessionCommand(sessionId: String): String {
+    return "claude --resume $sessionId"
+}
+
 internal fun cliSessionsTitle(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Sessões CLI" else "CLI Sessions"
 }
@@ -149,6 +161,29 @@ internal object CliSessionsLabels {
 
     fun back(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Voltar" else "Back"
+    }
+
+    fun copyResumeCommand(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Copiar comando de retomada"
+        } else {
+            "Copy resume command"
+        }
+    }
+
+    /**
+     * Rótulo da sessão de outra máquina.
+     *
+     * Ali o transcript não existe localmente e o `--resume` não teria o que
+     * retomar, então o botão copia só o identificador — e o texto não promete
+     * uma retomada que não acontece.
+     */
+    fun copySessionId(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Copiar id da sessão" else "Copy session id"
+    }
+
+    fun copied(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Copiado" else "Copied"
     }
 
     fun empty(language: AppLanguage): String {
