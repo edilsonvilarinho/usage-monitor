@@ -25,12 +25,14 @@ import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -860,6 +862,208 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         assertTrue(!anthropicCalled)
         assertTrue(!minimaxCalled)
         viewModel.onDestroy()
+    }
+
+    @Test
+    fun `cache restore brings the usage projection back with it`() = runTest {
+        val expectedRisk = QuotaRiskSummary(
+            level = UsageRiskLevel.WILL_EXCEED,
+            estimatedExhaustionAt = fixedInstant
+        )
+        val viewModel = cacheOnlyViewModel(
+            cachedStats = listOf(sampleAnthropicStats),
+            getUsageHistory = getUsageHistoryUseCase(
+                reportsBySource = mapOf(ApiSource.ANTHROPIC to riskReport(expectedRisk))
+            ),
+            persistedNextRefreshAt = fixedInstant + with(kotlin.time.Duration.Companion) { 5.minutes }
+        )
+
+        awaitCondition {
+            val state = viewModel.uiState.value
+            state is UiState.Success && state.riskSummaries.isNotEmpty()
+        }
+
+        val state = viewModel.uiState.value as UiState.Success
+        val risks = state.riskSummaries[anthropicTarget]
+        assertEquals(expectedRisk, risks?.get(QuotaSeriesKey("Tokens", PeriodType.INTERVAL)))
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `boots from cache even when the scheduled refresh already expired`() = runTest {
+        val fetchGate = CompletableDeferred<Unit>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                fetchGate.await()
+                return Result.success(sampleAnthropicStats)
+            }
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                fetchGate.await()
+                return Result.success(sampleMiniMaxStats)
+            }
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
+            enabledApis = defaultEnabledApis(),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getCachedDashboardStats = cachedStatsUseCase(listOf(sampleAnthropicStats, sampleMiniMaxStats)),
+            clock = Clock.System,
+            // Coleta inicial ligada e nenhum ciclo pendente: é o caso de quem
+            // deixou o app fechado por mais de um poll.
+            config = DashboardViewModelConfig(
+                autoStartInitialFetch = true,
+                autoStartCountdown = false,
+                autoStartUpdateChecks = false
+            ),
+            persistedNextRefreshAt = null
+        )
+
+        // A rede ainda está presa no portão: o que pintar aqui só pode ter vindo do disco.
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        val cachedState = viewModel.uiState.value as UiState.Success
+        assertEquals(2, cachedState.data.size)
+
+        fetchGate.complete(Unit)
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `fetched projection wins over the one restored from cache`() = runTest {
+        val restoredRisk = QuotaRiskSummary(
+            level = UsageRiskLevel.ON_TRACK,
+            estimatedExhaustionAt = null
+        )
+        val fetchedRisk = QuotaRiskSummary(
+            level = UsageRiskLevel.WILL_EXCEED,
+            estimatedExhaustionAt = fixedInstant
+        )
+        val historyCalls = MutableStateFlow(0)
+        val restoreGate = CompletableDeferred<Unit>()
+        val historyRepository = object : UsageHistoryRepository {
+            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+            override suspend fun getHistoryReport(
+                source: ApiSource,
+                range: HistoryRange,
+                now: Instant
+            ): ApiUsageHistoryReport {
+                // A primeira chamada é a do restore: o teste só solta a coleta
+                // depois de vê-la registrada, então a ordem é determinística.
+                val call = historyCalls.updateAndGet { current -> current + 1 }
+                if (call == 1) {
+                    restoreGate.await()
+                    return riskReport(restoredRisk)
+                }
+                return riskReport(fetchedRisk)
+            }
+        }
+
+        val viewModel = cacheOnlyViewModel(
+            cachedStats = listOf(sampleAnthropicStats),
+            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(historyRepository),
+            persistedNextRefreshAt = null,
+            anthropicUsage = Result.success(sampleAnthropicStats)
+        )
+
+        awaitCondition { historyCalls.value == 1 }
+
+        viewModel.refresh()
+        val seriesKey = QuotaSeriesKey("Tokens", PeriodType.INTERVAL)
+        awaitCondition {
+            val state = viewModel.uiState.value as? UiState.Success
+            state?.riskSummaries?.get(anthropicTarget)?.get(seriesKey) == fetchedRisk
+        }
+
+        // O restore termina agora, com um cálculo mais velho que o da coleta.
+        restoreGate.complete(Unit)
+        settleBackgroundWork()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(fetchedRisk, state.riskSummaries[anthropicTarget]?.get(seriesKey))
+        viewModel.onDestroy()
+    }
+
+    private val anthropicTarget = UsageTargetKey.forSource(ApiSource.ANTHROPIC)
+
+    private fun riskReport(risk: QuotaRiskSummary): ApiUsageHistoryReport {
+        return ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_7_DAYS,
+            lastUpdatedAt = fixedInstant,
+            series = listOf(
+                UsageHistorySeries(
+                    quotaLabel = "Tokens",
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE,
+                    points = emptyList(),
+                    currentDisplayUsed = 50000L,
+                    currentDisplayTotal = 200000L,
+                    deltaDisplayUsed = 50000L,
+                    averageDisplayConsumptionPerHour = 100.0,
+                    currentPeriodEndAt = fixedInstant,
+                    forecast = UsageForecast.InsufficientData,
+                    riskSummary = risk
+                )
+            )
+        )
+    }
+
+    private fun cachedStatsUseCase(
+        stats: List<ApiUsageStats>
+    ): com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase {
+        return com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase(
+            object : com.usagemonitor.domain.repository.DashboardCacheRepository {
+                override suspend fun saveSnapshot(stats: List<ApiUsageStats>, capturedAt: Instant) = Unit
+                override suspend fun loadSnapshot(): List<ApiUsageStats> = stats
+            }
+        )
+    }
+
+    /** ViewModel sem coleta automática, alimentado só pelo cache de disco. */
+    private fun cacheOnlyViewModel(
+        cachedStats: List<ApiUsageStats>,
+        getUsageHistory: com.usagemonitor.domain.usecase.GetUsageHistoryUseCase,
+        persistedNextRefreshAt: Instant?,
+        anthropicUsage: Result<ApiUsageStats> = Result.failure(Exception("Não deve ser chamado"))
+    ): DashboardViewModel {
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> = anthropicUsage
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        return DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepo),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepo),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepo),
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getUsageHistory = getUsageHistory,
+            getCachedDashboardStats = cachedStatsUseCase(cachedStats),
+            clock = Clock.System,
+            config = manualRefreshConfig(),
+            persistedNextRefreshAt = persistedNextRefreshAt
+        )
     }
 
 }

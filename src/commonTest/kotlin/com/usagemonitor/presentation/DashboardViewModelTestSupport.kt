@@ -294,6 +294,16 @@ abstract class DashboardViewModelTestSupport {
         assertTrue(predicate(), "Condition not met within real-time timeout")
     }
 
+    /**
+     * Deixa o trabalho de fundo assentar quando o teste precisa provar que algo
+     * **não** aconteceu — caso em que não há condição para esperar.
+     */
+    protected suspend fun settleBackgroundWork(rounds: Int = 25) {
+        repeat(rounds) {
+            pauseForBackgroundWork()
+        }
+    }
+
     private suspend fun pauseForBackgroundWork() {
         yield()
         Thread.sleep(20)

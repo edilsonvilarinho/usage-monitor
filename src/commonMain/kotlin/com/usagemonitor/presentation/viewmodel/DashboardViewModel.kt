@@ -125,11 +125,13 @@ class DashboardViewModel(
 
     init {
         val isPersistedRefreshStillPending = persistedNextRefreshAt != null && persistedNextRefreshAt > clock.now()
-        if (isPersistedRefreshStillPending) {
-            // Ainda não é hora do próximo ciclo: reidrata a UI com o último
-            // snapshot salvo em vez de deixar a tela presa em Loading.
-            loadCachedStateIfAvailable()
-        }
+        // Reidrata a UI com o último snapshot salvo em vez de deixar a tela
+        // presa em Loading. Vale mesmo quando o ciclo já venceu e a coleta vai
+        // sair logo em seguida: ela ainda depende da rede, e o app ficou o
+        // tempo todo mostrando "Carregando" com dados válidos em disco. As duas
+        // rotinas convivem porque o restore só preenche alvo que a coleta ainda
+        // não trouxe.
+        loadCachedStateIfAvailable()
         if (config.autoStartInitialFetch && !isPersistedRefreshStillPending) {
             initFetchJob = viewModelScope.launch {
                 if (initialFetchCancelled.get()) {
@@ -153,13 +155,17 @@ class DashboardViewModel(
             if (cachedStats.isEmpty()) {
                 return@launch
             }
+            val restored = mutableListOf<ApiUsageStats>()
             stateMutex.withLock {
                 // Não sobrescreve dados já obtidos por uma fetch que tenha
-                // completado antes desta corrotina (ex.: refresh manual do usuário).
+                // completado antes desta corrotina (ex.: refresh manual do
+                // usuário, ou a coleta inicial quando o ciclo já venceu). É esta
+                // guarda que deixa as duas rotinas correrem juntas.
                 val enabled = enabledTargets()
                 cachedStats.forEach { stats ->
                     if (stats.targetKey in enabled && stats.targetKey !in cachedStatsByTarget) {
                         cachedStatsByTarget[stats.targetKey] = stats
+                        restored += stats
                     }
                 }
                 publishUiState(enabled)
@@ -167,6 +173,35 @@ class DashboardViewModel(
             // O snapshot de disco pode trazer um reset que vence antes do poll —
             // inclusive um já vencido enquanto o app esteve fechado.
             nudgeCountdown()
+            restoreRiskSummaries(restored)
+        }
+    }
+
+    /**
+     * Recalcula a projeção dos alvos que vieram do cache de disco.
+     *
+     * O snapshot em disco guarda só o consumo; o risco sai do histórico local,
+     * e sem isto o card voltava do restart com os números certos mas sem o ponto
+     * do semáforo nem o tooltip de projeção — até o poll seguinte, dez minutos
+     * depois. Nada aqui depende de rede: o histórico é o SQLite local, então
+     * recomputar sai mais barato que persistir a projeção e ter de invalidá-la.
+     *
+     * Roda depois de a UI já ter sido publicada com o consumo: o card pinta na
+     * hora, e a projeção entra no quadro seguinte em vez de esperar o SQLite.
+     * Sequencial de propósito — a conexão é serializada e o mesmo arquivo é
+     * disputado pelo indexador de sessões CLI, então paralelizar só criaria
+     * contenção.
+     */
+    private suspend fun restoreRiskSummaries(restored: List<ApiUsageStats>) {
+        if (restored.isEmpty() || getUsageHistory == null) {
+            return
+        }
+        val now = clock.now()
+        restored.forEach { stats ->
+            refreshRiskSummaries(stats.targetKey, stats, now, overwriteExisting = false)
+        }
+        stateMutex.withLock {
+            publishUiState(enabledTargets())
         }
     }
 
@@ -593,7 +628,17 @@ class DashboardViewModel(
         }
     }
 
-    private suspend fun refreshRiskSummaries(target: UsageTargetKey, stats: ApiUsageStats, capturedAt: Instant) {
+    /**
+     * @param overwriteExisting `false` no caminho do cache de disco: uma coleta
+     * pode ter completado no meio do restore, e a projeção dela é a mais nova.
+     * Mesma regra que o consumo restaurado segue em [loadCachedStateIfAvailable].
+     */
+    private suspend fun refreshRiskSummaries(
+        target: UsageTargetKey,
+        stats: ApiUsageStats,
+        capturedAt: Instant,
+        overwriteExisting: Boolean = true
+    ) {
         val historyUseCase = getUsageHistory ?: return
         val risks = runCatching {
             historyUseCase(
@@ -607,7 +652,13 @@ class DashboardViewModel(
             ?.toMap()
             ?: return
 
-        cachedRiskByTarget[target] = risks
+        // Sob o mutex porque o restore do cache e a coleta escrevem no mesmo
+        // mapa: `mutableMapOf` não aguenta dois escritores.
+        stateMutex.withLock {
+            if (overwriteExisting || target !in cachedRiskByTarget) {
+                cachedRiskByTarget[target] = risks
+            }
+        }
     }
 
     private suspend fun checkForUpdate() {
