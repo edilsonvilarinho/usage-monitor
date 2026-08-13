@@ -266,7 +266,7 @@ data class CliSessionHealthTally(
  * [CliSessionContextStatus] se recusa a chutar uma. Contá-la como saudável
  * afirmaria o que não se sabe.
  */
-private fun Iterable<CliSessionSummary>.withKnownWindow(): List<CliSessionSummary> {
+internal fun Iterable<CliSessionSummary>.withKnownWindow(): List<CliSessionSummary> {
     return filter { session -> session.contextStatus.contextSaturation != null }
 }
 

@@ -56,6 +56,8 @@ import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
+import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
+import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
@@ -107,6 +109,8 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
+import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
@@ -155,6 +159,15 @@ private const val CLI_SESSION_LIVE_INTERVAL_MILLIS = 5_000L
  * intervalo de envio da máquina dele, não por este.
  */
 private const val TEAM_USAGE_LIVE_INTERVAL_MILLIS = 5_000L
+
+/**
+ * Cadência do semáforo de sessões dos botões dos cards.
+ *
+ * A janela avaliada é de minutos, então meio minuto é precisão de sobra — e
+ * mantém o tráfego para o servidor de time no mesmo patamar do envio, que já roda
+ * de 30 em 30 segundos.
+ */
+private const val SESSION_PULSE_INTERVAL_MILLIS = 30_000L
 private const val ENABLED_APIS_KEY = "enabledApis"
 private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
@@ -423,6 +436,26 @@ fun main() = application {
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
         )
     }
+    // Semáforo dos botões dos cards: lê o índice local de todas as contas e, para
+    // as que participam do time, o servidor. Reusa o mesmo `syncCliSessionIndex`
+    // das outras telas — o índice é um só.
+    val sessionPulseViewModel = remember(cliSessionRepository, teamUsageRepository, profileRegistry) {
+        SessionPulseViewModel(
+            getCliPulses = GetActiveCliSessionPulsesUseCase(cliSessionRepository),
+            getTeamPulse = GetActiveTeamSessionPulseUseCase(teamUsageRepository),
+            syncCliSessionIndex = syncCliSessionIndex,
+            teamTargetsProvider = {
+                buildSessionPulseTargets(
+                    registry = profileRegistry,
+                    settings = teamSettingsFlow.value
+                )
+            },
+            isAppVisible = isAppVisible,
+            intervalMillis = SESSION_PULSE_INTERVAL_MILLIS
+        )
+    }
+    val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()
+    val teamSessionPulses by sessionPulseViewModel.teamPulses.collectAsState()
     val teamKeysViewModel = remember(teamAdminRepository) {
         TeamKeysAdminViewModel(
             listKeys = ListTeamKeysUseCase(teamAdminRepository),
@@ -469,6 +502,7 @@ fun main() = application {
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
                 teamUsageViewModel.onDestroy()
+                sessionPulseViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
@@ -491,6 +525,7 @@ fun main() = application {
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
                 teamUsageViewModel.onDestroy()
+                sessionPulseViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
@@ -797,6 +832,7 @@ fun main() = application {
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
                 teamUsageViewModel.onDestroy()
+                sessionPulseViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 httpClient.close()
                 usageHistoryDataSource.close()
@@ -927,7 +963,9 @@ fun main() = application {
                         teamSettings.participatingProfileIds
                     } else {
                         emptySet()
-                    }
+                    },
+                    cliSessionPulses = cliSessionPulses,
+                    teamSessionPulses = teamSessionPulses
                 )
             }
         }
@@ -1468,6 +1506,26 @@ private fun buildTeamSyncTargets(registry: AnthropicProfileRegistry): List<TeamS
             organizationName = accountContext.workspaceName
         )
     }
+}
+
+/**
+ * Contas que o semáforo do botão de time deve consultar.
+ *
+ * Mesma resolução do envio ([buildTeamSyncTargets]) filtrada pela condição que já
+ * decide se o botão aparece no card: integração ligada e perfil marcado. Sem o
+ * filtro, o app consultaria o servidor por contas cujo botão nem existe.
+ */
+private fun buildSessionPulseTargets(
+    registry: AnthropicProfileRegistry,
+    settings: TeamIntegrationSettings
+): List<TeamPulseTarget> {
+    if (!settings.isActive) {
+        return emptyList()
+    }
+
+    return buildTeamSyncTargets(registry)
+        .filter { target -> target.profileId in settings.participatingProfileIds }
+        .map { target -> TeamPulseTarget(profileId = target.profileId, accountKey = target.accountKey) }
 }
 
 /**

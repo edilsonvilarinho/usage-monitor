@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -317,7 +318,8 @@ private fun TeamUsageList(
                                         // envio: o detalhe vem de lá.
                                         onOpen = {
                                             onOpenSession(member.memberKey, session.sessionId)
-                                        }
+                                        },
+                                        isLocalSession = false
                                     )
                                 }
                             }
@@ -689,6 +691,12 @@ private fun TeamSessionDetailPane(
                 text = shortSessionId(detail.sessionId),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
+            )
+            CopySessionCommandButton(
+                sessionId = detail.sessionId,
+                language = language,
+                isLocalSession = false,
+                showLabel = true
             )
         }
 

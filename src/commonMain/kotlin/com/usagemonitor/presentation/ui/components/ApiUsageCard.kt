@@ -46,6 +46,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
@@ -86,6 +87,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.displayName
@@ -137,6 +139,13 @@ fun ApiUsageCard(
      * não ganha um botão que não leva a lugar nenhum.
      */
     onOpenTeamUsage: (() -> Unit)? = null,
+    /**
+     * Sessões desta máquina, nesta conta, com interação nos últimos minutos e
+     * veredito laranja ou vermelho. Vazio deixa o botão como qualquer outro.
+     */
+    cliSessionPulse: SessionPulse = SessionPulse.EMPTY,
+    /** Mesmo semáforo, para as sessões de todo o time nesta conta. */
+    teamSessionPulse: SessionPulse = SessionPulse.EMPTY,
     onToggleMinimized: () -> Unit = {},
     onDragStart: () -> Unit = {},
     onDrag: (Offset) -> Unit = {},
@@ -357,7 +366,7 @@ fun ApiUsageCard(
                             onClick = onRefresh,
                             buttonSize = density.actionButtonSize,
                             enabled = !isRefreshing
-                        ) {
+                        ) { tint ->
                             if (isRefreshing) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(density.actionIconSize),
@@ -368,7 +377,7 @@ fun ApiUsageCard(
                                     imageVector = Icons.Rounded.Refresh,
                                     contentDescription = null,
                                     modifier = Modifier.size(density.actionIconSize),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    tint = tint
                                 )
                             }
                         }
@@ -377,12 +386,12 @@ fun ApiUsageCard(
                             label = historyActionLabel(language = language),
                             onClick = onOpenHistory,
                             buttonSize = density.actionButtonSize
-                        ) {
+                        ) { tint ->
                             Icon(
                                 imageVector = Icons.Rounded.History,
                                 contentDescription = null,
                                 modifier = Modifier.size(density.actionIconSize),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = tint
                             )
                         }
 
@@ -390,13 +399,15 @@ fun ApiUsageCard(
                             CardIconActionButton(
                                 label = cliSessionsActionLabel(language = language),
                                 onClick = onOpenCliSessions,
-                                buttonSize = density.actionButtonSize
-                            ) {
+                                buttonSize = density.actionButtonSize,
+                                pulse = cliSessionPulse,
+                                language = language
+                            ) { tint ->
                                 Icon(
                                     imageVector = Icons.Rounded.Terminal,
                                     contentDescription = null,
                                     modifier = Modifier.size(density.actionIconSize),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    tint = tint
                                 )
                             }
                         }
@@ -407,13 +418,15 @@ fun ApiUsageCard(
                             CardIconActionButton(
                                 label = teamUsageActionLabel(language = language),
                                 onClick = onOpenTeamUsage,
-                                buttonSize = density.actionButtonSize
-                            ) {
+                                buttonSize = density.actionButtonSize,
+                                pulse = teamSessionPulse,
+                                language = language
+                            ) { tint ->
                                 Icon(
                                     imageVector = Icons.Rounded.Groups,
                                     contentDescription = null,
                                     modifier = Modifier.size(density.actionIconSize),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    tint = tint
                                 )
                             }
                         }
@@ -425,16 +438,16 @@ fun ApiUsageCard(
                             ),
                             onClick = onToggleMinimized,
                             buttonSize = density.actionButtonSize
-                        ) {
+                        ) { tint ->
                             Icon(
                                 imageVector = if (isMinimized) {
                                     Icons.Rounded.Add
                                 } else {
                                     Icons.Rounded.Remove
                                 },
-                                contentDescription = null,
                                 modifier = Modifier.size(density.actionIconSize),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                contentDescription = null,
+                                tint = tint
                             )
                         }
                     }
@@ -887,22 +900,42 @@ private fun CardIconActionButton(
     onClick: () -> Unit,
     buttonSize: Dp,
     enabled: Boolean = true,
-    content: @Composable () -> Unit
+    /** Semáforo das sessões em curso; vazio deixa o botão em repouso. */
+    pulse: SessionPulse = SessionPulse.EMPTY,
+    language: AppLanguage = AppLanguage.PT,
+    /** Recebe a cor do ícone: a do tema em repouso, a da severidade no pisca. */
+    content: @Composable (Color) -> Unit
 ) {
+    val frame = rememberSessionPulseFrame(pulse)
+    // O motivo entra na descrição, e não só na tooltip: um botão que pisca sem
+    // explicação obriga justamente o clique que o semáforo quer poupar.
+    //
+    // Memorizado porque o pisca recompõe este botão a cada quadro: sem isso o
+    // texto seria remontado sessenta vezes por segundo sem nunca mudar.
+    val hint = remember(pulse, language) { sessionPulseHint(pulse, language) }
+    val description = remember(label, hint) { if (hint == null) label else "$label — $hint" }
+    val tint = frame?.color() ?: MaterialTheme.colorScheme.onSecondaryContainer
+    val containerColor = sessionPulseContainerColor(
+        frame = frame,
+        resting = MaterialTheme.colorScheme.secondaryContainer
+    )
+
     HoverTooltipBox(
         title = label,
+        subtitle = hint,
         metrics = emptyList()
     ) {
         FilledTonalIconButton(
             onClick = onClick,
             enabled = enabled,
+            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = containerColor),
             modifier = Modifier
                 .size(buttonSize)
                 .semantics {
-                    contentDescription = label
+                    contentDescription = description
                 }
         ) {
-            content()
+            content(tint)
         }
     }
 }

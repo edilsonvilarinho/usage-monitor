@@ -48,6 +48,7 @@ import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.presentation.ui.components.BinMode
+import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.HoverTooltipBox
 import com.usagemonitor.presentation.ui.components.TooltipMetric
@@ -393,7 +394,9 @@ internal fun LiveBadge(language: AppLanguage) {
 internal fun CliSessionRow(
     session: CliSessionSummary,
     language: AppLanguage,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    /** `false` no modal do time: o transcript daquela sessão não está nesta máquina. */
+    isLocalSession: Boolean = true
 ) {
     val status = session.contextStatus
     val statusColor = healthColor(status.health)
@@ -420,7 +423,9 @@ internal fun CliSessionRow(
                         .clip(AppShapes.small)
                         .background(statusColor)
                 )
-                Column {
+                // Com peso, o botão de copiar cabe sempre: a coluna cede espaço em
+                // vez de empurrá-lo para fora da largura fixa da célula.
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = shortSessionId(session.sessionId),
                         style = MaterialTheme.typography.bodyMedium,
@@ -434,6 +439,12 @@ internal fun CliSessionRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                // O clique do botão é consumido por ele: copiar não abre o detalhe.
+                CopySessionCommandButton(
+                    sessionId = session.sessionId,
+                    language = language,
+                    isLocalSession = isLocalSession
+                )
             }
 
             Column(modifier = Modifier.width(140.dp)) {
@@ -524,6 +535,11 @@ private fun CliSessionDetailPane(
                 text = shortSessionId(detail.sessionId),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
+            )
+            CopySessionCommandButton(
+                sessionId = detail.sessionId,
+                language = language,
+                showLabel = true
             )
         }
 

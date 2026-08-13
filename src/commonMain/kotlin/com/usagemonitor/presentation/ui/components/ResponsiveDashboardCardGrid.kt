@@ -24,6 +24,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
@@ -63,6 +64,10 @@ internal fun ResponsiveDashboardCardGrid(
      * de todos os cards sem nenhuma outra condição espalhada pela tela.
      */
     teamEnabledProfileIds: Set<String> = emptySet(),
+    /** Semáforo das sessões desta máquina, por card. Ausente significa repouso. */
+    cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
+    /** Semáforo das sessões de todo o time, por card. */
+    teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     /** Instante contra o qual o vencimento das janelas de cota é medido. */
     now: Instant,
     modifier: Modifier = Modifier
@@ -138,6 +143,8 @@ internal fun ResponsiveDashboardCardGrid(
                             } else {
                                 null
                             },
+                            cliSessionPulse = cliSessionPulses[stats.targetKey] ?: SessionPulse.EMPTY,
+                            teamSessionPulse = teamSessionPulses[stats.targetKey] ?: SessionPulse.EMPTY,
                             now = now,
                             onToggleMinimized = { onToggleCardMinimized(stats.targetKey) },
                             onDragStart = {
