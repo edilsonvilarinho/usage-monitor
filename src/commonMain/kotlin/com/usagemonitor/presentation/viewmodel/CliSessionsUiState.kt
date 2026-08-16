@@ -3,9 +3,32 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.AccountCreditUsage
+import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
+
+/**
+ * Qual das duas leituras a janela mostra.
+ *
+ * Enum novo, e não um valor a mais em algum enum existente: os `when` exaustivos
+ * de `CliSessionRange` e companhia não têm nada a ver com esta escolha.
+ */
+enum class CliSessionsView { SESSIONS, BREAKDOWN }
+
+/**
+ * Resultado da última exportação.
+ *
+ * Carrega o fato; a frase nasce na borda da UI, como em [DashboardToast]. O
+ * cancelamento do diálogo não produz resultado nenhum — não é sucesso nem erro,
+ * e anunciá-lo seria ruído.
+ */
+sealed interface CliExportOutcome {
+    data class Saved(val path: String) : CliExportOutcome
+    data class Failed(val message: String) : CliExportOutcome
+}
 
 sealed interface CliSessionsUiState {
 
@@ -50,7 +73,35 @@ sealed interface CliSessionsUiState {
          */
         val advancedExpanded: Boolean = false,
         /** Painel "Como ler esta tela". Mesmo tratamento de [advancedExpanded]. */
-        val glossaryExpanded: Boolean = false
+        val glossaryExpanded: Boolean = false,
+        /** Aba corrente. Mesmo tratamento de [advancedExpanded]: mora no estado. */
+        val view: CliSessionsView = CliSessionsView.SESSIONS,
+        /**
+         * Resumo por eixo da mesma janela.
+         *
+         * `null` significa "ainda não lido" — a aba só é carregada quando o
+         * usuário a abre. Uma leitura que falha **mantém** o valor anterior: no
+         * laço ao vivo o usuário está lendo a tela, não esperando por ela.
+         */
+        val breakdown: CliUsageBreakdown? = null,
+        /** Falha da última leitura do resumo, sem apagar o resumo já exibido. */
+        val breakdownError: String? = null,
+        /** Resultado da última exportação; `null` enquanto nenhuma aconteceu. */
+        val exportOutcome: CliExportOutcome? = null,
+        /**
+         * Orçamento do mês corrente. `null` sem teto configurado.
+         *
+         * Independe de [range]: orçamento é mensal, e amarrá-lo ao chip de 5h
+         * daria um número sem significado.
+         */
+        val budget: MonthlyBudgetStatus? = null,
+        /**
+         * Créditos de uso da conta, na moeda **real** dela.
+         *
+         * Fica ao lado de [budget] e nunca somado a ele: o custo do índice é
+         * sempre USD e este pode não ser.
+         */
+        val accountCredits: AccountCreditUsage? = null
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long

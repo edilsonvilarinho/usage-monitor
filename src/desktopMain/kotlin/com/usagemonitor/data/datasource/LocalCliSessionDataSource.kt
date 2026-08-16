@@ -5,7 +5,10 @@ import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliToolUsage
+import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ModelPricingTable
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
@@ -137,6 +140,102 @@ class LocalCliSessionDataSource(
                 } ?: return@useConnection null
 
                 CliSessionDetail(summary = summary, turns = readTurns(connection, sessionId))
+            }
+        }
+    }
+
+    override suspend fun readUsageGroups(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): List<CliUsageGroupRow> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(SELECT_USAGE_GROUPS_SQL).use { statement ->
+                    statement.setLong(1, sinceEpochMillis)
+                    statement.setInt(2, if (profileId == null) 1 else 0)
+                    statement.setString(3, profileId)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                add(
+                                    CliUsageGroupRow(
+                                        sessionId = rows.getString("session_id"),
+                                        cwd = rows.getString("cwd"),
+                                        gitBranch = rows.getString("git_branch"),
+                                        model = rows.getString("model"),
+                                        turnCount = rows.getInt("turn_count"),
+                                        inputTokens = rows.getLong("input_tokens"),
+                                        outputTokens = rows.getLong("output_tokens"),
+                                        cacheReadTokens = rows.getLong("cache_read_tokens"),
+                                        cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
+                                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override suspend fun readHourlyUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): List<CliHourlyUsageRow> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(SELECT_HOURLY_USAGE_SQL).use { statement ->
+                    statement.setLong(1, sinceEpochMillis)
+                    statement.setInt(2, if (profileId == null) 1 else 0)
+                    statement.setString(3, profileId)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                add(
+                                    CliHourlyUsageRow(
+                                        hourStartMillis = rows.getLong("hour_bucket") * MILLIS_PER_HOUR,
+                                        model = rows.getString("model"),
+                                        turnCount = rows.getInt("turn_count"),
+                                        inputTokens = rows.getLong("input_tokens"),
+                                        outputTokens = rows.getLong("output_tokens"),
+                                        cacheReadTokens = rows.getLong("cache_read_tokens"),
+                                        cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
+                                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override suspend fun readToolUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): List<CliToolUsage> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(SELECT_TOOL_USAGE_SQL).use { statement ->
+                    statement.setLong(1, sinceEpochMillis)
+                    statement.setInt(2, if (profileId == null) 1 else 0)
+                    statement.setString(3, profileId)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                add(
+                                    CliToolUsage(
+                                        toolName = rows.getString("tool_name"),
+                                        callCount = rows.getInt("call_count"),
+                                        turnCount = rows.getInt("turn_count")
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -359,7 +458,8 @@ class LocalCliSessionDataSource(
             outputTokens = usage.outputTokens,
             cacheReadTokens = usage.cacheReadInputTokens,
             cacheWrite5mTokens = usage.cacheWrite5mTokens,
-            cacheWrite1hTokens = usage.cacheWrite1hTokens
+            cacheWrite1hTokens = usage.cacheWrite1hTokens,
+            toolCalls = message.toolCalls
         )
     }
 
@@ -446,6 +546,8 @@ class LocalCliSessionDataSource(
             statement.executeBatch()
         }
 
+        insertTurnTools(connection, turns)
+
         // Garante que a sessão existe antes do recálculo, mesmo sem turnos novos aceitos.
         connection.prepareStatement(INSERT_SESSION_SHELL_SQL).use { statement ->
             for (sessionId in touched) {
@@ -459,6 +561,33 @@ class LocalCliSessionDataSource(
         }
 
         return touched
+    }
+
+    /**
+     * Grava as ferramentas de cada turno.
+     *
+     * A chave é `(session_id, message_id, tool_name)` e o `INSERT OR REPLACE`
+     * torna a passada idempotente: reindexar o mesmo arquivo não soma chamadas
+     * de novo, do mesmo jeito que o `message_id` já protege os turnos.
+     */
+    private fun insertTurnTools(connection: Connection, turns: List<ParsedTurn>) {
+        val withTools = turns.filter { turn -> turn.toolCalls.isNotEmpty() }
+        if (withTools.isEmpty()) {
+            return
+        }
+
+        connection.prepareStatement(INSERT_TURN_TOOL_SQL).use { statement ->
+            for (turn in withTools) {
+                for ((toolName, callCount) in turn.toolCalls) {
+                    statement.setString(1, turn.sessionId)
+                    statement.setString(2, turn.messageId)
+                    statement.setString(3, toolName)
+                    statement.setInt(4, callCount)
+                    statement.addBatch()
+                }
+            }
+            statement.executeBatch()
+        }
     }
 
     private fun readMaxSeq(connection: Connection, sessionId: String): Int {
@@ -624,6 +753,10 @@ class LocalCliSessionDataSource(
 
     /** Apaga sessões e turnos vindos de um arquivo que precisa ser reindexado do zero. */
     private fun purgeIndexedFile(connection: Connection, path: String) {
+        connection.prepareStatement(DELETE_TURN_TOOLS_BY_FILE_SQL).use { statement ->
+            statement.setString(1, path)
+            statement.executeUpdate()
+        }
         connection.prepareStatement(DELETE_TURNS_BY_FILE_SQL).use { statement ->
             statement.setString(1, path)
             statement.executeUpdate()
@@ -650,6 +783,7 @@ class LocalCliSessionDataSource(
             statement.execute(CREATE_FILES_TABLE_SQL)
             statement.execute(CREATE_SESSIONS_TABLE_SQL)
             statement.execute(CREATE_TURNS_TABLE_SQL)
+            statement.execute(CREATE_TURN_TOOLS_TABLE_SQL)
         }
 
         // Bases criadas antes do suporte a múltiplas contas não têm `profile_id`.
@@ -671,6 +805,36 @@ class LocalCliSessionDataSource(
             statement.execute(CREATE_TURNS_INDEX_SQL)
             statement.execute(CREATE_SESSIONS_PROFILE_INDEX_SQL)
             statement.execute(CREATE_TURNS_TS_INDEX_SQL)
+            statement.execute(CREATE_TURN_TOOLS_INDEX_SQL)
+        }
+
+        migrateSchemaVersion(connection)
+    }
+
+    /**
+     * Reindexa do zero quando a versão do índice muda.
+     *
+     * A tabela de ferramentas nasceu vazia para tudo que já estava indexado, e
+     * `syncIndex` só reprocessa arquivo alterado. Sem forçar a releitura, o
+     * ranking de ferramentas mostraria apenas as sessões novas — um número que
+     * parece completo e não é.
+     *
+     * O reset é só do `last_offset`: as sessões e os turnos são reinseridos por
+     * `INSERT OR IGNORE`/`INSERT OR REPLACE` e não se duplicam.
+     */
+    private fun migrateSchemaVersion(connection: Connection) {
+        val current = connection.createStatement().use { statement ->
+            statement.executeQuery("PRAGMA user_version;").use { rows ->
+                if (rows.next()) rows.getInt(1) else 0
+            }
+        }
+        if (current >= INDEX_SCHEMA_VERSION) {
+            return
+        }
+
+        connection.createStatement().use { statement ->
+            statement.execute(RESET_FILE_OFFSETS_SQL)
+            statement.execute("PRAGMA user_version = $INDEX_SCHEMA_VERSION;")
         }
     }
 
@@ -736,7 +900,9 @@ class LocalCliSessionDataSource(
         val outputTokens: Long,
         val cacheReadTokens: Long,
         val cacheWrite5mTokens: Long,
-        val cacheWrite1hTokens: Long
+        val cacheWrite1hTokens: Long,
+        /** Nome da ferramenta → número de chamadas neste turno. */
+        val toolCalls: Map<String, Int> = emptyMap()
     )
 
     private data class ParsedTranscript(
@@ -835,6 +1001,58 @@ class LocalCliSessionDataSource(
               cache_write_1h_tokens INTEGER NOT NULL DEFAULT 0,
               PRIMARY KEY (session_id, message_id)
             );
+        """
+
+        /**
+         * Versão do índice. Subir este número força uma releitura completa dos
+         * transcripts na próxima abertura.
+         *
+         * 1 = tabela `cli_turn_tools`, que nasceu vazia para tudo que já estava
+         * indexado.
+         */
+        private const val INDEX_SCHEMA_VERSION = 1
+
+        /**
+         * Ferramentas invocadas em cada turno.
+         *
+         * Guarda **só o nome e a contagem** — nunca o `input` da ferramenta nem
+         * o texto da resposta, na mesma regra que o envio para o time segue.
+         */
+        private val CREATE_TURN_TOOLS_TABLE_SQL = """
+            CREATE TABLE IF NOT EXISTS cli_turn_tools (
+              session_id TEXT NOT NULL,
+              message_id TEXT NOT NULL,
+              tool_name TEXT NOT NULL,
+              call_count INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY (session_id, message_id, tool_name)
+            );
+        """
+
+        /** Sem ele o recorte temporal varre a tabela inteira de ferramentas. */
+        private val CREATE_TURN_TOOLS_INDEX_SQL = """
+            CREATE INDEX IF NOT EXISTS idx_cli_turn_tools_session
+            ON cli_turn_tools(session_id, message_id);
+        """
+
+        /**
+         * Zera o offset de todos os arquivos para forçar a releitura.
+         *
+         * Não apaga sessões nem turnos: eles voltam pelos mesmos `INSERT OR
+         * IGNORE`/`INSERT OR REPLACE` da indexação normal e não se duplicam.
+         */
+        private val RESET_FILE_OFFSETS_SQL = """
+            UPDATE cli_session_files SET last_offset = 0;
+        """
+
+        private val INSERT_TURN_TOOL_SQL = """
+            INSERT OR REPLACE INTO cli_turn_tools
+              (session_id, message_id, tool_name, call_count)
+            VALUES (?, ?, ?, ?);
+        """
+
+        private val DELETE_TURN_TOOLS_BY_FILE_SQL = """
+            DELETE FROM cli_turn_tools
+            WHERE session_id IN (SELECT session_id FROM cli_sessions WHERE file_path = ?);
         """
 
         private val CREATE_SESSIONS_INDEX_SQL = """
@@ -972,6 +1190,80 @@ class LocalCliSessionDataSource(
               AND (? = 1 OR s.profile_id = ?)
             GROUP BY t.session_id, t.model
             ORDER BY last_ts DESC;
+        """
+
+        /**
+         * Mesmas linhas de [SELECT_SESSIONS_SINCE_SQL], com `cwd` e `git_branch`
+         * no lugar dos campos que só a lista usa.
+         *
+         * Manter as duas com o mesmo `GROUP BY` e o mesmo corte é o que garante
+         * que o total do resumo bate com o do cabeçalho da lista. Sem `ORDER BY`:
+         * a ordenação final é por custo, e custo é calculado no domain.
+         */
+        private val SELECT_USAGE_GROUPS_SQL = """
+            SELECT t.session_id AS session_id,
+                   s.cwd AS cwd,
+                   s.git_branch AS git_branch,
+                   t.model AS model,
+                   COUNT(*) AS turn_count,
+                   SUM(t.input_tokens) AS input_tokens,
+                   SUM(t.output_tokens) AS output_tokens,
+                   SUM(t.cache_read_tokens) AS cache_read_tokens,
+                   SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
+                   SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+            FROM cli_turns t
+            JOIN cli_sessions s ON s.session_id = t.session_id
+            WHERE t.ts >= ?
+              AND (? = 1 OR s.profile_id = ?)
+            GROUP BY t.session_id, t.model;
+        """
+
+        /** Uma hora em millis; o `hour_bucket` da grade é `ts` dividido por ela. */
+        private const val MILLIS_PER_HOUR = 3_600_000L
+
+        /**
+         * Turnos por hora cheia e modelo.
+         *
+         * O bucket é UTC — a divisão inteira do `ts` — e quem o traduz para hora
+         * local é o domain. Trinta dias produzem no máximo 720 horas × modelos
+         * distintos, então a lista cabe folgada na memória.
+         */
+        private val SELECT_HOURLY_USAGE_SQL = """
+            SELECT t.ts / $MILLIS_PER_HOUR AS hour_bucket,
+                   t.model AS model,
+                   COUNT(*) AS turn_count,
+                   SUM(t.input_tokens) AS input_tokens,
+                   SUM(t.output_tokens) AS output_tokens,
+                   SUM(t.cache_read_tokens) AS cache_read_tokens,
+                   SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
+                   SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+            FROM cli_turns t
+            JOIN cli_sessions s ON s.session_id = t.session_id
+            WHERE t.ts >= ?
+              AND (? = 1 OR s.profile_id = ?)
+            GROUP BY hour_bucket, t.model;
+        """
+
+        /**
+         * Ferramentas dos turnos da janela.
+         *
+         * O `ts` vem de `cli_turns`, não da tabela de ferramentas: repetir o
+         * carimbo ali seria dado duplicado que poderia divergir. O desempate por
+         * nome mantém a ordem total — duas leituras iguais têm de dar listas
+         * iguais, ou a tela recompõe a cada tique do laço ao vivo.
+         */
+        private val SELECT_TOOL_USAGE_SQL = """
+            SELECT tt.tool_name AS tool_name,
+                   SUM(tt.call_count) AS call_count,
+                   COUNT(*) AS turn_count
+            FROM cli_turn_tools tt
+            JOIN cli_turns t
+              ON t.session_id = tt.session_id AND t.message_id = tt.message_id
+            JOIN cli_sessions s ON s.session_id = t.session_id
+            WHERE t.ts >= ?
+              AND (? = 1 OR s.profile_id = ?)
+            GROUP BY tt.tool_name
+            ORDER BY call_count DESC, tool_name ASC;
         """
 
         /**

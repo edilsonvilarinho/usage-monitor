@@ -760,6 +760,184 @@ class LocalCliSessionDataSourceTest {
         }
     }
 
+    @Test
+    fun `usage groups carry project branch and model`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", model = "claude-opus-5", outputTokens = 100L),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:05:00Z", model = "claude-haiku-4-5", outputTokens = 200L)
+            )
+            dataSource.syncIndex()
+
+            val groups = dataSource.readUsageGroups()
+
+            assertEquals(2, groups.size)
+            assertEquals(setOf("claude-opus-5", "claude-haiku-4-5"), groups.mapNotNull { row -> row.model }.toSet())
+            assertTrue(groups.all { row -> row.sessionId == "session-a" })
+            assertTrue(groups.all { row -> row.cwd == "/workspace/usage-monitor" })
+            assertTrue(groups.all { row -> row.gitBranch == "main" })
+            assertEquals(300L, groups.sumOf { row -> row.outputTokens })
+        }
+    }
+
+    /**
+     * O resumo e a lista partem das mesmas linhas: os totais têm de bater na
+     * mesma janela, ou a tela mostraria dois números para o mesmo recorte.
+     */
+    @Test
+    fun `usage groups match the windowed session totals`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L, cacheReadTokens = 5_000L),
+                assistantLine("session-a", "msg-2", "2026-08-01T12:00:00Z", outputTokens = 200L, cacheReadTokens = 7_000L)
+            )
+            writeTranscript(
+                root,
+                "session-b",
+                assistantLine("session-b", "msg-3", "2026-08-01T11:00:00Z", outputTokens = 50L)
+            )
+            dataSource.syncIndex()
+
+            val cutoff = epochMillis("2026-08-01T10:30:00Z")
+            val sessions = dataSource.readSessions(sinceEpochMillis = cutoff)
+            val groups = dataSource.readUsageGroups(sinceEpochMillis = cutoff)
+
+            assertEquals(sessions.sumOf { session -> session.totalTokens }, groups.sumOf { row ->
+                row.inputTokens + row.outputTokens + row.cacheReadTokens +
+                    row.cacheWrite5mTokens + row.cacheWrite1hTokens
+            })
+            assertEquals(sessions.sumOf { session -> session.turnCount }, groups.sumOf { row -> row.turnCount })
+        }
+    }
+
+    /**
+     * O bucket sai em UTC de propósito: quem traduz para hora local é o domain,
+     * porque o SQLite deslocaria a grade em três horas.
+     */
+    @Test
+    fun `hourly usage buckets turns by whole utc hour`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:05:00Z", outputTokens = 100L),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:55:00Z", outputTokens = 200L),
+                assistantLine("session-a", "msg-3", "2026-08-01T11:05:00Z", outputTokens = 300L)
+            )
+            dataSource.syncIndex()
+
+            val hourly = dataSource.readHourlyUsage().sortedBy { row -> row.hourStartMillis }
+
+            assertEquals(2, hourly.size)
+            assertEquals(epochMillis("2026-08-01T10:00:00Z"), hourly[0].hourStartMillis)
+            assertEquals(2, hourly[0].turnCount)
+            assertEquals(300L, hourly[0].outputTokens)
+            assertEquals(epochMillis("2026-08-01T11:00:00Z"), hourly[1].hourStartMillis)
+            assertEquals(1, hourly[1].turnCount)
+        }
+    }
+
+    @Test
+    fun `hourly usage splits the same hour by model`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:05:00Z", model = "claude-opus-5"),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:15:00Z", model = "claude-haiku-4-5")
+            )
+            dataSource.syncIndex()
+
+            val hourly = dataSource.readHourlyUsage()
+
+            assertEquals(2, hourly.size)
+            assertTrue(hourly.all { row -> row.hourStartMillis == epochMillis("2026-08-01T10:00:00Z") })
+            assertEquals(setOf("claude-opus-5", "claude-haiku-4-5"), hourly.mapNotNull { row -> row.model }.toSet())
+        }
+    }
+
+    @Test
+    fun `tool calls are indexed and summed per tool`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine(
+                    "session-a",
+                    "msg-1",
+                    "2026-08-01T10:00:00Z",
+                    tools = listOf("Read", "Read", "Bash")
+                ),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:05:00Z", tools = listOf("Read"))
+            )
+            dataSource.syncIndex()
+
+            val tools = dataSource.readToolUsage()
+
+            assertEquals(2, tools.size)
+            assertEquals("Read", tools[0].toolName)
+            assertEquals(3, tools[0].callCount)
+            assertEquals(2, tools[0].turnCount)
+            assertEquals("Bash", tools[1].toolName)
+            assertEquals(1, tools[1].callCount)
+        }
+    }
+
+    /** Reindexar o mesmo arquivo não pode somar as chamadas de novo. */
+    @Test
+    fun `reindexing does not double the tool calls`() = runTest {
+        withFixture { root, dataSource ->
+            val file = writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", tools = listOf("Read", "Read"))
+            )
+            dataSource.syncIndex()
+
+            // Muda o carimbo sem mudar o conteúdo: força uma releitura do arquivo.
+            file.setLastModified(file.lastModified() + 10_000L)
+            dataSource.syncIndex()
+
+            assertEquals(2, dataSource.readToolUsage().single().callCount)
+        }
+    }
+
+    @Test
+    fun `the tool window follows the turn cutoff`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", tools = listOf("Read")),
+                assistantLine("session-a", "msg-2", "2026-08-01T12:00:00Z", tools = listOf("Bash"))
+            )
+            dataSource.syncIndex()
+
+            val recent = dataSource.readToolUsage(sinceEpochMillis = epochMillis("2026-08-01T11:00:00Z"))
+
+            assertEquals(listOf("Bash"), recent.map { tool -> tool.toolName })
+        }
+    }
+
+    @Test
+    fun `usage groups honour the profile filter`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L)
+            )
+            dataSource.syncIndex()
+
+            assertEquals(1, dataSource.readUsageGroups(profileId = PROFILE_A).size)
+            assertTrue(dataSource.readUsageGroups(profileId = PROFILE_B).isEmpty())
+        }
+    }
+
     private suspend fun withFixture(block: suspend (File, LocalCliSessionDataSource) -> Unit) {
         val tempDir = createTempDirectory().toFile()
         val projectsRoot = File(tempDir, "projects").also { it.mkdirs() }
@@ -794,12 +972,21 @@ class LocalCliSessionDataSourceTest {
         cacheReadTokens: Long = 0L,
         cacheWrite5mTokens: Long = 0L,
         cacheWrite1hTokens: Long = 0L,
-        isSidechain: Boolean = false
+        isSidechain: Boolean = false,
+        tools: List<String> = emptyList()
     ): String {
+        val contentJson = if (tools.isEmpty()) {
+            ""
+        } else {
+            val blocks = tools.mapIndexed { index, name ->
+                """{"type":"tool_use","id":"tool-$messageId-$index","name":"$name","input":{}}"""
+            }
+            """"content":[${blocks.joinToString(",")}],"""
+        }
         return """{"type":"assistant","uuid":"uuid-$messageId","sessionId":"$sessionId",""" +
             """"timestamp":"$timestamp","cwd":"/workspace/usage-monitor","gitBranch":"main",""" +
             """"version":"2.1.226","isSidechain":$isSidechain,""" +
-            """"message":{"id":"$messageId","model":"$model","stop_reason":"end_turn","usage":{""" +
+            """"message":{"id":"$messageId","model":"$model","stop_reason":"end_turn",$contentJson"usage":{""" +
             """"input_tokens":$inputTokens,"output_tokens":$outputTokens,""" +
             """"cache_read_input_tokens":$cacheReadTokens,""" +
             """"cache_creation_input_tokens":${cacheWrite5mTokens + cacheWrite1hTokens},""" +

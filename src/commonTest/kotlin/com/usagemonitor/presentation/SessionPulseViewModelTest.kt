@@ -2,8 +2,11 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliToolUsage
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -14,6 +17,7 @@ import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.repository.TeamUsageTrendData
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
@@ -173,27 +177,36 @@ class SessionPulseViewModelTest {
         viewModel.onDestroy()
     }
 
+    /**
+     * A parte local não pode parar com a janela minimizada: é dela que sai o
+     * alerta de sessão saturada, cujo destinatário é justamente quem não está
+     * olhando a tela.
+     */
     @Test
-    fun `the loop waits for the window to become visible`() = runTest {
-        val repository = FakePulseCliRepository()
+    fun `a hidden window keeps the local pass and suspends the team read`() = runTest {
+        val repository = FakePulseCliRepository(listOf(session("a", profileId = "conta2")))
+        val teamRepository = FakePulseTeamRepository()
         val isAppVisible = MutableStateFlow(false)
         val viewModel = buildViewModel(
             repository = repository,
+            teamRepository = teamRepository,
+            teamTargets = listOf(TeamPulseTarget(profileId = "conta2", accountKey = "acc-1")),
             isAppVisible = isAppVisible,
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             autoStart = true
         )
 
         runCurrent()
-        assertEquals(0, repository.syncCalls)
+        assertEquals(1, repository.syncCalls)
+        assertEquals(setOf(CONTA2), viewModel.cliPulses.value.keys)
+        assertTrue(teamRepository.requestedAccounts.isEmpty())
 
         isAppVisible.value = true
-        runCurrent()
-        assertEquals(1, repository.syncCalls)
-
         advanceTimeBy(INTERVAL_MILLIS)
         runCurrent()
+
         assertEquals(2, repository.syncCalls)
+        assertEquals(listOf("acc-1"), teamRepository.requestedAccounts)
         viewModel.onDestroy()
     }
 
@@ -286,6 +299,27 @@ private class FakePulseCliRepository(
     override suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?> {
         return Result.success(null)
     }
+
+    override suspend fun getUsageBreakdown(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<CliUsageBreakdown> {
+        return Result.success(CliUsageBreakdown())
+    }
+
+    override suspend fun getHourlyUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<List<CliHourlyUsageRow>> {
+        return Result.success(emptyList())
+    }
+
+    override suspend fun getToolUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<List<CliToolUsage>> {
+        return Result.success(emptyList())
+    }
 }
 
 private class FakePulseTeamRepository(
@@ -325,5 +359,9 @@ private class FakePulseTeamRepository(
 
     override suspend fun checkConnection(): Result<Unit> {
         return Result.success(Unit)
+    }
+
+    override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
+        return Result.success(null)
     }
 }

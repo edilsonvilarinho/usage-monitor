@@ -2,6 +2,11 @@ package com.usagemonitor.data.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * Uma linha do transcript `~/.claude/projects/<slug>/<sessionId>.jsonl`.
@@ -27,8 +32,42 @@ data class ClaudeTranscriptLineDto(
 data class ClaudeTranscriptMessageDto(
     val id: String? = null,
     val model: String? = null,
-    val usage: ClaudeTranscriptUsageDto? = null
-)
+    val usage: ClaudeTranscriptUsageDto? = null,
+    /**
+     * Blocos da mensagem, lidos como [JsonElement] cru.
+     *
+     * O campo é polimórfico no transcript: nas linhas do assistente é um array
+     * de blocos (`text`, `thinking`, `tool_use`), e em outras é uma string. Um
+     * tipo fixo faria o parse da linha inteira falhar num dos dois casos.
+     *
+     * Só o **nome** da ferramenta é extraído daqui — nunca o `input` nem o texto
+     * da resposta, na mesma regra que o envio para o time segue.
+     */
+    val content: JsonElement? = null
+) {
+    /**
+     * Ferramentas invocadas nesta mensagem, com a contagem de chamadas.
+     *
+     * Vazio quando `content` não é um array de blocos, o que é o caso normal das
+     * linhas que não são do assistente.
+     */
+    val toolCalls: Map<String, Int>
+        get() {
+            val blocks = content as? JsonArray ?: return emptyMap()
+            val counts = mutableMapOf<String, Int>()
+            for (block in blocks) {
+                val obj = block as? JsonObject ?: continue
+                if ((obj["type"] as? JsonPrimitive)?.contentOrNull != TOOL_USE_BLOCK_TYPE) {
+                    continue
+                }
+                val name = (obj["name"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: continue
+                counts[name] = (counts[name] ?: 0) + 1
+            }
+            return counts
+        }
+}
+
+private const val TOOL_USE_BLOCK_TYPE = "tool_use"
 
 @Serializable
 data class ClaudeTranscriptUsageDto(

@@ -296,6 +296,14 @@ internal object CliSessionsLabels {
         return if (language == AppLanguage.PT) "Taxa de acerto de cache" else "Cache hit rate"
     }
 
+    /**
+     * Não é a duração da sessão: intervalos acima de cinco minutos entre turnos
+     * são descartados por serem o usuário parado, não tempo de trabalho.
+     */
+    fun activeTime(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Tempo ativo" else "Active time"
+    }
+
     fun costDistribution(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Distribuição de custo" else "Cost distribution"
     }
@@ -523,4 +531,19 @@ internal object CliSessionsLabels {
     fun turnsLabel(count: Int, language: AppLanguage): String {
         return if (language == AppLanguage.PT) "$count turnos" else "$count turns"
     }
+}
+
+/**
+ * Tempo ativo como `1h05` ou `18min`.
+ *
+ * Segundos ficam de fora: o corte de pausa é de cinco minutos, então precisão
+ * abaixo do minuto sugeriria uma exatidão que a medida não tem.
+ */
+internal fun formatActiveTime(millis: Long): String {
+    val minutes = millis / 60_000L
+    val hours = minutes / 60L
+    if (hours <= 0L) {
+        return "${minutes}min"
+    }
+    return "${hours}h${(minutes % 60L).toString().padStart(2, '0')}"
 }

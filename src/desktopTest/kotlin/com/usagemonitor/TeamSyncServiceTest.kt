@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.repository.TeamUsageTrendData
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
 import kotlinx.coroutines.test.runTest
@@ -91,6 +92,10 @@ private class RecordingTeamRepository(
     }
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
+
+    override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
+        return Result.success(null)
+    }
 }
 
 private val ACTIVE_SETTINGS = TeamIntegrationSettings(

@@ -25,6 +25,24 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Auto-start em Windows (registro `Run`), Linux (`.desktop` em autostart) e macOS (LaunchAgent).
 - Verificacao de novas releases com banner manual e link para a pagina publicada no GitHub Releases.
 - Sinalizador semaforo de risco de overage nos cards de uso.
+- Aba Resumo nas Sessoes CLI: consumo da janela por projeto, por modelo e por
+  branch, com ranking por custo e economia agregada do cache.
+- Ritmo de queima em USD/h e tokens/h da janela corrente, com projecao de
+  fechamento, e grade de atividade dia da semana x hora (BRT).
+- Ranking das ferramentas mais chamadas na janela (Read, Bash, Edit...), por
+  contagem de chamadas.
+- Tendencia diaria do time nos ultimos 30 dias, uma faixa por integrante e todas
+  na mesma escala (exige servidor 0.6.0+).
+- Tempo ativo por sessao, descartando as pausas maiores que cinco minutos entre
+  turnos.
+- Exportacao de sessoes e do resumo em CSV ou JSON, seguindo a aba aberta e a
+  janela escolhida.
+- Orcamento mensal em USD com barra de consumo e projecao de fechamento. Os
+  creditos de uso da Anthropic aparecem a parte, na moeda real da conta.
+- Comparativo com o periodo anterior de mesma duracao no Historico.
+- Icone na bandeja do sistema com ponto de risco e notificacao nativa quando uma
+  cota cruza um limiar (75/90/100 por padrao) ou uma sessao CLI satura. Limiares,
+  alerta de sessao e periodo de silencio configuraveis em Configuracoes > Alertas.
 - Contagem regressiva de refresh persiste entre reinicios da app e avisa antes de um refresh manual.
 - Modais de Historico e Configuracoes voltam ao topo automaticamente ao reabrir, mesmo se ficaram atras de outra janela.
 - Scrollbar com contraste ajustado para o tema escuro.

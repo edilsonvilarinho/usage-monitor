@@ -53,6 +53,14 @@ data class ModelPricing(
         return weighted / TOKENS_PER_MILLION
     }
 
+    /**
+     * Economia do cache: o que [cacheReadTokens] teriam custado como input menos o
+     * que custaram como cache read.
+     */
+    fun cacheSavingsMicros(cacheReadTokens: Long): Long {
+        return cacheReadTokens * (inputMicrosPerMillion - cacheReadMicrosPerMillion) / TOKENS_PER_MILLION
+    }
+
     companion object {
         /** Constrói um preço a partir de valores em USD por milhão de tokens. */
         fun ofUsdPerMillion(input: Double, output: Double): ModelPricing {

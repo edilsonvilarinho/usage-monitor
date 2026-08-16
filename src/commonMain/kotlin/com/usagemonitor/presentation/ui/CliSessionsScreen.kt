@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionAnalytics
 import com.usagemonitor.domain.entity.CliSessionDetail
@@ -58,8 +59,10 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.darkAppAccents
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 
 // A paleta inteira é `internal` porque a tela de time usa a mesma codificação de
@@ -96,6 +99,10 @@ private val DETAIL_CHART_HEIGHT = 120.dp
 
 internal const val LIST_SCROLLBAR_TAG = "cliSessionsListScrollbar"
 internal const val DETAIL_SCROLLBAR_TAG = "cliSessionsDetailScrollbar"
+const val TAB_SESSIONS_TAG = "cliSessionsTabSessions"
+const val TAB_BREAKDOWN_TAG = "cliSessionsTabBreakdown"
+const val EXPORT_CSV_TAG = "cliSessionsExportCsv"
+const val EXPORT_JSON_TAG = "cliSessionsExportJson"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -114,6 +121,8 @@ fun CliSessionsScreen(
         onCloseDetail = { viewModel.closeDetail() },
         onToggleAdvanced = { viewModel.toggleAdvanced() },
         onToggleGlossary = { viewModel.toggleGlossary() },
+        onSelectView = { view -> viewModel.setView(view) },
+        onExport = { format -> viewModel.exportCurrentView(format) },
         modifier = modifier
     )
 }
@@ -128,6 +137,8 @@ internal fun CliSessionsContent(
     // Com default para não arrastar as chamadas que não exercitam os blocos.
     onToggleAdvanced: () -> Unit = {},
     onToggleGlossary: () -> Unit = {},
+    onSelectView: (CliSessionsView) -> Unit = {},
+    onExport: (UsageExportFormat) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -143,7 +154,9 @@ internal fun CliSessionsContent(
                         state = state,
                         language = language,
                         onSelectRange = onSelectRange,
-                        onOpenSession = onOpenSession
+                        onOpenSession = onOpenSession,
+                        onSelectView = onSelectView,
+                        onExport = onExport
                     )
                 } else {
                     CliSessionDetailPane(
@@ -181,17 +194,34 @@ private fun CliSessionsList(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
     onSelectRange: (CliSessionRange) -> Unit,
-    onOpenSession: (String) -> Unit
+    onOpenSession: (String) -> Unit,
+    onSelectView: (CliSessionsView) -> Unit = {},
+    onExport: (UsageExportFormat) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         CliSessionsHeader(
             state = state,
             language = language,
-            onSelectRange = onSelectRange
+            onSelectRange = onSelectRange,
+            onSelectView = onSelectView,
+            onExport = onExport
         )
 
         if (state.indexWarning != null) {
             NoticeText(state.indexWarning, MaterialTheme.colorScheme.error)
+        }
+
+        if (state.view == CliSessionsView.BREAKDOWN) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                CliUsageBreakdownPane(
+                    breakdown = state.breakdown,
+                    errorMessage = state.breakdownError,
+                    language = language,
+                    budget = state.budget,
+                    accountCredits = state.accountCredits
+                )
+            }
+            return@Column
         }
 
         if (state.sessions.isEmpty()) {
@@ -234,7 +264,9 @@ private fun CliSessionsList(
 private fun CliSessionsHeader(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
-    onSelectRange: (CliSessionRange) -> Unit
+    onSelectRange: (CliSessionRange) -> Unit,
+    onSelectView: (CliSessionsView) -> Unit = {},
+    onExport: (UsageExportFormat) -> Unit = {}
 ) {
     DepthSurface(
         accent = CACHE_READ_COLOR,
@@ -362,6 +394,58 @@ private fun CliSessionsHeader(
                     label = { Text(CliSessionsLabels.rangeLabel(entry, language)) }
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Abas depois dos chips de janela: a janela vale para as duas leituras,
+        // então trocá-la é a escolha de fora e a aba é a de dentro.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = state.view == CliSessionsView.SESSIONS,
+                onClick = { onSelectView(CliSessionsView.SESSIONS) },
+                label = { Text(BreakdownLabels.tabSessions(language)) },
+                modifier = Modifier.testTag(TAB_SESSIONS_TAG)
+            )
+            FilterChip(
+                selected = state.view == CliSessionsView.BREAKDOWN,
+                onClick = { onSelectView(CliSessionsView.BREAKDOWN) },
+                label = { Text(BreakdownLabels.tabBreakdown(language)) },
+                modifier = Modifier.testTag(TAB_BREAKDOWN_TAG)
+            )
+
+            // A exportação segue a aba aberta e a janela escolhida: exportar um
+            // recorte diferente do que está na tela seria surpresa.
+            TextButton(
+                onClick = { onExport(UsageExportFormat.CSV) },
+                modifier = Modifier.testTag(EXPORT_CSV_TAG)
+            ) {
+                Text(ExportLabels.exportCsv(language))
+            }
+            TextButton(
+                onClick = { onExport(UsageExportFormat.JSON) },
+                modifier = Modifier.testTag(EXPORT_JSON_TAG)
+            ) {
+                Text(ExportLabels.exportJson(language))
+            }
+        }
+
+        val exportOutcome = state.exportOutcome
+        if (exportOutcome != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = exportOutcomeMessage(exportOutcome, language),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (exportOutcome is CliExportOutcome.Failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
     }
 }
@@ -759,6 +843,16 @@ internal fun SessionSummaryRow(
             help = GlossaryTerm.CONTEXT_WINDOW,
             language = language
         )
+        // Só aparece quando há intervalo para medir: numa sessão de um turno
+        // "0min" seria lido como sessão instantânea, e não como não medida.
+        if (analytics.activeTimeMillis > 0L) {
+            MetricCard(
+                label = CliSessionsLabels.activeTime(language),
+                value = formatActiveTime(analytics.activeTimeMillis),
+                accent = OUTPUT_COLOR,
+                language = language
+            )
+        }
     }
 }
 

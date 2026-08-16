@@ -14,7 +14,11 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.Notification
+import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.isTraySupported
+import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberDialogState
@@ -44,6 +48,8 @@ import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.AccountCreditUsage
+import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AnthropicProfileRef
@@ -69,12 +75,15 @@ import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
+import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
+import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.ListTeamKeysUseCase
 import com.usagemonitor.domain.usecase.RegenerateTeamKeyUseCase
@@ -103,6 +112,7 @@ import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
+import com.usagemonitor.presentation.ui.usageAlertMessage
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
@@ -121,6 +131,7 @@ import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
+import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -404,6 +415,9 @@ fun main() = application {
         GetCachedDashboardStatsUseCase(dashboardCacheRepository)
     }
 
+    // Referência da janela principal: a bandeja e o diálogo de exportação
+    // precisam dela e nenhum dos dois vive dentro do `Window`.
+    var mainWindowRef by remember { mutableStateOf<java.awt.Window?>(null) }
     val isAppVisible = remember { MutableStateFlow(true) }
     val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
         DashboardViewModel(
@@ -442,11 +456,17 @@ fun main() = application {
     val syncCliSessionIndex = remember(cliSessionRepository) {
         SyncCliSessionIndexUseCase(cliSessionRepository)
     }
+    // A janela principal só existe depois da composição; por isso o writer
+    // recebe uma função e não a referência.
+    val usageExportWriter = remember { DesktopUsageExportWriter(parentWindow = { mainWindowRef }) }
     val cliSessionsViewModel = remember(cliSessionRepository) {
         CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
             getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
             syncCliSessionIndex = syncCliSessionIndex,
+            getCliUsageBreakdown = GetCliUsageBreakdownUseCase(cliSessionRepository),
+            exportWriter = usageExportWriter,
+            getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(cliSessionRepository),
             autoLoad = false,
             backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
@@ -458,6 +478,7 @@ fun main() = application {
             removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
             getTeamSessionDetail = GetTeamSessionDetailUseCase(teamUsageRepository),
             getAdminOverview = GetAdminTeamOverviewUseCase(teamAdminRepository),
+            getTeamUsageTrend = GetTeamUsageTrendUseCase(teamUsageRepository),
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
         )
     }
@@ -493,6 +514,16 @@ fun main() = application {
     }
     val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()
     val teamSessionPulses by sessionPulseViewModel.teamPulses.collectAsState()
+    // Preferências de alerta como flow, e não como estado da composição: quem as
+    // consome é o view model, que vive fora dela.
+    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
+    val usageAlertViewModel = remember(viewModel, sessionPulseViewModel, alertSettingsFlow) {
+        UsageAlertViewModel(
+            dashboardState = viewModel.uiState,
+            cliPulses = sessionPulseViewModel.cliPulses,
+            alertSettings = alertSettingsFlow
+        )
+    }
     val teamKeysViewModel = remember(teamAdminRepository) {
         TeamKeysAdminViewModel(
             listKeys = ListTeamKeysUseCase(teamAdminRepository),
@@ -545,6 +576,7 @@ fun main() = application {
                 teamUsageViewModel.onDestroy()
                 teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
+                usageAlertViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
@@ -569,6 +601,7 @@ fun main() = application {
                 teamUsageViewModel.onDestroy()
                 teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
+                usageAlertViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
@@ -752,6 +785,8 @@ fun main() = application {
                 opacitySaveGeneration += 1
             }
     }
+    val alertSettingsState by alertSettingsFlow.collectAsState()
+    var monthlyBudgetMicros by remember { mutableStateOf(readPersistedBudgetMicros(settings)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
@@ -891,6 +926,21 @@ fun main() = application {
             cliSessionsViewModel.setQuotaWindows(cliSessionsQuotaWindows)
         }
     }
+    // Os créditos vêm da API da Anthropic, que só o dashboard consulta; a janela
+    // de sessões conhece apenas o índice local, então eles chegam prontos daqui.
+    val cliSessionsAccountCredits = remember(dashboardState, cliSessionsProfileId) {
+        accountCreditsForProfile(dashboardState, cliSessionsProfileId)
+    }
+    LaunchedEffect(cliSessionsAccountCredits, isCliSessionsOpen) {
+        if (isCliSessionsOpen) {
+            cliSessionsViewModel.setAccountCredits(cliSessionsAccountCredits)
+        }
+    }
+    LaunchedEffect(monthlyBudgetMicros, isCliSessionsOpen) {
+        if (isCliSessionsOpen) {
+            cliSessionsViewModel.setBudgetLimitMicros(monthlyBudgetMicros)
+        }
+    }
     // O time é uma conta Anthropic: a janela de 5h dele ancora no mesmo reset de
     // quota que o card mede, senão os números do time não fecham com os locais.
     val teamUsageQuotaWindows = remember(dashboardState, teamUsageProfileId) {
@@ -910,6 +960,7 @@ fun main() = application {
                 teamUsageViewModel.onDestroy()
                 teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
+                usageAlertViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 httpClient.close()
                 usageHistoryDataSource.close()
@@ -919,6 +970,55 @@ fun main() = application {
                 singleInstanceGuard.close()
             }
             exitProcess(0)
+        }
+    }
+
+    val restoreMainWindow = {
+        mainWindowState.isMinimized = false
+        mainWindowRef?.let { window -> activateWindow(window) }
+        Unit
+    }
+
+    if (isTraySupported) {
+        val trayState = rememberTrayState()
+        val worstRisk by usageAlertViewModel.worstRisk.collectAsState()
+        val trayIcon = remember(iconImage, worstRisk) { TrayRiskIconPainter(iconImage, worstRisk) }
+
+        Tray(
+            icon = trayIcon,
+            state = trayState,
+            tooltip = "Usage Monitor",
+            onAction = restoreMainWindow,
+            menu = {
+                Item(
+                    text = if (language == AppLanguage.PT) "Abrir" else "Open",
+                    onClick = restoreMainWindow
+                )
+                Item(
+                    text = if (language == AppLanguage.PT) "Atualizar agora" else "Refresh now",
+                    onClick = { viewModel.refresh() }
+                )
+                Separator()
+                Item(
+                    text = if (language == AppLanguage.PT) "Sair" else "Quit",
+                    onClick = { shutdownApplication() }
+                )
+            }
+        )
+
+        // A língua entra na chave: trocar o idioma tem de recomeçar a coleta com o
+        // valor novo, senão a notificação seguinte sairia no idioma anterior.
+        LaunchedEffect(usageAlertViewModel, trayState, language) {
+            usageAlertViewModel.alerts.collect { alert ->
+                val message = usageAlertMessage(alert, language)
+                trayState.sendNotification(
+                    Notification(
+                        title = message.title,
+                        message = message.body,
+                        type = Notification.Type.Warning
+                    )
+                )
+            }
         }
     }
 
@@ -932,6 +1032,9 @@ fun main() = application {
         undecorated = true,
         alwaysOnTop = alwaysOnTopEnabled
     ) {
+        LaunchedEffect(window) {
+            mainWindowRef = window
+        }
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
@@ -1319,6 +1422,24 @@ fun main() = application {
                             // um toast por pixel.
                             windowOpacityPercent = clampWindowOpacityPercent(percent)
                         },
+                        alertSettings = alertSettingsState,
+                        onAlertSettingsChange = { updated ->
+                            alertSettingsFlow.value = updated
+                            persistAlertSettings(settings, updated)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
+                        },
+                        monthlyBudgetText = formatBudgetUsd(monthlyBudgetMicros),
+                        onMonthlyBudgetCommit = { text ->
+                            // Texto inválido não grava: o campo já recusa pelo
+                            // `validate`, e gravar zero aqui desligaria o teto em
+                            // silêncio no meio de uma digitação.
+                            val parsed = parseBudgetUsd(text)
+                            if (parsed != null) {
+                                monthlyBudgetMicros = parsed
+                                persistBudgetMicros(settings, parsed)
+                                showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
+                            }
+                        },
                         onApiToggle = { api, checked ->
                             val updatedApis = if (checked) {
                                 enabledApis.value + api
@@ -1701,6 +1822,33 @@ private fun quotaWindowsForProfile(state: UiState, profileId: String?): CliQuota
     } ?: return CliQuotaWindows()
 
     return CliQuotaWindows(fiveHourEndsAt = stats.quotaEndAt(PeriodType.INTERVAL))
+}
+
+/**
+ * Créditos de uso da conta, na moeda **real** dela.
+ *
+ * `null` quando o recurso está desligado — `AnthropicMapper` só cria a terceira
+ * cota com `is_enabled` verdadeiro, então a ausência aqui significa exatamente
+ * isso e não uma falha de leitura.
+ */
+private fun accountCreditsForProfile(state: UiState, profileId: String?): AccountCreditUsage? {
+    if (profileId == null || state !is UiState.Success) {
+        return null
+    }
+
+    val stats = state.data.firstOrNull { item ->
+        item.source == ApiSource.ANTHROPIC && item.targetKey.profileId == profileId
+    } ?: return null
+
+    val quota = stats.quotas.firstOrNull { item ->
+        item.label == AnthropicQuotaLabels.EXTRA_CREDITS
+    } ?: return null
+
+    return AccountCreditUsage(
+        usedMinorUnits = quota.rawUsed.takeIf { value -> value > 0L } ?: quota.used,
+        limitMinorUnits = quota.rawTotal.takeIf { value -> value > 0L } ?: quota.total,
+        currencyCode = quota.currencyCode
+    )
 }
 
 private fun ApiUsageStats.quotaEndAt(periodType: PeriodType): Instant? {

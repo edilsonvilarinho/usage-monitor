@@ -17,6 +17,7 @@ import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.repository.TeamUsageTrendData
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
@@ -107,6 +108,10 @@ private class FakeTeamRepository(
     }
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
+
+    override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
+        return Result.success(null)
+    }
 }
 
 private class TeamFixedClock(private val fixedNow: Instant) : Clock {

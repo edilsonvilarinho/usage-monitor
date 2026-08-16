@@ -6,6 +6,8 @@ import com.usagemonitor.data.dto.TeamMemberDto
 import com.usagemonitor.data.dto.TeamPresenceResponseDto
 import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSessionUploadDto
+import com.usagemonitor.data.dto.TeamTrendRowDto
+import com.usagemonitor.domain.entity.TeamTrendRow
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamTurnUploadDto
 import com.usagemonitor.domain.entity.CliSessionDetail
@@ -237,4 +239,35 @@ fun TeamSessionDetailResponseDto.toDomain(): CliSessionDetail {
     }
 
     return CliSessionDetail(summary = summary, turns = domainTurns)
+}
+
+/**
+ * Membro do time como identidade.
+ *
+ * A tendência precisa do apelido para nomear as linhas do gráfico, e o snapshot
+ * já traz o mesmo campo por outro caminho — este mapeia só a identidade, sem o
+ * consumo que a tendência não usa.
+ */
+fun TeamMemberDto.toIdentity(): TeamMemberIdentity {
+    return TeamMemberIdentity(
+        deviceId = deviceId,
+        alias = alias,
+        hostName = hostName,
+        organizationUuid = organizationUuid,
+        organizationName = organizationName
+    )
+}
+
+fun TeamTrendRowDto.toDomain(): TeamTrendRow {
+    return TeamTrendRow(
+        deviceId = deviceId,
+        dayStartMillis = dayStartMillis,
+        model = model,
+        turnCount = turnCount,
+        inputTokens = inputTokens,
+        outputTokens = outputTokens,
+        cacheReadTokens = cacheReadTokens,
+        cacheWrite5mTokens = cacheWrite5mTokens,
+        cacheWrite1hTokens = cacheWrite1hTokens
+    )
 }

@@ -54,6 +54,7 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
+import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppGlow
@@ -258,6 +259,30 @@ private fun TeamUsageList(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().testTag(TEAM_SLIDING_WINDOW_NOTICE_TAG)
             )
+        }
+
+        val trend = state.trend
+        if (trend != null && !trend.isEmpty) {
+            DepthSurface(
+                accent = OUTPUT_COLOR,
+                modifier = Modifier.fillMaxWidth(),
+                shape = AppShapes.medium,
+                elevation = AppElevation.card,
+                contentPadding = 12.dp
+            ) {
+                Text(
+                    text = TeamUsageLabels.trendTitle(trend.days.size, language),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OUTPUT_COLOR
+                )
+                TeamTrendChart(trend = trend, accent = OUTPUT_COLOR, language = language)
+                Text(
+                    text = TeamUsageLabels.trendNotice(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         if (removalError != null) {

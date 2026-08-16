@@ -51,11 +51,13 @@ import com.usagemonitor.domain.entity.AppTheme
 import com.usagemonitor.domain.entity.MAX_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.domain.entity.MIN_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import kotlin.math.roundToInt
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
+const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 
 enum class AnthropicProfileUiStatus { READY, INCOMPLETE, INVALID, DUPLICATE }
 
@@ -85,6 +87,10 @@ fun SettingsDialogContent(
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit = {},
     onWindowOpacityChange: (Int) -> Unit = {},
+    alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT,
+    onAlertSettingsChange: (UsageAlertSettings) -> Unit = {},
+    monthlyBudgetText: String = "",
+    onMonthlyBudgetCommit: (String) -> Unit = {},
     onApiToggle: (ApiSource, Boolean) -> Unit,
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
@@ -184,6 +190,16 @@ fun SettingsDialogContent(
                         onLanguageChange = onLanguageChange
                     )
                 }
+            }
+
+            SettingsSectionCard {
+                AlertSettingsSection(
+                    settings = alertSettings,
+                    language = currentLanguage,
+                    onSettingsChange = onAlertSettingsChange,
+                    budgetText = monthlyBudgetText,
+                    onBudgetCommit = onMonthlyBudgetCommit
+                )
             }
 
             SettingsSectionCard {
@@ -513,7 +529,10 @@ fun WindowOpacitySlider(
             Text(
                 text = "$percent%",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                // Marcado porque "75%" também é rótulo de chip no cartão de
+                // alertas: buscar pelo texto encontraria os dois.
+                modifier = Modifier.testTag(WINDOW_OPACITY_VALUE_TEST_TAG)
             )
         }
         Slider(

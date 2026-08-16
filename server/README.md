@@ -229,6 +229,40 @@ Duas propriedades desenhadas de propósito:
 
 `members` traz todos os membros da conta, inclusive quem não teve atividade na janela — quem não consumiu é informação, não ruído.
 
+### `GET /api/v1/team/trend`
+
+Série **diária** de uma conta, para o gráfico de tendência do modal **Sessões do time**. Disponível a partir da versão 0.6.0.
+
+```
+GET /api/v1/team/trend?accountKey=<uuid>&days=30
+x-team-key: <chave>
+```
+
+`days` é opcional (default 30) e vai até 365 — o teto existe porque a resposta cresce com dias × máquinas × modelos, e um valor sem limite viraria uma varredura da tabela inteira a pedido de qualquer portador de chave.
+
+```json
+{
+  "members": [
+    { "deviceId": "device-1", "alias": "edilson", "hostName": "DESKTOP-A1",
+      "organizationUuid": null, "organizationName": null, "lastSeenAt": 1786003600000 }
+  ],
+  "rows": [
+    { "deviceId": "device-1", "dayStartMillis": 1785974400000, "model": "claude-opus-5",
+      "turnCount": 12, "inputTokens": 1000, "outputTokens": 2000,
+      "cacheReadTokens": 30000, "cacheWrite5mTokens": 4000, "cacheWrite1hTokens": 0 }
+  ]
+}
+```
+
+- **O dia é UTC.** O servidor não conhece o fuso de quem consulta, e agrupar num fuso arbitrário daria um gráfico deslocado para metade do time. O cliente traduz.
+- **O servidor não calcula custo**, como em `/v1/team`: devolve tokens e o cliente aplica a própria tabela de preços.
+- **A máquina vem de `team_sessions`**: `team_turns` não guarda `device_id`, e o vínculo turno → máquina passa sempre pela sessão.
+- `members` vem junto para a tela nomear as linhas sem uma segunda chamada, e para uma máquina sem consumo na janela aparecer com série vazia em vez de sumir.
+
+Mesmas regras de acesso da família de leitura: a conta vai na query, `x-admin-token` vale como credencial de leitura e **nenhum `GET` reivindica conta**.
+
+Contra um servidor anterior à 0.6.0 a rota não existe e a resposta é `404`. O cliente trata isso como **tendência indisponível**, não como falha, e lembra a ausência por URL para não repetir o pedido a cada abertura do modal.
+
 ### `GET /api/v1/session`
 
 Turnos crus de **uma** sessão. É o que alimenta o painel de detalhe dentro do modal **Sessões do time** — o transcript é de outra máquina e não está no disco de quem consulta, mas os turnos estão aqui desde o primeiro ingest.

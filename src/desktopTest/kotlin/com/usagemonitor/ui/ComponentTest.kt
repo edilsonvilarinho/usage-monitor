@@ -21,6 +21,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -29,6 +30,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextReplacement
@@ -37,6 +39,7 @@ import com.usagemonitor.domain.entity.ActiveSessionAlert
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.HistoryRange
@@ -63,7 +66,10 @@ import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.AlertSettingsSection
 import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
+import com.usagemonitor.presentation.ui.components.WINDOW_OPACITY_VALUE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
@@ -1318,13 +1324,17 @@ class ComponentTest {
 
         onNodeWithText("System Startup").assertIsDisplayed()
         onNodeWithText("Window opacity").assertIsDisplayed()
-        onNodeWithText("75%").assertIsDisplayed()
+        // Por tag: "75%" também é rótulo de limiar no cartão de alertas.
+        onNodeWithTag(WINDOW_OPACITY_VALUE_TEST_TAG).assertTextEquals("75%")
         onNodeWithText("Language").assertIsDisplayed()
-        onNodeWithText("Monitored APIs").assertIsDisplayed()
-        onNodeWithText("Anthropic accounts").assertIsDisplayed()
-        onNodeWithText("personal@example.com").assertIsDisplayed()
-        onNodeWithText("OpenCode Zen Free").assertIsDisplayed()
-        onNodeWithText("Kilo Free").assertIsDisplayed()
+        onNodeWithText("Alerts").assertIsDisplayed()
+        // O diálogo rola: o que está abaixo da dobra precisa ser trazido à vista
+        // antes de se afirmar que aparece.
+        onNodeWithText("Monitored APIs").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Anthropic accounts").performScrollTo().assertIsDisplayed()
+        onNodeWithText("personal@example.com").performScrollTo().assertIsDisplayed()
+        onNodeWithText("OpenCode Zen Free").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Kilo Free").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Close").assertCountEquals(0)
     }
 
@@ -1406,13 +1416,80 @@ class ComponentTest {
         }
 
         // Colapsado por padrão: identidade visível, campo de edição do apelido ainda não.
-        onNodeWithText("personal@example.com").assertIsDisplayed()
+        onNodeWithText("personal@example.com").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Label").assertCountEquals(0)
 
-        onNodeWithContentDescription("Edit").performClick()
+        onNodeWithContentDescription("Edit").performScrollTo().performClick()
 
         // Expandido após clicar em "Editar": campo de edição do apelido aparece.
-        onNodeWithText("Label").assertIsDisplayed()
+        onNodeWithText("Label").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `AlertSettingsSection toggles a threshold without dropping the others`() = runDesktopComposeUiTest {
+        var current = UsageAlertSettings.DEFAULT
+
+        setContent {
+            AppTheme(isDark = true) {
+                var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
+                AlertSettingsSection(
+                    settings = settings,
+                    language = AppLanguage.PT,
+                    onSettingsChange = { updated ->
+                        settings = updated
+                        current = updated
+                    }
+                )
+            }
+        }
+
+        onNodeWithText("90%").performClick()
+        assertEquals(listOf(75, 100), current.effectiveQuotaPercents)
+
+        onNodeWithText("50%").performClick()
+        assertEquals(listOf(50, 75, 100), current.effectiveQuotaPercents)
+    }
+
+    /**
+     * Um limiar gravado fora da lista oferecida tem de continuar visível: sem
+     * isso ele sumiria da tela e seria apagado no primeiro clique em outro chip.
+     */
+    @Test
+    fun `AlertSettingsSection shows a stored threshold outside the offered list`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                AlertSettingsSection(
+                    settings = UsageAlertSettings.DEFAULT.copy(quotaPercents = listOf(63, 90)),
+                    language = AppLanguage.PT,
+                    onSettingsChange = {}
+                )
+            }
+        }
+
+        onNodeWithText("63%").assertIsDisplayed()
+        onNodeWithText("90%").assertIsDisplayed()
+    }
+
+    @Test
+    fun `AlertSettingsSection reveals the quiet range only when it is enabled`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
+                AlertSettingsSection(
+                    settings = settings,
+                    language = AppLanguage.PT,
+                    onSettingsChange = { updated -> settings = updated }
+                )
+            }
+        }
+
+        onAllNodesWithText("Das").assertCountEquals(0)
+
+        onNodeWithTag(ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG).performClick()
+
+        onNodeWithText("Das").assertIsDisplayed()
+        onNodeWithText("22h").assertIsDisplayed()
+        onNodeWithText("08h").assertIsDisplayed()
     }
 
     @Test

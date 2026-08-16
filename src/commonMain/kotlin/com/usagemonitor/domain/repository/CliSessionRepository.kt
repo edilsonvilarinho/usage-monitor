@@ -3,6 +3,9 @@ package com.usagemonitor.domain.repository
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
+import com.usagemonitor.domain.entity.CliToolUsage
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 
 /**
  * Contrato de acesso às sessões do Claude Code.
@@ -31,4 +34,37 @@ interface CliSessionRepository {
 
     /** Detalhe de uma sessão com os turnos. */
     suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?>
+
+    /**
+     * Consumo da janela recortado por projeto, branch e modelo.
+     *
+     * Parte das mesmas linhas de turno que [getSessions] usa na leitura janelada,
+     * então os totais dos dois batem. `sinceEpochMillis` zero abrange tudo.
+     */
+    suspend fun getUsageBreakdown(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): Result<CliUsageBreakdown>
+
+    /**
+     * Turnos somados por hora cheia (UTC) e modelo.
+     *
+     * Cru de propósito: a hora local depende do fuso da apresentação, e o
+     * repositório não conhece esse fuso.
+     */
+    suspend fun getHourlyUsage(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): Result<List<CliHourlyUsageRow>>
+
+    /**
+     * Ferramentas chamadas na janela.
+     *
+     * Separado do resumo por eixo porque ferramenta não tem custo próprio: o
+     * turno gastou tokens uma vez, mesmo tendo chamado duas.
+     */
+    suspend fun getToolUsage(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): Result<List<CliToolUsage>>
 }

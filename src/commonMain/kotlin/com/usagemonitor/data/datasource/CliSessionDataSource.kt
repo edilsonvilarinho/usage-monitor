@@ -3,6 +3,9 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
+import com.usagemonitor.domain.entity.CliToolUsage
+import com.usagemonitor.domain.entity.CliUsageGroupRow
 
 /**
  * Índice local das sessões do Claude Code.
@@ -29,4 +32,33 @@ interface CliSessionDataSource {
 
     /** Sessão com os turnos, ou `null` se o identificador não estiver no índice. */
     suspend fun readSession(sessionId: String): CliSessionDetail?
+
+    /**
+     * Linhas de turnos agrupadas por `(sessão, projeto, branch, modelo)` a partir
+     * de [sinceEpochMillis], para o resumo por eixo.
+     *
+     * Devolve as linhas cruas, sem precificar: quem aplica a tabela de preços é o
+     * domain, no mesmo caminho que a lista de sessões usa.
+     */
+    suspend fun readUsageGroups(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): List<CliUsageGroupRow>
+
+    /**
+     * Turnos somados por hora cheia (UTC) e modelo, para a grade de atividade.
+     *
+     * A conversão para hora local fica no domain: o SQLite agrupa em UTC e a
+     * grade sairia deslocada.
+     */
+    suspend fun readHourlyUsage(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): List<CliHourlyUsageRow>
+
+    /** Ferramentas chamadas nos turnos da janela, da mais chamada para a menos. */
+    suspend fun readToolUsage(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): List<CliToolUsage>
 }

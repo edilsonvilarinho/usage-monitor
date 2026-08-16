@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
+import com.usagemonitor.domain.entity.UsagePeriodComparison
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
@@ -420,4 +421,22 @@ internal fun buildQuotaChartSelectionKey(
     selectedRange: HistoryRange
 ): String {
     return "${source.name}:${quotaLabel}:${periodType.name}:${selectedRange.name}"
+}
+
+/**
+ * Variação contra o período anterior, como `+18%` ou `-7%`.
+ *
+ * Sem consumo anterior a variação não é 0% nem infinito: é indefinida, e a
+ * frase diz isso em vez de mostrar um número que ninguém pode interpretar.
+ */
+internal fun periodComparisonLabel(
+    comparison: UsagePeriodComparison,
+    language: AppLanguage
+): String {
+    val ratio = comparison.changeRatio
+        ?: return if (language == AppLanguage.PT) "Sem consumo anterior" else "No previous consumption"
+
+    val percent = (ratio * 100.0).roundToLong()
+    val sign = if (percent > 0L) "+" else ""
+    return "$sign$percent%"
 }

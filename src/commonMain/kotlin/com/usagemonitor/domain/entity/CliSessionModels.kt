@@ -46,11 +46,7 @@ data class CliSessionTurn(
      * teriam custado como input menos o que custaram como cache read.
      */
     val cacheSavingsMicros: Long?
-        get() {
-            val modelPricing = pricing ?: return null
-            val delta = modelPricing.inputMicrosPerMillion - modelPricing.cacheReadMicrosPerMillion
-            return cacheReadTokens * delta / MICROS_PER_USD
-        }
+        get() = pricing?.cacheSavingsMicros(cacheReadTokens)
 }
 
 /**
@@ -145,11 +141,22 @@ data class CliSessionSummary(
 
     /** Último segmento do `cwd`, usado como nome do projeto na lista. */
     val projectName: String?
-        get() = cwd
-            ?.trimEnd('/', '\\')
-            ?.split('/', '\\')
-            ?.lastOrNull()
-            ?.takeIf { it.isNotBlank() }
+        get() = projectNameFromCwd(cwd)
+}
+
+/**
+ * Último segmento de um `cwd`, sem separador final.
+ *
+ * Extraído de [CliSessionSummary.projectName] porque a agregação por projeto
+ * precisa do mesmo nome: duas derivações do mesmo caminho acabariam divergindo
+ * em algum caso de borda e a tela mostraria dois rótulos para um projeto só.
+ */
+fun projectNameFromCwd(cwd: String?): String? {
+    return cwd
+        ?.trimEnd('/', '\\')
+        ?.split('/', '\\')
+        ?.lastOrNull()
+        ?.takeIf { segment -> segment.isNotBlank() }
 }
 
 /** Sessão com os turnos carregados, entrada do cálculo de analytics. */
@@ -165,6 +172,38 @@ data class CliSessionIndexReport(
     /** Linhas que falharam o parse e foram ignoradas — nunca derrubam a sessão. */
     val skippedLines: Int = 0
 )
+
+/**
+ * Intervalo acima do qual dois turnos deixam de ser a mesma sessão de trabalho.
+ *
+ * Cinco minutos é o mesmo corte de [ACTIVE_SESSION_WINDOW_MILLIS]: o valor que
+ * o app já usa para dizer que alguém está trabalhando numa sessão agora. Um
+ * segundo corte diferente para a mesma pergunta daria duas respostas.
+ */
+const val TURN_GAP_CUTOFF_MILLIS = ACTIVE_SESSION_WINDOW_MILLIS
+
+private const val MILLIS_PER_HOUR = 3_600_000.0
+
+/**
+ * Soma os intervalos entre turnos consecutivos, descartando as pausas.
+ *
+ * Os turnos precisam vir em ordem cronológica; a função não reordena para não
+ * esconder um índice fora de ordem, que seria um defeito a corrigir e não a
+ * contornar.
+ */
+fun activeTimeMillisOf(turns: List<CliSessionTurn>): Long {
+    if (turns.size < 2) {
+        return 0L
+    }
+    var total = 0L
+    for (index in 1 until turns.size) {
+        val gap = turns[index].ts.toEpochMilliseconds() - turns[index - 1].ts.toEpochMilliseconds()
+        if (gap in 1 until TURN_GAP_CUTOFF_MILLIS) {
+            total += gap
+        }
+    }
+    return total
+}
 
 /** Distribuição do custo da sessão por componente, em micros de USD. */
 data class CliSessionCostBreakdown(
@@ -208,8 +247,30 @@ data class CliSessionAnalytics(
     val cacheWrite5mPerTurn: List<Long> = emptyList(),
     val cacheWrite1hPerTurn: List<Long> = emptyList(),
     val cumulativeCostMicros: List<Long> = emptyList(),
-    val cumulativeSavingsMicros: List<Long> = emptyList()
+    val cumulativeSavingsMicros: List<Long> = emptyList(),
+    /**
+     * Tempo de trabalho da sessão, somando só os intervalos entre turnos
+     * consecutivos menores que [TURN_GAP_CUTOFF_MILLIS].
+     *
+     * Os intervalos maiores são o usuário pensando, almoçando ou dormindo — não
+     * tempo de sessão. Sem o corte, "duração" seria só a distância entre o
+     * primeiro e o último turno, e uma sessão retomada no dia seguinte
+     * "duraria" vinte horas.
+     */
+    val activeTimeMillis: Long = 0L
 ) {
+    /**
+     * Turnos por hora de trabalho. Zero sem tempo ativo medido — uma sessão de
+     * um turno só não tem intervalo para medir.
+     */
+    val turnsPerActiveHour: Double
+        get() {
+            if (activeTimeMillis <= 0L) {
+                return 0.0
+            }
+            return mainTurnCount.toDouble() / (activeTimeMillis.toDouble() / MILLIS_PER_HOUR)
+        }
+
     /** As três métricas de contexto agrupadas, na mesma forma que a lista usa. */
     val contextStatus: CliSessionContextStatus
         get() = CliSessionContextStatus(

@@ -1,10 +1,16 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
+import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
+import com.usagemonitor.presentation.ui.exportRequestForBreakdown
+import com.usagemonitor.presentation.ui.exportRequestForSessions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +47,15 @@ class CliSessionsViewModel(
     private val getCliSessions: GetCliSessionsUseCase,
     private val getCliSessionDetail: GetCliSessionDetailUseCase,
     private val syncCliSessionIndex: SyncCliSessionIndexUseCase,
+    /**
+     * Resumo por eixo. `null` esconde a aba — instalação sem ele continua
+     * funcionando, mesmo tratamento dos recursos opcionais do time.
+     */
+    private val getCliUsageBreakdown: GetCliUsageBreakdownUseCase? = null,
+    /** Destino da exportação. `null` = sem exportação, como nos recursos opcionais. */
+    private val exportWriter: UsageExportWriter? = null,
+    /** Orçamento mensal. `null` esconde o cartão. */
+    private val getMonthlyBudgetStatus: GetMonthlyBudgetStatusUseCase? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     autoLoad: Boolean = true,
     private val backgroundIndexIntervalMillis: Long? = null,
@@ -52,6 +67,9 @@ class CliSessionsViewModel(
     private var loadJob: Job? = null
     private var detailJob: Job? = null
     private var liveJob: Job? = null
+    private var breakdownJob: Job? = null
+    private var exportJob: Job? = null
+    private var budgetJob: Job? = null
 
     /**
      * O laço de background e o ao vivo podem cair no mesmo instante. A conexão do
@@ -67,6 +85,7 @@ class CliSessionsViewModel(
     private var quotaWindows: CliQuotaWindows = CliQuotaWindows()
     private var profileId: String? = null
     private var profileLabel: String? = null
+    private var budgetLimitMicros: Long = 0L
 
     init {
         if (autoLoad) {
@@ -116,6 +135,7 @@ class CliSessionsViewModel(
         this.quotaWindows = quotaWindows
         if (range == CliSessionRange.LAST_5H || range == CliSessionRange.LAST_7D) {
             refresh()
+            refreshBreakdownIfVisible()
         }
     }
 
@@ -130,6 +150,125 @@ class CliSessionsViewModel(
     fun setRange(range: CliSessionRange) {
         this.range = range
         refresh()
+        // O resumo descreve a mesma janela: deixá-lo para trás mostraria dois
+        // recortes diferentes na mesma tela.
+        refreshBreakdownIfVisible()
+    }
+
+    /**
+     * Troca de aba.
+     *
+     * Ao abrir o resumo, carrega-o na hora: o laço ao vivo levaria segundos e a
+     * aba abriria vazia. A escolha vale para a janela toda, como os blocos
+     * recolhíveis do detalhe.
+     */
+    fun setView(view: CliSessionsView) {
+        val current = _uiState.value
+        if (current !is CliSessionsUiState.Success || current.view == view) {
+            return
+        }
+        _uiState.value = current.copy(view = view)
+        if (view == CliSessionsView.BREAKDOWN) {
+            startBreakdownLoad()
+            startBudgetLoad()
+        }
+    }
+
+    /**
+     * Exporta o que a aba aberta mostra, na janela escolhida.
+     *
+     * Exportar um recorte diferente do que está na tela seria surpresa, então o
+     * conteúdo sai do próprio estado — nenhuma leitura nova.
+     */
+    fun exportCurrentView(format: UsageExportFormat) {
+        val writer = exportWriter ?: return
+        val current = _uiState.value as? CliSessionsUiState.Success ?: return
+
+        val request = when (current.view) {
+            CliSessionsView.SESSIONS -> exportRequestForSessions(
+                sessions = current.sessions,
+                range = current.range,
+                format = format,
+                now = clock.now()
+            )
+            CliSessionsView.BREAKDOWN -> {
+                val breakdown = current.breakdown ?: return
+                exportRequestForBreakdown(
+                    breakdown = breakdown,
+                    range = current.range,
+                    format = format,
+                    now = clock.now()
+                )
+            }
+        }
+
+        exportJob?.cancel()
+        exportJob = viewModelScope.launch {
+            val outcome = runCatching { writer.write(request) }.fold(
+                // Cancelar o diálogo devolve `null` e não publica resultado: não
+                // é sucesso nem erro, e anunciá-lo seria ruído.
+                onSuccess = { path -> path?.let { saved -> CliExportOutcome.Saved(saved) } },
+                onFailure = { error -> CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE) }
+            ) ?: return@launch
+
+            val latest = _uiState.value as? CliSessionsUiState.Success ?: return@launch
+            _uiState.value = latest.copy(exportOutcome = outcome)
+        }
+    }
+
+    /**
+     * Teto mensal em micros de USD. Zero desliga.
+     *
+     * Recarrega só quando o valor muda: as Configurações reemitem o mesmo teto a
+     * cada recomposição e recalcular em toda emissão seria uma leitura do índice
+     * por tecla digitada.
+     */
+    fun setBudgetLimitMicros(limitMicros: Long) {
+        if (limitMicros == budgetLimitMicros) {
+            return
+        }
+        budgetLimitMicros = limitMicros
+        startBudgetLoad()
+    }
+
+    /**
+     * Créditos de uso da conta, vindos do dashboard.
+     *
+     * Não são lidos aqui porque a origem é a API da Anthropic, e esta janela só
+     * conhece o índice local. Chegam prontos, com a moeda da conta.
+     */
+    fun setAccountCredits(credits: AccountCreditUsage?) {
+        val current = _uiState.value as? CliSessionsUiState.Success ?: return
+        if (current.accountCredits == credits) {
+            return
+        }
+        _uiState.value = current.copy(accountCredits = credits)
+    }
+
+    private fun startBudgetLoad() {
+        val useCase = getMonthlyBudgetStatus ?: return
+        budgetJob?.cancel()
+        budgetJob = viewModelScope.launch {
+            val status = useCase(profileId = profileId, limitMicros = budgetLimitMicros).getOrNull()
+            val latest = _uiState.value as? CliSessionsUiState.Success ?: return@launch
+            // Falha mantém o cartão anterior: o orçamento é referência, não alarme.
+            if (status != null || budgetLimitMicros <= 0L) {
+                _uiState.value = latest.copy(budget = status)
+            }
+        }
+    }
+
+    private fun refreshBreakdownIfVisible() {
+        if ((_uiState.value as? CliSessionsUiState.Success)?.view == CliSessionsView.BREAKDOWN) {
+            startBreakdownLoad()
+        }
+    }
+
+    private fun startBreakdownLoad() {
+        breakdownJob?.cancel()
+        breakdownJob = viewModelScope.launch {
+            loadBreakdown()
+        }
     }
 
     fun openSession(sessionId: String) {
@@ -179,7 +318,35 @@ class CliSessionsViewModel(
         loadJob?.cancel()
         detailJob?.cancel()
         liveJob?.cancel()
+        breakdownJob?.cancel()
+        exportJob?.cancel()
+        budgetJob?.cancel()
         viewModelScope.cancel()
+    }
+
+    /**
+     * Recarrega o resumo no lugar.
+     *
+     * Falha **mantém** o resumo anterior e publica só a mensagem: apagar os
+     * números por causa de uma leitura ruim tiraria da tela o que o usuário está
+     * lendo. `internal` para o teste dispensar o laço.
+     */
+    internal suspend fun loadBreakdown() {
+        val useCase = getCliUsageBreakdown ?: return
+        if (_uiState.value !is CliSessionsUiState.Success) {
+            return
+        }
+
+        useCase(profileId = profileId, range = range, windows = quotaWindows).fold(
+            onSuccess = { breakdown ->
+                val latest = _uiState.value as? CliSessionsUiState.Success ?: return
+                _uiState.value = latest.copy(breakdown = breakdown, breakdownError = null)
+            },
+            onFailure = { error ->
+                val latest = _uiState.value as? CliSessionsUiState.Success ?: return
+                _uiState.value = latest.copy(breakdownError = error.message ?: UNKNOWN_ERROR_MESSAGE)
+            }
+        )
     }
 
     /**
@@ -213,6 +380,12 @@ class CliSessionsViewModel(
                 syncIndexOnce()
                 loadSessions()
                 reloadOpenDetail()
+                // Só com a aba aberta: recalcular o resumo que ninguém está
+                // vendo custaria um `GROUP BY` sobre a tabela de turnos a cada
+                // cinco segundos.
+                if ((_uiState.value as? CliSessionsUiState.Success)?.view == CliSessionsView.BREAKDOWN) {
+                    loadBreakdown()
+                }
             }
         }
     }
@@ -249,7 +422,15 @@ class CliSessionsViewModel(
                     // Estado da UI, não do índice: sem carregá-lo daqui os blocos
                     // recolhíveis se fechariam sozinhos a cada tique do laço ao vivo.
                     advancedExpanded = current?.advancedExpanded ?: false,
-                    glossaryExpanded = current?.glossaryExpanded ?: false
+                    glossaryExpanded = current?.glossaryExpanded ?: false,
+                    // Mesma razão: sem carregar a aba e o resumo daqui, a tela
+                    // voltaria para a lista sozinha a cada tique.
+                    view = current?.view ?: CliSessionsView.SESSIONS,
+                    breakdown = current?.breakdown,
+                    breakdownError = current?.breakdownError,
+                    exportOutcome = current?.exportOutcome,
+                    budget = current?.budget,
+                    accountCredits = current?.accountCredits
                 )
             },
             onFailure = { error ->

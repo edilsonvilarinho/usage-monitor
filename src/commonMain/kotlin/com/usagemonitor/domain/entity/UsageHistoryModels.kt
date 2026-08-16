@@ -20,9 +20,51 @@ enum class HistoryRange {
         }
     }
 
+    /**
+     * Início da janela **anterior**, de mesma duração, para o comparativo.
+     *
+     * `null` em [TOTAL]: "tudo" não tem período anterior contra o que comparar,
+     * e inventar um daria um número sem significado.
+     */
+    fun previousWindowStart(now: Instant): Instant? {
+        return when (this) {
+            LAST_24_HOURS -> now.minus(48, kotlinx.datetime.DateTimeUnit.HOUR, TimeZone.UTC)
+            LAST_7_DAYS -> now.minus(14, kotlinx.datetime.DateTimeUnit.DAY, TimeZone.UTC)
+            LAST_30_DAYS -> now.minus(60, kotlinx.datetime.DateTimeUnit.DAY, TimeZone.UTC)
+            TOTAL -> null
+        }
+    }
+
     private companion object {
         val TOTAL_WINDOW_START: Instant = Instant.fromEpochMilliseconds(Long.MIN_VALUE)
     }
+}
+
+/**
+ * Consumo desta janela contra o da janela anterior de mesma duração.
+ *
+ * Só compara o **delta** — o quanto foi consumido dentro de cada janela — e não
+ * o valor acumulado da cota: o acumulado zera no reset e a comparação viraria
+ * uma função de quando o reset caiu, não de quanto se usou.
+ */
+data class UsagePeriodComparison(
+    val currentDelta: Long,
+    val previousDelta: Long
+) {
+    /**
+     * Variação relativa. `null` quando a janela anterior não teve consumo —
+     * dividir por zero produziria "infinito por cento", que não informa nada.
+     */
+    val changeRatio: Double?
+        get() {
+            if (previousDelta <= 0L) {
+                return null
+            }
+            return (currentDelta - previousDelta).toDouble() / previousDelta.toDouble()
+        }
+
+    val isIncrease: Boolean
+        get() = currentDelta > previousDelta
 }
 
 private const val RESET_DETECTION_TOLERANCE_MS = 300_000L
@@ -112,7 +154,9 @@ data class UsageHistorySeries(
     val averageDisplayConsumptionPerHour: Double,
     val currentPeriodEndAt: Instant,
     val forecast: UsageForecast,
-    val riskSummary: QuotaRiskSummary?
+    val riskSummary: QuotaRiskSummary?,
+    /** Esta janela contra a anterior; `null` em "Total" ou sem dado anterior. */
+    val comparison: UsagePeriodComparison? = null
 ) {
     val seriesKey: QuotaSeriesKey
         get() = QuotaSeriesKey(label = quotaLabel, periodType = periodType)

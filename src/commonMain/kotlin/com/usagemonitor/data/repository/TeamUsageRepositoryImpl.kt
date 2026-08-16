@@ -6,6 +6,7 @@ import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.data.dto.TeamPresenceRequestDto
 import com.usagemonitor.data.mapper.toDomain
 import com.usagemonitor.data.mapper.toDto
+import com.usagemonitor.data.mapper.toIdentity
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -15,6 +16,7 @@ import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamServerClockOffset
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.repository.TeamUsageTrendData
 import kotlinx.datetime.Clock
 
 private const val NOT_CONFIGURED_MESSAGE =
@@ -55,6 +57,9 @@ class TeamUsageRepositoryImpl(
      * compatibilidade carimba exatamente o mesmo campo.
      */
     private var presenceRouteMissingFor: String? = null
+
+    /** Mesmo tratamento de [presenceRouteMissingFor], para `/v1/team/trend`. */
+    private var trendRouteMissingFor: String? = null
 
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
         val settings = settingsProvider()
@@ -139,6 +144,48 @@ class TeamUsageRepositoryImpl(
                 accountKey = accountKey,
                 sinceEpochMillis = cutoffMillis
             ).toDomain()
+        }
+    }
+
+    /**
+     * Tendência da conta. `404` vira `success(null)`, e não falha.
+     *
+     * A ausência é lembrada **por URL**, como em [presenceRouteMissingFor]: sem
+     * isso, um servidor anterior à rota pagaria um `404` a cada abertura do
+     * modal, para sempre. Só o `404` cai aí — `401`, `403`, `500` e falha de
+     * rede continuam falha de verdade, senão chave errada viraria "servidor
+     * antigo".
+     */
+    override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
+        val settings = settingsProvider()
+        val credential = settings.readCredential()
+            ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
+
+        val baseUrl = settings.normalizedServerUrl
+        if (trendRouteMissingFor == baseUrl) {
+            return Result.success(null)
+        }
+
+        val result = runCatching {
+            remoteDataSource.fetchTeamTrend(
+                baseUrl = baseUrl,
+                credential = credential,
+                accountKey = accountKey,
+                days = days
+            )
+        }
+
+        val error = result.exceptionOrNull()
+        if (error is TeamServerException && error.statusCode == NOT_FOUND_STATUS) {
+            trendRouteMissingFor = baseUrl
+            return Result.success(null)
+        }
+
+        return result.map { dto ->
+            TeamUsageTrendData(
+                members = dto.members.map { member -> member.toIdentity() },
+                rows = dto.rows.map { row -> row.toDomain() }
+            )
         }
     }
 

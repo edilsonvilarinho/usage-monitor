@@ -48,6 +48,28 @@ internal fun teamUsageWindowTitle(
  */
 internal object TeamUsageLabels {
 
+    fun trendTitle(dayCount: Int, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Tendência dos últimos $dayCount dias"
+        } else {
+            "Trend over the last $dayCount days"
+        }
+    }
+
+    /**
+     * A tendência não segue o filtro de janela da lista, e a tela precisa
+     * dizê-lo: um gráfico de dias ao lado de números de 5h seria lido como o
+     * mesmo recorte.
+     */
+    fun trendNotice(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Custo estimado por dia (BRT), independente do filtro de janela acima. Barras na mesma escala para comparar integrantes."
+        } else {
+            "Estimated cost per day (BRT), independent of the window filter above. Bars share one scale so members are comparable."
+        }
+    }
+
+
     fun memberCount(count: Int, language: AppLanguage): String {
         return if (language == AppLanguage.PT) {
             if (count == 1) "1 integrante" else "$count integrantes"
@@ -301,3 +323,4 @@ internal object TeamUsageLabels {
         }
     }
 }
+

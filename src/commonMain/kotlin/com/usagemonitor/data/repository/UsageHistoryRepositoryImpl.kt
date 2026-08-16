@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
+import com.usagemonitor.domain.entity.UsagePeriodComparison
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isSamePeriod
 import com.usagemonitor.domain.entity.riskSummary
@@ -35,8 +36,11 @@ class UsageHistoryRepositoryImpl(
         range: HistoryRange,
         now: Instant
     ): ApiUsageHistoryReport {
-        val records = dataSource.readSnapshots(source, range.windowStart(now))
-        return buildReport(source, range, records, accountContext = null)
+        // Lê a partir do início da janela **anterior** para poder comparar as
+        // duas; os pontos anteriores não entram no gráfico, só no delta.
+        val readFrom = range.previousWindowStart(now) ?: range.windowStart(now)
+        val records = dataSource.readSnapshots(source, readFrom)
+        return buildReport(source, range, records, accountContext = null, now = now)
     }
 
     override suspend fun getHistoryReport(
@@ -45,30 +49,51 @@ class UsageHistoryRepositoryImpl(
         range: HistoryRange,
         now: Instant
     ): ApiUsageHistoryReport {
-        val records = dataSource.readSnapshots(source, accountKey, range.windowStart(now))
+        val readFrom = range.previousWindowStart(now) ?: range.windowStart(now)
+        val records = dataSource.readSnapshots(source, accountKey, readFrom)
         val accountContext = if (accountKey == null) {
             null
         } else {
             dataSource.readAccounts(source).firstOrNull { account -> account.key == accountKey }
         }
-        return buildReport(source, range, records, accountContext)
+        return buildReport(source, range, records, accountContext, now)
     }
 
     private fun buildReport(
         source: ApiSource,
         range: HistoryRange,
         records: List<UsageSnapshotRecord>,
-        accountContext: UsageAccountContext?
+        accountContext: UsageAccountContext?,
+        now: Instant
     ): ApiUsageHistoryReport {
+        val currentWindowStart = range.windowStart(now)
+        val hasPreviousWindow = range.previousWindowStart(now) != null
+
         val groupedSeries = records
             .groupBy { record -> HistorySeriesKey(record.quotaLabel, record.periodType) }
-            .map { (key, groupRecords) -> buildSeries(key, groupRecords.sortedBy { it.capturedAt }, range) }
+            .mapNotNull { (key, groupRecords) ->
+                val sorted = groupRecords.sortedBy { it.capturedAt }
+                val current = sorted.filter { record -> record.capturedAt >= currentWindowStart }
+                // Série que só tem ponto na janela anterior não é desta janela:
+                // publicá-la mostraria dado velho como se fosse atual.
+                if (current.isEmpty()) {
+                    return@mapNotNull null
+                }
+                val previous = if (hasPreviousWindow) {
+                    sorted.filter { record -> record.capturedAt < currentWindowStart }
+                } else {
+                    emptyList()
+                }
+                buildSeries(key, current, previous, range)
+            }
             .sortedWith(compareBy<UsageHistorySeries>({ historySeriesRank(source, it) }, { it.quotaLabel }))
 
         return ApiUsageHistoryReport(
             source = source,
             range = range,
-            lastUpdatedAt = records.maxOfOrNull { it.capturedAt },
+            // Carimbo da janela corrente: o ponto mais recente da anterior seria
+            // sempre mais velho que o corte e faria a tela dizer que está parada.
+            lastUpdatedAt = records.filter { it.capturedAt >= currentWindowStart }.maxOfOrNull { it.capturedAt },
             series = groupedSeries,
             accountContext = accountContext
         )
@@ -77,6 +102,7 @@ class UsageHistoryRepositoryImpl(
     private fun buildSeries(
         key: HistorySeriesKey,
         records: List<UsageSnapshotRecord>,
+        previousRecords: List<UsageSnapshotRecord>,
         range: HistoryRange
     ): UsageHistorySeries {
         val points = records.map(::toHistoryPoint)
@@ -116,7 +142,28 @@ class UsageHistoryRepositoryImpl(
             riskSummary = forecast.riskSummary(
                 referenceAt = currentPoint.capturedAt,
                 periodEndAt = currentPoint.periodEndAt
-            )
+            ),
+            comparison = buildComparison(deltaDisplayUsed, previousRecords, unit)
+        )
+    }
+
+    /**
+     * Compara o consumo desta janela com o da anterior.
+     *
+     * Sem ponto na janela anterior não há comparação: zero ali significaria
+     * "não consumiu nada", quando o que houve foi "não havia dado".
+     */
+    private fun buildComparison(
+        currentDelta: Long,
+        previousRecords: List<UsageSnapshotRecord>,
+        unit: UsageUnit
+    ): UsagePeriodComparison? {
+        if (previousRecords.isEmpty()) {
+            return null
+        }
+        return UsagePeriodComparison(
+            currentDelta = currentDelta,
+            previousDelta = calculatePositiveDelta(previousRecords.map(::toHistoryPoint), unit)
         )
     }
 

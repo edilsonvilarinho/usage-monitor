@@ -254,3 +254,28 @@ data class TeamErrorDto(
     @SerialName("error") val message: String = "",
     val code: String = ""
 )
+
+/**
+ * Uma linha da série diária do time: uma máquina, um dia (UTC) e um modelo.
+ *
+ * O servidor não precifica nada — devolve tokens, e o cliente aplica a própria
+ * `ModelPricingTable`, como já faz com `/v1/team` e `/v1/session`.
+ */
+@Serializable
+data class TeamTrendRowDto(
+    val deviceId: String,
+    val dayStartMillis: Long,
+    val model: String? = null,
+    val turnCount: Int = 0,
+    val inputTokens: Long = 0L,
+    val outputTokens: Long = 0L,
+    val cacheReadTokens: Long = 0L,
+    val cacheWrite5mTokens: Long = 0L,
+    val cacheWrite1hTokens: Long = 0L
+)
+
+@Serializable
+data class TeamTrendResponseDto(
+    val members: List<TeamMemberDto> = emptyList(),
+    val rows: List<TeamTrendRowDto> = emptyList()
+)

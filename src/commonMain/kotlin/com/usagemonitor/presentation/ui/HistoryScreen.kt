@@ -1010,6 +1010,13 @@ private fun HistoryMetrics(
                 }
             )
         }
+        val comparison = series.comparison
+        if (comparison != null) {
+            MetricItem(
+                label = if (language == AppLanguage.PT) "vs. período anterior" else "vs. previous period",
+                value = periodComparisonLabel(comparison, language)
+            )
+        }
     }
 }
 
