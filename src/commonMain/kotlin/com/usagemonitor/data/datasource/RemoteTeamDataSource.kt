@@ -8,6 +8,8 @@ import com.usagemonitor.data.dto.TeamIngestResponseDto
 import com.usagemonitor.data.dto.TeamKeyDto
 import com.usagemonitor.data.dto.TeamKeyListDto
 import com.usagemonitor.data.dto.TeamOverviewDto
+import com.usagemonitor.data.dto.TeamPresenceRequestDto
+import com.usagemonitor.data.dto.TeamPresenceResponseDto
 import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamVerificationDto
@@ -134,6 +136,33 @@ open class RemoteTeamDataSource(
                 setBody(request)
             },
             operation = "envio ao time"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `POST /api/v1/presence`. Diz "esta máquina está com o app aberto agora".
+     *
+     * Existe a partir da versão 0.4.0 do servidor. Contra um servidor anterior a
+     * rota responde `404`, e quem chama cai num ingest só com o membro — mesmo
+     * padrão de [claimKey] → [verifyKey].
+     *
+     * Só aceita chave de time: o servidor recusa o token de administração aqui,
+     * porque quem administra lê, mas não declara presença em nome de ninguém.
+     */
+    open suspend fun touchPresence(
+        baseUrl: String,
+        apiKey: String,
+        request: TeamPresenceRequestDto
+    ): TeamPresenceResponseDto {
+        val response = requireSuccess(
+            response = httpClient.post("$baseUrl/api/v1/presence") {
+                authenticate(TeamCredential.TeamKey(apiKey))
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            },
+            operation = "sinal de presença"
         )
 
         return response.body()

@@ -57,6 +57,7 @@ internal fun ResponsiveDashboardCardGrid(
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
+    onOpenTeamPresenceCard: (UsageTargetKey) -> Unit = {},
     /**
      * Perfis Anthropic marcados como parte do time nas Configurações.
      *
@@ -140,6 +141,16 @@ internal fun ResponsiveDashboardCardGrid(
                                 stats.targetKey.profileId in teamEnabledProfileIds
                             ) {
                                 { onOpenTeamUsageCard(stats.targetKey) }
+                            } else {
+                                null
+                            },
+                            // Mesma condição: as duas janelas leem o mesmo
+                            // servidor de time, para a mesma conta.
+                            onOpenTeamPresence = if (
+                                stats.source == ApiSource.ANTHROPIC &&
+                                stats.targetKey.profileId in teamEnabledProfileIds
+                            ) {
+                                { onOpenTeamPresenceCard(stats.targetKey) }
                             } else {
                                 null
                             },

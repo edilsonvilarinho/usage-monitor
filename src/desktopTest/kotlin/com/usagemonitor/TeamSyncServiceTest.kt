@@ -7,9 +7,12 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamMemberIdentity
+import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
+import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.io.path.createTempDirectory
@@ -25,9 +28,14 @@ private const val ACCOUNT_KEY = "account-uuid-aaa"
 private class RecordingTeamRepository(
     var failure: Throwable? = null,
     /** Recusa só o envio de identidade, para separá-lo do envio de lotes. */
-    private val rejectIdentityPush: Boolean = false
+    private val rejectIdentityPush: Boolean = false,
+    /** Falha só a batida de presença, para provar que ela não trava o resto. */
+    var presenceFailure: Throwable? = null
 ) : TeamUsageRepository {
     val pushed = mutableListOf<TeamIngestPayload>()
+
+    /** Batidas de presença, na ordem em que chegaram. */
+    val presenceTouches = mutableListOf<Pair<String, TeamMemberIdentity>>()
 
     /** Lotes de verdade, sem os envios que só carregam a identidade. */
     val turnBatches: List<TeamIngestPayload>
@@ -68,6 +76,18 @@ private class RecordingTeamRepository(
 
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
         return Result.success(Unit)
+    }
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        val current = presenceFailure
+        if (current != null) {
+            return Result.failure(current)
+        }
+        presenceTouches += accountKey to member
+        return Result.success(TeamPresenceReceipt())
     }
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
@@ -437,6 +457,133 @@ class TeamSyncServiceTest {
         }
     }
 
+    @Test
+    fun `a passada carimba presenca mesmo sem turno pendente`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository()
+            val service = newService(syncState, repository)
+
+            service.syncOnce()
+
+            // O caso normal de quem ja sincronizou tudo: nenhum lote sai, e sem a
+            // batida a maquina ficaria indistinguivel de uma desligada.
+            val (accountKey, member) = repository.presenceTouches.single()
+            assertEquals(ACCOUNT_KEY, accountKey)
+            assertEquals("device-1", member.deviceId)
+            assertEquals("edilson", member.alias)
+            assertEquals("DESKTOP-TEST", member.hostName)
+            assertTrue(repository.turnBatches.isEmpty())
+        }
+    }
+
+    @Test
+    fun `a presenca sai a cada passada e nao so quando algo muda`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository()
+            val service = newService(syncState, repository)
+
+            service.syncOnce()
+            service.syncOnce()
+            service.syncOnce()
+
+            assertEquals(3, repository.presenceTouches.size)
+            // Identidade continua com o proprio marcador: sai uma vez so.
+            assertEquals(1, repository.identityPushes.size)
+        }
+    }
+
+    @Test
+    fun `a presenca sai uma vez por conta participante`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository()
+            val service = newService(
+                syncState,
+                repository,
+                settings = ACTIVE_SETTINGS.copy(participatingProfileIds = setOf(PROFILE_ID, "outro")),
+                targets = listOf(
+                    TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY),
+                    TeamSyncTarget(profileId = "outro", accountKey = "account-uuid-bbb")
+                )
+            )
+
+            service.syncOnce()
+
+            // `last_seen_at` e (conta, maquina): uma batida so cobriria uma conta.
+            assertEquals(
+                listOf(ACCOUNT_KEY, "account-uuid-bbb"),
+                repository.presenceTouches.map { touch -> touch.first }
+            )
+        }
+    }
+
+    @Test
+    fun `falha na presenca nao impede o envio dos turnos`() = runTest {
+        withFixture { root, indexer, syncState ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            indexer.syncIndex()
+
+            val repository = RecordingTeamRepository(
+                presenceFailure = IllegalStateException("presenca recusada")
+            )
+            val service = newService(syncState, repository)
+
+            val report = service.syncOnce()
+
+            assertEquals(1, report.pushedTurns)
+            assertTrue(report.hasFailure)
+            assertTrue(repository.presenceTouches.isEmpty())
+        }
+    }
+
+    @Test
+    fun `falha na presenca aparece no status para as Configuracoes`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository(
+                presenceFailure = IllegalStateException("presenca recusada")
+            )
+            val service = newService(syncState, repository)
+
+            service.syncOnce()
+
+            // Heartbeat falhando significa que a pessoa nao aparece online: e um
+            // problema real e merece o mesmo aviso do resto da passada.
+            assertTrue(service.syncStatus.value.isFailing)
+        }
+    }
+
+    @Test
+    fun `sem o caso de uso de presenca a passada segue igual`() = runTest {
+        withFixture { root, indexer, syncState ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            indexer.syncIndex()
+
+            val repository = RecordingTeamRepository()
+            val service = newService(syncState, repository, touchTeamPresence = null)
+
+            val report = service.syncOnce()
+
+            assertEquals(1, report.pushedTurns)
+            assertFalse(report.hasFailure)
+            assertTrue(repository.presenceTouches.isEmpty())
+        }
+    }
+
+    @Test
+    fun `integracao desligada nao carimba presenca`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository()
+            val service = newService(
+                syncState,
+                repository,
+                settings = ACTIVE_SETTINGS.copy(enabled = false)
+            )
+
+            service.syncOnce()
+
+            assertTrue(repository.presenceTouches.isEmpty())
+        }
+    }
+
     private fun newService(
         syncState: LocalTeamSyncStateDataSource,
         repository: RecordingTeamRepository,
@@ -446,7 +593,9 @@ class TeamSyncServiceTest {
         targets: List<TeamSyncTarget> = listOf(
             TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY)
         ),
-        settingsProvider: () -> TeamIntegrationSettings = { settings }
+        settingsProvider: () -> TeamIntegrationSettings = { settings },
+        /** `null` reproduz uma instalação anterior à presença. */
+        touchTeamPresence: TouchTeamPresenceUseCase? = TouchTeamPresenceUseCase(repository)
     ): TeamSyncService {
         return TeamSyncService(
             syncStateDataSource = syncState,
@@ -454,6 +603,7 @@ class TeamSyncServiceTest {
             settingsProvider = settingsProvider,
             targetsProvider = { targets },
             ensureIndexFresh = ensureIndexFresh,
+            touchTeamPresence = touchTeamPresence,
             hostNameProvider = { "DESKTOP-TEST" },
             batchSize = batchSize
         )

@@ -57,6 +57,24 @@ export function createIngestSchema(maxTurnsPerRequest: number) {
 export type IngestRequestBody = z.infer<ReturnType<typeof createIngestSchema>>;
 
 /**
+ * Batida de presenca: "esta maquina esta com o app aberto agora".
+ *
+ * Reusa [memberSchema] em vez de declarar os campos de novo — e exatamente o
+ * membro do ingest, sem sessoes nem turnos, e um schema paralelo divergiria
+ * dele no primeiro campo novo de identidade.
+ *
+ * Sem nenhum campo de timestamp, de proposito: o `last_seen_at` sai do relogio
+ * do servidor. Aceitar o do cliente deixaria uma maquina se declarar
+ * eternamente online.
+ */
+export const presenceBodySchema = z.object({
+  accountKey: z.string().min(1).max(TEXT_MAX),
+  member: memberSchema,
+});
+
+export type PresenceRequestBody = z.infer<typeof presenceBodySchema>;
+
+/**
  * `since` fica opcional em vez de anulavel com default: `z.coerce` roda antes de
  * qualquer default e transformaria a ausencia do parametro em `NaN`.
  */

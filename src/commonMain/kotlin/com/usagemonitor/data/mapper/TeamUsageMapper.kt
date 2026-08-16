@@ -3,6 +3,7 @@ package com.usagemonitor.data.mapper
 import com.usagemonitor.data.dto.TeamIngestRequestDto
 import com.usagemonitor.data.dto.TeamIngestResponseDto
 import com.usagemonitor.data.dto.TeamMemberDto
+import com.usagemonitor.data.dto.TeamPresenceResponseDto
 import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSessionUploadDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
@@ -11,21 +12,43 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
+import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
 import kotlinx.datetime.Instant
 
+/**
+ * Identidade da máquina no formato do servidor.
+ *
+ * Extraída para função própria porque dois caminhos a enviam — o ingest e a
+ * batida de presença — e duas montagens do mesmo DTO divergiriam no primeiro
+ * campo novo de identidade.
+ */
+fun TeamMemberIdentity.toDto(): TeamMemberDto {
+    return TeamMemberDto(
+        deviceId = deviceId,
+        alias = alias,
+        hostName = hostName,
+        organizationUuid = organizationUuid,
+        organizationName = organizationName
+    )
+}
+
+fun TeamPresenceResponseDto.toDomain(): TeamPresenceReceipt {
+    // `0L` é a ausência do campo, não a época zero: um servidor que não o mande
+    // deixa o cliente sem medida, e não com um desvio de 56 anos.
+    return TeamPresenceReceipt(
+        serverTimeAt = lastSeenAt.takeIf { millis -> millis > 0L }
+            ?.let { millis -> Instant.fromEpochMilliseconds(millis) }
+    )
+}
+
 fun TeamIngestPayload.toDto(): TeamIngestRequestDto {
     return TeamIngestRequestDto(
         accountKey = accountKey,
-        member = TeamMemberDto(
-            deviceId = member.deviceId,
-            alias = member.alias,
-            hostName = member.hostName,
-            organizationUuid = member.organizationUuid,
-            organizationName = member.organizationName
-        ),
+        member = member.toDto(),
         sessions = sessions.map { session ->
             TeamSessionUploadDto(
                 sessionId = session.sessionId,

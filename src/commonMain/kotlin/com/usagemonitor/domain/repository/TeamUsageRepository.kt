@@ -3,6 +3,8 @@ package com.usagemonitor.domain.repository
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
+import com.usagemonitor.domain.entity.TeamMemberIdentity
+import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 
 /**
@@ -16,6 +18,28 @@ interface TeamUsageRepository {
 
     /** Envia um lote de turnos. Idempotente: reenviar o mesmo lote é inofensivo. */
     suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt>
+
+    /**
+     * Carimba "esta máquina está com o app aberto" para uma conta.
+     *
+     * Não envia consumo: só o membro. É o que separa "o app está rodando" de
+     * "houve turno novo" — sem esta batida o servidor só sabe da máquina quando
+     * ela tem dado a enviar, e quem terminou o backfill fica indistinguível de
+     * quem desligou o computador.
+     *
+     * Contra um servidor anterior à rota de presença o `404` **não** vira falha:
+     * a chamada cai num ingest só com o membro, que faz o mesmo upsert e carimba
+     * o mesmo campo. Nem todo time atualiza servidor e app juntos. Falha de rede
+     * ou credencial continua vindo como `Result.failure`.
+     *
+     * Recebe `(accountKey, member)` e não um [TeamIngestPayload] de propósito: um
+     * payload permitiria passar turnos que o caminho primário descartaria em
+     * silêncio.
+     */
+    suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt>
 
     /**
      * Lê o consumo do time de uma conta.

@@ -7,7 +7,9 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
+import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.CliSessionRepository
@@ -312,6 +314,13 @@ private class FakePulseTeamRepository(
 
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
         return Result.success(Unit)
+    }
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        return Result.success(TeamPresenceReceipt())
     }
 
     override suspend fun checkConnection(): Result<Unit> {

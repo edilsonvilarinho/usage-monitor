@@ -8,6 +8,7 @@ import { errorHandler } from './http/errorHandler.js';
 import { createAdminRouter } from './http/routes/admin.js';
 import { createHealthRouter } from './http/routes/health.js';
 import { createIngestRouter } from './http/routes/ingest.js';
+import { createPresenceRouter } from './http/routes/presence.js';
 import { createTeamRouter } from './http/routes/team.js';
 import { createVerifyRouter } from './http/routes/verify.js';
 
@@ -59,6 +60,9 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
 
   app.use('/api', createHealthRouter(db));
   app.use('/api', createIngestRouter({ config, repository, keyRepository, now }));
+  // Junto do outro caminho de escrita, e incondicional: ao contrario da
+  // administracao, a presenca vale para qualquer deploy.
+  app.use('/api', createPresenceRouter({ config, repository, keyRepository, now }));
   app.use('/api', createTeamRouter({ config, repository, keyRepository, now }));
   app.use('/api', createVerifyRouter({ config, keyRepository, now }));
 

@@ -70,7 +70,10 @@ import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
+import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
+import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
+import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.ListTeamKeysUseCase
 import com.usagemonitor.domain.usecase.RegenerateTeamKeyUseCase
@@ -82,6 +85,7 @@ import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
+import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
@@ -91,10 +95,12 @@ import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.TeamKeysAdminScreen
+import com.usagemonitor.presentation.ui.TeamPresenceScreen
 import com.usagemonitor.presentation.ui.TeamUsageScreen
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
+import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
@@ -112,6 +118,7 @@ import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
+import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
@@ -159,6 +166,15 @@ private const val CLI_SESSION_LIVE_INTERVAL_MILLIS = 5_000L
  * intervalo de envio da máquina dele, não por este.
  */
 private const val TEAM_USAGE_LIVE_INTERVAL_MILLIS = 5_000L
+
+/**
+ * Cadência da janela de presença.
+ *
+ * A mesma das outras duas janelas ao vivo: a promessa ao usuário é idêntica, e a
+ * latência real com que alguém aparece é dominada pelo heartbeat de 30s da
+ * máquina dele, não por este intervalo.
+ */
+private const val TEAM_PRESENCE_LIVE_INTERVAL_MILLIS = 5_000L
 
 /**
  * Cadência do semáforo de sessões dos botões dos cards.
@@ -273,6 +289,9 @@ fun main() = application {
     val persistedTeamUsageWindowState = remember(settings) {
         readPersistedTeamUsageWindowState(settings)
     }
+    val persistedTeamPresenceWindowState = remember(settings) {
+        readPersistedTeamPresenceWindowState(settings)
+    }
 
     // A chave do servidor é segredo e vai para um arquivo com permissão restrita
     // ao dono, não para as preferências — estas são gravadas em claro no registro.
@@ -349,10 +368,15 @@ fun main() = application {
     val dashboardCacheRepository = remember(dashboardCacheDataSource) {
         DashboardCacheRepositoryImpl(dashboardCacheDataSource)
     }
-    val teamUsageRepository = remember(remoteTeamDataSource, teamSettingsFlow) {
+    // Uma instância só: o desvio é entre o relógio desta máquina e o do servidor,
+    // não de cada consumidor. Quem o mede é a batida de presença; quem o lê é a
+    // classificação de quem está online.
+    val teamServerClockOffset = remember { InMemoryTeamServerClockOffset() }
+    val teamUsageRepository = remember(remoteTeamDataSource, teamSettingsFlow, teamServerClockOffset) {
         TeamUsageRepositoryImpl(
             remoteDataSource = remoteTeamDataSource,
-            settingsProvider = { teamSettingsFlow.value }
+            settingsProvider = { teamSettingsFlow.value },
+            serverClockOffset = teamServerClockOffset
         )
     }
     val teamAdminRepository = remember(remoteTeamDataSource, teamSettingsFlow) {
@@ -436,6 +460,16 @@ fun main() = application {
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
         )
     }
+    val teamPresenceViewModel = remember(teamUsageRepository, teamAdminRepository, teamServerClockOffset) {
+        TeamPresenceViewModel(
+            getTeamPresence = GetTeamPresenceUseCase(teamUsageRepository, teamServerClockOffset),
+            getAdminTeamPresence = GetAdminTeamPresenceUseCase(
+                teamAdminRepository,
+                teamServerClockOffset
+            ),
+            liveIntervalMillis = TEAM_PRESENCE_LIVE_INTERVAL_MILLIS
+        )
+    }
     // Semáforo dos botões dos cards: lê o índice local de todas as contas e, para
     // as que participam do time, o servidor. Reusa o mesmo `syncCliSessionIndex`
     // das outras telas — o índice é um só.
@@ -483,7 +517,11 @@ fun main() = application {
             // Sem indexar aqui, a latência do time não seria o intervalo deste
             // serviço e sim o do laço de background (10min): ele só envia o que
             // já está no índice.
-            ensureIndexFresh = { syncCliSessionIndex() }
+            ensureIndexFresh = { syncCliSessionIndex() },
+            // O heartbeat que alimenta a janela de presença. Sai em toda passada,
+            // inclusive quando não há turno novo — é o que separa "app aberto" de
+            // "houve consumo".
+            touchTeamPresence = TouchTeamPresenceUseCase(teamUsageRepository)
         )
     }
     LaunchedEffect(teamSyncService, teamSettings.isActive) {
@@ -502,6 +540,7 @@ fun main() = application {
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
                 teamUsageViewModel.onDestroy()
+                teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
@@ -525,6 +564,7 @@ fun main() = application {
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
                 teamUsageViewModel.onDestroy()
+                teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
@@ -543,6 +583,8 @@ fun main() = application {
     val historyWindowState = rememberPersistedHistoryWindowState(persistedHistoryWindowState)
     val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(persistedCliSessionsWindowState)
     val teamUsageWindowState = rememberPersistedTeamUsageWindowState(persistedTeamUsageWindowState)
+    val teamPresenceWindowState =
+        rememberPersistedTeamPresenceWindowState(persistedTeamPresenceWindowState)
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -634,6 +676,29 @@ fun main() = application {
                 )
             }
     }
+    LaunchedEffect(teamPresenceWindowState, settings) {
+        snapshotFlow {
+            Triple(
+                teamPresenceWindowState.position,
+                teamPresenceWindowState.size,
+                teamPresenceWindowState.placement
+            )
+        }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { (position, size, placement) ->
+                persistTeamPresenceWindowState(
+                    settings = settings,
+                    snapshot = TeamPresenceWindowSnapshot(
+                        widthDp = size.width.value,
+                        heightDp = size.height.value,
+                        xDp = if (position.isSpecified) position.x.value else null,
+                        yDp = if (position.isSpecified) position.y.value else null,
+                        placement = placement
+                    )
+                )
+            }
+    }
     val enabledApisState by enabledApis.collectAsState()
     val profileUiModels = buildAnthropicProfileUiModels(
         records = profileRecords,
@@ -699,6 +764,11 @@ fun main() = application {
     // Quem abriu a janela é quem sabe se ela é a visão global; o rótulo nulo da
     // conta não prova isso — conta sem rótulo cairia no mesmo ramo.
     var teamUsageIsAdminOverview by remember { mutableStateOf(false) }
+    var isTeamPresenceOpen by remember { mutableStateOf(false) }
+    var teamPresenceOpenGeneration by remember { mutableStateOf(0) }
+    var teamPresenceAccountLabel by remember { mutableStateOf<String?>(null) }
+    // Mesma razão de `teamUsageIsAdminOverview`: quem abriu é quem sabe.
+    var teamPresenceIsAdminOverview by remember { mutableStateOf(false) }
     var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var teamAdminConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var isTeamKeysOpen by remember { mutableStateOf(false) }
@@ -835,6 +905,7 @@ fun main() = application {
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
                 teamUsageViewModel.onDestroy()
+                teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 httpClient.close()
@@ -923,6 +994,20 @@ fun main() = application {
                     } else {
                         null
                     },
+                    // Também só para quem administra: aqui o escopo é o servidor
+                    // inteiro. O integrante comum entra pelo botão do card, que
+                    // já é escopado na conta dele.
+                    onOpenTeamPresenceOverview = if (teamSettings.isAdminMode) {
+                        {
+                            teamPresenceAccountLabel = null
+                            teamPresenceIsAdminOverview = true
+                            isTeamPresenceOpen = true
+                            teamPresenceOpenGeneration++
+                            teamPresenceViewModel.openForAllAccounts()
+                        }
+                    } else {
+                        null
+                    },
                     onOpenCliSessions = { target ->
                         val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
                         val label = profileRecords
@@ -959,6 +1044,25 @@ fun main() = application {
                             // Antecipa o envio desta máquina: sem isso a janela
                             // abriria mostrando o time sem o que foi feito aqui
                             // desde o último tique de 30s.
+                            teamSyncService.requestImmediateSync()
+                        }
+                    },
+                    onOpenTeamPresence = { target ->
+                        val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+                        val accountContext = profileResolution.inspections[profileId]?.accountContext
+                        val accountKey = accountContext?.key?.providerAccountId
+                        if (accountKey != null) {
+                            teamPresenceAccountLabel = accountContext.displayLabel
+                            teamPresenceIsAdminOverview = false
+                            isTeamPresenceOpen = true
+                            teamPresenceOpenGeneration++
+                            teamPresenceViewModel.openForAccount(
+                                accountKey = accountKey,
+                                accountLabel = accountContext.displayLabel
+                            )
+                            // Antecipa a batida desta máquina: sem isso a janela
+                            // abriria com o próprio usuário aparecendo offline
+                            // por até 30 segundos.
                             teamSyncService.requestImmediateSync()
                         }
                     },
@@ -1074,6 +1178,46 @@ fun main() = application {
                 ) {
                     TeamUsageScreen(
                         viewModel = teamUsageViewModel,
+                        language = language,
+                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
+                    )
+                }
+            }
+        }
+    }
+
+    if (isTeamPresenceOpen) {
+        val presenceTitle = teamPresenceWindowTitle(
+            language = language,
+            accountLabel = teamPresenceAccountLabel,
+            isAdminOverview = teamPresenceIsAdminOverview
+        )
+        // Sem avisar o ViewModel, o laço ao vivo continuaria consultando o
+        // servidor de cinco em cinco segundos com a janela fechada.
+        val closeTeamPresence = {
+            isTeamPresenceOpen = false
+            teamPresenceViewModel.closeWindow()
+        }
+        Window(
+            onCloseRequest = closeTeamPresence,
+            title = presenceTitle,
+            icon = iconImage,
+            state = teamPresenceWindowState,
+            resizable = true,
+            undecorated = true
+        ) {
+            LaunchedEffect(teamPresenceOpenGeneration) {
+                activateWindow(window)
+            }
+            AppTheme(isDark = isDark) {
+                DesktopDialogFrame(
+                    title = presenceTitle,
+                    iconPainter = iconImage,
+                    windowState = teamPresenceWindowState,
+                    onCloseRequest = closeTeamPresence
+                ) {
+                    TeamPresenceScreen(
+                        viewModel = teamPresenceViewModel,
                         language = language,
                         localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
                     )

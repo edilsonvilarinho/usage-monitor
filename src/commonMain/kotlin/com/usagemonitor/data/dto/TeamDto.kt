@@ -59,6 +59,28 @@ data class TeamIngestResponseDto(
     val acceptedSessions: Int = 0
 )
 
+/**
+ * Corpo de `POST /api/v1/presence`. Reusa [TeamMemberDto] do ingest — é o mesmo
+ * membro, sem sessões nem turnos.
+ */
+@Serializable
+data class TeamPresenceRequestDto(
+    val accountKey: String,
+    val member: TeamMemberDto
+)
+
+/**
+ * Resposta de `POST /api/v1/presence`.
+ *
+ * [lastSeenAt] é o relógio do **servidor** no instante do carimbo — é dele que o
+ * cliente deduz o próprio desvio. `0L` significa servidor que não mandou o
+ * campo, e não época zero.
+ */
+@Serializable
+data class TeamPresenceResponseDto(
+    val lastSeenAt: Long = 0L
+)
+
 @Serializable
 data class TeamMemberRowDto(
     val deviceId: String,

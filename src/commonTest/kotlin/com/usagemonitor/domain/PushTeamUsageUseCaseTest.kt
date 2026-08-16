@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamMemberIdentity
+import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
@@ -34,6 +35,13 @@ private class CountingTeamRepository : TeamUsageRepository {
 
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
         return Result.success(Unit)
+    }
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        return Result.success(TeamPresenceReceipt())
     }
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)

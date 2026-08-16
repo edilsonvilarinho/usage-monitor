@@ -3,14 +3,19 @@ package com.usagemonitor.data.repository
 import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.datasource.TeamCredential
 import com.usagemonitor.data.datasource.TeamServerException
+import com.usagemonitor.data.dto.TeamPresenceRequestDto
 import com.usagemonitor.data.mapper.toDomain
 import com.usagemonitor.data.mapper.toDto
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamMemberIdentity
+import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
+import com.usagemonitor.domain.repository.TeamServerClockOffset
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import kotlinx.datetime.Clock
 
 private const val NOT_CONFIGURED_MESSAGE =
     "Integração com time incompleta: informe servidor, chave e apelido nas Configurações."
@@ -30,8 +35,26 @@ private const val NOT_FOUND_STATUS = 404
  */
 class TeamUsageRepositoryImpl(
     private val remoteDataSource: RemoteTeamDataSource,
-    private val settingsProvider: () -> TeamIntegrationSettings
+    private val settingsProvider: () -> TeamIntegrationSettings,
+    /** Alimentado por cada batida bem-sucedida. `NONE` desliga a correção. */
+    private val serverClockOffset: TeamServerClockOffset = TeamServerClockOffset.NONE,
+    private val clock: Clock = Clock.System
 ) : TeamUsageRepository {
+
+    /**
+     * URL cujo servidor já respondeu `404` na rota de presença.
+     *
+     * Chaveado pela URL: trocar de servidor nas Configurações re-testa a rota
+     * sozinho, sem invalidação manual. Sem este marcador, uma instalação contra
+     * um servidor anterior à 0.4.0 pagaria um `404` a cada 30 segundos, por
+     * conta, para sempre.
+     *
+     * `var` simples basta. É escrito e lido da mesma passada de envio, leitura de
+     * referência não rasga na JVM, e o pior desfecho de uma corrida é uma
+     * requisição a mais — o desfecho final é o mesmo, porque o caminho de
+     * compatibilidade carimba exatamente o mesmo campo.
+     */
+    private var presenceRouteMissingFor: String? = null
 
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
         val settings = settingsProvider()
@@ -46,6 +69,62 @@ class TeamUsageRepositoryImpl(
                 request = payload.toDto()
             ).toDomain()
         }
+    }
+
+    /**
+     * Tenta a rota dedicada e, só no `404`, cai no ingest só com o membro.
+     *
+     * `404` é o único status que significa "este servidor não conhece a rota".
+     * `401`, `403`, `500` e falha de rede continuam sendo falha de verdade: cair
+     * no caminho de compatibilidade neles esconderia chave errada e servidor
+     * quebrado atrás de uma batida que parece ter funcionado.
+     */
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        val settings = settingsProvider()
+        if (!settings.isActive) {
+            return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
+        }
+
+        val baseUrl = settings.normalizedServerUrl
+        if (presenceRouteMissingFor != baseUrl) {
+            val localNow = clock.now()
+            val result = runCatching {
+                remoteDataSource.touchPresence(
+                    baseUrl = baseUrl,
+                    apiKey = settings.apiKey,
+                    request = TeamPresenceRequestDto(
+                        accountKey = accountKey,
+                        member = member.toDto()
+                    )
+                ).toDomain()
+            }
+
+            val error = result.exceptionOrNull()
+            if (error !is TeamServerException || error.statusCode != NOT_FOUND_STATUS) {
+                val serverNow = result.getOrNull()?.serverTimeAt
+                if (serverNow != null) {
+                    serverClockOffset.record(serverNow = serverNow, localNow = localNow)
+                }
+                return result
+            }
+
+            presenceRouteMissingFor = baseUrl
+        }
+
+        // Servidor anterior à 0.4.0. O ingest sem sessões nem turnos faz o mesmo
+        // upsert de membro e carimba o mesmo `last_seen_at` — só não devolve o
+        // relógio, então a correção de desvio fica indisponível ali.
+        return push(
+            TeamIngestPayload(
+                accountKey = accountKey,
+                member = member,
+                sessions = emptyList(),
+                turns = emptyList()
+            )
+        ).map { TeamPresenceReceipt() }
     }
 
     override suspend fun fetch(accountKey: String, cutoffMillis: Long?): Result<TeamUsageSnapshot> {

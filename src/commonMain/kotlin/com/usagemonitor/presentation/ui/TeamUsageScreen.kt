@@ -481,9 +481,14 @@ private fun TeamAccountGroupHeader(
     }
 }
 
-/** Ponto colorido + veredito, igual na faixa da conta e na linha do integrante. */
+/**
+ * Ponto colorido + veredito, igual na faixa da conta e na linha do integrante.
+ *
+ * `internal` porque a tela de presença mostra o mesmo veredito na mesma coluna:
+ * duplicar a célula faria as duas divergirem no primeiro ajuste de cor.
+ */
 @Composable
-private fun TeamHealthCell(
+internal fun TeamHealthCell(
     health: CliSessionHealth,
     language: AppLanguage,
     modifier: Modifier = Modifier
