@@ -3,6 +3,7 @@ package com.usagemonitor.data
 import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.datasource.TeamCredential
 import com.usagemonitor.data.datasource.TeamServerException
+import com.usagemonitor.data.dto.TeamAccountDeletionDto
 import com.usagemonitor.data.dto.TeamVerificationDto
 import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
@@ -22,13 +23,28 @@ private val CONFIGURED = TeamIntegrationSettings(
 
 private const val ACCOUNT_KEY = "account-uuid-aaa"
 
+/** Mesmas configurações, mais o token que liga o modo administrador. */
+private val ADMIN = CONFIGURED.copy(adminToken = "token-de-admin-com-tamanho-suficiente")
+
 /** Fake do data source: nenhuma das chamadas abaixo toca a rede. */
 private class FakeRemoteTeamDataSource(
     private val claimResult: Result<TeamVerificationDto>,
-    private val verifyResult: Result<TeamVerificationDto>
+    private val verifyResult: Result<TeamVerificationDto>,
+    private val deleteAccountResult: Result<TeamAccountDeletionDto> =
+        Result.failure(IllegalStateException("nao deveria chamar"))
 ) : RemoteTeamDataSource(HttpClient()) {
     var claimCalls = 0
     var verifyCalls = 0
+    var deleteAccountCalls = 0
+
+    override suspend fun deleteAccount(
+        baseUrl: String,
+        adminToken: String,
+        accountKey: String
+    ): TeamAccountDeletionDto {
+        deleteAccountCalls += 1
+        return deleteAccountResult.getOrThrow()
+    }
 
     override suspend fun claimKey(
         baseUrl: String,
@@ -111,6 +127,60 @@ class TeamAdminRepositoryImplTest {
 
         assertTrue(result.isFailure)
         assertEquals(0, remote.verifyCalls)
+    }
+
+    @Test
+    fun `apaga a conta e devolve o recibo`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            deleteAccountResult = Result.success(
+                TeamAccountDeletionDto(
+                    deletedTurns = 1240,
+                    deletedSessions = 8,
+                    deletedMembers = 3,
+                    unlinkedKeys = 1
+                )
+            )
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { ADMIN }
+
+        val report = repository.deleteAccount(ACCOUNT_KEY).getOrThrow()
+
+        assertEquals(1240, report.deletedTurns)
+        assertEquals(3, report.deletedMembers)
+        assertEquals(1, report.unlinkedKeys)
+    }
+
+    @Test
+    fun `404 ao apagar conta vira pedido de atualizar o servidor`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            deleteAccountResult = Result.failure(TeamServerException(404, "rota inexistente"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { ADMIN }
+
+        val result = repository.deleteAccount(ACCOUNT_KEY)
+
+        // A rota é idempotente: 404 só pode ser servidor anterior a ela. E aqui
+        // não há fallback — nenhuma outra rota apaga uma conta.
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("0.5.0"))
+    }
+
+    @Test
+    fun `apagar conta exige modo administrador`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
+
+        val result = repository.deleteAccount(ACCOUNT_KEY)
+
+        assertTrue(result.isFailure)
+        assertEquals(0, remote.deleteAccountCalls)
     }
 
     @Test

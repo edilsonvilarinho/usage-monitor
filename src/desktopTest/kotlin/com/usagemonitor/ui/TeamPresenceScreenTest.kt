@@ -20,11 +20,16 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.presentation.ui.PRESENCE_ACCOUNT_DELETE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_ACCOUNT_GROUP_TAG_PREFIX
+import com.usagemonitor.presentation.ui.PRESENCE_ACTION_ERROR_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_CLOCK_SKEW_TAG
+import com.usagemonitor.presentation.ui.PRESENCE_DELETE_ACCOUNT_CONFIRM_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_LOCAL_BADGE_TAG_PREFIX
+import com.usagemonitor.presentation.ui.PRESENCE_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_ONLY_ONLINE_TAG
+import com.usagemonitor.presentation.ui.PRESENCE_REMOVE_CONFIRM_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_STATE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_WORKING_TAG_PREFIX
@@ -322,6 +327,99 @@ class TeamPresenceScreenTest {
     }
 
     @Test
+    fun `sem modo admin nenhum botao destrutivo aparece`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
+                ),
+                isAdminOverview = true,
+                expandedAccountKeys = setOf("acc-a")
+            ),
+            localDeviceId = "device-outro"
+        )
+
+        onAllNodesWithTag("${PRESENCE_MEMBER_REMOVE_TAG_PREFIX}acc-a/device-1").assertCountEquals(0)
+        onAllNodesWithTag("${PRESENCE_ACCOUNT_DELETE_TAG_PREFIX}acc-a").assertCountEquals(0)
+    }
+
+    @Test
+    fun `esta maquina e a conta dela nao ganham botao`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
+                ),
+                isAdminOverview = true,
+                expandedAccountKeys = setOf("acc-a")
+            ),
+            localDeviceId = "device-1",
+            canManage = true
+        )
+
+        // O próximo envio recriaria as duas: o botão entregaria uma remoção que
+        // se desfaz sozinha e apagaria o histórico local no caminho.
+        onAllNodesWithTag("${PRESENCE_MEMBER_REMOVE_TAG_PREFIX}acc-a/device-1").assertCountEquals(0)
+        onAllNodesWithTag("${PRESENCE_ACCOUNT_DELETE_TAG_PREFIX}acc-a").assertCountEquals(0)
+    }
+
+    @Test
+    fun `remover integrante so age depois de confirmar`() = runDesktopComposeUiTest {
+        var removed: String? = null
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
+                ),
+                isAdminOverview = true,
+                expandedAccountKeys = setOf("acc-a")
+            ),
+            localDeviceId = "device-outro",
+            canManage = true,
+            onRemoveMember = { key -> removed = key }
+        )
+
+        onNodeWithTag("${PRESENCE_MEMBER_REMOVE_TAG_PREFIX}acc-a/device-1").performClick()
+        assertEquals(null, removed)
+
+        onNodeWithTag(PRESENCE_REMOVE_CONFIRM_TAG).performClick()
+        assertEquals("acc-a/device-1", removed)
+    }
+
+    @Test
+    fun `apagar conta so age depois de confirmar`() = runDesktopComposeUiTest {
+        var deleted: String? = null
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
+                ),
+                isAdminOverview = true
+            ),
+            localDeviceId = "device-outro",
+            canManage = true,
+            onDeleteAccount = { key -> deleted = key }
+        )
+
+        onNodeWithTag("${PRESENCE_ACCOUNT_DELETE_TAG_PREFIX}acc-a").performClick()
+        assertEquals(null, deleted)
+
+        onNodeWithTag(PRESENCE_DELETE_ACCOUNT_CONFIRM_TAG).performClick()
+        assertEquals("acc-a", deleted)
+    }
+
+    @Test
+    fun `a falha da remocao aparece na tela`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(entries = listOf(entry())),
+            actionError = "servidor fora do ar"
+        )
+
+        onNodeWithTag(PRESENCE_ACTION_ERROR_TAG)
+            .assertTextContains("Não foi possível concluir a remoção: servidor fora do ar")
+    }
+
+    @Test
     fun `a lista tem barra de rolagem`() = runDesktopComposeUiTest {
         renderSuccess(TeamPresenceUiState.Success(entries = listOf(entry())))
 
@@ -352,8 +450,12 @@ class TeamPresenceScreenTest {
     private fun ComposeUiTest.renderSuccess(
         state: TeamPresenceUiState.Success,
         localDeviceId: String? = null,
+        canManage: Boolean = false,
+        actionError: String? = null,
         onToggleAccount: (String) -> Unit = {},
-        onSetOnlyOnline: (Boolean) -> Unit = {}
+        onSetOnlyOnline: (Boolean) -> Unit = {},
+        onRemoveMember: (String) -> Unit = {},
+        onDeleteAccount: (String) -> Unit = {}
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -362,8 +464,12 @@ class TeamPresenceScreenTest {
                         state = state,
                         language = AppLanguage.PT,
                         localDeviceId = localDeviceId,
+                        canManage = canManage,
+                        actionError = actionError,
                         onToggleAccount = onToggleAccount,
-                        onSetOnlyOnline = onSetOnlyOnline
+                        onSetOnlyOnline = onSetOnlyOnline,
+                        onRemoveMember = onRemoveMember,
+                        onDeleteAccount = onDeleteAccount
                     )
                 }
             }

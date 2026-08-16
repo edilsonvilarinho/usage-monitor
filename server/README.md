@@ -83,7 +83,7 @@ Fluxo:
 
 **Uma conta pertence a no máximo uma chave**, garantido por índice único. Se a chave errada reivindicar a conta, use `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` (botão **Desvincular** no painel) para liberá-la.
 
-**Regerar** troca a chave crua mantendo os vínculos — serve para chave perdida ou vazada, e a antiga para de valer na requisição seguinte. **Revogar** tira o acesso e **não apaga** nada: remover histórico continua sendo `DELETE /api/v1/member`.
+**Regerar** troca a chave crua mantendo os vínculos — serve para chave perdida ou vazada, e a antiga para de valer na requisição seguinte. **Revogar** tira o acesso e **não apaga** nada, e **Desvincular** também não: os dois mexem em quem pode ler, não no que já foi enviado. Apagar histórico é `DELETE /api/v1/member` (uma máquina) ou `DELETE /api/admin/v1/accounts/:accountKey` (a conta inteira).
 
 O `label` é PII quando você digita um e-mail nele. Ele é gravado no banco por decisão de quem administra — **nenhum e-mail vem do cliente**.
 
@@ -331,9 +331,18 @@ Disponíveis a partir da versão **0.3.0**, e **só quando `TEAM_ADMIN_TOKEN` es
 | `PATCH /api/admin/v1/keys/:id` | `{ label?, maxAccounts? }`. Teto abaixo do já reivindicado → `400`. |
 | `POST /api/admin/v1/keys/:id/regenerate` | Nova chave crua, vínculos mantidos, antiga invalidada na hora. |
 | `DELETE /api/admin/v1/keys/:id` | Revoga. **Não apaga dados.** |
-| `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` | Desfaz um vínculo errado. |
+| `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` | Desfaz um vínculo errado. **Não apaga dados.** |
+| `DELETE /api/admin/v1/accounts/:accountKey` | **0.5.0+.** Apaga a conta inteira: integrantes, sessões, turnos e o vínculo. Irreversível. |
 
 Conta que entrou pela chave legada aparece no `overview` com `label: null` — existe nos dados e não tem chave dona.
+
+**Desvincular não faz a conta sumir.** O `overview` é derivado de `team_members` e `team_turns`, nunca de `team_key_accounts`: uma conta desvinculada continua na lista, agora sem rótulo. Quem a tira de lá é `DELETE /api/admin/v1/accounts/:accountKey` — é o conserto da conta que a empresa deixou de usar, e o único caminho que não exige uma chamada por máquina.
+
+```jsonc
+{ "deletedTurns": 1240, "deletedSessions": 8, "deletedMembers": 3, "unlinkedKeys": 1 }
+```
+
+Idempotente: conta desconhecida responde `200` com zeros. **Apagar não impede a conta de voltar**: ingest e presença reivindicam sozinhos, então uma máquina que ainda participe dela a recria na batida seguinte. As travas são do lado do cliente — desmarcar a conta nas Configurações daquela máquina — ou baixar o `maxAccounts` da chave até o slot ficar cheio, o que faz a reivindicação receber `403`.
 
 A chave crua vem no corpo do `GET` de propósito: o painel é a lista de "quem tem qual chave", e mostrá-la só na criação obrigaria o administrador a guardá-la fora do sistema ou a regerar a cada consulta. O preço está em [Modelo de segurança](#modelo-de-segurança).
 
@@ -406,9 +415,9 @@ O `HEALTHCHECK` está no Dockerfile e no compose. O processo roda como `node` (u
 7. **Deploy.** Confira `GET https://<dominio>/api/health`.
 8. **Auto Deploy:** ative o webhook na branch `main` se quiser redeploy a cada push.
 
-**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. No caso da presença o app cai sozinho num ingest só-membro, que carimba o mesmo `last_seen_at`: a tela funciona igual, apenas sem a correção de relógio. Um redeploy resolve.
+**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**; apagar uma conta inteira depende do `DELETE /api/admin/v1/accounts/:accountKey`, da **0.5.0** — contra um servidor anterior a rota responde `404` e o app avisa que é preciso atualizar, porque aqui não há fallback: nenhuma outra rota faz o mesmo. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. No caso da presença o app cai sozinho num ingest só-membro, que carimba o mesmo `last_seen_at`: a tela funciona igual, apenas sem a correção de relógio. Um redeploy resolve.
 
-Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam, e a 0.4.0 não acrescenta tabela nem coluna — a presença escreve numa coluna que já existia. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
+Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam; a 0.4.0 não acrescenta tabela nem coluna — a presença escreve numa coluna que já existia — e a 0.5.0 tampouco: apagar conta só executa `DELETE` nas tabelas existentes. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
 
 Rodando em **Docker Swarm**, mantenha **1 réplica**: o SQLite é um arquivo local e duas réplicas em nós diferentes veriam bancos distintos. Se o cluster tiver mais de um nó, fixe uma constraint de nó para o volume seguir o serviço.
 

@@ -21,15 +21,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +64,11 @@ internal const val PRESENCE_ACCOUNT_GROUP_TAG_PREFIX = "teamPresenceAccountGroup
 internal const val PRESENCE_ONLY_ONLINE_TAG = "teamPresenceOnlyOnline"
 internal const val PRESENCE_CLOCK_SKEW_TAG = "teamPresenceClockSkewNotice"
 internal const val PRESENCE_SUMMARY_TAG = "teamPresenceSummary"
+internal const val PRESENCE_MEMBER_REMOVE_TAG_PREFIX = "teamPresenceMemberRemove:"
+internal const val PRESENCE_ACCOUNT_DELETE_TAG_PREFIX = "teamPresenceAccountDelete:"
+internal const val PRESENCE_REMOVE_CONFIRM_TAG = "teamPresenceRemoveConfirm"
+internal const val PRESENCE_DELETE_ACCOUNT_CONFIRM_TAG = "teamPresenceDeleteAccountConfirm"
+internal const val PRESENCE_ACTION_ERROR_TAG = "teamPresenceActionError"
 
 // Larguras das colunas num lugar só, pelo mesmo motivo da tela de consumo: a
 // faixa da conta e a linha do integrante têm de cair no mesmo x.
@@ -74,16 +87,24 @@ fun TeamPresenceScreen(
     language: AppLanguage,
     /** `deviceId` desta instalação; a linha correspondente ganha o selo. */
     localDeviceId: String?,
+    /** Modo administrador: é o que libera os botões destrutivos. */
+    canManage: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val actionError by viewModel.actionError.collectAsState()
 
     TeamPresenceContent(
         state = state,
         language = language,
         localDeviceId = localDeviceId,
+        canManage = canManage,
+        actionError = actionError,
         onToggleAccount = { groupKey -> viewModel.toggleAccount(groupKey) },
         onSetOnlyOnline = { value -> viewModel.setOnlyOnline(value) },
+        onRemoveMember = { memberKey -> viewModel.removeMember(memberKey) },
+        onDeleteAccount = { accountKey -> viewModel.deleteAccount(accountKey) },
+        onDismissActionError = { viewModel.clearActionError() },
         modifier = modifier
     )
 }
@@ -94,9 +115,19 @@ internal fun TeamPresenceContent(
     language: AppLanguage,
     modifier: Modifier = Modifier,
     localDeviceId: String? = null,
+    canManage: Boolean = false,
+    actionError: String? = null,
     onToggleAccount: (String) -> Unit = {},
-    onSetOnlyOnline: (Boolean) -> Unit = {}
+    onSetOnlyOnline: (Boolean) -> Unit = {},
+    onRemoveMember: (String) -> Unit = {},
+    onDeleteAccount: (String) -> Unit = {},
+    onDismissActionError: () -> Unit = {}
 ) {
+    // O alvo pendente mora aqui, e não no ViewModel: é estado de diálogo, e o
+    // laço ao vivo republica o estado a cada 5s sem saber que há um modal aberto.
+    var pendingMember by remember { mutableStateOf<TeamMemberPresence?>(null) }
+    var pendingAccount by remember { mutableStateOf<TeamPresenceAccountGroup?>(null) }
+
     Box(modifier = modifier.fillMaxSize()) {
         when (state) {
             is TeamPresenceUiState.Loading -> CenteredMessage(CliSessionsLabels.loading(language))
@@ -109,11 +140,80 @@ internal fun TeamPresenceContent(
                 state = state,
                 language = language,
                 localDeviceId = localDeviceId,
+                canManage = canManage,
+                actionError = actionError,
                 onToggleAccount = onToggleAccount,
-                onSetOnlyOnline = onSetOnlyOnline
+                onSetOnlyOnline = onSetOnlyOnline,
+                onRequestRemoveMember = { entry -> pendingMember = entry },
+                onRequestDeleteAccount = { group -> pendingAccount = group },
+                onDismissActionError = onDismissActionError
             )
         }
     }
+
+    val memberToRemove = pendingMember
+    if (memberToRemove != null) {
+        ConfirmationDialog(
+            title = TeamUsageLabels.removeMemberTitle(language),
+            message = TeamUsageLabels.removeMemberWarning(memberToRemove.alias, language),
+            confirmLabel = TeamUsageLabels.confirmRemoval(language),
+            confirmTag = PRESENCE_REMOVE_CONFIRM_TAG,
+            language = language,
+            onConfirm = {
+                pendingMember = null
+                onRemoveMember(memberToRemove.memberKey)
+            },
+            onDismiss = { pendingMember = null }
+        )
+    }
+
+    val accountToDelete = pendingAccount
+    if (accountToDelete != null) {
+        ConfirmationDialog(
+            title = TeamPresenceLabels.deleteAccountTitle(language),
+            message = TeamPresenceLabels.deleteAccountWarning(
+                accountKey = accountToDelete.groupKey,
+                memberCount = accountToDelete.totalCount,
+                language = language
+            ),
+            confirmLabel = TeamPresenceLabels.confirmAccountDeletion(language),
+            confirmTag = PRESENCE_DELETE_ACCOUNT_CONFIRM_TAG,
+            language = language,
+            onConfirm = {
+                pendingAccount = null
+                onDeleteAccount(accountToDelete.groupKey)
+            },
+            onDismiss = { pendingAccount = null }
+        )
+    }
+}
+
+/** Confirmação obrigatória: as duas ações apagam dados e não têm desfazer. */
+@Composable
+private fun ConfirmationDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    confirmTag: String,
+    language: AppLanguage,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onConfirm, modifier = Modifier.testTag(confirmTag)) {
+                Text(text = confirmLabel, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(TeamUsageLabels.cancel(language))
+            }
+        }
+    )
 }
 
 @Composable
@@ -121,14 +221,37 @@ private fun TeamPresenceList(
     state: TeamPresenceUiState.Success,
     language: AppLanguage,
     localDeviceId: String?,
+    canManage: Boolean,
+    actionError: String?,
     onToggleAccount: (String) -> Unit,
-    onSetOnlyOnline: (Boolean) -> Unit
+    onSetOnlyOnline: (Boolean) -> Unit,
+    onRequestRemoveMember: (TeamMemberPresence) -> Unit,
+    onRequestDeleteAccount: (TeamPresenceAccountGroup) -> Unit,
+    onDismissActionError: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TeamPresenceHeader(state = state, language = language, onSetOnlyOnline = onSetOnlyOnline)
+
+        if (actionError != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = TeamPresenceLabels.actionError(actionError, language),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f).testTag(PRESENCE_ACTION_ERROR_TAG)
+                )
+                TextButton(onClick = onDismissActionError) {
+                    Text(TeamUsageLabels.cancel(language))
+                }
+            }
+        }
 
         // Sem este aviso a coluna Estado passaria um número errado com cara de
         // certo: o carimbo vem do relógio do servidor, e sem NTP nos dois lados
@@ -161,6 +284,11 @@ private fun TeamPresenceList(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (group in state.presenceGroups) {
+                    // Esta máquina participa da conta: apagá-la levaria junto o
+                    // histórico local, e a conta voltaria no envio seguinte.
+                    val isLocalAccount = localDeviceId != null &&
+                        group.entries.any { entry -> entry.deviceId == localDeviceId }
+
                     // Faixa só na visão global: no modal de uma conta só ela já é
                     // a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
@@ -169,7 +297,9 @@ private fun TeamPresenceList(
                                 group = group,
                                 expanded = state.isAccountExpanded(group),
                                 language = language,
-                                onToggle = { onToggleAccount(group.groupKey) }
+                                deletable = canManage && !isLocalAccount,
+                                onToggle = { onToggleAccount(group.groupKey) },
+                                onDelete = { onRequestDeleteAccount(group) }
                             )
                         }
                     }
@@ -179,11 +309,17 @@ private fun TeamPresenceList(
                     }
 
                     items(count = group.entries.size, key = { index -> group.entries[index].memberKey }) { index ->
+                        val entry = group.entries[index]
+                        val isLocalMachine = localDeviceId != null && entry.deviceId == localDeviceId
                         TeamPresenceRow(
-                            entry = group.entries[index],
+                            entry = entry,
                             language = language,
-                            isLocalMachine = localDeviceId != null &&
-                                group.entries[index].deviceId == localDeviceId
+                            isLocalMachine = isLocalMachine,
+                            // Mesma regra do modal de consumo: esta máquina volta
+                            // no próximo envio, então o botão entregaria uma
+                            // remoção que se desfaz sozinha.
+                            removable = canManage && !isLocalMachine,
+                            onRemove = { onRequestRemoveMember(entry) }
                         )
                     }
                 }
@@ -312,7 +448,9 @@ private fun TeamPresenceAccountHeader(
     group: TeamPresenceAccountGroup,
     expanded: Boolean,
     language: AppLanguage,
-    onToggle: () -> Unit
+    deletable: Boolean,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit
 ) {
     FlowRow(
         modifier = Modifier
@@ -371,6 +509,19 @@ private fun TeamPresenceAccountHeader(
             valueColor = CACHE_READ_COLOR,
             modifier = Modifier.width(PRESENCE_COLUMN_WORKING)
         )
+
+        if (deletable) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.testTag("$PRESENCE_ACCOUNT_DELETE_TAG_PREFIX${group.groupKey}")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteForever,
+                    contentDescription = TeamPresenceLabels.deleteAccount(language),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
     }
 }
 
@@ -387,7 +538,9 @@ private fun TeamPresenceAccountHeader(
 private fun TeamPresenceRow(
     entry: TeamMemberPresence,
     language: AppLanguage,
-    isLocalMachine: Boolean
+    isLocalMachine: Boolean,
+    removable: Boolean,
+    onRemove: () -> Unit
 ) {
     // Neutro para offline, na mesma gramática de "sem atividade" da tela de
     // consumo; quem está trabalhando ganha o acento mais forte.
@@ -512,6 +665,21 @@ private fun TeamPresenceRow(
                     language = language,
                     modifier = Modifier.width(PRESENCE_COLUMN_STATUS)
                 )
+            }
+
+            if (removable) {
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.testTag(
+                        "$PRESENCE_MEMBER_REMOVE_TAG_PREFIX${entry.memberKey}"
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = TeamUsageLabels.removeMember(language),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -13,8 +14,10 @@ import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
+import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -29,6 +32,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -108,8 +112,12 @@ private class FakePresenceRepository(
         return Result.success(null)
     }
 
+    val removedMembers = mutableListOf<Pair<String, String>>()
+    var removeResult: Result<Unit>? = null
+
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
-        return Result.success(Unit)
+        removedMembers += accountKey to deviceId
+        return removeResult ?: Result.success(Unit)
     }
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
@@ -118,6 +126,21 @@ private class FakePresenceRepository(
 private class FakePresenceAdminRepository(
     var accounts: List<TeamAccountUsage> = emptyList()
 ) : TeamAdminRepository {
+
+    val deletedAccounts = mutableListOf<String>()
+    var deleteResult: Result<TeamAccountDeletion>? = null
+
+    override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
+        deletedAccounts += accountKey
+        return deleteResult ?: Result.success(
+            TeamAccountDeletion(
+                deletedTurns = 0,
+                deletedSessions = 0,
+                deletedMembers = 0,
+                unlinkedKeys = 0
+            )
+        )
+    }
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> {
         return Result.success(accounts)
@@ -165,6 +188,8 @@ class TeamPresenceViewModelTest {
     private fun TestScope.withViewModel(
         repository: FakePresenceRepository = FakePresenceRepository(),
         adminRepository: FakePresenceAdminRepository? = null,
+        /** Desligado por padrão: é o estado de quem não administra o servidor. */
+        canManage: Boolean = false,
         block: (TeamPresenceViewModel) -> Unit
     ) {
         val clock = PresenceSchedulerClock(PRESENCE_ORIGIN, testScheduler)
@@ -172,6 +197,12 @@ class TeamPresenceViewModelTest {
             getTeamPresence = GetTeamPresenceUseCase(repository, clock = clock),
             getAdminTeamPresence = adminRepository?.let { admin ->
                 GetAdminTeamPresenceUseCase(admin, clock = clock)
+            },
+            removeTeamMember = if (canManage) RemoveTeamMemberUseCase(repository) else null,
+            deleteTeamAccount = if (canManage && adminRepository != null) {
+                DeleteTeamAccountUseCase(adminRepository)
+            } else {
+                null
             },
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = PRESENCE_LIVE_INTERVAL_MILLIS,
@@ -438,6 +469,112 @@ class TeamPresenceViewModelTest {
                 state.entries.map { entry -> entry.memberKey }.sorted()
             )
             assertEquals(2, state.presenceGroups.size)
+        }
+    }
+
+    @Test
+    fun `remover integrante usa a conta dele e recarrega a lista`() = runTest {
+        val repository = FakePresenceRepository()
+        val adminRepository = FakePresenceAdminRepository(
+            accounts = listOf(
+                TeamAccountUsage(
+                    accountKey = ACCOUNT_KEY,
+                    label = "time-a",
+                    snapshot = TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
+                ),
+                TeamAccountUsage(
+                    accountKey = OTHER_ACCOUNT_KEY,
+                    label = "time-b",
+                    snapshot = TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
+                )
+            )
+        )
+
+        withViewModel(repository, adminRepository, canManage = true) { viewModel ->
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            viewModel.removeMember("$OTHER_ACCOUNT_KEY/device-1")
+            runCurrent()
+
+            // A conta é a do integrante, não a da janela: com a da janela isto
+            // apagaria o histórico da conta errada.
+            assertEquals(listOf(OTHER_ACCOUNT_KEY to "device-1"), repository.removedMembers)
+            assertNull(viewModel.actionError.value)
+        }
+    }
+
+    @Test
+    fun `apagar conta chama o servidor e recarrega`() = runTest {
+        val adminRepository = FakePresenceAdminRepository(
+            accounts = listOf(
+                TeamAccountUsage(
+                    accountKey = ACCOUNT_KEY,
+                    label = "time-a",
+                    snapshot = TeamUsageSnapshot(members = listOf(member()))
+                )
+            )
+        )
+
+        withViewModel(adminRepository = adminRepository, canManage = true) { viewModel ->
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            adminRepository.accounts = emptyList()
+            viewModel.deleteAccount(ACCOUNT_KEY)
+            runCurrent()
+
+            assertEquals(listOf(ACCOUNT_KEY), adminRepository.deletedAccounts)
+            // A leitura seguinte é a única prova de que o servidor apagou.
+            assertTrue(assertIs<TeamPresenceUiState.Success>(viewModel.uiState.value).isEmpty)
+        }
+    }
+
+    @Test
+    fun `falha ao remover vira aviso sem apagar a lista`() = runTest {
+        val repository = FakePresenceRepository(
+            TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
+        )
+        repository.removeResult = Result.failure(IllegalStateException("servidor fora do ar"))
+
+        withViewModel(repository, canManage = true) { viewModel ->
+            viewModel.openForAccount(ACCOUNT_KEY, "conta")
+            runCurrent()
+
+            // Numa janela de conta única o `memberKey` é só o `deviceId`: o
+            // carimbo da conta só existe na visão global.
+            viewModel.removeMember("device-1")
+            runCurrent()
+
+            assertEquals(listOf(ACCOUNT_KEY to "device-1"), repository.removedMembers)
+            assertEquals("servidor fora do ar", viewModel.actionError.value)
+            // Mostrar como removido o que continua no servidor seria mentir.
+            assertEquals(
+                1,
+                assertIs<TeamPresenceUiState.Success>(viewModel.uiState.value).entries.size
+            )
+
+            viewModel.clearActionError()
+            assertNull(viewModel.actionError.value)
+        }
+    }
+
+    @Test
+    fun `sem administracao nenhuma acao destrutiva executa`() = runTest {
+        val repository = FakePresenceRepository(
+            TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
+        )
+
+        withViewModel(repository) { viewModel ->
+            viewModel.openForAccount(ACCOUNT_KEY, "conta")
+            runCurrent()
+
+            viewModel.removeMember("device-1")
+            viewModel.deleteAccount(ACCOUNT_KEY)
+            runCurrent()
+
+            assertTrue(repository.removedMembers.isEmpty())
+            assertNull(viewModel.actionError.value)
         }
     }
 

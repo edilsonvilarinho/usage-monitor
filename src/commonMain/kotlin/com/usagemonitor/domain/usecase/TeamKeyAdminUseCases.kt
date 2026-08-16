@@ -1,5 +1,6 @@
 package com.usagemonitor.domain.usecase
 
+import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
 import com.usagemonitor.domain.repository.TeamAdminRepository
@@ -87,6 +88,24 @@ class UnclaimTeamKeyAccountUseCase(
 ) {
     suspend operator fun invoke(id: String, accountKey: String): Result<TeamKeyEntry> =
         repository.unclaimAccount(id = id, accountKey = accountKey)
+}
+
+/**
+ * Apaga uma conta inteira do servidor. **Irreversível.**
+ *
+ * É o conserto da conta que a empresa deixou de usar — alguém trocou de conta
+ * Anthropic e a antiga ficou na visão global com os integrantes de antes.
+ * [UnclaimTeamKeyAccountUseCase] não resolve esse caso: solta o vínculo e deixa
+ * os dados, então a conta continua na tela, agora sem rótulo.
+ *
+ * Não impede a conta de voltar: uma máquina que ainda participe dela a recria na
+ * batida seguinte, porque envio e presença reivindicam sozinhos.
+ */
+class DeleteTeamAccountUseCase(
+    private val repository: TeamAdminRepository
+) {
+    suspend operator fun invoke(accountKey: String): Result<TeamAccountDeletion> =
+        repository.deleteAccount(accountKey)
 }
 
 /**

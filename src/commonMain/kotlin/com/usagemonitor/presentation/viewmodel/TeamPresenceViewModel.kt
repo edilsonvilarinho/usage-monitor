@@ -1,7 +1,10 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.TeamMemberPresence
+import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
+import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.domain.usecase.TeamPresenceResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -27,13 +30,13 @@ private const val MILLIS_PER_MINUTE = 60L * 1_000
  * Estado da janela "Conectados agora".
  *
  * Espelha [TeamUsageViewModel] de propósito — mesma anatomia, mesma promessa de
- * tempo real, mesmas restrições anti-flicker. Duas diferenças deliberadas:
+ * tempo real, mesmas restrições anti-flicker, inclusive o segundo flow:
+ * [actionError] mora fora do `Success` porque o laço de 5s republica o estado e
+ * apagaria a mensagem antes de ela ser lida.
  *
- * - **Um flow só.** Não há `removalError` aqui porque a tela é somente leitura:
- *   nenhuma ação produz mensagem que o laço pudesse apagar antes de ser lida.
- *   Aquele segundo flow existe lá por essa razão, e ela não se aplica aqui.
- * - **Sem janela de quota.** Presença não tem `range` nem âncora de reset: o
- *   recorte é fixo e vive no caso de uso, como `sinceEpochMillis` cru.
+ * Uma diferença deliberada: **sem janela de quota**. Presença não tem `range`
+ * nem âncora de reset — o recorte é fixo e vive no caso de uso, como
+ * `sinceEpochMillis` cru.
  *
  * O [liveIntervalMillis] fecha o ciclo pelo lado da leitura; a latência real com
  * que alguém aparece é dominada pelo heartbeat de 30s da máquina dele.
@@ -47,6 +50,15 @@ class TeamPresenceViewModel(
      * administração, onde a janela só existe por conta.
      */
     private val getAdminTeamPresence: GetAdminTeamPresenceUseCase? = null,
+    /**
+     * Remoção de integrante e de conta, disponíveis só em modo admin.
+     *
+     * `null` desliga a ação, como [getAdminTeamPresence]: numa instalação sem
+     * administração a janela continua sendo só de leitura, e nenhum botão
+     * destrutivo aparece.
+     */
+    private val removeTeamMember: RemoveTeamMemberUseCase? = null,
+    private val deleteTeamAccount: DeleteTeamAccountUseCase? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
     private val clock: Clock = Clock.System
@@ -61,6 +73,10 @@ class TeamPresenceViewModel(
 
     private val _uiState = MutableStateFlow<TeamPresenceUiState>(TeamPresenceUiState.Loading)
     val uiState: StateFlow<TeamPresenceUiState> = _uiState.asStateFlow()
+
+    /** Falha da última remoção. Fora do [uiState] para o laço de 5s não a apagar. */
+    private val _actionError = MutableStateFlow<String?>(null)
+    val actionError: StateFlow<String?> = _actionError.asStateFlow()
 
     private var accountKey: String? = null
     private var accountLabel: String? = null
@@ -154,6 +170,46 @@ class TeamPresenceViewModel(
         }
     }
 
+    /**
+     * Apaga um integrante no servidor e recarrega a lista.
+     *
+     * Recarregar em vez de tirar a linha da lista em memória: a leitura seguinte
+     * é a única prova de que o servidor apagou. A falha vira aviso e a lista fica
+     * intacta — mostrar como removido o que continua lá seria mentir.
+     */
+    fun removeMember(memberKey: String) {
+        val useCase = removeTeamMember ?: return
+        val entry = findEntry(memberKey) ?: return
+        // Na visão global a conta é a do integrante, não a da janela: usar a da
+        // janela apagaria o histórico da conta errada.
+        val targetAccountKey = entry.accountKey ?: accountKey ?: return
+
+        viewModelScope.launch {
+            runAction { useCase(accountKey = targetAccountKey, deviceId = entry.deviceId) }
+        }
+    }
+
+    /**
+     * Apaga uma conta inteira e recarrega.
+     *
+     * Só faz sentido na visão global — é lá que uma conta que ninguém usa mais
+     * continua aparecendo com os integrantes de antes.
+     */
+    fun deleteAccount(accountKey: String) {
+        val useCase = deleteTeamAccount ?: return
+        if (accountKey.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch {
+            runAction { useCase(accountKey).map { } }
+        }
+    }
+
+    fun clearActionError() {
+        _actionError.value = null
+    }
+
     fun onDestroy() {
         loadJob?.cancel()
         liveJob?.cancel()
@@ -177,6 +233,22 @@ class TeamPresenceViewModel(
                 loadPresence()
             }
         }
+    }
+
+    /** Executa a ação destrutiva: erro vira aviso, sucesso recarrega a lista. */
+    private suspend fun runAction(block: suspend () -> Result<Unit>) {
+        val error = block().exceptionOrNull()
+        if (error != null) {
+            _actionError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
+            return
+        }
+        _actionError.value = null
+        loadPresence()
+    }
+
+    private fun findEntry(memberKey: String): TeamMemberPresence? {
+        val current = _uiState.value as? TeamPresenceUiState.Success ?: return null
+        return current.entries.firstOrNull { entry -> entry.memberKey == memberKey }
     }
 
     /** Lê o escopo ativo, ou `null` quando não há nenhum apontado. */

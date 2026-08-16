@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
@@ -43,6 +44,7 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
     var lastOverviewCutoff: Long? = null
     val createdLabels = mutableListOf<String>()
     val unclaimed = mutableListOf<Pair<String, String>>()
+    val deletedAccounts = mutableListOf<String>()
 
     override suspend fun validateToken(): Result<Unit> = Result.success(Unit)
 
@@ -106,6 +108,11 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
         val updated = keys[index].copy(accounts = keys[index].accounts - accountKey)
         keys[index] = updated
         return Result.success(updated)
+    }
+
+    override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
+        deletedAccounts += accountKey
+        return Result.failure(UnsupportedOperationException())
     }
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> {

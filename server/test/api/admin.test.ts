@@ -286,6 +286,134 @@ describe('visao global do admin', () => {
   });
 });
 
+describe('remocao de conta inteira', () => {
+  let harness: Harness;
+
+  beforeEach(() => {
+    harness = createHarness();
+  });
+
+  afterEach(() => {
+    harness.cleanup();
+  });
+
+  it('apaga integrantes, sessoes e turnos e tira a conta da visao global', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    await ingestWith(harness, created.key, ACCOUNT_A);
+
+    const removed = await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(removed.status).toBe(200);
+    expect(removed.body).toEqual({
+      deletedTurns: 1,
+      deletedSessions: 1,
+      deletedMembers: 1,
+      unlinkedKeys: 1,
+    });
+
+    // A visao global e derivada de team_members e team_turns: sem eles a conta
+    // deixa de existir na lista, e nao vira uma linha sem rotulo.
+    const overview = await request(harness.app)
+      .get('/api/admin/v1/overview')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+    expect(overview.body.accounts).toEqual([]);
+  });
+
+  it('nao encosta na outra conta da mesma maquina', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com', 2);
+    await ingestWith(harness, created.key, ACCOUNT_A);
+    await ingestWith(harness, created.key, ACCOUNT_B, 'session-b', 'msg-b');
+
+    await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    const overview = await request(harness.app)
+      .get('/api/admin/v1/overview')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(overview.body.accounts).toHaveLength(1);
+    expect(overview.body.accounts[0].accountKey).toBe(ACCOUNT_B);
+    expect(overview.body.accounts[0].rows).toHaveLength(1);
+  });
+
+  it('solta o vinculo e libera a conta para outra chave', async () => {
+    const antiga = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    const nova = await createKeyViaAdmin(harness, 'sicrano@empresa.com');
+    await ingestWith(harness, antiga.key, ACCOUNT_A);
+
+    await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    const chaves = await request(harness.app)
+      .get('/api/admin/v1/keys')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+    const antigaDepois = chaves.body.keys.find(
+      (key: { id: string }) => key.id === antiga.id,
+    );
+    expect(antigaDepois.accounts).toEqual([]);
+
+    // O slot volta a ficar livre: sem isso a conta ficaria presa a uma chave que
+    // nao a usa mais, e nenhuma outra poderia adota-la.
+    const reivindicada = await ingestWith(harness, nova.key, ACCOUNT_A, 'session-c', 'msg-c');
+    expect(reivindicada.status).toBe(200);
+  });
+
+  it('e idempotente: conta desconhecida responde 200 com zeros', async () => {
+    const response = await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_B}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      deletedTurns: 0,
+      deletedSessions: 0,
+      deletedMembers: 0,
+      unlinkedKeys: 0,
+    });
+  });
+
+  it('recusa sem o token de admin', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    await ingestWith(harness, created.key, ACCOUNT_A);
+
+    const response = await request(harness.app).delete(`/api/admin/v1/accounts/${ACCOUNT_A}`);
+
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('unauthorized');
+  });
+
+  it('recusa a chave de time, mesmo a legada em modo aberto', async () => {
+    await ingestWith(harness, TEST_TEAM_KEY, ACCOUNT_A);
+
+    // Chave legada le tudo, mas apagar conta e ato de administracao: a rota vive
+    // sob /admin e so o x-admin-token a monta.
+    const response = await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+      .set('x-team-key', TEST_TEAM_KEY);
+
+    expect(response.status).toBe(401);
+  });
+
+  it('nao existe num deploy sem token de admin', async () => {
+    const semAdmin = createHarness({ adminToken: null, keySecret: null });
+
+    try {
+      const response = await request(semAdmin.app)
+        .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+        .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+      expect(response.status).toBe(404);
+      expect(response.body.code).toBe('not_found');
+    } finally {
+      semAdmin.cleanup();
+    }
+  });
+});
+
 function ingestWith(
   harness: Harness,
   key: string,
