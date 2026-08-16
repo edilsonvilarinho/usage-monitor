@@ -89,6 +89,8 @@ fun SettingsDialogContent(
     onWindowOpacityChange: (Int) -> Unit = {},
     alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT,
     onAlertSettingsChange: (UsageAlertSettings) -> Unit = {},
+    monthlyBudgetText: String = "",
+    onMonthlyBudgetCommit: (String) -> Unit = {},
     onApiToggle: (ApiSource, Boolean) -> Unit,
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
@@ -194,7 +196,9 @@ fun SettingsDialogContent(
                 AlertSettingsSection(
                     settings = alertSettings,
                     language = currentLanguage,
-                    onSettingsChange = onAlertSettingsChange
+                    onSettingsChange = onAlertSettingsChange,
+                    budgetText = monthlyBudgetText,
+                    onBudgetCommit = onMonthlyBudgetCommit
                 )
             }
 

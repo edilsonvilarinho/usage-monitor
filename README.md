@@ -29,6 +29,11 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
   branch, com ranking por custo e economia agregada do cache.
 - Ritmo de queima em USD/h e tokens/h da janela corrente, com projecao de
   fechamento, e grade de atividade dia da semana x hora (BRT).
+- Exportacao de sessoes e do resumo em CSV ou JSON, seguindo a aba aberta e a
+  janela escolhida.
+- Orcamento mensal em USD com barra de consumo e projecao de fechamento. Os
+  creditos de uso da Anthropic aparecem a parte, na moeda real da conta.
+- Comparativo com o periodo anterior de mesma duracao no Historico.
 - Icone na bandeja do sistema com ponto de risco e notificacao nativa quando uma
   cota cruza um limiar (75/90/100 por padrao) ou uma sessao CLI satura. Limiares,
   alerta de sessao e periodo de silencio configuraveis em Configuracoes > Alertas.

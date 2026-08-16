@@ -13,12 +13,19 @@ import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.MICROS_PER_USD
+import com.usagemonitor.domain.entity.startOfMonthMillis
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
+import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
+import com.usagemonitor.presentation.ui.UsageExportRequest
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
+import com.usagemonitor.presentation.viewmodel.UsageExportWriter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -26,6 +33,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -772,8 +780,76 @@ class CliSessionsViewModelTest {
         viewModel.onDestroy()
     }
 
+    /** Exportar um recorte diferente do que está na tela seria surpresa. */
+    @Test
+    fun `exporting follows the open tab and the chosen window`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val writer = RecordingExportWriter()
+        val viewModel = buildViewModel(repository, exportWriter = writer)
+
+        viewModel.exportCurrentView(UsageExportFormat.CSV)
+        runCurrent()
+
+        val request = writer.requests.single()
+        assertTrue(request.suggestedFileName.startsWith("usage-monitor-sessions-5h-"))
+        assertTrue(request.suggestedFileName.endsWith(".csv"))
+        assertTrue(request.content.contains("session_id"))
+        assertTrue(request.content.contains("a,"))
+
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(CliExportOutcome.Saved("/tmp/export.csv"), state.exportOutcome)
+        viewModel.onDestroy()
+    }
+
+    /** Cancelar não é falha: não publica resultado nenhum. */
+    @Test
+    fun `cancelling the dialog publishes no outcome`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val writer = RecordingExportWriter(savedPath = null)
+        val viewModel = buildViewModel(repository, exportWriter = writer)
+
+        viewModel.exportCurrentView(UsageExportFormat.JSON)
+        runCurrent()
+
+        assertNull(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).exportOutcome)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a failed write is reported without losing the list`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val writer = RecordingExportWriter(failure = IllegalStateException("disco cheio"))
+        val viewModel = buildViewModel(repository, exportWriter = writer)
+
+        viewModel.exportCurrentView(UsageExportFormat.CSV)
+        runCurrent()
+
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(CliExportOutcome.Failed("disco cheio"), state.exportOutcome)
+        assertEquals(1, state.sessions.size)
+        viewModel.onDestroy()
+    }
+
+    /** Orçamento é mensal: o chip de janela não pode mexer nele. */
+    @Test
+    fun `the budget reads the current month regardless of the window`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.setBudgetLimitMicros(200L * MICROS_PER_USD)
+        runCurrent()
+
+        val startOfMonth = startOfMonthMillis(FIXED_NOW, TimeZone.of("America/Sao_Paulo"))
+        assertEquals(startOfMonth, repository.lastBreakdownSinceEpochMillis)
+
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(200L * MICROS_PER_USD, state.budget?.limitMicros)
+        viewModel.onDestroy()
+    }
+
     private fun kotlinx.coroutines.test.TestScope.buildViewModel(
         repository: FakeCliSessionRepository,
+        exportWriter: UsageExportWriter? = null,
         autoLoad: Boolean = true,
         backgroundIndexIntervalMillis: Long? = null,
         clock: Clock = FixedClock(FIXED_NOW),
@@ -786,6 +862,8 @@ class CliSessionsViewModelTest {
             getCliSessionDetail = GetCliSessionDetailUseCase(repository),
             syncCliSessionIndex = SyncCliSessionIndexUseCase(repository),
             getCliUsageBreakdown = GetCliUsageBreakdownUseCase(repository, useCaseClock),
+            exportWriter = exportWriter,
+            getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(repository, useCaseClock),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             autoLoad = autoLoad,
             backgroundIndexIntervalMillis = backgroundIndexIntervalMillis,
@@ -912,5 +990,22 @@ private class FakeCliSessionRepository(
         sinceEpochMillis: Long
     ): Result<List<CliHourlyUsageRow>> {
         return hourlyResult
+    }
+}
+
+/** Escreve na memória: o teste não pode abrir diálogo nem tocar no disco. */
+private class RecordingExportWriter(
+    private val savedPath: String? = "/tmp/export.csv",
+    private val failure: Throwable? = null
+) : UsageExportWriter {
+
+    val requests = mutableListOf<UsageExportRequest>()
+
+    override suspend fun write(request: UsageExportRequest): String? {
+        requests += request
+        if (failure != null) {
+            throw failure
+        }
+        return savedPath
     }
 }

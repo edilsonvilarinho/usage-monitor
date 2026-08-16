@@ -3,7 +3,9 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
@@ -15,6 +17,18 @@ import kotlinx.datetime.Instant
  * de `CliSessionRange` e companhia não têm nada a ver com esta escolha.
  */
 enum class CliSessionsView { SESSIONS, BREAKDOWN }
+
+/**
+ * Resultado da última exportação.
+ *
+ * Carrega o fato; a frase nasce na borda da UI, como em [DashboardToast]. O
+ * cancelamento do diálogo não produz resultado nenhum — não é sucesso nem erro,
+ * e anunciá-lo seria ruído.
+ */
+sealed interface CliExportOutcome {
+    data class Saved(val path: String) : CliExportOutcome
+    data class Failed(val message: String) : CliExportOutcome
+}
 
 sealed interface CliSessionsUiState {
 
@@ -71,7 +85,23 @@ sealed interface CliSessionsUiState {
          */
         val breakdown: CliUsageBreakdown? = null,
         /** Falha da última leitura do resumo, sem apagar o resumo já exibido. */
-        val breakdownError: String? = null
+        val breakdownError: String? = null,
+        /** Resultado da última exportação; `null` enquanto nenhuma aconteceu. */
+        val exportOutcome: CliExportOutcome? = null,
+        /**
+         * Orçamento do mês corrente. `null` sem teto configurado.
+         *
+         * Independe de [range]: orçamento é mensal, e amarrá-lo ao chip de 5h
+         * daria um número sem significado.
+         */
+        val budget: MonthlyBudgetStatus? = null,
+        /**
+         * Créditos de uso da conta, na moeda **real** dela.
+         *
+         * Fica ao lado de [budget] e nunca somado a ele: o custo do índice é
+         * sempre USD e este pode não ser.
+         */
+        val accountCredits: AccountCreditUsage? = null
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long

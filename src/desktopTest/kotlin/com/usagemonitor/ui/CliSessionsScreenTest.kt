@@ -14,17 +14,23 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.MICROS_PER_USD
+import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.EXPORT_CSV_TAG
+import com.usagemonitor.presentation.ui.EXPORT_JSON_TAG
 import com.usagemonitor.presentation.ui.LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.TAB_BREAKDOWN_TAG
 import com.usagemonitor.presentation.ui.TAB_SESSIONS_TAG
@@ -1137,6 +1143,76 @@ class CliSessionsScreenTest {
         onNodeWithTag(TAB_BREAKDOWN_TAG).performClick()
 
         assertEquals(CliSessionsView.BREAKDOWN, selected)
+    }
+
+    @Test
+    fun `the export buttons report the chosen format`() = runDesktopComposeUiTest {
+        var chosen: UsageExportFormat? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {},
+                        onExport = { format -> chosen = format }
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(EXPORT_CSV_TAG).performClick()
+        assertEquals(UsageExportFormat.CSV, chosen)
+
+        onNodeWithTag(EXPORT_JSON_TAG).performClick()
+        assertEquals(UsageExportFormat.JSON, chosen)
+    }
+
+    /**
+     * As duas moedas ficam em linhas separadas: somar o custo em USD aos
+     * créditos numa conta em BRL daria um número inventado.
+     */
+    @Test
+    fun `the budget card keeps the account currency apart`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            view = CliSessionsView.BREAKDOWN,
+                            breakdown = listOf(
+                                groupRow("s1", "/workspace/alpha", inputTokens = 1_000_000L)
+                            ).toUsageBreakdown(),
+                            budget = MonthlyBudgetStatus(
+                                limitMicros = 200L * MICROS_PER_USD,
+                                spentMicros = 150L * MICROS_PER_USD,
+                                daysElapsed = 15,
+                                daysInMonth = 31
+                            ),
+                            accountCredits = AccountCreditUsage(
+                                usedMinorUnits = 27_500L,
+                                limitMinorUnits = 55_000L,
+                                currencyCode = "BRL"
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Orçamento do mês").assertIsDisplayed()
+        onNodeWithText("\$150.00 de \$200.00").assertIsDisplayed()
+        onNodeWithText(
+            "Créditos de uso da conta: BRL 275.00 de BRL 550.00 (moeda da conta, não convertida)"
+        ).assertIsDisplayed()
     }
 
     private fun groupRow(

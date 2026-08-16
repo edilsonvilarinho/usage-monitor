@@ -113,6 +113,67 @@ internal object BreakdownLabels {
         }
     }
 
+    fun budgetTitle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Orçamento do mês" else "Monthly budget"
+    }
+
+    fun budgetValue(spentMicros: Long, limitMicros: Long, isComplete: Boolean, language: AppLanguage): String {
+        val spent = formatMicrosUsdShort(spentMicros) + if (isComplete) "" else "+"
+        val limit = formatMicrosUsdShort(limitMicros)
+        return if (language == AppLanguage.PT) "$spent de $limit" else "$spent of $limit"
+    }
+
+    fun budgetProjection(projectedMicros: Long, willExceed: Boolean, language: AppLanguage): String {
+        val projected = formatMicrosUsdShort(projectedMicros)
+        return if (language == AppLanguage.PT) {
+            if (willExceed) {
+                "No ritmo atual o mês fecha em $projected — acima do teto."
+            } else {
+                "No ritmo atual o mês fecha em $projected."
+            }
+        } else {
+            if (willExceed) {
+                "At this pace the month closes at $projected — over the cap."
+            } else {
+                "At this pace the month closes at $projected."
+            }
+        }
+    }
+
+    fun budgetScopeNotice(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Custo estimado das sessões CLI no mês corrente, em USD. Independe do filtro de janela."
+        } else {
+            "Estimated CLI session cost for the current month, in USD. Independent of the window filter."
+        }
+    }
+
+    /**
+     * Créditos da conta ao lado do orçamento, **nunca somados** a ele: o
+     * `extra_usage` da Anthropic vem na moeda real da conta e o custo do índice
+     * é sempre USD.
+     */
+    fun accountCredits(
+        usedMinorUnits: Long,
+        limitMinorUnits: Long,
+        currencyCode: String,
+        language: AppLanguage
+    ): String {
+        val used = formatMinorUnits(usedMinorUnits)
+        val limit = formatMinorUnits(limitMinorUnits)
+        return if (language == AppLanguage.PT) {
+            "Créditos de uso da conta: $currencyCode $used de $currencyCode $limit (moeda da conta, não convertida)"
+        } else {
+            "Account usage credits: $currencyCode $used of $currencyCode $limit (account currency, not converted)"
+        }
+    }
+
+    private fun formatMinorUnits(minorUnits: Long): String {
+        val units = minorUnits / 100L
+        val cents = (minorUnits % 100L).toString().padStart(2, '0')
+        return "$units.$cents"
+    }
+
     fun burnRateTitle(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Ritmo de queima" else "Burn rate"
     }

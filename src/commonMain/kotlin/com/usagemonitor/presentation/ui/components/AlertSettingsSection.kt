@@ -25,6 +25,7 @@ import com.usagemonitor.domain.entity.UsageAlertSettings
 const val ALERT_SETTINGS_QUOTA_SWITCH_TEST_TAG = "alertSettingsQuotaSwitch"
 const val ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG = "alertSettingsSessionSwitch"
 const val ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG = "alertSettingsQuietSwitch"
+const val ALERT_SETTINGS_BUDGET_FIELD_TEST_TAG = "alertSettingsBudgetField"
 
 /** Limiares oferecidos na tela. Outros valores continuam válidos se já gravados. */
 private val OFFERED_PERCENTS = listOf(50, 75, 90, 100)
@@ -44,6 +45,9 @@ fun AlertSettingsSection(
     settings: UsageAlertSettings,
     language: AppLanguage,
     onSettingsChange: (UsageAlertSettings) -> Unit,
+    /** Teto mensal já formatado; vazio significa desligado. */
+    budgetText: String = "",
+    onBudgetCommit: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isPt = language == AppLanguage.PT
@@ -151,6 +155,24 @@ fun AlertSettingsSection(
             )
         }
 
+        DebouncedTextField(
+            value = budgetText,
+            label = if (isPt) "Teto mensal em USD (vazio desliga)" else "Monthly cap in USD (empty disables)",
+            onCommit = onBudgetCommit,
+            placeholder = "200",
+            validate = { text -> budgetValidationError(text, isPt) },
+            modifier = Modifier.fillMaxWidth().testTag(ALERT_SETTINGS_BUDGET_FIELD_TEST_TAG)
+        )
+        Text(
+            text = if (isPt) {
+                "O teto mede o custo estimado das sessões CLI, em USD. Os créditos de uso da Anthropic aparecem à parte, na moeda da conta."
+            } else {
+                "The cap measures the estimated CLI session cost, in USD. Anthropic usage credits are shown separately, in the account currency."
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
         if (settings.quotaPercents != DEFAULT_QUOTA_ALERT_PERCENTS) {
             TextButton(
                 onClick = { onSettingsChange(settings.copy(quotaPercents = DEFAULT_QUOTA_ALERT_PERCENTS)) }
@@ -216,4 +238,22 @@ private fun HourStepper(
 
 internal fun wrapHour(hour: Int): Int {
     return ((hour % 24) + 24) % 24
+}
+
+/**
+ * Recusa texto que não é número, em vez de gravar zero em silêncio.
+ *
+ * Vírgula é aceita: em pt-BR é o separador decimal que a pessoa digita, e
+ * rejeitá-la seria transformar um hábito em erro.
+ */
+internal fun budgetValidationError(text: String, isPt: Boolean): String? {
+    val normalized = text.trim().replace(',', '.')
+    if (normalized.isEmpty()) {
+        return null
+    }
+    val value = normalized.toDoubleOrNull()
+    if (value == null || value < 0.0) {
+        return if (isPt) "Informe um valor em dólares, ex.: 200" else "Enter a dollar amount, e.g. 200"
+    }
+    return null
 }

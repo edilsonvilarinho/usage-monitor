@@ -48,6 +48,8 @@ import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.AccountCreditUsage
+import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AnthropicProfileRef
@@ -74,6 +76,7 @@ import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
+import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
@@ -411,6 +414,9 @@ fun main() = application {
         GetCachedDashboardStatsUseCase(dashboardCacheRepository)
     }
 
+    // Referência da janela principal: a bandeja e o diálogo de exportação
+    // precisam dela e nenhum dos dois vive dentro do `Window`.
+    var mainWindowRef by remember { mutableStateOf<java.awt.Window?>(null) }
     val isAppVisible = remember { MutableStateFlow(true) }
     val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
         DashboardViewModel(
@@ -449,12 +455,17 @@ fun main() = application {
     val syncCliSessionIndex = remember(cliSessionRepository) {
         SyncCliSessionIndexUseCase(cliSessionRepository)
     }
+    // A janela principal só existe depois da composição; por isso o writer
+    // recebe uma função e não a referência.
+    val usageExportWriter = remember { DesktopUsageExportWriter(parentWindow = { mainWindowRef }) }
     val cliSessionsViewModel = remember(cliSessionRepository) {
         CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
             getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
             syncCliSessionIndex = syncCliSessionIndex,
             getCliUsageBreakdown = GetCliUsageBreakdownUseCase(cliSessionRepository),
+            exportWriter = usageExportWriter,
+            getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(cliSessionRepository),
             autoLoad = false,
             backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
@@ -773,6 +784,7 @@ fun main() = application {
             }
     }
     val alertSettingsState by alertSettingsFlow.collectAsState()
+    var monthlyBudgetMicros by remember { mutableStateOf(readPersistedBudgetMicros(settings)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
@@ -912,6 +924,21 @@ fun main() = application {
             cliSessionsViewModel.setQuotaWindows(cliSessionsQuotaWindows)
         }
     }
+    // Os créditos vêm da API da Anthropic, que só o dashboard consulta; a janela
+    // de sessões conhece apenas o índice local, então eles chegam prontos daqui.
+    val cliSessionsAccountCredits = remember(dashboardState, cliSessionsProfileId) {
+        accountCreditsForProfile(dashboardState, cliSessionsProfileId)
+    }
+    LaunchedEffect(cliSessionsAccountCredits, isCliSessionsOpen) {
+        if (isCliSessionsOpen) {
+            cliSessionsViewModel.setAccountCredits(cliSessionsAccountCredits)
+        }
+    }
+    LaunchedEffect(monthlyBudgetMicros, isCliSessionsOpen) {
+        if (isCliSessionsOpen) {
+            cliSessionsViewModel.setBudgetLimitMicros(monthlyBudgetMicros)
+        }
+    }
     // O time é uma conta Anthropic: a janela de 5h dele ancora no mesmo reset de
     // quota que o card mede, senão os números do time não fecham com os locais.
     val teamUsageQuotaWindows = remember(dashboardState, teamUsageProfileId) {
@@ -944,10 +971,6 @@ fun main() = application {
         }
     }
 
-    // Referência da janela principal para a bandeja poder trazê-la à frente. O
-    // menu da bandeja vive fora de qualquer `Window`, então não alcança o
-    // `window` implícito do conteúdo.
-    var mainWindowRef by remember { mutableStateOf<java.awt.Window?>(null) }
     val restoreMainWindow = {
         mainWindowState.isMinimized = false
         mainWindowRef?.let { window -> activateWindow(window) }
@@ -1403,6 +1426,18 @@ fun main() = application {
                             persistAlertSettings(settings, updated)
                             showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
                         },
+                        monthlyBudgetText = formatBudgetUsd(monthlyBudgetMicros),
+                        onMonthlyBudgetCommit = { text ->
+                            // Texto inválido não grava: o campo já recusa pelo
+                            // `validate`, e gravar zero aqui desligaria o teto em
+                            // silêncio no meio de uma digitação.
+                            val parsed = parseBudgetUsd(text)
+                            if (parsed != null) {
+                                monthlyBudgetMicros = parsed
+                                persistBudgetMicros(settings, parsed)
+                                showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
+                            }
+                        },
                         onApiToggle = { api, checked ->
                             val updatedApis = if (checked) {
                                 enabledApis.value + api
@@ -1785,6 +1820,33 @@ private fun quotaWindowsForProfile(state: UiState, profileId: String?): CliQuota
     } ?: return CliQuotaWindows()
 
     return CliQuotaWindows(fiveHourEndsAt = stats.quotaEndAt(PeriodType.INTERVAL))
+}
+
+/**
+ * Créditos de uso da conta, na moeda **real** dela.
+ *
+ * `null` quando o recurso está desligado — `AnthropicMapper` só cria a terceira
+ * cota com `is_enabled` verdadeiro, então a ausência aqui significa exatamente
+ * isso e não uma falha de leitura.
+ */
+private fun accountCreditsForProfile(state: UiState, profileId: String?): AccountCreditUsage? {
+    if (profileId == null || state !is UiState.Success) {
+        return null
+    }
+
+    val stats = state.data.firstOrNull { item ->
+        item.source == ApiSource.ANTHROPIC && item.targetKey.profileId == profileId
+    } ?: return null
+
+    val quota = stats.quotas.firstOrNull { item ->
+        item.label == AnthropicQuotaLabels.EXTRA_CREDITS
+    } ?: return null
+
+    return AccountCreditUsage(
+        usedMinorUnits = quota.rawUsed.takeIf { value -> value > 0L } ?: quota.used,
+        limitMinorUnits = quota.rawTotal.takeIf { value -> value > 0L } ?: quota.total,
+        currencyCode = quota.currencyCode
+    )
 }
 
 private fun ApiUsageStats.quotaEndAt(periodType: PeriodType): Instant? {

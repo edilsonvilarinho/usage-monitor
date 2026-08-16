@@ -24,9 +24,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
+import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.presentation.ui.components.ActivityHeatmapGrid
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
@@ -50,6 +52,8 @@ internal fun CliUsageBreakdownPane(
     breakdown: CliUsageBreakdown?,
     errorMessage: String?,
     language: AppLanguage,
+    budget: MonthlyBudgetStatus? = null,
+    accountCredits: AccountCreditUsage? = null,
     modifier: Modifier = Modifier
 ) {
     if (breakdown == null) {
@@ -76,6 +80,12 @@ internal fun CliUsageBreakdownPane(
 
             item {
                 BurnRateCard(breakdown = breakdown, language = language)
+            }
+
+            if (budget != null || accountCredits != null) {
+                item(key = "budget") {
+                    BudgetCard(budget = budget, accountCredits = accountCredits, language = language)
+                }
             }
 
             if (errorMessage != null) {
@@ -207,6 +217,75 @@ private fun BreakdownTotalsCard(breakdown: CliUsageBreakdown, language: AppLangu
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun BudgetCard(
+    budget: MonthlyBudgetStatus?,
+    accountCredits: AccountCreditUsage?,
+    language: AppLanguage
+) {
+    DepthSurface(
+        accent = INPUT_COLOR,
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapes.medium,
+        elevation = AppElevation.card,
+        contentPadding = 12.dp
+    ) {
+        Text(
+            text = BreakdownLabels.budgetTitle(language),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = INPUT_COLOR
+        )
+
+        if (budget != null) {
+            Text(
+                text = BreakdownLabels.budgetValue(
+                    spentMicros = budget.spentMicros,
+                    limitMicros = budget.limitMicros,
+                    isComplete = budget.isSpendComplete,
+                    language = language
+                ),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (budget.isExceeded) MaterialTheme.colorScheme.error else INPUT_COLOR
+            )
+            ShareBar(
+                share = budget.share,
+                accent = if (budget.isExceeded) MaterialTheme.colorScheme.error else INPUT_COLOR
+            )
+            Text(
+                text = BreakdownLabels.budgetProjection(budget.projectedMicros, budget.willExceed, language),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (budget.willExceed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            Text(
+                text = BreakdownLabels.budgetScopeNotice(language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (accountCredits != null) {
+            // Linha própria e moeda explícita: somar isto ao valor acima daria um
+            // número inventado quando a conta não é em USD.
+            Text(
+                text = BreakdownLabels.accountCredits(
+                    usedMinorUnits = accountCredits.usedMinorUnits,
+                    limitMinorUnits = accountCredits.limitMinorUnits,
+                    currencyCode = accountCredits.currencyCode,
+                    language = language
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = CACHE_READ_COLOR
+            )
+        }
     }
 }
 
