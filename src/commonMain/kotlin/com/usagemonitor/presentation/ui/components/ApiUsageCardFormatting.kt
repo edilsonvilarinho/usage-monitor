@@ -12,6 +12,8 @@ import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
+import com.usagemonitor.presentation.ui.theme.AppAccents
+import com.usagemonitor.presentation.ui.theme.darkAppAccents
 import kotlinx.datetime.Instant
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
@@ -113,14 +115,25 @@ internal fun cardContainerColor(): Color {
     }
 }
 
-internal fun accentColorFor(source: ApiSource): Color {
+/**
+ * Cor de identidade da fonte.
+ *
+ * [accents] tem default escuro porque este card ainda não migrou para o token por
+ * tema — trocar o default mudaria a renderização do dashboard inteiro, que está
+ * fora desta rodada. O que a mudança resolve é a duplicação: esta tabela e a do
+ * histórico eram duas cópias literais da mesma paleta.
+ */
+internal fun accentColorFor(
+    source: ApiSource,
+    accents: AppAccents = darkAppAccents
+): Color {
     return when (source) {
-        ApiSource.ANTHROPIC -> Color(0xFF4F8CFF)
-        ApiSource.MINIMAX -> Color(0xFFFF8A3D)
-        ApiSource.CODEX -> Color(0xFF27BFA3)
-        ApiSource.DEEPSEEK -> Color(0xFFC084FC)
-        ApiSource.OPENCODE -> Color(0xFF7BD389)
-        ApiSource.KILO -> Color(0xFFE6D84E)
+        ApiSource.ANTHROPIC -> accents.anthropic
+        ApiSource.MINIMAX -> accents.minimax
+        ApiSource.CODEX -> accents.codex
+        ApiSource.DEEPSEEK -> accents.deepseek
+        ApiSource.OPENCODE -> accents.opencode
+        ApiSource.KILO -> accents.kilo
     }
 }
 

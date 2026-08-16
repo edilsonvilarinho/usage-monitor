@@ -30,6 +30,7 @@ import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.TeamPresenceContent
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
@@ -40,6 +41,7 @@ import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -95,6 +97,8 @@ fun main(args: Array<String>) {
     generator.cliSessions()
     generator.cliSessionDetail()
     generator.teamUsage()
+    generator.presence(isDark = true)
+    generator.presence(isDark = false)
 
     println("Capturas geradas em ${outputDir.absolutePath}")
 }
@@ -102,7 +106,14 @@ fun main(args: Array<String>) {
 private class ScreenshotGenerator(private val outputDir: File) {
 
     @OptIn(ExperimentalComposeUiApi::class)
-    fun capture(name: String, widthDp: Int, heightDp: Int, content: @Composable () -> Unit) {
+    fun capture(
+        name: String,
+        widthDp: Int,
+        heightDp: Int,
+        /** O tema claro tem paleta de acentos própria; capturá-lo é como se confere. */
+        isDark: Boolean = true,
+        content: @Composable () -> Unit
+    ) {
         val scene = ImageComposeScene(
             width = widthDp * SCALE,
             height = heightDp * SCALE,
@@ -111,7 +122,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
 
         try {
             scene.setContent {
-                AppTheme(isDark = true) {
+                AppTheme(isDark = isDark) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -302,6 +313,30 @@ private class ScreenshotGenerator(private val outputDir: File) {
             onToggleMember = {},
             localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID
         )
+    }
+
+    /**
+     * Presença nos dois temas.
+     *
+     * Vai com `canManage = true` de propósito: o botão de remover é a coluna que
+     * empurrava o `FlowRow` para além da largura útil, e sem ele a captura não
+     * provaria o pior caso. A largura é a mesma da janela real (960dp) — capturar
+     * mais largo esconderia justamente a quebra que se quer conferir.
+     */
+    fun presence(isDark: Boolean) {
+        val name = if (isDark) "presence" else "presence-light"
+        capture(name, widthDp = 960, heightDp = 460, isDark = isDark) {
+            TeamPresenceContent(
+                state = TeamPresenceUiState.Success(
+                    entries = ScreenshotFixtures.teamPresence,
+                    accountLabel = "dev@example.com — Example Org",
+                    lastChangedAt = ScreenshotFixtures.NOW
+                ),
+                language = AppLanguage.PT,
+                localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID,
+                canManage = true
+            )
+        }
     }
 }
 

@@ -17,9 +17,12 @@ private const val TEAM_PRESENCE_WINDOW_X_KEY = "teamPresenceWindowX"
 private const val TEAM_PRESENCE_WINDOW_Y_KEY = "teamPresenceWindowY"
 private const val TEAM_PRESENCE_WINDOW_PLACEMENT_KEY = "teamPresenceWindowPlacement"
 
-// Menor que a janela de consumo: são cinco colunas curtas, não a tabela de
-// tokens e custo.
-private const val DEFAULT_TEAM_PRESENCE_WINDOW_WIDTH_DP = 860
+// Igual à janela de consumo, e não menor como antes: a lista de presença tem
+// cinco colunas fixas mais o botão de remover, e em 860dp o pior caso passava da
+// largura útil — o `FlowRow` quebrava e as colunas deixavam de alinhar entre as
+// linhas, que é justamente o que as larguras fixas existem para impedir. A conta
+// está em `TeamPresenceScreen.PRESENCE_COLUMN_*`.
+private const val DEFAULT_TEAM_PRESENCE_WINDOW_WIDTH_DP = 960
 private const val DEFAULT_TEAM_PRESENCE_WINDOW_HEIGHT_DP = 620
 
 /**
