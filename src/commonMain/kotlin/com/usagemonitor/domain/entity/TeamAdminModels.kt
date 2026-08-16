@@ -51,6 +51,20 @@ data class TeamKeyVerification(
     val claimedAccounts: Int = 0
 )
 
+/**
+ * O que a remoção de uma conta apagou.
+ *
+ * [unlinkedKeys] é 0 quando a conta não pertencia a chave nenhuma — o caso da
+ * conta que entrou pela chave legada. Não é erro: ela existia nos dados e era
+ * exatamente isso que a tornava visível na visão global.
+ */
+data class TeamAccountDeletion(
+    val deletedTurns: Int,
+    val deletedSessions: Int,
+    val deletedMembers: Int,
+    val unlinkedKeys: Int
+)
+
 /** Uma conta dentro da visão global do administrador. */
 data class TeamAccountUsage(
     val accountKey: String,

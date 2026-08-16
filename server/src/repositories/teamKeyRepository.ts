@@ -112,6 +112,18 @@ const DELETE_ACCOUNT_SQL = `
 DELETE FROM team_key_accounts WHERE key_id = @keyId AND account_key = @accountKey
 `;
 
+/**
+ * Mesmo delete, sem saber de que chave a conta e.
+ *
+ * Quem apaga uma conta inteira nao tem o `key_id` em maos — a visao global
+ * mostra contas, nao chaves — e exigi-lo obrigaria a varrer a lista de chaves
+ * atras da dona antes de cada remocao. O indice unico
+ * `idx_team_key_accounts_account` garante que isso apague no maximo uma linha.
+ */
+const DELETE_ACCOUNT_ANYWHERE_SQL = `
+DELETE FROM team_key_accounts WHERE account_key = @accountKey
+`;
+
 const UPDATE_KEY_SQL = `
 UPDATE team_keys SET label = @label, max_accounts = @maxAccounts WHERE id = @id
 `;
@@ -214,6 +226,12 @@ export class TeamKeyRepository {
 
   unclaimAccount(keyId: string, accountKey: string): boolean {
     const result = this.db.prepare(DELETE_ACCOUNT_SQL).run({ keyId, accountKey });
+    return result.changes > 0;
+  }
+
+  /** Solta a conta de qualquer chave. `false` quando ninguem a tinha. */
+  unclaimAccountAnywhere(accountKey: string): boolean {
+    const result = this.db.prepare(DELETE_ACCOUNT_ANYWHERE_SQL).run({ accountKey });
     return result.changes > 0;
   }
 

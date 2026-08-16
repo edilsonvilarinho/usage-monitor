@@ -56,6 +56,7 @@ import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
+import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
@@ -467,6 +468,8 @@ fun main() = application {
                 teamAdminRepository,
                 teamServerClockOffset
             ),
+            removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
+            deleteTeamAccount = DeleteTeamAccountUseCase(teamAdminRepository),
             liveIntervalMillis = TEAM_PRESENCE_LIVE_INTERVAL_MILLIS
         )
     }
@@ -1219,7 +1222,8 @@ fun main() = application {
                     TeamPresenceScreen(
                         viewModel = teamPresenceViewModel,
                         language = language,
-                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
+                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() },
+                        canManage = teamSettings.isAdminMode
                     )
                 }
             }

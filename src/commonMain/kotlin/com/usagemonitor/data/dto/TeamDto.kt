@@ -220,6 +220,20 @@ data class UpdateTeamKeyRequestDto(
     val maxAccounts: Int? = null
 )
 
+/**
+ * Recibo de `DELETE /api/admin/v1/accounts/{accountKey}`.
+ *
+ * Defaults em tudo pelo mesmo motivo dos outros DTOs: um servidor que passe a
+ * responder com menos campos não pode quebrar a desserialização.
+ */
+@Serializable
+data class TeamAccountDeletionDto(
+    val deletedTurns: Int = 0,
+    val deletedSessions: Int = 0,
+    val deletedMembers: Int = 0,
+    val unlinkedKeys: Int = 0
+)
+
 /** Uma conta dentro de `GET /api/admin/v1/overview`. */
 @Serializable
 data class TeamAccountSnapshotDto(

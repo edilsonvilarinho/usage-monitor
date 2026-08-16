@@ -188,6 +188,44 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
     ),
   );
 
+  /**
+   * Apaga uma conta inteira: integrantes, sessoes, turnos e o vinculo com a
+   * chave. **Destrutivo e irreversivel.**
+   *
+   * E o conserto da conta que a empresa deixou de usar. Desvincular sozinho nao
+   * resolvia: a visao global e derivada de `team_members` e `team_turns`, entao
+   * a conta continuava na tela, agora sem rotulo. E `DELETE /v1/member` exige um
+   * `deviceId` por vez, depois de descobrir cada maquina.
+   *
+   * **A ordem e deliberada: dados primeiro, vinculo depois.** Falhando o segundo
+   * passo sobra um vinculo apontando para conta sem dados — inofensivo, e o
+   * Desvincular ao lado desfaz. O inverso deixaria a conta orfa e reivindicavel
+   * por outra chave com o historico ainda no banco. Nao e uma transacao unica
+   * porque as duas tabelas pertencem a repositorios diferentes; compor os dois
+   * na rota e o mesmo padrao do `PATCH` aqui em cima.
+   *
+   * Nao impede a conta de voltar: ingest e presenca reivindicam sozinhos, entao
+   * uma maquina que ainda participe dela a recria na batida seguinte. Quem trava
+   * isso e o cliente parar de marcar a conta, ou o `maxAccounts` da chave.
+   */
+  router.delete(
+    '/admin/v1/accounts/:accountKey',
+    protect(
+      wrap((req, res) => {
+        const accountKey = req.params.accountKey ?? '';
+        if (accountKey === '') {
+          throw new ValidationError('Informe a conta a remover.');
+        }
+
+        const report = deps.repository.deleteAccount(accountKey);
+        const unlinked = deps.keyRepository.unclaimAccountAnywhere(accountKey);
+
+        logger.debug({ accountKey, ...report, unlinked }, 'conta removida');
+        res.json({ ...report, unlinkedKeys: unlinked ? 1 : 0 });
+      }),
+    ),
+  );
+
   return router;
 }
 

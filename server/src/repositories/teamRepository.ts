@@ -126,6 +126,18 @@ export interface DeleteMemberReport {
   deletedMembers: number;
 }
 
+/**
+ * Mesmo recibo da remocao de integrante, agora para a conta inteira.
+ *
+ * Um tipo proprio, e nao um alias de [DeleteMemberReport]: a rota que o devolve
+ * acrescenta `unlinkedKeys`, que nao vem deste repositorio.
+ */
+export interface DeleteAccountReport {
+  deletedTurns: number;
+  deletedSessions: number;
+  deletedMembers: number;
+}
+
 const UPSERT_MEMBER_SQL = `
 INSERT INTO team_members (
   account_key, device_id, alias, host_name, organization_uuid, organization_name, last_seen_at
@@ -347,6 +359,26 @@ const DELETE_MEMBER_SQL = `
 DELETE FROM team_members WHERE account_key = @accountKey AND device_id = @deviceId
 `;
 
+/**
+ * Os mesmos tres deletes, sem o recorte por maquina.
+ *
+ * Aqui os turnos nao precisam do subselect sobre `team_sessions`: sem filtro de
+ * `device_id`, `account_key` sozinho ja identifica tudo o que sai. A ordem
+ * continua importando pelo mesmo motivo — apagar as sessoes antes deixaria os
+ * turnos sem de onde ser deduzidos se o filtro voltasse a depender delas.
+ */
+const DELETE_ACCOUNT_TURNS_SQL = `
+DELETE FROM team_turns WHERE account_key = @accountKey
+`;
+
+const DELETE_ACCOUNT_SESSIONS_SQL = `
+DELETE FROM team_sessions WHERE account_key = @accountKey
+`;
+
+const DELETE_ACCOUNT_MEMBERS_SQL = `
+DELETE FROM team_members WHERE account_key = @accountKey
+`;
+
 export class TeamRepository {
   private readonly db: Db;
 
@@ -454,6 +486,32 @@ export class TeamRepository {
       const deletedTurns = this.db.prepare(DELETE_MEMBER_TURNS_SQL).run(params).changes;
       const deletedSessions = this.db.prepare(DELETE_MEMBER_SESSIONS_SQL).run(params).changes;
       const deletedMembers = this.db.prepare(DELETE_MEMBER_SQL).run(params).changes;
+      return { deletedTurns, deletedSessions, deletedMembers };
+    });
+
+    return run();
+  }
+
+  /**
+   * Remove uma conta inteira: todos os integrantes, sessoes e turnos dela.
+   *
+   * Existe para a conta que a empresa deixou de usar — alguem trocou de conta
+   * Anthropic e a antiga ficou na visao global com os integrantes de antes.
+   * Desvincular a chave nao resolvia: a agregacao parte de `team_members` e
+   * `team_turns`, entao a conta continuava na lista, so que sem rotulo.
+   *
+   * Nao toca em `team_key_accounts` — o vinculo e da camada de chaves, e quem
+   * compoe as duas e a rota. Idempotente, e **destrutivo e irreversivel** pela
+   * mesma razao de [deleteMember]: as maquinas ja marcaram os turnos como
+   * enviados no marcador local e nao os reenviam.
+   */
+  deleteAccount(accountKey: string): DeleteAccountReport {
+    const params = { accountKey };
+
+    const run = this.db.transaction((): DeleteAccountReport => {
+      const deletedTurns = this.db.prepare(DELETE_ACCOUNT_TURNS_SQL).run(params).changes;
+      const deletedSessions = this.db.prepare(DELETE_ACCOUNT_SESSIONS_SQL).run(params).changes;
+      const deletedMembers = this.db.prepare(DELETE_ACCOUNT_MEMBERS_SQL).run(params).changes;
       return { deletedTurns, deletedSessions, deletedMembers };
     });
 

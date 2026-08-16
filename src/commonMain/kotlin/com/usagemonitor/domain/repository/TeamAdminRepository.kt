@@ -1,5 +1,6 @@
 package com.usagemonitor.domain.repository
 
+import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
@@ -30,6 +31,16 @@ interface TeamAdminRepository {
 
     /** Desfaz um vínculo criado no envio errado, liberando a conta. */
     suspend fun unclaimAccount(id: String, accountKey: String): Result<TeamKeyEntry>
+
+    /**
+     * Apaga uma conta inteira do servidor: integrantes, sessões, turnos e o
+     * vínculo com a chave. **Irreversível.**
+     *
+     * Diferente de [unclaimAccount], que só solta o vínculo: a conta desvinculada
+     * continua na visão global, agora sem rótulo, porque a agregação parte dos
+     * dados de uso e não da tabela de vínculos.
+     */
+    suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion>
 
     /**
      * Consumo de todas as contas do servidor.

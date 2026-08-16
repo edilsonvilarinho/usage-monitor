@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CreateTeamKeyRequestDto
+import com.usagemonitor.data.dto.TeamAccountDeletionDto
 import com.usagemonitor.data.dto.TeamClaimRequestDto
 import com.usagemonitor.data.dto.TeamErrorDto
 import com.usagemonitor.data.dto.TeamIngestRequestDto
@@ -347,6 +348,30 @@ open class RemoteTeamDataSource(
                 authenticate(TeamCredential.AdminToken(adminToken))
             },
             operation = "remoção do vínculo da conta"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `DELETE /api/admin/v1/accounts/{accountKey}`. Apaga a conta inteira.
+     *
+     * Existe a partir da versão 0.5.0 do servidor. Contra um servidor anterior a
+     * rota responde `404`, e aqui **não há fallback**: nenhuma outra rota apaga
+     * uma conta. Quem chama traduz o 404 num pedido de atualização.
+     */
+    open suspend fun deleteAccount(
+        baseUrl: String,
+        adminToken: String,
+        accountKey: String
+    ): TeamAccountDeletionDto {
+        val response = requireSuccess(
+            response = httpClient.delete(
+                "$baseUrl/api/admin/v1/accounts/${accountKey.encodeURLPathPart()}"
+            ) {
+                authenticate(TeamCredential.AdminToken(adminToken))
+            },
+            operation = "remoção da conta"
         )
 
         return response.body()

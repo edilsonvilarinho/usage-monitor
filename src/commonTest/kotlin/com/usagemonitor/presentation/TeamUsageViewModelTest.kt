@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -927,6 +928,9 @@ private class FakeAdminOverviewRepository(
         Result.failure(UnsupportedOperationException())
 
     override suspend fun unclaimAccount(id: String, accountKey: String): Result<TeamKeyEntry> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> =
         Result.failure(UnsupportedOperationException())
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> =

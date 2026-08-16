@@ -6,6 +6,7 @@ import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.data.dto.CreateTeamKeyRequestDto
 import com.usagemonitor.data.dto.UpdateTeamKeyRequestDto
 import com.usagemonitor.data.mapper.toDomain
+import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamKeyEntry
@@ -17,6 +18,9 @@ private const val NOT_ADMIN_MESSAGE =
 
 private const val NOT_CONFIGURED_MESSAGE =
     "Integração com time incompleta: informe servidor e chave nas Configurações."
+
+private const val OUTDATED_SERVER_MESSAGE =
+    "Este servidor de time não sabe apagar contas. Atualize-o para a versão 0.5.0 ou mais nova."
 
 /**
  * Administração do servidor de time.
@@ -107,6 +111,29 @@ class TeamAdminRepositoryImpl(
                 accountKey = accountKey
             ).toDomain()
         }
+    }
+
+    /**
+     * Apaga a conta inteira. Não tem desfazer e não tem fallback.
+     *
+     * O `404` aqui só pode ser servidor anterior à rota: ela é idempotente e
+     * responde `200` com zeros para conta desconhecida. Ao contrário de
+     * [claimKeyForAccount], não há rota mais antiga que faça o mesmo — a única
+     * saída é atualizar o servidor, e é isso que a mensagem diz.
+     */
+    override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
+        val result = withAdmin { settings ->
+            remoteDataSource.deleteAccount(
+                baseUrl = settings.normalizedServerUrl,
+                adminToken = settings.adminToken,
+                accountKey = accountKey
+            ).toDomain()
+        }
+
+        if (result.isMissingRoute()) {
+            return Result.failure(IllegalStateException(OUTDATED_SERVER_MESSAGE))
+        }
+        return result
     }
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> {

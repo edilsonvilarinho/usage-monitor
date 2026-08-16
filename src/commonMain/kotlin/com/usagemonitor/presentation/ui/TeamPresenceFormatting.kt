@@ -163,6 +163,60 @@ internal object TeamPresenceLabels {
         }
     }
 
+    fun deleteAccount(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Apagar conta do servidor" else "Delete account data"
+    }
+
+    fun deleteAccountTitle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Apagar a conta inteira?" else "Delete whole account?"
+    }
+
+    /**
+     * Texto da confirmação, com o custo real e com a única trava que existe.
+     *
+     * Apagar não impede a conta de voltar: envio e presença reivindicam sozinhos,
+     * então uma máquina que ainda participe dela a recria na batida seguinte.
+     * Omitir isso faria o administrador achar que a limpeza falhou.
+     */
+    fun deleteAccountWarning(
+        accountKey: String,
+        memberCount: Int,
+        language: AppLanguage
+    ): String {
+        return if (language == AppLanguage.PT) {
+            "A conta $accountKey, os $memberCount integrante(s) dela e todo o consumo já " +
+                "enviado serão apagados do servidor. Isto não tem volta. Se alguma máquina " +
+                "ainda participar dessa conta, ela reaparece no próximo sinal — desmarque a " +
+                "conta lá, ou reduza o limite de contas da chave."
+        } else {
+            "Account $accountKey, its $memberCount member(s) and all usage already reported " +
+                "will be deleted from the server. This cannot be undone. If any machine still " +
+                "reports for this account it will come back on the next signal — unselect the " +
+                "account there, or lower the key's account limit."
+        }
+    }
+
+    fun confirmAccountDeletion(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Apagar" else "Delete"
+    }
+
+    /** A própria conta não pode ser apagada: esta máquina a recriaria. */
+    fun cannotDeleteOwnAccount(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "esta máquina participa desta conta"
+        } else {
+            "this machine reports for this account"
+        }
+    }
+
+    fun actionError(message: String, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Não foi possível concluir a remoção: $message"
+        } else {
+            "Could not complete the removal: $message"
+        }
+    }
+
     /**
      * Aviso de relógios divergentes.
      *

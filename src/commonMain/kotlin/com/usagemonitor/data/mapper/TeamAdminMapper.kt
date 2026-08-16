@@ -1,9 +1,11 @@
 package com.usagemonitor.data.mapper
 
+import com.usagemonitor.data.dto.TeamAccountDeletionDto
 import com.usagemonitor.data.dto.TeamKeyDto
 import com.usagemonitor.data.dto.TeamOverviewDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamVerificationDto
+import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
@@ -30,6 +32,15 @@ fun TeamKeyDto.toDomain(): TeamKeyEntry {
         createdAt = createdAt.toInstantOrNull(),
         revokedAt = revokedAt.toInstantOrNull(),
         lastUsedAt = lastUsedAt.toInstantOrNull()
+    )
+}
+
+fun TeamAccountDeletionDto.toDomain(): TeamAccountDeletion {
+    return TeamAccountDeletion(
+        deletedTurns = deletedTurns,
+        deletedSessions = deletedSessions,
+        deletedMembers = deletedMembers,
+        unlinkedKeys = unlinkedKeys
     )
 }
 
