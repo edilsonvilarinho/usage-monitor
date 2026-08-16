@@ -54,8 +54,10 @@ import com.usagemonitor.presentation.ui.components.HoverTooltipBox
 import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.components.TurnSeries
 import com.usagemonitor.presentation.ui.components.TurnSeriesChart
+import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.darkAppAccents
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
@@ -64,13 +66,17 @@ import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 // cor: custo em azul, tokens em verde, cache gravado em laranja, economia em
 // ciano. Duas paletas para o mesmo significado fariam o usuário reaprender a ler
 // ao trocar de janela — e o painel de detalhe agora é o mesmo nas duas.
-internal val INPUT_COLOR = Color(0xFF4C8DFF)
-internal val OUTPUT_COLOR = Color(0xFFB07CFF)
-internal val CACHE_READ_COLOR = Color(0xFF4CAF50)
-internal val CACHE_WRITE_COLOR = Color(0xFFFFA726)
-internal val SAVINGS_COLOR = Color(0xFF26C6DA)
-private val SATURATED_COLOR = Color(0xFFE05252)
-internal val NEUTRAL_ACCENT = Color(0xFF7C8CA5)
+//
+// Os valores em si mudaram de casa: moram em `theme/AppAccents.kt`, que tem uma
+// variante por tema. Estes nomes continuam aqui, amarrados à variante **escura**,
+// para as telas que ainda não migraram (`ApiUsageCard`, `HistoryScreen`, charts)
+// renderizarem exatamente como hoje. Código novo lê `AppAccents.current`.
+internal val INPUT_COLOR = darkAppAccents.input
+internal val OUTPUT_COLOR = darkAppAccents.output
+internal val CACHE_READ_COLOR = darkAppAccents.cacheRead
+internal val CACHE_WRITE_COLOR = darkAppAccents.cacheWrite
+internal val SAVINGS_COLOR = darkAppAccents.savings
+internal val NEUTRAL_ACCENT = darkAppAccents.neutral
 
 /** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
 internal val SCROLLBAR_GUTTER = 12.dp
@@ -1070,11 +1076,21 @@ internal fun HealthTallyText(tally: CliSessionHealthTally, language: AppLanguage
     )
 }
 
-internal fun healthColor(health: CliSessionHealth): Color {
+/**
+ * Cor do veredito de saúde.
+ *
+ * [accents] tem default escuro para as telas que ainda não migraram continuarem
+ * compilando com a cor de hoje. Quem está dentro de uma composição deve passar
+ * `AppAccents.current` — é o que faz o veredito continuar legível no tema claro.
+ */
+internal fun healthColor(
+    health: CliSessionHealth,
+    accents: AppAccents = darkAppAccents
+): Color {
     return when (health) {
-        CliSessionHealth.HEALTHY -> CACHE_READ_COLOR
-        CliSessionHealth.ATTENTION -> CACHE_WRITE_COLOR
-        CliSessionHealth.SATURATED -> SATURATED_COLOR
+        CliSessionHealth.HEALTHY -> accents.cacheRead
+        CliSessionHealth.ATTENTION -> accents.cacheWrite
+        CliSessionHealth.SATURATED -> accents.saturated
     }
 }
 
@@ -1182,6 +1198,47 @@ internal fun MetricCard(
             )
         }
     }
+}
+
+/**
+ * Só o valor, sem a legenda.
+ *
+ * Existe para listas que carregam as legendas numa faixa de cabeçalho: repeti-las
+ * dentro de cada linha dobra o texto da lista sem acrescentar informação. Fica ao
+ * lado de [MetricText] e com a mesma tipografia de valor de propósito — as duas
+ * anatomias têm de cair na mesma linha de base quando aparecem lado a lado.
+ */
+@Composable
+internal fun MetricValue(
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = value,
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = FontWeight.SemiBold,
+        color = valueColor,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+/** Legenda de coluna, na faixa de cabeçalho de uma lista tabular. */
+@Composable
+internal fun ColumnHeaderLabel(
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
 }
 
 // `internal`, e não `private`, porque a tela de time reaproveita estes blocos:

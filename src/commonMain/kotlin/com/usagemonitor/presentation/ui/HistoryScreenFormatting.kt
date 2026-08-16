@@ -11,20 +11,18 @@ import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.presentation.ui.components.accentColorFor
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToLong
 
+/**
+ * Delega para [accentColorFor]: a mesma fonte tem de ter a mesma cor no card e no
+ * gráfico do histórico. Antes eram duas tabelas idênticas copiadas à mão.
+ */
 internal fun accentColorForHistorySource(source: ApiSource): Color {
-    return when (source) {
-        ApiSource.ANTHROPIC -> Color(0xFF4F8CFF)
-        ApiSource.MINIMAX -> Color(0xFFFF8A3D)
-        ApiSource.CODEX -> Color(0xFF27BFA3)
-        ApiSource.DEEPSEEK -> Color(0xFFC084FC)
-        ApiSource.OPENCODE -> Color(0xFF7BD389)
-        ApiSource.KILO -> Color(0xFFE6D84E)
-    }
+    return accentColorFor(source)
 }
 
 internal fun rangeLabel(range: HistoryRange, language: AppLanguage): String {

@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -24,6 +25,7 @@ import com.usagemonitor.presentation.ui.PRESENCE_ACCOUNT_DELETE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_ACCOUNT_GROUP_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_ACTION_ERROR_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_CLOCK_SKEW_TAG
+import com.usagemonitor.presentation.ui.PRESENCE_COLUMN_HEADER_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_DELETE_ACCOUNT_CONFIRM_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_LOCAL_BADGE_TAG_PREFIX
@@ -417,6 +419,45 @@ class TeamPresenceScreenTest {
 
         onNodeWithTag(PRESENCE_ACTION_ERROR_TAG)
             .assertTextContains("Não foi possível concluir a remoção: servidor fora do ar")
+    }
+
+    /**
+     * As legendas de coluna vivem numa faixa só, e não dentro de cada linha.
+     *
+     * Antes cada integrante reimprimia "Máquina", "Estado" e "Trabalhando agora"
+     * ao lado do próprio valor: o texto da lista dobrava e o ruído crescia com o
+     * tamanho do time. A contagem exata é o que impede a legenda de voltar para
+     * dentro da linha sem alguém perceber.
+     */
+    @Test
+    fun `as legendas de coluna aparecem uma vez para a lista inteira`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", isWorkingNow = true, activeSessionCount = 1),
+                    entry(deviceId = "device-2", alias = "maria"),
+                    entry(deviceId = "device-3", alias = "joao", isOnline = false)
+                )
+            )
+        )
+
+        onNodeWithTag(PRESENCE_COLUMN_HEADER_TAG).assertIsDisplayed()
+        for (label in listOf("Integrante", "Máquina", "Estado", "Trabalhando agora")) {
+            onAllNodesWithText(label, useUnmergedTree = true).assertCountEquals(1)
+        }
+    }
+
+    /**
+     * A coluna de status some do cabeçalho quando ninguém tem veredito — do
+     * contrário a faixa prometeria uma coluna que nenhuma linha preenche.
+     */
+    @Test
+    fun `sem veredito a coluna de status nao entra no cabecalho`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(entries = listOf(entry(activeSessionCount = 0)))
+        )
+
+        onAllNodesWithText("Status", useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test

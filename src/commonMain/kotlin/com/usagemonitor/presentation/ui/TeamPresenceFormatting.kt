@@ -50,6 +50,11 @@ internal object TeamPresenceLabels {
         return if (language == AppLanguage.PT) "Desconectado" else "Disconnected"
     }
 
+    /** Legenda da coluna de identidade, na faixa de cabeçalho da lista. */
+    fun columnMember(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Integrante" else "Member"
+    }
+
     fun columnState(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Estado" else "State"
     }

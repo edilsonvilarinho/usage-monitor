@@ -36,6 +36,26 @@ object AppElevation {
     val banner: Dp = 1.dp
 }
 
+/**
+ * Intensidade do brilho de acento de `DepthSurface`.
+ *
+ * Nomeia os três patamares que a app já usava de fato, espalhados como floats
+ * soltos em cada chamada. Faltar um nome custou caro: a linha da tela de presença
+ * simplesmente não passava o parâmetro e herdava [card], calibrado para os cards
+ * do dashboard — onde a cor identifica a API e cada card tem respiro. Numa linha
+ * de lista o mesmo valor lava o texto de cor.
+ */
+object AppGlow {
+    /** Blocos de detalhe: a cor fica no dado, não no fundo. */
+    const val quiet: Float = 0.06f
+
+    /** Linha de lista: o acento orienta a varredura sem competir com o texto. */
+    const val row: Float = 0.16f
+
+    /** Card de dashboard, onde a cor é a identidade da fonte. */
+    const val card: Float = 0.22f
+}
+
 object AppShapes {
     val small      = RoundedCornerShape(10.dp)
     val medium     = RoundedCornerShape(16.dp)
@@ -144,6 +164,7 @@ fun AppTheme(
     } else {
         usageMonitorLightColorScheme
     }
+    val accents = if (isDark) darkAppAccents else lightAppAccents
 
     MaterialTheme(
         colorScheme = colorScheme,
@@ -154,7 +175,10 @@ fun AppTheme(
             unhoverColor = colorScheme.onSurface.copy(alpha = 0.24f),
             hoverColor   = colorScheme.onSurface.copy(alpha = 0.5f)
         )
-        CompositionLocalProvider(LocalScrollbarStyle provides scrollbarStyle) {
+        CompositionLocalProvider(
+            LocalScrollbarStyle provides scrollbarStyle,
+            LocalAppAccents provides accents
+        ) {
             content()
         }
     }

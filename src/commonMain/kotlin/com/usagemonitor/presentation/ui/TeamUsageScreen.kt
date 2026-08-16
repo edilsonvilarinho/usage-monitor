@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -53,7 +54,9 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
+import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppGlow
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
@@ -394,6 +397,8 @@ private fun TeamAccountGroupHeader(
     language: AppLanguage,
     onToggle: () -> Unit
 ) {
+    val accents = AppAccents.current
+
     FlowRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -418,13 +423,13 @@ private fun TeamAccountGroupHeader(
                 } else {
                     TeamUsageLabels.expandAccount(language)
                 },
-                tint = CACHE_READ_COLOR
+                tint = accents.cacheRead
             )
             Column {
                 Text(
                     text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
                     style = MaterialTheme.typography.titleSmall,
-                    color = CACHE_READ_COLOR,
+                    color = accents.cacheRead,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -460,14 +465,14 @@ private fun TeamAccountGroupHeader(
             } else {
                 "${formatMicrosUsd(group.totalCostMicros)}+"
             },
-            valueColor = INPUT_COLOR,
+            valueColor = accents.input,
             modifier = Modifier.width(TEAM_COLUMN_COST)
         )
 
         Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
             MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
             Spacer(modifier = Modifier.height(4.dp))
-            MeterBar(fraction = share, color = CACHE_READ_COLOR, height = 4.dp)
+            MeterBar(fraction = share, color = accents.cacheRead, height = 4.dp)
         }
 
         val worstHealth = group.worstHealth
@@ -491,9 +496,11 @@ private fun TeamAccountGroupHeader(
 internal fun TeamHealthCell(
     health: CliSessionHealth,
     language: AppLanguage,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** `false` onde a lista já carrega a legenda numa faixa de cabeçalho. */
+    showLabel: Boolean = true
 ) {
-    val healthAccent = healthColor(health)
+    val healthAccent = healthColor(health, AppAccents.current)
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -502,14 +509,21 @@ internal fun TeamHealthCell(
         Box(
             modifier = Modifier
                 .size(8.dp)
-                .clip(AppShapes.small)
+                .clip(CircleShape)
                 .background(healthAccent)
         )
-        MetricText(
-            label = TeamUsageLabels.columnStatus(language),
-            value = TeamUsageLabels.healthShort(health, language),
-            valueColor = healthAccent
-        )
+        if (showLabel) {
+            MetricText(
+                label = TeamUsageLabels.columnStatus(language),
+                value = TeamUsageLabels.healthShort(health, language),
+                valueColor = healthAccent
+            )
+        } else {
+            MetricValue(
+                value = TeamUsageLabels.healthShort(health, language),
+                valueColor = healthAccent
+            )
+        }
     }
 }
 
@@ -520,8 +534,10 @@ private fun TeamUsageHeader(
     language: AppLanguage,
     onSelectRange: (CliSessionRange) -> Unit
 ) {
+    val accents = AppAccents.current
+
     DepthSurface(
-        accent = CACHE_READ_COLOR,
+        accent = accents.cacheRead,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.large,
         elevation = AppElevation.dialog,
@@ -536,7 +552,7 @@ private fun TeamUsageHeader(
                 Text(
                     text = state.accountLabel,
                     style = MaterialTheme.typography.labelMedium,
-                    color = CACHE_READ_COLOR,
+                    color = accents.cacheRead,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -544,7 +560,7 @@ private fun TeamUsageHeader(
                 Text(
                     text = TeamUsageLabels.allAccounts(state.memberGroups.size, language),
                     style = MaterialTheme.typography.labelMedium,
-                    color = CACHE_READ_COLOR,
+                    color = accents.cacheRead,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.testTag(TEAM_ADMIN_OVERVIEW_TAG)
                 )
@@ -587,7 +603,7 @@ private fun TeamUsageHeader(
                     text = formatQuantity(state.totalTokens),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = CACHE_READ_COLOR
+                    color = accents.cacheRead
                 )
                 Text(
                     text = TeamUsageLabels.columnTokens(language),
@@ -605,7 +621,7 @@ private fun TeamUsageHeader(
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = INPUT_COLOR
+                    color = accents.input
                 )
                 Text(
                     text = TeamUsageLabels.estimatedTotalInRange(
@@ -649,9 +665,11 @@ private fun TeamMemberRow(
     onToggle: () -> Unit,
     onRemove: () -> Unit
 ) {
+    val accents = AppAccents.current
+
     // Integrante sem uso no período fica neutro: destacá-lo com a mesma cor de
     // quem consumiu daria a impressão de atividade que não houve.
-    val accent = if (member.hasActivity) CACHE_READ_COLOR else MaterialTheme.colorScheme.outline
+    val accent = if (member.hasActivity) accents.cacheRead else MaterialTheme.colorScheme.outline
 
     DepthSurface(
         accent = accent,
@@ -659,7 +677,7 @@ private fun TeamMemberRow(
             .fillMaxWidth()
             .clickable(enabled = member.hasActivity, onClick = onToggle)
             .testTag("$TEAM_MEMBER_ROW_TAG_PREFIX${member.deviceId}"),
-        glowAlpha = 0.16f,
+        glowAlpha = AppGlow.row,
         contentPadding = 14.dp
     ) {
         FlowRow(
@@ -734,7 +752,7 @@ private fun TeamMemberRow(
                 } else {
                     "${formatMicrosUsd(member.totalCostMicros)}+"
                 },
-                valueColor = INPUT_COLOR,
+                valueColor = accents.input,
                 modifier = Modifier.width(TEAM_COLUMN_COST)
             )
 

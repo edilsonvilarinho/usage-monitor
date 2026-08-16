@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -487,6 +488,36 @@ internal object ScreenshotFixtures {
 
     /** Máquina que abriu o modal: a própria linha não ganha botão de remover. */
     const val LOCAL_DEVICE_ID = "device-a1"
+
+    /**
+     * Presença montada à mão, e não por `toTeamPresence(NOW)`.
+     *
+     * A janela de online são 90 segundos, e os carimbos de [teamMembers] são muito
+     * mais velhos que isso — passados pelo classificador, todo mundo sairia
+     * desconectado e a captura não mostraria nada do que interessa. Aqui cada um
+     * dos três estados aparece uma vez: trabalhando, conectado e parado,
+     * desconectado.
+     */
+    val teamPresence: List<TeamMemberPresence> = listOf(
+        TeamMemberPresence(
+            member = teamMembers[0],
+            isOnline = true,
+            isWorkingNow = true,
+            activeSessionCount = 2
+        ),
+        TeamMemberPresence(
+            member = teamMembers[1],
+            isOnline = true,
+            isWorkingNow = false,
+            activeSessionCount = 0
+        ),
+        TeamMemberPresence(
+            member = teamMembers[2],
+            isOnline = false,
+            isWorkingNow = false,
+            activeSessionCount = 0
+        )
+    )
 
     // --- Configurações -------------------------------------------------------
 
