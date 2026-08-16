@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
+import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.repository.CliSessionRepository
@@ -40,5 +41,12 @@ class CliSessionRepositoryImpl(
         sinceEpochMillis: Long
     ): Result<List<CliHourlyUsageRow>> {
         return runCatching { dataSource.readHourlyUsage(profileId, sinceEpochMillis) }
+    }
+
+    override suspend fun getToolUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<List<CliToolUsage>> {
+        return runCatching { dataSource.readToolUsage(profileId, sinceEpochMillis) }
     }
 }

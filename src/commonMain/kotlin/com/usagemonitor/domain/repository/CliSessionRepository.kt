@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
+import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 
 /**
@@ -55,4 +56,15 @@ interface CliSessionRepository {
         profileId: String? = null,
         sinceEpochMillis: Long = 0L
     ): Result<List<CliHourlyUsageRow>>
+
+    /**
+     * Ferramentas chamadas na janela.
+     *
+     * Separado do resumo por eixo porque ferramenta não tem custo próprio: o
+     * turno gastou tokens uma vez, mesmo tendo chamado duas.
+     */
+    suspend fun getToolUsage(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): Result<List<CliToolUsage>>
 }

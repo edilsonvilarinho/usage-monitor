@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
+import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 
 /**
@@ -54,4 +55,10 @@ interface CliSessionDataSource {
         profileId: String? = null,
         sinceEpochMillis: Long = 0L
     ): List<CliHourlyUsageRow>
+
+    /** Ferramentas chamadas nos turnos da janela, da mais chamada para a menos. */
+    suspend fun readToolUsage(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): List<CliToolUsage>
 }

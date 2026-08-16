@@ -21,6 +21,20 @@ data class CliUsageGroupRow(
     val cacheWrite1hTokens: Long = 0L
 )
 
+/**
+ * Chamadas de uma ferramenta na janela.
+ *
+ * Fica fora de [CliUsageBucket] porque a ferramenta não tem custo próprio: um
+ * turno com `Read` e `Bash` gastou tokens uma vez só, e atribuir o custo do
+ * turno às duas contaria o mesmo gasto duas vezes.
+ */
+data class CliToolUsage(
+    val toolName: String,
+    val callCount: Int = 0,
+    /** Turnos distintos em que a ferramenta apareceu. */
+    val turnCount: Int = 0
+)
+
 /** Consumo somado de um recorte — um projeto, um branch, um modelo ou o total. */
 data class CliUsageBucket(
     /** Rótulo do recorte; `null` quando o índice não conhece o valor. */
@@ -76,6 +90,13 @@ data class CliUsageBreakdown(
     val byBranch: List<CliUsageBucket> = emptyList(),
     val byModel: List<CliUsageBucket> = emptyList(),
     val totals: CliUsageBucket = CliUsageBucket(),
+    /**
+     * Ferramentas mais chamadas na janela, da mais chamada para a menos.
+     *
+     * Não entra nas somas de custo: um turno com duas ferramentas gastou tokens
+     * uma vez só.
+     */
+    val byTool: List<CliToolUsage> = emptyList(),
     /** Mesma janela vista por hora local; vazio quando não foi lida. */
     val heatmap: CliActivityHeatmap = CliActivityHeatmap(),
     /** Ritmo dentro da janela; `null` sem janela ou sem tempo decorrido bastante. */

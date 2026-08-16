@@ -121,6 +121,12 @@ internal fun CliUsageBreakdownPane(
                 language = language
             )
 
+            if (breakdown.byTool.isNotEmpty()) {
+                item(key = "tools") {
+                    ToolUsageCard(breakdown = breakdown, language = language)
+                }
+            }
+
             if (!breakdown.heatmap.isEmpty) {
                 item(key = "activity") {
                     ActivityCard(breakdown = breakdown, language = language)
@@ -334,6 +340,60 @@ private fun BurnRateCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
         }
         Text(
             text = BreakdownLabels.burnRateElapsed(burnRate.elapsedMillis, language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun ToolUsageCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
+    val peak = breakdown.byTool.maxOf { tool -> tool.callCount }
+
+    DepthSurface(
+        accent = CACHE_WRITE_COLOR,
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapes.medium,
+        elevation = AppElevation.card,
+        contentPadding = 12.dp
+    ) {
+        Text(
+            text = BreakdownLabels.byTool(language),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = CACHE_WRITE_COLOR
+        )
+
+        breakdown.byTool.forEach { tool ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = tool.toolName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = tool.callCount.toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CACHE_WRITE_COLOR
+                )
+            }
+            // Fatia contra a ferramenta mais chamada, não contra o total: a
+            // pergunta é qual domina, e todas somariam 100% de qualquer jeito.
+            ShareBar(share = tool.callCount.toDouble() / peak.toDouble(), accent = CACHE_WRITE_COLOR)
+            Text(
+                text = BreakdownLabels.toolSubtitle(tool.callCount, tool.turnCount, language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Text(
+            text = BreakdownLabels.toolNotice(language),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

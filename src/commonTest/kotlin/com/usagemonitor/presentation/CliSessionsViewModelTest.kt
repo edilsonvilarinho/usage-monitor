@@ -6,6 +6,7 @@ import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageGroupRow
@@ -949,6 +950,7 @@ private class FakeCliSessionRepository(
 
     var breakdownResult: Result<CliUsageBreakdown> = Result.success(CliUsageBreakdown())
     var hourlyResult: Result<List<CliHourlyUsageRow>> = Result.success(emptyList())
+    var toolResult: Result<List<CliToolUsage>> = Result.success(emptyList())
     var breakdownCalls: Int = 0
     var lastBreakdownSinceEpochMillis: Long? = null
 
@@ -990,6 +992,13 @@ private class FakeCliSessionRepository(
         sinceEpochMillis: Long
     ): Result<List<CliHourlyUsageRow>> {
         return hourlyResult
+    }
+
+    override suspend fun getToolUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<List<CliToolUsage>> {
+        return toolResult
     }
 }
 

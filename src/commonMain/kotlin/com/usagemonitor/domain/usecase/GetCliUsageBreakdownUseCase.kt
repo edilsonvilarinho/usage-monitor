@@ -47,6 +47,11 @@ class GetCliUsageBreakdownUseCase(
             .map { rows -> rows.toActivityHeatmap(timeZone) }
             .getOrNull()
 
+        // Mesmo tratamento da grade: acessória, e uma falha nela não derruba o
+        // resumo. Instalação com índice anterior à tabela de ferramentas devolve
+        // lista vazia até a reindexação passar.
+        val tools = repository.getToolUsage(profileId, cutoffMillis).getOrNull()
+
         val burnRate = burnRateOf(
             totals = breakdown.totals,
             windowStart = window.cutoffMillis?.let { millis -> Instant.fromEpochMilliseconds(millis) },
@@ -56,6 +61,7 @@ class GetCliUsageBreakdownUseCase(
 
         return Result.success(
             breakdown.copy(
+                byTool = tools ?: breakdown.byTool,
                 heatmap = heatmap ?: breakdown.heatmap,
                 burnRate = burnRate
             )

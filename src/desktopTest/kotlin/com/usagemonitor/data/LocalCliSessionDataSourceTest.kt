@@ -861,6 +861,69 @@ class LocalCliSessionDataSourceTest {
     }
 
     @Test
+    fun `tool calls are indexed and summed per tool`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine(
+                    "session-a",
+                    "msg-1",
+                    "2026-08-01T10:00:00Z",
+                    tools = listOf("Read", "Read", "Bash")
+                ),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:05:00Z", tools = listOf("Read"))
+            )
+            dataSource.syncIndex()
+
+            val tools = dataSource.readToolUsage()
+
+            assertEquals(2, tools.size)
+            assertEquals("Read", tools[0].toolName)
+            assertEquals(3, tools[0].callCount)
+            assertEquals(2, tools[0].turnCount)
+            assertEquals("Bash", tools[1].toolName)
+            assertEquals(1, tools[1].callCount)
+        }
+    }
+
+    /** Reindexar o mesmo arquivo não pode somar as chamadas de novo. */
+    @Test
+    fun `reindexing does not double the tool calls`() = runTest {
+        withFixture { root, dataSource ->
+            val file = writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", tools = listOf("Read", "Read"))
+            )
+            dataSource.syncIndex()
+
+            // Muda o carimbo sem mudar o conteúdo: força uma releitura do arquivo.
+            file.setLastModified(file.lastModified() + 10_000L)
+            dataSource.syncIndex()
+
+            assertEquals(2, dataSource.readToolUsage().single().callCount)
+        }
+    }
+
+    @Test
+    fun `the tool window follows the turn cutoff`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", tools = listOf("Read")),
+                assistantLine("session-a", "msg-2", "2026-08-01T12:00:00Z", tools = listOf("Bash"))
+            )
+            dataSource.syncIndex()
+
+            val recent = dataSource.readToolUsage(sinceEpochMillis = epochMillis("2026-08-01T11:00:00Z"))
+
+            assertEquals(listOf("Bash"), recent.map { tool -> tool.toolName })
+        }
+    }
+
+    @Test
     fun `usage groups honour the profile filter`() = runTest {
         withFixture { root, dataSource ->
             writeTranscript(
@@ -909,12 +972,21 @@ class LocalCliSessionDataSourceTest {
         cacheReadTokens: Long = 0L,
         cacheWrite5mTokens: Long = 0L,
         cacheWrite1hTokens: Long = 0L,
-        isSidechain: Boolean = false
+        isSidechain: Boolean = false,
+        tools: List<String> = emptyList()
     ): String {
+        val contentJson = if (tools.isEmpty()) {
+            ""
+        } else {
+            val blocks = tools.mapIndexed { index, name ->
+                """{"type":"tool_use","id":"tool-$messageId-$index","name":"$name","input":{}}"""
+            }
+            """"content":[${blocks.joinToString(",")}],"""
+        }
         return """{"type":"assistant","uuid":"uuid-$messageId","sessionId":"$sessionId",""" +
             """"timestamp":"$timestamp","cwd":"/workspace/usage-monitor","gitBranch":"main",""" +
             """"version":"2.1.226","isSidechain":$isSidechain,""" +
-            """"message":{"id":"$messageId","model":"$model","stop_reason":"end_turn","usage":{""" +
+            """"message":{"id":"$messageId","model":"$model","stop_reason":"end_turn",$contentJson"usage":{""" +
             """"input_tokens":$inputTokens,"output_tokens":$outputTokens,""" +
             """"cache_read_input_tokens":$cacheReadTokens,""" +
             """"cache_creation_input_tokens":${cacheWrite5mTokens + cacheWrite1hTokens},""" +

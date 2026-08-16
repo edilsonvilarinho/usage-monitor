@@ -222,6 +222,30 @@ internal object BreakdownLabels {
         }
     }
 
+    fun byTool(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Ferramentas mais usadas" else "Most used tools"
+    }
+
+    fun toolSubtitle(callCount: Int, turnCount: Int, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "$callCount chamadas em $turnCount turnos"
+        } else {
+            "$callCount calls across $turnCount turns"
+        }
+    }
+
+    /**
+     * A ferramenta não carrega custo: o turno gastou tokens uma vez, mesmo tendo
+     * chamado duas. Sem este aviso a seção seria lida como rateio de gasto.
+     */
+    fun toolNotice(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Contagem de chamadas, não de custo — um turno que chama duas ferramentas gastou tokens uma vez só."
+        } else {
+            "Call counts, not cost — a turn calling two tools spent tokens only once."
+        }
+    }
+
     fun activityTitle(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Atividade por hora" else "Activity by hour"
     }

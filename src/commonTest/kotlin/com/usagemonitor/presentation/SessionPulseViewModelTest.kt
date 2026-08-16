@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIngestPayload
@@ -309,6 +310,13 @@ private class FakePulseCliRepository(
         profileId: String?,
         sinceEpochMillis: Long
     ): Result<List<CliHourlyUsageRow>> {
+        return Result.success(emptyList())
+    }
+
+    override suspend fun getToolUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<List<CliToolUsage>> {
         return Result.success(emptyList())
     }
 }

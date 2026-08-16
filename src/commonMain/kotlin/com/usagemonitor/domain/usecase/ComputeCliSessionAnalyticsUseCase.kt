@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.ModelPricingTable
+import com.usagemonitor.domain.entity.activeTimeMillisOf
 import com.usagemonitor.domain.entity.computeContextStatus
 
 /**
@@ -51,7 +52,10 @@ class ComputeCliSessionAnalyticsUseCase {
             cacheWrite5mPerTurn = mainTurns.map { turn -> turn.cacheWrite5mTokens },
             cacheWrite1hPerTurn = mainTurns.map { turn -> turn.cacheWrite1hTokens },
             cumulativeCostMicros = accumulate(turns) { turn -> turn.costMicros ?: 0L },
-            cumulativeSavingsMicros = accumulate(turns) { turn -> turn.cacheSavingsMicros ?: 0L }
+            cumulativeSavingsMicros = accumulate(turns) { turn -> turn.cacheSavingsMicros ?: 0L },
+            // Só a thread principal: o subagente roda em paralelo, e somar os
+            // intervalos dele contaria o mesmo tempo duas vezes.
+            activeTimeMillis = activeTimeMillisOf(mainTurns)
         )
     }
 

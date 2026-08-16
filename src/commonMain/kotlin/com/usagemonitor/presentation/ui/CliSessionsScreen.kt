@@ -843,6 +843,16 @@ internal fun SessionSummaryRow(
             help = GlossaryTerm.CONTEXT_WINDOW,
             language = language
         )
+        // Só aparece quando há intervalo para medir: numa sessão de um turno
+        // "0min" seria lido como sessão instantânea, e não como não medida.
+        if (analytics.activeTimeMillis > 0L) {
+            MetricCard(
+                label = CliSessionsLabels.activeTime(language),
+                value = formatActiveTime(analytics.activeTimeMillis),
+                accent = OUTPUT_COLOR,
+                language = language
+            )
+        }
     }
 }
 

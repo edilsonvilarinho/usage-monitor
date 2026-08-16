@@ -29,6 +29,10 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
   branch, com ranking por custo e economia agregada do cache.
 - Ritmo de queima em USD/h e tokens/h da janela corrente, com projecao de
   fechamento, e grade de atividade dia da semana x hora (BRT).
+- Ranking das ferramentas mais chamadas na janela (Read, Bash, Edit...), por
+  contagem de chamadas.
+- Tempo ativo por sessao, descartando as pausas maiores que cinco minutos entre
+  turnos.
 - Exportacao de sessoes e do resumo em CSV ou JSON, seguindo a aba aberta e a
   janela escolhida.
 - Orcamento mensal em USD com barra de consumo e projecao de fechamento. Os
