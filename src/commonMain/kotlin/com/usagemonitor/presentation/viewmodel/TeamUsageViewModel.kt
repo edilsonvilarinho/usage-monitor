@@ -11,6 +11,7 @@ import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
+import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import kotlinx.coroutines.CoroutineDispatcher
@@ -57,6 +58,11 @@ class TeamUsageViewModel(
      * administração, onde a janela só existe por conta.
      */
     private val getAdminOverview: GetAdminTeamOverviewUseCase? = null,
+    /**
+     * Tendência diária. `null` esconde o gráfico — instalação sem ele continua
+     * funcionando, mesmo tratamento dos demais recursos opcionais do time.
+     */
+    private val getTeamUsageTrend: GetTeamUsageTrendUseCase? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
     private val clock: Clock = Clock.System,
@@ -67,6 +73,7 @@ class TeamUsageViewModel(
     private var loadJob: Job? = null
     private var detailJob: Job? = null
     private var liveJob: Job? = null
+    private var trendJob: Job? = null
 
     /** Evita empilhar consultas quando a rede está mais lenta que o intervalo. */
     private val loadMutex = Mutex()
@@ -111,6 +118,7 @@ class TeamUsageViewModel(
 
         refresh()
         startLiveLoop()
+        startTrendLoad(accountKey)
     }
 
     /**
@@ -319,6 +327,7 @@ class TeamUsageViewModel(
         loadJob?.cancel()
         detailJob?.cancel()
         liveJob?.cancel()
+        trendJob?.cancel()
         viewModelScope.cancel()
     }
 
@@ -400,6 +409,24 @@ class TeamUsageViewModel(
         return current.members.firstOrNull { member -> member.memberKey == memberKey }
     }
 
+    /**
+     * Carrega a tendência uma vez por abertura, fora do laço ao vivo.
+     *
+     * A série é de dias: recarregá-la de cinco em cinco segundos seria uma
+     * consulta ao servidor por tique para redesenhar exatamente o mesmo gráfico.
+     * Falha ou rota ausente deixam o gráfico de fora, sem erro na tela — o
+     * consumo do time, que é a informação principal, continua.
+     */
+    private fun startTrendLoad(accountKey: String) {
+        val useCase = getTeamUsageTrend ?: return
+        trendJob?.cancel()
+        trendJob = viewModelScope.launch {
+            val trend = useCase(accountKey).getOrNull() ?: return@launch
+            val current = _uiState.value as? TeamUsageUiState.Success ?: return@launch
+            _uiState.value = current.copy(trend = trend)
+        }
+    }
+
     private suspend fun loadTeam() {
         loadMutex.withLock {
             val current = _uiState.value as? TeamUsageUiState.Success
@@ -441,7 +468,8 @@ class TeamUsageViewModel(
                         // de 5s fecharia o painel na cara de quem está lendo.
                         detail = current?.detail,
                         advancedExpanded = current?.advancedExpanded ?: false,
-                        glossaryExpanded = current?.glossaryExpanded ?: false
+                        glossaryExpanded = current?.glossaryExpanded ?: false,
+                        trend = current?.trend
                     )
                 },
                 onFailure = { error ->

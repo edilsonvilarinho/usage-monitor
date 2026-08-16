@@ -10,6 +10,7 @@ import com.usagemonitor.data.dto.TeamKeyDto
 import com.usagemonitor.data.dto.TeamKeyListDto
 import com.usagemonitor.data.dto.TeamOverviewDto
 import com.usagemonitor.data.dto.TeamPresenceRequestDto
+import com.usagemonitor.data.dto.TeamTrendResponseDto
 import com.usagemonitor.data.dto.TeamPresenceResponseDto
 import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
@@ -114,6 +115,31 @@ open class RemoteTeamDataSource(
                 parameter("sessionId", sessionId)
             },
             operation = "leitura da sessão do time"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `GET /api/v1/team/trend`. Série diária da conta.
+     *
+     * Existe a partir da versão 0.6.0 do servidor. Contra um servidor mais antigo
+     * a rota não existe e a resposta é `404` — quem chama trata isso como
+     * "sem tendência disponível", não como falha.
+     */
+    open suspend fun fetchTeamTrend(
+        baseUrl: String,
+        credential: TeamCredential,
+        accountKey: String,
+        days: Int
+    ): TeamTrendResponseDto {
+        val response = requireSuccess(
+            response = httpClient.get("$baseUrl/api/v1/team/trend") {
+                authenticate(credential)
+                parameter("accountKey", accountKey)
+                parameter("days", days)
+            },
+            operation = "leitura da tendência do time"
         )
 
         return response.body()

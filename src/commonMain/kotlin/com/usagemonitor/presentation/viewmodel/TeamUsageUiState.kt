@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.entity.worstHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
@@ -81,7 +82,16 @@ sealed interface TeamUsageUiState {
         /** Bloco Avançado do detalhe. Mesmo tratamento de [detail]. */
         val advancedExpanded: Boolean = false,
         /** Painel "Como ler esta tela". Mesmo tratamento de [detail]. */
-        val glossaryExpanded: Boolean = false
+        val glossaryExpanded: Boolean = false,
+        /**
+         * Tendência diária da conta.
+         *
+         * `null` significa **indisponível**, não vazia: servidor anterior à rota
+         * ou visão global, onde uma série por conta não caberia num gráfico só.
+         * Mesmo tratamento de [detail]: mora no estado e é carregada do valor
+         * anterior a cada tique.
+         */
+        val trend: TeamUsageTrend? = null
     ) : TeamUsageUiState {
 
         val totalTokens: Long

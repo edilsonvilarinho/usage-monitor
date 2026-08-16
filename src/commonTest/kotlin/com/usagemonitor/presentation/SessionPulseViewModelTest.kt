@@ -17,6 +17,7 @@ import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.repository.TeamUsageTrendData
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
@@ -358,5 +359,9 @@ private class FakePulseTeamRepository(
 
     override suspend fun checkConnection(): Result<Unit> {
         return Result.success(Unit)
+    }
+
+    override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
+        return Result.success(null)
     }
 }

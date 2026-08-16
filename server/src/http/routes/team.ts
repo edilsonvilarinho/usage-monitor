@@ -5,7 +5,12 @@ import type { TeamKeyRepository } from '../../repositories/teamKeyRepository.js'
 import type { TeamRepository } from '../../repositories/teamRepository.js';
 import { logger } from '../../logger.js';
 import { requireTeamAccess, type AccessDeps } from '../access.js';
-import { deleteMemberQuerySchema, sessionQuerySchema, teamQuerySchema } from '../dto.js';
+import {
+  deleteMemberQuerySchema,
+  sessionQuerySchema,
+  teamQuerySchema,
+  trendQuerySchema,
+} from '../dto.js';
 import { wrap } from '../errorHandler.js';
 
 export interface TeamRouterDeps {
@@ -14,6 +19,11 @@ export interface TeamRouterDeps {
   keyRepository: TeamKeyRepository;
   now: () => number;
 }
+
+/** Janela padrao da serie diaria: um mes cobre a leitura tipica sem inchar. */
+const DEFAULT_TREND_DAYS = 30;
+
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1_000;
 
 /** A conta alvo destas rotas vem sempre da query. */
 const accountFromQuery = (req: { query: Record<string, unknown> }): unknown => req.query.accountKey;
@@ -47,6 +57,38 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
         );
 
         res.json(snapshot);
+      }),
+    ),
+  );
+
+  /**
+   * Serie diaria da conta, para a tendencia do time.
+   *
+   * Mesma familia de leitura de `/v1/team`: o acesso passa pelo mesmo
+   * `requireTeamAccess` com a conta na query, e nenhum `GET` reivindica conta.
+   *
+   * Devolve linhas cruas por `(maquina, dia, modelo)` — o servidor continua sem
+   * precificar nada, e o cliente aplica a propria tabela de precos, como ja faz
+   * com `/v1/team` e `/v1/session`.
+   */
+  router.get(
+    '/v1/team/trend',
+    requireTeamAccess(
+      access,
+      accountFromQuery,
+      wrap((req, res) => {
+        const parsed = trendQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+          const first = parsed.error.issues[0];
+          throw new ValidationError(
+            `Query invalida — ${first ? `${first.path.join('.')}: ${first.message}` : 'parametros ausentes'}`,
+          );
+        }
+
+        const days = parsed.data.days ?? DEFAULT_TREND_DAYS;
+        const since = deps.now() - days * MILLIS_PER_DAY;
+
+        res.json(deps.repository.readTrend(parsed.data.accountKey, since));
       }),
     ),
   );

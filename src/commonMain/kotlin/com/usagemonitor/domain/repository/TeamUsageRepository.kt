@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.TeamPresenceReceipt
+import com.usagemonitor.domain.entity.TeamTrendRow
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 
 /**
@@ -51,6 +52,20 @@ interface TeamUsageRepository {
     suspend fun fetch(accountKey: String, cutoffMillis: Long? = null): Result<TeamUsageSnapshot>
 
     /**
+     * Serie diaria dos ultimos [days] dias, para a tendencia do time.
+     *
+     * Devolve as linhas cruas por `(maquina, dia UTC, modelo)`: quem precifica e
+     * quem traduz o dia para o fuso local e o cliente, do mesmo jeito que faz
+     * com [fetch].
+     *
+     * Contra um servidor anterior a rota o `404` **nao** vira falha: a leitura
+     * devolve `null`, que a tela mostra como "tendencia indisponivel". Nem todo
+     * time atualiza servidor e app juntos. Falha de rede ou credencial continua
+     * vindo como `Result.failure`.
+     */
+    suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?>
+
+    /**
      * Detalhe de uma sessão de outra máquina, com os turnos crus.
      *
      * Sem recorte temporal, ao contrário de [fetch]: o detalhe é sempre a sessão
@@ -80,3 +95,9 @@ interface TeamUsageRepository {
     /** Valida URL e chave sem gravar nada, para o botão "Testar conexão". */
     suspend fun checkConnection(): Result<Unit>
 }
+
+/** Linhas cruas da tendencia com os integrantes que as nomeiam. */
+data class TeamUsageTrendData(
+    val members: List<TeamMemberIdentity> = emptyList(),
+    val rows: List<TeamTrendRow> = emptyList()
+)

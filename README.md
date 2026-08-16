@@ -31,6 +31,8 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
   fechamento, e grade de atividade dia da semana x hora (BRT).
 - Ranking das ferramentas mais chamadas na janela (Read, Bash, Edit...), por
   contagem de chamadas.
+- Tendencia diaria do time nos ultimos 30 dias, uma faixa por integrante e todas
+  na mesma escala (exige servidor 0.6.0+).
 - Tempo ativo por sessao, descartando as pausas maiores que cinco minutos entre
   turnos.
 - Exportacao de sessoes e do resumo em CSV ou JSON, seguindo a aba aberta e a

@@ -71,6 +71,30 @@ export interface TeamUsageRow {
   cacheWrite1hTokens: number;
 }
 
+/**
+ * Um dia de consumo de uma maquina, ja agrupado por modelo.
+ *
+ * O bucket e o dia **UTC**: o servidor nao conhece o fuso de quem consulta, e
+ * agrupar num fuso arbitrario daria um grafico deslocado para metade do time. O
+ * cliente traduz, do mesmo jeito que faz com a grade de atividade local.
+ */
+export interface TeamTrendRow {
+  deviceId: string;
+  dayStartMillis: number;
+  model: string | null;
+  turnCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWrite5mTokens: number;
+  cacheWrite1hTokens: number;
+}
+
+export interface TeamTrend {
+  members: TeamMemberRow[];
+  rows: TeamTrendRow[];
+}
+
 export interface TeamSnapshot {
   members: TeamMemberRow[];
   rows: TeamUsageRow[];
@@ -215,6 +239,37 @@ ORDER BY alias COLLATE NOCASE ASC
  * por sessao e aplica a tabela de precos e o cliente, para que o custo do modal
  * de time acompanhe a tabela do app sem duplica-la aqui.
  */
+/**
+ * Consumo por maquina, dia (UTC) e modelo.
+ *
+ * O dia sai da divisao inteira do `ts` por 86.400.000 — a mesma tecnica da grade
+ * local, e pela mesma razao: quem traduz para o fuso de apresentacao e o
+ * cliente. O indice `idx_team_turns_window` cobre o recorte.
+ *
+ * A maquina vem de `team_sessions`: `team_turns` nao guarda `device_id`, e o
+ * vinculo turno -> maquina passa sempre pela sessao.
+ */
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1_000;
+
+const SELECT_TREND_SQL = `
+SELECT s.device_id AS deviceId,
+       (t.ts / 86400000) AS dayBucket,
+       t.model AS model,
+       COUNT(*) AS turnCount,
+       SUM(t.input_tokens) AS inputTokens,
+       SUM(t.output_tokens) AS outputTokens,
+       SUM(t.cache_read_tokens) AS cacheReadTokens,
+       SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+FROM team_turns t
+JOIN team_sessions s
+  ON s.account_key = t.account_key AND s.session_id = t.session_id
+WHERE t.account_key = @accountKey
+  AND t.ts >= @since
+GROUP BY s.device_id, dayBucket, t.model
+ORDER BY dayBucket ASC, deviceId ASC
+`;
+
 const SELECT_USAGE_SQL = `
 SELECT s.device_id AS deviceId,
        t.session_id AS sessionId,
@@ -522,6 +577,27 @@ export class TeamRepository {
   readTeam(accountKey: string, since: number | null): TeamSnapshot {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
     const rows = this.db.prepare(SELECT_USAGE_SQL).all({ accountKey, since }) as TeamUsageRow[];
+    return { members, rows };
+  }
+
+  /**
+   * Serie diaria de uma conta a partir de `since`.
+   *
+   * Os integrantes vem junto para a tela nomear as linhas sem uma segunda
+   * chamada — e para uma maquina que existe mas nao consumiu no periodo
+   * aparecer com serie vazia, em vez de sumir.
+   */
+  readTrend(accountKey: string, since: number): TeamTrend {
+    const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
+    const raw = this.db.prepare(SELECT_TREND_SQL).all({ accountKey, since }) as Array<
+      Omit<TeamTrendRow, 'dayStartMillis'> & { dayBucket: number }
+    >;
+
+    const rows = raw.map(({ dayBucket, ...rest }) => ({
+      ...rest,
+      dayStartMillis: dayBucket * MILLIS_PER_DAY,
+    }));
+
     return { members, rows };
   }
 

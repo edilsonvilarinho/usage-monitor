@@ -142,6 +142,18 @@ export const updateKeyBodySchema = z
  * sempre `(conta, maquina)`, como no resto da API. Sem ele a rota responderia a
  * sessao de outra maquina da mesma conta a partir do id sozinho.
  */
+/**
+ * Janela da serie diaria, em dias.
+ *
+ * O teto existe porque a resposta cresce com dias x maquinas x modelos, e um
+ * `days=100000` viraria uma varredura da tabela inteira a pedido de qualquer
+ * portador de chave.
+ */
+export const trendQuerySchema = z.object({
+  accountKey: z.string().min(1).max(TEXT_MAX),
+  days: z.coerce.number().int().positive().max(365).optional(),
+});
+
 export const sessionQuerySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
   sessionId: z.string().min(1).max(TEXT_MAX),
