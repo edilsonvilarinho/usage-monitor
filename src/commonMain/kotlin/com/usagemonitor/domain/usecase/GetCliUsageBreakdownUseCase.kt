@@ -1,13 +1,19 @@
 package com.usagemonitor.domain.usecase
 
+import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.burnRateOf
+import com.usagemonitor.domain.entity.toActivityHeatmap
 import com.usagemonitor.domain.repository.CliSessionRepository
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 /**
- * Consumo da janela recortado por projeto, branch e modelo.
+ * Consumo da janela recortado por projeto, branch e modelo, com a grade de
+ * atividade por hora e o ritmo de queima.
  *
  * Não sincroniza o índice: quem abre o resumo já veio da lista de sessões, que
  * sincroniza a cada carga e a cada tique do laço ao vivo. Uma segunda varredura
@@ -19,14 +25,40 @@ import kotlinx.datetime.Clock
  */
 class GetCliUsageBreakdownUseCase(
     private val repository: CliSessionRepository,
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    private val timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
 ) {
     suspend operator fun invoke(
         profileId: String? = null,
         range: CliSessionRange = CliSessionRange.DEFAULT,
         windows: CliQuotaWindows = CliQuotaWindows()
     ): Result<CliUsageBreakdown> {
-        val window = range.resolve(clock.now(), windows)
-        return repository.getUsageBreakdown(profileId, window.cutoffMillis ?: 0L)
+        val now = clock.now()
+        val window = range.resolve(now, windows)
+        val cutoffMillis = window.cutoffMillis ?: 0L
+
+        val breakdown = repository.getUsageBreakdown(profileId, cutoffMillis).getOrElse { error ->
+            return Result.failure(error)
+        }
+
+        // A grade é acessória: uma falha nela não pode derrubar o resumo inteiro,
+        // que é a informação principal da aba.
+        val heatmap = repository.getHourlyUsage(profileId, cutoffMillis)
+            .map { rows -> rows.toActivityHeatmap(timeZone) }
+            .getOrNull()
+
+        val burnRate = burnRateOf(
+            totals = breakdown.totals,
+            windowStart = window.cutoffMillis?.let { millis -> Instant.fromEpochMilliseconds(millis) },
+            now = now,
+            windowEndsAt = window.endsAt
+        )
+
+        return Result.success(
+            breakdown.copy(
+                heatmap = heatmap ?: breakdown.heatmap,
+                burnRate = burnRate
+            )
+        )
     }
 }

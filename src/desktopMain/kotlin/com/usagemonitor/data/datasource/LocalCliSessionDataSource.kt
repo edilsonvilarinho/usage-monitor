@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
@@ -160,6 +161,39 @@ class LocalCliSessionDataSource(
                                         sessionId = rows.getString("session_id"),
                                         cwd = rows.getString("cwd"),
                                         gitBranch = rows.getString("git_branch"),
+                                        model = rows.getString("model"),
+                                        turnCount = rows.getInt("turn_count"),
+                                        inputTokens = rows.getLong("input_tokens"),
+                                        outputTokens = rows.getLong("output_tokens"),
+                                        cacheReadTokens = rows.getLong("cache_read_tokens"),
+                                        cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
+                                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override suspend fun readHourlyUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): List<CliHourlyUsageRow> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(SELECT_HOURLY_USAGE_SQL).use { statement ->
+                    statement.setLong(1, sinceEpochMillis)
+                    statement.setInt(2, if (profileId == null) 1 else 0)
+                    statement.setString(3, profileId)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                add(
+                                    CliHourlyUsageRow(
+                                        hourStartMillis = rows.getLong("hour_bucket") * MILLIS_PER_HOUR,
                                         model = rows.getString("model"),
                                         turnCount = rows.getInt("turn_count"),
                                         inputTokens = rows.getLong("input_tokens"),
@@ -1034,6 +1068,32 @@ class LocalCliSessionDataSource(
             WHERE t.ts >= ?
               AND (? = 1 OR s.profile_id = ?)
             GROUP BY t.session_id, t.model;
+        """
+
+        /** Uma hora em millis; o `hour_bucket` da grade é `ts` dividido por ela. */
+        private const val MILLIS_PER_HOUR = 3_600_000L
+
+        /**
+         * Turnos por hora cheia e modelo.
+         *
+         * O bucket é UTC — a divisão inteira do `ts` — e quem o traduz para hora
+         * local é o domain. Trinta dias produzem no máximo 720 horas × modelos
+         * distintos, então a lista cabe folgada na memória.
+         */
+        private val SELECT_HOURLY_USAGE_SQL = """
+            SELECT t.ts / $MILLIS_PER_HOUR AS hour_bucket,
+                   t.model AS model,
+                   COUNT(*) AS turn_count,
+                   SUM(t.input_tokens) AS input_tokens,
+                   SUM(t.output_tokens) AS output_tokens,
+                   SUM(t.cache_read_tokens) AS cache_read_tokens,
+                   SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
+                   SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+            FROM cli_turns t
+            JOIN cli_sessions s ON s.session_id = t.session_id
+            WHERE t.ts >= ?
+              AND (? = 1 OR s.profile_id = ?)
+            GROUP BY hour_bucket, t.model;
         """
 
         /**

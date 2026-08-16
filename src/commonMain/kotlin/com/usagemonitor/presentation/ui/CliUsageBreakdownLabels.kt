@@ -113,6 +113,66 @@ internal object BreakdownLabels {
         }
     }
 
+    fun burnRateTitle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Ritmo de queima" else "Burn rate"
+    }
+
+    /**
+     * Ritmo em dinheiro e tokens por hora.
+     *
+     * Diferente do consumo médio do histórico, que mede **percentual de quota**
+     * sobre snapshots. As duas convivem e o rótulo precisa separá-las.
+     */
+    fun burnRateValue(costMicrosPerHour: Long, tokensPerHour: Double, language: AppLanguage): String {
+        val cost = formatMicrosUsdShort(costMicrosPerHour)
+        val tokens = formatQuantity(tokensPerHour.toLong())
+        return if (language == AppLanguage.PT) {
+            "$cost/h · $tokens tokens/h"
+        } else {
+            "$cost/h · $tokens tokens/h"
+        }
+    }
+
+    fun burnRateElapsed(elapsedMillis: Long, language: AppLanguage): String {
+        val minutes = elapsedMillis / 60_000L
+        val hours = minutes / 60L
+        val remainingMinutes = minutes % 60L
+        val elapsed = if (hours > 0L) "${hours}h${remainingMinutes.toString().padStart(2, '0')}" else "${minutes}min"
+        return if (language == AppLanguage.PT) {
+            "Medido sobre $elapsed decorridos da janela, não sobre a duração nominal dela."
+        } else {
+            "Measured over $elapsed elapsed in the window, not over its nominal length."
+        }
+    }
+
+    fun burnRateProjection(projectedMicros: Long, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Mantido o ritmo, a janela fecha em ${formatMicrosUsdShort(projectedMicros)}."
+        } else {
+            "At this pace, the window closes at ${formatMicrosUsdShort(projectedMicros)}."
+        }
+    }
+
+    fun burnRateUnavailable(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Ritmo indisponível: a janela é aberta ou começou há pouco."
+        } else {
+            "Burn rate unavailable: the window is open-ended or just started."
+        }
+    }
+
+    fun activityTitle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Atividade por hora" else "Activity by hour"
+    }
+
+    fun activityNotice(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Intensidade pelo custo da célula, relativa ao pico desta janela. Horário BRT."
+        } else {
+            "Intensity by cell cost, relative to this window's peak. BRT time."
+        }
+    }
+
     fun staleNotice(errorMessage: String, language: AppLanguage): String {
         return if (language == AppLanguage.PT) {
             "Última leitura falhou; os números são da anterior. $errorMessage"

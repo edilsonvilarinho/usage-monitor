@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
@@ -302,6 +303,13 @@ private class FakePulseCliRepository(
         sinceEpochMillis: Long
     ): Result<CliUsageBreakdown> {
         return Result.success(CliUsageBreakdown())
+    }
+
+    override suspend fun getHourlyUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<List<CliHourlyUsageRow>> {
+        return Result.success(emptyList())
     }
 }
 

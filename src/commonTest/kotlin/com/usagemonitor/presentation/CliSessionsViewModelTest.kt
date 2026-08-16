@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
@@ -869,6 +870,7 @@ private class FakeCliSessionRepository(
     var lastProfileId: String? = null
 
     var breakdownResult: Result<CliUsageBreakdown> = Result.success(CliUsageBreakdown())
+    var hourlyResult: Result<List<CliHourlyUsageRow>> = Result.success(emptyList())
     var breakdownCalls: Int = 0
     var lastBreakdownSinceEpochMillis: Long? = null
 
@@ -903,5 +905,12 @@ private class FakeCliSessionRepository(
         breakdownCalls++
         lastBreakdownSinceEpochMillis = sinceEpochMillis
         return breakdownResult
+    }
+
+    override suspend fun getHourlyUsage(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<List<CliHourlyUsageRow>> {
+        return hourlyResult
     }
 }

@@ -3,6 +3,7 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 
 /**
@@ -42,4 +43,15 @@ interface CliSessionDataSource {
         profileId: String? = null,
         sinceEpochMillis: Long = 0L
     ): List<CliUsageGroupRow>
+
+    /**
+     * Turnos somados por hora cheia (UTC) e modelo, para a grade de atividade.
+     *
+     * A conversão para hora local fica no domain: o SQLite agrupa em UTC e a
+     * grade sairia deslocada.
+     */
+    suspend fun readHourlyUsage(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): List<CliHourlyUsageRow>
 }

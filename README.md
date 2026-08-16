@@ -27,6 +27,8 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Sinalizador semaforo de risco de overage nos cards de uso.
 - Aba Resumo nas Sessoes CLI: consumo da janela por projeto, por modelo e por
   branch, com ranking por custo e economia agregada do cache.
+- Ritmo de queima em USD/h e tokens/h da janela corrente, com projecao de
+  fechamento, e grade de atividade dia da semana x hora (BRT).
 - Icone na bandeja do sistema com ponto de risco e notificacao nativa quando uma
   cota cruza um limiar (75/90/100 por padrao) ou uma sessao CLI satura. Limiares,
   alerta de sessao e periodo de silencio configuraveis em Configuracoes > Alertas.

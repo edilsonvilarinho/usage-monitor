@@ -814,6 +814,52 @@ class LocalCliSessionDataSourceTest {
         }
     }
 
+    /**
+     * O bucket sai em UTC de propósito: quem traduz para hora local é o domain,
+     * porque o SQLite deslocaria a grade em três horas.
+     */
+    @Test
+    fun `hourly usage buckets turns by whole utc hour`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:05:00Z", outputTokens = 100L),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:55:00Z", outputTokens = 200L),
+                assistantLine("session-a", "msg-3", "2026-08-01T11:05:00Z", outputTokens = 300L)
+            )
+            dataSource.syncIndex()
+
+            val hourly = dataSource.readHourlyUsage().sortedBy { row -> row.hourStartMillis }
+
+            assertEquals(2, hourly.size)
+            assertEquals(epochMillis("2026-08-01T10:00:00Z"), hourly[0].hourStartMillis)
+            assertEquals(2, hourly[0].turnCount)
+            assertEquals(300L, hourly[0].outputTokens)
+            assertEquals(epochMillis("2026-08-01T11:00:00Z"), hourly[1].hourStartMillis)
+            assertEquals(1, hourly[1].turnCount)
+        }
+    }
+
+    @Test
+    fun `hourly usage splits the same hour by model`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:05:00Z", model = "claude-opus-5"),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:15:00Z", model = "claude-haiku-4-5")
+            )
+            dataSource.syncIndex()
+
+            val hourly = dataSource.readHourlyUsage()
+
+            assertEquals(2, hourly.size)
+            assertTrue(hourly.all { row -> row.hourStartMillis == epochMillis("2026-08-01T10:00:00Z") })
+            assertEquals(setOf("claude-opus-5", "claude-haiku-4-5"), hourly.mapNotNull { row -> row.model }.toSet())
+        }
+    }
+
     @Test
     fun `usage groups honour the profile filter`() = runTest {
         withFixture { root, dataSource ->

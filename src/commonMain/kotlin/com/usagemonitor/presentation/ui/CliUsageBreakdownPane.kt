@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
+import com.usagemonitor.presentation.ui.components.ActivityHeatmapGrid
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -73,6 +74,10 @@ internal fun CliUsageBreakdownPane(
                 BreakdownTotalsCard(breakdown = breakdown, language = language)
             }
 
+            item {
+                BurnRateCard(breakdown = breakdown, language = language)
+            }
+
             if (errorMessage != null) {
                 item {
                     // O resumo anterior continua na tela: a mensagem diz que a
@@ -105,6 +110,12 @@ internal fun CliUsageBreakdownPane(
                 accent = OUTPUT_COLOR,
                 language = language
             )
+
+            if (!breakdown.heatmap.isEmpty) {
+                item(key = "activity") {
+                    ActivityCard(breakdown = breakdown, language = language)
+                }
+            }
         }
 
         VerticalScrollbar(
@@ -193,6 +204,86 @@ private fun BreakdownTotalsCard(breakdown: CliUsageBreakdown, language: AppLangu
         }
         Text(
             text = BreakdownLabels.axisNotice(language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun BurnRateCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
+    val burnRate = breakdown.burnRate
+
+    DepthSurface(
+        accent = OUTPUT_COLOR,
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapes.medium,
+        elevation = AppElevation.card,
+        contentPadding = 12.dp
+    ) {
+        Text(
+            text = BreakdownLabels.burnRateTitle(language),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = OUTPUT_COLOR
+        )
+
+        if (burnRate == null) {
+            Text(
+                text = BreakdownLabels.burnRateUnavailable(language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            return@DepthSurface
+        }
+
+        Text(
+            text = BreakdownLabels.burnRateValue(
+                costMicrosPerHour = burnRate.costMicrosPerHour,
+                tokensPerHour = burnRate.tokensPerHour,
+                language = language
+            ),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (burnRate.projectedCostMicros != null) {
+            Text(
+                text = BreakdownLabels.burnRateProjection(burnRate.projectedCostMicros, language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            text = BreakdownLabels.burnRateElapsed(burnRate.elapsedMillis, language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun ActivityCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
+    DepthSurface(
+        accent = CACHE_READ_COLOR,
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapes.medium,
+        elevation = AppElevation.card,
+        contentPadding = 12.dp
+    ) {
+        Text(
+            text = BreakdownLabels.activityTitle(language),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = CACHE_READ_COLOR
+        )
+        ActivityHeatmapGrid(
+            heatmap = breakdown.heatmap,
+            accent = CACHE_READ_COLOR,
+            language = language,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = BreakdownLabels.activityNotice(language),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

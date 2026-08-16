@@ -75,7 +75,11 @@ data class CliUsageBreakdown(
     val byProject: List<CliUsageBucket> = emptyList(),
     val byBranch: List<CliUsageBucket> = emptyList(),
     val byModel: List<CliUsageBucket> = emptyList(),
-    val totals: CliUsageBucket = CliUsageBucket()
+    val totals: CliUsageBucket = CliUsageBucket(),
+    /** Mesma janela vista por hora local; vazio quando não foi lida. */
+    val heatmap: CliActivityHeatmap = CliActivityHeatmap(),
+    /** Ritmo dentro da janela; `null` sem janela ou sem tempo decorrido bastante. */
+    val burnRate: CliBurnRate? = null
 ) {
     val isEmpty: Boolean
         get() = totals.turnCount == 0
