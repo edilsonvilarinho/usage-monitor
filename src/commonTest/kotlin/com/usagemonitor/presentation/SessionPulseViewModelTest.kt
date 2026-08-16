@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -294,6 +295,13 @@ private class FakePulseCliRepository(
 
     override suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?> {
         return Result.success(null)
+    }
+
+    override suspend fun getUsageBreakdown(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<CliUsageBreakdown> {
+        return Result.success(CliUsageBreakdown())
     }
 }
 

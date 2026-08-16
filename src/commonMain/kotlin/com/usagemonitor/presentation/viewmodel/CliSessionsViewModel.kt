@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +42,11 @@ class CliSessionsViewModel(
     private val getCliSessions: GetCliSessionsUseCase,
     private val getCliSessionDetail: GetCliSessionDetailUseCase,
     private val syncCliSessionIndex: SyncCliSessionIndexUseCase,
+    /**
+     * Resumo por eixo. `null` esconde a aba — instalação sem ele continua
+     * funcionando, mesmo tratamento dos recursos opcionais do time.
+     */
+    private val getCliUsageBreakdown: GetCliUsageBreakdownUseCase? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     autoLoad: Boolean = true,
     private val backgroundIndexIntervalMillis: Long? = null,
@@ -52,6 +58,7 @@ class CliSessionsViewModel(
     private var loadJob: Job? = null
     private var detailJob: Job? = null
     private var liveJob: Job? = null
+    private var breakdownJob: Job? = null
 
     /**
      * O laço de background e o ao vivo podem cair no mesmo instante. A conexão do
@@ -116,6 +123,7 @@ class CliSessionsViewModel(
         this.quotaWindows = quotaWindows
         if (range == CliSessionRange.LAST_5H || range == CliSessionRange.LAST_7D) {
             refresh()
+            refreshBreakdownIfVisible()
         }
     }
 
@@ -130,6 +138,40 @@ class CliSessionsViewModel(
     fun setRange(range: CliSessionRange) {
         this.range = range
         refresh()
+        // O resumo descreve a mesma janela: deixá-lo para trás mostraria dois
+        // recortes diferentes na mesma tela.
+        refreshBreakdownIfVisible()
+    }
+
+    /**
+     * Troca de aba.
+     *
+     * Ao abrir o resumo, carrega-o na hora: o laço ao vivo levaria segundos e a
+     * aba abriria vazia. A escolha vale para a janela toda, como os blocos
+     * recolhíveis do detalhe.
+     */
+    fun setView(view: CliSessionsView) {
+        val current = _uiState.value
+        if (current !is CliSessionsUiState.Success || current.view == view) {
+            return
+        }
+        _uiState.value = current.copy(view = view)
+        if (view == CliSessionsView.BREAKDOWN) {
+            startBreakdownLoad()
+        }
+    }
+
+    private fun refreshBreakdownIfVisible() {
+        if ((_uiState.value as? CliSessionsUiState.Success)?.view == CliSessionsView.BREAKDOWN) {
+            startBreakdownLoad()
+        }
+    }
+
+    private fun startBreakdownLoad() {
+        breakdownJob?.cancel()
+        breakdownJob = viewModelScope.launch {
+            loadBreakdown()
+        }
     }
 
     fun openSession(sessionId: String) {
@@ -179,7 +221,33 @@ class CliSessionsViewModel(
         loadJob?.cancel()
         detailJob?.cancel()
         liveJob?.cancel()
+        breakdownJob?.cancel()
         viewModelScope.cancel()
+    }
+
+    /**
+     * Recarrega o resumo no lugar.
+     *
+     * Falha **mantém** o resumo anterior e publica só a mensagem: apagar os
+     * números por causa de uma leitura ruim tiraria da tela o que o usuário está
+     * lendo. `internal` para o teste dispensar o laço.
+     */
+    internal suspend fun loadBreakdown() {
+        val useCase = getCliUsageBreakdown ?: return
+        if (_uiState.value !is CliSessionsUiState.Success) {
+            return
+        }
+
+        useCase(profileId = profileId, range = range, windows = quotaWindows).fold(
+            onSuccess = { breakdown ->
+                val latest = _uiState.value as? CliSessionsUiState.Success ?: return
+                _uiState.value = latest.copy(breakdown = breakdown, breakdownError = null)
+            },
+            onFailure = { error ->
+                val latest = _uiState.value as? CliSessionsUiState.Success ?: return
+                _uiState.value = latest.copy(breakdownError = error.message ?: UNKNOWN_ERROR_MESSAGE)
+            }
+        )
     }
 
     /**
@@ -213,6 +281,12 @@ class CliSessionsViewModel(
                 syncIndexOnce()
                 loadSessions()
                 reloadOpenDetail()
+                // Só com a aba aberta: recalcular o resumo que ninguém está
+                // vendo custaria um `GROUP BY` sobre a tabela de turnos a cada
+                // cinco segundos.
+                if ((_uiState.value as? CliSessionsUiState.Success)?.view == CliSessionsView.BREAKDOWN) {
+                    loadBreakdown()
+                }
             }
         }
     }
@@ -249,7 +323,12 @@ class CliSessionsViewModel(
                     // Estado da UI, não do índice: sem carregá-lo daqui os blocos
                     // recolhíveis se fechariam sozinhos a cada tique do laço ao vivo.
                     advancedExpanded = current?.advancedExpanded ?: false,
-                    glossaryExpanded = current?.glossaryExpanded ?: false
+                    glossaryExpanded = current?.glossaryExpanded ?: false,
+                    // Mesma razão: sem carregar a aba e o resumo daqui, a tela
+                    // voltaria para a lista sozinha a cada tique.
+                    view = current?.view ?: CliSessionsView.SESSIONS,
+                    breakdown = current?.breakdown,
+                    breakdownError = current?.breakdownError
                 )
             },
             onFailure = { error ->

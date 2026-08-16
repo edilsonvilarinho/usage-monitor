@@ -760,6 +760,75 @@ class LocalCliSessionDataSourceTest {
         }
     }
 
+    @Test
+    fun `usage groups carry project branch and model`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", model = "claude-opus-5", outputTokens = 100L),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:05:00Z", model = "claude-haiku-4-5", outputTokens = 200L)
+            )
+            dataSource.syncIndex()
+
+            val groups = dataSource.readUsageGroups()
+
+            assertEquals(2, groups.size)
+            assertEquals(setOf("claude-opus-5", "claude-haiku-4-5"), groups.mapNotNull { row -> row.model }.toSet())
+            assertTrue(groups.all { row -> row.sessionId == "session-a" })
+            assertTrue(groups.all { row -> row.cwd == "/workspace/usage-monitor" })
+            assertTrue(groups.all { row -> row.gitBranch == "main" })
+            assertEquals(300L, groups.sumOf { row -> row.outputTokens })
+        }
+    }
+
+    /**
+     * O resumo e a lista partem das mesmas linhas: os totais têm de bater na
+     * mesma janela, ou a tela mostraria dois números para o mesmo recorte.
+     */
+    @Test
+    fun `usage groups match the windowed session totals`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L, cacheReadTokens = 5_000L),
+                assistantLine("session-a", "msg-2", "2026-08-01T12:00:00Z", outputTokens = 200L, cacheReadTokens = 7_000L)
+            )
+            writeTranscript(
+                root,
+                "session-b",
+                assistantLine("session-b", "msg-3", "2026-08-01T11:00:00Z", outputTokens = 50L)
+            )
+            dataSource.syncIndex()
+
+            val cutoff = epochMillis("2026-08-01T10:30:00Z")
+            val sessions = dataSource.readSessions(sinceEpochMillis = cutoff)
+            val groups = dataSource.readUsageGroups(sinceEpochMillis = cutoff)
+
+            assertEquals(sessions.sumOf { session -> session.totalTokens }, groups.sumOf { row ->
+                row.inputTokens + row.outputTokens + row.cacheReadTokens +
+                    row.cacheWrite5mTokens + row.cacheWrite1hTokens
+            })
+            assertEquals(sessions.sumOf { session -> session.turnCount }, groups.sumOf { row -> row.turnCount })
+        }
+    }
+
+    @Test
+    fun `usage groups honour the profile filter`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L)
+            )
+            dataSource.syncIndex()
+
+            assertEquals(1, dataSource.readUsageGroups(profileId = PROFILE_A).size)
+            assertTrue(dataSource.readUsageGroups(profileId = PROFILE_B).isEmpty())
+        }
+    }
+
     private suspend fun withFixture(block: suspend (File, LocalCliSessionDataSource) -> Unit) {
         val tempDir = createTempDirectory().toFile()
         val projectsRoot = File(tempDir, "projects").also { it.mkdirs() }

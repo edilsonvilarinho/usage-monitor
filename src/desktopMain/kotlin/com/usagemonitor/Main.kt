@@ -73,6 +73,7 @@ import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
@@ -453,6 +454,7 @@ fun main() = application {
             getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
             getCliSessionDetail = GetCliSessionDetailUseCase(cliSessionRepository),
             syncCliSessionIndex = syncCliSessionIndex,
+            getCliUsageBreakdown = GetCliUsageBreakdownUseCase(cliSessionRepository),
             autoLoad = false,
             backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS

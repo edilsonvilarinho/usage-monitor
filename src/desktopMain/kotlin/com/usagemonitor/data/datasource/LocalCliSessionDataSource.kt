@@ -6,6 +6,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ModelPricingTable
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
@@ -137,6 +138,41 @@ class LocalCliSessionDataSource(
                 } ?: return@useConnection null
 
                 CliSessionDetail(summary = summary, turns = readTurns(connection, sessionId))
+            }
+        }
+    }
+
+    override suspend fun readUsageGroups(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): List<CliUsageGroupRow> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(SELECT_USAGE_GROUPS_SQL).use { statement ->
+                    statement.setLong(1, sinceEpochMillis)
+                    statement.setInt(2, if (profileId == null) 1 else 0)
+                    statement.setString(3, profileId)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                add(
+                                    CliUsageGroupRow(
+                                        sessionId = rows.getString("session_id"),
+                                        cwd = rows.getString("cwd"),
+                                        gitBranch = rows.getString("git_branch"),
+                                        model = rows.getString("model"),
+                                        turnCount = rows.getInt("turn_count"),
+                                        inputTokens = rows.getLong("input_tokens"),
+                                        outputTokens = rows.getLong("output_tokens"),
+                                        cacheReadTokens = rows.getLong("cache_read_tokens"),
+                                        cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
+                                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -972,6 +1008,32 @@ class LocalCliSessionDataSource(
               AND (? = 1 OR s.profile_id = ?)
             GROUP BY t.session_id, t.model
             ORDER BY last_ts DESC;
+        """
+
+        /**
+         * Mesmas linhas de [SELECT_SESSIONS_SINCE_SQL], com `cwd` e `git_branch`
+         * no lugar dos campos que só a lista usa.
+         *
+         * Manter as duas com o mesmo `GROUP BY` e o mesmo corte é o que garante
+         * que o total do resumo bate com o do cabeçalho da lista. Sem `ORDER BY`:
+         * a ordenação final é por custo, e custo é calculado no domain.
+         */
+        private val SELECT_USAGE_GROUPS_SQL = """
+            SELECT t.session_id AS session_id,
+                   s.cwd AS cwd,
+                   s.git_branch AS git_branch,
+                   t.model AS model,
+                   COUNT(*) AS turn_count,
+                   SUM(t.input_tokens) AS input_tokens,
+                   SUM(t.output_tokens) AS output_tokens,
+                   SUM(t.cache_read_tokens) AS cache_read_tokens,
+                   SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
+                   SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+            FROM cli_turns t
+            JOIN cli_sessions s ON s.session_id = t.session_id
+            WHERE t.ts >= ?
+              AND (? = 1 OR s.profile_id = ?)
+            GROUP BY t.session_id, t.model;
         """
 
         /**

@@ -6,12 +6,17 @@ import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -681,6 +686,91 @@ class CliSessionsViewModelTest {
         }
     }
 
+    @Test
+    fun `the breakdown is only read when its tab opens`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+
+        assertEquals(0, repository.breakdownCalls)
+
+        viewModel.setView(CliSessionsView.BREAKDOWN)
+        runCurrent()
+
+        assertEquals(1, repository.breakdownCalls)
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(CliSessionsView.BREAKDOWN, state.view)
+        viewModel.onDestroy()
+    }
+
+    /** O resumo descreve a mesma janela da lista; ficar para trás mostraria dois recortes. */
+    @Test
+    fun `changing the range reloads the open breakdown`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.setView(CliSessionsView.BREAKDOWN)
+        runCurrent()
+        assertEquals(
+            FIXED_NOW.toEpochMilliseconds() - FIVE_HOURS_MILLIS,
+            repository.lastBreakdownSinceEpochMillis
+        )
+
+        viewModel.setRange(CliSessionRange.ALL)
+        runCurrent()
+
+        assertEquals(2, repository.breakdownCalls)
+        // `ALL` não corta nada, e o repositório abrange tudo a partir de zero.
+        assertEquals(0L, repository.lastBreakdownSinceEpochMillis)
+        viewModel.onDestroy()
+    }
+
+    /** Apagar os números por causa de uma leitura ruim tiraria da tela o que está sendo lido. */
+    @Test
+    fun `a failed breakdown reading keeps the previous numbers`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        repository.breakdownResult = Result.success(
+            listOf(
+                CliUsageGroupRow(sessionId = "a", cwd = "/home/dev/alpha", model = "claude-opus-5", turnCount = 1)
+            ).toUsageBreakdown()
+        )
+        val viewModel = buildViewModel(repository)
+
+        viewModel.setView(CliSessionsView.BREAKDOWN)
+        runCurrent()
+        val loaded = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).breakdown
+        assertEquals(1, loaded?.byProject?.size)
+
+        repository.breakdownResult = Result.failure(IllegalStateException("banco travado"))
+        viewModel.setRange(CliSessionRange.ALL)
+        runCurrent()
+
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(loaded, state.breakdown)
+        assertEquals("banco travado", state.breakdownError)
+        viewModel.onDestroy()
+    }
+
+    /** Sem carregar a aba do estado anterior, a tela voltaria para a lista sozinha. */
+    @Test
+    fun `the live loop keeps the open tab`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+        viewModel.openForProfile(profileId = "default", profileLabel = null)
+        runCurrent()
+
+        viewModel.setView(CliSessionsView.BREAKDOWN)
+        runCurrent()
+        val callsBeforeTick = repository.breakdownCalls
+
+        advanceTimeBy(LIVE_INTERVAL_MILLIS + 1)
+        runCurrent()
+
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(CliSessionsView.BREAKDOWN, state.view)
+        assertTrue(repository.breakdownCalls > callsBeforeTick)
+        viewModel.onDestroy()
+    }
+
     private fun kotlinx.coroutines.test.TestScope.buildViewModel(
         repository: FakeCliSessionRepository,
         autoLoad: Boolean = true,
@@ -694,6 +784,7 @@ class CliSessionsViewModelTest {
             getCliSessions = GetCliSessionsUseCase(repository, useCaseClock),
             getCliSessionDetail = GetCliSessionDetailUseCase(repository),
             syncCliSessionIndex = SyncCliSessionIndexUseCase(repository),
+            getCliUsageBreakdown = GetCliUsageBreakdownUseCase(repository, useCaseClock),
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             autoLoad = autoLoad,
             backgroundIndexIntervalMillis = backgroundIndexIntervalMillis,
@@ -777,6 +868,10 @@ private class FakeCliSessionRepository(
     var lastSinceEpochMillis: Long? = null
     var lastProfileId: String? = null
 
+    var breakdownResult: Result<CliUsageBreakdown> = Result.success(CliUsageBreakdown())
+    var breakdownCalls: Int = 0
+    var lastBreakdownSinceEpochMillis: Long? = null
+
     override suspend fun syncIndex(): Result<CliSessionIndexReport> {
         syncCalls++
         return syncResult
@@ -799,5 +894,14 @@ private class FakeCliSessionRepository(
         return Result.success(
             CliSessionDetail(summary = summary, turns = turnsBySession[sessionId].orEmpty())
         )
+    }
+
+    override suspend fun getUsageBreakdown(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<CliUsageBreakdown> {
+        breakdownCalls++
+        lastBreakdownSinceEpochMillis = sinceEpochMillis
+        return breakdownResult
     }
 }

@@ -3,6 +3,7 @@ package com.usagemonitor.domain.repository
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 
 /**
  * Contrato de acesso às sessões do Claude Code.
@@ -31,4 +32,15 @@ interface CliSessionRepository {
 
     /** Detalhe de uma sessão com os turnos. */
     suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?>
+
+    /**
+     * Consumo da janela recortado por projeto, branch e modelo.
+     *
+     * Parte das mesmas linhas de turno que [getSessions] usa na leitura janelada,
+     * então os totais dos dois batem. `sinceEpochMillis` zero abrange tudo.
+     */
+    suspend fun getUsageBreakdown(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): Result<CliUsageBreakdown>
 }

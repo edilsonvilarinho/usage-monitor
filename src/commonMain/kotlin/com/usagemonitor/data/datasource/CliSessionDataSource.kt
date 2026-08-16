@@ -3,6 +3,7 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliUsageGroupRow
 
 /**
  * Índice local das sessões do Claude Code.
@@ -29,4 +30,16 @@ interface CliSessionDataSource {
 
     /** Sessão com os turnos, ou `null` se o identificador não estiver no índice. */
     suspend fun readSession(sessionId: String): CliSessionDetail?
+
+    /**
+     * Linhas de turnos agrupadas por `(sessão, projeto, branch, modelo)` a partir
+     * de [sinceEpochMillis], para o resumo por eixo.
+     *
+     * Devolve as linhas cruas, sem precificar: quem aplica a tabela de preços é o
+     * domain, no mesmo caminho que a lista de sessões usa.
+     */
+    suspend fun readUsageGroups(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L
+    ): List<CliUsageGroupRow>
 }

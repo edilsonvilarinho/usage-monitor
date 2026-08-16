@@ -25,6 +25,8 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Auto-start em Windows (registro `Run`), Linux (`.desktop` em autostart) e macOS (LaunchAgent).
 - Verificacao de novas releases com banner manual e link para a pagina publicada no GitHub Releases.
 - Sinalizador semaforo de risco de overage nos cards de uso.
+- Aba Resumo nas Sessoes CLI: consumo da janela por projeto, por modelo e por
+  branch, com ranking por custo e economia agregada do cache.
 - Icone na bandeja do sistema com ponto de risco e notificacao nativa quando uma
   cota cruza um limiar (75/90/100 por padrao) ou uma sessao CLI satura. Limiares,
   alerta de sessao e periodo de silencio configuraveis em Configuracoes > Alertas.

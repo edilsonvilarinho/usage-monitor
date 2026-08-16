@@ -19,14 +19,19 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.LIST_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.TAB_BREAKDOWN_TAG
+import com.usagemonitor.presentation.ui.TAB_SESSIONS_TAG
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -1043,6 +1048,110 @@ class CliSessionsScreenTest {
         }
 
         onNodeWithText("índice indisponível").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the breakdown tab ranks projects by cost and declares the axes`() = runDesktopComposeUiTest {
+        val breakdown = listOf(
+            groupRow("s1", "/workspace/alpha", inputTokens = 3_000_000L),
+            groupRow("s2", "/workspace/beta", inputTokens = 1_000_000L)
+        ).toUsageBreakdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            view = CliSessionsView.BREAKDOWN,
+                            breakdown = breakdown
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Por projeto").assertIsDisplayed()
+        onNodeWithText("alpha").assertIsDisplayed()
+        onNodeWithText("beta").assertIsDisplayed()
+        onNodeWithText("75%").assertIsDisplayed()
+        // Somar seções contaria o mesmo gasto três vezes; a tela diz isso.
+        onNodeWithText(
+            "As três seções descrevem os mesmos turnos por eixos diferentes — não se somam."
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the breakdown tab reports a stale reading without hiding the numbers`() = runDesktopComposeUiTest {
+        val breakdown = listOf(groupRow("s1", "/workspace/alpha", inputTokens = 1_000_000L)).toUsageBreakdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            view = CliSessionsView.BREAKDOWN,
+                            breakdown = breakdown,
+                            breakdownError = "banco travado"
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("alpha").assertIsDisplayed()
+        onNodeWithText(
+            "Última leitura falhou; os números são da anterior. banco travado"
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `clicking the breakdown tab emits the view change`() = runDesktopComposeUiTest {
+        var selected: CliSessionsView? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {},
+                        onSelectView = { view -> selected = view }
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(TAB_SESSIONS_TAG).assertIsSelected()
+        onNodeWithTag(TAB_BREAKDOWN_TAG).performClick()
+
+        assertEquals(CliSessionsView.BREAKDOWN, selected)
+    }
+
+    private fun groupRow(
+        sessionId: String,
+        cwd: String,
+        inputTokens: Long = 0L
+    ): CliUsageGroupRow {
+        return CliUsageGroupRow(
+            sessionId = sessionId,
+            cwd = cwd,
+            gitBranch = "main",
+            model = "claude-opus-5",
+            turnCount = 1,
+            inputTokens = inputTokens
+        )
     }
 
     private fun summary(

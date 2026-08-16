@@ -46,11 +46,7 @@ data class CliSessionTurn(
      * teriam custado como input menos o que custaram como cache read.
      */
     val cacheSavingsMicros: Long?
-        get() {
-            val modelPricing = pricing ?: return null
-            val delta = modelPricing.inputMicrosPerMillion - modelPricing.cacheReadMicrosPerMillion
-            return cacheReadTokens * delta / MICROS_PER_USD
-        }
+        get() = pricing?.cacheSavingsMicros(cacheReadTokens)
 }
 
 /**
@@ -145,11 +141,22 @@ data class CliSessionSummary(
 
     /** Último segmento do `cwd`, usado como nome do projeto na lista. */
     val projectName: String?
-        get() = cwd
-            ?.trimEnd('/', '\\')
-            ?.split('/', '\\')
-            ?.lastOrNull()
-            ?.takeIf { it.isNotBlank() }
+        get() = projectNameFromCwd(cwd)
+}
+
+/**
+ * Último segmento de um `cwd`, sem separador final.
+ *
+ * Extraído de [CliSessionSummary.projectName] porque a agregação por projeto
+ * precisa do mesmo nome: duas derivações do mesmo caminho acabariam divergindo
+ * em algum caso de borda e a tela mostraria dois rótulos para um projeto só.
+ */
+fun projectNameFromCwd(cwd: String?): String? {
+    return cwd
+        ?.trimEnd('/', '\\')
+        ?.split('/', '\\')
+        ?.lastOrNull()
+        ?.takeIf { segment -> segment.isNotBlank() }
 }
 
 /** Sessão com os turnos carregados, entrada do cálculo de analytics. */

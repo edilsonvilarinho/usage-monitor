@@ -3,9 +3,18 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
+
+/**
+ * Qual das duas leituras a janela mostra.
+ *
+ * Enum novo, e não um valor a mais em algum enum existente: os `when` exaustivos
+ * de `CliSessionRange` e companhia não têm nada a ver com esta escolha.
+ */
+enum class CliSessionsView { SESSIONS, BREAKDOWN }
 
 sealed interface CliSessionsUiState {
 
@@ -50,7 +59,19 @@ sealed interface CliSessionsUiState {
          */
         val advancedExpanded: Boolean = false,
         /** Painel "Como ler esta tela". Mesmo tratamento de [advancedExpanded]. */
-        val glossaryExpanded: Boolean = false
+        val glossaryExpanded: Boolean = false,
+        /** Aba corrente. Mesmo tratamento de [advancedExpanded]: mora no estado. */
+        val view: CliSessionsView = CliSessionsView.SESSIONS,
+        /**
+         * Resumo por eixo da mesma janela.
+         *
+         * `null` significa "ainda não lido" — a aba só é carregada quando o
+         * usuário a abre. Uma leitura que falha **mantém** o valor anterior: no
+         * laço ao vivo o usuário está lendo a tela, não esperando por ela.
+         */
+        val breakdown: CliUsageBreakdown? = null,
+        /** Falha da última leitura do resumo, sem apagar o resumo já exibido. */
+        val breakdownError: String? = null
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long

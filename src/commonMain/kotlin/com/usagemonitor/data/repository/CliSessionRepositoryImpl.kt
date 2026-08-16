@@ -4,6 +4,8 @@ import com.usagemonitor.data.datasource.CliSessionDataSource
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.repository.CliSessionRepository
 
 class CliSessionRepositoryImpl(
@@ -23,5 +25,12 @@ class CliSessionRepositoryImpl(
 
     override suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?> {
         return runCatching { dataSource.readSession(sessionId) }
+    }
+
+    override suspend fun getUsageBreakdown(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<CliUsageBreakdown> {
+        return runCatching { dataSource.readUsageGroups(profileId, sinceEpochMillis).toUsageBreakdown() }
     }
 }
