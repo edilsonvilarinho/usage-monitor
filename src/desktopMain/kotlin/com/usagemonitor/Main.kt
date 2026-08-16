@@ -14,7 +14,11 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.Notification
+import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.isTraySupported
+import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberDialogState
@@ -103,6 +107,7 @@ import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
+import com.usagemonitor.presentation.ui.usageAlertMessage
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
@@ -121,6 +126,7 @@ import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
+import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -493,6 +499,16 @@ fun main() = application {
     }
     val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()
     val teamSessionPulses by sessionPulseViewModel.teamPulses.collectAsState()
+    // Preferências de alerta como flow, e não como estado da composição: quem as
+    // consome é o view model, que vive fora dela.
+    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
+    val usageAlertViewModel = remember(viewModel, sessionPulseViewModel, alertSettingsFlow) {
+        UsageAlertViewModel(
+            dashboardState = viewModel.uiState,
+            cliPulses = sessionPulseViewModel.cliPulses,
+            alertSettings = alertSettingsFlow
+        )
+    }
     val teamKeysViewModel = remember(teamAdminRepository) {
         TeamKeysAdminViewModel(
             listKeys = ListTeamKeysUseCase(teamAdminRepository),
@@ -545,6 +561,7 @@ fun main() = application {
                 teamUsageViewModel.onDestroy()
                 teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
+                usageAlertViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
@@ -569,6 +586,7 @@ fun main() = application {
                 teamUsageViewModel.onDestroy()
                 teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
+                usageAlertViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
@@ -752,6 +770,7 @@ fun main() = application {
                 opacitySaveGeneration += 1
             }
     }
+    val alertSettingsState by alertSettingsFlow.collectAsState()
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
@@ -910,6 +929,7 @@ fun main() = application {
                 teamUsageViewModel.onDestroy()
                 teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
+                usageAlertViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 httpClient.close()
                 usageHistoryDataSource.close()
@@ -919,6 +939,59 @@ fun main() = application {
                 singleInstanceGuard.close()
             }
             exitProcess(0)
+        }
+    }
+
+    // Referência da janela principal para a bandeja poder trazê-la à frente. O
+    // menu da bandeja vive fora de qualquer `Window`, então não alcança o
+    // `window` implícito do conteúdo.
+    var mainWindowRef by remember { mutableStateOf<java.awt.Window?>(null) }
+    val restoreMainWindow = {
+        mainWindowState.isMinimized = false
+        mainWindowRef?.let { window -> activateWindow(window) }
+        Unit
+    }
+
+    if (isTraySupported) {
+        val trayState = rememberTrayState()
+        val worstRisk by usageAlertViewModel.worstRisk.collectAsState()
+        val trayIcon = remember(iconImage, worstRisk) { TrayRiskIconPainter(iconImage, worstRisk) }
+
+        Tray(
+            icon = trayIcon,
+            state = trayState,
+            tooltip = "Usage Monitor",
+            onAction = restoreMainWindow,
+            menu = {
+                Item(
+                    text = if (language == AppLanguage.PT) "Abrir" else "Open",
+                    onClick = restoreMainWindow
+                )
+                Item(
+                    text = if (language == AppLanguage.PT) "Atualizar agora" else "Refresh now",
+                    onClick = { viewModel.refresh() }
+                )
+                Separator()
+                Item(
+                    text = if (language == AppLanguage.PT) "Sair" else "Quit",
+                    onClick = { shutdownApplication() }
+                )
+            }
+        )
+
+        // A língua entra na chave: trocar o idioma tem de recomeçar a coleta com o
+        // valor novo, senão a notificação seguinte sairia no idioma anterior.
+        LaunchedEffect(usageAlertViewModel, trayState, language) {
+            usageAlertViewModel.alerts.collect { alert ->
+                val message = usageAlertMessage(alert, language)
+                trayState.sendNotification(
+                    Notification(
+                        title = message.title,
+                        message = message.body,
+                        type = Notification.Type.Warning
+                    )
+                )
+            }
         }
     }
 
@@ -932,6 +1005,9 @@ fun main() = application {
         undecorated = true,
         alwaysOnTop = alwaysOnTopEnabled
     ) {
+        LaunchedEffect(window) {
+            mainWindowRef = window
+        }
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
@@ -1318,6 +1394,12 @@ fun main() = application {
                             // debounce lá em cima, e arrastar o slider dispararia
                             // um toast por pixel.
                             windowOpacityPercent = clampWindowOpacityPercent(percent)
+                        },
+                        alertSettings = alertSettingsState,
+                        onAlertSettingsChange = { updated ->
+                            alertSettingsFlow.value = updated
+                            persistAlertSettings(settings, updated)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
                         },
                         onApiToggle = { api, checked ->
                             val updatedApis = if (checked) {

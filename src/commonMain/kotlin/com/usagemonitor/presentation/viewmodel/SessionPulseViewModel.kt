@@ -16,7 +16,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -36,9 +35,12 @@ data class TeamPulseTarget(
  * resultado é publicado por [UsageTargetKey] porque é assim que o grid de cards
  * indexa tudo.
  *
- * O laço espera a janela ficar visível antes de cada passada: com o app
- * minimizado ninguém vê o pisca, e insistir custaria uma requisição por conta a
- * cada intervalo sem nada em troca.
+ * Com a janela minimizada a passada continua, mas **só na parte local**: a
+ * leitura do índice é do próprio disco e alimenta o alerta de sessão saturada,
+ * que existe justamente para chegar a quem não está olhando a tela. O que fica
+ * suspenso é a leitura do time — uma requisição por conta a cada intervalo sem
+ * ninguém para ver o pisca. Os pulsos de time guardados envelhecem mesmo assim,
+ * senão voltariam acesos ao restaurar a janela.
  *
  * Uma leitura que falha **não apaga** o pulso anterior: um soluço de rede
  * deixaria o botão piscando de forma intermitente sem que nada tivesse mudado nas
@@ -88,10 +90,7 @@ class SessionPulseViewModel(
         }
         loopJob = viewModelScope.launch {
             while (true) {
-                if (!isAppVisible.value) {
-                    isAppVisible.first { visible -> visible }
-                }
-                refreshOnce()
+                refreshOnce(includeTeam = isAppVisible.value)
                 delay(intervalMillis)
             }
         }
@@ -103,8 +102,13 @@ class SessionPulseViewModel(
         viewModelScope.cancel()
     }
 
-    /** Uma passada completa. `internal` para o teste dispensar o laço. */
-    internal suspend fun refreshOnce() {
+    /**
+     * Uma passada. `internal` para o teste dispensar o laço.
+     *
+     * [includeTeam] falso pula a ida ao servidor e apenas envelhece o que já
+     * estava publicado.
+     */
+    internal suspend fun refreshOnce(includeTeam: Boolean = true) {
         // Sem indexar aqui a latência do semáforo seria a do laço de background
         // (10min), não a deste laço: a leitura só enxerga turno já indexado.
         // Falha de indexação não impede a leitura do que já está no índice.
@@ -112,7 +116,19 @@ class SessionPulseViewModel(
 
         val now = clock.now()
         refreshCliPulses(now)
-        refreshTeamPulses(now)
+        if (includeTeam) {
+            refreshTeamPulses(now)
+        } else {
+            ageTeamPulses(now)
+        }
+    }
+
+    /** Envelhece sem ler: o que passou da janela de atividade some sozinho. */
+    private fun ageTeamPulses(now: Instant) {
+        val aged = _teamPulses.value.prunedAt(now)
+        if (aged != _teamPulses.value) {
+            _teamPulses.value = aged
+        }
     }
 
     private suspend fun refreshCliPulses(now: Instant) {

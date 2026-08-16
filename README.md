@@ -25,6 +25,9 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Auto-start em Windows (registro `Run`), Linux (`.desktop` em autostart) e macOS (LaunchAgent).
 - Verificacao de novas releases com banner manual e link para a pagina publicada no GitHub Releases.
 - Sinalizador semaforo de risco de overage nos cards de uso.
+- Icone na bandeja do sistema com ponto de risco e notificacao nativa quando uma
+  cota cruza um limiar (75/90/100 por padrao) ou uma sessao CLI satura. Limiares,
+  alerta de sessao e periodo de silencio configuraveis em Configuracoes > Alertas.
 - Contagem regressiva de refresh persiste entre reinicios da app e avisa antes de um refresh manual.
 - Modais de Historico e Configuracoes voltam ao topo automaticamente ao reabrir, mesmo se ficaram atras de outra janela.
 - Scrollbar com contraste ajustado para o tema escuro.

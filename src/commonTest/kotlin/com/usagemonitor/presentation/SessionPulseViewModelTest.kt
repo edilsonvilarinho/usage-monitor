@@ -173,27 +173,36 @@ class SessionPulseViewModelTest {
         viewModel.onDestroy()
     }
 
+    /**
+     * A parte local não pode parar com a janela minimizada: é dela que sai o
+     * alerta de sessão saturada, cujo destinatário é justamente quem não está
+     * olhando a tela.
+     */
     @Test
-    fun `the loop waits for the window to become visible`() = runTest {
-        val repository = FakePulseCliRepository()
+    fun `a hidden window keeps the local pass and suspends the team read`() = runTest {
+        val repository = FakePulseCliRepository(listOf(session("a", profileId = "conta2")))
+        val teamRepository = FakePulseTeamRepository()
         val isAppVisible = MutableStateFlow(false)
         val viewModel = buildViewModel(
             repository = repository,
+            teamRepository = teamRepository,
+            teamTargets = listOf(TeamPulseTarget(profileId = "conta2", accountKey = "acc-1")),
             isAppVisible = isAppVisible,
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             autoStart = true
         )
 
         runCurrent()
-        assertEquals(0, repository.syncCalls)
+        assertEquals(1, repository.syncCalls)
+        assertEquals(setOf(CONTA2), viewModel.cliPulses.value.keys)
+        assertTrue(teamRepository.requestedAccounts.isEmpty())
 
         isAppVisible.value = true
-        runCurrent()
-        assertEquals(1, repository.syncCalls)
-
         advanceTimeBy(INTERVAL_MILLIS)
         runCurrent()
+
         assertEquals(2, repository.syncCalls)
+        assertEquals(listOf("acc-1"), teamRepository.requestedAccounts)
         viewModel.onDestroy()
     }
 
