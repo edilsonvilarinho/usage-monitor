@@ -105,6 +105,8 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onOpenCliSessions: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
+    /** Presença da conta do card — a porta do integrante comum. */
+    onOpenTeamPresence: (UsageTargetKey) -> Unit = {},
     /** Perfis que participam do time; vazio esconde o botão de todos os cards. */
     teamEnabledProfileIds: Set<String> = emptySet(),
     /**
@@ -117,6 +119,14 @@ fun DashboardScreen(
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     /** `null` esconde o botão de todas as contas — só quem administra o recebe. */
     onOpenAdminOverview: (() -> Unit)? = null,
+    /**
+     * Presença de **todas** as contas do servidor — a porta do administrador.
+     *
+     * Separada de [onOpenTeamPresence] porque os escopos são outros: aquela é a
+     * conta de um card, esta é o servidor inteiro. Um parâmetro só obrigaria a
+     * inventar um `UsageTargetKey` que não corresponde a card nenhum.
+     */
+    onOpenTeamPresenceOverview: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -163,7 +173,8 @@ fun DashboardScreen(
                 onRefresh = { pendingRefreshAction = { viewModel.refresh() } },
                 onOpenSettings = onOpenSettings,
                 countdownUpdatesEnabled = countdownUpdatesEnabled,
-                onOpenAdminOverview = onOpenAdminOverview
+                onOpenAdminOverview = onOpenAdminOverview,
+                onOpenTeamPresence = onOpenTeamPresenceOverview
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -237,6 +248,7 @@ fun DashboardScreen(
                                     onOpenHistoryCard = onOpenHistory,
                                     onOpenCliSessionsCard = onOpenCliSessions,
                                     onOpenTeamUsageCard = onOpenTeamUsage,
+                                    onOpenTeamPresenceCard = onOpenTeamPresence,
                                     teamEnabledProfileIds = teamEnabledProfileIds,
                                     cliSessionPulses = cliSessionPulses,
                                     teamSessionPulses = teamSessionPulses,
@@ -409,6 +421,7 @@ private fun SuccessContent(
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
+    onOpenTeamPresenceCard: (UsageTargetKey) -> Unit = {},
     teamEnabledProfileIds: Set<String> = emptySet(),
     cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
@@ -481,6 +494,7 @@ private fun SuccessContent(
                 onOpenHistoryCard = onOpenHistoryCard,
                 onOpenCliSessionsCard = onOpenCliSessionsCard,
                 onOpenTeamUsageCard = onOpenTeamUsageCard,
+                onOpenTeamPresenceCard = onOpenTeamPresenceCard,
                 teamEnabledProfileIds = teamEnabledProfileIds,
                 cliSessionPulses = cliSessionPulses,
                 teamSessionPulses = teamSessionPulses,

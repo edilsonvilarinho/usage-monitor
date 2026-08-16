@@ -96,6 +96,7 @@ Regras importantes:
   - `autoStart`
   - `windowOpacityPercent`
   - `teamUsageWindow*` (geometria da janela de Sessoes do time)
+  - `teamPresenceWindow*` (geometria da janela de Conectados agora)
 - `AutoStartManager` escreve em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 - **A configuracao de time NAO vai para as preferencias.** Vive em
   `~/.usage-monitor/team.json` (`LocalTeamSettingsDataSource`), com escrita atomica
@@ -127,6 +128,14 @@ conta Anthropic.
   relatorio mas nao cancela o envio do que ja estava indexado. Abrir o modal
   chama `requestImmediateSync()`, que antecipa uma passada sem reiniciar o laco.
 - **Leitura:** `TeamUsageViewModel`, laco ao vivo de 5s, so com a janela aberta.
+- **Presenca (servidor 0.4.0+):** `POST /api/v1/presence` carimba `team_members.last_seen_at`
+  a cada passada de 30s, mesmo sem turno novo — e o que separa "app aberto" de
+  "houve consumo". Rota propria porque e escrita, com a conta no corpo e
+  `x-admin-token` recusado; **nenhuma coluna nova**. Contra servidor anterior o 404
+  cai num ingest so-membro, lembrado por URL. A tela `TeamPresenceViewModel`
+  classifica *online* (90s de janela) e *trabalhando agora*
+  (`ACTIVE_SESSION_WINDOW_MILLIS`), corrigindo o relogio pelo desvio que a propria
+  resposta do heartbeat mede.
 - **Precificacao:** o servidor devolve tokens por `(deviceId, sessionId, model)` e
   **nao** calcula custo. Quem aplica `ModelPricingTable` e o cliente, via
   `WindowedSessionAccumulator` — a mesma classe que o indice local usa.

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.FOOTER_ADMIN_OVERVIEW_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_TEAM_PRESENCE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.coroutines.channels.Channel
@@ -100,6 +101,57 @@ class FooterBarTest {
         }
 
         onNodeWithTag(FOOTER_ADMIN_OVERVIEW_TEST_TAG).performClick()
+
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun `FooterBar esconde a presenca do time sem o callback`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
+                    )
+                }
+            }
+        }
+
+        // A porta do integrante comum é o botão do card, escopado na conta dele.
+        onAllNodesWithTag(FOOTER_TEAM_PRESENCE_TEST_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun `FooterBar mostra e aciona a presenca do time`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+        var opened = 0
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false,
+                        onOpenTeamPresence = { opened += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(FOOTER_TEAM_PRESENCE_TEST_TAG).performClick()
 
         assertEquals(1, opened)
     }

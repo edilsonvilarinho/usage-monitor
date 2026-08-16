@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
+import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,12 @@ internal class TeamSyncService(
      * enviar só o que outro laço já indexou.
      */
     private val ensureIndexFresh: (suspend () -> Unit)? = null,
+    /**
+     * Sinal de "o app está aberto nesta máquina". `null` desliga — é o que uma
+     * instalação sem a tela de presença teria, e o que os testes que não a
+     * exercitam usam.
+     */
+    private val touchTeamPresence: TouchTeamPresenceUseCase? = null,
     private val hostNameProvider: () -> String? = { defaultHostName() },
     private val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS,
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
@@ -130,9 +137,13 @@ internal class TeamSyncService(
      * Última identidade que o servidor confirmou, por conta.
      *
      * Só em memória: o custo de errar é uma requisição de ~200 bytes por conta a
-     * cada início do app, que ainda serve de heartbeat para o `last_seen_at`.
-     * Persistir isso ao lado de `team_sync_state` seria estado a mais para
-     * economizar esse POST. O acesso é sempre de dentro do [passMutex].
+     * cada início do app. Persistir isso ao lado de `team_sync_state` seria
+     * estado a mais para economizar esse POST. O acesso é sempre de dentro do
+     * [passMutex].
+     *
+     * Quem mantém o `last_seen_at` fresco é [touchPresence], não este marcador:
+     * antes da rota de presença o envio de identidade era o único sinal de vida
+     * da máquina, e ele só sai quando algo muda.
      *
      * A **chave de time entra na comparação** junto do apelido. Guardar só o
      * apelido fazia trocar a chave não gerar requisição nenhuma: numa máquina sem
@@ -269,7 +280,17 @@ internal class TeamSyncService(
         var batches = 0
         val failures = mutableListOf<Throwable>()
 
-        // Identidade primeiro, e independente de haver turnos: o apelido só vai
+        // Presença primeiro, e por conta: `last_seen_at` é (conta, máquina), então
+        // uma máquina logada em duas contas da empresa precisa das duas batidas.
+        // Vem antes de tudo porque é a operação mais barata e a mais sensível a
+        // atraso — quem espera cinco lotes de backfill terminarem some da tela dos
+        // colegas com o app aberto na frente dele.
+        val presenceFailure = touchPresence(settings, target)
+        if (presenceFailure != null) {
+            failures += presenceFailure
+        }
+
+        // Identidade depois, e independente de haver turnos: o apelido só vai
         // ao servidor dentro de um ingest, então sem isto uma máquina que trocou
         // de apelido e parou de usar o Claude Code ficaria com o nome velho na
         // tela do time para sempre. Falhar aqui não impede o envio dos lotes.
@@ -330,6 +351,41 @@ internal class TeamSyncService(
         }
 
         return TeamSyncReport(pushedTurns, batches, failures)
+    }
+
+    /**
+     * Carimba a presença desta máquina para uma conta.
+     *
+     * Sai em **toda** passada, e não só quando algo mudou: é o que separa "o app
+     * está rodando" de "houve turno novo". Sem ela o servidor só sabe da máquina
+     * quando ela tem dado a enviar, e quem terminou o backfill fica
+     * indistinguível de quem desligou o computador.
+     *
+     * Não substitui [pushIdentityIfChanged]. A batida grava o apelido corrente
+     * junto — é o mesmo upsert — mas quem decide se a **chave** mudou e precisa
+     * reivindicar a conta continua sendo o marcador de identidade. A presença é
+     * aditiva; misturar as duas coisas quebraria o vínculo de chave.
+     *
+     * Devolve a falha, ou `null`. Nunca lança: falhar aqui não pode cancelar o
+     * envio dos turnos, que é o trabalho principal da passada.
+     */
+    private suspend fun touchPresence(
+        settings: TeamIntegrationSettings,
+        target: TeamSyncTarget
+    ): Throwable? {
+        val useCase = touchTeamPresence ?: return null
+
+        return useCase(
+            accountKey = target.accountKey,
+            member = TeamMemberIdentity(
+                deviceId = settings.deviceId,
+                alias = settings.alias,
+                // Sem lote não há sessão de onde ler o hostname do índice.
+                hostName = hostNameProvider(),
+                organizationUuid = target.organizationUuid,
+                organizationName = target.organizationName
+            )
+        ).exceptionOrNull()
     }
 
     /**

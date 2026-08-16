@@ -39,6 +39,17 @@ data class TeamIngestReceipt(
 )
 
 /**
+ * Recibo de uma batida de presença.
+ *
+ * [serverTimeAt] é o agora do servidor no instante do carimbo, e é o que permite
+ * medir o desvio entre os dois relógios. Vem `null` no caminho de compatibilidade
+ * — um servidor anterior à 0.4.0 responde pelo ingest, que não devolve relógio.
+ */
+data class TeamPresenceReceipt(
+    val serverTimeAt: Instant? = null
+)
+
+/**
  * Consumo de um integrante do time dentro da janela consultada.
  *
  * [sessions] pode vir vazia: o servidor devolve todos os membros da conta,

@@ -148,6 +148,14 @@ internal fun teamUsageActionLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Sessões do time nesta conta" else "Team sessions in this account"
 }
 
+internal fun teamPresenceActionLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        "Quem está conectado agora"
+    } else {
+        "Who is connected now"
+    }
+}
+
 internal fun historyActionLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Abrir histórico" else "Open history"
 }

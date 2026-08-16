@@ -93,9 +93,9 @@ Base `/api`. Todas as rotas exigem credencial, exceto o healthcheck.
 
 | Credencial | Header | Alcance |
 |---|---|---|
-| Chave de time | `x-team-key` | As contas daquela chave. Única aceita no ingest. |
+| Chave de time | `x-team-key` | As contas daquela chave. Única aceita no ingest e na presença. |
 | Chave legada | `x-team-key` | Todas as contas, **enquanto** `TEAM_LEGACY_KEY_MODE=open`. |
-| Token de admin | `x-admin-token` | Todas as contas, **só leitura** — recusado no ingest. |
+| Token de admin | `x-admin-token` | Todas as contas, **só leitura** — recusado no ingest e na presença. |
 
 O `x-admin-token` ser aceito nas rotas `/v1/*` é o que evita uma família `/admin/v1/team`, `/admin/v1/session` e `/admin/v1/member` paralela: é a mesma leitura, com outra credencial.
 
@@ -162,6 +162,39 @@ Resposta:
 **Invariante do lote:** todo `turn.sessionId` tem de estar em `sessions` no mesmo corpo. A leitura faz `JOIN team_sessions`; um turno órfão seria gravado e nunca apareceria. O servidor rejeita o lote com `400` em vez de aceitar dado invisível.
 
 Timestamps em **epoch millis**. Os tokens são o **delta do turno**, não o acumulado da sessão.
+
+### `POST /api/v1/presence`
+
+Disponível a partir da versão **0.4.0**. Diz "o Usage Monitor está aberto nesta máquina agora". É o que alimenta o modal **Conectados agora** do app desktop.
+
+```jsonc
+{
+  "accountKey": "<accountUuid da conta Anthropic>",
+  "member": {
+    "deviceId": "<uuid estável por instalação>",
+    "alias": "edilson",
+    "hostName": "DESKTOP-A1",
+    "organizationUuid": null,
+    "organizationName": null
+  }
+}
+```
+
+```json
+{ "lastSeenAt": 1786003600000 }
+```
+
+O app bate a cada **30 segundos**, por conta participante, enquanto estiver aberto — inclusive minimizado, e inclusive sem nenhum turno novo a enviar.
+
+Três propriedades desenhadas de propósito:
+
+- **Grava só `team_members`.** Nunca sessão nem turno. É o mesmo upsert do ingest (`MAX` no `last_seen_at`, `COALESCE` no `host_name` e na organização), num statement só, sem transação.
+- **O `lastSeenAt` é o relógio do servidor**, e vem na resposta justamente para o cliente medir o próprio desvio. Sem isso o app compararia um carimbo do servidor com o relógio local, e um desvio de minutos deixaria o time inteiro "online" para sempre. O corpo **não** aceita timestamp: aceitar o do cliente permitiria a uma máquina se declarar eternamente presente.
+- **Idempotente e barata.** A mesma linha é reescrita a cada batida; ~200 bytes por requisição.
+
+**Não há coluna nova nem migração**: a rota escreve na `team_members.last_seen_at`, que existe desde a 0.1.0.
+
+O `x-admin-token` é recusado com **401** — presença é declaração de identidade em nome de um `deviceId`, e um admin capaz de marcá-la por terceiros criaria membro fantasma. Como no ingest, a primeira batida **vincula** a conta à chave apresentada.
 
 ### `GET /api/v1/team`
 
@@ -312,6 +345,8 @@ A chave crua vem no corpo do `GET` de propósito: o painel é a lista de "quem t
 
 `TEAM_RETENTION_DAYS` (default 45). Roda no boot e a cada 6h: apaga turnos fora do horizonte, depois sessões sem turno, depois membros antigos sem sessão. Uma falha na limpeza é logada e **não** derruba o servidor.
 
+Com a presença da 0.4.0 o efeito prático muda para membros: quem mantém o app aberto tem `last_seen_at` sempre fresco e **nunca é recolhido**, mesmo sem consumo nenhum. É o comportamento desejado — a lista de conectados precisa da linha do membro — mas significa que a retenção só recolhe quem parou de abrir o app.
+
 ## Modelo de segurança
 
 O isolamento entre times vem das **chaves por conta**: cada chave só lê e escreve as contas que ela reivindicou, uma conta pertence a no máximo uma chave, e a autorização é conferida em toda rota.
@@ -371,9 +406,9 @@ O `HEALTHCHECK` está no Dockerfile e no compose. O processo roda como `node` (u
 7. **Deploy.** Confira `GET https://<dominio>/api/health`.
 8. **Auto Deploy:** ative o webhook na branch `main` se quiser redeploy a cada push.
 
-**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. Um redeploy resolve.
+**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. No caso da presença o app cai sozinho num ingest só-membro, que carimba o mesmo `last_seen_at`: a tela funciona igual, apenas sem a correção de relógio. Um redeploy resolve.
 
-Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
+Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam, e a 0.4.0 não acrescenta tabela nem coluna — a presença escreve numa coluna que já existia. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
 
 Rodando em **Docker Swarm**, mantenha **1 réplica**: o SQLite é um arquivo local e duas réplicas em nós diferentes veriam bancos distintos. Se o cluster tiver mais de um nó, fixe uma constraint de nó para o volume seguir o serviço.
 

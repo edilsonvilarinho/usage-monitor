@@ -354,6 +354,29 @@ export class TeamRepository {
     this.db = db;
   }
 
+  /**
+   * Carimba `last_seen_at` do integrante com o relogio do servidor.
+   *
+   * Mesma instrucao do ingest ([UPSERT_MEMBER_SQL]): o heartbeat nao pode ter
+   * uma segunda regra de upsert que divirja dela — o `COALESCE` do host_name e
+   * o `MAX` do `last_seen_at` valem aqui pelos mesmos motivos.
+   *
+   * Sem transacao, ao contrario de [ingest]: e um statement so, e no SQLite um
+   * statement ja e atomico. Passar por [ingest] com arrays vazios prepararia
+   * `UPSERT_SESSION` e `INSERT_TURN` para nada e devolveria um recibo que mente.
+   */
+  touchMember(accountKey: string, member: IngestMember, now: number): void {
+    this.db.prepare(UPSERT_MEMBER_SQL).run({
+      accountKey,
+      deviceId: member.deviceId,
+      alias: member.alias,
+      hostName: member.hostName,
+      organizationUuid: member.organizationUuid,
+      organizationName: member.organizationName,
+      lastSeenAt: now,
+    });
+  }
+
   /** Grava membro, sessoes e turnos numa transacao unica. Idempotente. */
   ingest(payload: IngestPayload, now: number): IngestReceipt {
     const upsertMember = this.db.prepare(UPSERT_MEMBER_SQL);

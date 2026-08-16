@@ -10,7 +10,9 @@ import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
+import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
@@ -60,6 +62,13 @@ private class FakeTeamRepository(
 
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
         return Result.success(TeamIngestReceipt())
+    }
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        return Result.success(TeamPresenceReceipt())
     }
 
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {

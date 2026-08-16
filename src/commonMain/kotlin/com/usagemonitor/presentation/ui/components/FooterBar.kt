@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -45,6 +46,8 @@ import kotlinx.datetime.Instant
 
 const val FOOTER_ADMIN_OVERVIEW_TEST_TAG = "footerAdminOverview"
 
+const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
+
 @Composable
 fun FooterBar(
     appVersion: String,
@@ -63,7 +66,14 @@ fun FooterBar(
      * maioria. O componente segue sem saber o que é modo admin: quem decide é o
      * `Main`, a partir das configurações de time.
      */
-    onOpenAdminOverview: (() -> Unit)? = null
+    onOpenAdminOverview: (() -> Unit)? = null,
+    /**
+     * Abre a presença de todas as contas do servidor.
+     *
+     * `null` esconde, pela mesma razão de [onOpenAdminOverview]: o integrante
+     * comum entra pela porta do card, que já é escopada na conta dele.
+     */
+    onOpenTeamPresence: (() -> Unit)? = null
 ) {
     val initialRemaining = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
     var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(initialRemaining) }
@@ -108,7 +118,8 @@ fun FooterBar(
                 onRefresh = onRefresh,
                 onOpenSettings = onOpenSettings,
                 iconOnly = true,
-                onOpenAdminOverview = onOpenAdminOverview
+                onOpenAdminOverview = onOpenAdminOverview,
+                onOpenTeamPresence = onOpenTeamPresence
             )
         }
     }
@@ -188,13 +199,35 @@ private fun FooterActionGroup(
     onOpenSettings: () -> Unit,
     iconOnly: Boolean = false,
     modifier: Modifier = Modifier,
-    onOpenAdminOverview: (() -> Unit)? = null
+    onOpenAdminOverview: (() -> Unit)? = null,
+    onOpenTeamPresence: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Vem antes da visão global e ao lado dela: as duas são do administrador
+        // e abrem o servidor inteiro, só que por perguntas diferentes — quem está
+        // aí agora, e quanto cada um gastou.
+        if (onOpenTeamPresence != null) {
+            FooterIconActionButton(
+                label = if (language == AppLanguage.PT) {
+                    "Quem está conectado agora"
+                } else {
+                    "Who is connected now"
+                },
+                onClick = onOpenTeamPresence,
+                testTag = FOOTER_TEAM_PRESENCE_TEST_TAG
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Sensors,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+
         if (onOpenAdminOverview != null) {
             FooterIconActionButton(
                 label = if (language == AppLanguage.PT) {

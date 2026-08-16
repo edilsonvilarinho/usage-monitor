@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Card
@@ -139,6 +140,12 @@ fun ApiUsageCard(
      * não ganha um botão que não leva a lugar nenhum.
      */
     onOpenTeamUsage: (() -> Unit)? = null,
+    /**
+     * Abre a janela de quem está conectado agora nesta conta.
+     *
+     * Mesma condição de [onOpenTeamUsage]: nulo esconde o botão.
+     */
+    onOpenTeamPresence: (() -> Unit)? = null,
     /**
      * Sessões desta máquina, nesta conta, com interação nos últimos minutos e
      * veredito laranja ou vermelho. Vazio deixa o botão como qualquer outro.
@@ -424,6 +431,31 @@ fun ApiUsageCard(
                             ) { tint ->
                                 Icon(
                                     imageVector = Icons.Rounded.Groups,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(density.actionIconSize),
+                                    tint = tint
+                                )
+                            }
+                        }
+
+                        // Mesma condição do botão de sessões do time, e vizinho
+                        // dele de propósito: os dois abrem janelas do time e
+                        // separá-los mandaria o usuário procurar em dois cantos.
+                        //
+                        // Sem `pulse`, e o default já é `SessionPulse.EMPTY`.
+                        // Neste app o pisca significa uma coisa só — sessão em
+                        // atenção ou saturada — e o botão colado a este já a
+                        // carrega. Um segundo botão piscando pelo mesmo motivo
+                        // criaria uma segunda animação infinita no mesmo card,
+                        // sem acrescentar informação nenhuma.
+                        if (onOpenTeamPresence != null) {
+                            CardIconActionButton(
+                                label = teamPresenceActionLabel(language = language),
+                                onClick = onOpenTeamPresence,
+                                buttonSize = density.actionButtonSize
+                            ) { tint ->
+                                Icon(
+                                    imageVector = Icons.Rounded.Sensors,
                                     contentDescription = null,
                                     modifier = Modifier.size(density.actionIconSize),
                                     tint = tint
