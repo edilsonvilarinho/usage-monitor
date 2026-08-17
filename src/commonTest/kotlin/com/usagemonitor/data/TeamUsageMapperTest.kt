@@ -284,6 +284,42 @@ class TeamUsageMapperTest {
     }
 
     @Test
+    fun `guarda as linhas cruas no integrante para o resumo por eixo`() {
+        val snapshot = TeamSnapshotDto(
+            members = listOf(member()),
+            rows = listOf(
+                row(model = OPUS, turnCount = 3, inputTokens = MILLION),
+                row(model = HAIKU, turnCount = 1, inputTokens = MILLION)
+            )
+        ).toDomain()
+
+        val groupRows = snapshot.members.single().groupRows
+        // Uma linha por modelo: dobrá-las na sessão colapsaria os dois num
+        // `primaryModel` só, e o eixo "por modelo" do resumo sumiria.
+        assertEquals(2, groupRows.size)
+        assertEquals(listOf(OPUS, HAIKU), groupRows.map { groupRow -> groupRow.model })
+        assertEquals(listOf("/home/dev/api-gateway", "/home/dev/api-gateway"), groupRows.map { it.cwd })
+        assertEquals(listOf("main", "main"), groupRows.map { groupRow -> groupRow.gitBranch })
+        assertEquals(4, groupRows.sumOf { groupRow -> groupRow.turnCount })
+    }
+
+    @Test
+    fun `maquina sem linha de membro tambem leva as proprias linhas cruas`() {
+        val snapshot = TeamSnapshotDto(
+            members = listOf(member()),
+            rows = listOf(
+                row(deviceId = "device-1", inputTokens = MILLION),
+                row(deviceId = "device-fantasma", sessionId = "s9", inputTokens = MILLION)
+            )
+        ).toDomain()
+
+        // Sem isto o resumo mostraria menos gasto que a lista para o mesmo período.
+        val ghost = snapshot.members.first { it.deviceId == "device-fantasma" }
+        assertEquals(1, ghost.groupRows.size)
+        assertEquals("s9", ghost.groupRows.single().sessionId)
+    }
+
+    @Test
     fun `monta o detalhe da sessao a partir dos turnos crus`() {
         val detail = detailResponse(
             turns = listOf(

@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,6 +51,12 @@ fun DepthSurface(
     ) {
         Column(
             modifier = Modifier
+                // A largura cheia não chega sozinha até aqui: o `Surface` do `Card`
+                // propaga a constraint mínima, mas a `Column` que o `Card` põe entre
+                // ele e o conteúdo não. Sem isto esta `Column` mede pelo texto mais
+                // largo e o brilho — que é desenhado sobre o `size` dela — para no
+                // meio do card.
+                .fillMaxWidth()
                 .clip(shape)
                 .drawWithCache {
                     val glow = Brush.verticalGradient(

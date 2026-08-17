@@ -20,9 +20,17 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliRangeWindow
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.TeamMemberTrend
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamTrendPoint
+import com.usagemonitor.domain.entity.TeamUsageSnapshot
+import com.usagemonitor.domain.entity.TeamUsageTrend
+import com.usagemonitor.domain.entity.toTeamBreakdown
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.TEAM_ACCOUNT_GROUP_TAG_PREFIX
@@ -32,11 +40,23 @@ import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_REMOVE_CONFIRM_TAG
+import com.usagemonitor.presentation.ui.TEAM_TAB_BREAKDOWN_TAG
+import com.usagemonitor.presentation.ui.TEAM_TAB_MEMBERS_TAG
+import com.usagemonitor.presentation.ui.TEAM_TAB_TREND_TAG
+import com.usagemonitor.presentation.ui.BREAKDOWN_AXIS_TABS_TAG
+import com.usagemonitor.presentation.ui.BREAKDOWN_AXIS_TAB_TAG_PREFIX
+import com.usagemonitor.presentation.ui.BREAKDOWN_PAGER_TAG
+import com.usagemonitor.presentation.ui.BREAKDOWN_PANE_TAG
+import com.usagemonitor.presentation.ui.REFRESHING_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TeamUsageContent
+import com.usagemonitor.presentation.ui.TeamUsageLabels
+import com.usagemonitor.presentation.ui.components.TEAM_TREND_CHART_TAG
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
+import com.usagemonitor.presentation.viewmodel.TeamUsageView
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -560,22 +580,277 @@ class TeamUsageScreenTest {
         assertEquals(0, onAllNodesWithTextCount("0 em atenção"))
     }
 
+    // ------------------------------------------------------------------------
+    // Abas: Integrantes, Resumo e Tendência
+    // ------------------------------------------------------------------------
+
+    @Test
+    fun `o cabecalho oferece as tres abas`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+            ),
+            width = 1_400.dp
+        )
+
+        onNodeWithTag(TEAM_TAB_MEMBERS_TAG).assertIsDisplayed()
+        onNodeWithTag(TEAM_TAB_BREAKDOWN_TAG).assertIsDisplayed()
+        onNodeWithTag(TEAM_TAB_TREND_TAG).assertIsDisplayed()
+        onNodeWithTag(TEAM_TAB_MEMBERS_TAG).assertIsSelected()
+    }
+
+    @Test
+    fun `clicar na aba de resumo emite a troca de aba`() = runDesktopComposeUiTest {
+        var selected: TeamUsageView? = null
+
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+            ),
+            width = 1_400.dp,
+            onSelectView = { view -> selected = view }
+        )
+
+        onNodeWithTag(TEAM_TAB_BREAKDOWN_TAG).performClick()
+
+        assertEquals(TeamUsageView.BREAKDOWN, selected)
+    }
+
+    @Test
+    fun `a aba de resumo mostra os eixos do consumo do time`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1")))),
+                view = TeamUsageView.BREAKDOWN,
+                breakdown = teamBreakdown()
+            ),
+            width = 1_400.dp
+        )
+
+        onNodeWithTag(BREAKDOWN_PANE_TAG).assertIsDisplayed()
+        // Um eixo por aba: a coluna única de antes obrigava a rolar por todos.
+        onNodeWithTag("${BREAKDOWN_AXIS_TAB_TAG_PREFIX}MEMBER").assertIsSelected()
+        onNodeWithTag("${BREAKDOWN_AXIS_TAB_TAG_PREFIX}PROJECT").assertIsDisplayed()
+        // O eixo por integrante é o que só existe aqui: no resumo da máquina a
+        // máquina é uma só e a pergunta não faria sentido. Ele abre primeiro.
+        onNodeWithText("edilson").assertIsDisplayed()
+        assertEquals(0, onAllNodesWithTextCount("alpha"))
+
+        onNodeWithTag("${BREAKDOWN_AXIS_TAB_TAG_PREFIX}PROJECT").performClick()
+
+        onNodeWithText("alpha").assertIsDisplayed()
+    }
+
+    /** O mesmo Resumo, na janela que mistura todas as contas. */
+    @Test
+    fun `a visao global tambem pagina o resumo por eixo`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = twoAccountMembers(),
+                isAdminOverview = true,
+                view = TeamUsageView.BREAKDOWN,
+                breakdown = teamBreakdown()
+            ),
+            width = 1_400.dp
+        )
+
+        onNodeWithTag(BREAKDOWN_PANE_TAG).assertIsDisplayed()
+        onNodeWithTag(BREAKDOWN_AXIS_TABS_TAG).assertIsDisplayed()
+        onNodeWithTag(BREAKDOWN_PAGER_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `trocar a janela avisa que os numeros ainda sao os antigos`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1")))),
+                isRefreshing = true
+            ),
+            width = 1_400.dp
+        )
+
+        onNodeWithTag(REFRESHING_NOTICE_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `sem recarga em voo nao ha aviso de atualizacao`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+            ),
+            width = 1_400.dp
+        )
+
+        assertEquals(0, onAllNodesWithTag(REFRESHING_NOTICE_TAG).fetchSemanticsNodes(false).size)
+    }
+
+    /**
+     * Duas máquinas com o mesmo apelido derrubavam a janela: dois baldes com o
+     * rótulo "SUETONIO" repetiam a chave do `LazyColumn`.
+     */
+    @Test
+    fun `a aba de resumo aguenta dois integrantes com o mesmo apelido`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = listOf(member("device-1", "SUETONIO", "devmachine", listOf(session("s1")))),
+                    view = TeamUsageView.BREAKDOWN,
+                    breakdown = sameAliasBreakdown()
+                ),
+                width = 1_400.dp,
+                height = 1_100.dp
+            )
+
+            onNodeWithTag(BREAKDOWN_PANE_TAG).assertIsDisplayed()
+            onNodeWithText("SUETONIO (device-a)").assertIsDisplayed()
+            onNodeWithText("SUETONIO (device-b)").assertIsDisplayed()
+        }
+
+    /** Issue #57: o gráfico ocupava metade do modal sem ninguém o ter pedido. */
+    @Test
+    fun `a tendencia nao aparece na aba de integrantes`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1")))),
+                trend = trend()
+            ),
+            width = 1_400.dp
+        )
+
+        assertEquals(0, onAllNodesWithTag(TEAM_TREND_CHART_TAG).fetchSemanticsNodes(false).size)
+    }
+
+    @Test
+    fun `a aba de tendencia mostra o grafico com a explicacao do que ele mede`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1")))),
+                    view = TeamUsageView.TREND,
+                    trend = trend()
+                ),
+                width = 1_400.dp
+            )
+
+            onNodeWithTag(TEAM_TREND_CHART_TAG).assertIsDisplayed()
+            // O que faltava na issue #57: o painel dizia como ler, nunca o que é.
+            onNodeWithText(
+                TeamUsageLabels.trendHint(2, AppLanguage.PT)
+            ).assertIsDisplayed()
+        }
+
+    @Test
+    fun `a aba de tendencia sem serie diz que o servidor nao a serve`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1")))),
+                    view = TeamUsageView.TREND
+                ),
+                width = 1_400.dp
+            )
+
+            onNodeWithText(TeamUsageLabels.trendUnavailable(AppLanguage.PT)).assertIsDisplayed()
+        }
+
+    @Test
+    fun `a visao global nao mostra a aba de tendencia`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = twoAccountMembers(),
+                isAdminOverview = true,
+                expandedAccountKeys = setOf("account-a")
+            ),
+            width = 1_400.dp
+        )
+
+        // A série é por conta; ali a janela mistura várias e ela nunca é lida.
+        assertEquals(0, onAllNodesWithTag(TEAM_TAB_TREND_TAG).fetchSemanticsNodes(false).size)
+        onNodeWithTag(TEAM_TAB_BREAKDOWN_TAG).assertIsDisplayed()
+    }
+
+    private fun teamBreakdown(): CliUsageBreakdown {
+        val snapshot = TeamUsageSnapshot(
+            members = listOf(
+                TeamMemberUsage(
+                    deviceId = "device-1",
+                    alias = "edilson",
+                    sessions = listOf(session("s1")),
+                    groupRows = listOf(
+                        CliUsageGroupRow(
+                            sessionId = "s1",
+                            cwd = "/home/dev/alpha",
+                            gitBranch = "main",
+                            model = OPUS,
+                            turnCount = 2,
+                            inputTokens = 1_000_000L
+                        )
+                    )
+                )
+            )
+        )
+        return snapshot.toTeamBreakdown(window = CliRangeWindow(), now = NOW)
+    }
+
+    /** Duas máquinas distintas com o mesmo apelido, como no time real. */
+    private fun sameAliasBreakdown(): CliUsageBreakdown {
+        val snapshot = TeamUsageSnapshot(
+            members = listOf("device-aaaaaaaa1111", "device-bbbbbbbb2222").mapIndexed { index, deviceId ->
+                TeamMemberUsage(
+                    deviceId = deviceId,
+                    alias = "SUETONIO",
+                    hostName = "devmachine",
+                    sessions = listOf(session("s$index")),
+                    groupRows = listOf(
+                        CliUsageGroupRow(
+                            sessionId = "s$index",
+                            cwd = "/home/dev/alpha",
+                            model = OPUS,
+                            turnCount = 1,
+                            inputTokens = 1_000_000L * (index + 1)
+                        )
+                    )
+                )
+            }
+        )
+        return snapshot.toTeamBreakdown(window = CliRangeWindow(), now = NOW)
+    }
+
+    private fun trend(): TeamUsageTrend {
+        val days = listOf(LocalDate(2026, 8, 15), LocalDate(2026, 8, 16))
+        return TeamUsageTrend(
+            days = days,
+            members = listOf(
+                TeamMemberTrend(
+                    deviceId = "device-1",
+                    alias = "edilson",
+                    points = days.mapIndexed { index, date ->
+                        TeamTrendPoint(date = date, costMicros = 1_000_000L * (index + 1), turnCount = 1)
+                    }
+                )
+            )
+        )
+    }
+
     private fun ComposeUiTest.renderSuccess(
         state: TeamUsageUiState.Success,
         localDeviceId: String? = null,
         width: androidx.compose.ui.unit.Dp = 900.dp,
-        onToggleAccount: (String) -> Unit = {}
+        height: androidx.compose.ui.unit.Dp = 700.dp,
+        onToggleAccount: (String) -> Unit = {},
+        onSelectView: (TeamUsageView) -> Unit = {}
     ) {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(width).height(700.dp)) {
+                Box(modifier = Modifier.width(width).height(height)) {
                     TeamUsageContent(
                         state = state,
                         language = AppLanguage.PT,
                         onSelectRange = {},
                         onToggleMember = {},
                         onToggleAccount = onToggleAccount,
-                        localDeviceId = localDeviceId
+                        localDeviceId = localDeviceId,
+                        onSelectView = onSelectView
                     )
                 }
             }

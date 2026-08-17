@@ -23,6 +23,14 @@ internal object BreakdownLabels {
         return if (language == AppLanguage.PT) "Por projeto" else "By project"
     }
 
+    fun byMember(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Por integrante" else "By member"
+    }
+
+    fun unknownMember(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Integrante desconhecido" else "Unknown member"
+    }
+
     fun byModel(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Por modelo" else "By model"
     }
@@ -41,6 +49,131 @@ internal object BreakdownLabels {
 
     fun unknownBranch(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Sem branch" else "No branch"
+    }
+
+    /** Nome da aba do eixo, no singular: a aba é o recorte, não a lista. */
+    fun axisTab(axis: BreakdownAxis, language: AppLanguage): String {
+        val portuguese = language == AppLanguage.PT
+        return when (axis) {
+            BreakdownAxis.MEMBER -> if (portuguese) "Integrante" else "Member"
+            BreakdownAxis.PROJECT -> if (portuguese) "Projeto" else "Project"
+            BreakdownAxis.MODEL -> if (portuguese) "Modelo" else "Model"
+            BreakdownAxis.BRANCH -> if (portuguese) "Branch" else "Branch"
+            BreakdownAxis.TOOL -> if (portuguese) "Ferramentas" else "Tools"
+            BreakdownAxis.ACTIVITY -> if (portuguese) "Atividade" else "Activity"
+        }
+    }
+
+    /** Texto que a linha sem rótulo mostra, por eixo. */
+    fun unknownLabel(axis: BreakdownAxis, language: AppLanguage): String {
+        return when (axis) {
+            BreakdownAxis.MEMBER -> unknownMember(language)
+            BreakdownAxis.PROJECT -> unknownProject(language)
+            BreakdownAxis.MODEL -> unknownModel(language)
+            BreakdownAxis.BRANCH -> unknownBranch(language)
+            BreakdownAxis.TOOL, BreakdownAxis.ACTIVITY -> ""
+        }
+    }
+
+    /**
+     * Nome da coluna de ordenação, que muda com o eixo: a ferramenta não tem
+     * custo nem tokens, e chamar de "custo" o número dela seria mentira.
+     */
+    fun sortOption(sort: BreakdownSort, axis: BreakdownAxis, language: AppLanguage): String {
+        val portuguese = language == AppLanguage.PT
+        val isTool = axis == BreakdownAxis.TOOL
+        return when (sort) {
+            BreakdownSort.SHARE -> when {
+                isTool && portuguese -> "Chamadas"
+                isTool -> "Calls"
+                portuguese -> "Custo"
+                else -> "Cost"
+            }
+            BreakdownSort.VOLUME -> when {
+                isTool && portuguese -> "Turnos"
+                isTool -> "Turns"
+                portuguese -> "Tokens"
+                else -> "Tokens"
+            }
+            BreakdownSort.NAME -> if (portuguese) "Nome" else "Name"
+        }
+    }
+
+    fun sortLabel(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Ordenar por" else "Sort by"
+    }
+
+    fun filterPlaceholder(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Filtrar" else "Filter"
+    }
+
+    fun clearFilter(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Limpar filtro" else "Clear filter"
+    }
+
+    fun sortDirection(descending: Boolean, language: AppLanguage): String {
+        val portuguese = language == AppLanguage.PT
+        return when {
+            descending && portuguese -> "Maior primeiro"
+            descending -> "Highest first"
+            portuguese -> "Menor primeiro"
+            else -> "Lowest first"
+        }
+    }
+
+    /** Onde a página começa e termina, para o rodapé não dizer só "1 de 4". */
+    fun pageSummary(page: BreakdownPage<*>, language: AppLanguage): String {
+        val portuguese = language == AppLanguage.PT
+        if (page.filteredCount == 0) {
+            return if (portuguese) "nenhum resultado" else "no results"
+        }
+        val first = page.fromIndex + 1
+        val shown = "${first}–${page.fromIndex + page.items.size}"
+        val suffix = if (page.isFiltered) {
+            if (portuguese) " (de ${page.totalCount} sem filtro)" else " (of ${page.totalCount} unfiltered)"
+        } else {
+            ""
+        }
+        return if (portuguese) {
+            "$shown de ${page.filteredCount}$suffix"
+        } else {
+            "$shown of ${page.filteredCount}$suffix"
+        }
+    }
+
+    fun pageSizeLabel(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Por página" else "Per page"
+    }
+
+    fun previousPage(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Página anterior" else "Previous page"
+    }
+
+    fun nextPage(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Próxima página" else "Next page"
+    }
+
+    fun noMatches(query: String, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Nada com \"$query\" neste eixo."
+        } else {
+            "Nothing matching \"$query\" on this axis."
+        }
+    }
+
+    /**
+     * Aviso de que os números na tela ainda são os da janela anterior.
+     *
+     * Texto e não indicador animado: uma animação infinita trava o `waitForIdle`
+     * dos testes de componente — a mesma razão pela qual o ponto da tela de
+     * presença não pisca.
+     */
+    fun refreshing(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Atualizando… os números abaixo ainda são da janela anterior."
+        } else {
+            "Refreshing… the numbers below are still from the previous window."
+        }
     }
 
     fun empty(language: AppLanguage): String {
@@ -105,11 +238,15 @@ internal object BreakdownLabels {
         }
     }
 
+    /**
+     * Sem contar as seções: o resumo do time tem um eixo a mais — "por
+     * integrante" — e um literal "três" mentiria numa das duas telas.
+     */
     fun axisNotice(language: AppLanguage): String {
         return if (language == AppLanguage.PT) {
-            "As três seções descrevem os mesmos turnos por eixos diferentes — não se somam."
+            "As seções descrevem os mesmos turnos por eixos diferentes — não se somam."
         } else {
-            "The three sections describe the same turns along different axes — they do not add up."
+            "The sections describe the same turns along different axes — they do not add up."
         }
     }
 

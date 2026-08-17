@@ -74,7 +74,18 @@ data class TeamMemberUsage(
      */
     val accountKey: String? = null,
     /** Rótulo da conta; `null` quando ela não tem chave emitida. */
-    val accountLabel: String? = null
+    val accountLabel: String? = null,
+    /**
+     * As linhas cruas `(sessão, projeto, branch, modelo)` que geraram [sessions].
+     *
+     * Mora no integrante, e não no snapshot, porque é delas que sai o eixo "por
+     * integrante" do resumo — e porque a visão global do administrador já copia o
+     * integrante inteiro em `flattenAccounts`, então as linhas viajam junto sem um
+     * segundo caminho para manter em sincronia.
+     *
+     * Vazia no caminho de compatibilidade que monta um integrante sem consumo.
+     */
+    val groupRows: List<CliUsageGroupRow> = emptyList()
 ) {
     val sessionCount: Int
         get() = sessions.size

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +24,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberTrend
 import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import kotlinx.datetime.LocalDate
 
 const val TEAM_TREND_CHART_TAG = "teamTrendChart"
 
@@ -66,7 +68,55 @@ fun TeamTrendChart(
         trend.members.filter { member -> member.hasActivity }.forEach { member ->
             TrendRow(member = member, peak = peak, accent = accent, emptyColor = emptyColor, language = language)
         }
+
+        TrendDayAxis(days = trend.days)
     }
+}
+
+/**
+ * Primeiro e último dia da série, uma vez só, abaixo de todas as faixas.
+ *
+ * Sem eles as barras são retângulos sem escala horizontal: dá para ver que houve
+ * um pico, não em que dia. Só os extremos porque trinta rótulos não cabem, e
+ * repeti-los por integrante seria ruído — o eixo é o mesmo para todas as faixas.
+ */
+@Composable
+private fun TrendDayAxis(days: List<LocalDate>) {
+    val first = days.firstOrNull() ?: return
+    val last = days.lastOrNull() ?: return
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Recuo igual ao da coluna de apelidos: sem ele os rótulos nasceriam
+        // deslocados da primeira e da última barra que descrevem.
+        Spacer(modifier = Modifier.width(ALIAS_COLUMN_WIDTH))
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = shortDayLabel(first),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (last != first) {
+                Text(
+                    text = shortDayLabel(last),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/** `dd/MM`, o mesmo formato curto que o resto da UI usa para data sem hora. */
+private fun shortDayLabel(date: LocalDate): String {
+    val day = date.dayOfMonth.toString().padStart(2, '0')
+    val month = date.monthNumber.toString().padStart(2, '0')
+    return "$day/$month"
 }
 
 @Composable

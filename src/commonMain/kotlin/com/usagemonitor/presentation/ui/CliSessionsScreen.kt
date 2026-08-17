@@ -211,6 +211,16 @@ private fun CliSessionsList(
             NoticeText(state.indexWarning, MaterialTheme.colorScheme.error)
         }
 
+        // Acima das duas abas: a troca de janela desatualiza a lista e o resumo.
+        if (state.isRefreshing) {
+            Text(
+                text = BreakdownLabels.refreshing(language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().testTag(REFRESHING_NOTICE_TAG)
+            )
+        }
+
         if (state.view == CliSessionsView.BREAKDOWN) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 CliUsageBreakdownPane(

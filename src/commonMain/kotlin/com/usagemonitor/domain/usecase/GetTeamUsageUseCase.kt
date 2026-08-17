@@ -3,7 +3,9 @@ package com.usagemonitor.domain.usecase
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliRangeWindow
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
+import com.usagemonitor.domain.entity.toTeamBreakdown
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import kotlinx.datetime.Clock
 
@@ -26,10 +28,15 @@ class GetTeamUsageUseCase(
         range: CliSessionRange = CliSessionRange.DEFAULT,
         windows: CliQuotaWindows = CliQuotaWindows()
     ): Result<TeamUsageResult> {
-        val window = range.resolve(clock.now(), windows)
+        val now = clock.now()
+        val window = range.resolve(now, windows)
 
         return repository.fetch(accountKey, window.cutoffMillis).map { snapshot ->
-            TeamUsageResult(snapshot = snapshot, window = window)
+            TeamUsageResult(
+                snapshot = snapshot,
+                window = window,
+                breakdown = snapshot.toTeamBreakdown(window = window, now = now)
+            )
         }
     }
 }
@@ -37,5 +44,13 @@ class GetTeamUsageUseCase(
 data class TeamUsageResult(
     val snapshot: TeamUsageSnapshot,
     /** Janela efetivamente aplicada, para a UI rotular sem recalcular. */
-    val window: CliRangeWindow = CliRangeWindow()
+    val window: CliRangeWindow = CliRangeWindow(),
+    /**
+     * O mesmo consumo recortado por eixo.
+     *
+     * Sai daqui, e não de uma segunda chamada: as linhas cruas vieram na mesma
+     * resposta, e um caso de uso próprio pediria ao servidor de novo o que já
+     * está em memória.
+     */
+    val breakdown: CliUsageBreakdown = CliUsageBreakdown()
 )

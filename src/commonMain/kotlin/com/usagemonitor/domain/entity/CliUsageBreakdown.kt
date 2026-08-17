@@ -89,6 +89,14 @@ data class CliUsageBreakdown(
     val byProject: List<CliUsageBucket> = emptyList(),
     val byBranch: List<CliUsageBucket> = emptyList(),
     val byModel: List<CliUsageBucket> = emptyList(),
+    /**
+     * Consumo por integrante do time; mais um eixo sobre os mesmos turnos.
+     *
+     * Vazio no índice local, onde a máquina é uma só e o eixo não faria pergunta
+     * nenhuma. Campo com default para o resumo local continuar montando o mesmo
+     * objeto sem saber que o time existe.
+     */
+    val byMember: List<CliUsageBucket> = emptyList(),
     val totals: CliUsageBucket = CliUsageBucket(),
     /**
      * Ferramentas mais chamadas na janela, da mais chamada para a menos.
@@ -155,19 +163,26 @@ fun Iterable<CliUsageGroupRow>.toUsageBreakdown(): CliUsageBreakdown {
 }
 
 /**
- * Ordem total e determinística: custo desc, e o rótulo desbanca o empate.
+ * Ordem total e determinística: custo desc, tokens, e o rótulo desbanca o empate.
  *
  * O desempate não é estético. Duas leituras iguais têm de produzir listas
  * iguais, senão o `StateFlow` reemite e a tela recompõe a cada tique do laço ao
  * vivo — o mesmo motivo que ordena a tela de presença do time.
+ *
+ * Pública porque o eixo por integrante do time nasce fora daqui e tem de sair na
+ * mesma ordem dos outros três: duas ordenações para a mesma lista divergiriam no
+ * primeiro empate.
  */
+fun Iterable<CliUsageBucket>.rankedByCost(): List<CliUsageBucket> {
+    return sortedWith(
+        compareByDescending<CliUsageBucket> { bucket -> bucket.costMicros }
+            .thenByDescending { bucket -> bucket.totalTokens }
+            .thenBy { bucket -> bucket.label ?: "" }
+    )
+}
+
 private fun Iterable<BucketAccumulator>.toRankedBuckets(): List<CliUsageBucket> {
-    return map { accumulator -> accumulator.toBucket() }
-        .sortedWith(
-            compareByDescending<CliUsageBucket> { bucket -> bucket.costMicros }
-                .thenByDescending { bucket -> bucket.totalTokens }
-                .thenBy { bucket -> bucket.label ?: "" }
-        )
+    return map { accumulator -> accumulator.toBucket() }.rankedByCost()
 }
 
 private class BucketAccumulator(private val label: String?) {

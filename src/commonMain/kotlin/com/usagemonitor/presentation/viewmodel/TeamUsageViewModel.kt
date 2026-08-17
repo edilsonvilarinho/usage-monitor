@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliRangeWindow
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
@@ -177,7 +178,32 @@ class TeamUsageViewModel(
 
     fun setRange(range: CliSessionRange) {
         this.range = range
+        // O usuário clicou e espera outra resposta. Sem esta marca a tela segura
+        // os números da janela anterior durante toda a ida ao servidor, sem nada
+        // dizendo que eles ainda são os antigos.
+        markRefreshing()
         refresh()
+    }
+
+    private fun markRefreshing() {
+        val current = _uiState.value
+        if (current is TeamUsageUiState.Success && !current.isRefreshing) {
+            _uiState.value = current.copy(isRefreshing = true)
+        }
+    }
+
+    /**
+     * Troca a aba do modal.
+     *
+     * Sem recarregar: as três leituras já estão no estado — os integrantes e o
+     * resumo vêm da mesma resposta, e a tendência foi lida uma vez na abertura.
+     */
+    fun setView(view: TeamUsageView) {
+        val current = _uiState.value
+        if (current !is TeamUsageUiState.Success) {
+            return
+        }
+        _uiState.value = current.copy(view = view)
     }
 
     /** Abre ou fecha as sessões de um integrante, por `memberKey`. */
@@ -351,10 +377,11 @@ class TeamUsageViewModel(
         }
     }
 
-    /** Membros já rotulados e a janela aplicada, vindos de um dos dois escopos. */
+    /** Membros já rotulados, a janela aplicada e o resumo, de um dos dois escopos. */
     private data class LoadedTeam(
         val members: List<TeamMemberUsage>,
-        val window: CliRangeWindow
+        val window: CliRangeWindow,
+        val breakdown: CliUsageBreakdown
     )
 
     /**
@@ -369,7 +396,11 @@ class TeamUsageViewModel(
         if (adminOverview) {
             val overview = getAdminOverview ?: return null
             return overview(range = range).map { result ->
-                LoadedTeam(members = flattenAccounts(result.accounts), window = result.window)
+                LoadedTeam(
+                    members = flattenAccounts(result.accounts),
+                    window = result.window,
+                    breakdown = result.breakdown
+                )
             }
         }
 
@@ -379,7 +410,11 @@ class TeamUsageViewModel(
             range = range,
             windows = quotaWindows
         ).map { result ->
-            LoadedTeam(members = result.snapshot.members, window = result.window)
+            LoadedTeam(
+                members = result.snapshot.members,
+                window = result.window,
+                breakdown = result.breakdown
+            )
         }
     }
 
@@ -469,13 +504,22 @@ class TeamUsageViewModel(
                         detail = current?.detail,
                         advancedExpanded = current?.advancedExpanded ?: false,
                         glossaryExpanded = current?.glossaryExpanded ?: false,
-                        trend = current?.trend
+                        trend = current?.trend,
+                        // Mesmo tratamento do detalhe: sem carregá-la daqui, o
+                        // tique de 5s devolveria à lista quem está lendo o resumo.
+                        view = current?.view ?: TeamUsageView.MEMBERS,
+                        breakdown = result.breakdown
                     )
                 },
                 onFailure = { error ->
                     // Falha intermitente com dados na tela não apaga o que o
-                    // usuário está lendo: o erro vira aviso e a lista fica.
+                    // usuário está lendo: o erro vira aviso e a lista fica. Mas o
+                    // "Atualizando…" tem de sair, senão a tela avisaria para sempre
+                    // que está esperando uma resposta que já falhou.
                     if (current != null) {
+                        if (current.isRefreshing) {
+                            _uiState.value = current.copy(isRefreshing = false)
+                        }
                         return@fold
                     }
                     _uiState.value = TeamUsageUiState.Error(

@@ -3,12 +3,22 @@ package com.usagemonitor.presentation.viewmodel
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.entity.worstHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import kotlinx.datetime.Instant
+
+/**
+ * Qual das três leituras a janela do time mostra.
+ *
+ * Enum próprio, e não valor a mais em [CliSessionRange] ou em [CliSessionsView]:
+ * os `when` exaustivos daqueles não têm nada a ver com esta escolha, e a tela do
+ * time tem uma aba que a da máquina não tem.
+ */
+enum class TeamUsageView { MEMBERS, BREAKDOWN, TREND }
 
 sealed interface TeamUsageUiState {
 
@@ -91,8 +101,54 @@ sealed interface TeamUsageUiState {
          * Mesmo tratamento de [detail]: mora no estado e é carregada do valor
          * anterior a cada tique.
          */
-        val trend: TeamUsageTrend? = null
+        val trend: TeamUsageTrend? = null,
+        /** Aba corrente. Mesmo tratamento de [detail]: mora no estado. */
+        val view: TeamUsageView = TeamUsageView.MEMBERS,
+        /**
+         * O mesmo consumo da janela recortado por eixo.
+         *
+         * Vem junto com [members], da mesma resposta — ao contrário do resumo da
+         * máquina, que é uma segunda consulta ao índice e por isso só é lido
+         * quando o usuário abre a aba.
+         */
+        val breakdown: CliUsageBreakdown? = null,
+        /**
+         * `true` enquanto uma troca de janela pedida pelo usuário está em voo.
+         *
+         * Não passa por `Loading`: apagar a tela a cada troca é o pisca que o laço
+         * ao vivo existe para evitar. Mas sem aviso nenhum os números da janela
+         * **anterior** ficam na tela durante a ida ao servidor, e quem acabou de
+         * clicar em "30 dias" lê o total de "5h" como se fosse a resposta.
+         *
+         * Só a ação do usuário liga a bandeira. O tique de 5s não: um aviso
+         * piscando de cinco em cinco segundos vira ruído de fundo.
+         */
+        val isRefreshing: Boolean = false
     ) : TeamUsageUiState {
+
+        /**
+         * Se a aba de tendência tem o que mostrar.
+         *
+         * Na visão global a série nunca é carregada — uma linha por conta não
+         * caberia num gráfico só — e um chip permanentemente morto é pior que
+         * chip nenhum.
+         */
+        val isTrendAvailable: Boolean
+            get() = !isAdminOverview
+
+        /**
+         * Aba a desenhar de fato.
+         *
+         * A escolha guardada pode ter deixado de existir — trocar do modal de uma
+         * conta para a visão global tira a aba de tendência do ar — e desenhar
+         * painel nenhum seria uma janela vazia sem explicação.
+         */
+        val effectiveView: TeamUsageView
+            get() = if (view == TeamUsageView.TREND && !isTrendAvailable) {
+                TeamUsageView.MEMBERS
+            } else {
+                view
+            }
 
         val totalTokens: Long
             get() = members.sumOf { member -> member.totalTokens }
