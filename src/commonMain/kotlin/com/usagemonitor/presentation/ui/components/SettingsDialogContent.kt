@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +24,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +38,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -59,6 +63,29 @@ import kotlin.math.roundToInt
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 
+/**
+ * Seções das Configurações, uma por aba.
+ *
+ * Enum próprio, e não um valor a mais em algum enum existente: os `when`
+ * exaustivos de `AppLanguage` e companhia não têm nada a ver com esta escolha.
+ * A ordem de declaração é a ordem das abas na tela.
+ */
+enum class SettingsTab { GENERAL, ALERTS, APIS, ACCOUNTS, TEAM }
+
+/** Marcado por aba: o rótulo é traduzido e buscar por texto amarraria o teste ao idioma. */
+fun settingsTabTestTag(tab: SettingsTab): String = "settingsTab_${tab.name}"
+
+internal fun settingsTabLabel(tab: SettingsTab, language: AppLanguage): String {
+    val isPt = language == AppLanguage.PT
+    return when (tab) {
+        SettingsTab.GENERAL -> if (isPt) "Geral" else "General"
+        SettingsTab.ALERTS -> if (isPt) "Alertas" else "Alerts"
+        SettingsTab.APIS -> if (isPt) "APIs" else "APIs"
+        SettingsTab.ACCOUNTS -> if (isPt) "Contas" else "Accounts"
+        SettingsTab.TEAM -> if (isPt) "Time" else "Team"
+    }
+}
+
 enum class AnthropicProfileUiStatus { READY, INCOMPLETE, INVALID, DUPLICATE }
 
 data class AnthropicProfileUiModel(
@@ -72,7 +99,6 @@ data class AnthropicProfileUiModel(
     val detail: String? = null
 )
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsDialogContent(
     currentTheme: AppTheme,
@@ -115,9 +141,18 @@ fun SettingsDialogContent(
     onTeamOpenKeysManager: () -> Unit = {},
     onTeamExitAdminMode: () -> Unit = {},
     toastEvent: SettingsToastEvent? = null,
+    /** Aba aberta ao entrar; existe para os geradores de captura escolherem a seção. */
+    initialTab: SettingsTab = SettingsTab.GENERAL,
     modifier: Modifier = Modifier
 ) {
-    val scrollState = rememberScrollState()
+    // A aba mora num `remember` do próprio diálogo: ele é uma janela separada e
+    // nenhuma outra parte do app precisa saber qual seção está aberta — mesmo
+    // critério que o filtro e a página do resumo por eixo seguem.
+    var selectedTab by remember { mutableStateOf(initialTab) }
+
+    // Um estado de rolagem por aba, começando no topo: reaproveitar o mesmo faria
+    // a aba curta abrir rolada pela posição que a aba longa deixou para trás.
+    val scrollState = remember(selectedTab) { ScrollState(0) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Evento que já existia quando o diálogo abriu é de uma edição anterior —
@@ -145,167 +180,280 @@ fun SettingsDialogContent(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            SettingsSectionCard {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ThemeToggle(
-                        isDark = currentTheme == AppTheme.DARK,
-                        language = currentLanguage,
-                        onToggle = onThemeToggle
-                    )
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Preso no topo fica só a fileira de abas: ela é o controle de
+            // navegação, e rolar o conteúdo não pode tirá-la da vista.
+            SettingsTabRow(
+                selected = selectedTab,
+                language = currentLanguage,
+                onSelect = { tab -> selectedTab = tab }
+            )
 
-                    AutoStartToggle(
-                        enabled = autoStartEnabled,
-                        language = currentLanguage,
-                        onToggle = onAutoStartChange
-                    )
-
-                    AlwaysOnTopToggle(
-                        enabled = alwaysOnTopEnabled,
-                        language = currentLanguage,
-                        onToggle = onAlwaysOnTopChange
-                    )
-
-                    WindowOpacitySlider(
-                        percent = windowOpacityPercent,
-                        language = currentLanguage,
-                        enabled = windowOpacityEnabled,
-                        onPercentChange = onWindowOpacityChange
-                    )
-
-                    Text(
-                        text = if (currentLanguage == AppLanguage.PT) "Idioma" else "Language",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    LanguageSelector(
+            // A barra de rolagem mora dentro da área rolável, e não sobre o
+            // diálogo inteiro: no topo ela não teria o que rolar e ficaria por
+            // cima das abas.
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                when (selectedTab) {
+                    SettingsTab.GENERAL -> GeneralSettingsTab(
+                        currentTheme = currentTheme,
                         currentLanguage = currentLanguage,
-                        onLanguageChange = onLanguageChange
+                        autoStartEnabled = autoStartEnabled,
+                        alwaysOnTopEnabled = alwaysOnTopEnabled,
+                        windowOpacityPercent = windowOpacityPercent,
+                        windowOpacityEnabled = windowOpacityEnabled,
+                        onThemeToggle = onThemeToggle,
+                        onLanguageChange = onLanguageChange,
+                        onAutoStartChange = onAutoStartChange,
+                        onAlwaysOnTopChange = onAlwaysOnTopChange,
+                        onWindowOpacityChange = onWindowOpacityChange
                     )
-                }
-            }
 
-            SettingsSectionCard {
-                AlertSettingsSection(
-                    settings = alertSettings,
-                    language = currentLanguage,
-                    onSettingsChange = onAlertSettingsChange,
-                    budgetText = monthlyBudgetText,
-                    onBudgetCommit = onMonthlyBudgetCommit
-                )
-            }
+                    SettingsTab.ALERTS -> SettingsSectionCard {
+                        AlertSettingsSection(
+                            settings = alertSettings,
+                            language = currentLanguage,
+                            onSettingsChange = onAlertSettingsChange,
+                            budgetText = monthlyBudgetText,
+                            onBudgetCommit = onMonthlyBudgetCommit
+                        )
+                    }
 
-            SettingsSectionCard {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = if (currentLanguage == AppLanguage.PT) "APIs monitoradas" else "Monitored APIs",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
+                    SettingsTab.APIS -> MonitoredApisTab(
+                        currentLanguage = currentLanguage,
+                        enabledApis = enabledApis,
+                        onApiToggle = onApiToggle
                     )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ApiSource.entries.forEach { api ->
-                            ApiCheckboxRow(
-                                api = api,
-                                language = currentLanguage,
-                                isChecked = api in enabledApis,
-                                onCheckedChange = { checked -> onApiToggle(api, checked) }
-                            )
-                        }
+
+                    SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
+                        currentLanguage = currentLanguage,
+                        anthropicProfiles = anthropicProfiles,
+                        expandedProfileId = expandedProfileId,
+                        onAnthropicProfileToggle = onAnthropicProfileToggle,
+                        onAnthropicProfileRename = onAnthropicProfileRename,
+                        onAddAnthropicProfile = onAddAnthropicProfile,
+                        onRemoveAnthropicProfile = onRemoveAnthropicProfile,
+                        onRescanAnthropicProfiles = onRescanAnthropicProfiles,
+                        onToggleProfileExpanded = onToggleProfileExpanded
+                    )
+
+                    SettingsTab.TEAM -> SettingsSectionCard {
+                        TeamIntegrationSection(
+                            settings = teamSettings,
+                            language = currentLanguage,
+                            profiles = anthropicProfiles,
+                            connection = teamConnection,
+                            onEnabledChange = onTeamEnabledChange,
+                            onServerUrlChange = onTeamServerUrlChange,
+                            onApiKeyChange = onTeamApiKeyChange,
+                            onAliasChange = onTeamAliasChange,
+                            onProfileParticipationChange = onTeamProfileParticipationChange,
+                            onTestConnection = onTeamTestConnection,
+                            syncFailureMessage = teamSyncFailureMessage,
+                            adminConnection = teamAdminConnection,
+                            onAdminTokenChange = onTeamAdminTokenChange,
+                            onValidateAdminToken = onTeamValidateAdminToken,
+                            onOpenKeysManager = onTeamOpenKeysManager,
+                            onExitAdminMode = onTeamExitAdminMode
+                        )
                     }
                 }
             }
-
-            SettingsSectionCard {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (currentLanguage == AppLanguage.PT) "Contas Anthropic" else "Anthropic accounts",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = onRescanAnthropicProfiles) {
-                            Text(if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan")
-                        }
-                        Button(onClick = onAddAnthropicProfile) {
-                            Text(if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add")
-                        }
-                    }
-
-                    if (anthropicProfiles.isEmpty()) {
-                        Text(
-                            text = if (currentLanguage == AppLanguage.PT) {
-                                "Nenhum perfil Anthropic detectado."
-                            } else {
-                                "No Anthropic profile detected."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        anthropicProfiles.forEach { profile ->
-                            key(profile.id) {
-                                AnthropicProfileRow(
-                                    profile = profile,
-                                    language = currentLanguage,
-                                    expanded = profile.id == expandedProfileId,
-                                    onToggle = onAnthropicProfileToggle,
-                                    onRename = onAnthropicProfileRename,
-                                    onRemove = onRemoveAnthropicProfile,
-                                    onToggleExpanded = { onToggleProfileExpanded(profile.id) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            SettingsSectionCard {
-                TeamIntegrationSection(
-                    settings = teamSettings,
-                    language = currentLanguage,
-                    profiles = anthropicProfiles,
-                    connection = teamConnection,
-                    onEnabledChange = onTeamEnabledChange,
-                    onServerUrlChange = onTeamServerUrlChange,
-                    onApiKeyChange = onTeamApiKeyChange,
-                    onAliasChange = onTeamAliasChange,
-                    onProfileParticipationChange = onTeamProfileParticipationChange,
-                    onTestConnection = onTeamTestConnection,
-                    syncFailureMessage = teamSyncFailureMessage,
-                    adminConnection = teamAdminConnection,
-                    onAdminTokenChange = onTeamAdminTokenChange,
-                    onValidateAdminToken = onTeamValidateAdminToken,
-                    onOpenKeysManager = onTeamOpenKeysManager,
-                    onExitAdminMode = onTeamExitAdminMode
-                )
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(scrollState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .testTag(SETTINGS_TOAST_HOST_TEST_TAG)
+            )
             }
         }
-        VerticalScrollbar(
-            adapter = rememberScrollbarAdapter(scrollState),
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-        )
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag(SETTINGS_TOAST_HOST_TEST_TAG)
-        )
+    }
+}
+
+@Composable
+private fun GeneralSettingsTab(
+    currentTheme: AppTheme,
+    currentLanguage: AppLanguage,
+    autoStartEnabled: Boolean,
+    alwaysOnTopEnabled: Boolean,
+    windowOpacityPercent: Int,
+    windowOpacityEnabled: Boolean,
+    onThemeToggle: () -> Unit,
+    onLanguageChange: (AppLanguage) -> Unit,
+    onAutoStartChange: (Boolean) -> Unit,
+    onAlwaysOnTopChange: (Boolean) -> Unit,
+    onWindowOpacityChange: (Int) -> Unit
+) {
+    SettingsSectionCard {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ThemeToggle(
+                isDark = currentTheme == AppTheme.DARK,
+                language = currentLanguage,
+                onToggle = onThemeToggle
+            )
+
+            AutoStartToggle(
+                enabled = autoStartEnabled,
+                language = currentLanguage,
+                onToggle = onAutoStartChange
+            )
+
+            AlwaysOnTopToggle(
+                enabled = alwaysOnTopEnabled,
+                language = currentLanguage,
+                onToggle = onAlwaysOnTopChange
+            )
+
+            WindowOpacitySlider(
+                percent = windowOpacityPercent,
+                language = currentLanguage,
+                enabled = windowOpacityEnabled,
+                onPercentChange = onWindowOpacityChange
+            )
+
+            Text(
+                text = if (currentLanguage == AppLanguage.PT) "Idioma" else "Language",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            LanguageSelector(
+                currentLanguage = currentLanguage,
+                onLanguageChange = onLanguageChange
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MonitoredApisTab(
+    currentLanguage: AppLanguage,
+    enabledApis: Set<ApiSource>,
+    onApiToggle: (ApiSource, Boolean) -> Unit
+) {
+    SettingsSectionCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = if (currentLanguage == AppLanguage.PT) "APIs monitoradas" else "Monitored APIs",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ApiSource.entries.forEach { api ->
+                    ApiCheckboxRow(
+                        api = api,
+                        language = currentLanguage,
+                        isChecked = api in enabledApis,
+                        onCheckedChange = { checked -> onApiToggle(api, checked) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnthropicAccountsTab(
+    currentLanguage: AppLanguage,
+    anthropicProfiles: List<AnthropicProfileUiModel>,
+    expandedProfileId: String?,
+    onAnthropicProfileToggle: (String, Boolean) -> Unit,
+    onAnthropicProfileRename: (String, String) -> Unit,
+    onAddAnthropicProfile: () -> Unit,
+    onRemoveAnthropicProfile: (String) -> Unit,
+    onRescanAnthropicProfiles: () -> Unit,
+    onToggleProfileExpanded: (String) -> Unit
+) {
+    SettingsSectionCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (currentLanguage == AppLanguage.PT) "Contas Anthropic" else "Anthropic accounts",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onRescanAnthropicProfiles) {
+                    Text(if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan")
+                }
+                Button(onClick = onAddAnthropicProfile) {
+                    Text(if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add")
+                }
+            }
+
+            if (anthropicProfiles.isEmpty()) {
+                Text(
+                    text = if (currentLanguage == AppLanguage.PT) {
+                        "Nenhum perfil Anthropic detectado."
+                    } else {
+                        "No Anthropic profile detected."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                anthropicProfiles.forEach { profile ->
+                    key(profile.id) {
+                        AnthropicProfileRow(
+                            profile = profile,
+                            language = currentLanguage,
+                            expanded = profile.id == expandedProfileId,
+                            onToggle = onAnthropicProfileToggle,
+                            onRename = onAnthropicProfileRename,
+                            onRemove = onRemoveAnthropicProfile,
+                            onToggleExpanded = { onToggleProfileExpanded(profile.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Fileira de abas em `FilterChip`, que é como o app já desenha aba — os chips do
+ * resumo por eixo e os do modal do time seguem o mesmo desenho. Um `TabRow` aqui
+ * seria um segundo vocabulário visual para a mesma função.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingsTabRow(
+    selected: SettingsTab,
+    language: AppLanguage,
+    onSelect: (SettingsTab) -> Unit
+) {
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SettingsTab.entries.forEach { tab ->
+            FilterChip(
+                selected = tab == selected,
+                onClick = { onSelect(tab) },
+                label = { Text(settingsTabLabel(tab, language)) },
+                modifier = Modifier.testTag(settingsTabTestTag(tab))
+            )
         }
     }
 }
