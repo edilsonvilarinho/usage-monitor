@@ -52,6 +52,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
@@ -62,6 +63,7 @@ import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
+import com.usagemonitor.presentation.viewmodel.TeamUsageView
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 
 internal const val TEAM_LIST_SCROLLBAR_TAG = "teamUsageListScrollbar"
@@ -74,6 +76,14 @@ internal const val TEAM_REMOVE_CONFIRM_TAG = "teamMemberRemoveConfirm"
 internal const val TEAM_ADMIN_OVERVIEW_TAG = "teamAdminOverviewBadge"
 internal const val TEAM_ACCOUNT_GROUP_TAG_PREFIX = "teamAccountGroup:"
 internal const val TEAM_SLIDING_WINDOW_NOTICE_TAG = "teamSlidingWindowNotice"
+const val TEAM_TAB_MEMBERS_TAG = "teamUsageTabMembers"
+const val TEAM_TAB_BREAKDOWN_TAG = "teamUsageTabBreakdown"
+const val TEAM_TAB_TREND_TAG = "teamUsageTabTrend"
+internal const val TEAM_TREND_PANE_TAG = "teamUsageTrendPane"
+internal const val TEAM_TREND_SCROLLBAR_TAG = "teamUsageTrendScrollbar"
+
+/** Compartilhada com o modal da máquina: as duas telas dão o mesmo aviso. */
+const val REFRESHING_NOTICE_TAG = "usageRefreshingNotice"
 
 // Larguras das colunas da lista, num lugar só: a faixa da conta e a linha do
 // integrante têm de cair no mesmo x, e dois conjuntos de literais seriam dois
@@ -116,6 +126,7 @@ fun TeamUsageScreen(
         onCloseDetail = { viewModel.closeDetail() },
         onToggleAdvanced = { viewModel.toggleAdvanced() },
         onToggleGlossary = { viewModel.toggleGlossary() },
+        onSelectView = { view -> viewModel.setView(view) },
         modifier = modifier
     )
 }
@@ -138,7 +149,8 @@ internal fun TeamUsageContent(
     onOpenSession: (String, String) -> Unit = { _, _ -> },
     onCloseDetail: () -> Unit = {},
     onToggleAdvanced: () -> Unit = {},
-    onToggleGlossary: () -> Unit = {}
+    onToggleGlossary: () -> Unit = {},
+    onSelectView: (TeamUsageView) -> Unit = {}
 ) {
     // Qual integrante está aguardando confirmação. Estado de tela, não do
     // servidor: o laço ao vivo recarrega a lista a cada 5s e não pode fechar o
@@ -168,7 +180,8 @@ internal fun TeamUsageContent(
                         onToggleAccount = onToggleAccount,
                         onOpenSession = onOpenSession,
                         onRequestRemoveMember = { member -> pendingRemoval = member },
-                        onDismissRemovalError = onDismissRemovalError
+                        onDismissRemovalError = onDismissRemovalError,
+                        onSelectView = onSelectView
                     )
                 } else {
                     TeamSessionDetailPane(
@@ -241,18 +254,30 @@ private fun TeamUsageList(
     onToggleAccount: (String) -> Unit,
     onOpenSession: (String, String) -> Unit,
     onRequestRemoveMember: (TeamMemberUsage) -> Unit,
-    onDismissRemovalError: () -> Unit
+    onDismissRemovalError: () -> Unit,
+    onSelectView: (TeamUsageView) -> Unit
 ) {
+    val view = state.effectiveView
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        TeamUsageHeader(state = state, language = language, onSelectRange = onSelectRange)
+        TeamUsageHeader(
+            state = state,
+            language = language,
+            onSelectRange = onSelectRange,
+            onSelectView = onSelectView
+        )
 
         // Sem este aviso a diferença para o modal de uma conta parece defeito:
         // lá a janela de 5h começa no reset da quota daquela conta, e aqui não
-        // pode começar no reset de nenhuma, porque são várias.
-        if (state.isAdminOverview && state.range == CliSessionRange.LAST_5H) {
+        // pode começar no reset de nenhuma, porque são várias. Só nas abas que
+        // obedecem ao filtro de janela: a tendência é de dias e o ignora.
+        if (state.isAdminOverview &&
+            state.range == CliSessionRange.LAST_5H &&
+            view != TeamUsageView.TREND
+        ) {
             Text(
                 text = TeamUsageLabels.slidingWindowNotice(language),
                 style = MaterialTheme.typography.labelSmall,
@@ -261,30 +286,20 @@ private fun TeamUsageList(
             )
         }
 
-        val trend = state.trend
-        if (trend != null && !trend.isEmpty) {
-            DepthSurface(
-                accent = OUTPUT_COLOR,
-                modifier = Modifier.fillMaxWidth(),
-                shape = AppShapes.medium,
-                elevation = AppElevation.card,
-                contentPadding = 12.dp
-            ) {
-                Text(
-                    text = TeamUsageLabels.trendTitle(trend.days.size, language),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = OUTPUT_COLOR
-                )
-                TeamTrendChart(trend = trend, accent = OUTPUT_COLOR, language = language)
-                Text(
-                    text = TeamUsageLabels.trendNotice(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        // Acima do despacho de aba: vale para as três, porque a troca de janela
+        // deixa desatualizado tudo o que elas mostram.
+        if (state.isRefreshing) {
+            Text(
+                text = BreakdownLabels.refreshing(language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().testTag(REFRESHING_NOTICE_TAG)
+            )
         }
 
+        // Acima do despacho de aba, e não dentro da lista: é o retorno de uma ação
+        // que o usuário tomou, e trocar de aba não pode escondê-lo antes de ele
+        // ser lido — o mesmo motivo pelo qual ele não mora no `uiState`.
         if (removalError != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -301,6 +316,27 @@ private fun TeamUsageList(
                     Text(TeamUsageLabels.cancel(language))
                 }
             }
+        }
+
+        if (view == TeamUsageView.TREND) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                TeamTrendPane(trend = state.trend, language = language)
+            }
+            return@Column
+        }
+
+        if (view == TeamUsageView.BREAKDOWN) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                CliUsageBreakdownPane(
+                    breakdown = state.breakdown,
+                    errorMessage = null,
+                    language = language,
+                    // Sem orçamento nem créditos: os dois são da máquina e da conta
+                    // desta instalação, não do time que a janela mostra.
+                    hint = TeamUsageLabels.breakdownHint(language)
+                )
+            }
+            return@Column
         }
 
         if (state.isEmpty) {
@@ -396,6 +432,78 @@ private fun TeamUsageList(
                     .testTag(TEAM_LIST_SCROLLBAR_TAG)
             )
         }
+    }
+}
+
+/**
+ * Aba da tendência: o gráfico com a altura inteira do modal.
+ *
+ * Era um painel fixo acima da lista, e nessa posição comia cerca de metade da
+ * janela para mostrar um recorte — dias — que nem sequer obedece ao filtro de
+ * janela escolhido logo acima dele. Como aba, ele só aparece para quem o pediu, e
+ * aí tem espaço para ser lido.
+ *
+ * Rola porque a altura cresce com o número de integrantes: com dez pessoas a
+ * última faixa cairia fora da janela.
+ */
+@Composable
+private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
+    if (trend == null) {
+        CenteredMessage(TeamUsageLabels.trendUnavailable(language))
+        return
+    }
+    if (trend.isEmpty) {
+        CenteredMessage(TeamUsageLabels.trendEmpty(language))
+        return
+    }
+
+    val scrollState = rememberScrollState()
+
+    Box(modifier = Modifier.fillMaxSize().testTag(TEAM_TREND_PANE_TAG)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(end = SCROLLBAR_GUTTER),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            DepthSurface(
+                accent = OUTPUT_COLOR,
+                modifier = Modifier.fillMaxWidth(),
+                shape = AppShapes.large,
+                elevation = AppElevation.dialog,
+                contentPadding = 16.dp
+            ) {
+                Text(
+                    text = TeamUsageLabels.trendTitle(trend.days.size, language),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OUTPUT_COLOR
+                )
+                // O que a tendência é, antes de como lê-la: sem esta frase o
+                // painel entrega barras sem dizer que grandeza elas medem.
+                Text(
+                    text = TeamUsageLabels.trendHint(trend.days.size, language),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = TeamUsageLabels.trendNotice(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            TeamTrendChart(trend = trend, accent = OUTPUT_COLOR, language = language)
+        }
+
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .testTag(TEAM_TREND_SCROLLBAR_TAG)
+        )
     }
 }
 
@@ -557,7 +665,8 @@ internal fun TeamHealthCell(
 private fun TeamUsageHeader(
     state: TeamUsageUiState.Success,
     language: AppLanguage,
-    onSelectRange: (CliSessionRange) -> Unit
+    onSelectRange: (CliSessionRange) -> Unit,
+    onSelectView: (TeamUsageView) -> Unit
 ) {
     val accents = AppAccents.current
 
@@ -673,6 +782,42 @@ private fun TeamUsageHeader(
                     selected = state.range == entry,
                     onClick = { onSelectRange(entry) },
                     label = { Text(TeamUsageLabels.rangeLabel(entry, language)) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Abas depois dos chips de janela, como no modal da máquina: a janela vale
+        // para as leituras de dentro, então trocá-la é a escolha de fora.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val view = state.effectiveView
+
+            FilterChip(
+                selected = view == TeamUsageView.MEMBERS,
+                onClick = { onSelectView(TeamUsageView.MEMBERS) },
+                label = { Text(TeamUsageLabels.tabMembers(language)) },
+                modifier = Modifier.testTag(TEAM_TAB_MEMBERS_TAG)
+            )
+            FilterChip(
+                selected = view == TeamUsageView.BREAKDOWN,
+                onClick = { onSelectView(TeamUsageView.BREAKDOWN) },
+                label = { Text(BreakdownLabels.tabBreakdown(language)) },
+                modifier = Modifier.testTag(TEAM_TAB_BREAKDOWN_TAG)
+            )
+            // Na visão global a série nunca é carregada — uma linha por conta não
+            // caberia num gráfico só — e um chip que nunca mostra nada é pior que
+            // chip nenhum.
+            if (state.isTrendAvailable) {
+                FilterChip(
+                    selected = view == TeamUsageView.TREND,
+                    onClick = { onSelectView(TeamUsageView.TREND) },
+                    label = { Text(TeamUsageLabels.tabTrend(language)) },
+                    modifier = Modifier.testTag(TEAM_TAB_TREND_TAG)
                 )
             }
         }

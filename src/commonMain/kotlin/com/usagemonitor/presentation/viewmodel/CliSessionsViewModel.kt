@@ -149,6 +149,13 @@ class CliSessionsViewModel(
     /** Troca a janela temporal e recarrega a lista reagregada. */
     fun setRange(range: CliSessionRange) {
         this.range = range
+        // O usuário clicou e espera outra resposta. Sem esta marca a tela segura
+        // os números da janela anterior durante toda a varredura, sem nada
+        // dizendo que eles ainda são os antigos.
+        val current = _uiState.value
+        if (current is CliSessionsUiState.Success && !current.isRefreshing) {
+            _uiState.value = current.copy(isRefreshing = true)
+        }
         refresh()
         // O resumo descreve a mesma janela: deixá-lo para trás mostraria dois
         // recortes diferentes na mesma tela.
@@ -258,8 +265,18 @@ class CliSessionsViewModel(
         }
     }
 
+    /**
+     * `true` entre o pedido de recarga do resumo e a resposta dele.
+     *
+     * A lista e o resumo são duas leituras: sem este marcador, a que terminasse
+     * primeiro apagaria o "Atualizando…" e o resumo da janela **anterior**
+     * ficaria na tela parecendo a resposta nova.
+     */
+    private var breakdownReloadPending = false
+
     private fun refreshBreakdownIfVisible() {
         if ((_uiState.value as? CliSessionsUiState.Success)?.view == CliSessionsView.BREAKDOWN) {
+            breakdownReloadPending = true
             startBreakdownLoad()
         }
     }
@@ -339,12 +356,23 @@ class CliSessionsViewModel(
 
         useCase(profileId = profileId, range = range, windows = quotaWindows).fold(
             onSuccess = { breakdown ->
+                breakdownReloadPending = false
                 val latest = _uiState.value as? CliSessionsUiState.Success ?: return
-                _uiState.value = latest.copy(breakdown = breakdown, breakdownError = null)
+                _uiState.value = latest.copy(
+                    breakdown = breakdown,
+                    breakdownError = null,
+                    isRefreshing = false
+                )
             },
             onFailure = { error ->
+                // O aviso sai mesmo na falha: ele diz "estou esperando", e a
+                // espera acabou — o que resta é o erro, que tem linha própria.
+                breakdownReloadPending = false
                 val latest = _uiState.value as? CliSessionsUiState.Success ?: return
-                _uiState.value = latest.copy(breakdownError = error.message ?: UNKNOWN_ERROR_MESSAGE)
+                _uiState.value = latest.copy(
+                    breakdownError = error.message ?: UNKNOWN_ERROR_MESSAGE,
+                    isRefreshing = false
+                )
             }
         )
     }
@@ -430,7 +458,10 @@ class CliSessionsViewModel(
                     breakdownError = current?.breakdownError,
                     exportOutcome = current?.exportOutcome,
                     budget = current?.budget,
-                    accountCredits = current?.accountCredits
+                    accountCredits = current?.accountCredits,
+                    // A lista já chegou, mas o resumo descreve a mesma janela e
+                    // pode estar a caminho: o aviso só sai quando os dois chegam.
+                    isRefreshing = breakdownReloadPending
                 )
             },
             onFailure = { error ->

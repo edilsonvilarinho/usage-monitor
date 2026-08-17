@@ -48,6 +48,59 @@ internal fun teamUsageWindowTitle(
  */
 internal object TeamUsageLabels {
 
+    fun tabMembers(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Integrantes" else "Members"
+    }
+
+    fun tabTrend(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Tendência" else "Trend"
+    }
+
+    /**
+     * O que a tendência **é**, e não só como lê-la.
+     *
+     * Sem esta frase o painel entrega barras roxas sem dizer que grandeza elas
+     * medem, em que recorte, nem por que não obedecem ao filtro de janela logo
+     * acima delas.
+     */
+    fun trendHint(dayCount: Int, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Quanto cada integrante gastou por dia nos últimos $dayCount dias, uma barra por dia. " +
+                "Serve para ver quem subiu ou parou ao longo do tempo — é história, não a janela de quota atual."
+        } else {
+            "How much each member spent per day over the last $dayCount days, one bar per day. " +
+                "It answers who ramped up or stopped over time — it is history, not the current quota window."
+        }
+    }
+
+    fun trendEmpty(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Nenhum consumo registrado nos dias cobertos pela tendência."
+        } else {
+            "No usage recorded in the days the trend covers."
+        }
+    }
+
+    fun trendUnavailable(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Tendência indisponível: este servidor de time é anterior à rota que a serve."
+        } else {
+            "Trend unavailable: this team server predates the route that serves it."
+        }
+    }
+
+    /**
+     * O resumo descreve os **mesmos** turnos da lista, por outros eixos. Sem
+     * dizê-lo, os dois totais parecem duas medidas concorrentes.
+     */
+    fun breakdownHint(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Os mesmos turnos da lista de integrantes, recortados por eixo. Custo estimado a preço de tabela, calculado nesta máquina."
+        } else {
+            "The same turns from the member list, sliced by axis. Estimated cost at list price, computed on this machine."
+        }
+    }
+
     fun trendTitle(dayCount: Int, language: AppLanguage): String {
         return if (language == AppLanguage.PT) {
             "Tendência dos últimos $dayCount dias"

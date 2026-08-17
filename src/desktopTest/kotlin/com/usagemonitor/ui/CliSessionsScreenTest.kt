@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.data.export.UsageExportFormat
@@ -32,6 +34,13 @@ import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.EXPORT_CSV_TAG
 import com.usagemonitor.presentation.ui.EXPORT_JSON_TAG
 import com.usagemonitor.presentation.ui.LIST_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.BREAKDOWN_AXIS_TAB_TAG_PREFIX
+import com.usagemonitor.presentation.ui.BREAKDOWN_FILTER_TAG
+import com.usagemonitor.presentation.ui.BREAKDOWN_NEXT_PAGE_TAG
+import com.usagemonitor.presentation.ui.BREAKDOWN_PAGE_SIZE_TAG_PREFIX
+import com.usagemonitor.presentation.ui.BREAKDOWN_SORT_DIRECTION_TAG
+import com.usagemonitor.presentation.ui.BREAKDOWN_SORT_TAG_PREFIX
+import com.usagemonitor.presentation.ui.REFRESHING_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TAB_BREAKDOWN_TAG
 import com.usagemonitor.presentation.ui.TAB_SESSIONS_TAG
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -1081,14 +1090,115 @@ class CliSessionsScreenTest {
             }
         }
 
-        onNodeWithText("Por projeto").assertIsDisplayed()
+        // Sem eixo por integrante nem ferramenta neste resumo: só as abas que têm
+        // dado aparecem, e "Projeto" é a primeira delas.
+        onNodeWithTag("${BREAKDOWN_AXIS_TAB_TAG_PREFIX}PROJECT").assertIsSelected()
         onNodeWithText("alpha").assertIsDisplayed()
         onNodeWithText("beta").assertIsDisplayed()
         onNodeWithText("75%").assertIsDisplayed()
-        // Somar seções contaria o mesmo gasto três vezes; a tela diz isso.
+        // Somar seções contaria o mesmo gasto duas vezes; a tela diz isso.
         onNodeWithText(
-            "As três seções descrevem os mesmos turnos por eixos diferentes — não se somam."
+            "As seções descrevem os mesmos turnos por eixos diferentes — não se somam."
         ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `o filtro do resumo estreita a lista do eixo`() = runDesktopComposeUiTest {
+        val breakdown = listOf(
+            groupRow("s1", "/workspace/alpha", inputTokens = 3_000_000L),
+            groupRow("s2", "/workspace/beta", inputTokens = 1_000_000L)
+        ).toUsageBreakdown()
+
+        renderBreakdown(breakdown)
+
+        onNodeWithTag(BREAKDOWN_FILTER_TAG).performTextInput("alp")
+
+        onNodeWithText("alpha").assertIsDisplayed()
+        assertEquals(0, onAllNodesWithText("beta").fetchSemanticsNodes(false).size)
+    }
+
+    /** Issue #58: em produção a lista de projetos exigia rolagem sem fim. */
+    @Test
+    fun `o resumo pagina o eixo e caminha entre as paginas`() = runDesktopComposeUiTest {
+        val breakdown = (1..8).map { index ->
+            groupRow("s$index", "/workspace/proj$index", inputTokens = index * 1_000_000L)
+        }.toUsageBreakdown()
+
+        renderBreakdown(breakdown, pageSizeTag = "${BREAKDOWN_PAGE_SIZE_TAG_PREFIX}5")
+
+        // Cinco por página: o oitavo projeto não cabe na primeira.
+        onNodeWithText("proj8").assertIsDisplayed()
+        assertEquals(0, onAllNodesWithText("proj1").fetchSemanticsNodes(false).size)
+
+        onNodeWithTag(BREAKDOWN_NEXT_PAGE_TAG).performClick()
+
+        onNodeWithText("proj1").assertIsDisplayed()
+        assertEquals(0, onAllNodesWithText("proj8").fetchSemanticsNodes(false).size)
+    }
+
+    @Test
+    fun `ordenar por nome reordena o eixo`() = runDesktopComposeUiTest {
+        val breakdown = listOf(
+            groupRow("s1", "/workspace/zulu", inputTokens = 3_000_000L),
+            groupRow("s2", "/workspace/alpha", inputTokens = 1_000_000L)
+        ).toUsageBreakdown()
+
+        renderBreakdown(breakdown)
+
+        // Por custo, zulu vem primeiro; por nome crescente, alpha.
+        onNodeWithTag("${BREAKDOWN_SORT_TAG_PREFIX}NAME").performClick()
+        onNodeWithTag(BREAKDOWN_SORT_DIRECTION_TAG).performClick()
+
+        onNodeWithText("alpha").assertIsDisplayed()
+        onNodeWithText("zulu").assertIsDisplayed()
+    }
+
+    @Test
+    fun `trocar a janela avisa que os numeros ainda sao os antigos`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            isRefreshing = true
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(REFRESHING_NOTICE_TAG).assertIsDisplayed()
+    }
+
+    private fun ComposeUiTest.renderBreakdown(
+        breakdown: com.usagemonitor.domain.entity.CliUsageBreakdown,
+        pageSizeTag: String? = null
+    ) {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(1_100.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-abcdef01")),
+                            view = CliSessionsView.BREAKDOWN,
+                            breakdown = breakdown
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+        if (pageSizeTag != null) {
+            onNodeWithTag(pageSizeTag).performClick()
+        }
     }
 
     @Test

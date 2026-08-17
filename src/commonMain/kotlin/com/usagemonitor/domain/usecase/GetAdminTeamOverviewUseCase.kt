@@ -3,7 +3,10 @@ package com.usagemonitor.domain.usecase
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliRangeWindow
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.TeamAccountUsage
+import com.usagemonitor.domain.entity.TeamUsageSnapshot
+import com.usagemonitor.domain.entity.toTeamBreakdown
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import kotlinx.datetime.Clock
 
@@ -24,10 +27,20 @@ class GetAdminTeamOverviewUseCase(
     suspend operator fun invoke(
         range: CliSessionRange = CliSessionRange.DEFAULT
     ): Result<AdminTeamOverviewResult> {
-        val window = range.resolve(clock.now(), CliQuotaWindows())
+        val now = clock.now()
+        val window = range.resolve(now, CliQuotaWindows())
 
         return repository.fetchOverview(window.cutoffMillis).map { accounts ->
-            AdminTeamOverviewResult(accounts = accounts, window = window)
+            // O resumo global soma as contas, que é o mesmo escopo da lista logo
+            // abaixo dele na tela: um resumo por conta ali obrigaria a escolher uma.
+            val merged = TeamUsageSnapshot(
+                members = accounts.flatMap { account -> account.snapshot.members }
+            )
+            AdminTeamOverviewResult(
+                accounts = accounts,
+                window = window,
+                breakdown = merged.toTeamBreakdown(window = window, now = now)
+            )
         }
     }
 }
@@ -35,5 +48,7 @@ class GetAdminTeamOverviewUseCase(
 data class AdminTeamOverviewResult(
     val accounts: List<TeamAccountUsage> = emptyList(),
     /** Janela efetivamente aplicada, para a UI rotular sem recalcular. */
-    val window: CliRangeWindow = CliRangeWindow()
+    val window: CliRangeWindow = CliRangeWindow(),
+    /** O mesmo consumo recortado por eixo, somando todas as contas. */
+    val breakdown: CliUsageBreakdown = CliUsageBreakdown()
 )

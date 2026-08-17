@@ -12,6 +12,7 @@ import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamTurnUploadDto
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamMemberIdentity
@@ -102,6 +103,11 @@ fun TeamIngestResponseDto.toDomain(): TeamIngestReceipt {
 fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
     val accumulatorsByDevice = LinkedHashMap<String, LinkedHashMap<String, WindowedSessionAccumulator>>()
 
+    // As mesmas linhas da resposta, guardadas cruas para o resumo por eixo. Sair
+    // das sessões já dobradas não serviria: `toSummary()` colapsa os modelos num
+    // `primaryModel` só, e o eixo "por modelo" some no caminho.
+    val groupRowsByDevice = LinkedHashMap<String, MutableList<CliUsageGroupRow>>()
+
     // A máquina é do integrante, não da linha de uso: `team_sessions` não guarda
     // hostname. Sem este índice a sessão chegaria com `hostName` nulo e o card de
     // metadados do detalhe mostraria "Máquina —" para uma máquina conhecida.
@@ -130,6 +136,21 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
             cacheWrite5mTokens = row.cacheWrite5mTokens,
             cacheWrite1hTokens = row.cacheWrite1hTokens
         )
+
+        groupRowsByDevice.getOrPut(row.deviceId) { mutableListOf() }.add(
+            CliUsageGroupRow(
+                sessionId = row.sessionId,
+                cwd = row.cwd,
+                gitBranch = row.gitBranch,
+                model = row.model,
+                turnCount = row.turnCount,
+                inputTokens = row.inputTokens,
+                outputTokens = row.outputTokens,
+                cacheReadTokens = row.cacheReadTokens,
+                cacheWrite5mTokens = row.cacheWrite5mTokens,
+                cacheWrite1hTokens = row.cacheWrite1hTokens
+            )
+        )
     }
 
     val summariesByDevice = accumulatorsByDevice.mapValues { (_, sessions) ->
@@ -149,7 +170,8 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
             lastSeenAt = member.lastSeenAt
                 .takeIf { millis -> millis > 0L }
                 ?.let { millis -> Instant.fromEpochMilliseconds(millis) },
-            sessions = summariesByDevice[member.deviceId].orEmpty()
+            sessions = summariesByDevice[member.deviceId].orEmpty(),
+            groupRows = groupRowsByDevice[member.deviceId].orEmpty()
         )
     }
 
@@ -158,7 +180,12 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
     val orphanMembers = summariesByDevice
         .filterKeys { deviceId -> deviceId !in knownDeviceIds }
         .map { (deviceId, sessions) ->
-            TeamMemberUsage(deviceId = deviceId, alias = deviceId, sessions = sessions)
+            TeamMemberUsage(
+                deviceId = deviceId,
+                alias = deviceId,
+                sessions = sessions,
+                groupRows = groupRowsByDevice[deviceId].orEmpty()
+            )
         }
 
     val allMembers = (declaredMembers + orphanMembers).sortedWith(

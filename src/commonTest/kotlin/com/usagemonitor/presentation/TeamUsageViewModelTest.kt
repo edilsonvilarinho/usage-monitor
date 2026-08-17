@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIngestPayload
@@ -24,6 +25,7 @@ import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
+import com.usagemonitor.presentation.viewmodel.TeamUsageView
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -37,6 +39,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -407,6 +410,103 @@ class TeamUsageViewModelTest {
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
         assertEquals(setOf("device-1"), state.expandedMemberKeys)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a aba escolhida sobrevive aos tiques do tempo real`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.setView(TeamUsageView.BREAKDOWN)
+        advanceTimeBy(3 * TEAM_LIVE_INTERVAL_MILLIS + 1)
+        runCurrent()
+
+        // Sem carregar a aba do estado anterior, o tique de 5s devolveria à lista
+        // quem está lendo o resumo.
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(TeamUsageView.BREAKDOWN, state.view)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `o resumo por eixo vem junto com a lista e soma o mesmo custo`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        sessions = listOf(session("s1", tokens = 1_000L, cost = 5_000L))
+                    ).copy(
+                        groupRows = listOf(
+                            CliUsageGroupRow(
+                                sessionId = "s1",
+                                cwd = "/home/dev/alpha",
+                                gitBranch = "main",
+                                model = OPUS,
+                                turnCount = 2,
+                                inputTokens = 1_000L
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        // Vem da mesma resposta que os integrantes: nenhuma segunda consulta.
+        assertEquals(1, repository.fetchCalls)
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        val breakdown = assertNotNull(state.breakdown)
+        assertEquals(listOf("alpha"), breakdown.byProject.mapNotNull { bucket -> bucket.label })
+        assertEquals(listOf("edilson"), breakdown.byMember.mapNotNull { bucket -> bucket.label })
+        assertEquals(2, breakdown.totals.turnCount)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a visao global nao oferece a aba de tendencia`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10))
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        // A série é por conta e a visão global mistura várias: um chip que nunca
+        // mostraria nada é pior que chip nenhum.
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertFalse(state.isTrendAvailable)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `aba de tendencia guardada cai na lista quando ela deixa de existir`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10))
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+        viewModel.setView(TeamUsageView.TREND)
+
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        // Desenhar painel nenhum seria uma janela vazia sem explicação.
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(TeamUsageView.MEMBERS, state.effectiveView)
         viewModel.onDestroy()
     }
 

@@ -101,7 +101,18 @@ sealed interface CliSessionsUiState {
          * Fica ao lado de [budget] e nunca somado a ele: o custo do índice é
          * sempre USD e este pode não ser.
          */
-        val accountCredits: AccountCreditUsage? = null
+        val accountCredits: AccountCreditUsage? = null,
+        /**
+         * `true` enquanto uma troca de janela pedida pelo usuário está em voo.
+         *
+         * Não passa por `Loading`: apagar a tela a cada troca é o pisca que o laço
+         * ao vivo existe para evitar. Mas sem aviso nenhum os números da janela
+         * **anterior** ficam na tela durante a varredura, e quem acabou de clicar
+         * em "30 dias" lê o total de "5h" como se fosse a resposta.
+         *
+         * Só a ação do usuário liga a bandeira; o tique do laço ao vivo não.
+         */
+        val isRefreshing: Boolean = false
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long
