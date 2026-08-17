@@ -375,7 +375,8 @@ Dependencias principais do bootstrap:
 - `build-with-icon.ps1` e um fluxo auxiliar Windows para gerar distributable, aplicar icone com `rcedit` e chamar o NSIS manualmente.
 - `packageDmg` so roda em macOS: o jpackage nao faz cross-compile.
 - A versao da app vem de `build.gradle.kts` e e propagada para `CURRENT_APP_VERSION`.
-- Tags `v*` disparam `.github/workflows/release-linux.yml`, que publica artefatos Linux, Windows e macOS no GitHub Release.
+- Tags `v*` disparam `.github/workflows/release-linux.yml`, que publica artefatos Linux, Windows e macOS no GitHub Release. O job `verify` roda `allTests` em paralelo com os builds e `publish-release` depende dele: suite vermelha nao publica release.
+- `.github/workflows/ci.yml` roda `allTests` em push para `main` e em pull request; `.github/workflows/ci-server.yml` roda `typecheck` e `vitest` do `server/` quando `server/**` muda.
 
 ### Instalacao no macOS
 
@@ -425,6 +426,8 @@ Sintomas conhecidos:
 - `src/installer/UsageMonitor.nsi`: script do instalador NSIS.
 - `src/desktopMain/kotlin/com/usagemonitor/data/datasource/AnthropicCredentialStore.kt`: origem das credenciais Anthropic (ficheiro ou Keychain no macOS).
 - `.github/workflows/release-linux.yml`: pipeline de release (Linux, Windows e macOS).
+- `.github/workflows/ci.yml`: testes Kotlin (`allTests`) em push e pull request.
+- `.github/workflows/ci-server.yml`: typecheck e testes do servidor de time.
 
 ## Convencao de commit
 

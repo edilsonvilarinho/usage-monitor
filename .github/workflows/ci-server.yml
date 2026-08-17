@@ -1,0 +1,48 @@
+name: CI Server
+
+# Workflow separado em vez de filtro condicional dentro do `ci.yml` para nao
+# depender de action de terceiros para path filtering.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+      - '.github/workflows/ci-server.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - '.github/workflows/ci-server.yml'
+
+concurrency:
+  group: ci-server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # `server/package.json` declara engines.node >=20.
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test

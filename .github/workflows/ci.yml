@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'server/**'
+      - 'docs/**'
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - 'server/**'
+      - 'docs/**'
+      - '**.md'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    # windows-latest, nao ubuntu: os testes de componente usam
+    # `runDesktopComposeUiTest` e nunca rodaram headless em Linux. O repositorio
+    # nao tem nenhuma configuracao de headless/xvfb, entao um alvo Linux seria
+    # um gate nao comprovado.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      # MINIMAX_API_KEY fica deliberadamente indefinida: os testes injetam o
+      # leitor da env var e `MiniMaxRepositoryImplTest` afirma a mensagem de
+      # variavel ausente. Defini-la aqui quebraria o teste.
+      - name: Run tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat allTests
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/tests/**
+          if-no-files-found: ignore

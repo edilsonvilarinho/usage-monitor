@@ -12,6 +12,42 @@ on:
         type: string
 
 jobs:
+  # Gate de testes do release. Roda em paralelo com os jobs de build (nenhum
+  # deles depende deste), e so `publish-release` o exige: falha aqui deixa os
+  # artefatos como artifacts do workflow, mas nenhum GitHub Release e criado.
+  # Encadear os builds atras dele somaria ~4 min a todo release sem ganho.
+  verify:
+    # Mesmo motivo do `ci.yml`: os testes de componente Compose nunca rodaram
+    # headless em Linux.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat allTests
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/tests/**
+          if-no-files-found: ignore
+
   build-linux:
     # GitHub's standard hosted runners no longer expose Ubuntu 20.04 directly.
     # Keep the host on 22.04, but run jpackage inside an Ubuntu 20.04 container
@@ -225,6 +261,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Extract version
         id: version
@@ -265,6 +302,7 @@ jobs:
   publish-release:
     runs-on: ubuntu-latest
     needs:
+      - verify
       - build-linux
       - build-windows
       - build-macos
