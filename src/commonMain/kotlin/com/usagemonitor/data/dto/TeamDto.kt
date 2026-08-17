@@ -118,10 +118,31 @@ data class TeamUsageRowDto(
     val cacheWrite1hTokens: Long = 0L
 )
 
+/**
+ * Tempo de trabalho de uma sessão na janela, medido pelo servidor.
+ *
+ * Lista à parte de [TeamUsageRowDto] porque tempo é propriedade da sessão, não
+ * do trecho de um modelo: como coluna daquela linha, uma sessão que trocou de
+ * modelo teria a hora dela somada uma vez por modelo.
+ */
+@Serializable
+data class TeamSessionActivityDto(
+    val deviceId: String = "",
+    val sessionId: String = "",
+    val activeMillis: Long = 0L
+)
+
 @Serializable
 data class TeamSnapshotDto(
     val members: List<TeamMemberRowDto> = emptyList(),
-    val rows: List<TeamUsageRowDto> = emptyList()
+    val rows: List<TeamUsageRowDto> = emptyList(),
+    /**
+     * Vazia contra servidor anterior à 0.7.0, que não conhece o campo.
+     *
+     * Lista vazia vira hora **não medida** no domínio, e não zero: o campo
+     * ausente diz que o servidor não sabe, não que ninguém trabalhou.
+     */
+    val activity: List<TeamSessionActivityDto> = emptyList()
 )
 
 /** Metadados da sessão pedida em `GET /api/v1/session`, já com a máquina de origem. */
@@ -240,7 +261,8 @@ data class TeamAccountSnapshotDto(
     val accountKey: String,
     val label: String? = null,
     val members: List<TeamMemberRowDto> = emptyList(),
-    val rows: List<TeamUsageRowDto> = emptyList()
+    val rows: List<TeamUsageRowDto> = emptyList(),
+    val activity: List<TeamSessionActivityDto> = emptyList()
 )
 
 @Serializable

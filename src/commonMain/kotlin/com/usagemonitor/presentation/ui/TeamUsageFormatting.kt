@@ -186,6 +186,11 @@ internal object TeamUsageLabels {
         return CliSessionsLabels.columnCost(language)
     }
 
+    /** Mesmo rótulo da tela da máquina: é a mesma medida, com o mesmo corte. */
+    fun columnActiveTime(language: AppLanguage): String {
+        return CliSessionsLabels.activeTime(language)
+    }
+
     fun columnStatus(language: AppLanguage): String {
         return CliSessionsLabels.columnStatus(language)
     }

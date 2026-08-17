@@ -105,6 +105,12 @@ sealed interface TeamUsageUiState {
         /** Aba corrente. Mesmo tratamento de [detail]: mora no estado. */
         val view: TeamUsageView = TeamUsageView.MEMBERS,
         /**
+         * Resultado da última exportação. Mesmo tratamento de [detail]: `loadTeam`
+         * o carrega do estado anterior, ou o tique de 5s apagaria a mensagem antes
+         * de ela ser lida.
+         */
+        val exportOutcome: CliExportOutcome? = null,
+        /**
          * O mesmo consumo da janela recortado por eixo.
          *
          * Vem junto com [members], da mesma resposta — ao contrário do resumo da

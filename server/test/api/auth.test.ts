@@ -60,7 +60,7 @@ describe('autenticacao por chave de time', () => {
       .query({ accountKey: ACCOUNT_A });
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ members: [], rows: [] });
+    expect(response.body).toEqual({ members: [], rows: [], activity: [] });
   });
 
   it('devolve 404 com corpo JSON em rota desconhecida', async () => {

@@ -201,9 +201,9 @@ private class ScreenshotGenerator(private val outputDir: File) {
         )
     }
 
-    // Altura escolhida para o corte cair entre cartões: a seção de time começa
-    // logo abaixo e entraria pela metade, com o título cortado ao meio.
-    fun settings() = capture("settings", widthDp = 640, heightDp = 872) {
+    // O diálogo é dividido em abas, então a captura mostra a fileira de abas e a
+    // primeira delas inteira. Altura maior sobraria como faixa vazia embaixo.
+    fun settings() = capture("settings", widthDp = 640, heightDp = 460) {
         SettingsDialogContent(
             currentTheme = AppThemePreference.DARK,
             currentLanguage = AppLanguage.PT,

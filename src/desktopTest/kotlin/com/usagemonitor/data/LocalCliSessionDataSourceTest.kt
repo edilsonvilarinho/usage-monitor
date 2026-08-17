@@ -3,6 +3,7 @@ package com.usagemonitor.data
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.activeTimeMillisOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
 import java.io.File
@@ -264,6 +265,112 @@ class LocalCliSessionDataSourceTest {
             assertEquals(2, detail.turns.size)
             assertFalse(detail.turns[0].isSidechain)
             assertTrue(detail.turns[1].isSidechain)
+        }
+    }
+
+    @Test
+    fun `active time sums only the gaps under the cutoff`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"),
+                // 3 min: dentro do corte, entra.
+                assistantLine("session-a", "msg-2", "2026-08-01T10:03:00Z"),
+                // 57 min: é o usuário fora do teclado, não tempo de sessão.
+                assistantLine("session-a", "msg-3", "2026-08-01T11:00:00Z"),
+                // 2 min: entra.
+                assistantLine("session-a", "msg-4", "2026-08-01T11:02:00Z")
+            )
+            dataSource.syncIndex()
+
+            val session = dataSource.readSessions().single()
+            assertEquals(5L * 60 * 1_000, session.activeMillis)
+        }
+    }
+
+    @Test
+    fun `active time in SQL matches the domain function over the same turns`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:04:30Z"),
+                assistantLine("session-a", "msg-3", "2026-08-01T10:09:00Z"),
+                assistantLine("session-a", "msg-4", "2026-08-01T14:00:00Z"),
+                assistantLine("session-a", "msg-5", "2026-08-01T14:00:45Z"),
+                assistantLine("session-a", "msg-6", "2026-08-01T14:03:00Z", isSidechain = true)
+            )
+            dataSource.syncIndex()
+
+            // A consulta é `activeTimeMillisOf` escrita em SQL. A equivalência é
+            // afirmada aqui, e não deduzida da semelhança entre os dois textos:
+            // divergência significa dois donos do corte de 5 min.
+            val detail = assertNotNull(dataSource.readSession("session-a"))
+            val expected = activeTimeMillisOf(detail.turns.filter { turn -> !turn.isSidechain })
+
+            assertEquals(expected, dataSource.readSessions().single().activeMillis)
+        }
+    }
+
+    @Test
+    fun `sidechain turns do not add active time`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:04:00Z"),
+                // O subagente roda em paralelo: somar os intervalos dele contaria
+                // o mesmo tempo duas vezes.
+                assistantLine("session-a", "msg-3", "2026-08-01T10:20:00Z", isSidechain = true),
+                assistantLine("session-a", "msg-4", "2026-08-01T10:22:00Z", isSidechain = true)
+            )
+            dataSource.syncIndex()
+
+            assertEquals(4L * 60 * 1_000, dataSource.readSessions().single().activeMillis)
+        }
+    }
+
+    @Test
+    fun `a single turn session has zero active time`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            dataSource.syncIndex()
+
+            // Zero, e não nulo: a medida aconteceu e não há intervalo para medir.
+            assertEquals(0L, dataSource.readSessions().single().activeMillis)
+        }
+    }
+
+    @Test
+    fun `active time follows the window cutoff`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:02:00Z"),
+                assistantLine("session-a", "msg-3", "2026-08-01T10:04:00Z")
+            )
+            dataSource.syncIndex()
+
+            // Corte depois do primeiro turno: sobra um único intervalo dentro da
+            // janela, e o que ficou para trás não conta.
+            val windowed = dataSource.readSessions(sinceEpochMillis = epochMillis("2026-08-01T10:01:00Z"))
+            assertEquals(2L * 60 * 1_000, windowed.single().activeMillis)
+        }
+    }
+
+    @Test
+    fun `active time is scoped by profile`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            dataSource.syncIndex()
+
+            val times = dataSource.readSessionActiveTimes(profileId = PROFILE_B)
+            assertTrue(times.isEmpty())
         }
     }
 

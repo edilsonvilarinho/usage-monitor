@@ -49,7 +49,18 @@ data class CliUsageBucket(
     val costMicros: Long = 0L,
     val cacheSavingsMicros: Long = 0L,
     /** Turnos cujo modelo não está na tabela de preços: o custo é parcial. */
-    val unpricedTurnCount: Int = 0
+    val unpricedTurnCount: Int = 0,
+    /**
+     * Tempo de trabalho somado das sessões deste balde, pela definição de
+     * [activeTimeMillisOf]. `null` quando o eixo não admite a medida ou quando
+     * ela não foi lida.
+     *
+     * **Os eixos de modelo e de ferramenta ficam sempre nulos**: o intervalo
+     * entre dois turnos não pertence a um modelo nem a uma ferramenta, e ratear
+     * inventaria um número que ninguém mediu. Só projeto, branch e integrante —
+     * eixos em que a sessão inteira cai num balde só — têm hora.
+     */
+    val activeMillis: Long? = null
 ) {
     val cacheWriteTokens: Long
         get() = cacheWrite5mTokens + cacheWrite1hTokens
@@ -135,12 +146,19 @@ data class CliUsageBreakdown(
  *
  * A contagem de sessões é por identificador distinto: uma sessão aparece em
  * várias linhas (uma por modelo) e somá-las inflaria o número na tela.
+ *
+ * [activeTimes] mapeia sessão → tempo de trabalho na janela. Entra pelo mesmo
+ * conjunto de sessões distintas que alimenta `sessionCount`, então uma sessão
+ * que usou três modelos contribui com a hora dela **uma vez só**. Mapa vazio
+ * deixa as horas nulas em toda parte, que é o estado de quem não as leu.
  */
-fun Iterable<CliUsageGroupRow>.toUsageBreakdown(): CliUsageBreakdown {
+fun Iterable<CliUsageGroupRow>.toUsageBreakdown(
+    activeTimes: Map<String, Long> = emptyMap()
+): CliUsageBreakdown {
     val byProject = linkedMapOf<String?, BucketAccumulator>()
     val byBranch = linkedMapOf<String?, BucketAccumulator>()
     val byModel = linkedMapOf<String?, BucketAccumulator>()
-    val totals = BucketAccumulator(null)
+    val totals = BucketAccumulator(null, activeTimes)
 
     for (row in this) {
         val sessionKey = row.sessionId
@@ -148,8 +166,9 @@ fun Iterable<CliUsageGroupRow>.toUsageBreakdown(): CliUsageBreakdown {
         val branchLabel = row.gitBranch?.takeIf { branch -> branch.isNotBlank() }
         val modelLabel = row.model?.takeIf { model -> model.isNotBlank() }
 
-        byProject.getOrPut(projectLabel) { BucketAccumulator(projectLabel) }.add(row, sessionKey)
-        byBranch.getOrPut(branchLabel) { BucketAccumulator(branchLabel) }.add(row, sessionKey)
+        byProject.getOrPut(projectLabel) { BucketAccumulator(projectLabel, activeTimes) }.add(row, sessionKey)
+        byBranch.getOrPut(branchLabel) { BucketAccumulator(branchLabel, activeTimes) }.add(row, sessionKey)
+        // O eixo de modelo nasce sem mapa: a hora não é atribuível a um modelo.
         byModel.getOrPut(modelLabel) { BucketAccumulator(modelLabel) }.add(row, sessionKey)
         totals.add(row, sessionKey)
     }
@@ -185,7 +204,11 @@ private fun Iterable<BucketAccumulator>.toRankedBuckets(): List<CliUsageBucket> 
     return map { accumulator -> accumulator.toBucket() }.rankedByCost()
 }
 
-private class BucketAccumulator(private val label: String?) {
+private class BucketAccumulator(
+    private val label: String?,
+    /** Vazio no eixo que não admite hora; ver [CliUsageBucket.activeMillis]. */
+    private val activeTimes: Map<String, Long> = emptyMap()
+) {
     private var turnCount = 0
     private var inputTokens = 0L
     private var outputTokens = 0L
@@ -225,11 +248,26 @@ private class BucketAccumulator(private val label: String?) {
         cacheSavingsMicros += pricing.cacheSavingsMicros(row.cacheReadTokens)
     }
 
+    /**
+     * Soma o tempo das sessões distintas deste balde.
+     *
+     * `null` quando o eixo não tem mapa — e não zero, que afirmaria medida.
+     * Sessão sem entrada no mapa não entra: o índice pode conhecer a sessão e
+     * não ter medida para ela.
+     */
+    private fun activeMillis(): Long? {
+        if (activeTimes.isEmpty()) {
+            return null
+        }
+        return sessionIds.sumOf { sessionId -> activeTimes[sessionId] ?: 0L }
+    }
+
     fun toBucket(): CliUsageBucket {
         return CliUsageBucket(
             label = label,
             turnCount = turnCount,
             sessionCount = sessionIds.size,
+            activeMillis = activeMillis(),
             inputTokens = inputTokens,
             outputTokens = outputTokens,
             cacheReadTokens = cacheReadTokens,

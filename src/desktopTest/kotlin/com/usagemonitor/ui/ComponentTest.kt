@@ -64,6 +64,8 @@ import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.components.SettingsTab
+import com.usagemonitor.presentation.ui.components.settingsTabTestTag
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG
@@ -1366,20 +1368,51 @@ class ComponentTest {
             }
         }
 
+        // A aba Geral é a que abre; o resto do diálogo só existe depois do clique
+        // na aba correspondente.
         onNodeWithText("System Startup").assertIsDisplayed()
         onNodeWithText("Window opacity").assertIsDisplayed()
         // Por tag: "75%" também é rótulo de limiar no cartão de alertas.
         onNodeWithTag(WINDOW_OPACITY_VALUE_TEST_TAG).assertTextEquals("75%")
         onNodeWithText("Language").assertIsDisplayed()
-        onNodeWithText("Alerts").assertIsDisplayed()
-        // O diálogo rola: o que está abaixo da dobra precisa ser trazido à vista
-        // antes de se afirmar que aparece.
-        onNodeWithText("Monitored APIs").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Anthropic accounts").performScrollTo().assertIsDisplayed()
-        onNodeWithText("personal@example.com").performScrollTo().assertIsDisplayed()
+
+        onNodeWithTag(settingsTabTestTag(SettingsTab.APIS)).performClick()
+        onNodeWithText("Monitored APIs").assertIsDisplayed()
         onNodeWithText("OpenCode Zen Free").performScrollTo().assertIsDisplayed()
         onNodeWithText("Kilo Free").performScrollTo().assertIsDisplayed()
+
+        onNodeWithTag(settingsTabTestTag(SettingsTab.ACCOUNTS)).performClick()
+        onNodeWithText("Anthropic accounts").assertIsDisplayed()
+        onNodeWithText("personal@example.com").assertIsDisplayed()
+
         onAllNodesWithText("Close").assertCountEquals(0)
+    }
+
+    @Test
+    fun `SettingsDialogContent shows one tab at a time`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.EN,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        // O conteúdo das outras abas não está apenas fora da vista: ele não está
+        // na composição. Sem isso as abas seriam decoração sobre a mesma coluna.
+        onNodeWithText("System Startup").assertIsDisplayed()
+        onAllNodesWithText("Monitored APIs").assertCountEquals(0)
+        onAllNodesWithText("Anthropic accounts").assertCountEquals(0)
+
+        onNodeWithTag(settingsTabTestTag(SettingsTab.TEAM)).performClick()
+        onAllNodesWithText("System Startup").assertCountEquals(0)
     }
 
     @Test
@@ -1454,7 +1487,10 @@ class ComponentTest {
                     expandedProfileId = expandedProfileId,
                     onToggleProfileExpanded = { profileId ->
                         expandedProfileId = if (expandedProfileId == profileId) null else profileId
-                    }
+                    },
+                    // As contas moram na aba própria; o teste é sobre o editor do
+                    // perfil, não sobre a navegação entre abas.
+                    initialTab = SettingsTab.ACCOUNTS
                 )
             }
         }

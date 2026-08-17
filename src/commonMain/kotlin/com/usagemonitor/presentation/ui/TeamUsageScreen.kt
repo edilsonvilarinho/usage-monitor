@@ -60,6 +60,7 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppGlow
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
@@ -81,6 +82,7 @@ const val TEAM_TAB_BREAKDOWN_TAG = "teamUsageTabBreakdown"
 const val TEAM_TAB_TREND_TAG = "teamUsageTabTrend"
 internal const val TEAM_TREND_PANE_TAG = "teamUsageTrendPane"
 internal const val TEAM_TREND_SCROLLBAR_TAG = "teamUsageTrendScrollbar"
+const val TEAM_EXPORT_PDF_TAG = "teamUsageExportPdf"
 
 /** Compartilhada com o modal da máquina: as duas telas dão o mesmo aviso. */
 const val REFRESHING_NOTICE_TAG = "usageRefreshingNotice"
@@ -92,6 +94,7 @@ private val TEAM_COLUMN_IDENTITY = 210.dp
 private val TEAM_COLUMN_MACHINE = 140.dp
 private val TEAM_COLUMN_TOKENS = 140.dp
 private val TEAM_COLUMN_COST = 96.dp
+private val TEAM_COLUMN_ACTIVE_TIME = 84.dp
 private val TEAM_COLUMN_SHARE = 96.dp
 private val TEAM_COLUMN_STATUS = 112.dp
 
@@ -127,6 +130,7 @@ fun TeamUsageScreen(
         onToggleAdvanced = { viewModel.toggleAdvanced() },
         onToggleGlossary = { viewModel.toggleGlossary() },
         onSelectView = { view -> viewModel.setView(view) },
+        onExportReport = { viewModel.exportReport(language) },
         modifier = modifier
     )
 }
@@ -150,7 +154,8 @@ internal fun TeamUsageContent(
     onCloseDetail: () -> Unit = {},
     onToggleAdvanced: () -> Unit = {},
     onToggleGlossary: () -> Unit = {},
-    onSelectView: (TeamUsageView) -> Unit = {}
+    onSelectView: (TeamUsageView) -> Unit = {},
+    onExportReport: () -> Unit = {}
 ) {
     // Qual integrante está aguardando confirmação. Estado de tela, não do
     // servidor: o laço ao vivo recarrega a lista a cada 5s e não pode fechar o
@@ -181,7 +186,8 @@ internal fun TeamUsageContent(
                         onOpenSession = onOpenSession,
                         onRequestRemoveMember = { member -> pendingRemoval = member },
                         onDismissRemovalError = onDismissRemovalError,
-                        onSelectView = onSelectView
+                        onSelectView = onSelectView,
+                        onExportReport = onExportReport
                     )
                 } else {
                     TeamSessionDetailPane(
@@ -255,7 +261,8 @@ private fun TeamUsageList(
     onOpenSession: (String, String) -> Unit,
     onRequestRemoveMember: (TeamMemberUsage) -> Unit,
     onDismissRemovalError: () -> Unit,
-    onSelectView: (TeamUsageView) -> Unit
+    onSelectView: (TeamUsageView) -> Unit,
+    onExportReport: () -> Unit
 ) {
     val view = state.effectiveView
 
@@ -267,7 +274,8 @@ private fun TeamUsageList(
             state = state,
             language = language,
             onSelectRange = onSelectRange,
-            onSelectView = onSelectView
+            onSelectView = onSelectView,
+            onExportReport = onExportReport
         )
 
         // Sem este aviso a diferença para o modal de uma conta parece defeito:
@@ -666,7 +674,8 @@ private fun TeamUsageHeader(
     state: TeamUsageUiState.Success,
     language: AppLanguage,
     onSelectRange: (CliSessionRange) -> Unit,
-    onSelectView: (TeamUsageView) -> Unit
+    onSelectView: (TeamUsageView) -> Unit,
+    onExportReport: () -> Unit
 ) {
     val accents = AppAccents.current
 
@@ -820,6 +829,29 @@ private fun TeamUsageHeader(
                     modifier = Modifier.testTag(TEAM_TAB_TREND_TAG)
                 )
             }
+
+            // O relatorio nao segue a aba: ele e o recorte inteiro da janela, com
+            // integrantes, resumo e sessoes juntos.
+            TextButton(
+                onClick = onExportReport,
+                modifier = Modifier.testTag(TEAM_EXPORT_PDF_TAG)
+            ) {
+                Text(ExportLabels.exportPdf(language))
+            }
+        }
+
+        val exportOutcome = state.exportOutcome
+        if (exportOutcome != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = exportOutcomeMessage(exportOutcome, language),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (exportOutcome is CliExportOutcome.Failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
     }
 }
@@ -924,6 +956,17 @@ private fun TeamMemberRow(
                 },
                 valueColor = accents.input,
                 modifier = Modifier.width(TEAM_COLUMN_COST)
+            )
+
+            // Servidor anterior à 0.7.0 não mede tempo e a coluna sai como "—".
+            // Zero mediria e diria "não trabalhou", que é outra afirmação.
+            MetricText(
+                label = TeamUsageLabels.columnActiveTime(language),
+                value = member.totalActiveMillis
+                    ?.takeIf { millis -> millis > 0L }
+                    ?.let { millis -> formatActiveTime(millis) }
+                    ?: "—",
+                modifier = Modifier.width(TEAM_COLUMN_ACTIVE_TIME)
             )
 
             Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {

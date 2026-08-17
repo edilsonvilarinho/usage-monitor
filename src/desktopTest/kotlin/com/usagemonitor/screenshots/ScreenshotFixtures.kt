@@ -274,7 +274,8 @@ internal object ScreenshotFixtures {
         costMicros: Long,
         liveContextTokens: Long,
         startedHoursAgo: Int,
-        lastMinutesAgo: Int
+        lastMinutesAgo: Int,
+        activeMillis: Long
     ) = CliSessionSummary(
         sessionId = id,
         filePath = "$cwd/.claude/$id.jsonl",
@@ -292,7 +293,8 @@ internal object ScreenshotFixtures {
         cacheWrite5mTokens = cacheWriteTokens,
         costMicros = costMicros,
         liveContextTokens = liveContextTokens,
-        liveContextModel = model
+        liveContextModel = model,
+        activeMillis = activeMillis
     )
 
     /**
@@ -316,7 +318,8 @@ internal object ScreenshotFixtures {
         costMicros = 5_479_200L,
         liveContextTokens = 720_000L,
         startedHoursAgo = 4,
-        lastMinutesAgo = 2
+        lastMinutesAgo = 2,
+        activeMillis = 8_040_000L
     )
 
     /** Em atenção: 460K numa janela de 1M. */
@@ -334,7 +337,8 @@ internal object ScreenshotFixtures {
         costMicros = 3_610_000L,
         liveContextTokens = 460_000L,
         startedHoursAgo = 3,
-        lastMinutesAgo = 27
+        lastMinutesAgo = 27,
+        activeMillis = 3_900_000L
     )
 
     private val healthySession = session(
@@ -351,7 +355,8 @@ internal object ScreenshotFixtures {
         costMicros = 412_000L,
         liveContextTokens = 48_000L,
         startedHoursAgo = 2,
-        lastMinutesAgo = 96
+        lastMinutesAgo = 96,
+        activeMillis = 2_280_000L
     )
 
     val cliSessions: List<CliSessionSummary> = listOf(
@@ -402,7 +407,8 @@ internal object ScreenshotFixtures {
         tokens: Long,
         costMicros: Long,
         liveContextTokens: Long,
-        lastMinutesAgo: Int
+        lastMinutesAgo: Int,
+        activeMillis: Long
     ) = CliSessionSummary(
         sessionId = id,
         filePath = "",
@@ -419,7 +425,8 @@ internal object ScreenshotFixtures {
         cacheWrite5mTokens = tokens / 20L,
         costMicros = costMicros,
         liveContextTokens = liveContextTokens,
-        liveContextModel = model
+        liveContextModel = model,
+        activeMillis = activeMillis
     )
 
     val teamMembers: List<TeamMemberUsage> = listOf(
@@ -441,7 +448,8 @@ internal object ScreenshotFixtures {
                     // nas duas capturas.
                     costMicros = 5_479_200L,
                     liveContextTokens = 720_000L,
-                    lastMinutesAgo = 2
+                    lastMinutesAgo = 2,
+                    activeMillis = 8_040_000L
                 ),
                 teamSession(
                     id = "b81e35c07af6",
@@ -453,7 +461,8 @@ internal object ScreenshotFixtures {
                     tokens = 1_920_000L,
                     costMicros = 3_610_000L,
                     liveContextTokens = 460_000L,
-                    lastMinutesAgo = 27
+                    lastMinutesAgo = 27,
+                    activeMillis = 3_900_000L
                 )
             )
         ),
@@ -473,7 +482,8 @@ internal object ScreenshotFixtures {
                     tokens = 2_650_000L,
                     costMicros = 5_120_000L,
                     liveContextTokens = 480_000L,
-                    lastMinutesAgo = 11
+                    lastMinutesAgo = 11,
+                    activeMillis = 5_220_000L
                 )
             )
         ),

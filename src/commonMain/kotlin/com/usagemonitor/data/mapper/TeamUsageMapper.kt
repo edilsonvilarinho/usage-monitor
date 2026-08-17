@@ -153,9 +153,24 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
         )
     }
 
-    val summariesByDevice = accumulatorsByDevice.mapValues { (_, sessions) ->
+    // Servidor anterior à 0.7.0 não manda o campo: o mapa fica vazio e as sessões
+    // ficam com `activeMillis` nulo — "não medido", e não zero.
+    val activeMillisByKey = activity.associate { entry ->
+        (entry.deviceId to entry.sessionId) to entry.activeMillis
+    }
+    val hasActivity = activity.isNotEmpty()
+
+    val summariesByDevice = accumulatorsByDevice.mapValues { (deviceId, sessions) ->
         sessions.values
-            .map { accumulator -> accumulator.toSummary() }
+            .map { accumulator ->
+                val summary = accumulator.toSummary()
+                if (!hasActivity) {
+                    return@map summary
+                }
+                // Sessão fora do mapa recebe zero: a medida aconteceu e a ausência
+                // ali significa "nenhum intervalo dentro do corte".
+                summary.copy(activeMillis = activeMillisByKey[deviceId to summary.sessionId] ?: 0L)
+            }
             .sortedByDescending { summary -> summary.lastTs }
     }
 

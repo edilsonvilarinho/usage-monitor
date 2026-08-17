@@ -29,6 +29,7 @@ internal enum class GlossaryTerm {
     COST_VERSUS_SAVINGS,
     TOTAL_TOKENS,
     ESTIMATED_COST,
+    ACTIVE_TIME,
     SIDECHAIN
 }
 
@@ -56,6 +57,7 @@ internal object CliSessionsGlossary {
         GlossaryTerm.COMPACTION,
         GlossaryTerm.CACHE_WRITE_PER_TURN,
         GlossaryTerm.COST_VERSUS_SAVINGS,
+        GlossaryTerm.ACTIVE_TIME,
         GlossaryTerm.SIDECHAIN
     )
 
@@ -139,6 +141,14 @@ internal object CliSessionsGlossary {
                 explanation = "Estimativa a preço de tabela, calculada dos tokens do transcript. Não é " +
                     "fatura e não desconta plano nem crédito."
             )
+            GlossaryTerm.ACTIVE_TIME -> GlossaryEntry(
+                title = "Tempo ativo",
+                explanation = "Não é a duração da sessão: é a soma dos intervalos entre turnos seguidos " +
+                    "menores que cinco minutos. As pausas maiores são você longe do teclado, e contá-las " +
+                    "faria uma sessão retomada no dia seguinte \"durar\" vinte horas. Só a conversa " +
+                    "principal entra; o subagente roda em paralelo e contaria o mesmo tempo duas vezes."
+            )
+
             GlossaryTerm.SIDECHAIN -> GlossaryEntry(
                 title = "Turno de subagente",
                 explanation = "Turno rodado por um subagente. Soma no custo, mas fica fora dos gráficos " +
@@ -223,6 +233,14 @@ internal object CliSessionsGlossary {
                 explanation = "Estimated at list price from the transcript tokens. Not an invoice, and it " +
                     "discounts neither plan nor credit."
             )
+            GlossaryTerm.ACTIVE_TIME -> GlossaryEntry(
+                title = "Active time",
+                explanation = "Not the session's duration: it is the sum of the gaps between consecutive " +
+                    "turns shorter than five minutes. Longer gaps are you away from the keyboard, and " +
+                    "counting them would make a session resumed the next day 'last' twenty hours. Only " +
+                    "the main thread counts; a subagent runs in parallel and would double the same time."
+            )
+
             GlossaryTerm.SIDECHAIN -> GlossaryEntry(
                 title = "Subagent turn",
                 explanation = "A turn run by a subagent. It counts toward cost but stays out of the " +

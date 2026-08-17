@@ -41,6 +41,46 @@ class CliUsageBreakdownTest {
     }
 
     /**
+     * Mesmo argumento da contagem de sessões, aplicado à hora: o tempo de uma
+     * sessão que trocou de modelo no meio não pode ser somado uma vez por modelo.
+     */
+    @Test
+    fun `active time of a session split across models counts once`() {
+        val breakdown = listOf(
+            row(sessionId = "s1", cwd = "/home/dev/alpha", gitBranch = "main", model = OPUS, turnCount = 3),
+            row(sessionId = "s1", cwd = "/home/dev/alpha", gitBranch = "main", model = HAIKU, turnCount = 2),
+            row(sessionId = "s2", cwd = "/home/dev/alpha", gitBranch = "main", model = OPUS, turnCount = 1)
+        ).toUsageBreakdown(activeTimes = mapOf("s1" to 600_000L, "s2" to 300_000L))
+
+        assertEquals(900_000L, breakdown.byProject.single().activeMillis)
+        assertEquals(900_000L, breakdown.byBranch.single().activeMillis)
+        assertEquals(900_000L, breakdown.totals.activeMillis)
+    }
+
+    /**
+     * O intervalo entre dois turnos não pertence a um modelo: ratear inventaria
+     * um número que ninguém mediu, e nulo diz exatamente isso.
+     */
+    @Test
+    fun `the model axis never carries active time`() {
+        val breakdown = listOf(
+            row(sessionId = "s1", cwd = "/home/dev/alpha", model = OPUS),
+            row(sessionId = "s1", cwd = "/home/dev/alpha", model = HAIKU)
+        ).toUsageBreakdown(activeTimes = mapOf("s1" to 600_000L))
+
+        assertTrue(breakdown.byModel.all { bucket -> bucket.activeMillis == null })
+    }
+
+    /** Sem mapa não há medida: nulo é "não se sabe", zero afirmaria "não trabalhou". */
+    @Test
+    fun `without measured times the buckets carry no hours`() {
+        val breakdown = listOf(row(sessionId = "s1", cwd = "/home/dev/alpha")).toUsageBreakdown()
+
+        assertEquals(null, breakdown.byProject.single().activeMillis)
+        assertEquals(null, breakdown.totals.activeMillis)
+    }
+
+    /**
      * O custo tem de sair da tabela de preços por modelo, não de um rateio: é a
      * mesma conta que a lista de sessões faz, e as duas telas não podem divergir.
      */

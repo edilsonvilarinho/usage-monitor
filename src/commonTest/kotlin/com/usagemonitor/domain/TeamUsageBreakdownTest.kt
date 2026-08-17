@@ -1,6 +1,7 @@
 package com.usagemonitor.domain
 
 import com.usagemonitor.data.dto.TeamMemberRowDto
+import com.usagemonitor.data.dto.TeamSessionActivityDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamUsageRowDto
 import com.usagemonitor.data.mapper.toDomain
@@ -49,13 +50,15 @@ private fun row(
 
 private fun snapshotOf(
     members: List<Pair<String, String>>,
-    rows: List<TeamUsageRowDto>
+    rows: List<TeamUsageRowDto>,
+    activity: List<TeamSessionActivityDto> = emptyList()
 ): TeamUsageSnapshot {
     return TeamSnapshotDto(
         members = members.map { (deviceId, alias) ->
             TeamMemberRowDto(deviceId = deviceId, alias = alias)
         },
-        rows = rows
+        rows = rows,
+        activity = activity
     ).toDomain()
 }
 
@@ -77,6 +80,49 @@ class TeamUsageBreakdownTest {
         assertEquals(listOf("fix/x", "main"), breakdown.byBranch.mapNotNull { it.label }.sorted())
         assertEquals(listOf(HAIKU, OPUS), breakdown.byModel.mapNotNull { it.label }.sorted())
         assertEquals(2 * MILLION, breakdown.totals.inputTokens)
+    }
+
+    @Test
+    fun `o tempo medido pelo servidor chega aos eixos e ao integrante`() {
+        val snapshot = snapshotOf(
+            members = listOf("device-1" to "edilson", "device-2" to "maria"),
+            rows = listOf(
+                // A mesma sessão em dois modelos: a hora dela entra uma vez só.
+                row("device-1", "s1", model = OPUS, cwd = "/home/dev/alpha"),
+                row("device-1", "s1", model = HAIKU, cwd = "/home/dev/alpha"),
+                row("device-2", "s2", model = OPUS, cwd = "/home/dev/alpha")
+            ),
+            activity = listOf(
+                TeamSessionActivityDto("device-1", "s1", 600_000L),
+                TeamSessionActivityDto("device-2", "s2", 300_000L)
+            )
+        )
+
+        val breakdown = snapshot.toTeamBreakdown(window = ANCHORED_WINDOW, now = NOW)
+
+        assertEquals(900_000L, breakdown.byProject.single().activeMillis)
+        assertEquals(900_000L, breakdown.totals.activeMillis)
+        assertEquals(
+            listOf(300_000L, 600_000L),
+            breakdown.byMember.map { bucket -> bucket.activeMillis }.sortedBy { millis -> millis }
+        )
+        assertEquals(600_000L, snapshot.members.first { it.deviceId == "device-1" }.totalActiveMillis)
+    }
+
+    /** Servidor anterior à 0.7.0 não manda o campo: hora nula, resto intacto. */
+    @Test
+    fun `sem medida do servidor as horas ficam nulas`() {
+        val snapshot = snapshotOf(
+            members = listOf("device-1" to "edilson"),
+            rows = listOf(row("device-1", "s1", cwd = "/home/dev/alpha"))
+        )
+
+        val breakdown = snapshot.toTeamBreakdown(window = ANCHORED_WINDOW, now = NOW)
+
+        assertNull(breakdown.totals.activeMillis)
+        assertNull(breakdown.byProject.single().activeMillis)
+        assertNull(snapshot.members.single().totalActiveMillis)
+        assertEquals(MILLION, breakdown.totals.inputTokens)
     }
 
     /**

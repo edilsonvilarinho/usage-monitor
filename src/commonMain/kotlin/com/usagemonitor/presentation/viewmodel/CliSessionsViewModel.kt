@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.domain.entity.AccountCreditUsage
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
@@ -9,8 +10,11 @@ import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
+import com.usagemonitor.presentation.ui.UsageExportRequest
 import com.usagemonitor.presentation.ui.exportRequestForBreakdown
 import com.usagemonitor.presentation.ui.exportRequestForSessions
+import com.usagemonitor.presentation.ui.report.reportForCliSessions
+import com.usagemonitor.presentation.ui.reportRequest
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -209,18 +213,57 @@ class CliSessionsViewModel(
             }
         }
 
+        publishExport(writer, request)
+    }
+
+    /**
+     * Relatório PDF do recorte que está na tela.
+     *
+     * Ao contrário de [exportCurrentView], **carrega o resumo por eixo se ele
+     * ainda não foi lido**: um relatório sem a seção de projetos e sem a grade de
+     * atividade seria uma surpresa pior que a espera, e quem exporta da aba de
+     * sessões não tem por que saber que a outra aba precisava ter sido aberta.
+     */
+    fun exportReport(language: AppLanguage) {
+        val writer = exportWriter ?: return
+        if (_uiState.value !is CliSessionsUiState.Success) {
+            return
+        }
+
         exportJob?.cancel()
         exportJob = viewModelScope.launch {
-            val outcome = runCatching { writer.write(request) }.fold(
-                // Cancelar o diálogo devolve `null` e não publica resultado: não
-                // é sucesso nem erro, e anunciá-lo seria ruído.
-                onSuccess = { path -> path?.let { saved -> CliExportOutcome.Saved(saved) } },
-                onFailure = { error -> CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE) }
-            ) ?: return@launch
+            if ((_uiState.value as? CliSessionsUiState.Success)?.breakdown == null) {
+                loadBreakdown()
+            }
+            val current = _uiState.value as? CliSessionsUiState.Success ?: return@launch
 
-            val latest = _uiState.value as? CliSessionsUiState.Success ?: return@launch
-            _uiState.value = latest.copy(exportOutcome = outcome)
+            val now = clock.now()
+            val request = reportRequest(
+                document = reportForCliSessions(state = current, language = language, now = now),
+                range = current.range,
+                now = now
+            )
+            writeExport(writer, request)
         }
+    }
+
+    private fun publishExport(writer: UsageExportWriter, request: UsageExportRequest) {
+        exportJob?.cancel()
+        exportJob = viewModelScope.launch {
+            writeExport(writer, request)
+        }
+    }
+
+    private suspend fun writeExport(writer: UsageExportWriter, request: UsageExportRequest) {
+        val outcome = runCatching { writer.write(request) }.fold(
+            // Cancelar o diálogo devolve `null` e não publica resultado: não é
+            // sucesso nem erro, e anunciá-lo seria ruído.
+            onSuccess = { path -> path?.let { saved -> CliExportOutcome.Saved(saved) } },
+            onFailure = { error -> CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE) }
+        ) ?: return
+
+        val latest = _uiState.value as? CliSessionsUiState.Success ?: return
+        _uiState.value = latest.copy(exportOutcome = outcome)
     }
 
     /**

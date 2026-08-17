@@ -138,6 +138,22 @@ sealed interface CliSessionsUiState {
             get() = sessions.all { session -> session.isCostComplete }
 
         /**
+         * Tempo de trabalho somado das sessões da janela.
+         *
+         * `null` quando nenhuma sessão traz medida — instalação cuja leitura não
+         * a consultou. Soma direta porque cada sessão aparece uma vez só na
+         * lista, ao contrário das linhas do resumo por eixo.
+         */
+        val totalActiveMillis: Long?
+            get() {
+                val measured = sessions.mapNotNull { session -> session.activeMillis }
+                if (measured.isEmpty()) {
+                    return null
+                }
+                return measured.sum()
+            }
+
+        /**
          * Quantas sessões estão saturadas ou em atenção.
          *
          * Vai para o cabeçalho: o veredito por sessão já está na linha, mas com

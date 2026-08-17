@@ -4,7 +4,12 @@ import { logger } from '../../logger.js';
 import type { TeamKeyRepository, TeamKeyRecord } from '../../repositories/teamKeyRepository.js';
 import type { TeamRepository } from '../../repositories/teamRepository.js';
 import { requireAdminToken } from '../access.js';
-import { createKeyBodySchema, overviewQuerySchema, updateKeyBodySchema } from '../dto.js';
+import {
+  DEFAULT_GAP_CUTOFF_MS,
+  createKeyBodySchema,
+  overviewQuerySchema,
+  updateKeyBodySchema,
+} from '../dto.js';
 import { wrap } from '../errorHandler.js';
 
 export interface AdminRouterDeps {
@@ -63,6 +68,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         const accounts = deps.repository.readOverview(
           parsed.data.since ?? null,
           deps.keyRepository.accountLabels(),
+          parsed.data.gapCutoffMs ?? DEFAULT_GAP_CUTOFF_MS,
         );
 
         res.json({ accounts });

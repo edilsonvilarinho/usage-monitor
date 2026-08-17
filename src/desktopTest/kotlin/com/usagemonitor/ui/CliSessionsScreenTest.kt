@@ -33,6 +33,7 @@ import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.EXPORT_CSV_TAG
 import com.usagemonitor.presentation.ui.EXPORT_JSON_TAG
+import com.usagemonitor.presentation.ui.EXPORT_PDF_TAG
 import com.usagemonitor.presentation.ui.LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.BREAKDOWN_AXIS_TAB_TAG_PREFIX
 import com.usagemonitor.presentation.ui.BREAKDOWN_FILTER_TAG
@@ -1279,6 +1280,37 @@ class CliSessionsScreenTest {
 
         onNodeWithTag(EXPORT_JSON_TAG).performClick()
         assertEquals(UsageExportFormat.JSON, chosen)
+    }
+
+    /**
+     * O relatório não passa por [UsageExportFormat]: ele é o recorte inteiro da
+     * janela e tem ação própria, com sessões e resumo no mesmo arquivo.
+     */
+    @Test
+    fun `the pdf button reports its own action`() = runDesktopComposeUiTest {
+        var chosenFormat: UsageExportFormat? = null
+        var reportRequests = 0
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {},
+                        onExport = { format -> chosenFormat = format },
+                        onExportReport = { reportRequests += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(EXPORT_PDF_TAG).performClick()
+
+        assertEquals(1, reportRequests)
+        assertEquals(null, chosenFormat)
     }
 
     /**

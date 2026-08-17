@@ -167,6 +167,123 @@ describe('GET /api/v1/team', () => {
     expect(response.status).toBe(400);
     expect(response.body.code).toBe('validation_error');
   });
+
+  it('soma o tempo ativo descartando as pausas longas', async () => {
+    const start = Date.UTC(2026, 7, 11, 10, 0, 0);
+    await post(
+      makePayload({
+        turns: [
+          makeTurn({ messageId: 'a', ts: start }),
+          // 3 min: dentro do corte, entra.
+          makeTurn({ messageId: 'b', ts: start + 3 * 60_000 }),
+          // 57 min: o usuario fora do teclado, nao tempo de sessao.
+          makeTurn({ messageId: 'c', ts: start + 60 * 60_000 }),
+          makeTurn({ messageId: 'd', ts: start + 62 * 60_000 }),
+        ],
+      }),
+    );
+
+    const response = await get({ accountKey: ACCOUNT_A });
+
+    expect(response.body.activity).toEqual([
+      { deviceId: 'device-1', sessionId: 'session-1', activeMillis: 5 * 60_000 },
+    ]);
+  });
+
+  it('nao conta o subagente no tempo ativo', async () => {
+    const start = Date.UTC(2026, 7, 11, 10, 0, 0);
+    await post(
+      makePayload({
+        turns: [
+          makeTurn({ messageId: 'a', ts: start }),
+          makeTurn({ messageId: 'b', ts: start + 4 * 60_000 }),
+          // Roda em paralelo com a conversa principal: somar contaria duas vezes.
+          makeTurn({ messageId: 'c', ts: start + 20 * 60_000, isSidechain: true }),
+          makeTurn({ messageId: 'd', ts: start + 22 * 60_000, isSidechain: true }),
+        ],
+      }),
+    );
+
+    const response = await get({ accountKey: ACCOUNT_A });
+
+    expect(response.body.activity).toEqual([
+      { deviceId: 'device-1', sessionId: 'session-1', activeMillis: 4 * 60_000 },
+    ]);
+  });
+
+  it('aplica o corte que o cliente pediu', async () => {
+    const start = Date.UTC(2026, 7, 11, 10, 0, 0);
+    await post(
+      makePayload({
+        turns: [
+          makeTurn({ messageId: 'a', ts: start }),
+          makeTurn({ messageId: 'b', ts: start + 8 * 60_000 }),
+        ],
+      }),
+    );
+
+    // Com o corte padrao de 5 min o intervalo de 8 min e pausa; com 10 min ele
+    // vira trabalho. O valor e do cliente, e o servidor so o aplica.
+    const padrao = await get({ accountKey: ACCOUNT_A });
+    expect(padrao.body.activity).toEqual([]);
+
+    const ampliado = await get({ accountKey: ACCOUNT_A, gapCutoffMs: 10 * 60_000 });
+    expect(ampliado.body.activity).toEqual([
+      { deviceId: 'device-1', sessionId: 'session-1', activeMillis: 8 * 60_000 },
+    ]);
+  });
+
+  it('sessao de um turno nao aparece no tempo ativo', async () => {
+    await post(makePayload({ turns: [makeTurn({ messageId: 'unico' })] }));
+
+    const response = await get({ accountKey: ACCOUNT_A });
+
+    expect(response.body.activity).toEqual([]);
+  });
+
+  it('recorta o tempo ativo pela janela', async () => {
+    const start = NOW - 6 * HOUR;
+    await post(
+      makePayload({
+        turns: [
+          makeTurn({ messageId: 'a', ts: start }),
+          makeTurn({ messageId: 'b', ts: start + 2 * 60_000 }),
+          makeTurn({ messageId: 'c', ts: NOW - 2 * HOUR }),
+          makeTurn({ messageId: 'd', ts: NOW - 2 * HOUR + 3 * 60_000 }),
+        ],
+      }),
+    );
+
+    const response = await get({ accountKey: ACCOUNT_A, since: NOW - 5 * HOUR });
+
+    expect(response.body.activity).toEqual([
+      { deviceId: 'device-1', sessionId: 'session-1', activeMillis: 3 * 60_000 },
+    ]);
+  });
+
+  it('nao mistura o tempo ativo de outra conta', async () => {
+    const start = Date.UTC(2026, 7, 11, 10, 0, 0);
+    await post(
+      makePayload({
+        accountKey: ACCOUNT_B,
+        turns: [
+          makeTurn({ messageId: 'a', ts: start }),
+          makeTurn({ messageId: 'b', ts: start + 60_000 }),
+        ],
+      }),
+    );
+
+    const response = await get({ accountKey: ACCOUNT_A });
+
+    expect(response.body.activity).toEqual([]);
+  });
+
+  it('rejeita corte fora do intervalo aceito', async () => {
+    const response = await get({ accountKey: ACCOUNT_A, gapCutoffMs: 0 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('validation_error');
+  });
 });
 
 describe('DELETE /api/v1/member', () => {
