@@ -8,6 +8,7 @@ import com.usagemonitor.data.dto.AnthropicUsageWindow
 import com.usagemonitor.data.mapper.AnthropicMapper
 import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
@@ -141,6 +142,9 @@ class AnthropicMapperTest {
 
         assertEquals(2, result.quotas.size)
         assertNull(result.quotas.firstOrNull { quota -> quota.isExtraCreditsQuota })
+        // Nenhuma das duas fontes indica créditos: a ausência é a resposta certa
+        // e avisar transformaria o estado normal num alerta permanente.
+        assertEquals(emptySet(), result.notices)
     }
 
     @Test
@@ -162,6 +166,7 @@ class AnthropicMapperTest {
 
         assertEquals(2, result.quotas.size)
         assertNull(result.quotas.firstOrNull { quota -> quota.isExtraCreditsQuota })
+        assertEquals(emptySet(), result.notices)
     }
 
     @Test
@@ -252,6 +257,114 @@ class AnthropicMapperTest {
             )
         )
 
-        assertEquals(2, AnthropicMapper.toUsageStats(response).quotas.size)
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(2, result.quotas.size)
+        // A fonte se contradisse — disse que há créditos e não deu limite. Sem o
+        // aviso isso ficaria indistinguível de uma conta sem o recurso.
+        assertEquals(setOf(ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE), result.notices)
+    }
+
+    @Test
+    fun `builds the credits quota from spend when extra_usage loses the monthly limit`() {
+        val response = sampleResponse.copy(
+            extraUsage = AnthropicExtraUsage(
+                isEnabled = true,
+                monthlyLimit = null,
+                usedCredits = null,
+                utilization = null,
+                creditsEverEnabled = true
+            ),
+            spend = AnthropicSpend(
+                used = AnthropicSpendAmount(amountMinor = 55134L, currency = "BRL", exponent = 2),
+                limit = AnthropicSpendAmount(amountMinor = 57000L, currency = "BRL", exponent = 2),
+                percent = 97.0,
+                enabled = true
+            )
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(3, result.quotas.size)
+        val credits = result.quotas[2]
+        assertEquals(AnthropicQuotaLabels.EXTRA_CREDITS, credits.label)
+        assertEquals(97L, credits.used)
+        assertEquals(55134L, credits.rawUsed)
+        assertEquals(57000L, credits.rawTotal)
+        assertEquals("BRL", credits.currencyCode)
+        // A linha sobreviveu pela fonte redundante: não há falha a avisar.
+        assertEquals(emptySet(), result.notices)
+    }
+
+    @Test
+    fun `builds the credits quota from spend when extra_usage is absent entirely`() {
+        val response = sampleResponse.copy(
+            spend = AnthropicSpend(
+                used = AnthropicSpendAmount(amountMinor = 1250L, currency = "USD", exponent = 2),
+                limit = AnthropicSpendAmount(amountMinor = 5000L, currency = "USD", exponent = 2),
+                percent = 25.0,
+                enabled = true
+            )
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(3, result.quotas.size)
+        assertEquals(25L, result.quotas[2].used)
+        assertEquals("USD", result.quotas[2].currencyCode)
+        assertEquals(emptySet(), result.notices)
+    }
+
+    @Test
+    fun `refuses money with an exponent the UI cannot format`() {
+        val response = sampleResponse.copy(
+            extraUsage = AnthropicExtraUsage(
+                isEnabled = true,
+                monthlyLimit = null,
+                creditsEverEnabled = true
+            ),
+            spend = AnthropicSpend(
+                // JPY não tem casas decimais: formatar como centavos dividiria
+                // o valor por cem e mostraria um número cem vezes menor.
+                used = AnthropicSpendAmount(amountMinor = 5000L, currency = "JPY", exponent = 0),
+                limit = AnthropicSpendAmount(amountMinor = 20000L, currency = "JPY", exponent = 0),
+                percent = 25.0,
+                enabled = true
+            )
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(2, result.quotas.size)
+        assertEquals(setOf(ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE), result.notices)
+    }
+
+    @Test
+    fun `keeps extra_usage as the primary source when both are complete`() {
+        // spend traz números levemente diferentes de propósito: quem manda é
+        // extra_usage, cujo utilization não vem arredondado.
+        val response = sampleResponse.copy(
+            extraUsage = AnthropicExtraUsage(
+                isEnabled = true,
+                monthlyLimit = 57000L,
+                usedCredits = 55134.0,
+                utilization = 96.72631578947369,
+                currency = "BRL",
+                creditsEverEnabled = true
+            ),
+            spend = AnthropicSpend(
+                used = AnthropicSpendAmount(amountMinor = 40000L, currency = "USD", exponent = 2),
+                limit = AnthropicSpendAmount(amountMinor = 50000L, currency = "USD", exponent = 2),
+                percent = 80.0,
+                enabled = true
+            )
+        )
+
+        val credits = AnthropicMapper.toUsageStats(response).quotas[2]
+
+        assertEquals(97L, credits.used)
+        assertEquals(55134L, credits.rawUsed)
+        assertEquals(57000L, credits.rawTotal)
+        assertEquals("BRL", credits.currencyCode)
     }
 }

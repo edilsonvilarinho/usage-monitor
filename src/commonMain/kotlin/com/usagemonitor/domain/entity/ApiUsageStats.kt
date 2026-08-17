@@ -32,5 +32,13 @@ data class ApiUsageStats(
 
 enum class ApiUsageNotice {
     WEEKLY_QUOTA_UNAVAILABLE,
-    SOURCE_UNSTABLE
+    SOURCE_UNSTABLE,
+
+    /**
+     * A conta tem créditos de uso, mas a coleta não trouxe valores utilizáveis.
+     *
+     * Distingue "a fonte não respondeu os créditos" de "esta conta não tem
+     * créditos", que até agosto de 2026 eram a mesma tela em branco.
+     */
+    EXTRA_CREDITS_UNAVAILABLE
 }

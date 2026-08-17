@@ -544,7 +544,10 @@ fun ApiUsageCard(
                     }
                 }
 
-                if (!isMinimized && notices.isNotEmpty()) {
+                // O aviso sai também com o card fechado: foi exatamente o card
+                // minimizado que escondeu o sumiço dos créditos de agosto/2026 —
+                // quem monitora três contas mantém todos fechados.
+                if (notices.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     InlineNotices(
                         notices = notices,
@@ -646,6 +649,13 @@ private fun inlineNoticeText(notice: ApiUsageNotice, language: AppLanguage): Str
                 "Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar."
             } else {
                 "Codex usage source is unstable: the contract changed and limits may fluctuate until it stabilizes."
+            }
+        }
+        ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE -> {
+            if (language == AppLanguage.PT) {
+                "Créditos de uso não vieram nesta coleta. O saldo no claude.ai continua valendo."
+            } else {
+                "Usage credits missing from this snapshot. The balance on claude.ai still holds."
             }
         }
     }
