@@ -370,6 +370,50 @@ class ComponentTest {
     }
 
     @Test
+    fun `ApiUsageCard shows the missing credits notice on a minimized card`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 11L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-08-17T17:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = "Claude 7d",
+                            used = 98L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-08-18T03:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    notices = setOf(ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-08-17T12:00:00Z")
+                )
+            }
+        }
+
+        // Com o card fechado o aviso continua visível: foi o card minimizado que
+        // escondeu o sumiço dos créditos em agosto/2026.
+        onNodeWithText("Créditos de uso não vieram nesta coleta. O saldo no claude.ai continua valendo.")
+            .assertIsDisplayed()
+        onNodeWithText("Claude 7d").assertIsDisplayed()
+    }
+
+    @Test
     fun `ApiUsageCard shows balance title for currency quotas`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {

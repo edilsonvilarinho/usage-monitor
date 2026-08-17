@@ -25,6 +25,7 @@ import androidx.compose.ui.window.rememberDialogState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
+import com.usagemonitor.data.datasource.LocalAnthropicCreditsDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
@@ -323,8 +324,17 @@ fun main() = application {
     }
     val codexAuthDataSource = remember { LocalCodexAuthDataSource() }
     val codexDiagnosticsRecorder = remember { LocalCodexDiagnosticsRecorder() }
-    val remoteApiDataSource = remember(httpClient, codexDiagnosticsRecorder) {
-        RemoteApiDataSource(httpClient, codexDiagnosticsRecorder)
+    val anthropicCreditsDiagnosticsRecorder = remember { LocalAnthropicCreditsDiagnosticsRecorder() }
+    val remoteApiDataSource = remember(
+        httpClient,
+        codexDiagnosticsRecorder,
+        anthropicCreditsDiagnosticsRecorder
+    ) {
+        RemoteApiDataSource(
+            httpClient = httpClient,
+            codexDiagnosticsRecorder = codexDiagnosticsRecorder,
+            anthropicCreditsDiagnosticsRecorder = anthropicCreditsDiagnosticsRecorder
+        )
     }
     val usageHistoryDataSource = remember { LocalUsageHistoryDataSource() }
     // Cada conta Anthropic tem seu próprio config dir do Claude Code, e cada um

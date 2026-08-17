@@ -6,6 +6,7 @@ import com.usagemonitor.data.dto.DeepSeekBalanceResponse
 import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
+import com.usagemonitor.data.mapper.resolveExtraCredits
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -16,6 +17,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 private const val CLAUDE_USER_AGENT = "claude-code/1.0.0"
 private const val ANTHROPIC_BETA_OAUTH = "oauth-2025-04-20"
@@ -25,8 +28,18 @@ private const val USAGE_MONITOR_USER_AGENT = "UsageMonitorDesktop"
 // Aberto para permitir fakes em testes unitários (substituem chamadas HTTP reais).
 open class RemoteApiDataSource(
     private val httpClient: HttpClient,
-    private val codexDiagnosticsRecorder: CodexDiagnosticsRecorder = NoOpCodexDiagnosticsRecorder
+    private val codexDiagnosticsRecorder: CodexDiagnosticsRecorder = NoOpCodexDiagnosticsRecorder,
+    private val anthropicCreditsDiagnosticsRecorder: AnthropicCreditsDiagnosticsRecorder =
+        NoOpAnthropicCreditsDiagnosticsRecorder
 ) {
+
+    // Mesmas flags do `Json` do ContentNegotiation em Main.kt: o caminho de
+    // diagnóstico não pode desserializar sob regras diferentes das do caminho
+    // normal, senão registraria um comportamento que a coleta não tem.
+    private val diagnosticsJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
     /**
      * Busca uso atual via endpoint dedicado OAuth da Anthropic.
@@ -46,7 +59,38 @@ open class RemoteApiDataSource(
             sourceName = "Anthropic"
         )
 
-        return response.body()
+        // Com o registro desligado — o normal — o corpo continua sendo lido uma
+        // vez só, pelo ContentNegotiation. Ler o texto sempre para guardá-lo
+        // custaria uma cópia da resposta em toda coleta de toda conta.
+        if (!anthropicCreditsDiagnosticsRecorder.isEnabled) {
+            return response.body()
+        }
+
+        val payload = response.bodyAsText()
+        val parsed = diagnosticsJson.decodeFromString<AnthropicUsageResponse>(payload)
+        recordAnthropicCreditsDiagnostics(payload = payload, parsed = parsed)
+        return parsed
+    }
+
+    /**
+     * O desfecho vem de [resolveExtraCredits], a mesma função que o mapper usa —
+     * um segundo julgamento aqui poderia registrar um motivo que a tela não teve.
+     */
+    private fun recordAnthropicCreditsDiagnostics(payload: String, parsed: AnthropicUsageResponse) {
+        val resolution = resolveExtraCredits(
+            extraUsage = parsed.extraUsage,
+            spend = parsed.spend
+        )
+        val root = runCatching { diagnosticsJson.parseToJsonElement(payload).jsonObject }.getOrNull()
+
+        anthropicCreditsDiagnosticsRecorder.record(
+            AnthropicCreditsDiagnosticsEvent(
+                timestamp = Clock.System.now().toString(),
+                outcome = resolution.outcome.name,
+                extraUsageRaw = root?.get("extra_usage")?.toString(),
+                spendRaw = root?.get("spend")?.toString()
+            )
+        )
     }
 
     open suspend fun fetchMiniMaxTokenPlan(apiKey: String): MiniMaxTokenPlanResponse {
