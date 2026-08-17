@@ -129,6 +129,12 @@ private val ANTHROPIC_CREDENTIAL_MARKERS = listOf(
     "Credentials not found",
     "Token refresh retornou sem access_token",
     "Token refresh returned without access_token",
+    // A renovação que falha no HTTP passou a trazer status e corpo. Sem o marcador
+    // a mensagem cairia no bloco genérico de erro e perderia a orientação de login.
+    // Rate limit e indisponibilidade são testados antes disto em `warningFor`, então
+    // um 429/503 na renovação continua no banner de "aguarde".
+    "Token refresh falhou",
+    "Token refresh failed",
     "Sua sessão do Claude Code está sem a permissão esperada ou desatualizada",
     "Claude Code session is missing the expected permission or is outdated"
 )

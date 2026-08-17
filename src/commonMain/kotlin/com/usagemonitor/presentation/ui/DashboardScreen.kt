@@ -231,7 +231,7 @@ fun DashboardScreen(
                                     errors = state.errors,
                                     language = language,
                                     onRetryAll = { viewModel.refresh() },
-                                    onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) }
+                                    onRetryTarget = { target -> viewModel.refresh(target) }
                                 )
                                 is UiState.Success -> SuccessContent(
                                     apiStatsList = state.data,
@@ -252,7 +252,7 @@ fun DashboardScreen(
                                     teamEnabledProfileIds = teamEnabledProfileIds,
                                     cliSessionPulses = cliSessionPulses,
                                     teamSessionPulses = teamSessionPulses,
-                                    onRetryAnthropic = { viewModel.refresh(ApiSource.ANTHROPIC) },
+                                    onRetryTarget = { target -> viewModel.refresh(target) },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -350,7 +350,7 @@ private fun ErrorContent(
     errors: List<UiApiError>,
     language: AppLanguage,
     onRetryAll: () -> Unit,
-    onRetryAnthropic: () -> Unit
+    onRetryTarget: (UsageTargetKey) -> Unit
 ) {
     val warnings = errors.mapNotNull { error -> warningFor(error = error, language = language) }
     val genericErrors = errors.filterNot { error ->
@@ -374,8 +374,8 @@ private fun ErrorContent(
                     description = warning.description,
                     actionLabel = warning.actionLabel,
                     onAction = warningActionFor(
-                        source = warning.source,
-                        onRetryAnthropic = onRetryAnthropic
+                        warning = warning,
+                        onRetryTarget = onRetryTarget
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -425,7 +425,7 @@ private fun SuccessContent(
     teamEnabledProfileIds: Set<String> = emptySet(),
     cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
-    onRetryAnthropic: () -> Unit,
+    onRetryTarget: (UsageTargetKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val itemByTarget = apiStatsList.associateBy { stats -> stats.targetKey }
@@ -458,8 +458,8 @@ private fun SuccessContent(
                             description = warning.description,
                             actionLabel = warning.actionLabel,
                             onAction = warningActionFor(
-                                source = warning.source,
-                                onRetryAnthropic = onRetryAnthropic
+                                warning = warning,
+                                onRetryTarget = onRetryTarget
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )

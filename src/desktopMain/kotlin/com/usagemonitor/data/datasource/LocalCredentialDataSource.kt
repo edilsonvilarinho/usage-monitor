@@ -11,17 +11,37 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L  // renova se expira em menos de 5 min
-private const val OAUTH_REFRESH_URL = "https://console.anthropic.com/v1/oauth/token"
+
+// Espelhados da configuração de produção do binário do Claude Code CLI
+// (`TOKEN_URL` e `CLIENT_ID`). O endpoint valida o formato do corpo antes de
+// olhar o grant: sem `client_id` responde HTTP 400 "Invalid request format"
+// com qualquer refresh token, e era por isso que a renovação nunca funcionava.
+// O client id é público — vem embutido no binário distribuído do CLI.
+private const val OAUTH_REFRESH_URL = "https://platform.claude.com/v1/oauth/token"
+private const val CLAUDE_CODE_OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+private val DEFAULT_OAUTH_SCOPES = listOf(
+    "user:profile",
+    "user:inference",
+    "user:sessions:claude_code",
+    "user:mcp_servers",
+    "user:file_upload"
+)
+private const val CLAUDE_AI_OAUTH_KEY = "claudeAiOauth"
 
 internal class LocalCredentialDataSource(
     private val httpClient: HttpClient,
@@ -147,35 +167,102 @@ internal class LocalCredentialDataSource(
         originalContent: String,
         creds: CredentialsFileDto
     ): CredentialsFileDto {
-        val response = httpClient.post(OAUTH_REFRESH_URL) {
+        // Escopo igual ao do CLI: os do ficheiro quando existem, senão os default.
+        // Pedir a lista fixa numa conta que tem menos escopos seria pedir permissão
+        // que ela não concedeu.
+        val scopes = creds.claudeAiOauth.scopes.ifEmpty { DEFAULT_OAUTH_SCOPES }
+        val httpResponse = httpClient.post(OAUTH_REFRESH_URL) {
             contentType(ContentType.Application.Json)
-            setBody(TokenRefreshRequest("refresh_token", creds.claudeAiOauth.refreshToken))
-        }.body<TokenRefreshResponse>()
+            setBody(
+                TokenRefreshRequest(
+                    grant_type = "refresh_token",
+                    refresh_token = creds.claudeAiOauth.refreshToken,
+                    client_id = CLAUDE_CODE_OAUTH_CLIENT_ID,
+                    scope = scopes.joinToString(" ")
+                )
+            )
+        }
 
+        // Sem esta checagem o corpo de erro (`{"type":"error",...}`) desserializa
+        // sem lançar — todos os campos de TokenRefreshResponse são opcionais e o
+        // cliente não liga `expectSuccess` — e a falha chegava à tela como
+        // "sem access_token", sem status nem motivo.
+        if (!httpResponse.status.isSuccess()) {
+            val body = httpResponse.bodyAsText()
+            throw IllegalStateException(
+                "Token refresh falhou (HTTP ${httpResponse.status.value}): $body"
+            )
+        }
+
+        val response = httpResponse.body<TokenRefreshResponse>()
         val newAccessToken = response.accessToken
             ?: throw IllegalStateException("Token refresh retornou sem access_token")
+        val newRefreshToken = response.refreshToken ?: creds.claudeAiOauth.refreshToken
+        val newExpiresAt = if (response.expiresIn != null) {
+            System.currentTimeMillis() + response.expiresIn * 1000
+        } else {
+            creds.claudeAiOauth.expiresAt
+        }
 
         val updated = creds.copy(
             claudeAiOauth = creds.claudeAiOauth.copy(
                 accessToken = newAccessToken,
-                refreshToken = response.refreshToken ?: creds.claudeAiOauth.refreshToken,
-                expiresAt = if (response.expiresIn != null)
-                    System.currentTimeMillis() + response.expiresIn * 1000
-                else creds.claudeAiOauth.expiresAt
+                refreshToken = newRefreshToken,
+                expiresAt = newExpiresAt
             )
         )
         if (store.read() != originalContent) {
             throw IllegalStateException("As credenciais do Claude Code mudaram durante a renovação; a coleta será repetida.")
         }
 
-        store.write(json.encodeToString(CredentialsFileDto.serializer(), updated))
+        store.write(
+            patchedCredentialsJson(
+                originalContent = originalContent,
+                accessToken = newAccessToken,
+                refreshToken = newRefreshToken,
+                expiresAt = newExpiresAt
+            )
+        )
         return updated
+    }
+
+    /**
+     * Regrava o ficheiro trocando só os três campos renovados.
+     *
+     * Serializar [CredentialsFileDto] de volta apagaria em silêncio todo nó que o
+     * app não declara — `mcpOAuth` (autenticação dos MCP servers),
+     * `refreshTokenExpiresAt` e o que a Anthropic acrescentar depois —, porque o
+     * `Json` usa `ignoreUnknownKeys`. O DTO continua servindo a leitura.
+     */
+    private fun patchedCredentialsJson(
+        originalContent: String,
+        accessToken: String,
+        refreshToken: String,
+        expiresAt: Long
+    ): String {
+        val root = json.parseToJsonElement(originalContent).jsonObject
+        val oauth = root[CLAUDE_AI_OAUTH_KEY]?.jsonObject ?: JsonObject(emptyMap())
+        val patchedOauth = JsonObject(
+            oauth.toMutableMap().apply {
+                put("accessToken", JsonPrimitive(accessToken))
+                put("refreshToken", JsonPrimitive(refreshToken))
+                put("expiresAt", JsonPrimitive(expiresAt))
+            }
+        )
+        val patchedRoot = JsonObject(
+            root.toMutableMap().apply {
+                put(CLAUDE_AI_OAUTH_KEY, patchedOauth)
+            }
+        )
+        return json.encodeToString(JsonObject.serializer(), patchedRoot)
     }
 
     @Serializable
     private data class TokenRefreshRequest(
         val grant_type: String,
         val refresh_token: String,
+        val client_id: String,
+        val scope: String,
     )
 
     @Serializable
