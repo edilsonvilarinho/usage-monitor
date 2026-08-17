@@ -386,6 +386,12 @@ class LocalCliSessionDataSource(
                     metadata = parsed.metadataBySession[sessionId]
                 )
             }
+            // Fora do laço acima de propósito: um arquivo reprocessado só porque
+            // mudou de conta não traz turno novo, `touchedSessions` sai vazio e
+            // `recomputeSession` nunca roda. Sem este carimbo a sessão fica com a
+            // conta antiga — ou sem conta nenhuma, que foi o que aconteceu quando
+            // a coluna nasceu.
+            stampSessionProfile(connection, file.absolutePath, profileId)
             upsertFileState(
                 connection = connection,
                 path = file.absolutePath,
@@ -733,6 +739,16 @@ class LocalCliSessionDataSource(
         }
     }
 
+    /** Atribui [profileId] a todas as sessões vindas de [path]. Caminho e conta são 1:1. */
+    private fun stampSessionProfile(connection: Connection, path: String, profileId: String) {
+        connection.prepareStatement(STAMP_SESSION_PROFILE_SQL).use { statement ->
+            statement.setString(1, profileId)
+            statement.setString(2, path)
+            statement.setString(3, profileId)
+            statement.executeUpdate()
+        }
+    }
+
     private fun upsertFileState(
         connection: Connection,
         path: String,
@@ -784,6 +800,7 @@ class LocalCliSessionDataSource(
             statement.execute(CREATE_SESSIONS_TABLE_SQL)
             statement.execute(CREATE_TURNS_TABLE_SQL)
             statement.execute(CREATE_TURN_TOOLS_TABLE_SQL)
+            statement.execute(CREATE_INDEX_META_TABLE_SQL)
         }
 
         // Bases criadas antes do suporte a múltiplas contas não têm `profile_id`.
@@ -792,6 +809,10 @@ class LocalCliSessionDataSource(
         // reatribuí-las pelo caminho do arquivo.
         addColumnIfMissing(connection, "cli_session_files", "profile_id")
         addColumnIfMissing(connection, "cli_sessions", "profile_id")
+        // Antes de `migrateSchemaVersion`, obrigatoriamente: o reset dele apaga
+        // `cli_session_files`, que é de onde este backfill lê a conta. Invertido,
+        // sessão de transcript já apagado do disco ficaria órfã para sempre.
+        backfillSessionProfile(connection)
 
         // Tudo que já está no índice foi lido de um transcript desta máquina, então
         // atribuir o hostname atual às linhas antigas é factual — e é a única
@@ -819,22 +840,59 @@ class LocalCliSessionDataSource(
      * ranking de ferramentas mostraria apenas as sessões novas — um número que
      * parece completo e não é.
      *
-     * O reset é só do `last_offset`: as sessões e os turnos são reinseridos por
-     * `INSERT OR IGNORE`/`INSERT OR REPLACE` e não se duplicam.
+     * O contador mora em `cli_index_meta`, tabela deste índice. Ele já esteve no
+     * `PRAGMA user_version` e aquilo nunca funcionou: o histórico de uso vive no
+     * mesmo arquivo e grava `user_version = 3` a cada abertura, então esta
+     * migração lia um número alheio, concluía que já havia rodado e voltava sem
+     * fazer nada. Um pragma por arquivo não comporta dois donos.
+     *
+     * O reset apaga as linhas de `cli_session_files`, não os offsets: `syncIndex`
+     * decide pular por tamanho + data de modificação e faz `continue` **antes** de
+     * olhar o `last_offset`, então zerá-lo era inerte. Sem a linha do arquivo a
+     * varredura o trata como novo e o lê inteiro. Sessões e turnos ficam onde
+     * estão e voltam pelos mesmos `INSERT OR IGNORE`/`INSERT OR REPLACE`, sem
+     * duplicar.
      */
     private fun migrateSchemaVersion(connection: Connection) {
-        val current = connection.createStatement().use { statement ->
-            statement.executeQuery("PRAGMA user_version;").use { rows ->
-                if (rows.next()) rows.getInt(1) else 0
-            }
-        }
+        val current = readIndexSchemaVersion(connection)
         if (current >= INDEX_SCHEMA_VERSION) {
             return
         }
 
         connection.createStatement().use { statement ->
-            statement.execute(RESET_FILE_OFFSETS_SQL)
-            statement.execute("PRAGMA user_version = $INDEX_SCHEMA_VERSION;")
+            statement.execute(RESET_INDEXED_FILES_SQL)
+        }
+        connection.prepareStatement(UPSERT_INDEX_SCHEMA_VERSION_SQL).use { statement ->
+            statement.setString(1, INDEX_SCHEMA_VERSION.toString())
+            statement.executeUpdate()
+        }
+    }
+
+    /** Versão gravada do índice; ausente ou ilegível conta como zero. */
+    private fun readIndexSchemaVersion(connection: Connection): Int {
+        return connection.prepareStatement(SELECT_INDEX_SCHEMA_VERSION_SQL).use { statement ->
+            statement.executeQuery().use { rows ->
+                if (rows.next()) rows.getString(1)?.toIntOrNull() ?: 0 else 0
+            }
+        }
+    }
+
+    /**
+     * Reatribui a conta das sessões que ficaram sem ela.
+     *
+     * A conta da sessão só era gravada por `recomputeSession`, que roda apenas
+     * para sessão com turno novo. Quando a coluna nasceu, `syncIndex` reprocessou
+     * os arquivos inalterados, não leu turno nenhum — o offset já estava no fim —
+     * e mesmo assim carimbou `cli_session_files`. Da passada seguinte em diante o
+     * arquivo passou a ser pulado, e a sessão ficou com a conta nula para sempre:
+     * invisível em toda tela, porque `profile_id = ?` não casa com nulo.
+     *
+     * Roda em toda abertura, e não só quando a coluna é criada, porque nas bases
+     * já danificadas ela existe há muito. Em base sã não casa nenhuma linha.
+     */
+    private fun backfillSessionProfile(connection: Connection) {
+        connection.createStatement().use { statement ->
+            statement.execute(BACKFILL_SESSION_PROFILE_SQL)
         }
     }
 
@@ -1008,9 +1066,39 @@ class LocalCliSessionDataSource(
          * transcripts na próxima abertura.
          *
          * 1 = tabela `cli_turn_tools`, que nasceu vazia para tudo que já estava
-         * indexado.
+         *     indexado. Nunca chegou a disparar: o contador era o `PRAGMA
+         *     user_version`, que o histórico de uso também escreve neste mesmo
+         *     arquivo, e o reset de então não forçava releitura nenhuma.
+         * 2 = primeira versão com contador próprio (`cli_index_meta`) e com um
+         *     reset que a varredura respeita. É a passada que finalmente preenche
+         *     `cli_turn_tools` do histórico já indexado.
          */
-        private const val INDEX_SCHEMA_VERSION = 1
+        private const val INDEX_SCHEMA_VERSION = 2
+
+        /**
+         * Metadados do índice CLI, hoje só a versão do schema.
+         *
+         * Existe porque o `PRAGMA user_version` é um valor por arquivo e o
+         * histórico de uso mora no mesmo `.db`.
+         */
+        private val CREATE_INDEX_META_TABLE_SQL = """
+            CREATE TABLE IF NOT EXISTS cli_index_meta (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            );
+        """
+
+        private const val INDEX_SCHEMA_VERSION_KEY = "schema_version"
+
+        private val SELECT_INDEX_SCHEMA_VERSION_SQL = """
+            SELECT value FROM cli_index_meta WHERE key = '$INDEX_SCHEMA_VERSION_KEY';
+        """
+
+        private val UPSERT_INDEX_SCHEMA_VERSION_SQL = """
+            INSERT INTO cli_index_meta (key, value)
+            VALUES ('$INDEX_SCHEMA_VERSION_KEY', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+        """
 
         /**
          * Ferramentas invocadas em cada turno.
@@ -1035,13 +1123,40 @@ class LocalCliSessionDataSource(
         """
 
         /**
-         * Zera o offset de todos os arquivos para forçar a releitura.
+         * Esquece os arquivos já lidos para forçar a releitura.
+         *
+         * Apagar a linha, e não zerar o `last_offset`, é o que faz diferença:
+         * `syncIndex` pula por tamanho + data de modificação antes de consultar o
+         * offset, então um arquivo inalterado com offset zerado continuava sendo
+         * pulado. Sem a linha ele é tratado como novo.
          *
          * Não apaga sessões nem turnos: eles voltam pelos mesmos `INSERT OR
          * IGNORE`/`INSERT OR REPLACE` da indexação normal e não se duplicam.
          */
-        private val RESET_FILE_OFFSETS_SQL = """
-            UPDATE cli_session_files SET last_offset = 0;
+        private val RESET_INDEXED_FILES_SQL = """
+            DELETE FROM cli_session_files;
+        """
+
+        /**
+         * Reatribui a conta pelo caminho do arquivo, para as sessões que ficaram
+         * com ela nula. Só toca em linha órfã.
+         */
+        private val BACKFILL_SESSION_PROFILE_SQL = """
+            UPDATE cli_sessions
+            SET profile_id = (
+              SELECT f.profile_id FROM cli_session_files f WHERE f.path = cli_sessions.file_path
+            )
+            WHERE profile_id IS NULL
+              AND EXISTS (
+                SELECT 1 FROM cli_session_files f
+                WHERE f.path = cli_sessions.file_path AND f.profile_id IS NOT NULL
+              );
+        """
+
+        private val STAMP_SESSION_PROFILE_SQL = """
+            UPDATE cli_sessions
+            SET profile_id = ?
+            WHERE file_path = ? AND (profile_id IS NULL OR profile_id <> ?);
         """
 
         private val INSERT_TURN_TOOL_SQL = """

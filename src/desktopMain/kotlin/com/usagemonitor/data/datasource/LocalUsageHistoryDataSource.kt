@@ -202,6 +202,12 @@ class LocalUsageHistoryDataSource(
             statement.execute(CREATE_INDEX_BY_SERIES_SQL)
             statement.execute(CREATE_INDEX_BY_ACCOUNT_SQL)
             statement.execute(CREATE_INDEX_BY_ACCOUNT_SERIES_SQL)
+            // O `user_version` é um valor único por arquivo, e este arquivo é
+            // compartilhado com o índice de sessões CLI. Ele pertence só ao
+            // histórico: o índice já tentou usá-lo como contador de migração e
+            // passou a ler este 3 como se fosse seu, concluindo que já havia
+            // migrado. Quem precisar de versão própria aqui cria a sua tabela,
+            // como `cli_index_meta`.
             statement.execute("PRAGMA user_version = 3;")
         }
     }

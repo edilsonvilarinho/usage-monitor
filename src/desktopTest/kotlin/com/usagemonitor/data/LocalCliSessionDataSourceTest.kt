@@ -724,6 +724,139 @@ class LocalCliSessionDataSourceTest {
         }
     }
 
+    @Test
+    fun `session of an already indexed file without an account is reassigned on open`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val root = File(tempDir, "projects").also { it.mkdirs() }
+        val databaseFile = File(tempDir, "cli.db")
+        writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+
+        withDataSource(root, databaseFile) { dataSource -> dataSource.syncIndex() }
+
+        // Estado real do banco danificado: o arquivo já carrega a conta, a sessão
+        // não. Como tamanho e data batem, `syncIndex` pula o arquivo para sempre.
+        executeSql(databaseFile, "UPDATE cli_sessions SET profile_id = NULL;")
+
+        withDataSource(root, databaseFile) { dataSource ->
+            // Sem reindexar: quem repara é o backfill da abertura.
+            assertEquals(
+                listOf("session-a"),
+                dataSource.readSessions(profileId = PROFILE_A).map { session -> session.sessionId }
+            )
+        }
+        tempDir.deleteRecursively()
+    }
+
+    @Test
+    fun `an unchanged file changes account when its root changes`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val root = File(tempDir, "projects").also { it.mkdirs() }
+        val databaseFile = File(tempDir, "cli.db")
+        writeTranscript(root, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+
+        withDataSource(root, databaseFile) { dataSource -> dataSource.syncIndex() }
+
+        // Mesmo arquivo, mesma data, mesmo tamanho — só a conta da raiz muda. Não
+        // há turno novo para ler, então o carimbo não pode depender disso.
+        withDataSource(root, databaseFile, profileId = PROFILE_B) { dataSource ->
+            dataSource.syncIndex()
+
+            assertEquals(PROFILE_B, dataSource.readSessions(profileId = PROFILE_B).single().profileId)
+            assertTrue(dataSource.readSessions(profileId = PROFILE_A).isEmpty())
+        }
+        tempDir.deleteRecursively()
+    }
+
+    @Test
+    fun `raising the index version rereads unchanged transcripts`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val root = File(tempDir, "projects").also { it.mkdirs() }
+        val databaseFile = File(tempDir, "cli.db")
+        writeTranscript(
+            root,
+            "session-a",
+            assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", tools = listOf("Read"))
+        )
+
+        withDataSource(root, databaseFile) { dataSource -> dataSource.syncIndex() }
+
+        // Base anterior à tabela de ferramentas: os turnos estão indexados, as
+        // ferramentas não, e o arquivo não mudou desde então.
+        executeSql(databaseFile, "DELETE FROM cli_turn_tools;", "DELETE FROM cli_index_meta;")
+
+        withDataSource(root, databaseFile) { dataSource ->
+            dataSource.syncIndex()
+
+            assertEquals(
+                listOf("Read"),
+                dataSource.readToolUsage(profileId = PROFILE_A, sinceEpochMillis = 0L)
+                    .map { usage -> usage.toolName }
+            )
+        }
+        tempDir.deleteRecursively()
+    }
+
+    @Test
+    fun `a foreign user_version does not cancel the index migration`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val root = File(tempDir, "projects").also { it.mkdirs() }
+        val databaseFile = File(tempDir, "cli.db")
+        writeTranscript(
+            root,
+            "session-a",
+            assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", tools = listOf("Read"))
+        )
+
+        withDataSource(root, databaseFile) { dataSource -> dataSource.syncIndex() }
+
+        // O histórico de uso vive no mesmo arquivo e grava este 3 a cada abertura.
+        // Enquanto ele era o contador do índice, esta migração nunca acontecia.
+        executeSql(
+            databaseFile,
+            "DELETE FROM cli_turn_tools;",
+            "DELETE FROM cli_index_meta;",
+            "PRAGMA user_version = 3;"
+        )
+
+        withDataSource(root, databaseFile) { dataSource ->
+            dataSource.syncIndex()
+
+            assertEquals(
+                listOf("Read"),
+                dataSource.readToolUsage(profileId = PROFILE_A, sinceEpochMillis = 0L)
+                    .map { usage -> usage.toolName }
+            )
+        }
+        tempDir.deleteRecursively()
+    }
+
+    /** Abre o índice sobre um banco já existente, para exercitar a migração da abertura. */
+    private suspend fun withDataSource(
+        root: File,
+        databaseFile: File,
+        profileId: String = PROFILE_A,
+        block: suspend (LocalCliSessionDataSource) -> Unit
+    ) {
+        val dataSource = LocalCliSessionDataSource(
+            projectRootsProvider = { listOf(CliProjectRoot(profileId, root.absolutePath)) },
+            databaseFile = databaseFile
+        )
+        try {
+            block(dataSource)
+        } finally {
+            dataSource.close()
+        }
+    }
+
+    /** Escreve direto no índice para reproduzir o estado de bases já danificadas. */
+    private fun executeSql(databaseFile: File, vararg statements: String) {
+        DriverManager.getConnection("jdbc:sqlite:" + databaseFile.absolutePath).use { connection ->
+            connection.createStatement().use { statement ->
+                statements.forEach { sql -> statement.execute(sql) }
+            }
+        }
+    }
+
     /** Mesma cadeia de resolução usada pelo datasource. */
     private fun expectedHostName(): String? {
         val fromEnvironment = System.getenv("COMPUTERNAME")?.takeIf { it.isNotBlank() }
