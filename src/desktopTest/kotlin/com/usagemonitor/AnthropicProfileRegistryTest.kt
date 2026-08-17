@@ -110,8 +110,12 @@ class AnthropicProfileRegistryTest {
         writeProfileFiles(aDir, File(aDir, ".claude.json"), "alpha@example.com", "account-b")
         writeProfileFiles(bDir, File(bDir, ".claude.json"), "beta@example.com", "account-c")
         val registry = newRegistry()
-        val alpha = registry.profiles.value.first { it.configDirectory == aDir.absolutePath }
-        val beta = registry.profiles.value.first { it.configDirectory == bDir.absolutePath }
+        // `canonicalPath`, nao `absolutePath`: o registry canonicaliza o diretorio
+        // antes de publicar. Onde o TEMP vem em forma 8.3 — `C:\Users\RUNNER~1\...`
+        // no runner do GitHub, porque `runneradmin` passa de 8 caracteres — as duas
+        // formas divergem e a busca nao acharia nada.
+        val alpha = registry.profiles.value.first { it.configDirectory == aDir.canonicalPath }
+        val beta = registry.profiles.value.first { it.configDirectory == bDir.canonicalPath }
         val orderBefore = registry.profiles.value.map { it.id }
 
         // Rótulo escolhido de propósito para inverter a ordem alfabética (alpha < beta)
