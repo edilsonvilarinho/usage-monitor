@@ -130,7 +130,7 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 - Perfis adicionais também podem ser cadastrados manualmente em **Configurações > Contas Anthropic**. A aplicação apenas monitora: não executa login/logout e não remove arquivos de credenciais.
 - O perfil padrão usa `~/.claude/.credentials.json` para o token e `~/.claude.json` para a identidade. Perfis personalizados usam `<CLAUDE_CONFIG_DIR>/.credentials.json` e `<CLAUDE_CONFIG_DIR>/.claude.json`.
 - Novos perfis detectados ficam desabilitados até confirmação do usuário. Perfis habilitados aparecem simultaneamente, com um card por conta/workspace; caminhos duplicados e identidades duplicadas não geram coleta duplicada.
-- Se o token estiver perto de expirar, `LocalCredentialDataSource` tenta refresh em `https://console.anthropic.com/v1/oauth/token`, com gravação atômica e proteção contra alteração concorrente do arquivo.
+- Se o token estiver perto de expirar, `LocalCredentialDataSource` tenta refresh em `https://platform.claude.com/v1/oauth/token`, com gravação atômica e proteção contra alteração concorrente do arquivo. O corpo leva `client_id` e `scope` além de `grant_type`/`refresh_token` — sem `client_id` o endpoint recusa com `400 Invalid request format`. A regravação preserva os nós que o app não conhece (`mcpOAuth`, `refreshTokenExpiresAt`).
 - No Windows, uma variável definida apenas com `$env:CLAUDE_CONFIG_DIR` afeta o PowerShell atual e seus processos filhos. O Usage Monitor usa os perfis cadastrados e não depende de ser aberto pelo mesmo terminal.
 - A app trabalha com as janelas `five_hour` e `seven_day`.
 - Headers obrigatorios:

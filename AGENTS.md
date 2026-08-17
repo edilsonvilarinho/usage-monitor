@@ -67,7 +67,9 @@ Regras importantes:
   - `anthropic-beta: oauth-2025-04-20`
   - `User-Agent: claude-code/1.0.0`
 - O token vem de `~/.claude/.credentials.json` -> `claudeAiOauth.accessToken`
-- Se o token estiver perto de expirar, `LocalCredentialDataSource` tenta refresh em `https://console.anthropic.com/v1/oauth/token`
+- Se o token estiver perto de expirar, `LocalCredentialDataSource` tenta refresh em `https://platform.claude.com/v1/oauth/token`
+  - O corpo precisa de `client_id` e `scope` alem de `grant_type`/`refresh_token`. Sem `client_id` o endpoint responde `400 Invalid request format` com qualquer refresh token
+  - A regravacao do ficheiro e patch de JSON: ele tem nos que o app nao declara (`mcpOAuth`, `refreshTokenExpiresAt`) e serializar o DTO de volta os apagava
 - O payload retornado traz janelas de uso `five_hour` e `seven_day`
 
 ### MiniMax
