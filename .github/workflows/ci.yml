@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'server/**'
+      - 'docs/**'
+      - '**.md'
+  # Sem filtro de path no `pull_request`, de proposito. Um workflow que o filtro
+  # impede de disparar nunca reporta status, e um check obrigatorio nessa
+  # condicao trava o PR em "Expected - Waiting for status to be reported". O
+  # recorte por path passou para dentro do job, que assim sempre reporta
+  # `success` de verdade — sem depender de a protecao de branch tratar um job
+  # `skipped` como sucesso.
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    # windows-latest, nao ubuntu: os testes de componente usam
+    # `runDesktopComposeUiTest` e nunca rodaram headless em Linux. O repositorio
+    # nao tem nenhuma configuracao de headless/xvfb, entao um alvo Linux seria
+    # um gate nao comprovado.
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      # Recorte por path feito aqui, e nao no gatilho. `gh` ja vem instalado no
+      # runner: nenhuma action de terceiros entra no caminho.
+      - name: Detect relevant changes
+        id: filter
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Push so chega ate aqui quando o `paths-ignore` do gatilho ja aprovou.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          files="$(gh api --paginate \
+            "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --jq '.[].filename')"
+
+          relevant=false
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            # Mesmo recorte do `paths-ignore` do gatilho de push.
+            case "$file" in
+              server/*|docs/*|*.md) continue ;;
+            esac
+            echo "Desktop change: $file"
+            relevant=true
+            break
+          done <<< "$files"
+
+          echo "relevant=$relevant"
+          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.filter.outputs.relevant == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        if: steps.filter.outputs.relevant == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      # MINIMAX_API_KEY fica deliberadamente indefinida: os testes injetam o
+      # leitor da env var e `MiniMaxRepositoryImplTest` afirma a mensagem de
+      # variavel ausente. Defini-la aqui quebraria o teste.
+      - name: Run tests
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat allTests
+
+      - name: Upload test reports
+        if: failure() && steps.filter.outputs.relevant == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/tests/**
+          if-no-files-found: ignore
