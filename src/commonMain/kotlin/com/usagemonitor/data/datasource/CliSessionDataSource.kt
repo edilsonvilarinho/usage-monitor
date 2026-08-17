@@ -1,11 +1,13 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.CliSessionActiveTime
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 
 /**
  * Índice local das sessões do Claude Code.
@@ -61,4 +63,19 @@ interface CliSessionDataSource {
         profileId: String? = null,
         sinceEpochMillis: Long = 0L
     ): List<CliToolUsage>
+
+    /**
+     * Tempo de trabalho de cada sessão na janela, pela definição de
+     * `activeTimeMillisOf`: soma dos intervalos entre turnos consecutivos da
+     * thread principal menores que [gapCutoffMillis].
+     *
+     * O corte chega como parâmetro e **não** é literal no SQL: a constante mora
+     * no domain, e a consulta apenas a aplica. Sessão sem intervalo dentro da
+     * janela não aparece na lista.
+     */
+    suspend fun readSessionActiveTimes(
+        profileId: String? = null,
+        sinceEpochMillis: Long = 0L,
+        gapCutoffMillis: Long = TURN_GAP_CUTOFF_MILLIS
+    ): List<CliSessionActiveTime>
 }

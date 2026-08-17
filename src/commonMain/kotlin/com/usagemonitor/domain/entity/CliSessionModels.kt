@@ -105,6 +105,17 @@ data class CliSessionSummary(
     val liveContextTokens: Long = 0L,
     /** Modelo desse último turno principal; define a tarifa da próxima mensagem. */
     val liveContextModel: String? = null,
+    /**
+     * Tempo de trabalho da sessão dentro da janela lida, pela mesma definição de
+     * [activeTimeMillisOf]: só os intervalos entre turnos consecutivos da thread
+     * principal menores que [TURN_GAP_CUTOFF_MILLIS].
+     *
+     * `null` significa **não medido** — leitura que não consultou o tempo ativo,
+     * ou servidor de time anterior ao campo. Zero significa medido e sem
+     * intervalo, o caso da sessão de um turno só. Colapsar os dois faria a tela
+     * afirmar "não trabalhou" onde a resposta certa é "não se sabe".
+     */
+    val activeMillis: Long? = null,
     /** O `.jsonl` de origem não existe mais (retenção do CLI); só o resumo sobrevive. */
     val stale: Boolean = false
 ) {
@@ -191,6 +202,18 @@ private const val MILLIS_PER_HOUR = 3_600_000.0
  * esconder um índice fora de ordem, que seria um defeito a corrigir e não a
  * contornar.
  */
+/**
+ * Tempo de trabalho de uma sessão dentro da janela lida.
+ *
+ * Par cru, e não uma coluna a mais em [CliUsageGroupRow]: aquela linha é
+ * `(sessão, modelo)` e uma sessão que trocou de modelo aparece em várias delas —
+ * somar o tempo por linha multiplicaria a hora pelo número de modelos.
+ */
+data class CliSessionActiveTime(
+    val sessionId: String,
+    val activeMillis: Long = 0L
+)
+
 fun activeTimeMillisOf(turns: List<CliSessionTurn>): Long {
     if (turns.size < 2) {
         return 0L

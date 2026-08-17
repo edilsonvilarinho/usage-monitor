@@ -78,9 +78,24 @@ export type PresenceRequestBody = z.infer<typeof presenceBodySchema>;
  * `since` fica opcional em vez de anulavel com default: `z.coerce` roda antes de
  * qualquer default e transformaria a ausencia do parametro em `NaN`.
  */
+/**
+ * Corte entre turnos consecutivos acima do qual a pausa deixa de ser tempo de
+ * trabalho, em milissegundos.
+ *
+ * Quem manda o valor e o cliente, e o default so cobre cliente antigo: a
+ * constante mora no dominio do app (`TURN_GAP_CUTOFF_MILLIS`), e duplica-la aqui
+ * como fonte da verdade daria duas respostas para a mesma pergunta — o mesmo
+ * motivo pelo qual este servidor nao precifica turno.
+ */
+export const DEFAULT_GAP_CUTOFF_MS = 5 * 60 * 1_000;
+
+/** Um dia como teto: acima disso o "intervalo" ja nao descreve trabalho seguido. */
+const GAP_CUTOFF_MAX_MS = 24 * 60 * 60 * 1_000;
+
 export const teamQuerySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
   since: z.coerce.number().int().nonnegative().optional(),
+  gapCutoffMs: z.coerce.number().int().positive().max(GAP_CUTOFF_MAX_MS).optional(),
 });
 
 /**
@@ -105,6 +120,7 @@ export const claimBodySchema = z.object({
 /** Recorte opcional da visao global. Mesma semantica do `since` de `/v1/team`. */
 export const overviewQuerySchema = z.object({
   since: z.coerce.number().int().nonnegative().optional(),
+  gapCutoffMs: z.coerce.number().int().positive().max(GAP_CUTOFF_MAX_MS).optional(),
 });
 
 /**

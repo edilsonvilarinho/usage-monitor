@@ -16,6 +16,7 @@ import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamVerificationDto
 import com.usagemonitor.data.dto.UpdateTeamKeyRequestDto
+import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
@@ -86,6 +87,11 @@ open class RemoteTeamDataSource(
                 if (sinceEpochMillis != null) {
                     parameter("since", sinceEpochMillis)
                 }
+                // O corte do tempo ativo viaja daqui pelo mesmo motivo pelo qual o
+                // servidor não precifica: a constante é do domínio do app, e um
+                // segundo dono do valor daria duas respostas. Servidor anterior à
+                // 0.7.0 ignora o parâmetro sem erro.
+                parameter("gapCutoffMs", TURN_GAP_CUTOFF_MILLIS)
             },
             operation = "leitura do time"
         )
@@ -285,6 +291,7 @@ open class RemoteTeamDataSource(
                 if (sinceEpochMillis != null) {
                     parameter("since", sinceEpochMillis)
                 }
+                parameter("gapCutoffMs", TURN_GAP_CUTOFF_MILLIS)
             },
             operation = "leitura da visão do administrador"
         )

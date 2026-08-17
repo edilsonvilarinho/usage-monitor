@@ -100,6 +100,21 @@ data class TeamMemberUsage(
     val isCostComplete: Boolean
         get() = sessions.all { session -> session.isCostComplete }
 
+    /**
+     * Tempo de trabalho somado das sessões deste integrante na janela.
+     *
+     * `null` quando o servidor não mede — anterior à 0.7.0. Zero e nulo não se
+     * confundem: um diz "só sessões de um turno", o outro diz "não se sabe".
+     */
+    val totalActiveMillis: Long?
+        get() {
+            val measured = sessions.mapNotNull { session -> session.activeMillis }
+            if (measured.isEmpty()) {
+                return null
+            }
+            return measured.sum()
+        }
+
     val hasActivity: Boolean
         get() = sessions.isNotEmpty()
 

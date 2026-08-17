@@ -67,6 +67,10 @@ kotlin {
                 // Coroutines com suporte ao dispatcher Swing (UI thread do Desktop)
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.sqlite.jdbc)
+
+                // PDFBox: relatorio PDF das telas de sessoes. E JVM-only, entao o
+                // modelo do documento fica em commonMain e so a renderizacao aqui.
+                implementation(libs.pdfbox)
             }
         }
 
@@ -107,7 +111,12 @@ compose.desktop {
             )
             packageName = "Usage Monitor"
             packageVersion = appVersion
-            modules("java.sql")
+            // `java.logging` cobre o commons-logging que o PDFBox traz: hoje ele
+            // acha o SLF4J que o Ktor ja poe no classpath, mas o fallback dele e o
+            // `Jdk14Logger`, de `java.util.logging`. Modulo faltando no runtime
+            // image so aparece no app empacotado, nunca no `gradlew run` — por isso
+            // vai declarado, e nao descoberto no primeiro relatorio que falhar.
+            modules("java.sql", "java.logging")
 
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.ico"))

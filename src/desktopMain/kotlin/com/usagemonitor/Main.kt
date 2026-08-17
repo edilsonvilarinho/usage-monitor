@@ -23,6 +23,7 @@ import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberDialogState
 import com.russhwolf.settings.PreferencesSettings
+import com.russhwolf.settings.Settings
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
 import com.usagemonitor.data.datasource.LocalAnthropicCreditsDiagnosticsRecorder
@@ -200,6 +201,13 @@ private const val SESSION_PULSE_INTERVAL_MILLIS = 30_000L
 private const val ENABLED_APIS_KEY = "enabledApis"
 private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
+
+/** Idioma persistido; valor irreconhecivel cai no default em vez de derrubar. */
+private fun storedLanguage(settings: Settings): AppLanguage {
+    return settings.getStringOrNull(LANGUAGE_KEY)
+        ?.let { stored -> runCatching { AppLanguage.valueOf(stored) }.getOrNull() }
+        ?: AppLanguage.PT
+}
 private const val AUTO_START_KEY = "autoStart"
 private const val ALWAYS_ON_TOP_KEY = "alwaysOnTop"
 private const val CARD_ORDER_KEY = "cardOrder"
@@ -468,7 +476,15 @@ fun main() = application {
     }
     // A janela principal só existe depois da composição; por isso o writer
     // recebe uma função e não a referência.
-    val usageExportWriter = remember { DesktopUsageExportWriter(parentWindow = { mainWindowRef }) }
+    // O idioma sai das preferencias na hora de gerar, e nao do estado da tela:
+    // ele so e declarado bem mais abaixo, e o relatorio precisa do idioma
+    // corrente, nao do que estava valendo quando o app subiu.
+    val usageExportWriter = remember(settings) {
+        DesktopUsageExportWriter(
+            parentWindow = { mainWindowRef },
+            language = { storedLanguage(settings) }
+        )
+    }
     val cliSessionsViewModel = remember(cliSessionRepository) {
         CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(cliSessionRepository),
@@ -489,6 +505,7 @@ fun main() = application {
             getTeamSessionDetail = GetTeamSessionDetailUseCase(teamUsageRepository),
             getAdminOverview = GetAdminTeamOverviewUseCase(teamAdminRepository),
             getTeamUsageTrend = GetTeamUsageTrendUseCase(teamUsageRepository),
+            exportWriter = usageExportWriter,
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
         )
     }
@@ -758,13 +775,7 @@ fun main() = application {
         writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, minimizedCards)
     }
     var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
-    var language by remember {
-        mutableStateOf(
-            settings.getStringOrNull(LANGUAGE_KEY)
-                ?.let { runCatching { AppLanguage.valueOf(it) }.getOrNull() }
-                ?: AppLanguage.PT
-        )
-    }
+    var language by remember { mutableStateOf(storedLanguage(settings)) }
     var autoStartEnabled by remember { mutableStateOf(storedAutoStartPreference) }
     LaunchedEffect(settings) {
         if (AutoStartManager.isAutoStartSupported()) {

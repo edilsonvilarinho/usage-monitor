@@ -10,15 +10,18 @@ import kotlinx.datetime.Instant
  * modais precifiquem igual: uma segunda agregação aqui divergiria da local no
  * primeiro ajuste de tarifa.
  *
- * O servidor não manda hora nem ferramenta, então [CliUsageBreakdown.heatmap] e
- * [CliUsageBreakdown.byTool] ficam vazios e a tela pula as duas seções — não é
- * lacuna a preencher com número inventado.
+ * O servidor não manda grade por hora nem ferramenta, então
+ * [CliUsageBreakdown.heatmap] e [CliUsageBreakdown.byTool] ficam vazios e a tela
+ * pula as duas seções — não é lacuna a preencher com número inventado. O tempo
+ * de trabalho por sessão, esse, ele manda a partir da versão 0.7.0; contra
+ * servidor anterior o mapa nasce vazio e as horas ficam nulas.
  */
 fun TeamUsageSnapshot.toTeamBreakdown(
     window: CliRangeWindow,
     now: Instant
 ): CliUsageBreakdown {
-    val breakdown = members.flatMap { member -> member.groupRows }.toUsageBreakdown()
+    val activeTimes = activeTimesOf(members)
+    val breakdown = members.flatMap { member -> member.groupRows }.toUsageBreakdown(activeTimes)
 
     // Integrante sem linha nenhuma fica de fora — uma linha zerada por pessoa que
     // não trabalhou no período é ruído, e a lista de integrantes já a mostra.
@@ -29,7 +32,10 @@ fun TeamUsageSnapshot.toTeamBreakdown(
     // segundo caminho de soma que poderia não bater com o total da tela.
     val byMember = active
         .map { member ->
-            member.groupRows.toUsageBreakdown().totals.copy(label = labels[member.memberKey])
+            member.groupRows
+                .toUsageBreakdown(activeTimesOf(listOf(member)))
+                .totals
+                .copy(label = labels[member.memberKey])
         }
         .rankedByCost()
 
@@ -41,6 +47,19 @@ fun TeamUsageSnapshot.toTeamBreakdown(
     )
 
     return breakdown.copy(byMember = byMember, burnRate = burnRate)
+}
+
+/**
+ * Tempo de trabalho por sessão, a partir do que o servidor mediu.
+ *
+ * Sessão sem medida fica **fora** do mapa em vez de entrar com zero: mapa vazio
+ * é o sinal de "servidor não mede isto", e um zero ali o apagaria.
+ */
+private fun activeTimesOf(members: List<TeamMemberUsage>): Map<String, Long> {
+    return members
+        .flatMap { member -> member.sessions }
+        .mapNotNull { session -> session.activeMillis?.let { millis -> session.sessionId to millis } }
+        .toMap()
 }
 
 /** Quanto do `deviceId` basta para separar dois apelidos iguais na tela. */

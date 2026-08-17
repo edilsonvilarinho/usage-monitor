@@ -33,10 +33,14 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
   contagem de chamadas.
 - Tendencia diaria do time nos ultimos 30 dias, uma faixa por integrante e todas
   na mesma escala (exige servidor 0.6.0+).
-- Tempo ativo por sessao, descartando as pausas maiores que cinco minutos entre
-  turnos.
+- Tempo ativo por sessao, projeto, branch e integrante do time, descartando as
+  pausas maiores que cinco minutos entre turnos. No time exige servidor 0.7.0+;
+  contra servidor anterior a coluna aparece como `-`.
 - Exportacao de sessoes e do resumo em CSV ou JSON, seguindo a aba aberta e a
   janela escolhida.
+- Relatorio PDF do recorte que esta na tela, nas Sessoes CLI e no modal do time:
+  totais, projetos, branches, modelos, ferramentas, grade de atividade e a lista
+  de sessoes, com o tempo ativo em cada eixo que o admite.
 - Orcamento mensal em USD com barra de consumo e projecao de fechamento. Os
   creditos de uso da Anthropic aparecem a parte, na moeda real da conta.
 - Comparativo com o periodo anterior de mesma duracao no Historico.
@@ -46,7 +50,8 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Contagem regressiva de refresh persiste entre reinicios da app e avisa antes de um refresh manual.
 - Modais de Historico e Configuracoes voltam ao topo automaticamente ao reabrir, mesmo se ficaram atras de outra janela.
 - Scrollbar com contraste ajustado para o tema escuro.
-- Modal de Configuracoes reorganizado em cartoes (Geral/Idioma, APIs monitoradas, Contas Anthropic).
+- Modal de Configuracoes em abas (Geral, Alertas, APIs, Contas, Time), uma
+  secao por vez em vez de uma coluna unica de cartoes empilhados.
 - Opacidade da janela principal ajustavel entre 50% e 100% nas Configuracoes, com persistencia local.
 
 ## Screenshots

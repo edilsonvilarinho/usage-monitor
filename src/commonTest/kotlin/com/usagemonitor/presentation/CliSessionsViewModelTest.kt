@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
@@ -20,6 +21,7 @@ import com.usagemonitor.domain.entity.startOfMonthMillis
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
+import com.usagemonitor.presentation.ui.UsageExportPayload
 import com.usagemonitor.presentation.ui.UsageExportRequest
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
@@ -39,6 +41,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
@@ -794,8 +797,9 @@ class CliSessionsViewModelTest {
         val request = writer.requests.single()
         assertTrue(request.suggestedFileName.startsWith("usage-monitor-sessions-5h-"))
         assertTrue(request.suggestedFileName.endsWith(".csv"))
-        assertTrue(request.content.contains("session_id"))
-        assertTrue(request.content.contains("a,"))
+        val payload = assertIs<UsageExportPayload.Text>(request.payload)
+        assertTrue(payload.content.contains("session_id"))
+        assertTrue(payload.content.contains("a,"))
 
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
         assertEquals(CliExportOutcome.Saved("/tmp/export.csv"), state.exportOutcome)
@@ -828,6 +832,37 @@ class CliSessionsViewModelTest {
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
         assertEquals(CliExportOutcome.Failed("disco cheio"), state.exportOutcome)
         assertEquals(1, state.sessions.size)
+        viewModel.onDestroy()
+    }
+
+    /**
+     * O relatório carrega o resumo por eixo se ele ainda não foi lido: um PDF sem
+     * a seção de projetos surpreenderia mais que a espera, e quem exporta da aba
+     * de sessões não tem por que saber que a outra aba precisava ter sido aberta.
+     */
+    @Test
+    fun `the report loads the breakdown before writing`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val writer = RecordingExportWriter(savedPath = "/tmp/report.pdf")
+        val viewModel = buildViewModel(repository, exportWriter = writer)
+        runCurrent()
+
+        // A aba do resumo nunca foi aberta: o estado começa sem ele.
+        assertNull(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).breakdown)
+
+        viewModel.exportReport(AppLanguage.PT)
+        runCurrent()
+
+        val request = writer.requests.single()
+        assertTrue(request.suggestedFileName.startsWith("usage-monitor-report-5h-"))
+        assertTrue(request.suggestedFileName.endsWith(".pdf"))
+
+        val payload = assertIs<UsageExportPayload.Report>(request.payload)
+        assertTrue(payload.document.sections.isNotEmpty())
+
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(CliExportOutcome.Saved("/tmp/report.pdf"), state.exportOutcome)
+        assertNotNull(state.breakdown)
         viewModel.onDestroy()
     }
 

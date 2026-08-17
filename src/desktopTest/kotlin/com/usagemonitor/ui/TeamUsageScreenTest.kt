@@ -40,6 +40,7 @@ import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_REMOVE_CONFIRM_TAG
+import com.usagemonitor.presentation.ui.TEAM_EXPORT_PDF_TAG
 import com.usagemonitor.presentation.ui.TEAM_TAB_BREAKDOWN_TAG
 import com.usagemonitor.presentation.ui.TEAM_TAB_MEMBERS_TAG
 import com.usagemonitor.presentation.ui.TEAM_TAB_TREND_TAG
@@ -599,6 +600,30 @@ class TeamUsageScreenTest {
         onNodeWithTag(TEAM_TAB_MEMBERS_TAG).assertIsSelected()
     }
 
+    /**
+     * O relatorio nao e uma aba: ele e o recorte inteiro da janela, e clicar nele
+     * nao pode trocar o que a tela mostra.
+     */
+    @Test
+    fun `o botao de relatorio pede a exportacao sem trocar de aba`() = runDesktopComposeUiTest {
+        var selected: TeamUsageView? = null
+        var reportRequests = 0
+
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+            ),
+            width = 1_400.dp,
+            onSelectView = { view -> selected = view },
+            onExportReport = { reportRequests += 1 }
+        )
+
+        onNodeWithTag(TEAM_EXPORT_PDF_TAG).performClick()
+
+        assertEquals(1, reportRequests)
+        assertEquals(null, selected)
+    }
+
     @Test
     fun `clicar na aba de resumo emite a troca de aba`() = runDesktopComposeUiTest {
         var selected: TeamUsageView? = null
@@ -838,7 +863,8 @@ class TeamUsageScreenTest {
         width: androidx.compose.ui.unit.Dp = 900.dp,
         height: androidx.compose.ui.unit.Dp = 700.dp,
         onToggleAccount: (String) -> Unit = {},
-        onSelectView: (TeamUsageView) -> Unit = {}
+        onSelectView: (TeamUsageView) -> Unit = {},
+        onExportReport: () -> Unit = {}
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -850,7 +876,8 @@ class TeamUsageScreenTest {
                         onToggleMember = {},
                         onToggleAccount = onToggleAccount,
                         localDeviceId = localDeviceId,
-                        onSelectView = onSelectView
+                        onSelectView = onSelectView,
+                        onExportReport = onExportReport
                     )
                 }
             }

@@ -6,6 +6,7 @@ import type { TeamRepository } from '../../repositories/teamRepository.js';
 import { logger } from '../../logger.js';
 import { requireTeamAccess, type AccessDeps } from '../access.js';
 import {
+  DEFAULT_GAP_CUTOFF_MS,
   deleteMemberQuerySchema,
   sessionQuerySchema,
   teamQuerySchema,
@@ -54,6 +55,7 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
         const snapshot = deps.repository.readTeam(
           parsed.data.accountKey,
           parsed.data.since ?? null,
+          parsed.data.gapCutoffMs ?? DEFAULT_GAP_CUTOFF_MS,
         );
 
         res.json(snapshot);

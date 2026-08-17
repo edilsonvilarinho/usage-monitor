@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.ClaudeTranscriptLineDto
 import com.usagemonitor.domain.entity.CliProjectRoot
+import com.usagemonitor.domain.entity.CliSessionActiveTime
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
@@ -11,6 +12,7 @@ import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ModelPricingTable
+import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -119,11 +121,19 @@ class LocalCliSessionDataSource(
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
                 val liveContexts = readLiveContexts(connection)
-                if (sinceEpochMillis == null) {
+                // Segunda consulta juntada por `session_id` em memória, pelo mesmo
+                // desenho do contexto vivo: o tempo ativo não é agregado de
+                // `cli_sessions`, sai da distância entre turnos.
+                val activeTimes = readActiveTimes(connection, profileId, sinceEpochMillis ?: 0L)
+                val sessions = if (sinceEpochMillis == null) {
                     readStoredSessions(connection, profileId, liveContexts)
                 } else {
                     readWindowedSessions(connection, profileId, sinceEpochMillis, liveContexts)
                 }
+                // Sessão fora do mapa recebe zero, e não nulo: a consulta rodou, e
+                // ausência ali significa "nenhum intervalo medido" — o caso da
+                // sessão de um turno só.
+                sessions.map { session -> session.copy(activeMillis = activeTimes[session.sessionId] ?: 0L) }
             }
         }
     }
@@ -240,6 +250,19 @@ class LocalCliSessionDataSource(
         }
     }
 
+    override suspend fun readSessionActiveTimes(
+        profileId: String?,
+        sinceEpochMillis: Long,
+        gapCutoffMillis: Long
+    ): List<CliSessionActiveTime> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                readActiveTimes(connection, profileId, sinceEpochMillis, gapCutoffMillis)
+                    .map { entry -> CliSessionActiveTime(entry.key, entry.value) }
+            }
+        }
+    }
+
     override fun close() {
         connectionManager.close()
     }
@@ -288,6 +311,34 @@ class LocalCliSessionDataSource(
                                 model = rows.getString("model")
                             )
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Tempo de trabalho de cada sessão na janela, por `session_id`.
+     *
+     * O corte entre turnos vai **ligado como parâmetro**, nunca escrito no SQL:
+     * `TURN_GAP_CUTOFF_MILLIS` continua sendo o único dono do valor, e a consulta
+     * só o aplica. Sessão sem intervalo dentro do corte não aparece no resultado.
+     */
+    private fun readActiveTimes(
+        connection: Connection,
+        profileId: String?,
+        sinceEpochMillis: Long,
+        gapCutoffMillis: Long = TURN_GAP_CUTOFF_MILLIS
+    ): Map<String, Long> {
+        return connection.prepareStatement(SELECT_SESSION_ACTIVE_TIME_SQL).use { statement ->
+            statement.setLong(1, sinceEpochMillis)
+            statement.setInt(2, if (profileId == null) 1 else 0)
+            statement.setString(3, profileId)
+            statement.setLong(4, gapCutoffMillis)
+            statement.executeQuery().use { rows ->
+                buildMap {
+                    while (rows.next()) {
+                        put(rows.getString("session_id"), rows.getLong("active_millis"))
                     }
                 }
             }
@@ -1331,6 +1382,40 @@ class LocalCliSessionDataSource(
             WHERE t.ts >= ?
               AND (? = 1 OR s.profile_id = ?)
             GROUP BY t.session_id, t.model;
+        """
+
+        /**
+         * Tempo de trabalho por sessão: soma dos intervalos entre turnos
+         * consecutivos da thread principal menores que o corte.
+         *
+         * É `activeTimeMillisOf` escrito em SQL, e a equivalência entre os dois é
+         * garantida por teste — não por semelhança de leitura. Três detalhes
+         * carregam essa equivalência:
+         *
+         * - **O corte é `?`, não literal.** A constante continua morando no domain;
+         *   duplicá-la aqui daria duas respostas para a mesma pergunta.
+         * - **`is_sidechain = 0`**: o subagente roda em paralelo com a thread
+         *   principal e somar os intervalos dele contaria tempo em dobro.
+         * - **`ORDER BY seq`**, e não por `ts`: a ordem de inserção é a do
+         *   transcript e `seq` não empata como `ts` pode empatar — o mesmo motivo
+         *   que ordena a leitura do contexto vivo.
+         *
+         * O primeiro turno da janela não tem antecessor, `LAG` devolve `NULL` e ele
+         * fica de fora — que é o que a função do domain faz sobre a lista recortada.
+         */
+        private val SELECT_SESSION_ACTIVE_TIME_SQL = """
+            SELECT session_id, SUM(gap) AS active_millis
+            FROM (
+              SELECT t.session_id AS session_id,
+                     t.ts - LAG(t.ts) OVER (PARTITION BY t.session_id ORDER BY t.seq) AS gap
+              FROM cli_turns t
+              JOIN cli_sessions s ON s.session_id = t.session_id
+              WHERE t.ts >= ?
+                AND t.is_sidechain = 0
+                AND (? = 1 OR s.profile_id = ?)
+            )
+            WHERE gap > 0 AND gap < ?
+            GROUP BY session_id;
         """
 
         /** Uma hora em millis; o `hour_bucket` da grade é `ts` dividido por ela. */

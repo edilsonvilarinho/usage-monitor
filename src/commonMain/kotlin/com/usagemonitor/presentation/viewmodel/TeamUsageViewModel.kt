@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliRangeWindow
 import com.usagemonitor.domain.entity.CliSessionDetail
@@ -15,6 +16,8 @@ import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
+import com.usagemonitor.presentation.ui.report.reportForTeam
+import com.usagemonitor.presentation.ui.reportRequest
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +67,12 @@ class TeamUsageViewModel(
      * funcionando, mesmo tratamento dos demais recursos opcionais do time.
      */
     private val getTeamUsageTrend: GetTeamUsageTrendUseCase? = null,
+    /**
+     * Gravação do relatório. `null` desliga a exportação — mesmo tratamento dos
+     * demais recursos opcionais do time, e o que permite ao teste de componente
+     * não abrir diálogo de arquivo.
+     */
+    private val exportWriter: UsageExportWriter? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
     private val clock: Clock = Clock.System,
@@ -75,6 +84,7 @@ class TeamUsageViewModel(
     private var detailJob: Job? = null
     private var liveJob: Job? = null
     private var trendJob: Job? = null
+    private var exportJob: Job? = null
 
     /** Evita empilhar consultas quando a rede está mais lenta que o intervalo. */
     private val loadMutex = Mutex()
@@ -183,6 +193,37 @@ class TeamUsageViewModel(
         // dizendo que eles ainda são os antigos.
         markRefreshing()
         refresh()
+    }
+
+    /**
+     * Relatório PDF do recorte que está na tela.
+     *
+     * Não recarrega nada: no time o resumo por eixo vem na mesma resposta da
+     * lista, então o estado já tem tudo — ao contrário da tela da máquina, onde
+     * o resumo é uma segunda consulta ao índice.
+     */
+    fun exportReport(language: AppLanguage) {
+        val writer = exportWriter ?: return
+        val current = _uiState.value as? TeamUsageUiState.Success ?: return
+
+        val now = clock.now()
+        val request = reportRequest(
+            document = reportForTeam(state = current, language = language, now = now),
+            range = current.range,
+            now = now
+        )
+
+        exportJob?.cancel()
+        exportJob = viewModelScope.launch {
+            val outcome = runCatching { writer.write(request) }.fold(
+                // Cancelar o diálogo não é sucesso nem erro: nada é publicado.
+                onSuccess = { path -> path?.let { saved -> CliExportOutcome.Saved(saved) } },
+                onFailure = { error -> CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE) }
+            ) ?: return@launch
+
+            val latest = _uiState.value as? TeamUsageUiState.Success ?: return@launch
+            _uiState.value = latest.copy(exportOutcome = outcome)
+        }
     }
 
     private fun markRefreshing() {
@@ -508,6 +549,7 @@ class TeamUsageViewModel(
                         // Mesmo tratamento do detalhe: sem carregá-la daqui, o
                         // tique de 5s devolveria à lista quem está lendo o resumo.
                         view = current?.view ?: TeamUsageView.MEMBERS,
+                        exportOutcome = current?.exportOutcome,
                         breakdown = result.breakdown
                     )
                 },

@@ -103,6 +103,7 @@ const val TAB_SESSIONS_TAG = "cliSessionsTabSessions"
 const val TAB_BREAKDOWN_TAG = "cliSessionsTabBreakdown"
 const val EXPORT_CSV_TAG = "cliSessionsExportCsv"
 const val EXPORT_JSON_TAG = "cliSessionsExportJson"
+const val EXPORT_PDF_TAG = "cliSessionsExportPdf"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -123,6 +124,7 @@ fun CliSessionsScreen(
         onToggleGlossary = { viewModel.toggleGlossary() },
         onSelectView = { view -> viewModel.setView(view) },
         onExport = { format -> viewModel.exportCurrentView(format) },
+        onExportReport = { viewModel.exportReport(language) },
         modifier = modifier
     )
 }
@@ -139,6 +141,7 @@ internal fun CliSessionsContent(
     onToggleGlossary: () -> Unit = {},
     onSelectView: (CliSessionsView) -> Unit = {},
     onExport: (UsageExportFormat) -> Unit = {},
+    onExportReport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -156,7 +159,8 @@ internal fun CliSessionsContent(
                         onSelectRange = onSelectRange,
                         onOpenSession = onOpenSession,
                         onSelectView = onSelectView,
-                        onExport = onExport
+                        onExport = onExport,
+                        onExportReport = onExportReport
                     )
                 } else {
                     CliSessionDetailPane(
@@ -196,7 +200,8 @@ private fun CliSessionsList(
     onSelectRange: (CliSessionRange) -> Unit,
     onOpenSession: (String) -> Unit,
     onSelectView: (CliSessionsView) -> Unit = {},
-    onExport: (UsageExportFormat) -> Unit = {}
+    onExport: (UsageExportFormat) -> Unit = {},
+    onExportReport: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         CliSessionsHeader(
@@ -204,7 +209,8 @@ private fun CliSessionsList(
             language = language,
             onSelectRange = onSelectRange,
             onSelectView = onSelectView,
-            onExport = onExport
+            onExport = onExport,
+            onExportReport = onExportReport
         )
 
         if (state.indexWarning != null) {
@@ -276,7 +282,8 @@ private fun CliSessionsHeader(
     language: AppLanguage,
     onSelectRange: (CliSessionRange) -> Unit,
     onSelectView: (CliSessionsView) -> Unit = {},
-    onExport: (UsageExportFormat) -> Unit = {}
+    onExport: (UsageExportFormat) -> Unit = {},
+    onExportReport: () -> Unit = {}
 ) {
     DepthSurface(
         accent = CACHE_READ_COLOR,
@@ -386,6 +393,24 @@ private fun CliSessionsHeader(
                 )
             }
 
+            // Só aparece quando há tempo medido: uma coluna com "—" no cabeçalho
+            // ocuparia espaço para não dizer nada.
+            val activeMillis = state.totalActiveMillis
+            if (activeMillis != null && activeMillis > 0L) {
+                Column {
+                    Text(
+                        text = formatActiveTime(activeMillis),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = OUTPUT_COLOR
+                    )
+                    Text(
+                        text = CliSessionsLabels.activeTime(language),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -441,6 +466,14 @@ private fun CliSessionsHeader(
                 modifier = Modifier.testTag(EXPORT_JSON_TAG)
             ) {
                 Text(ExportLabels.exportJson(language))
+            }
+            // O relatório não segue a aba: ele é o recorte inteiro da janela, com
+            // sessões e resumo juntos. Seguir a aba daria dois PDFs pela metade.
+            TextButton(
+                onClick = onExportReport,
+                modifier = Modifier.testTag(EXPORT_PDF_TAG)
+            ) {
+                Text(ExportLabels.exportPdf(language))
             }
         }
 
@@ -567,7 +600,7 @@ internal fun CliSessionRow(
             MetricText(
                 label = CliSessionsLabels.columnTokens(language),
                 value = formatQuantity(session.totalTokens),
-                modifier = Modifier.width(118.dp)
+                modifier = Modifier.width(106.dp)
             )
 
             Column(modifier = Modifier.width(84.dp)) {
@@ -585,6 +618,18 @@ internal fun CliSessionRow(
                 },
                 valueColor = INPUT_COLOR,
                 modifier = Modifier.width(96.dp)
+            )
+
+            // Tempo de trabalho, não duração: as pausas acima de cinco minutos
+            // ficam de fora. Sem medida e sem intervalo saem os dois como "—" —
+            // "0min" seria lido como sessão instantânea.
+            MetricText(
+                label = CliSessionsLabels.activeTime(language),
+                value = session.activeMillis
+                    ?.takeIf { millis -> millis > 0L }
+                    ?.let { millis -> formatActiveTime(millis) }
+                    ?: "—",
+                modifier = Modifier.width(72.dp)
             )
 
             // O veredito que antes exigia abrir o detalhe. Vem com o número que o

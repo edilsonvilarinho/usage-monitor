@@ -196,19 +196,36 @@ internal object BreakdownLabels {
     }
 
     fun totalSubtitle(totals: CliUsageBucket, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
+        val base = if (language == AppLanguage.PT) {
             "${totals.sessionCount} sessões · ${totals.turnCount} turnos · ${formatQuantity(totals.totalTokens)} tokens"
         } else {
             "${totals.sessionCount} sessions · ${totals.turnCount} turns · ${formatQuantity(totals.totalTokens)} tokens"
         }
+        val activeMillis = totals.activeMillis ?: return base
+        if (activeMillis <= 0L) {
+            return base
+        }
+        // "Tempo ativo" nomeado por extenso aqui, e não só o valor: no cartão de
+        // totais ele fica ao lado de tokens e turnos, e um "4h35" solto seria
+        // lido como duração da janela.
+        val label = if (language == AppLanguage.PT) "tempo ativo" else "active time"
+        return "$base · ${formatActiveTime(activeMillis)} $label"
     }
 
     fun bucketSubtitle(bucket: CliUsageBucket, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
+        val base = if (language == AppLanguage.PT) {
             "${bucket.sessionCount} sessões · ${formatQuantity(bucket.totalTokens)} tokens · cache ${formatPercent(bucket.cacheHitRate)}"
         } else {
             "${bucket.sessionCount} sessions · ${formatQuantity(bucket.totalTokens)} tokens · cache ${formatPercent(bucket.cacheHitRate)}"
         }
+        // Hora nula é eixo sem medida (modelo, ferramenta, time de servidor
+        // antigo) e hora zero é balde só de sessões de um turno: nos dois casos o
+        // trecho some, porque "0min" seria lido como trabalho instantâneo.
+        val activeMillis = bucket.activeMillis ?: return base
+        if (activeMillis <= 0L) {
+            return base
+        }
+        return "$base · ${formatActiveTime(activeMillis)}"
     }
 
     /**

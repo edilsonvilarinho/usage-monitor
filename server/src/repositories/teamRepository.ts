@@ -95,9 +95,23 @@ export interface TeamTrend {
   rows: TeamTrendRow[];
 }
 
+/**
+ * Tempo de trabalho de uma sessao dentro da janela.
+ *
+ * Lista separada, e nunca uma coluna em [TeamUsageRow]: aquela linha e
+ * `(maquina, sessao, modelo)` e uma sessao que trocou de modelo no meio aparece
+ * em varias delas — o cliente somaria a hora uma vez por modelo.
+ */
+export interface TeamSessionActivityRow {
+  deviceId: string;
+  sessionId: string;
+  activeMillis: number;
+}
+
 export interface TeamSnapshot {
   members: TeamMemberRow[];
   rows: TeamUsageRow[];
+  activity: TeamSessionActivityRow[];
 }
 
 /** Uma conta dentro da visao global do admin. */
@@ -293,6 +307,59 @@ WHERE t.account_key = @accountKey
   AND (@since IS NULL OR t.ts >= @since)
 GROUP BY s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
+`;
+
+/**
+ * Tempo de trabalho por sessao: soma dos intervalos entre turnos consecutivos
+ * da thread principal menores que o corte.
+ *
+ * E a mesma definicao que o indice local aplica em `activeTimeMillisOf`, e o
+ * corte chega **do cliente** em `@gapCutoffMs` justamente para o servidor nao
+ * virar um segundo dono da constante — pelo mesmo motivo que ele nao precifica
+ * turno nenhum.
+ *
+ * `is_sidechain = 0` porque o subagente roda em paralelo com a conversa
+ * principal: somar os intervalos dele contaria o mesmo tempo duas vezes.
+ *
+ * A ordem e `(ts, message_id)` e nao `seq`: o servidor nao guarda a sequencia
+ * do transcript, e esse par ja e a ordem canonica que `/v1/session` devolve.
+ */
+const SELECT_SESSION_ACTIVITY_SQL = `
+SELECT deviceId, sessionId, SUM(gap) AS activeMillis
+FROM (
+  SELECT s.device_id AS deviceId,
+         t.session_id AS sessionId,
+         t.ts - LAG(t.ts) OVER (
+           PARTITION BY t.account_key, t.session_id ORDER BY t.ts, t.message_id
+         ) AS gap
+  FROM team_turns t
+  JOIN team_sessions s
+    ON s.account_key = t.account_key AND s.session_id = t.session_id
+  WHERE t.account_key = @accountKey
+    AND t.is_sidechain = 0
+    AND (@since IS NULL OR t.ts >= @since)
+)
+WHERE gap > 0 AND gap < @gapCutoffMs
+GROUP BY deviceId, sessionId
+`;
+
+const SELECT_ALL_SESSION_ACTIVITY_SQL = `
+SELECT accountKey, deviceId, sessionId, SUM(gap) AS activeMillis
+FROM (
+  SELECT t.account_key AS accountKey,
+         s.device_id AS deviceId,
+         t.session_id AS sessionId,
+         t.ts - LAG(t.ts) OVER (
+           PARTITION BY t.account_key, t.session_id ORDER BY t.ts, t.message_id
+         ) AS gap
+  FROM team_turns t
+  JOIN team_sessions s
+    ON s.account_key = t.account_key AND s.session_id = t.session_id
+  WHERE t.is_sidechain = 0
+    AND (@since IS NULL OR t.ts >= @since)
+)
+WHERE gap > 0 AND gap < @gapCutoffMs
+GROUP BY accountKey, deviceId, sessionId
 `;
 
 /**
@@ -574,10 +641,13 @@ export class TeamRepository {
   }
 
   /** Snapshot de uma conta. `since` nulo devolve tudo o que sobreviveu a retencao. */
-  readTeam(accountKey: string, since: number | null): TeamSnapshot {
+  readTeam(accountKey: string, since: number | null, gapCutoffMs: number): TeamSnapshot {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
     const rows = this.db.prepare(SELECT_USAGE_SQL).all({ accountKey, since }) as TeamUsageRow[];
-    return { members, rows };
+    const activity = this.db
+      .prepare(SELECT_SESSION_ACTIVITY_SQL)
+      .all({ accountKey, since, gapCutoffMs }) as TeamSessionActivityRow[];
+    return { members, rows, activity };
   }
 
   /**
@@ -612,13 +682,21 @@ export class TeamRepository {
    * com `rows` vazia — e a mesma promessa de `readTeam`, onde quem nao consumiu
    * e informacao e nao ruido.
    */
-  readOverview(since: number | null, labels: Map<string, string>): TeamAccountSnapshot[] {
+  readOverview(
+    since: number | null,
+    labels: Map<string, string>,
+    gapCutoffMs: number,
+  ): TeamAccountSnapshot[] {
     const memberRows = this.db.prepare(SELECT_ALL_MEMBERS_SQL).all() as Array<
       TeamMemberRow & { accountKey: string }
     >;
     const usageRows = this.db.prepare(SELECT_ALL_USAGE_SQL).all({ since }) as Array<
       TeamUsageRow & { accountKey: string }
     >;
+    const activityRows = this.db.prepare(SELECT_ALL_SESSION_ACTIVITY_SQL).all({
+      since,
+      gapCutoffMs,
+    }) as Array<TeamSessionActivityRow & { accountKey: string }>;
 
     const byAccount = new Map<string, TeamAccountSnapshot>();
 
@@ -632,6 +710,7 @@ export class TeamRepository {
         label: labels.get(accountKey) ?? null,
         members: [],
         rows: [],
+        activity: [],
       };
       byAccount.set(accountKey, created);
       return created;
@@ -645,6 +724,11 @@ export class TeamRepository {
     for (const row of usageRows) {
       const { accountKey, ...usage } = row;
       ensure(accountKey).rows.push(usage);
+    }
+
+    for (const row of activityRows) {
+      const { accountKey, ...activity } = row;
+      ensure(accountKey).activity.push(activity);
     }
 
     return [...byAccount.values()];

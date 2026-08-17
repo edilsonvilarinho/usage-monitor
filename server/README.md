@@ -202,6 +202,7 @@ O `x-admin-token` é recusado com **401** — presença é declaração de ident
 |---|---|---|
 | `accountKey` | sim | Escopo da resposta. Uma resposta nunca mistura contas. |
 | `since` | não | Epoch millis. Ausente = tudo o que sobreviveu à retenção. |
+| `gapCutoffMs` | não | Corte entre turnos para o tempo ativo. Default 300000 (5 min), teto 86400000. Disponível a partir da versão 0.7.0. |
 
 ```jsonc
 {
@@ -216,14 +217,24 @@ O `x-admin-token` é recusado com **401** — presença é declaração de ident
       "firstTs": 1786000000000, "lastTs": 1786003600000,
       "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0,
       "cacheWrite5mTokens": 0, "cacheWrite1hTokens": 0 }
+  ],
+  "activity": [
+    { "deviceId": "device-1", "sessionId": "a3f9c1e2-...", "activeMillis": 2700000 }
   ]
 }
 ```
 
-Duas propriedades desenhadas de propósito:
+Três propriedades desenhadas de propósito:
 
 - **O recorte incide sobre os turnos, não sobre as sessões.** Uma sessão de dez dias atrás com um turno nas últimas 5h aparece com os tokens desse turno, não com o total histórico. É a mesma semântica do filtro local.
 - **Uma linha por `(deviceId, sessionId, model)`.** Uma sessão que trocou de modelo no meio precisa ser precificada com a tarifa de cada trecho.
+- **`activity` é lista separada de `rows`, com uma entrada por `(deviceId, sessionId)`.** Tempo é propriedade da sessão, não do trecho de um modelo: como coluna em `rows`, uma sessão que trocou de modelo teria a hora dela somada uma vez por modelo. Sessão sem intervalo dentro do corte não aparece — e ausência ali significa "nenhum intervalo medido", não "não trabalhou".
+
+**O tempo ativo desconta as pausas.** É a soma dos intervalos entre turnos consecutivos da conversa principal (`is_sidechain = 0`) menores que `gapCutoffMs`. Intervalo maior é a pessoa longe do teclado, e contá-lo faria uma sessão retomada no dia seguinte "durar" vinte horas. O subagente fica de fora porque roda em paralelo e contaria o mesmo tempo duas vezes.
+
+**O corte vem do cliente**, pelo mesmo motivo pelo qual o servidor não precifica: a constante mora no domínio do app (`TURN_GAP_CUTOFF_MILLIS`) e um segundo dono do valor daria duas respostas para a mesma pergunta. O default aqui só cobre cliente antigo.
+
+Contra um servidor anterior à 0.7.0 o campo `activity` simplesmente não vem, e o cliente trata isso como **hora não medida** — não como zero. `gapCutoffMs` enviado a um servidor antigo é ignorado sem erro.
 
 **O servidor não calcula custo.** Devolve tokens por modelo; o cliente aplica a própria tabela de preços (`ModelPricingTable`). Assim a tabela não é duplicada aqui e o custo do modal de time acompanha as atualizações do app.
 
@@ -359,7 +370,7 @@ Disponíveis a partir da versão **0.3.0**, e **só quando `TEAM_ADMIN_TOKEN` es
 | Rota | Efeito |
 |---|---|
 | `GET /api/admin/v1/ping` | `{"status":"ok"}`. É o que o botão **Validar** do app chama. |
-| `GET /api/admin/v1/overview?since=` | Todas as contas: `{ accounts: [{ accountKey, label, members[], rows[] }] }`. Mesmo formato de `/v1/team`, uma entrada por conta. |
+| `GET /api/admin/v1/overview?since=&gapCutoffMs=` | Todas as contas: `{ accounts: [{ accountKey, label, members[], rows[], activity[] }] }`. Mesmo formato de `/v1/team`, uma entrada por conta. `activity` a partir da 0.7.0. |
 | `POST /api/admin/v1/keys` | `{ label, maxAccounts? }` → `201` com a chave crua. |
 | `GET /api/admin/v1/keys` | Lista **com a chave crua**, mais `keyPrefix`, `maxAccounts`, `accounts[]` e as datas. |
 | `PATCH /api/admin/v1/keys/:id` | `{ label?, maxAccounts? }`. Teto abaixo do já reivindicado → `400`. |

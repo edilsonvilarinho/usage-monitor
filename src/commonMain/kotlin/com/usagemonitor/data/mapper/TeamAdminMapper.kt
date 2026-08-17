@@ -56,7 +56,11 @@ fun TeamOverviewDto.toDomain(): List<TeamAccountUsage> {
         TeamAccountUsage(
             accountKey = account.accountKey,
             label = account.label,
-            snapshot = TeamSnapshotDto(members = account.members, rows = account.rows).toDomain()
+            snapshot = TeamSnapshotDto(
+                members = account.members,
+                rows = account.rows,
+                activity = account.activity
+            ).toDomain()
         )
     }
 }
