@@ -1,19 +1,13 @@
 package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 // Largura de card abaixo da qual o layout adota a densidade estreita.
 internal val NarrowCardWidthThreshold = 320.dp
 
 // Largura mínima de cada badge resumido para caber lado a lado com os demais.
 internal val MinimumCompactQuotaWidth = 105.dp
-
-// Largura mínima de cada coluna expandida: o arco tem tamanho fixo (72dp na
-// densidade estreita) e ainda precisa de respiro lateral entre as colunas.
-internal val MinimumExpandedQuotaWidth = 96.dp
 
 /**
  * Dimensões do [ApiUsageCard] derivadas da largura real do card.
@@ -31,42 +25,33 @@ internal data class ApiUsageCardDensity(
     val compactQuotaSpacing: Dp,
     val expandedQuotaSpacing: Dp,
     val badgeHorizontalPadding: Dp,
-    val badgeVerticalPadding: Dp,
-    val arcSize: Dp,
-    val arcStrokeWidth: Dp,
-    val arcPercentageFontSize: TextUnit
+    val badgeVerticalPadding: Dp
 )
 
 private val regularCardDensity = ApiUsageCardDensity(
-    contentHorizontalPadding = 20.dp,
-    contentVerticalPadding = 16.dp,
-    actionButtonSize = 34.dp,
-    actionIconSize = 16.dp,
-    actionSpacing = 8.dp,
+    contentHorizontalPadding = 12.dp,
+    contentVerticalPadding = 10.dp,
+    actionButtonSize = 26.dp,
+    actionIconSize = 14.dp,
+    actionSpacing = 4.dp,
     headerSpacing = 8.dp,
-    compactQuotaSpacing = 10.dp,
-    expandedQuotaSpacing = 14.dp,
-    badgeHorizontalPadding = 12.dp,
-    badgeVerticalPadding = 10.dp,
-    arcSize = 92.dp,
-    arcStrokeWidth = 10.dp,
-    arcPercentageFontSize = 18.sp
+    compactQuotaSpacing = 8.dp,
+    expandedQuotaSpacing = 10.dp,
+    badgeHorizontalPadding = 10.dp,
+    badgeVerticalPadding = 8.dp
 )
 
 private val narrowCardDensity = ApiUsageCardDensity(
-    contentHorizontalPadding = 12.dp,
-    contentVerticalPadding = 12.dp,
-    actionButtonSize = 28.dp,
-    actionIconSize = 14.dp,
-    actionSpacing = 4.dp,
+    contentHorizontalPadding = 8.dp,
+    contentVerticalPadding = 8.dp,
+    actionButtonSize = 24.dp,
+    actionIconSize = 12.dp,
+    actionSpacing = 2.dp,
     headerSpacing = 6.dp,
     compactQuotaSpacing = 6.dp,
     expandedQuotaSpacing = 8.dp,
     badgeHorizontalPadding = 8.dp,
-    badgeVerticalPadding = 8.dp,
-    arcSize = 72.dp,
-    arcStrokeWidth = 8.dp,
-    arcPercentageFontSize = 15.sp
+    badgeVerticalPadding = 6.dp
 )
 
 internal fun resolveApiUsageCardDensity(cardWidth: Dp): ApiUsageCardDensity {
@@ -87,7 +72,6 @@ internal fun shouldStackCompactQuotas(cardWidth: Dp, quotaCount: Int): Boolean {
     return quotaCount > 1 && cardWidth < MinimumCompactQuotaWidth * quotaCount
 }
 
-/** Mesma regra para as colunas expandidas, que carregam o arco de tamanho fixo. */
-internal fun shouldStackExpandedQuotas(cardWidth: Dp, quotaCount: Int): Boolean {
-    return quotaCount > 1 && cardWidth < MinimumExpandedQuotaWidth * quotaCount
-}
+// A regra de empilhamento das colunas expandidas saiu junto com os arcos: a cota
+// expandida virou linha de largura cheia, e linha empilha por construção. O que
+// sobrou de decisão de largura vale só para os badges do card minimizado.

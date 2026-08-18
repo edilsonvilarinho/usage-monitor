@@ -465,11 +465,19 @@ internal fun formatCurrencyAmount(cents: Long, currencyCode: String = "USD"): St
     return "$sign${currencySymbol(currencyCode)}${units}.${remainder.toString().padStart(2, '0')}"
 }
 
+/**
+ * O percentual exibido de uma cota.
+ *
+ * **Truncado, não arredondado**, e é a regra que o resto do app já seguia: o
+ * arco fazia `toInt()` e os alertas da bandeja tratam o limiar como piso — 89,9%
+ * não cruzou 90%. Só esta função arredondava, então o mesmo card mostrava 26% na
+ * cota expandida e 27% no badge minimizado, para o mesmo 12 de 45.
+ */
 internal fun compactPercentageLabel(quota: QuotaInfo): String {
     return when (quota.unit) {
         UsageUnit.CURRENCY_USD -> formatCents(quota.total, quota.currencyCode)
         UsageUnit.PERCENTAGE -> "${quota.used}%"
-        else -> "${(quota.percentageUsed * 100).roundToInt()}%"
+        else -> "${(quota.percentageUsed * 100).toInt()}%"
     }
 }
 

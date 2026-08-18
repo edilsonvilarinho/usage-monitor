@@ -90,6 +90,9 @@ import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountContext
+import com.usagemonitor.domain.entity.UsageRiskLevel
+import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
@@ -331,10 +334,6 @@ fun ApiUsageCard(
                 cardWidth = maxWidth,
                 quotaCount = orderedQuotas.size
             )
-            val stackExpandedQuotas = shouldStackExpandedQuotas(
-                cardWidth = maxWidth,
-                quotaCount = orderedQuotas.size
-            )
 
             Column(
                 modifier = Modifier
@@ -560,7 +559,6 @@ fun ApiUsageCard(
                             language = language,
                             riskByQuotaKey = riskByQuotaKey,
                             density = density,
-                            stacked = stackExpandedQuotas,
                             now = now
                         )
                     }
@@ -1174,6 +1172,15 @@ private fun CompactQuotaBadge(
     }
 }
 
+/**
+ * As cotas do card expandido, uma por linha.
+ *
+ * Eram colunas com um arco de 92dp cada. O arco ocupava a maior parte da altura
+ * do card para dizer um número que a linha diz em 12sp, e três deles lado a lado
+ * — a Anthropic tem três cotas desde os créditos de uso — obrigavam uma regra de
+ * empilhamento própria, com largura mínima por coluna. Empilhado sempre, essa
+ * regra deixa de existir: a linha ocupa a largura que o card tiver.
+ */
 @Composable
 private fun ExpandedQuotaSummary(
     quotas: List<QuotaInfo>,
@@ -1181,143 +1188,137 @@ private fun ExpandedQuotaSummary(
     language: AppLanguage,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     density: ApiUsageCardDensity,
-    stacked: Boolean,
     now: Instant,
     modifier: Modifier = Modifier
 ) {
-    // Cada coluna tem o arco em tamanho fixo: sem largura para todas lado a
-    // lado, a linha estouraria o card em vez de encolher.
-    if (stacked) {
-        Column(
-            modifier = modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            quotas.forEach { quota ->
-                QuotaColumn(
-                    quota = quota,
-                    showUsageDetails = showUsageDetails,
-                    language = language,
-                    risk = riskByQuotaKey[quota.seriesKey],
-                    density = density,
-                    now = now
-                )
-            }
-        }
-
-        return
-    }
-
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing),
-        verticalAlignment = Alignment.Top
+        verticalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing)
     ) {
-        for (index in quotas.indices) {
-            val quota = quotas[index]
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                QuotaColumn(
-                    quota = quota,
-                    showUsageDetails = showUsageDetails,
-                    language = language,
-                    risk = riskByQuotaKey[quota.seriesKey],
-                    density = density,
-                    now = now
-                )
-            }
+        quotas.forEach { quota ->
+            QuotaRow(
+                quota = quota,
+                showUsageDetails = showUsageDetails,
+                language = language,
+                risk = riskByQuotaKey[quota.seriesKey],
+                now = now
+            )
         }
     }
 }
 
+/**
+ * Uma cota: rótulo e valor na mesma linha, barra abaixo, reinício embaixo.
+ *
+ * A barra é a leitura de relance que o arco fazia, na altura de 4dp em vez de
+ * 92. Cota em moeda **não** ganha barra: o saldo da DeepSeek não tem um total
+ * contra o qual medir, e uma barra ali desenharia uma fração inventada. Os
+ * créditos de uso ganham, porque têm limite mensal declarado.
+ */
 @Composable
-private fun QuotaColumn(
+private fun QuotaRow(
     quota: QuotaInfo,
     showUsageDetails: Boolean,
     language: AppLanguage,
     risk: QuotaRiskSummary?,
-    density: ApiUsageCardDensity,
     now: Instant,
     modifier: Modifier = Modifier
 ) {
     val isExpired = quota.isExpiredAt(now)
+    val staleAlpha = if (isExpired) STALE_QUOTA_ALPHA else 1f
+    val hasTrack = quota.unit != UsageUnit.CURRENCY_USD || quota.isExtraCreditsQuota
 
-    Column(
-        modifier = modifier.testTag(quotaBlockTag(quota.label)),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    HoverTooltipBox(
+        title = quota.label,
+        subtitle = expandedQuotaTitle(quota = quota, language = language),
+        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
+        modifier = modifier.testTag(quotaBlockTag(quota.label))
     ) {
-        HoverTooltipBox(
-            title = quota.label,
-            subtitle = expandedQuotaTitle(quota = quota, language = language),
-            metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            UsageArcChart(
-                used = quota.used,
-                total = quota.total,
-                unit = quota.unit,
-                currencyCode = quota.currencyCode,
-                size = density.arcSize,
-                strokeWidth = density.arcStrokeWidth,
-                // Janela vencida: o arco continua sendo o ultimo dado real da
-                // fonte, so esmaecido para nao passar por leitura corrente.
-                modifier = Modifier.alpha(if (isExpired) STALE_QUOTA_ALPHA else 1f),
-                percentageTextStyle = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = density.arcPercentageFontSize,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-        }
-
-        if (risk != null) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                RiskSemaphoreDot(risk = risk, quotaLabel = quota.label, language = language)
+                if (risk != null) {
+                    RiskSemaphoreDot(
+                        risk = risk,
+                        quotaLabel = quota.label,
+                        language = language,
+                        showTooltip = false
+                    )
+                }
                 Text(
                     text = expandedQuotaTitle(quota = quota, language = language),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = compactPercentageLabel(quota),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    // Mesmo tratamento de antes: janela vencida mostra o último
+                    // dado real da fonte, esmaecido para não passar por corrente.
+                    modifier = Modifier.alpha(staleAlpha)
+                )
+            }
+
+            if (hasTrack) {
+                AppProgressTrack(
+                    fraction = quota.percentageUsed,
+                    tone = quotaTone(quota = quota, risk = risk),
+                    modifier = Modifier.alpha(staleAlpha)
+                )
+            }
+
+            val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
+            if (detailText != null) {
+                Text(
+                    text = detailText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        } else {
+
             Text(
-                text = expandedQuotaTitle(quota = quota, language = language),
+                text = resetLabel(quota = quota, language = language, now = now),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
             )
         }
-
-        val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
-        if (detailText != null) {
-            Text(
-                text = detailText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-        }
-
-        Text(
-            text = resetLabel(quota = quota, language = language, now = now),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 2
-        )
     }
 }
 
+/**
+ * Severidade da barra.
+ *
+ * O risco projetado tem prioridade sobre o percentual porque responde à pergunta
+ * certa: 40% às onze da manhã pode ser pior que 80% faltando dez minutos para o
+ * reinício. Sem projeção conhecida, sobra o percentual, com os mesmos cortes de
+ * 75 e 90 que os alertas da bandeja usam.
+ */
+private fun quotaTone(quota: QuotaInfo, risk: QuotaRiskSummary?): AppTone {
+    if (risk != null) {
+        return when (risk.level) {
+            UsageRiskLevel.ON_TRACK -> AppTone.OK
+            UsageRiskLevel.AT_RISK -> AppTone.WARNING
+            UsageRiskLevel.WILL_EXCEED -> AppTone.CRITICAL
+        }
+    }
+    val percent = quota.percentageUsed * 100f
+    return when {
+        percent >= 90f -> AppTone.CRITICAL
+        percent >= 75f -> AppTone.WARNING
+        else -> AppTone.OK
+    }
+}
