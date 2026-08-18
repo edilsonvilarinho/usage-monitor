@@ -1,5 +1,11 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppDataSurface
+import com.usagemonitor.presentation.ui.components.AppSegment
+import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
@@ -322,9 +328,8 @@ private fun HistoryHeader(
                     showSourceSelector = showSourceSelector,
                     language = language
                 ),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = historySubtitle(
@@ -332,18 +337,31 @@ private fun HistoryHeader(
                     showSourceSelector = showSourceSelector,
                     language = language
                 ),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         if (showSourceSelector) {
-            androidx.compose.material3.TextButton(onClick = onBack) {
-                Text(if (language == AppLanguage.PT) "Voltar" else "Back")
-            }
+            AppButton(
+                label = if (language == AppLanguage.PT) "Voltar" else "Back",
+                onClick = onBack,
+                tone = AppButtonTone.GHOST
+            )
         }
     }
 }
 
+/**
+ * Fonte, conta e intervalo numa barra só.
+ *
+ * Eram três blocos empilhados, cada um com o próprio título e a própria fileira
+ * de chips: quase duzentos dp de altura antes do primeiro ponto do gráfico. Aqui
+ * os três viram controle segmentado com o rótulo ao lado, e a barra quebra em
+ * mais de uma linha quando a janela é estreita — daí o `FlowRow`, e não `Row`.
+ *
+ * O rótulo de cada grupo continua na tela ("API", "Conta", "Intervalo"): sem
+ * ele, três segmentados lado a lado não dizem o que escolhem.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HistoryControls(
@@ -358,37 +376,26 @@ private fun HistoryControls(
     onSelectAccount: (UsageAccountContext) -> Unit,
     onSelectRange: (HistoryRange) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (showSourceSelector) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (language == AppLanguage.PT) "API" else "API",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    availableSources.forEach { source ->
-                        RangeChip(
-                            label = sourceLabel(source),
-                            selected = source == selectedSource,
-                            onClick = { onSelectSource(source) },
-                            testTag = historySourceChipTag(source)
-                        )
-                    }
+    AppDataSurface(contentPadding = AppSpacing.sm) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+        ) {
+            if (showSourceSelector) {
+                HistoryControlGroup(label = if (language == AppLanguage.PT) "API" else "API") {
+                    AppSegmentedControl(
+                        options = availableSources.map { source ->
+                            AppSegment(label = sourceLabel(source), testTag = historySourceChipTag(source))
+                        },
+                        selectedIndex = availableSources.indexOf(selectedSource),
+                        onSelect = { index -> onSelectSource(availableSources[index]) }
+                    )
                 }
             }
-        }
 
-        if (selectedSource.requiresUsageAccount) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Conta" else "Account",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            if (selectedSource.requiresUsageAccount) {
+                HistoryControlGroup(label = if (language == AppLanguage.PT) "Conta" else "Account") {
                 if (availableAccounts.isEmpty()) {
                     Text(
                         text = if (language == AppLanguage.PT) {
@@ -400,85 +407,49 @@ private fun HistoryControls(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        for (account in availableAccounts) {
-                            RangeChip(
+                    AppSegmentedControl(
+                        options = availableAccounts.map { account ->
+                            AppSegment(
                                 label = account.displayLabel,
-                                selected = account.key == selectedAccount?.key,
-                                onClick = { onSelectAccount(account) },
                                 testTag = historyAccountChipTag(account)
                             )
-                        }
-                    }
-                }
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = if (language == AppLanguage.PT) "Intervalo" else "Range",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                HistoryRange.entries.forEach { range ->
-                    RangeChip(
-                        label = rangeLabel(range, language),
-                        selected = range == selectedRange,
-                        onClick = { onSelectRange(range) },
-                        testTag = historyRangeChipTag(range)
+                        },
+                        selectedIndex = availableAccounts.indexOfFirst { account ->
+                            account.key == selectedAccount?.key
+                        },
+                        onSelect = { index -> onSelectAccount(availableAccounts[index]) }
                     )
                 }
+                }
+            }
+
+            HistoryControlGroup(label = if (language == AppLanguage.PT) "Intervalo" else "Range") {
+                AppSegmentedControl(
+                    options = HistoryRange.entries.map { range ->
+                        AppSegment(label = rangeLabel(range, language), testTag = historyRangeChipTag(range))
+                    },
+                    selectedIndex = HistoryRange.entries.indexOf(selectedRange),
+                    onSelect = { index -> onSelectRange(HistoryRange.entries[index]) }
+                )
             }
         }
     }
 }
 
+/** Rótulo e controle na mesma linha de base, como um par. */
 @Composable
-private fun RangeChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    testTag: String? = null
-) {
-    val containerColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
-                      else           MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(durationMillis = AppMotion.fast),
-        label = "chipColor"
-    )
-    val labelColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                      else           MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(durationMillis = AppMotion.fast),
-        label = "chipLabelColor"
-    )
-
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        modifier = if (testTag == null) Modifier else Modifier.testTag(testTag),
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = labelColor
-            )
-        },
-        shape = AppShapes.small,
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor            = containerColor,
-            selectedContainerColor    = containerColor,
-            labelColor                = labelColor,
-            selectedLabelColor        = labelColor
+private fun HistoryControlGroup(label: String, content: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    )
+        content()
+    }
 }
 
 @Composable
