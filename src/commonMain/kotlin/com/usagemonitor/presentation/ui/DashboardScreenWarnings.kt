@@ -1,14 +1,29 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.presentation.ui.components.BannerTone
-import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
+import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.UiApiError
+
+const val APP_UPDATE_BANNER_TAG = "appUpdateBanner"
 
 /**
  * A ação recarrega só o alvo que falhou. Recarregar toda a fonte também refazia a
@@ -205,6 +220,16 @@ internal fun warningFor(
     return null
 }
 
+/**
+ * Faixa de uma linha só. O banner antigo era o `PersistentApiWarningBanner`
+ * genérico — título, parágrafo de descrição e `Button` empilhados —, e ficava fixo
+ * no topo do dashboard empurrando os cards enquanto a atualização não fosse
+ * instalada (issue #67).
+ *
+ * A faixa inteira é clicável e não há botão: a descrição só repetia em prosa o que
+ * o rótulo da ação já diz, e uma linha clicável entrega a mesma ação com um terço
+ * da altura.
+ */
 @Composable
 internal fun AppUpdateBanner(
     state: AppUpdateUiState,
@@ -214,14 +239,48 @@ internal fun AppUpdateBanner(
 ) {
     val content = updateBannerContent(state = state, language = language)
 
-    PersistentApiWarningBanner(
-        title = content.title,
-        description = content.description,
-        actionLabel = content.actionLabel,
-        onAction = if (content.showAction) onOpenRelease else null,
-        tone = BannerTone.INFO,
+    Surface(
         modifier = modifier
-    )
+            .fillMaxWidth()
+            .clickable(onClick = onOpenRelease)
+            .testTag(APP_UPDATE_BANNER_TAG),
+        shape = AppShapes.small,
+        tonalElevation = AppElevation.banner,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "i",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            // Quem cede espaço numa janela estreita é o título: o rótulo da ação é
+            // a única pista de que a faixa é clicável.
+            Text(
+                text = content.title,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${content.actionLabel} →",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 internal fun updateBannerContent(
@@ -235,21 +294,13 @@ internal fun updateBannerContent(
             } else {
                 "Version ${state.update.version} is available"
             }
-            val description = if (language == AppLanguage.PT) {
-                "A atualização está disponível na release publicada. Abra a página da versão para baixar e instalar."
-            } else {
-                "The update is available on the published release page. Open the version page to download and install it."
-            }
-
             UpdateBannerContent(
                 title = title,
-                description = description,
                 actionLabel = if (language == AppLanguage.PT) {
                     "Baixar atualização"
                 } else {
                     "Download update"
-                },
-                showAction = true
+                }
             )
         }
     }
@@ -267,7 +318,5 @@ internal data class DashboardWarning(
 
 internal data class UpdateBannerContent(
     val title: String,
-    val description: String,
-    val actionLabel: String? = null,
-    val showAction: Boolean = false
+    val actionLabel: String
 )

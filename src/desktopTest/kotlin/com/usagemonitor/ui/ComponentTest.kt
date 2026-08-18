@@ -59,6 +59,7 @@ import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
+import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
@@ -1295,11 +1296,13 @@ class ComponentTest {
         }
 
         onNodeWithText("Nova versão 7.1.0 disponível").assertIsDisplayed()
-        onNodeWithText("A atualização está disponível na release publicada. Abra a página da versão para baixar e instalar.").assertIsDisplayed()
+        onNodeWithText("Baixar atualização →").assertIsDisplayed()
         viewModel.onDestroy()
     }
 
     @Test
+    // Clique em qualquer ponto da faixa abre a release: não há mais botão, e é a
+    // linha inteira que carrega a ação (issue #67).
     fun `DashboardScreen opens release page from update banner action`() = runDesktopComposeUiTest {
         val enabledApis = MutableStateFlow(emptySet<ApiSource>())
         var opened = false
@@ -1327,12 +1330,12 @@ class ComponentTest {
 
         waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                onNodeWithText("Baixar atualização").fetchSemanticsNode()
+                onNodeWithTag(APP_UPDATE_BANNER_TAG).fetchSemanticsNode()
                 true
             }.getOrDefault(false)
         }
 
-        onNodeWithText("Baixar atualização").performClick()
+        onNodeWithTag(APP_UPDATE_BANNER_TAG).performClick()
         assertEquals(true, opened)
         viewModel.onDestroy()
     }
