@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -264,11 +265,26 @@ internal fun formatBrtDateTime(instant: Instant, language: AppLanguage): String 
     return "${parts.day} ${parts.date} ${parts.time}"
 }
 
+/**
+ * Cor do semáforo de risco.
+ *
+ * Passou a sair de [AppTone] em vez de três literais. Os antigos `0xFFFFC107` e
+ * `0xFFF44336` nunca foram medidos contra as superfícies dos dois temas — o
+ * amarelo dava menos de 3:1 sobre a superfície clara —, e o verde já era, por
+ * coincidência, o mesmo `cacheRead` da paleta. Um dono só para a semântica de
+ * cor, e o `AppAccentsContrastTest` a cobre.
+ */
+@Composable
+@ReadOnlyComposable
 internal fun colorFor(level: UsageRiskLevel): Color {
+    return toneFor(level).color()
+}
+
+internal fun toneFor(level: UsageRiskLevel): AppTone {
     return when (level) {
-        UsageRiskLevel.ON_TRACK -> Color(0xFF4CAF50)
-        UsageRiskLevel.AT_RISK -> Color(0xFFFFC107)
-        UsageRiskLevel.WILL_EXCEED -> Color(0xFFF44336)
+        UsageRiskLevel.ON_TRACK -> AppTone.OK
+        UsageRiskLevel.AT_RISK -> AppTone.WARNING
+        UsageRiskLevel.WILL_EXCEED -> AppTone.CRITICAL
     }
 }
 
