@@ -110,40 +110,115 @@ private val appTypography = Typography(
     )
 )
 
-// ── Paleta Dark ───────────────────────────────────────────────────────────────
-private val DarkBackground = Color(0xFF181818)
-private val DarkSurface    = Color(0xFF242424)
-private val DarkOnSurface  = Color(0xFFE0E0E0)
-private val DarkPrimary    = Color(0xFF82B1FF)
-private val DarkSecondary  = Color(0xFF80CBC4)
+/**
+ * Superfícies neutras da paleta.
+ *
+ * São quatro degraus dentro de ~14% de luminância, e é deliberado: a
+ * profundidade passa a vir da **borda de 1dp e do espaçamento**, não de sombra
+ * nem de gradiente de acento. Quatro superfícies muito distintas entre si
+ * reconstruiriam por volume a hierarquia que este sistema quer ler por camada.
+ *
+ * [AppSurfaces] existe como objeto nomeado — e não só como argumento do
+ * `darkColorScheme` — porque os degraus não têm papel Material equivalente um a
+ * um: `raised` cobre `surfaceVariant` e a família `surfaceContainer*` ao mesmo
+ * tempo, e sem um nome próprio cada chamada repetiria o literal.
+ */
+object AppSurfaces {
+    // ── Escuro (a referência aprovada) ────────────────────────────────────────
+    val darkBackground = Color(0xFF131010)
+    val darkSurface    = Color(0xFF1B1818)
+    val darkRaised     = Color(0xFF211E1E)
+    val darkBorder     = Color(0xFF3D3838)
+    val darkForeground = Color(0xFFF2EDED)
+    val darkMuted      = Color(0xFFB8B2B2)
 
+    // ── Claro ─────────────────────────────────────────────────────────────────
+    val lightBackground = Color(0xFFF6F3F3)
+    val lightSurface    = Color(0xFFFFFCFC)
+    val lightRaised     = Color(0xFFEFEAEA)
+    val lightBorder     = Color(0xFFD7D0D0)
+    val lightForeground = Color(0xFF171414)
+    val lightMuted      = Color(0xFF686060)
+}
+
+// O azul de informação é o mesmo `input` de `AppAccents`, e o vermelho é o mesmo
+// `saturated`: um segundo vermelho "de erro" ao lado do vermelho de contexto
+// saturado faria a tela ter duas cores para a mesma ideia.
+private val DarkInfo     = Color(0xFF4C8DFF)
+private val DarkCritical = Color(0xFFE86A6A)
+private val LightInfo     = Color(0xFF1565C0)
+private val LightCritical = Color(0xFFB3261E)
+
+// ── Paleta Dark ───────────────────────────────────────────────────────────────
 private val usageMonitorDarkColorScheme = darkColorScheme(
-    background        = DarkBackground,
-    surface           = DarkSurface,
-    onSurface         = DarkOnSurface,
-    primary           = DarkPrimary,
-    onPrimary         = Color(0xFF001064),
-    secondary         = DarkSecondary,
-    onSecondary       = Color(0xFF003731),
-    surfaceVariant    = Color(0xFF2C2C2C),
-    onSurfaceVariant  = Color(0xFFBDBDBD),
-    surfaceTint       = DarkPrimary,
-    outlineVariant    = Color(0xFF3A3A3A)
+    background              = AppSurfaces.darkBackground,
+    onBackground            = AppSurfaces.darkForeground,
+    surface                 = AppSurfaces.darkSurface,
+    onSurface               = AppSurfaces.darkForeground,
+    surfaceVariant          = AppSurfaces.darkRaised,
+    onSurfaceVariant        = AppSurfaces.darkMuted,
+    surfaceContainerLowest  = AppSurfaces.darkBackground,
+    surfaceContainerLow     = AppSurfaces.darkSurface,
+    surfaceContainer        = AppSurfaces.darkRaised,
+    surfaceContainerHigh    = AppSurfaces.darkRaised,
+    surfaceContainerHighest = AppSurfaces.darkRaised,
+    primary                 = DarkInfo,
+    onPrimary               = AppSurfaces.darkBackground,
+    primaryContainer        = AppSurfaces.darkRaised,
+    onPrimaryContainer      = AppSurfaces.darkForeground,
+    secondary               = AppSurfaces.darkMuted,
+    onSecondary             = AppSurfaces.darkBackground,
+    secondaryContainer      = AppSurfaces.darkRaised,
+    onSecondaryContainer    = AppSurfaces.darkMuted,
+    tertiary                = AppSurfaces.darkMuted,
+    onTertiary              = AppSurfaces.darkBackground,
+    tertiaryContainer       = AppSurfaces.darkRaised,
+    onTertiaryContainer     = AppSurfaces.darkForeground,
+    error                   = DarkCritical,
+    onError                 = AppSurfaces.darkBackground,
+    errorContainer          = AppSurfaces.darkRaised,
+    onErrorContainer        = DarkCritical,
+    outline                 = AppSurfaces.darkBorder,
+    outlineVariant          = AppSurfaces.darkBorder,
+    surfaceTint             = DarkInfo,
+    inverseSurface          = AppSurfaces.darkForeground,
+    inverseOnSurface        = AppSurfaces.darkBackground
 )
 
 // ── Paleta Light ──────────────────────────────────────────────────────────────
 private val usageMonitorLightColorScheme = lightColorScheme(
-    background        = Color(0xFFF4F6F8),
-    surface           = Color(0xFFF8F9FA),
-    onSurface         = Color(0xFF1A1A1A),
-    primary           = Color(0xFF1565C0),
-    onPrimary         = Color.White,
-    secondary         = Color(0xFF00796B),
-    onSecondary       = Color.White,
-    surfaceVariant    = Color(0xFFECEEF0),
-    onSurfaceVariant  = Color(0xFF555555),
-    surfaceTint       = Color(0xFF1565C0),
-    outlineVariant    = Color(0xFFD0D5DB)
+    background              = AppSurfaces.lightBackground,
+    onBackground            = AppSurfaces.lightForeground,
+    surface                 = AppSurfaces.lightSurface,
+    onSurface               = AppSurfaces.lightForeground,
+    surfaceVariant          = AppSurfaces.lightRaised,
+    onSurfaceVariant        = AppSurfaces.lightMuted,
+    surfaceContainerLowest  = AppSurfaces.lightSurface,
+    surfaceContainerLow     = AppSurfaces.lightBackground,
+    surfaceContainer        = AppSurfaces.lightRaised,
+    surfaceContainerHigh    = AppSurfaces.lightRaised,
+    surfaceContainerHighest = AppSurfaces.lightRaised,
+    primary                 = LightInfo,
+    onPrimary               = AppSurfaces.lightSurface,
+    primaryContainer        = AppSurfaces.lightRaised,
+    onPrimaryContainer      = AppSurfaces.lightForeground,
+    secondary               = AppSurfaces.lightMuted,
+    onSecondary             = AppSurfaces.lightSurface,
+    secondaryContainer      = AppSurfaces.lightRaised,
+    onSecondaryContainer    = AppSurfaces.lightMuted,
+    tertiary                = AppSurfaces.lightMuted,
+    onTertiary              = AppSurfaces.lightSurface,
+    tertiaryContainer       = AppSurfaces.lightRaised,
+    onTertiaryContainer     = AppSurfaces.lightForeground,
+    error                   = LightCritical,
+    onError                 = AppSurfaces.lightSurface,
+    errorContainer          = AppSurfaces.lightRaised,
+    onErrorContainer        = LightCritical,
+    outline                 = AppSurfaces.lightBorder,
+    outlineVariant          = AppSurfaces.lightBorder,
+    surfaceTint             = LightInfo,
+    inverseSurface          = AppSurfaces.lightForeground,
+    inverseOnSurface        = AppSurfaces.lightSurface
 )
 
 /**
