@@ -12,7 +12,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fases A–D concluídas — dashboard no vocabulário novo, pronto para a Fase E`
+**Estado atual:** `Fases A–E concluídas — dashboard e histórico no vocabulário novo, pronto para a Fase F`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
@@ -34,19 +34,18 @@ e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b
 
 ### ▶ Próxima atividade
 
-**Fase E, commit E1** — âncoras de teste do Histórico.
+**Fase F, commit F1** — âncoras de teste das Sessões CLI.
 
-Criar a branch `visual/e-history` a partir da integração e ancorar por `testTag` o que a Fase E vai
-mexer de forma em `HistoryScreen.kt` e `ApiSelector.kt`: os seletores de fonte, de conta e de
-intervalo, que viram uma toolbar única. Depois E2 (toolbar), E3 (painel de gráfico e tooltip) e E4
-(métricas como tabela).
+Criar a branch `visual/f-cli-sessions` a partir da integração e ancorar por `testTag` o que a fase
+vai mexer de forma em `CliSessionsScreen.kt`. Depois F2 (lista como linhas alinhadas), F3 (detalhe de
+sessão e `TurnSeriesChart`), F4 (pane de resumo e grade de atividade) e F5 (exportação e glossário).
 
-Preservar em E: seleção por fonte e por conta, `24h`/`7 dias`/`30 dias`/`Total`, reinícios de janela,
-média por hora, forecast, comparação com o período anterior e as regras de saldo e de créditos.
+`LazyColumn` continua `LazyColumn`. Paginação, filtro, ordem e abas do resumo continuam no `remember`
+da pane, não no ViewModel.
 
-**O que a Fase D deixou pronto para reuso:** `AppBanner` já é a base de `PersistentApiWarningBanner`
-e dos avisos inline do card; `AppLoadingState`/`AppErrorState` já cobrem os estados do dashboard;
-`AppStatusBar` serve tanto o rodapé da janela quanto o do card.
+**Padrão que se repete daqui em diante:** toda tela que ficou mais alta obriga a subir a altura da
+**cena** dos testes de componente (1024 × 768 por padrão), nunca a do `Box` interno. Já aconteceu em
+C3 e em E4.
 
 ### Progresso por fase
 
@@ -56,7 +55,7 @@ e dos avisos inline do card; `AppLoadingState`/`AppErrorState` já cobrem os est
 | B — Isolamento | — | ✅ concluída | 1/1 | 2026-08-18 |
 | C — Fundação | `visual/c-foundation` | ✅ concluída | 8/8 | 2026-08-18 |
 | D — Dashboard | `visual/d-dashboard` | ✅ concluída | 5/5 | 2026-08-18 |
-| E — Histórico | `visual/e-history` | ⬜ pendente | 0/4 | — |
+| E — Histórico | `visual/e-history` | ✅ concluída | 4/4 | 2026-08-18 |
 | F — Sessões CLI | `visual/f-cli-sessions` | ⬜ pendente | 0/5 | — |
 | G — Time | `visual/g-team` | ⬜ pendente | 0/5 | — |
 | H — Configurações | `visual/h-settings` | ⬜ pendente | 0/4 | — |
@@ -74,6 +73,10 @@ Uma linha por commit, em ordem cronológica.
 
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
+| 2026-08-18 | E4 | `refactor(history): lay out metrics as a table` | `allTests` — verde; capturas inspecionadas |
+| 2026-08-18 | E3 | `refactor(history): restyle the chart panel and tooltip` | `ui.*` — verde |
+| 2026-08-18 | E2 | `refactor(history): merge source, account and range into one toolbar` | `ui.*` — verde |
+| 2026-08-18 | E1 | `test(ui): anchor history assertions on test tags` | `ui.*` — verde antes e depois |
 | 2026-08-18 | D5 | `refactor(dashboard): apply state primitives to loading, empty and error` | `allTests` — verde; capturas inspecionadas |
 | 2026-08-18 | D4 | `refactor(dashboard): convert the footer into a status bar` | `ui.*` — verde |
 | 2026-08-18 | D3 | `refactor(dashboard): restyle the card chrome and actions` | `ui.*` — verde |
@@ -123,6 +126,9 @@ motivo.
 | 2026-08-18 | O card minimizado mantém os **badges por cota**, em vez do resumo "68% · 41%" do protótipo | A forma do protótipo apaga o rótulo da cota e a tooltip por cota, que são dado e ação existentes. Os badges foram reestilizados (superfície neutra, borda, raio 6) em vez de removidos |
 | 2026-08-18 | `compactPercentageLabel` passou a **truncar** em vez de arredondar | Era o único lugar do app que arredondava: o arco fazia `toInt()` e os limiares da bandeja são piso. O mesmo card mostrava 26% na cota expandida e 27% no badge minimizado para o mesmo 12 de 45 |
 | 2026-08-18 | `colorFor(UsageRiskLevel)` passou a sair de `AppTone` | Os três literais (`0xFF4CAF50`, `0xFFFFC107`, `0xFFF44336`) nunca foram medidos contra as superfícies dos dois temas — o âmbar dava menos de 3:1 sobre a clara — e escapavam do `AppAccentsContrastTest` |
+| 2026-08-18 | A tabela de métricas do histórico é `Row` de duas `Column` com `weight`, **nunca** `FlowRow` | Num `FlowRow` a linha mede pelo conteúdo, o `weight` do valor fica sem referência e o Compose deixa o texto **sem posicionar**: `isPlaced` falso, nó presente na árvore semântica e nada desenhado. O sintoma é `assertIsDisplayed` falhando com `boundsInRoot` válido |
+| 2026-08-18 | `UsageHistoryLineChart` passou a receber `accentColor` | A identidade é da fonte, e as séries de Anthropic e Codex desenhavam a mesma linha `primary`. A cor que o card usa para distingui-las não chegava ao gráfico |
+| 2026-08-18 | O emblema de reinício do gráfico foi de 64dp para 84dp | A largura cabia "Reinício" na fonte de sistema anterior; a IBM Plex Mono é mais larga e a palavra quebrava letra a letra dentro do emblema |
 | 2026-08-18 | O `ShimmerBox` saiu da tela de carregamento do dashboard, mas **o componente fica** | Ele é a única animação infinita da app e estava justamente na primeira tela que um teste de componente encontra. Apagar o componente seria remover algo que o plano não mandou remover; deixá-lo em uso é que era o problema |
 
 ### Bloqueios e riscos abertos

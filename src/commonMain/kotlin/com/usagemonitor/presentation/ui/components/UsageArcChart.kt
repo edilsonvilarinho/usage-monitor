@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,7 +67,7 @@ fun UsageArcChart(
         label = "arcAnimation"
     )
 
-    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val usedColor = if (isCurrency) arcColor(0f) else arcColor(percentage)
     val resolvedTextStyle = percentageTextStyle ?: MaterialTheme.typography.headlineMedium
 
@@ -137,11 +138,20 @@ fun UsageArcChart(
     }
 }
 
-/** Cor do arco com base no nível de uso: tertiary (baixo) → primary (médio) → error (alto). */
+/**
+ * Cor do arco por faixa de uso, com os mesmos cortes de 75 e 90 dos alertas.
+ *
+ * Sai de [AppTone] e não de três literais: os antigos `0xFFF44336` e
+ * `0xFFFFC107` nunca passaram pelo `AppAccentsContrastTest` e reprovavam contra
+ * a superfície clara.
+ */
+@Composable
+@ReadOnlyComposable
 private fun arcColor(percentage: Float): androidx.compose.ui.graphics.Color {
-    return when {
-        percentage >= 0.9f -> androidx.compose.ui.graphics.Color(0xFFF44336)
-        percentage >= 0.75f -> androidx.compose.ui.graphics.Color(0xFFFFC107)
-        else -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
+    val tone = when {
+        percentage >= 0.9f -> AppTone.CRITICAL
+        percentage >= 0.75f -> AppTone.WARNING
+        else -> AppTone.OK
     }
+    return tone.color()
 }

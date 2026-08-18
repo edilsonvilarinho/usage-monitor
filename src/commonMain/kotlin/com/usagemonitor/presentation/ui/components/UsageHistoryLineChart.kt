@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -64,7 +65,9 @@ private const val HISTORY_PLOT_HORIZONTAL_INSET_PX = 14f
 private val HISTORY_PLOT_HEIGHT = 120.dp
 private val HISTORY_TOOLTIP_BAND_HEIGHT = 48.dp
 private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HEIGHT
-private val HISTORY_ANNOTATION_LABEL_WIDTH = 64.dp
+// 64dp cabia "Reinício" na fonte de sistema anterior; a IBM Plex Mono é mais
+// larga e a palavra passou a quebrar letra a letra dentro do emblema.
+private val HISTORY_ANNOTATION_LABEL_WIDTH = 84.dp
 private const val HISTORY_RESET_CLUSTER_GAP_PX = 24f
 private const val HISTORY_MIN_ZOOM_WIDTH_FRACTION = 0.05f
 private const val HISTORY_ZOOM_STEP_FACTOR = 0.85f
@@ -85,13 +88,24 @@ internal fun UsageHistoryLineChart(
     chartSelectionKey: String,
     modifier: Modifier = Modifier,
     tooltipTitle: String? = null,
-    tooltipSubtitle: String? = null
+    tooltipSubtitle: String? = null,
+    /**
+     * Cor da série.
+     *
+     * Entra por parâmetro porque a identidade é da **fonte**: o histórico da
+     * Anthropic é azul, o do Codex é verde-água, e os dois desenhavam a mesma
+     * linha `primary` — a cor que o card do dashboard usa para distingui-los não
+     * chegava até aqui.
+     */
+    accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
-    val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f)
-    val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-    val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    val lineColor = accentColor
+    val fillColor = accentColor.copy(alpha = 0.12f)
+    // A grade é a mesma cor de borda do resto do app, e não o texto com alpha:
+    // duas linhas de referência com tons diferentes numa tela só.
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
     val axisTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val chartIndicatorColor = MaterialTheme.colorScheme.primary
+    val chartIndicatorColor = accentColor
     val chartIndicatorHaloColor = MaterialTheme.colorScheme.surface
     val renderPoints = filteredPoints(points, unit)
 
@@ -505,9 +519,9 @@ private fun HistoryAnnotationLabel(
                     y = topPadding.roundToPx()
                 )
             },
-        shape = AppShapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-        tonalElevation = 1.dp
+        shape = AppShapes.extraSmall,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Text(
             modifier = Modifier
@@ -516,7 +530,8 @@ private fun HistoryAnnotationLabel(
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }

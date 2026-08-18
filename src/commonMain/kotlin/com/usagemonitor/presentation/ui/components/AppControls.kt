@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -342,8 +343,9 @@ private fun AppSegmentItem(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
+    val tagged = if (option.testTag != null) Modifier.testTag(option.testTag) else Modifier
     Box(
-        modifier = Modifier
+        modifier = tagged
             .background(container.copy(alpha = container.alpha * alpha))
             .selectable(selected = selected, enabled = enabled, onClick = onClick)
             .padding(horizontal = AppSpacing.sm),
