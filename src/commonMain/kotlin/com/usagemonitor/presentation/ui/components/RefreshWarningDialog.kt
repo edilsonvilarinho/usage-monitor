@@ -1,10 +1,11 @@
 package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.theme.AppShapes
 
 @Composable
 fun RefreshWarningDialog(
@@ -21,19 +22,25 @@ fun RefreshWarningDialog(
     val confirmLabel = if (language == AppLanguage.PT) "Atualizar" else "Refresh"
     val dismissLabel = if (language == AppLanguage.PT) "Cancelar" else "Cancel"
 
+    // O `AlertDialog` do Material fica, com a forma e as cores do sistema: é ele
+    // que traz o escurecimento do fundo, o foco preso e o fechar pelo Esc. O que
+    // muda é o cromo — raio de 10dp em vez de 28 e os botões do app, sendo o de
+    // confirmar o único com peso, porque é a ação que o diálogo propõe.
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(body) },
+        title = {
+            Text(text = title, style = MaterialTheme.typography.titleSmall)
+        },
+        text = {
+            Text(text = body, style = MaterialTheme.typography.bodySmall)
+        },
+        shape = AppShapes.large,
+        containerColor = MaterialTheme.colorScheme.surface,
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmLabel)
-            }
+            AppButton(label = confirmLabel, onClick = onConfirm, tone = AppButtonTone.PRIMARY)
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(dismissLabel)
-            }
+            AppButton(label = dismissLabel, onClick = onDismiss, tone = AppButtonTone.GHOST)
         }
     )
 }

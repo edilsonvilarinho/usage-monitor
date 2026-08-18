@@ -1,6 +1,9 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,7 +18,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
@@ -33,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -47,6 +50,21 @@ import kotlinx.datetime.Instant
 const val FOOTER_ADMIN_OVERVIEW_TEST_TAG = "footerAdminOverview"
 
 const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
+
+/**
+ * Âncoras do rodapé.
+ *
+ * A versão e a contagem regressiva são hoje dois emblemas arredondados e viram
+ * texto solto de uma barra de estado. O conteúdo é o mesmo — `v1.1.0`, `02:05` —,
+ * mas o nó que o carrega muda de forma, e o assert por texto encontraria também
+ * qualquer outro lugar da tela onde a versão apareça.
+ */
+const val FOOTER_VERSION_TEST_TAG = "footerVersion"
+const val FOOTER_COUNTDOWN_TEST_TAG = "footerCountdown"
+
+/** Alvo de clique do rodapé: quadrado, na altura da barra de 30dp. */
+private val FOOTER_ACTION_SIZE = 26.dp
+private val FOOTER_ICON_SIZE = 14.dp
 
 @Composable
 fun FooterBar(
@@ -94,34 +112,24 @@ fun FooterBar(
         }
     }
 
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FooterCompactStatusGroup(
-                appVersion = appVersion,
-                language = language,
-                secondsUntilRefresh = secondsUntilRefresh,
-                dense = true,
-                modifier = Modifier.weight(1f)
-            )
-            FooterActionGroup(
-                language = language,
-                onRefresh = onRefresh,
-                onOpenSettings = onOpenSettings,
-                iconOnly = true,
-                onOpenAdminOverview = onOpenAdminOverview,
-                onOpenTeamPresence = onOpenTeamPresence
-            )
-        }
+    // Barra de estado, não faixa elevada: o rodapé é a última linha da janela e
+    // o que o separa do conteúdo é a divisória de 1dp, não uma elevação tonal.
+    AppStatusBar(modifier = modifier) {
+        FooterCompactStatusGroup(
+            appVersion = appVersion,
+            language = language,
+            secondsUntilRefresh = secondsUntilRefresh,
+            dense = true,
+            modifier = Modifier.weight(1f)
+        )
+        FooterActionGroup(
+            language = language,
+            onRefresh = onRefresh,
+            onOpenSettings = onOpenSettings,
+            iconOnly = true,
+            onOpenAdminOverview = onOpenAdminOverview,
+            onOpenTeamPresence = onOpenTeamPresence
+        )
     }
 }
 
@@ -154,8 +162,16 @@ private fun FooterCompactStatusGroup(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        FooterCompactBadge(text = "v$appVersion", tooltipLabel = versionTooltip)
-        FooterCompactBadge(text = refreshLabel, tooltipLabel = refreshTooltip)
+        FooterCompactBadge(
+            text = "v$appVersion",
+            tooltipLabel = versionTooltip,
+            testTag = FOOTER_VERSION_TEST_TAG
+        )
+        FooterCompactBadge(
+            text = refreshLabel,
+            tooltipLabel = refreshTooltip,
+            testTag = FOOTER_COUNTDOWN_TEST_TAG
+        )
     }
 }
 
@@ -164,8 +180,12 @@ private fun FooterCompactStatusGroup(
 private fun FooterCompactBadge(
     text: String,
     tooltipLabel: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    testTag: String? = null
 ) {
+    // Texto solto, sem cápsula. Dois emblemas arredondados numa barra de 30dp
+    // repetiam a moldura que a barra já é; a tooltip, que é o que explica o que
+    // o número significa, continua.
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = {
@@ -175,20 +195,16 @@ private fun FooterCompactBadge(
         },
         state = rememberTooltipState(isPersistent = true)
     ) {
-        Surface(
-            modifier = modifier,
-            shape = AppShapes.small,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-            )
-        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            // A tag mora no texto: é o texto que o assert compara.
+            modifier = modifier
+                .let { base -> if (testTag == null) base else base.testTag(testTag) }
+        )
     }
 }
 
@@ -223,7 +239,8 @@ private fun FooterActionGroup(
                 Icon(
                     imageVector = Icons.Rounded.Sensors,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    modifier = Modifier.size(FOOTER_ICON_SIZE),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -241,7 +258,8 @@ private fun FooterActionGroup(
                 Icon(
                     imageVector = Icons.Rounded.Groups,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    modifier = Modifier.size(FOOTER_ICON_SIZE),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -253,7 +271,8 @@ private fun FooterActionGroup(
             Icon(
                 imageVector = Icons.Rounded.Refresh,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                modifier = Modifier.size(FOOTER_ICON_SIZE),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -265,7 +284,8 @@ private fun FooterActionGroup(
                 Icon(
                     imageVector = Icons.Rounded.Settings,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    modifier = Modifier.size(FOOTER_ICON_SIZE),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
@@ -299,15 +319,16 @@ private fun FooterIconActionButton(
         },
         state = rememberTooltipState(isPersistent = true)
     ) {
-        FilledTonalIconButton(
-            onClick = onClick,
+        Box(
             modifier = Modifier
-                .height(34.dp)
-                .width(34.dp)
+                .size(FOOTER_ACTION_SIZE)
+                .clip(AppShapes.small)
+                .clickable(onClick = onClick)
                 .semantics {
                     contentDescription = label
                 }
-                .let { base -> if (testTag == null) base else base.testTag(testTag) }
+                .let { base -> if (testTag == null) base else base.testTag(testTag) },
+            contentAlignment = Alignment.Center
         ) {
             content()
         }

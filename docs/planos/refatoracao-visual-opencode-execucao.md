@@ -12,7 +12,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fases A, B e C concluídas — fundação no lugar, pronto para a Fase D`
+**Estado atual:** `Fases A–D concluídas — dashboard no vocabulário novo, pronto para a Fase E`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
@@ -34,20 +34,19 @@ e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b
 
 ### ▶ Próxima atividade
 
-**Fase D, commit D1** — `test(ui): anchor dashboard assertions on test tags`.
+**Fase E, commit E1** — âncoras de teste do Histórico.
 
-Criar a branch `visual/d-dashboard` a partir da integração e mover para `testTag` os asserts de
-texto de `ComponentTest.kt` e `FooterBarTest.kt`, acrescentando as tags em `ApiUsageCard.kt` e
-`FooterBar.kt`. Comportamento inalterado, suíte verde antes e depois — **nenhum pixel muda neste
-commit**. Só depois vêm D2–D5.
+Criar a branch `visual/e-history` a partir da integração e ancorar por `testTag` o que a Fase E vai
+mexer de forma em `HistoryScreen.kt` e `ApiSelector.kt`: os seletores de fonte, de conta e de
+intervalo, que viram uma toolbar única. Depois E2 (toolbar), E3 (painel de gráfico e tooltip) e E4
+(métricas como tabela).
 
-O que a Fase C deixou pronto para a Fase D consumir: `AppDataSurfaceFlush` + `AppSectionHeader`
-(com marcador de 2dp) para o card, `AppDataRow` + `AppProgressTrack` + `AppStatusIndicator` para as
-cotas, `AppStatusBar` para o rodapé e `AppIconButton` para as ações.
+Preservar em E: seleção por fonte e por conta, `24h`/`7 dias`/`30 dias`/`Total`, reinícios de janela,
+média por hora, forecast, comparação com o período anterior e as regras de saldo e de créditos.
 
-**Ponto de atenção herdado:** o brilho de acento do dashboard **não** saiu em C8. `ApiUsageCard`
-desenha o gradiente inline, sem passar por `DepthSurface` — é o que a captura de fim da Fase C ainda
-mostra nos cards do Codex e do DeepSeek. Removê-lo é trabalho de D3.
+**O que a Fase D deixou pronto para reuso:** `AppBanner` já é a base de `PersistentApiWarningBanner`
+e dos avisos inline do card; `AppLoadingState`/`AppErrorState` já cobrem os estados do dashboard;
+`AppStatusBar` serve tanto o rodapé da janela quanto o do card.
 
 ### Progresso por fase
 
@@ -56,7 +55,7 @@ mostra nos cards do Codex e do DeepSeek. Removê-lo é trabalho de D3.
 | A — Protótipo | — | ✅ aprovado | 1/1 | 2026-08-18 |
 | B — Isolamento | — | ✅ concluída | 1/1 | 2026-08-18 |
 | C — Fundação | `visual/c-foundation` | ✅ concluída | 8/8 | 2026-08-18 |
-| D — Dashboard | `visual/d-dashboard` | ⬜ pendente | 0/5 | — |
+| D — Dashboard | `visual/d-dashboard` | ✅ concluída | 5/5 | 2026-08-18 |
 | E — Histórico | `visual/e-history` | ⬜ pendente | 0/4 | — |
 | F — Sessões CLI | `visual/f-cli-sessions` | ⬜ pendente | 0/5 | — |
 | G — Time | `visual/g-team` | ⬜ pendente | 0/5 | — |
@@ -75,6 +74,11 @@ Uma linha por commit, em ordem cronológica.
 
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
+| 2026-08-18 | D5 | `refactor(dashboard): apply state primitives to loading, empty and error` | `allTests` — verde; capturas inspecionadas |
+| 2026-08-18 | D4 | `refactor(dashboard): convert the footer into a status bar` | `ui.*` — verde |
+| 2026-08-18 | D3 | `refactor(dashboard): restyle the card chrome and actions` | `ui.*` — verde |
+| 2026-08-18 | D2 | `refactor(dashboard): turn quota blocks into compact rows` | `allTests` — verde |
+| 2026-08-18 | D1 | `test(ui): anchor dashboard assertions on test tags` | `ui.*` — verde antes e depois, nenhum pixel alterado |
 | 2026-08-18 | C8 | `refactor(ui): replace the DepthSurface glow with bordered surfaces` | `allTests` — 1084 testes, 0 falhas, 0 ignorados; capturas geradas |
 | 2026-08-18 | C7 | `feat(ui): add state primitives` | `ui.*` — verde |
 | 2026-08-18 | C6 | `feat(ui): add control primitives` | `ui.*` — verde |
@@ -115,13 +119,18 @@ motivo.
 | 2026-08-18 | Cinco testes do resumo passaram a pedir cena de 1.600px | Quem limita o que o `LazyColumn` compõe é a **cena** do teste (1024 × 768 por padrão), não o `Box` interno. A Plex é mais larga que a fonte de sistema anterior, os rótulos quebram em mais linhas e o último item da página caía fora: os asserts falhavam por viewport, não por comportamento |
 | 2026-08-18 | Testes próprios para as dezessete primitivas, que o plano não previa | Defeito em primitiva consumida por oito suítes aparece em oito lugares de uma vez. Foi assim que o sublinhado de `AppTabs` — um `Box(fillMaxWidth)` que esticava a aba inteira e engolia os cliques das vizinhas — apareceu em C5, antes de qualquer tela usá-lo |
 | 2026-08-18 | `DepthSurface` **perdeu** `accent` e `glowAlpha` em C8, e a cor da fonte fica ausente até a fase da tela | Manter o parâmetro só para pintar um marcador em toda superfície poria cor onde o protótipo não põe — inclusive nos blocos internos do detalhe de sessão. O marcador entra no lugar certo (o cabeçalho) quando cada tela migrar para `AppSectionHeader` |
+| 2026-08-18 | As ações de navegação do card viraram **barra de estado no rodapé do card**, mas continuam botões de **ícone**, não de texto como no protótipo | A `contentDescription` de cada uma carrega a explicação do pisca ("1 sessão ativa agora pede atenção: …"), que é a razão de o semáforo existir e o que os testes observam. Botão de texto não teria onde levá-la |
+| 2026-08-18 | O card minimizado mantém os **badges por cota**, em vez do resumo "68% · 41%" do protótipo | A forma do protótipo apaga o rótulo da cota e a tooltip por cota, que são dado e ação existentes. Os badges foram reestilizados (superfície neutra, borda, raio 6) em vez de removidos |
+| 2026-08-18 | `compactPercentageLabel` passou a **truncar** em vez de arredondar | Era o único lugar do app que arredondava: o arco fazia `toInt()` e os limiares da bandeja são piso. O mesmo card mostrava 26% na cota expandida e 27% no badge minimizado para o mesmo 12 de 45 |
+| 2026-08-18 | `colorFor(UsageRiskLevel)` passou a sair de `AppTone` | Os três literais (`0xFF4CAF50`, `0xFFFFC107`, `0xFFF44336`) nunca foram medidos contra as superfícies dos dois temas — o âmbar dava menos de 3:1 sobre a clara — e escapavam do `AppAccentsContrastTest` |
+| 2026-08-18 | O `ShimmerBox` saiu da tela de carregamento do dashboard, mas **o componente fica** | Ele é a única animação infinita da app e estava justamente na primeira tela que um teste de componente encontra. Apagar o componente seria remover algo que o plano não mandou remover; deixá-lo em uso é que era o problema |
 
 ### Bloqueios e riscos abertos
 
 | Item | Fase | Estado |
 |---|---|---|
 | Assinatura exata da API de carregamento de fonte no Compose Desktop 1.7.1 | C3 | ✅ resolvido — `Font(resource: String, weight, style)` existe |
-| Brilho de acento inline em `ApiUsageCard`, fora do alcance de C8 | D3 | 🔎 a remover na fase do dashboard |
+| Brilho de acento inline em `ApiUsageCard`, fora do alcance de C8 | D3 | ✅ resolvido — gradiente e rastro de coleta removidos |
 | `.icns` não verificável em Windows — só no job `build-macos` do release | J2 | ⚠ risco aceito |
 | Embutir Plex no PDFBox recalcula `getStringWidth` de todas as colunas | K1 | ⚠ risco conhecido, commit isolado |
 
