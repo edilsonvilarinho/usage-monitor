@@ -156,6 +156,12 @@ private class FakePresenceAdminRepository(
         return Result.success(accounts)
     }
 
+    override suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?> = Result.failure(UnsupportedOperationException())
+
     override suspend fun validateToken(): Result<Unit> = Result.success(Unit)
 
     override suspend fun listKeys(): Result<List<TeamKeyEntry>> = Result.success(emptyList())

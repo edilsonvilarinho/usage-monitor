@@ -4,6 +4,8 @@ import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.datasource.TeamCredential
 import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.data.dto.TeamAccountDeletionDto
+import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
+import com.usagemonitor.data.dto.TeamSessionRowDto
 import com.usagemonitor.data.dto.TeamVerificationDto
 import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
@@ -34,6 +36,8 @@ private class FakeRemoteTeamDataSource(
         Result.failure(IllegalStateException("nao deveria chamar")),
     private val deleteSessionResult: Result<Unit> =
         Result.failure(IllegalStateException("nao deveria chamar")),
+    private val sessionDetailResult: Result<TeamSessionDetailResponseDto> =
+        Result.failure(IllegalStateException("nao deveria chamar")),
     private val deleteAccountResult: Result<TeamAccountDeletionDto> =
         Result.failure(IllegalStateException("nao deveria chamar"))
 ) : RemoteTeamDataSource(HttpClient()) {
@@ -42,7 +46,9 @@ private class FakeRemoteTeamDataSource(
     var deleteMemberCalls = 0
     var deleteSessionCalls = 0
     var deleteAccountCalls = 0
+    var sessionDetailCalls = 0
     var lastDeleteMemberCredential: TeamCredential? = null
+    var lastSessionDetailCredential: TeamCredential? = null
     var lastDeleteSessionAdminToken: String? = null
     var lastDeleteSessionTarget: Triple<String, String, String>? = null
 
@@ -77,6 +83,18 @@ private class FakeRemoteTeamDataSource(
         lastDeleteSessionAdminToken = adminToken
         lastDeleteSessionTarget = Triple(accountKey, deviceId, sessionId)
         deleteSessionResult.getOrThrow()
+    }
+
+    override suspend fun fetchSessionDetail(
+        baseUrl: String,
+        credential: TeamCredential,
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): TeamSessionDetailResponseDto {
+        sessionDetailCalls += 1
+        lastSessionDetailCredential = credential
+        return sessionDetailResult.getOrThrow()
     }
 
     override suspend fun claimKey(
@@ -198,6 +216,32 @@ class TeamAdminRepositoryImplTest {
         assertEquals(
             Triple(ACCOUNT_KEY, "device-1", "session-1"),
             remote.lastDeleteSessionTarget
+        )
+    }
+
+    @Test
+    fun `administrador le detalhe com token de admin mesmo tendo chave de time`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            sessionDetailResult = Result.success(
+                TeamSessionDetailResponseDto(
+                    session = TeamSessionRowDto(
+                        deviceId = "device-1",
+                        sessionId = "session-1"
+                    )
+                )
+            )
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { ADMIN }
+
+        val result = repository.fetchSessionDetail(ACCOUNT_KEY, "device-1", "session-1")
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, remote.sessionDetailCalls)
+        assertEquals(
+            TeamCredential.AdminToken(ADMIN.adminToken),
+            remote.lastSessionDetailCredential
         )
     }
 

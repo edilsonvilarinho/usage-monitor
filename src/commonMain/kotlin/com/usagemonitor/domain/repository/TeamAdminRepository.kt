@@ -1,5 +1,6 @@
 package com.usagemonitor.domain.repository
 
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamKeyEntry
@@ -64,6 +65,19 @@ interface TeamAdminRepository {
      * [cutoffMillis] recorta os turnos, como em [TeamUsageRepository.fetch].
      */
     suspend fun fetchOverview(cutoffMillis: Long? = null): Result<List<TeamAccountUsage>>
+
+    /**
+     * Lê o detalhe de uma sessão com o token de administração.
+     *
+     * É um contrato separado de [TeamUsageRepository.fetchSessionDetail]: a
+     * visão global precisa atravessar contas pertencentes a outras chaves de
+     * time, mesmo quando esta instalação também participa de um time.
+     */
+    suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?>
 
     /**
      * Pergunta se a chave de time configurada serve para [accountKey].

@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
+import com.usagemonitor.domain.usecase.GetAdminTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
@@ -62,6 +63,8 @@ class TeamUsageViewModel(
      * administração, onde a janela só existe por conta.
      */
     private val getAdminOverview: GetAdminTeamOverviewUseCase? = null,
+    /** Detalhe global com token de admin; nunca pode cair na chave do time local. */
+    private val getAdminTeamSessionDetail: GetAdminTeamSessionDetailUseCase? = null,
     /** Remoção global com token de admin; não pode reutilizar a chave de time. */
     private val removeAdminTeamMember: RemoveAdminTeamMemberUseCase? = null,
     /** Exclusão de sessão também exclusiva do token administrativo. */
@@ -148,7 +151,7 @@ class TeamUsageViewModel(
      * instalação não tem administração.
      */
     fun openForAllAccounts() {
-        if (getAdminOverview == null) {
+        if (getAdminOverview == null || getAdminTeamSessionDetail == null) {
             return
         }
 
@@ -386,7 +389,8 @@ class TeamUsageViewModel(
                 accountKey = targetAccountKey,
                 deviceId = deviceId,
                 sessionId = sessionId,
-                scopedAccountKey = member.accountKey
+                scopedAccountKey = member.accountKey,
+                adminAccess = current.isAdminOverview
             )
             publishDetail(
                 deviceId = deviceId,
@@ -631,7 +635,8 @@ class TeamUsageViewModel(
             accountKey = targetAccountKey,
             deviceId = open.deviceId,
             sessionId = open.sessionId,
-            scopedAccountKey = open.accountKey
+            scopedAccountKey = open.accountKey,
+            adminAccess = current.isAdminOverview
         )
         if (reloaded is TeamSessionDetailUiState.Ready) {
             publishDetail(
@@ -647,13 +652,31 @@ class TeamUsageViewModel(
         accountKey: String,
         deviceId: String,
         sessionId: String,
-        scopedAccountKey: String?
+        scopedAccountKey: String?,
+        adminAccess: Boolean
     ): TeamSessionDetailUiState {
-        return getTeamSessionDetail(
-            accountKey = accountKey,
-            deviceId = deviceId,
-            sessionId = sessionId
-        ).fold(
+        val result = if (adminAccess) {
+            val adminReader = getAdminTeamSessionDetail
+                ?: return TeamSessionDetailUiState.Error(
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    accountKey = scopedAccountKey,
+                    message = "Leitura administrativa da sessão não configurada."
+                )
+            adminReader(
+                accountKey = accountKey,
+                deviceId = deviceId,
+                sessionId = sessionId
+            )
+        } else {
+            getTeamSessionDetail(
+                accountKey = accountKey,
+                deviceId = deviceId,
+                sessionId = sessionId
+            )
+        }
+
+        return result.fold(
             onSuccess = { loaded ->
                 if (loaded == null) {
                     // Servidor sem a rota de detalhe, ou sessão fora da retenção.

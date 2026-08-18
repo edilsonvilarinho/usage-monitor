@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamAccountDeletion
@@ -128,6 +129,12 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
         lastOverviewCutoff = cutoffMillis
         return overviewResult ?: Result.success(overview)
     }
+
+    override suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?> = Result.failure(UnsupportedOperationException())
 
     override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
         return Result.success(TeamKeyVerification(authorized = true, claimed = true))

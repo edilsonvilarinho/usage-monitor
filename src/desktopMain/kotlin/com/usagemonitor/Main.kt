@@ -79,6 +79,7 @@ import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
+import com.usagemonitor.domain.usecase.GetAdminTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
@@ -504,6 +505,7 @@ fun main() = application {
             getTeamUsage = GetTeamUsageUseCase(teamUsageRepository),
             getTeamSessionDetail = GetTeamSessionDetailUseCase(teamUsageRepository),
             getAdminOverview = GetAdminTeamOverviewUseCase(teamAdminRepository),
+            getAdminTeamSessionDetail = GetAdminTeamSessionDetailUseCase(teamAdminRepository),
             removeAdminTeamMember = RemoveAdminTeamMemberUseCase(teamAdminRepository),
             removeAdminTeamSession = RemoveAdminTeamSessionUseCase(teamAdminRepository),
             getTeamUsageTrend = GetTeamUsageTrendUseCase(teamUsageRepository),

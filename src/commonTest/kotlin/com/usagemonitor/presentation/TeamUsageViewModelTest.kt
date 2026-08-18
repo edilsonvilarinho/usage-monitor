@@ -19,6 +19,7 @@ import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.repository.TeamUsageTrendData
+import com.usagemonitor.domain.usecase.GetAdminTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
@@ -813,6 +814,9 @@ class TeamUsageViewModelTest {
             getAdminOverview = adminRepository?.let { admin ->
                 GetAdminTeamOverviewUseCase(admin, useCaseClock)
             },
+            getAdminTeamSessionDetail = adminRepository?.let { admin ->
+                GetAdminTeamSessionDetailUseCase(admin)
+            },
             removeAdminTeamMember = adminRepository?.let { admin ->
                 RemoveAdminTeamMemberUseCase(admin)
             },
@@ -1020,6 +1024,7 @@ class TeamUsageViewModelTest {
                 overviewAccount(OTHER_ACCOUNT_KEY, null, "device-1", tokens = 30)
             )
         )
+        admin.detailResult = Result.success(detail("s1", cacheReadTokens = 10_000L))
         val viewModel = buildViewModel(repository, adminRepository = admin)
         viewModel.openForAllAccounts()
         runCurrent()
@@ -1027,9 +1032,13 @@ class TeamUsageViewModelTest {
         viewModel.openSession(memberKey = "$ACCOUNT_KEY/device-1", sessionId = "s1")
         runCurrent()
 
-        assertEquals(ACCOUNT_KEY, repository.lastDetailAccountKey)
+        assertEquals(0, repository.detailCalls)
+        assertEquals(1, admin.detailCalls)
+        assertEquals(ACCOUNT_KEY, admin.lastDetailAccountKey)
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        assertEquals(ACCOUNT_KEY, state.detail?.accountKey)
+        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        assertEquals(ACCOUNT_KEY, ready.accountKey)
+        assertEquals(listOf(10_000L), ready.result.analytics.contextPerTurn)
         viewModel.onDestroy()
     }
 
@@ -1079,6 +1088,9 @@ private class FakeAdminOverviewRepository(
     val removedSessions = mutableListOf<Triple<String, String, String>>()
     var removeMemberResult: Result<Unit> = Result.success(Unit)
     var removeSessionResult: Result<Unit> = Result.success(Unit)
+    var detailResult: Result<CliSessionDetail?> = Result.success(null)
+    var detailCalls = 0
+    var lastDetailAccountKey: String? = null
 
     override suspend fun validateToken(): Result<Unit> = Result.success(Unit)
 
@@ -1125,6 +1137,16 @@ private class FakeAdminOverviewRepository(
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> =
         Result.success(accounts)
+
+    override suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?> {
+        detailCalls += 1
+        lastDetailAccountKey = accountKey
+        return detailResult
+    }
 
     override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> =
         Result.success(TeamKeyVerification(authorized = true, claimed = true))

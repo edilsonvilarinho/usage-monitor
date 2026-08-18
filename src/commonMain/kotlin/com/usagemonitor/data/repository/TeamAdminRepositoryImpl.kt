@@ -6,6 +6,7 @@ import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.data.dto.CreateTeamKeyRequestDto
 import com.usagemonitor.data.dto.UpdateTeamKeyRequestDto
 import com.usagemonitor.data.mapper.toDomain
+import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
@@ -179,6 +180,29 @@ class TeamAdminRepositoryImpl(
                 sinceEpochMillis = cutoffMillis
             ).toDomain()
         }
+    }
+
+    override suspend fun fetchSessionDetail(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<CliSessionDetail?> {
+        val result = withAdmin { settings ->
+            remoteDataSource.fetchSessionDetail(
+                baseUrl = settings.normalizedServerUrl,
+                credential = TeamCredential.AdminToken(settings.adminToken),
+                accountKey = accountKey,
+                deviceId = deviceId,
+                sessionId = sessionId
+            ).toDomain()
+        }
+
+        // Mesma compatibilidade da leitura comum: servidor anterior à rota ou
+        // sessão já removida significam que não há turnos para apresentar.
+        if (result.isMissingRoute()) {
+            return Result.success(null)
+        }
+        return result
     }
 
     /**
