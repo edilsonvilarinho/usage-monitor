@@ -52,7 +52,6 @@ import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppGlow
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
@@ -383,7 +382,6 @@ private fun TeamPresenceHeader(
     val accents = AppAccents.current
 
     DepthSurface(
-        accent = accents.cacheRead,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.large,
         elevation = AppElevation.dialog,
@@ -655,15 +653,10 @@ private fun TeamPresenceRow(
     }
 
     DepthSurface(
-        accent = accent,
         modifier = Modifier
             .fillMaxWidth()
             .testTag("$PRESENCE_ROW_TAG_PREFIX${entry.memberKey}"),
         shape = AppShapes.medium,
-        // Sem isto a linha herdava o default de `DepthSurface`, calibrado para os
-        // cards do dashboard: era a superfície mais berrante da app, e por
-        // acidente — nenhuma outra lista deixa de passar o parâmetro.
-        glowAlpha = AppGlow.row,
         contentPadding = PRESENCE_ROW_CONTENT_PADDING
     ) {
         FlowRow(

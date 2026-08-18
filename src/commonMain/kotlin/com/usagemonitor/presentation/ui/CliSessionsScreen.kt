@@ -83,20 +83,9 @@ internal val OUTPUT_COLOR = darkAppAccents.output
 internal val CACHE_READ_COLOR = darkAppAccents.cacheRead
 internal val CACHE_WRITE_COLOR = darkAppAccents.cacheWrite
 internal val SAVINGS_COLOR = darkAppAccents.savings
-internal val NEUTRAL_ACCENT = darkAppAccents.neutral
 
 /** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
 internal val SCROLLBAR_GUTTER = 12.dp
-
-/**
- * Brilho quase apagado para os blocos do detalhe.
- *
- * O default de `DepthSurface` (0.22) é o do dashboard, onde cada card é uma API
- * distinta e a cor identifica. Aqui os blocos são a mesma sessão vista de
- * ângulos diferentes: com o brilho cheio a tela vira uma pilha de retângulos
- * coloridos e nada se destaca. A cor fica no dado, não no fundo.
- */
-private const val QUIET_GLOW_ALPHA = 0.06f
 
 /** Mais baixo que o default de `TurnSeriesChart`: são vários numa página só. */
 private val DETAIL_CHART_HEIGHT = 120.dp
@@ -290,7 +279,6 @@ private fun CliSessionsHeader(
     onExportReport: () -> Unit = {}
 ) {
     DepthSurface(
-        accent = CACHE_READ_COLOR,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.large,
         elevation = AppElevation.dialog,
@@ -542,9 +530,7 @@ internal fun CliSessionRow(
     val statusColor = healthColor(status.health)
 
     DepthSurface(
-        accent = statusColor,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-        glowAlpha = 0.16f,
         contentPadding = 14.dp
     ) {
         FlowRow(
@@ -1095,9 +1081,7 @@ internal fun AdvancedDisclosure(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         DepthSurface(
-            accent = NEUTRAL_ACCENT,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
-            glowAlpha = QUIET_GLOW_ALPHA,
             contentPadding = 14.dp
         ) {
             Row(
@@ -1146,9 +1130,7 @@ internal fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLa
     val accent = healthColor(health)
 
     DepthSurface(
-        accent = accent,
         modifier = Modifier.fillMaxWidth(),
-        glowAlpha = if (health == CliSessionHealth.HEALTHY) 0.14f else 0.26f,
         contentPadding = 14.dp
     ) {
         Row(
@@ -1202,9 +1184,7 @@ internal fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLa
 @Composable
 internal fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguage) {
     DepthSurface(
-        accent = NEUTRAL_ACCENT,
         modifier = Modifier.fillMaxWidth(),
-        glowAlpha = 0.10f,
         contentPadding = 14.dp
     ) {
         FlowRow(
@@ -1279,9 +1259,7 @@ internal fun DetailSection(
     content: @Composable () -> Unit
 ) {
     DepthSurface(
-        accent = accent,
         modifier = Modifier.fillMaxWidth(),
-        glowAlpha = QUIET_GLOW_ALPHA,
         contentPadding = 14.dp
     ) {
         Row(
@@ -1330,9 +1308,7 @@ internal fun MetricCard(
     help: GlossaryTerm? = null
 ) {
     DepthSurface(
-        accent = accent,
         modifier = Modifier.width(168.dp),
-        glowAlpha = QUIET_GLOW_ALPHA,
         contentPadding = 12.dp
     ) {
         Row(
@@ -1491,9 +1467,7 @@ internal fun GlossaryPanel(
     onToggle: () -> Unit
 ) {
     DepthSurface(
-        accent = NEUTRAL_ACCENT,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
-        glowAlpha = QUIET_GLOW_ALPHA,
         contentPadding = 14.dp
     ) {
         Row(

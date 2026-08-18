@@ -59,7 +59,6 @@ import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppGlow
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
@@ -578,7 +577,6 @@ private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             DepthSurface(
-                accent = OUTPUT_COLOR,
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.large,
                 elevation = AppElevation.dialog,
@@ -784,7 +782,6 @@ private fun TeamUsageHeader(
     val accents = AppAccents.current
 
     DepthSurface(
-        accent = accents.cacheRead,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.large,
         elevation = AppElevation.dialog,
@@ -978,12 +975,10 @@ private fun TeamMemberRow(
     val accent = if (member.hasActivity) accents.cacheRead else MaterialTheme.colorScheme.outline
 
     DepthSurface(
-        accent = accent,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = member.hasActivity, onClick = onToggle)
             .testTag("$TEAM_MEMBER_ROW_TAG_PREFIX${member.deviceId}"),
-        glowAlpha = AppGlow.row,
         contentPadding = 0.dp
     ) {
         FlowRow(

@@ -12,7 +12,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fases A e B concluídas — protótipo aprovado, pronto para a Fase C`
+**Estado atual:** `Fases A, B e C concluídas — fundação no lugar, pronto para a Fase D`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
@@ -34,16 +34,20 @@ e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b
 
 ### ▶ Próxima atividade
 
-**Fase C, commit C1** — `chore(assets): add IBM Plex Mono and Sans with the OFL license`.
+**Fase D, commit D1** — `test(ui): anchor dashboard assertions on test tags`.
 
-Criar a branch `visual/c-foundation` a partir da integração e adicionar em
-`src/desktopMain/resources/fonts/` os seis TTFs oficiais da IBM Plex
-(`IBMPlexMono-{Regular,Medium,SemiBold}`, `IBMPlexSans-{Regular,Medium,SemiBold}`) mais o `OFL.txt`.
-Só assets neste commit — nenhum Kotlin.
+Criar a branch `visual/d-dashboard` a partir da integração e mover para `testTag` os asserts de
+texto de `ComponentTest.kt` e `FooterBarTest.kt`, acrescentando as tags em `ApiUsageCard.kt` e
+`FooterBar.kt`. Comportamento inalterado, suíte verde antes e depois — **nenhum pixel muda neste
+commit**. Só depois vêm D2–D5.
 
-Em seguida C2 (paleta) e **C3, que carrega o bloqueio a resolver**: confirmar a assinatura da API de
-carregamento de fonte no Compose Desktop 1.7.1 antes de escrever a `Typography`. A métrica da fonte
-define toda a densidade; nenhuma tela muda de aparência antes disso fechar.
+O que a Fase C deixou pronto para a Fase D consumir: `AppDataSurfaceFlush` + `AppSectionHeader`
+(com marcador de 2dp) para o card, `AppDataRow` + `AppProgressTrack` + `AppStatusIndicator` para as
+cotas, `AppStatusBar` para o rodapé e `AppIconButton` para as ações.
+
+**Ponto de atenção herdado:** o brilho de acento do dashboard **não** saiu em C8. `ApiUsageCard`
+desenha o gradiente inline, sem passar por `DepthSurface` — é o que a captura de fim da Fase C ainda
+mostra nos cards do Codex e do DeepSeek. Removê-lo é trabalho de D3.
 
 ### Progresso por fase
 
@@ -51,7 +55,7 @@ define toda a densidade; nenhuma tela muda de aparência antes disso fechar.
 |---|---|---|---|---|
 | A — Protótipo | — | ✅ aprovado | 1/1 | 2026-08-18 |
 | B — Isolamento | — | ✅ concluída | 1/1 | 2026-08-18 |
-| C — Fundação | `visual/c-foundation` | ⬜ pendente | 0/8 | — |
+| C — Fundação | `visual/c-foundation` | ✅ concluída | 8/8 | 2026-08-18 |
 | D — Dashboard | `visual/d-dashboard` | ⬜ pendente | 0/5 | — |
 | E — Histórico | `visual/e-history` | ⬜ pendente | 0/4 | — |
 | F — Sessões CLI | `visual/f-cli-sessions` | ⬜ pendente | 0/5 | — |
@@ -71,8 +75,21 @@ Uma linha por commit, em ordem cronológica.
 
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
+| 2026-08-18 | C8 | `refactor(ui): replace the DepthSurface glow with bordered surfaces` | `allTests` — 1084 testes, 0 falhas, 0 ignorados; capturas geradas |
+| 2026-08-18 | C7 | `feat(ui): add state primitives` | `ui.*` — verde |
+| 2026-08-18 | C6 | `feat(ui): add control primitives` | `ui.*` — verde |
+| 2026-08-18 | C5 | `feat(ui): add structural primitives` | `ui.*` — verde |
+| 2026-08-18 | C4 | `feat(theme): tighten radius, elevation, spacing and motion tokens` | `ui.*` — verde |
+| 2026-08-18 | C3 | `feat(theme): load IBM Plex and rebuild the type scale` | `ui.*` — verde após ampliar a cena de cinco testes de resumo |
+| 2026-08-18 | C2 | `feat(theme): replace the color scheme with a neutral palette` | `ui.*` + `AppAccentsContrastTest` — verde |
+| 2026-08-18 | C1 | `chore(assets): add IBM Plex Mono and Sans with the OFL license` | `ui.*` — 199 testes, 0 falhas |
 | 2026-08-18 | B | `docs(plan): add the visual refactor execution plan` | `allTests` — 1068 testes, 0 falhas, 0 ignorados |
 | 2026-08-18 | A | `docs(plan): add the approved visual prototype` | n/a — documento |
+
+**Contagem de testes: 1068 → 1084.** As dezesseis linhas novas são os testes das primitivas
+(`AppStructureTest`, `AppControlsTest`, `AppStatesTest`), acrescentados junto de C5, C6 e C7. O plano
+não os previa; primitiva consumida por oito suítes sem teste próprio faz um defeito nela aparecer em
+oito lugares com a causa ambígua.
 
 **Linha de base — `allTests` no worktree limpo em `2947b4d`, antes de qualquer edição:
 1068 testes, 0 falhas, 0 ignorados, 3m28s.** Toda falha posterior é comparada contra este número;
@@ -92,12 +109,19 @@ motivo.
 | 2026-08-18 | `git branch --unset-upstream` na branch de integração | O `git worktree add -b ... origin/main` deixa a branch nova **rastreando `origin/main`**; um `git push` sem argumento iria para a `main` do remoto. Sem upstream, o push exige destino explícito |
 | 2026-08-18 | O script `commit_and_push.ps1` **não é usado** nesta iniciativa | Ele grava a identidade temporária com `git config --local`, e num worktree o `.git` é um arquivo: o comando falha com `could not lock config file .git/config`. Os commits usam `git -c user.name=claude -c user.email=claude@anthropic.com commit`, que não altera configuração nenhuma e por isso dispensa a restauração que o `finally` do script existe para garantir |
 | 2026-08-18 | Protótipo **versionado no repositório**, contra o que este plano previa ("fora do repositório") | A regra existia para impedir código Compose antes da aprovação, e isso já aconteceu. Aprovado, ele virou a especificação visual, e especificação que vive só no scratchpad de uma sessão não sobrevive à sessão seguinte |
+| 2026-08-18 | TTFs vindos dos **releases do GitHub** (`ibm-plex-mono.zip` @2.5.0, `ibm-plex-sans.zip` @1.1.0), não do npm | Os pacotes `@ibm/plex-*` atuais só publicam `woff`/`woff2`, que o Skia não carrega do classpath. O `LICENSE.txt` é byte-idêntico nas duas famílias, daí um `OFL.txt` só |
+| 2026-08-18 | Fonte carregada por `Font(resource: String, …)`, a sobrecarga de classpath | Bloqueio C3 resolvido por inspeção do `ui-text-desktop-1.7.1.jar`: as duas sobrecargas existem. A de `java.io.File` não serve — o jpackage não deixa TTF solto no disco para um caminho absoluto apontar |
+| 2026-08-18 | `AppAccentsContrastTest` continua medindo contra `surface`, agora `#1B1818` / `#FFFCFC` | Medir contra `surfaceVariant` seria o pior caso aritmético, mas contra o claro `cacheRead` e `opencode` caem a 4,30:1, e corrigir isso exigiria mexer nos acentos que o protótipo congela. A regra do teste não mudou; mudaram os dois valores |
+| 2026-08-18 | Cinco testes do resumo passaram a pedir cena de 1.600px | Quem limita o que o `LazyColumn` compõe é a **cena** do teste (1024 × 768 por padrão), não o `Box` interno. A Plex é mais larga que a fonte de sistema anterior, os rótulos quebram em mais linhas e o último item da página caía fora: os asserts falhavam por viewport, não por comportamento |
+| 2026-08-18 | Testes próprios para as dezessete primitivas, que o plano não previa | Defeito em primitiva consumida por oito suítes aparece em oito lugares de uma vez. Foi assim que o sublinhado de `AppTabs` — um `Box(fillMaxWidth)` que esticava a aba inteira e engolia os cliques das vizinhas — apareceu em C5, antes de qualquer tela usá-lo |
+| 2026-08-18 | `DepthSurface` **perdeu** `accent` e `glowAlpha` em C8, e a cor da fonte fica ausente até a fase da tela | Manter o parâmetro só para pintar um marcador em toda superfície poria cor onde o protótipo não põe — inclusive nos blocos internos do detalhe de sessão. O marcador entra no lugar certo (o cabeçalho) quando cada tela migrar para `AppSectionHeader` |
 
 ### Bloqueios e riscos abertos
 
 | Item | Fase | Estado |
 |---|---|---|
-| Assinatura exata da API de carregamento de fonte no Compose Desktop 1.7.1 | C3 | 🔎 a verificar antes do commit |
+| Assinatura exata da API de carregamento de fonte no Compose Desktop 1.7.1 | C3 | ✅ resolvido — `Font(resource: String, weight, style)` existe |
+| Brilho de acento inline em `ApiUsageCard`, fora do alcance de C8 | D3 | 🔎 a remover na fase do dashboard |
 | `.icns` não verificável em Windows — só no job `build-macos` do release | J2 | ⚠ risco aceito |
 | Embutir Plex no PDFBox recalcula `getStringWidth` de todas as colunas | K1 | ⚠ risco conhecido, commit isolado |
 

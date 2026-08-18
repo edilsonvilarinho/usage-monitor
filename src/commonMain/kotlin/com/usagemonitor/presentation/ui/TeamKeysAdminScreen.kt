@@ -267,11 +267,6 @@ private fun TeamKeyCard(
     val clipboard = LocalClipboardManager.current
 
     DepthSurface(
-        accent = if (entry.isRevoked) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.primary
-        },
         modifier = Modifier.fillMaxWidth().testTag("$TEAM_KEYS_ROW_TAG_PREFIX${entry.id}"),
         shape = AppShapes.large,
         elevation = AppElevation.card,

@@ -88,26 +88,6 @@ object AppSpacing {
 }
 
 /**
- * Intensidade do brilho de acento de `DepthSurface`.
- *
- * Nomeia os três patamares que a app já usava de fato, espalhados como floats
- * soltos em cada chamada. Faltar um nome custou caro: a linha da tela de presença
- * simplesmente não passava o parâmetro e herdava [card], calibrado para os cards
- * do dashboard — onde a cor identifica a API e cada card tem respiro. Numa linha
- * de lista o mesmo valor lava o texto de cor.
- */
-object AppGlow {
-    /** Blocos de detalhe: a cor fica no dado, não no fundo. */
-    const val quiet: Float = 0.06f
-
-    /** Linha de lista: o acento orienta a varredura sem competir com o texto. */
-    const val row: Float = 0.16f
-
-    /** Card de dashboard, onde a cor é a identidade da fonte. */
-    const val card: Float = 0.22f
-}
-
-/**
  * Raios: 4 · 6 · 8 · 10, e o teto é 10.
  *
  * A escala anterior ia de 10 a 28dp e transformava quase toda superfície num
