@@ -55,6 +55,18 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class CliSessionsScreenTest {
 
+    /**
+     * A aba de resumo empilha totais, ritmo e a lista do eixo numa coluna só, e
+     * quem limita o que o `LazyColumn` compõe é a **cena** do teste — 1024 × 768
+     * por padrão —, não o `Box` interno. Com a IBM Plex, mais larga que a fonte
+     * de sistema que a app usava antes, os rótulos ocupam mais linhas e o último
+     * item da página cai fora: o assert falharia por viewport, não por
+     * comportamento.
+     */
+    private companion object {
+        const val BREAKDOWN_SCENE_HEIGHT = 1_600
+    }
+
     @Test
     fun `list shows session count total tokens and total cost`() = runDesktopComposeUiTest {
         setContent {
@@ -1067,7 +1079,7 @@ class CliSessionsScreenTest {
     }
 
     @Test
-    fun `the breakdown tab ranks projects by cost and declares the axes`() = runDesktopComposeUiTest {
+    fun `the breakdown tab ranks projects by cost and declares the axes`() = runDesktopComposeUiTest(height = BREAKDOWN_SCENE_HEIGHT) {
         val breakdown = listOf(
             groupRow("s1", "/workspace/alpha", inputTokens = 3_000_000L),
             groupRow("s2", "/workspace/beta", inputTokens = 1_000_000L)
@@ -1075,7 +1087,8 @@ class CliSessionsScreenTest {
 
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                // Mesma razão de `renderBreakdown`: a coluna do resumo é alta.
+                Box(modifier = Modifier.width(900.dp).height(1_500.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary("session-abcdef01")),
@@ -1104,7 +1117,7 @@ class CliSessionsScreenTest {
     }
 
     @Test
-    fun `o filtro do resumo estreita a lista do eixo`() = runDesktopComposeUiTest {
+    fun `o filtro do resumo estreita a lista do eixo`() = runDesktopComposeUiTest(height = BREAKDOWN_SCENE_HEIGHT) {
         val breakdown = listOf(
             groupRow("s1", "/workspace/alpha", inputTokens = 3_000_000L),
             groupRow("s2", "/workspace/beta", inputTokens = 1_000_000L)
@@ -1120,7 +1133,7 @@ class CliSessionsScreenTest {
 
     /** Issue #58: em produção a lista de projetos exigia rolagem sem fim. */
     @Test
-    fun `o resumo pagina o eixo e caminha entre as paginas`() = runDesktopComposeUiTest {
+    fun `o resumo pagina o eixo e caminha entre as paginas`() = runDesktopComposeUiTest(height = BREAKDOWN_SCENE_HEIGHT) {
         val breakdown = (1..8).map { index ->
             groupRow("s$index", "/workspace/proj$index", inputTokens = index * 1_000_000L)
         }.toUsageBreakdown()
@@ -1138,7 +1151,7 @@ class CliSessionsScreenTest {
     }
 
     @Test
-    fun `ordenar por nome reordena o eixo`() = runDesktopComposeUiTest {
+    fun `ordenar por nome reordena o eixo`() = runDesktopComposeUiTest(height = BREAKDOWN_SCENE_HEIGHT) {
         val breakdown = listOf(
             groupRow("s1", "/workspace/zulu", inputTokens = 3_000_000L),
             groupRow("s2", "/workspace/alpha", inputTokens = 1_000_000L)
@@ -1182,7 +1195,9 @@ class CliSessionsScreenTest {
     ) {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(900.dp).height(1_100.dp)) {
+                // Acompanha [BREAKDOWN_SCENE_HEIGHT]: o `Box` não pode ser o
+                // limite mais apertado, ou a cena maior não serviria de nada.
+                Box(modifier = Modifier.width(900.dp).height(1_500.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary("session-abcdef01")),
@@ -1318,10 +1333,10 @@ class CliSessionsScreenTest {
      * créditos numa conta em BRL daria um número inventado.
      */
     @Test
-    fun `the budget card keeps the account currency apart`() = runDesktopComposeUiTest {
+    fun `the budget card keeps the account currency apart`() = runDesktopComposeUiTest(height = BREAKDOWN_SCENE_HEIGHT) {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                Box(modifier = Modifier.width(900.dp).height(1_500.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary("session-abcdef01")),

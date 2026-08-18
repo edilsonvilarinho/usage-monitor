@@ -71,42 +71,124 @@ private val appShapes = Shapes(
     extraLarge = AppShapes.extraLarge
 )
 
-private val appTypography = Typography(
-    titleLarge = TextStyle(
+/**
+ * Escala tipográfica: 10 · 12 · 14 · 16 · 20 · 28.
+ *
+ * A divisão entre as duas famílias segue o papel do texto, não o tamanho.
+ * `label*`, `title*`, `headline*` e `display*` são [AppFontFamilies.mono] —
+ * rótulo, número, cabeçalho de coluna e título de painel, onde a largura fixa do
+ * dígito é o que alinha a coluna. `body*` é [AppFontFamilies.sans], porque é
+ * onde mora o texto corrido: descrição de opção, glossário, mensagem de estado.
+ *
+ * Sem itálico e sem peso 700: a família carrega 400, 500 e 600, e pedir um peso
+ * ausente faz o Skia sintetizar o traço, que numa monoespaçada borra o alinhamento
+ * vertical das colunas.
+ */
+private fun appTypography(fonts: AppFontFamilies) = Typography(
+    displayLarge = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 28.sp,
+        lineHeight    = 34.sp,
+        letterSpacing = (-0.5).sp
+    ),
+    displayMedium = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 28.sp,
+        lineHeight    = 34.sp,
+        letterSpacing = (-0.5).sp
+    ),
+    displaySmall = TextStyle(
+        fontFamily    = fonts.mono,
         fontWeight    = FontWeight.SemiBold,
         fontSize      = 20.sp,
-        lineHeight    = 28.sp,
-        letterSpacing = (-0.25).sp
+        lineHeight    = 26.sp,
+        letterSpacing = (-0.2).sp
+    ),
+    headlineLarge = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 28.sp,
+        lineHeight    = 34.sp,
+        letterSpacing = (-0.5).sp
+    ),
+    headlineMedium = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 20.sp,
+        lineHeight    = 26.sp,
+        letterSpacing = (-0.2).sp
+    ),
+    headlineSmall = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 16.sp,
+        lineHeight    = 22.sp,
+        letterSpacing = (-0.1).sp
+    ),
+    titleLarge = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 20.sp,
+        lineHeight    = 26.sp,
+        letterSpacing = (-0.2).sp
     ),
     titleMedium = TextStyle(
+        fontFamily    = fonts.mono,
         fontWeight    = FontWeight.Medium,
         fontSize      = 16.sp,
-        lineHeight    = 24.sp,
-        letterSpacing = (-0.15).sp
+        lineHeight    = 22.sp,
+        letterSpacing = (-0.1).sp
+    ),
+    titleSmall = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.SemiBold,
+        fontSize      = 12.sp,
+        lineHeight    = 16.sp,
+        letterSpacing = 0.2.sp
+    ),
+    bodyLarge = TextStyle(
+        fontFamily    = fonts.sans,
+        fontWeight    = FontWeight.Normal,
+        fontSize      = 14.sp,
+        lineHeight    = 20.sp,
+        letterSpacing = 0.sp
     ),
     bodyMedium = TextStyle(
+        fontFamily    = fonts.sans,
         fontWeight    = FontWeight.Normal,
         fontSize      = 14.sp,
         lineHeight    = 20.sp,
         letterSpacing = 0.sp
     ),
     bodySmall = TextStyle(
+        fontFamily    = fonts.sans,
+        fontWeight    = FontWeight.Normal,
+        fontSize      = 12.sp,
+        lineHeight    = 17.sp,
+        letterSpacing = 0.sp
+    ),
+    labelLarge = TextStyle(
+        fontFamily    = fonts.mono,
+        fontWeight    = FontWeight.Medium,
+        fontSize      = 12.sp,
+        lineHeight    = 16.sp,
+        letterSpacing = 0.sp
+    ),
+    labelMedium = TextStyle(
+        fontFamily    = fonts.mono,
         fontWeight    = FontWeight.Normal,
         fontSize      = 12.sp,
         lineHeight    = 16.sp,
-        letterSpacing = 0.1.sp
-    ),
-    labelMedium = TextStyle(
-        fontWeight    = FontWeight.Medium,
-        fontSize      = 12.sp,
-        lineHeight    = 16.sp,
-        letterSpacing = 0.4.sp
+        letterSpacing = 0.sp
     ),
     labelSmall = TextStyle(
+        fontFamily    = fonts.mono,
         fontWeight    = FontWeight.Medium,
         fontSize      = 10.sp,
         lineHeight    = 14.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.7.sp
     )
 )
 
@@ -221,6 +303,8 @@ private val usageMonitorLightColorScheme = lightColorScheme(
     inverseOnSurface        = AppSurfaces.lightSurface
 )
 
+private val rememberedTypography by lazy { appTypography(appFontFamilies) }
+
 /**
  * Tema principal da aplicação.
  *
@@ -240,11 +324,14 @@ fun AppTheme(
         usageMonitorLightColorScheme
     }
     val accents = if (isDark) darkAppAccents else lightAppAccents
+    // A escala é montada uma vez por processo: as famílias não mudam com o tema,
+    // e reconstruir catorze `TextStyle` a cada troca seria trabalho sem efeito.
+    val typography = rememberedTypography
 
     MaterialTheme(
         colorScheme = colorScheme,
         shapes      = appShapes,
-        typography  = appTypography
+        typography  = typography
     ) {
         val scrollbarStyle = LocalScrollbarStyle.current.copy(
             unhoverColor = colorScheme.onSurface.copy(alpha = 0.24f),
