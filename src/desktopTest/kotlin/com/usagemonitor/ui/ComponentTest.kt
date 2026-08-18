@@ -115,6 +115,16 @@ private val ACTIVE_TEAM_SETTINGS = TeamIntegrationSettings(
 @OptIn(ExperimentalTestApi::class)
 class ComponentTest {
 
+    /**
+     * A tela de Histórico virou tabela: cada métrica ocupa uma linha de rótulo e
+     * valor em vez de um bloco de duas linhas espremido num `FlowRow`, e a coluna
+     * ficou mais alta que os 768px da cena padrão. Os asserts falhavam por
+     * viewport — o nó existe, só está abaixo do corte.
+     */
+    private companion object {
+        const val HISTORY_SCENE_HEIGHT = 1_600
+    }
+
     // ── UsageArcChart ────────────────────────────────────────────────────
 
     @Test
@@ -1762,7 +1772,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen renders one OpenCode chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest {
+    fun `HistoryScreen renders one OpenCode chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.OPENCODE,
             range = HistoryRange.LAST_24_HOURS,
@@ -1895,7 +1905,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen renders one Kilo chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest {
+    fun `HistoryScreen renders one Kilo chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.KILO,
             range = HistoryRange.LAST_24_HOURS,
@@ -2041,7 +2051,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen renders one Claude chart instead of separate 5h and 7d cards`() = runDesktopComposeUiTest {
+    fun `HistoryScreen renders one Claude chart instead of separate 5h and 7d cards`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.ANTHROPIC,
             range = HistoryRange.LAST_24_HOURS,
@@ -2246,7 +2256,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen renders reported Codex series without inferred metrics`() = runDesktopComposeUiTest {
+    fun `HistoryScreen renders reported Codex series without inferred metrics`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.CODEX,
             range = HistoryRange.LAST_24_HOURS,
@@ -2355,7 +2365,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen keeps reported Codex series separate from legacy series`() = runDesktopComposeUiTest {
+    fun `HistoryScreen keeps reported Codex series separate from legacy series`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.CODEX,
             range = HistoryRange.LAST_24_HOURS,
@@ -2454,7 +2464,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen renders DeepSeek-specific balance summary`() = runDesktopComposeUiTest {
+    fun `HistoryScreen renders DeepSeek-specific balance summary`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.DEEPSEEK,
             range = HistoryRange.LAST_24_HOURS,
@@ -2553,7 +2563,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `HistoryScreen renders MiniMax request metrics as counts instead of rounded percentage`() = runDesktopComposeUiTest {
+    fun `HistoryScreen renders MiniMax request metrics as counts instead of rounded percentage`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.MINIMAX,
             range = HistoryRange.LAST_30_DAYS,

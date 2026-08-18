@@ -65,7 +65,9 @@ private const val HISTORY_PLOT_HORIZONTAL_INSET_PX = 14f
 private val HISTORY_PLOT_HEIGHT = 120.dp
 private val HISTORY_TOOLTIP_BAND_HEIGHT = 48.dp
 private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HEIGHT
-private val HISTORY_ANNOTATION_LABEL_WIDTH = 64.dp
+// 64dp cabia "Reinício" na fonte de sistema anterior; a IBM Plex Mono é mais
+// larga e a palavra passou a quebrar letra a letra dentro do emblema.
+private val HISTORY_ANNOTATION_LABEL_WIDTH = 84.dp
 private const val HISTORY_RESET_CLUSTER_GAP_PX = 24f
 private const val HISTORY_MIN_ZOOM_WIDTH_FRACTION = 0.05f
 private const val HISTORY_ZOOM_STEP_FACTOR = 0.85f
@@ -517,9 +519,9 @@ private fun HistoryAnnotationLabel(
                     y = topPadding.roundToPx()
                 )
             },
-        shape = AppShapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-        tonalElevation = 1.dp
+        shape = AppShapes.extraSmall,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Text(
             modifier = Modifier
@@ -528,7 +530,8 @@ private fun HistoryAnnotationLabel(
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }
