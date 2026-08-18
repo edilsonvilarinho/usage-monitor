@@ -102,9 +102,12 @@ private val TEAM_COLUMN_SHARE = 96.dp
 private val TEAM_COLUMN_STATUS = 112.dp
 
 // A linha do integrante mora dentro de um `DepthSurface`, e a faixa da conta
-// não. Sem repetir aqui o `contentPadding` dele, as colunas da faixa nasceriam
-// deslocadas das colunas de baixo.
-private val TEAM_ROW_CONTENT_PADDING = 14.dp
+// não. O padding horizontal compartilhado mantém as colunas no mesmo x; os
+// paddings verticais são diferentes de propósito para destacar a hierarquia.
+private val TEAM_ROW_HORIZONTAL_PADDING = 14.dp
+private val TEAM_ACCOUNT_VERTICAL_PADDING = 10.dp
+private val TEAM_MEMBER_VERTICAL_PADDING = 10.dp
+private val TEAM_MEMBER_WRAPPED_ROW_GAP = 4.dp
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -642,9 +645,11 @@ private fun TeamAccountGroupHeader(
     FlowRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp)
             .clickable(onClick = onToggle)
-            .padding(horizontal = TEAM_ROW_CONTENT_PADDING)
+            .padding(
+                horizontal = TEAM_ROW_HORIZONTAL_PADDING,
+                vertical = TEAM_ACCOUNT_VERTICAL_PADDING
+            )
             .testTag("$TEAM_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -979,12 +984,17 @@ private fun TeamMemberRow(
             .clickable(enabled = member.hasActivity, onClick = onToggle)
             .testTag("$TEAM_MEMBER_ROW_TAG_PREFIX${member.deviceId}"),
         glowAlpha = AppGlow.row,
-        contentPadding = 14.dp
+        contentPadding = 0.dp
     ) {
         FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = TEAM_ROW_HORIZONTAL_PADDING,
+                    vertical = TEAM_MEMBER_VERTICAL_PADDING
+                ),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(TEAM_MEMBER_WRAPPED_ROW_GAP)
         ) {
             Row(
                 modifier = Modifier.width(TEAM_COLUMN_IDENTITY),

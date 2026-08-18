@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -1080,6 +1081,33 @@ class TeamUsageScreenTest {
             accountLabel = accountLabel
         )
     }
+
+    @Test
+    fun `faixa da conta cresce e linha do integrante fica compacta em 960dp`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = listOf(
+                        member(
+                            "device-1",
+                            "edilson",
+                            "DESKTOP-A1",
+                            listOf(session("abcdef0123", tokens = 500L)),
+                            accountKey = "account-a",
+                            accountLabel = "fulano@empresa.com"
+                        )
+                    ),
+                    expandedAccountKeys = setOf("account-a"),
+                    isAdminOverview = true
+                ),
+                width = 960.dp
+            )
+
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
+                .assertHeightIsEqualTo(57.dp)
+            onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
+                .assertHeightIsEqualTo(109.dp)
+        }
 
     @Test
     fun `visao global agrupa por conta e mostra o uuid ao lado do rotulo`() =
