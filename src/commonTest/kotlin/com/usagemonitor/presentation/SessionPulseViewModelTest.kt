@@ -346,10 +346,6 @@ private class FakePulseTeamRepository(
         return Result.success(null)
     }
 
-    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
-        return Result.success(Unit)
-    }
-
     override suspend fun touchPresence(
         accountKey: String,
         member: TeamMemberIdentity

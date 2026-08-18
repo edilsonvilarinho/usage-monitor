@@ -164,6 +164,11 @@ export interface DeleteMemberReport {
   deletedMembers: number;
 }
 
+export interface DeleteSessionReport {
+  deletedTurns: number;
+  deletedSessions: number;
+}
+
 /**
  * Mesmo recibo da remocao de integrante, agora para a conta inteira.
  *
@@ -482,6 +487,30 @@ DELETE FROM team_members WHERE account_key = @accountKey AND device_id = @device
 `;
 
 /**
+ * Apaga somente os turnos da sessao que ainda pertence ao device informado.
+ *
+ * O subselect impede um identificador de maquina obsoleto de apagar uma sessao
+ * que foi associada a outra maquina pelo ingest mais recente.
+ */
+const DELETE_SESSION_TURNS_SQL = `
+DELETE FROM team_turns
+ WHERE account_key = @accountKey
+   AND session_id IN (
+     SELECT session_id FROM team_sessions
+      WHERE account_key = @accountKey
+        AND device_id = @deviceId
+        AND session_id = @sessionId
+   )
+`;
+
+const DELETE_SESSION_SQL = `
+DELETE FROM team_sessions
+ WHERE account_key = @accountKey
+   AND device_id = @deviceId
+   AND session_id = @sessionId
+`;
+
+/**
  * Os mesmos tres deletes, sem o recorte por maquina.
  *
  * Aqui os turnos nao precisam do subselect sobre `team_sessions`: sem filtro de
@@ -609,6 +638,23 @@ export class TeamRepository {
       const deletedSessions = this.db.prepare(DELETE_MEMBER_SESSIONS_SQL).run(params).changes;
       const deletedMembers = this.db.prepare(DELETE_MEMBER_SQL).run(params).changes;
       return { deletedTurns, deletedSessions, deletedMembers };
+    });
+
+    return run();
+  }
+
+  /**
+   * Remove uma sessao e os turnos dela, preservando o integrante e as demais
+   * sessoes. Idempotente e irreversivel: o cliente de origem ja marcou os
+   * turnos antigos como enviados e so atividade futura pode recriar a sessao.
+   */
+  deleteSession(accountKey: string, deviceId: string, sessionId: string): DeleteSessionReport {
+    const params = { accountKey, deviceId, sessionId };
+
+    const run = this.db.transaction((): DeleteSessionReport => {
+      const deletedTurns = this.db.prepare(DELETE_SESSION_TURNS_SQL).run(params).changes;
+      const deletedSessions = this.db.prepare(DELETE_SESSION_SQL).run(params).changes;
+      return { deletedTurns, deletedSessions };
     });
 
     return run();

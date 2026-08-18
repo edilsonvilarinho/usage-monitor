@@ -3,6 +3,7 @@ import request from 'supertest';
 import {
   ACCOUNT_A,
   ACCOUNT_B,
+  TEST_ADMIN_TOKEN,
   TEST_TEAM_KEY,
   createHarness,
   makePayload,
@@ -286,7 +287,7 @@ describe('GET /api/v1/team', () => {
   });
 });
 
-describe('DELETE /api/v1/member', () => {
+describe('DELETE /api/v1/member administrativo', () => {
   let harness: Harness;
 
   beforeEach(() => {
@@ -304,7 +305,7 @@ describe('DELETE /api/v1/member', () => {
   function del(query: Record<string, unknown>) {
     return request(harness.app)
       .delete('/api/v1/member')
-      .set('x-team-key', TEST_TEAM_KEY)
+      .set('x-admin-token', TEST_ADMIN_TOKEN)
       .query(query);
   }
 
@@ -371,11 +372,27 @@ describe('DELETE /api/v1/member', () => {
     expect(response.body.code).toBe('validation_error');
   });
 
-  it('exige a chave do time', async () => {
+  it('exige o token de administracao', async () => {
     const response = await request(harness.app)
       .delete('/api/v1/member')
       .query({ accountKey: ACCOUNT_A, deviceId: 'device-1' });
 
     expect(response.status).toBe(401);
+  });
+
+  it('recusa a chave do time mesmo quando ela e dona da conta', async () => {
+    await post(makePayload());
+
+    const response = await request(harness.app)
+      .delete('/api/v1/member')
+      .set('x-team-key', TEST_TEAM_KEY)
+      .query({ accountKey: ACCOUNT_A, deviceId: 'device-1' });
+
+    expect(response.status).toBe(401);
+    const remaining = await request(harness.app)
+      .get('/api/v1/team')
+      .set('x-team-key', TEST_TEAM_KEY)
+      .query({ accountKey: ACCOUNT_A });
+    expect(remaining.body.members).toHaveLength(1);
   });
 });

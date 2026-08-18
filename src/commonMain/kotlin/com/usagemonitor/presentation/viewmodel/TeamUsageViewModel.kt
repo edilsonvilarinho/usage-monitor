@@ -16,7 +16,7 @@ import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
-import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamSessionUseCase
 import com.usagemonitor.presentation.ui.report.reportForTeam
 import com.usagemonitor.presentation.ui.reportRequest
 import kotlinx.coroutines.CoroutineDispatcher
@@ -54,7 +54,6 @@ private const val SESSION_GONE_MESSAGE =
  */
 class TeamUsageViewModel(
     private val getTeamUsage: GetTeamUsageUseCase,
-    private val removeTeamMember: RemoveTeamMemberUseCase,
     private val getTeamSessionDetail: GetTeamSessionDetailUseCase,
     /**
      * Leitura de todas as contas, para o administrador.
@@ -65,6 +64,8 @@ class TeamUsageViewModel(
     private val getAdminOverview: GetAdminTeamOverviewUseCase? = null,
     /** Remoção global com token de admin; não pode reutilizar a chave de time. */
     private val removeAdminTeamMember: RemoveAdminTeamMemberUseCase? = null,
+    /** Exclusão de sessão também exclusiva do token administrativo. */
+    private val removeAdminTeamSession: RemoveAdminTeamSessionUseCase? = null,
     /**
      * Tendência diária. `null` esconde o gráfico — instalação sem ele continua
      * funcionando, mesmo tratamento dos demais recursos opcionais do time.
@@ -103,6 +104,9 @@ class TeamUsageViewModel(
      */
     private val _removalError = MutableStateFlow<String?>(null)
     val removalError: StateFlow<String?> = _removalError.asStateFlow()
+
+    private val _sessionRemovalError = MutableStateFlow<String?>(null)
+    val sessionRemovalError: StateFlow<String?> = _sessionRemovalError.asStateFlow()
 
     private var range: CliSessionRange = CliSessionRange.DEFAULT
     private var quotaWindows: CliQuotaWindows = CliQuotaWindows()
@@ -144,7 +148,7 @@ class TeamUsageViewModel(
      * instalação não tem administração.
      */
     fun openForAllAccounts() {
-        if (getAdminOverview == null || removeAdminTeamMember == null) {
+        if (getAdminOverview == null) {
             return
         }
 
@@ -292,18 +296,15 @@ class TeamUsageViewModel(
      * a lista fica intacta — não dá para mostrar como removido o que continua lá.
      */
     fun removeMember(memberKey: String) {
+        if (!adminOverview) {
+            return
+        }
+        val remover = removeAdminTeamMember ?: return
         val member = findMember(memberKey) ?: return
-        // Na visão global a conta é a do integrante, não a da janela: usar a da
-        // janela apagaria o histórico da conta errada.
-        val targetAccountKey = member.accountKey ?: accountKey ?: return
+        val targetAccountKey = member.accountKey ?: return
 
         viewModelScope.launch {
-            val result = if (adminOverview) {
-                val adminRemover = removeAdminTeamMember ?: return@launch
-                adminRemover(accountKey = targetAccountKey, deviceId = member.deviceId)
-            } else {
-                removeTeamMember(accountKey = targetAccountKey, deviceId = member.deviceId)
-            }
+            val result = remover(accountKey = targetAccountKey, deviceId = member.deviceId)
             val error = result.exceptionOrNull()
             if (error != null) {
                 _removalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
@@ -316,6 +317,43 @@ class TeamUsageViewModel(
 
     fun clearRemovalError() {
         _removalError.value = null
+    }
+
+    /**
+     * Apaga uma sessão somente na visão global administrativa.
+     *
+     * A sessão precisa continuar pertencendo ao integrante exibido. O servidor
+     * repete essa validação e executa a remoção em transação.
+     */
+    fun removeSession(memberKey: String, sessionId: String) {
+        if (!adminOverview) {
+            return
+        }
+        val remover = removeAdminTeamSession ?: return
+        val member = findMember(memberKey) ?: return
+        val targetAccountKey = member.accountKey ?: return
+        if (member.sessions.none { session -> session.sessionId == sessionId }) {
+            return
+        }
+
+        viewModelScope.launch {
+            val result = remover(
+                accountKey = targetAccountKey,
+                deviceId = member.deviceId,
+                sessionId = sessionId
+            )
+            val error = result.exceptionOrNull()
+            if (error != null) {
+                _sessionRemovalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
+                return@launch
+            }
+            _sessionRemovalError.value = null
+            loadTeam()
+        }
+    }
+
+    fun clearSessionRemovalError() {
+        _sessionRemovalError.value = null
     }
 
     /**

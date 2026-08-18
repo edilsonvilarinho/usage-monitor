@@ -18,7 +18,7 @@ import com.usagemonitor.domain.repository.TeamUsageTrendData
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
-import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -113,14 +113,6 @@ private class FakePresenceRepository(
         return Result.success(null)
     }
 
-    val removedMembers = mutableListOf<Pair<String, String>>()
-    var removeResult: Result<Unit>? = null
-
-    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
-        removedMembers += accountKey to deviceId
-        return removeResult ?: Result.success(Unit)
-    }
-
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
 
     override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
@@ -133,10 +125,20 @@ private class FakePresenceAdminRepository(
 ) : TeamAdminRepository {
 
     val deletedAccounts = mutableListOf<String>()
+    val removedMembers = mutableListOf<Pair<String, String>>()
+    var removeResult: Result<Unit>? = null
     var deleteResult: Result<TeamAccountDeletion>? = null
 
-    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
+        removedMembers += accountKey to deviceId
+        return removeResult ?: Result.success(Unit)
+    }
+
+    override suspend fun removeSession(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<Unit> = Result.failure(UnsupportedOperationException())
 
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
         deletedAccounts += accountKey
@@ -206,7 +208,11 @@ class TeamPresenceViewModelTest {
             getAdminTeamPresence = adminRepository?.let { admin ->
                 GetAdminTeamPresenceUseCase(admin, clock = clock)
             },
-            removeTeamMember = if (canManage) RemoveTeamMemberUseCase(repository) else null,
+            removeTeamMember = if (canManage && adminRepository != null) {
+                RemoveAdminTeamMemberUseCase(adminRepository)
+            } else {
+                null
+            },
             deleteTeamAccount = if (canManage && adminRepository != null) {
                 DeleteTeamAccountUseCase(adminRepository)
             } else {
@@ -507,7 +513,7 @@ class TeamPresenceViewModelTest {
 
             // A conta é a do integrante, não a da janela: com a da janela isto
             // apagaria o histórico da conta errada.
-            assertEquals(listOf(OTHER_ACCOUNT_KEY to "device-1"), repository.removedMembers)
+            assertEquals(listOf(OTHER_ACCOUNT_KEY to "device-1"), adminRepository.removedMembers)
             assertNull(viewModel.actionError.value)
         }
     }
@@ -540,21 +546,25 @@ class TeamPresenceViewModelTest {
 
     @Test
     fun `falha ao remover vira aviso sem apagar a lista`() = runTest {
-        val repository = FakePresenceRepository(
-            TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
+        val adminRepository = FakePresenceAdminRepository(
+            accounts = listOf(
+                TeamAccountUsage(
+                    accountKey = ACCOUNT_KEY,
+                    label = "conta",
+                    snapshot = TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
+                )
+            )
         )
-        repository.removeResult = Result.failure(IllegalStateException("servidor fora do ar"))
+        adminRepository.removeResult = Result.failure(IllegalStateException("servidor fora do ar"))
 
-        withViewModel(repository, canManage = true) { viewModel ->
-            viewModel.openForAccount(ACCOUNT_KEY, "conta")
+        withViewModel(adminRepository = adminRepository, canManage = true) { viewModel ->
+            viewModel.openForAllAccounts()
             runCurrent()
 
-            // Numa janela de conta única o `memberKey` é só o `deviceId`: o
-            // carimbo da conta só existe na visão global.
-            viewModel.removeMember("device-1")
+            viewModel.removeMember("$ACCOUNT_KEY/device-1")
             runCurrent()
 
-            assertEquals(listOf(ACCOUNT_KEY to "device-1"), repository.removedMembers)
+            assertEquals(listOf(ACCOUNT_KEY to "device-1"), adminRepository.removedMembers)
             assertEquals("servidor fora do ar", viewModel.actionError.value)
             // Mostrar como removido o que continua no servidor seria mentir.
             assertEquals(
@@ -572,8 +582,9 @@ class TeamPresenceViewModelTest {
         val repository = FakePresenceRepository(
             TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
         )
+        val adminRepository = FakePresenceAdminRepository()
 
-        withViewModel(repository) { viewModel ->
+        withViewModel(repository, adminRepository, canManage = true) { viewModel ->
             viewModel.openForAccount(ACCOUNT_KEY, "conta")
             runCurrent()
 
@@ -581,7 +592,8 @@ class TeamPresenceViewModelTest {
             viewModel.deleteAccount(ACCOUNT_KEY)
             runCurrent()
 
-            assertTrue(repository.removedMembers.isEmpty())
+            assertTrue(adminRepository.removedMembers.isEmpty())
+            assertTrue(adminRepository.deletedAccounts.isEmpty())
             assertNull(viewModel.actionError.value)
         }
     }

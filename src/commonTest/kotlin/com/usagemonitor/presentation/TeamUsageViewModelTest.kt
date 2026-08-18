@@ -23,7 +23,7 @@ import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
 import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
-import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamSessionUseCase
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageView
@@ -60,12 +60,6 @@ private class FakeTeamRepository(
     var lastCutoffMillis: Long? = null
     var lastAccountKey: String? = null
     var fetchResult: Result<TeamUsageSnapshot>? = null
-    val removedDeviceIds = mutableListOf<String>()
-
-    /** Conta e máquina de cada remoção; a conta importa na visão global. */
-    val removedTargets = mutableListOf<Pair<String, String>>()
-    var removeResult: Result<Unit> = Result.success(Unit)
-
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
         return Result.success(TeamIngestReceipt())
     }
@@ -75,14 +69,6 @@ private class FakeTeamRepository(
         member: TeamMemberIdentity
     ): Result<TeamPresenceReceipt> {
         return Result.success(TeamPresenceReceipt())
-    }
-
-    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
-        if (removeResult.isSuccess) {
-            removedDeviceIds += deviceId
-            removedTargets += accountKey to deviceId
-        }
-        return removeResult
     }
 
     override suspend fun fetch(accountKey: String, cutoffMillis: Long?): Result<TeamUsageSnapshot> {
@@ -201,7 +187,7 @@ class TeamUsageViewModelTest {
     }
 
     @Test
-    fun `remover integrante apaga no servidor e recarrega a lista`() = runTest {
+    fun `modal de uma conta nao remove integrante mesmo com chamada direta`() = runTest {
         val repository = FakeTeamRepository(
             snapshot = TeamUsageSnapshot(
                 members = listOf(
@@ -210,41 +196,38 @@ class TeamUsageViewModelTest {
                 )
             )
         )
-        val viewModel = buildViewModel(repository)
+        val admin = FakeAdminOverviewRepository(emptyList())
+        val viewModel = buildViewModel(repository, adminRepository = admin)
         viewModel.openForAccount(ACCOUNT_KEY, null)
         runCurrent()
 
-        repository.snapshot = TeamUsageSnapshot(
-            members = listOf(member("device-1", "edilson", listOf(session("s1", tokens = 100L))))
-        )
         viewModel.removeMember("device-2")
         runCurrent()
 
-        assertEquals(listOf("device-2"), repository.removedDeviceIds)
-        // A lista só muda pelo que o servidor devolve depois: tirar da memória
-        // mostraria como removido quem ainda pode estar lá.
+        assertTrue(admin.removedMembers.isEmpty())
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        assertEquals(listOf("edilson"), state.members.map { it.alias })
+        assertEquals(listOf("edilson", "fantasma"), state.members.map { it.alias })
         assertEquals(null, viewModel.removalError.value)
         viewModel.onDestroy()
     }
 
     @Test
-    fun `falha ao remover vira aviso e mantem a lista`() = runTest {
-        val repository = FakeTeamRepository(
-            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson")))
+    fun `falha administrativa ao remover vira aviso e mantem a lista`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            listOf(overviewAccount(ACCOUNT_KEY, "time-a", "device-1"))
         )
-        val viewModel = buildViewModel(repository)
-        viewModel.openForAccount(ACCOUNT_KEY, null)
+        admin.removeMemberResult = Result.failure(IllegalStateException("servidor fora do ar"))
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
         runCurrent()
 
-        repository.removeResult = Result.failure(IllegalStateException("servidor fora do ar"))
-        viewModel.removeMember("device-1")
+        viewModel.removeMember("$ACCOUNT_KEY/device-1")
         runCurrent()
 
         assertEquals("servidor fora do ar", viewModel.removalError.value)
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        assertEquals(listOf("edilson"), state.members.map { it.alias })
+        assertEquals(listOf("device-1"), state.members.map { it.alias })
 
         viewModel.clearRemovalError()
         assertEquals(null, viewModel.removalError.value)
@@ -826,13 +809,15 @@ class TeamUsageViewModelTest {
     ): TeamUsageViewModel {
         return TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(repository, useCaseClock),
-            removeTeamMember = RemoveTeamMemberUseCase(repository),
             getTeamSessionDetail = GetTeamSessionDetailUseCase(repository),
             getAdminOverview = adminRepository?.let { admin ->
                 GetAdminTeamOverviewUseCase(admin, useCaseClock)
             },
             removeAdminTeamMember = adminRepository?.let { admin ->
                 RemoveAdminTeamMemberUseCase(admin)
+            },
+            removeAdminTeamSession = adminRepository?.let { admin ->
+                RemoveAdminTeamSessionUseCase(admin)
             },
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = TEAM_LIVE_INTERVAL_MILLIS,
@@ -950,7 +935,79 @@ class TeamUsageViewModelTest {
         runCurrent()
 
         assertEquals(listOf(OTHER_ACCOUNT_KEY to "device-1"), admin.removedMembers)
-        assertTrue(repository.removedTargets.isEmpty())
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `visao global exclui a sessao na conta e maquina corretas e recarrega`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            listOf(overviewAccount(ACCOUNT_KEY, "time-a", "device-1", tokens = 10))
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        admin.accounts = listOf(
+            TeamAccountUsage(
+                accountKey = ACCOUNT_KEY,
+                label = "time-a",
+                snapshot = TeamUsageSnapshot(members = listOf(member("device-1")))
+            )
+        )
+        viewModel.removeSession("$ACCOUNT_KEY/device-1", "s1")
+        runCurrent()
+
+        assertEquals(
+            listOf(Triple(ACCOUNT_KEY, "device-1", "s1")),
+            admin.removedSessions
+        )
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertTrue(state.members.single().sessions.isEmpty())
+        assertNull(viewModel.sessionRemovalError.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `modal de uma conta nao exclui sessao mesmo com chamada direta`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(
+                members = listOf(member("device-1", sessions = listOf(session("s1"))))
+            )
+        )
+        val admin = FakeAdminOverviewRepository(emptyList())
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAccount(ACCOUNT_KEY, null)
+        runCurrent()
+
+        viewModel.removeSession("device-1", "s1")
+        runCurrent()
+
+        assertTrue(admin.removedSessions.isEmpty())
+        assertEquals(1, assertIs<TeamUsageUiState.Success>(viewModel.uiState.value).sessionCount)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `falha ao excluir sessao mantem a linha e publica erro especifico`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            listOf(overviewAccount(ACCOUNT_KEY, "time-a", "device-1", tokens = 10))
+        )
+        admin.removeSessionResult = Result.failure(IllegalStateException("HTTP 500"))
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        viewModel.removeSession("$ACCOUNT_KEY/device-1", "s1")
+        runCurrent()
+
+        assertTrue(admin.removedSessions.isEmpty())
+        assertEquals("HTTP 500", viewModel.sessionRemovalError.value)
+        assertEquals(1, assertIs<TeamUsageUiState.Success>(viewModel.uiState.value).sessionCount)
+
+        viewModel.clearSessionRemovalError()
+        assertNull(viewModel.sessionRemovalError.value)
         viewModel.onDestroy()
     }
 
@@ -1016,9 +1073,12 @@ private const val OTHER_ACCOUNT_KEY = "account-uuid-bbb"
 
 /** Só o que a visão global precisa; o resto do contrato não é exercitado aqui. */
 private class FakeAdminOverviewRepository(
-    private val accounts: List<TeamAccountUsage>
+    var accounts: List<TeamAccountUsage>
 ) : TeamAdminRepository {
     val removedMembers = mutableListOf<Pair<String, String>>()
+    val removedSessions = mutableListOf<Triple<String, String, String>>()
+    var removeMemberResult: Result<Unit> = Result.success(Unit)
+    var removeSessionResult: Result<Unit> = Result.success(Unit)
 
     override suspend fun validateToken(): Result<Unit> = Result.success(Unit)
 
@@ -1043,8 +1103,21 @@ private class FakeAdminOverviewRepository(
         Result.failure(UnsupportedOperationException())
 
     override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
-        removedMembers += accountKey to deviceId
-        return Result.success(Unit)
+        if (removeMemberResult.isSuccess) {
+            removedMembers += accountKey to deviceId
+        }
+        return removeMemberResult
+    }
+
+    override suspend fun removeSession(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<Unit> {
+        if (removeSessionResult.isSuccess) {
+            removedSessions += Triple(accountKey, deviceId, sessionId)
+        }
+        return removeSessionResult
     }
 
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> =

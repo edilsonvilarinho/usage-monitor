@@ -82,16 +82,6 @@ interface TeamUsageRepository {
         sessionId: String
     ): Result<CliSessionDetail?>
 
-    /**
-     * Apaga um integrante e tudo o que ele enviou.
-     *
-     * Existe para desfazer duplicata — uma instalação que perdeu a configuração
-     * volta com outro `deviceId` e o antigo fica na lista sem atividade. É
-     * **irreversível**: aquela máquina já marcou os turnos como enviados e não
-     * os reenvia.
-     */
-    suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit>
-
     /** Valida URL e chave sem gravar nada, para o botão "Testar conexão". */
     suspend fun checkConnection(): Result<Unit>
 }

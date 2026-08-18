@@ -310,8 +310,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
             ),
             language = AppLanguage.PT,
             onSelectRange = {},
-            onToggleMember = {},
-            localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID
+            onToggleMember = {}
         )
     }
 

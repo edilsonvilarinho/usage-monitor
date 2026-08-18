@@ -83,7 +83,7 @@ Fluxo:
 
 **Uma conta pertence a no máximo uma chave**, garantido por índice único. Se a chave errada reivindicar a conta, use `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` (botão **Desvincular** no painel) para liberá-la.
 
-**Regerar** troca a chave crua mantendo os vínculos — serve para chave perdida ou vazada, e a antiga para de valer na requisição seguinte. **Revogar** tira o acesso e **não apaga** nada, e **Desvincular** também não: os dois mexem em quem pode ler, não no que já foi enviado. Apagar histórico é `DELETE /api/v1/member` (uma máquina) ou `DELETE /api/admin/v1/accounts/:accountKey` (a conta inteira).
+**Regerar** troca a chave crua mantendo os vínculos — serve para chave perdida ou vazada, e a antiga para de valer na requisição seguinte. **Revogar** tira o acesso e **não apaga** nada, e **Desvincular** também não: os dois mexem em quem pode ler, não no que já foi enviado. Apagar histórico exige o token de admin: `DELETE /api/v1/member` remove uma máquina, `DELETE /api/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId` remove uma sessão e `DELETE /api/admin/v1/accounts/:accountKey` remove a conta inteira.
 
 O `label` é PII quando você digita um e-mail nele. Ele é gravado no banco por decisão de quem administra — **nenhum e-mail vem do cliente**.
 
@@ -321,6 +321,8 @@ Sessão inexistente, de outra conta ou de outra máquina devolve `404` — a mes
 
 Remove um integrante e tudo o que ele enviou: turnos, sessões e a linha em `team_members`, numa transação.
 
+**Administrativa desde a versão 0.8.0.** Apesar de manter o endereço para compatibilidade com clientes administrativos anteriores, a rota aceita exclusivamente `x-admin-token`. `x-team-key` recebe `401`, inclusive quando a chave é dona da conta.
+
 | Query | Obrigatório | Nota |
 |---|---|---|
 | `accountKey` | sim | Conta a que o integrante pertence. |
@@ -333,6 +335,16 @@ Remove um integrante e tudo o que ele enviou: turnos, sessões e a linha em `tea
 Idempotente: um `deviceId` desconhecido devolve `200` com zeros.
 
 **Destrutivo e irreversível.** A máquina daquele `deviceId` já marcou os turnos como enviados no próprio marcador local e não os reenvia — o histórico dela não volta. A rota existe para o caso de duplicata: uma instalação que perdeu o `~/.usage-monitor/team.json` volta com outro `deviceId` e o antigo fica na lista, sem atividade, até a retenção recolhê-lo.
+
+### `DELETE /api/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId`
+
+Disponível a partir da versão **0.8.0** e protegida exclusivamente por `x-admin-token`. Apaga os turnos e depois a sessão correspondente ao trio conta/máquina/sessão, numa única transação. Preserva o integrante, as demais sessões dele e todas as outras contas.
+
+```jsonc
+{ "deletedTurns": 42, "deletedSessions": 1 }
+```
+
+Idempotente: sessão inexistente ou associada a outro `deviceId` responde `200` com zeros. A exclusão não grava tombstone. O histórico antigo não é reenviado, mas novos turnos ainda não sincronizados podem recriar a sessão com o mesmo `sessionId`.
 
 ### `GET /api/v1/verify`
 
@@ -377,6 +389,7 @@ Disponíveis a partir da versão **0.3.0**, e **só quando `TEAM_ADMIN_TOKEN` es
 | `POST /api/admin/v1/keys/:id/regenerate` | Nova chave crua, vínculos mantidos, antiga invalidada na hora. |
 | `DELETE /api/admin/v1/keys/:id` | Revoga. **Não apaga dados.** |
 | `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` | Desfaz um vínculo errado. **Não apaga dados.** |
+| `DELETE /api/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId` | **0.8.0+.** Apaga somente a sessão e seus turnos. Irreversível; novos turnos podem recriá-la. |
 | `DELETE /api/admin/v1/accounts/:accountKey` | **0.5.0+.** Apaga a conta inteira: integrantes, sessões, turnos e o vínculo. Irreversível. |
 
 Conta que entrou pela chave legada aparece no `overview` com `label: null` — existe nos dados e não tem chave dona.
@@ -460,9 +473,9 @@ O `HEALTHCHECK` está no Dockerfile e no compose. O processo roda como `node` (u
 7. **Deploy.** Confira `GET https://<dominio>/api/health`.
 8. **Auto Deploy:** ative o webhook na branch `main` se quiser redeploy a cada push.
 
-**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**; apagar uma conta inteira depende do `DELETE /api/admin/v1/accounts/:accountKey`, da **0.5.0** — contra um servidor anterior a rota responde `404` e o app avisa que é preciso atualizar, porque aqui não há fallback: nenhuma outra rota faz o mesmo. Contra um servidor mais antigo o app não quebra: a rota responde `404`, o painel cai no detalhe agregado — sem os gráficos por turno — e avisa o usuário. No caso da presença o app cai sozinho num ingest só-membro, que carimba o mesmo `last_seen_at`: a tela funciona igual, apenas sem a correção de relógio. Um redeploy resolve.
+**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**; apagar uma conta inteira depende da **0.5.0**; e excluir uma sessão depende da rota administrativa da **0.8.0**. Contra servidor anterior, a exclusão de sessão responde `404` e o app exige atualização, pois não existe fallback seguro. Nas leituras compatíveis, o painel continua caindo no agregado ou no heartbeat via ingest conforme o recurso ausente. Um redeploy resolve.
 
-Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam; a 0.4.0 não acrescenta tabela nem coluna — a presença escreve numa coluna que já existia — e a 0.5.0 tampouco: apagar conta só executa `DELETE` nas tabelas existentes. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
+Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam. As versões 0.4.0, 0.5.0 e 0.8.0 não acrescentam tabela nem coluna; presença e exclusões usam o esquema existente. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
 
 Rodando em **Docker Swarm**, mantenha **1 réplica**: o SQLite é um arquivo local e duas réplicas em nós diferentes veriam bancos distintos. Se o cluster tiver mais de um nó, fixe uma constraint de nó para o volume seguir o serviço.
 

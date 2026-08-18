@@ -23,7 +23,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -529,7 +533,10 @@ internal fun CliSessionRow(
     language: AppLanguage,
     onOpen: () -> Unit,
     /** `false` no modal do time: o transcript daquela sessão não está nesta máquina. */
-    isLocalSession: Boolean = true
+    isLocalSession: Boolean = true,
+    /** Ação destrutiva opcional; ausente nas listas locais e para não administradores. */
+    onRemove: (() -> Unit)? = null,
+    removeButtonTag: String? = null
 ) {
     val status = session.contextStatus
     val statusColor = healthColor(status.health)
@@ -652,6 +659,23 @@ internal fun CliSessionRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            if (onRemove != null) {
+                IconButton(
+                    onClick = onRemove,
+                    modifier = if (removeButtonTag != null) {
+                        Modifier.testTag(removeButtonTag)
+                    } else {
+                        Modifier
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = TeamUsageLabels.removeSession(language),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

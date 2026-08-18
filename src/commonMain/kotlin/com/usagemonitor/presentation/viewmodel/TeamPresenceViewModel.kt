@@ -4,7 +4,7 @@ import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
-import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
 import com.usagemonitor.domain.usecase.TeamPresenceResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -57,7 +57,7 @@ class TeamPresenceViewModel(
      * administração a janela continua sendo só de leitura, e nenhum botão
      * destrutivo aparece.
      */
-    private val removeTeamMember: RemoveTeamMemberUseCase? = null,
+    private val removeTeamMember: RemoveAdminTeamMemberUseCase? = null,
     private val deleteTeamAccount: DeleteTeamAccountUseCase? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
@@ -178,11 +178,12 @@ class TeamPresenceViewModel(
      * intacta — mostrar como removido o que continua lá seria mentir.
      */
     fun removeMember(memberKey: String) {
+        if (!adminOverview) {
+            return
+        }
         val useCase = removeTeamMember ?: return
         val entry = findEntry(memberKey) ?: return
-        // Na visão global a conta é a do integrante, não a da janela: usar a da
-        // janela apagaria o histórico da conta errada.
-        val targetAccountKey = entry.accountKey ?: accountKey ?: return
+        val targetAccountKey = entry.accountKey ?: return
 
         viewModelScope.launch {
             runAction { useCase(accountKey = targetAccountKey, deviceId = entry.deviceId) }
@@ -196,6 +197,9 @@ class TeamPresenceViewModel(
      * continua aparecendo com os integrantes de antes.
      */
     fun deleteAccount(accountKey: String) {
+        if (!adminOverview) {
+            return
+        }
         val useCase = deleteTeamAccount ?: return
         if (accountKey.isBlank()) {
             return

@@ -414,6 +414,106 @@ describe('remocao de conta inteira', () => {
   });
 });
 
+describe('remocao administrativa de sessao', () => {
+  let harness: Harness;
+
+  beforeEach(() => {
+    harness = createHarness();
+  });
+
+  afterEach(() => {
+    harness.cleanup();
+  });
+
+  const route = (accountKey: string, deviceId: string, sessionId: string) =>
+    `/api/admin/v1/accounts/${accountKey}/members/${deviceId}/sessions/${sessionId}`;
+
+  it('apaga somente a sessao escolhida e preserva membro, outras sessoes e contas', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com', 2);
+    await ingestWith(harness, created.key, ACCOUNT_A, 'session-1', 'msg-1');
+    await ingestWith(harness, created.key, ACCOUNT_A, 'session-2', 'msg-2');
+    await ingestWith(harness, created.key, ACCOUNT_B, 'session-1', 'msg-b');
+
+    const removed = await request(harness.app)
+      .delete(route(ACCOUNT_A, 'device-1', 'session-1'))
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(removed.status).toBe(200);
+    expect(removed.body).toEqual({ deletedTurns: 1, deletedSessions: 1 });
+
+    const accountA = await request(harness.app)
+      .get('/api/v1/team')
+      .set('x-team-key', created.key)
+      .query({ accountKey: ACCOUNT_A });
+    expect(accountA.body.members).toHaveLength(1);
+    expect(accountA.body.rows.map((row: { sessionId: string }) => row.sessionId)).toEqual([
+      'session-2',
+    ]);
+
+    const accountB = await request(harness.app)
+      .get('/api/v1/team')
+      .set('x-team-key', created.key)
+      .query({ accountKey: ACCOUNT_B });
+    expect(accountB.body.rows.map((row: { sessionId: string }) => row.sessionId)).toEqual([
+      'session-1',
+    ]);
+  });
+
+  it('e idempotente e nao apaga com deviceId divergente', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    await ingestWith(harness, created.key, ACCOUNT_A);
+
+    const wrongDevice = await request(harness.app)
+      .delete(route(ACCOUNT_A, 'device-errado', 'session-1'))
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+    expect(wrongDevice.body).toEqual({ deletedTurns: 0, deletedSessions: 0 });
+
+    await request(harness.app)
+      .delete(route(ACCOUNT_A, 'device-1', 'session-1'))
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+    const repeated = await request(harness.app)
+      .delete(route(ACCOUNT_A, 'device-1', 'session-1'))
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+    expect(repeated.body).toEqual({ deletedTurns: 0, deletedSessions: 0 });
+  });
+
+  it('permite que atividade futura recrie a sessao sem recuperar turnos antigos', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    await ingestWith(harness, created.key, ACCOUNT_A, 'session-1', 'msg-antiga');
+    await request(harness.app)
+      .delete(route(ACCOUNT_A, 'device-1', 'session-1'))
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    await ingestWith(harness, created.key, ACCOUNT_A, 'session-1', 'msg-nova');
+    const detail = await request(harness.app)
+      .get('/api/v1/session')
+      .set('x-team-key', created.key)
+      .query({ accountKey: ACCOUNT_A, deviceId: 'device-1', sessionId: 'session-1' });
+
+    expect(detail.status).toBe(200);
+    expect(detail.body.turns.map((turn: { messageId: string }) => turn.messageId)).toEqual([
+      'msg-nova',
+    ]);
+  });
+
+  it('recusa ausencia de token e a chave dona da conta', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    await ingestWith(harness, created.key, ACCOUNT_A);
+    const target = route(ACCOUNT_A, 'device-1', 'session-1');
+
+    const missing = await request(harness.app).delete(target);
+    const owner = await request(harness.app).delete(target).set('x-team-key', created.key);
+
+    expect(missing.status).toBe(401);
+    expect(owner.status).toBe(401);
+    const remaining = await request(harness.app)
+      .get('/api/v1/session')
+      .set('x-team-key', created.key)
+      .query({ accountKey: ACCOUNT_A, deviceId: 'device-1', sessionId: 'session-1' });
+    expect(remaining.status).toBe(200);
+  });
+});
+
 function ingestWith(
   harness: Harness,
   key: string,

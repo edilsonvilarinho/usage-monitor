@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
@@ -74,6 +75,8 @@ internal const val TEAM_MEMBER_SESSIONS_TAG_PREFIX = "teamMemberSessions:"
 internal const val TEAM_MEMBER_REMOVE_TAG_PREFIX = "teamMemberRemove:"
 internal const val TEAM_MEMBER_HEALTH_TAG_PREFIX = "teamMemberHealth:"
 internal const val TEAM_REMOVE_CONFIRM_TAG = "teamMemberRemoveConfirm"
+internal const val TEAM_SESSION_REMOVE_TAG_PREFIX = "teamSessionRemove:"
+internal const val TEAM_SESSION_REMOVE_CONFIRM_TAG = "teamSessionRemoveConfirm"
 internal const val TEAM_ADMIN_OVERVIEW_TAG = "teamAdminOverviewBadge"
 internal const val TEAM_ACCOUNT_GROUP_TAG_PREFIX = "teamAccountGroup:"
 internal const val TEAM_SLIDING_WINDOW_NOTICE_TAG = "teamSlidingWindowNotice"
@@ -108,23 +111,26 @@ private val TEAM_ROW_CONTENT_PADDING = 14.dp
 fun TeamUsageScreen(
     viewModel: TeamUsageViewModel,
     language: AppLanguage,
-    /** `deviceId` desta instalação; a linha correspondente não ganha o botão. */
-    localDeviceId: String?,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
     val removalError by viewModel.removalError.collectAsState()
+    val sessionRemovalError by viewModel.sessionRemovalError.collectAsState()
 
     TeamUsageContent(
         state = state,
         language = language,
-        localDeviceId = localDeviceId,
         removalError = removalError,
+        sessionRemovalError = sessionRemovalError,
         onSelectRange = { range -> viewModel.setRange(range) },
         onToggleMember = { memberKey -> viewModel.toggleMember(memberKey) },
         onToggleAccount = { groupKey -> viewModel.toggleAccount(groupKey) },
         onRemoveMember = { memberKey -> viewModel.removeMember(memberKey) },
         onDismissRemovalError = { viewModel.clearRemovalError() },
+        onRemoveSession = { memberKey, sessionId ->
+            viewModel.removeSession(memberKey, sessionId)
+        },
+        onDismissSessionRemovalError = { viewModel.clearSessionRemovalError() },
         onOpenSession = { memberKey, sessionId -> viewModel.openSession(memberKey, sessionId) },
         onCloseDetail = { viewModel.closeDetail() },
         onToggleAdvanced = { viewModel.toggleAdvanced() },
@@ -145,10 +151,12 @@ internal fun TeamUsageContent(
     // Com default para não arrastar as chamadas que só exercitam o modal de uma
     // conta, onde não existe faixa a recolher.
     onToggleAccount: (String) -> Unit = {},
-    localDeviceId: String? = null,
     removalError: String? = null,
+    sessionRemovalError: String? = null,
     onRemoveMember: (String) -> Unit = {},
     onDismissRemovalError: () -> Unit = {},
+    onRemoveSession: (String, String) -> Unit = { _, _ -> },
+    onDismissSessionRemovalError: () -> Unit = {},
     // Com default para não arrastar as chamadas que não exercitam o detalhe.
     onOpenSession: (String, String) -> Unit = { _, _ -> },
     onCloseDetail: () -> Unit = {},
@@ -161,6 +169,7 @@ internal fun TeamUsageContent(
     // servidor: o laço ao vivo recarrega a lista a cada 5s e não pode fechar o
     // diálogo debaixo do usuário.
     var pendingRemoval by remember { mutableStateOf<TeamMemberUsage?>(null) }
+    var pendingSessionRemoval by remember { mutableStateOf<PendingSessionRemoval?>(null) }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (state) {
@@ -178,14 +187,18 @@ internal fun TeamUsageContent(
                     TeamUsageList(
                         state = state,
                         language = language,
-                        localDeviceId = localDeviceId,
                         removalError = removalError,
+                        sessionRemovalError = sessionRemovalError,
                         onSelectRange = onSelectRange,
                         onToggleMember = onToggleMember,
                         onToggleAccount = onToggleAccount,
                         onOpenSession = onOpenSession,
                         onRequestRemoveMember = { member -> pendingRemoval = member },
                         onDismissRemovalError = onDismissRemovalError,
+                        onRequestRemoveSession = { member, session ->
+                            pendingSessionRemoval = PendingSessionRemoval(member, session)
+                        },
+                        onDismissSessionRemovalError = onDismissSessionRemovalError,
                         onSelectView = onSelectView,
                         onExportReport = onExportReport
                     )
@@ -216,7 +229,28 @@ internal fun TeamUsageContent(
             onDismiss = { pendingRemoval = null }
         )
     }
+
+    val sessionToRemove = pendingSessionRemoval
+    if (sessionToRemove != null) {
+        RemoveSessionConfirmation(
+            target = sessionToRemove,
+            language = language,
+            onConfirm = {
+                pendingSessionRemoval = null
+                onRemoveSession(
+                    sessionToRemove.member.memberKey,
+                    sessionToRemove.session.sessionId
+                )
+            },
+            onDismiss = { pendingSessionRemoval = null }
+        )
+    }
 }
+
+private data class PendingSessionRemoval(
+    val member: TeamMemberUsage,
+    val session: CliSessionSummary
+)
 
 /** Confirmação obrigatória: a remoção apaga dados e não tem desfazer. */
 @Composable
@@ -250,17 +284,57 @@ private fun RemoveMemberConfirmation(
 }
 
 @Composable
+private fun RemoveSessionConfirmation(
+    target: PendingSessionRemoval,
+    language: AppLanguage,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(TeamUsageLabels.removeSessionTitle(language)) },
+        text = {
+            Text(
+                TeamUsageLabels.removeSessionWarning(
+                    sessionId = target.session.sessionId,
+                    projectName = target.session.projectName,
+                    language = language
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag(TEAM_SESSION_REMOVE_CONFIRM_TAG)
+            ) {
+                Text(
+                    text = TeamUsageLabels.confirmSessionRemoval(language),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(TeamUsageLabels.cancel(language))
+            }
+        }
+    )
+}
+
+@Composable
 private fun TeamUsageList(
     state: TeamUsageUiState.Success,
     language: AppLanguage,
-    localDeviceId: String?,
     removalError: String?,
+    sessionRemovalError: String?,
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
     onToggleAccount: (String) -> Unit,
     onOpenSession: (String, String) -> Unit,
     onRequestRemoveMember: (TeamMemberUsage) -> Unit,
     onDismissRemovalError: () -> Unit,
+    onRequestRemoveSession: (TeamMemberUsage, CliSessionSummary) -> Unit,
+    onDismissSessionRemovalError: () -> Unit,
     onSelectView: (TeamUsageView) -> Unit,
     onExportReport: () -> Unit
 ) {
@@ -321,6 +395,24 @@ private fun TeamUsageList(
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = onDismissRemovalError) {
+                    Text(TeamUsageLabels.cancel(language))
+                }
+            }
+        }
+
+        if (sessionRemovalError != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = TeamUsageLabels.sessionRemovalError(sessionRemovalError, language),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onDismissSessionRemovalError) {
                     Text(TeamUsageLabels.cancel(language))
                 }
             }
@@ -388,12 +480,7 @@ private fun TeamUsageList(
                                 share = state.tokenShareOf(member),
                                 expanded = member.memberKey in state.expandedMemberKeys,
                                 language = language,
-                                // No modal de uma conta, esta máquina volta no próximo
-                                // envio e a remoção se desfaz sozinha. Na visão global,
-                                // porém, quem administra pode apagar qualquer histórico,
-                                // inclusive o enviado pela própria máquina.
-                                removable = state.isAdminOverview ||
-                                    (localDeviceId != null && member.deviceId != localDeviceId),
+                                removable = state.isAdminOverview,
                                 onToggle = { onToggleMember(member.memberKey) },
                                 onRemove = { onRequestRemoveMember(member) }
                             )
@@ -425,7 +512,17 @@ private fun TeamUsageList(
                                         onOpen = {
                                             onOpenSession(member.memberKey, session.sessionId)
                                         },
-                                        isLocalSession = false
+                                        isLocalSession = false,
+                                        onRemove = if (state.isAdminOverview) {
+                                            { onRequestRemoveSession(member, session) }
+                                        } else {
+                                            null
+                                        },
+                                        removeButtonTag = if (state.isAdminOverview) {
+                                            "$TEAM_SESSION_REMOVE_TAG_PREFIX${member.memberKey}:${session.sessionId}"
+                                        } else {
+                                            null
+                                        }
                                     )
                                 }
                             }

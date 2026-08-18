@@ -7,7 +7,9 @@ import { requireAdminToken } from '../access.js';
 import {
   DEFAULT_GAP_CUTOFF_MS,
   createKeyBodySchema,
+  deleteMemberQuerySchema,
   overviewQuerySchema,
+  sessionQuerySchema,
   updateKeyBodySchema,
 } from '../dto.js';
 import { wrap } from '../errorHandler.js';
@@ -42,6 +44,77 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
     protect(
       wrap((_req, res) => {
         res.json({ status: 'ok' });
+      }),
+    ),
+  );
+
+  /**
+   * Compatibilidade com clientes administrativos anteriores.
+   *
+   * A rota conserva o endereco antigo, mas agora nasce apenas no roteador de
+   * administracao e exige `x-admin-token`. Uma chave de time, inclusive a dona
+   * da conta, nao pode mais apagar integrantes.
+   */
+  router.delete(
+    '/v1/member',
+    protect(
+      wrap((req, res) => {
+        const parsed = deleteMemberQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+          const first = parsed.error.issues[0];
+          throw new ValidationError(
+            `Query invalida — ${first ? `${first.path.join('.')}: ${first.message}` : 'parametros ausentes'}`,
+          );
+        }
+
+        const report = deps.repository.deleteMember(
+          parsed.data.accountKey,
+          parsed.data.deviceId,
+        );
+
+        logger.debug(
+          { accountKey: parsed.data.accountKey, deviceId: parsed.data.deviceId, ...report },
+          'integrante removido',
+        );
+        res.json(report);
+      }),
+    ),
+  );
+
+  /**
+   * Apaga uma sessao e os turnos dela. O integrante e as demais sessoes ficam.
+   *
+   * A identidade completa vem no caminho para impedir que estado obsoleto da
+   * tela apague uma sessao atualmente associada a outra maquina.
+   */
+  router.delete(
+    '/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId',
+    protect(
+      wrap((req, res) => {
+        const parsed = sessionQuerySchema.safeParse(req.params);
+        if (!parsed.success) {
+          const first = parsed.error.issues[0];
+          throw new ValidationError(
+            `Caminho invalido — ${first ? `${first.path.join('.')}: ${first.message}` : 'parametros ausentes'}`,
+          );
+        }
+
+        const report = deps.repository.deleteSession(
+          parsed.data.accountKey,
+          parsed.data.deviceId,
+          parsed.data.sessionId,
+        );
+
+        logger.debug(
+          {
+            accountKey: parsed.data.accountKey,
+            deviceId: parsed.data.deviceId,
+            sessionId: parsed.data.sessionId,
+            ...report,
+          },
+          'sessao removida',
+        );
+        res.json(report);
       }),
     ),
   );

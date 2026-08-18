@@ -98,6 +98,21 @@ class RemoveAdminTeamMemberUseCase(
         repository.removeMember(accountKey = accountKey, deviceId = deviceId)
 }
 
+/** Remove uma sessão usando exclusivamente o token administrativo. */
+class RemoveAdminTeamSessionUseCase(
+    private val repository: TeamAdminRepository
+) {
+    suspend operator fun invoke(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<Unit> = repository.removeSession(
+        accountKey = accountKey,
+        deviceId = deviceId,
+        sessionId = sessionId
+    )
+}
+
 /**
  * Apaga uma conta inteira do servidor. **Irreversível.**
  *

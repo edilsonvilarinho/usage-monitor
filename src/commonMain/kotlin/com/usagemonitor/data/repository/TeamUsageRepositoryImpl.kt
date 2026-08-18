@@ -224,21 +224,6 @@ class TeamUsageRepositoryImpl(
         return result
     }
 
-    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
-        val settings = settingsProvider()
-        val credential = settings.readCredential()
-            ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
-
-        return runCatching {
-            remoteDataSource.deleteMember(
-                baseUrl = settings.normalizedServerUrl,
-                credential = credential,
-                accountKey = accountKey,
-                deviceId = deviceId
-            )
-        }
-    }
-
     /**
      * Confere URL e chave sem gravar nada.
      *

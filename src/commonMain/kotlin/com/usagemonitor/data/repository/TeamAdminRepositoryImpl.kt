@@ -22,6 +22,9 @@ private const val NOT_CONFIGURED_MESSAGE =
 private const val OUTDATED_SERVER_MESSAGE =
     "Este servidor de time não sabe apagar contas. Atualize-o para a versão 0.5.0 ou mais nova."
 
+private const val OUTDATED_SESSION_DELETE_SERVER_MESSAGE =
+    "Este servidor de time não sabe apagar sessões. Atualize-o para a versão 0.8.0 ou mais nova."
+
 /**
  * Administração do servidor de time.
  *
@@ -122,6 +125,27 @@ class TeamAdminRepositoryImpl(
                 deviceId = deviceId
             )
         }
+    }
+
+    override suspend fun removeSession(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<Unit> {
+        val result = withAdmin { settings ->
+            remoteDataSource.deleteSession(
+                baseUrl = settings.normalizedServerUrl,
+                adminToken = settings.adminToken,
+                accountKey = accountKey,
+                deviceId = deviceId,
+                sessionId = sessionId
+            )
+        }
+
+        if (result.isMissingRoute()) {
+            return Result.failure(IllegalStateException(OUTDATED_SESSION_DELETE_SERVER_MESSAGE))
+        }
+        return result
     }
 
     /**

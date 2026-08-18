@@ -95,7 +95,7 @@ import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
-import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamSessionUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
@@ -502,10 +502,10 @@ fun main() = application {
     val teamUsageViewModel = remember(teamUsageRepository, teamAdminRepository) {
         TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(teamUsageRepository),
-            removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
             getTeamSessionDetail = GetTeamSessionDetailUseCase(teamUsageRepository),
             getAdminOverview = GetAdminTeamOverviewUseCase(teamAdminRepository),
             removeAdminTeamMember = RemoveAdminTeamMemberUseCase(teamAdminRepository),
+            removeAdminTeamSession = RemoveAdminTeamSessionUseCase(teamAdminRepository),
             getTeamUsageTrend = GetTeamUsageTrendUseCase(teamUsageRepository),
             exportWriter = usageExportWriter,
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
@@ -518,7 +518,7 @@ fun main() = application {
                 teamAdminRepository,
                 teamServerClockOffset
             ),
-            removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
+            removeTeamMember = RemoveAdminTeamMemberUseCase(teamAdminRepository),
             deleteTeamAccount = DeleteTeamAccountUseCase(teamAdminRepository),
             liveIntervalMillis = TEAM_PRESENCE_LIVE_INTERVAL_MILLIS
         )
@@ -1307,8 +1307,7 @@ fun main() = application {
                 ) {
                     TeamUsageScreen(
                         viewModel = teamUsageViewModel,
-                        language = language,
-                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
+                        language = language
                     )
                 }
             }

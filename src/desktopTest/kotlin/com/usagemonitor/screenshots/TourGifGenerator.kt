@@ -274,8 +274,7 @@ private fun TourContent(state: TourState, historyViewModel: HistoryViewModel) {
                         state = state.teamState,
                         language = AppLanguage.PT,
                         onSelectRange = {},
-                        onToggleMember = {},
-                        localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID
+                        onToggleMember = {}
                     )
 
                     TourScreen.SETTINGS -> SettingsTourScreen()

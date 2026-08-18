@@ -224,6 +224,32 @@ open class RemoteTeamDataSource(
     }
 
     /**
+     * `DELETE /api/admin/v1/accounts/{account}/members/{device}/sessions/{session}`.
+     * A rota aceita somente o token de administração.
+     */
+    open suspend fun deleteSession(
+        baseUrl: String,
+        adminToken: String,
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ) {
+        val path = buildString {
+            append(accountKey.encodeURLPathPart())
+            append("/members/")
+            append(deviceId.encodeURLPathPart())
+            append("/sessions/")
+            append(sessionId.encodeURLPathPart())
+        }
+        requireSuccess(
+            response = httpClient.delete("$baseUrl/api/admin/v1/accounts/$path") {
+                authenticate(TeamCredential.AdminToken(adminToken))
+            },
+            operation = "remoção da sessão"
+        )
+    }
+
+    /**
      * `GET /api/v1/verify`. A chave configurada serve para esta conta?
      *
      * Substitui a consulta a uma conta inventada que o "Testar conexão" fazia:

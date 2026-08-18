@@ -39,6 +39,16 @@ interface TeamAdminRepository {
     suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit>
 
     /**
+     * Apaga uma sessão e os turnos dela usando exclusivamente a autoridade de
+     * administração. O integrante e as demais sessões permanecem.
+     */
+    suspend fun removeSession(
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ): Result<Unit>
+
+    /**
      * Apaga uma conta inteira do servidor: integrantes, sessões, turnos e o
      * vínculo com a chave. **Irreversível.**
      *

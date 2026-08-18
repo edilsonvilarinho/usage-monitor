@@ -162,7 +162,7 @@ internal fun TeamPresenceContent(
                 state = state,
                 language = language,
                 localDeviceId = localDeviceId,
-                canManage = canManage,
+                canManage = canManage && state.isAdminOverview,
                 actionError = actionError,
                 onToggleAccount = onToggleAccount,
                 onSetOnlyOnline = onSetOnlyOnline,

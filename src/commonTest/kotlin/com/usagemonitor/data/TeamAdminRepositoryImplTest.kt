@@ -32,14 +32,19 @@ private class FakeRemoteTeamDataSource(
     private val verifyResult: Result<TeamVerificationDto>,
     private val deleteMemberResult: Result<Unit> =
         Result.failure(IllegalStateException("nao deveria chamar")),
+    private val deleteSessionResult: Result<Unit> =
+        Result.failure(IllegalStateException("nao deveria chamar")),
     private val deleteAccountResult: Result<TeamAccountDeletionDto> =
         Result.failure(IllegalStateException("nao deveria chamar"))
 ) : RemoteTeamDataSource(HttpClient()) {
     var claimCalls = 0
     var verifyCalls = 0
     var deleteMemberCalls = 0
+    var deleteSessionCalls = 0
     var deleteAccountCalls = 0
     var lastDeleteMemberCredential: TeamCredential? = null
+    var lastDeleteSessionAdminToken: String? = null
+    var lastDeleteSessionTarget: Triple<String, String, String>? = null
 
     override suspend fun deleteMember(
         baseUrl: String,
@@ -59,6 +64,19 @@ private class FakeRemoteTeamDataSource(
     ): TeamAccountDeletionDto {
         deleteAccountCalls += 1
         return deleteAccountResult.getOrThrow()
+    }
+
+    override suspend fun deleteSession(
+        baseUrl: String,
+        adminToken: String,
+        accountKey: String,
+        deviceId: String,
+        sessionId: String
+    ) {
+        deleteSessionCalls += 1
+        lastDeleteSessionAdminToken = adminToken
+        lastDeleteSessionTarget = Triple(accountKey, deviceId, sessionId)
+        deleteSessionResult.getOrThrow()
     }
 
     override suspend fun claimKey(
@@ -161,6 +179,55 @@ class TeamAdminRepositoryImplTest {
             TeamCredential.AdminToken(ADMIN.adminToken),
             remote.lastDeleteMemberCredential
         )
+    }
+
+    @Test
+    fun `administrador exclui sessao com token de admin e alvo completo`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            deleteSessionResult = Result.success(Unit)
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { ADMIN }
+
+        val result = repository.removeSession(ACCOUNT_KEY, "device-1", "session-1")
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, remote.deleteSessionCalls)
+        assertEquals(ADMIN.adminToken, remote.lastDeleteSessionAdminToken)
+        assertEquals(
+            Triple(ACCOUNT_KEY, "device-1", "session-1"),
+            remote.lastDeleteSessionTarget
+        )
+    }
+
+    @Test
+    fun `404 ao excluir sessao exige servidor 0_8_0`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            deleteSessionResult = Result.failure(TeamServerException(404, "rota inexistente"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { ADMIN }
+
+        val result = repository.removeSession(ACCOUNT_KEY, "device-1", "session-1")
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("0.8.0"))
+    }
+
+    @Test
+    fun `excluir sessao exige modo administrador`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar"))
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
+
+        val result = repository.removeSession(ACCOUNT_KEY, "device-1", "session-1")
+
+        assertTrue(result.isFailure)
+        assertEquals(0, remote.deleteSessionCalls)
     }
 
     @Test

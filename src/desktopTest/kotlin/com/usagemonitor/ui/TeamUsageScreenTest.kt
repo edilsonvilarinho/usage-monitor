@@ -40,6 +40,8 @@ import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_REMOVE_CONFIRM_TAG
+import com.usagemonitor.presentation.ui.TEAM_SESSION_REMOVE_CONFIRM_TAG
+import com.usagemonitor.presentation.ui.TEAM_SESSION_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_EXPORT_PDF_TAG
 import com.usagemonitor.presentation.ui.TEAM_TAB_BREAKDOWN_TAG
 import com.usagemonitor.presentation.ui.TEAM_TAB_MEMBERS_TAG
@@ -271,21 +273,20 @@ class TeamUsageScreenTest {
     }
 
     @Test
-    fun `so o integrante de outra maquina ganha o botao de remover`() = runDesktopComposeUiTest {
+    fun `modal de uma conta nao mostra nenhuma acao de remocao`() = runDesktopComposeUiTest {
         renderSuccess(
             TeamUsageUiState.Success(
                 members = listOf(
                     member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1", tokens = 10L))),
                     member("device-2", "fantasma", "NOTE-C3", emptyList())
-                )
-            ),
-            localDeviceId = "device-1"
+                ),
+                expandedMemberKeys = setOf("device-1")
+            )
         )
 
-        // Esta máquina voltaria no próximo envio: remover a si mesma só apagaria
-        // o próprio histórico sem tirar a linha da lista.
         onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-1").assertDoesNotExist()
-        onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-2").assertExists()
+        onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-2").assertDoesNotExist()
+        onNodeWithTag("${TEAM_SESSION_REMOVE_TAG_PREFIX}device-1:s1").assertDoesNotExist()
     }
 
     /** Issue #66: o administrador também pode apagar o histórico da máquina local. */
@@ -308,7 +309,6 @@ class TeamUsageScreenTest {
                 expandedAccountKeys = setOf("account-a"),
                 isAdminOverview = true
             ),
-            localDeviceId = "device-1",
             onRemoveMember = { memberKey -> removed = memberKey }
         )
 
@@ -330,14 +330,21 @@ class TeamUsageScreenTest {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(
                             members = listOf(
-                                member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))),
-                                member("device-2", "fantasma", "NOTE-C3", emptyList())
-                            )
+                                member(
+                                    "device-2",
+                                    "fantasma",
+                                    "NOTE-C3",
+                                    listOf(session("s2", tokens = 10L)),
+                                    accountKey = "account-a",
+                                    accountLabel = "time-a"
+                                )
+                            ),
+                            expandedAccountKeys = setOf("account-a"),
+                            isAdminOverview = true
                         ),
                         language = AppLanguage.PT,
                         onSelectRange = {},
                         onToggleMember = {},
-                        localDeviceId = "device-1",
                         onRemoveMember = { deviceId -> removed = deviceId }
                     )
                 }
@@ -350,7 +357,77 @@ class TeamUsageScreenTest {
 
         onNodeWithTag(TEAM_REMOVE_CONFIRM_TAG).performClick()
 
-        assertEquals("device-2", removed)
+        assertEquals("account-a/device-2", removed)
+    }
+
+    @Test
+    fun `excluir sessao administrativa exige confirmacao e nao abre detalhe`() =
+        runDesktopComposeUiTest {
+            var removed: Pair<String, String>? = null
+            var opened: Pair<String, String>? = null
+            val member = member(
+                "device-1",
+                "edilson",
+                "DESKTOP-A1",
+                listOf(session("session-12345678")),
+                accountKey = "account-a",
+                accountLabel = "time-a"
+            )
+
+            setContent {
+                AppTheme(isDark = true) {
+                    Box(modifier = Modifier.width(1100.dp).height(700.dp)) {
+                        TeamUsageContent(
+                            state = TeamUsageUiState.Success(
+                                members = listOf(member),
+                                expandedAccountKeys = setOf("account-a"),
+                                expandedMemberKeys = setOf(member.memberKey),
+                                isAdminOverview = true
+                            ),
+                            language = AppLanguage.PT,
+                            onSelectRange = {},
+                            onToggleMember = {},
+                            onOpenSession = { memberKey, sessionId ->
+                                opened = memberKey to sessionId
+                            },
+                            onRemoveSession = { memberKey, sessionId ->
+                                removed = memberKey to sessionId
+                            }
+                        )
+                    }
+                }
+            }
+
+            val tag = "$TEAM_SESSION_REMOVE_TAG_PREFIX${member.memberKey}:session-12345678"
+            onNodeWithTag(tag).performClick()
+            assertEquals(null, opened)
+            assertEquals(null, removed)
+            onNodeWithText("Excluir sessão?").assertIsDisplayed()
+            onNodeWithText("novos turnos poderão recriá-la", substring = true).assertIsDisplayed()
+
+            onNodeWithTag(TEAM_SESSION_REMOVE_CONFIRM_TAG).performClick()
+
+            assertEquals(member.memberKey to "session-12345678", removed)
+            assertEquals(null, opened)
+        }
+
+    @Test
+    fun `falha ao excluir sessao aparece com mensagem especifica`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Success(members = emptyList()),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onToggleMember = {},
+                        sessionRemovalError = "HTTP 401"
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Não foi possível excluir a sessão: HTTP 401").assertIsDisplayed()
     }
 
     @Test
@@ -891,13 +968,13 @@ class TeamUsageScreenTest {
 
     private fun ComposeUiTest.renderSuccess(
         state: TeamUsageUiState.Success,
-        localDeviceId: String? = null,
         width: androidx.compose.ui.unit.Dp = 900.dp,
         height: androidx.compose.ui.unit.Dp = 700.dp,
         onToggleAccount: (String) -> Unit = {},
         onSelectView: (TeamUsageView) -> Unit = {},
         onExportReport: () -> Unit = {},
-        onRemoveMember: (String) -> Unit = {}
+        onRemoveMember: (String) -> Unit = {},
+        onRemoveSession: (String, String) -> Unit = { _, _ -> }
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -908,10 +985,10 @@ class TeamUsageScreenTest {
                         onSelectRange = {},
                         onToggleMember = {},
                         onToggleAccount = onToggleAccount,
-                        localDeviceId = localDeviceId,
                         onSelectView = onSelectView,
                         onExportReport = onExportReport,
-                        onRemoveMember = onRemoveMember
+                        onRemoveMember = onRemoveMember,
+                        onRemoveSession = onRemoveSession
                     )
                 }
             }

@@ -316,6 +316,39 @@ internal object TeamUsageLabels {
         return if (language == AppLanguage.PT) "Remover do time" else "Remove from team"
     }
 
+    fun removeSession(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Excluir sessão" else "Delete session"
+    }
+
+    fun removeSessionTitle(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Excluir sessão?" else "Delete session?"
+    }
+
+    fun removeSessionWarning(
+        sessionId: String,
+        projectName: String?,
+        language: AppLanguage
+    ): String {
+        val identity = if (projectName.isNullOrBlank()) {
+            shortSessionId(sessionId)
+        } else {
+            "${shortSessionId(sessionId)} ($projectName)"
+        }
+        return if (language == AppLanguage.PT) {
+            "A sessão $identity e todo o consumo já enviado por ela serão apagados do " +
+                "servidor. O histórico antigo não será reenviado e isto não tem volta. " +
+                "Se a sessão continuar ativa, novos turnos poderão recriá-la."
+        } else {
+            "Session $identity and all usage already reported by it will be deleted from " +
+                "the server. The old history will not be sent again and this cannot be " +
+                "undone. If the session remains active, new turns may recreate it."
+        }
+    }
+
+    fun confirmSessionRemoval(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Excluir" else "Delete"
+    }
+
     fun removeMemberTitle(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Remover integrante?" else "Remove member?"
     }
@@ -361,6 +394,14 @@ internal object TeamUsageLabels {
             "Não foi possível remover o integrante: $message"
         } else {
             "Could not remove the member: $message"
+        }
+    }
+
+    fun sessionRemovalError(message: String, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Não foi possível excluir a sessão: $message"
+        } else {
+            "Could not delete the session: $message"
         }
     }
 
