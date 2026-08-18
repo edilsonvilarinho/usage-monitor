@@ -12,26 +12,44 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fase B concluída — aguardando protótipo da Fase A`
+**Estado atual:** `Fases A e B concluídas — protótipo aprovado, pronto para a Fase C`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
 **Checkout principal:** `C:\Users\edils\workspace\usage-monitor`, em `main`, intocado
 
+### ★ Protótipo aprovado — referência obrigatória
+
+[`docs/planos/prototipo-visual-opencode.html`](prototipo-visual-opencode.html) — aprovado
+integralmente pelo usuário em 2026-08-18: paleta, tipografia, marca, densidade, dashboard, telas
+tabulares, configurações, PDF e tema claro.
+
+**Abrir e consultar antes de escrever qualquer código de UI, em toda sessão.** Ele é a
+especificação visual desta iniciativa; este plano descreve a execução, não a aparência. Divergência
+entre o Compose e o protótipo é defeito do Compose — salvo quando o protótipo estiver
+tecnicamente errado, e aí a decisão vai para a tabela de decisões antes de o código mudar.
+
+Cópias vivas: neste repositório (a canônica), em `C:\Users\edils\Desktop\prototipo-usage-monitor.html`
+e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b8f3`.
+
 ### ▶ Próxima atividade
 
-**Fase A — protótipo HTML navegável.** Produzir o Artifact com a prancha de tokens + 24 áreas + 16
-estados, dark e light, com dados de `ScreenshotFixtures`. Apresentar e aguardar aprovação explícita
-de paleta, tipografia, marca, densidade, dashboard, telas tabulares, configurações, PDF e tema
-claro. **Nenhuma linha de Kotlin antes disso.**
+**Fase C, commit C1** — `chore(assets): add IBM Plex Mono and Sans with the OFL license`.
 
-Aprovado o protótipo, a atividade seguinte é a Fase C, commit C1.
+Criar a branch `visual/c-foundation` a partir da integração e adicionar em
+`src/desktopMain/resources/fonts/` os seis TTFs oficiais da IBM Plex
+(`IBMPlexMono-{Regular,Medium,SemiBold}`, `IBMPlexSans-{Regular,Medium,SemiBold}`) mais o `OFL.txt`.
+Só assets neste commit — nenhum Kotlin.
+
+Em seguida C2 (paleta) e **C3, que carrega o bloqueio a resolver**: confirmar a assinatura da API de
+carregamento de fonte no Compose Desktop 1.7.1 antes de escrever a `Typography`. A métrica da fonte
+define toda a densidade; nenhuma tela muda de aparência antes disso fechar.
 
 ### Progresso por fase
 
 | Fase | Branch | Estado | Commits | Concluída em |
 |---|---|---|---|---|
-| A — Protótipo | — | ⬜ pendente | 0/0 | — |
+| A — Protótipo | — | ✅ aprovado | 1/1 | 2026-08-18 |
 | B — Isolamento | — | ✅ concluída | 1/1 | 2026-08-18 |
 | C — Fundação | `visual/c-foundation` | ⬜ pendente | 0/8 | — |
 | D — Dashboard | `visual/d-dashboard` | ⬜ pendente | 0/5 | — |
@@ -54,6 +72,7 @@ Uma linha por commit, em ordem cronológica.
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
 | 2026-08-18 | B | `docs(plan): add the visual refactor execution plan` | `allTests` — 1068 testes, 0 falhas, 0 ignorados |
+| 2026-08-18 | A | `docs(plan): add the approved visual prototype` | n/a — documento |
 
 **Linha de base — `allTests` no worktree limpo em `2947b4d`, antes de qualquer edição:
 1068 testes, 0 falhas, 0 ignorados, 3m28s.** Toda falha posterior é comparada contra este número;
@@ -71,6 +90,8 @@ motivo.
 | 2026-08-18 | Mono estrutural + Sans em texto corrido | Escolha explícita do usuário, sobrepondo "mono em tudo" do documento do Codex |
 | 2026-08-18 | Fase B executada **antes** da Fase A | Este documento tem de viver na branch da refatoração, e `main` não recebe commit nenhum. Criar o worktree antes é o único jeito de o plano existir versionado sem sujar `main`. Nenhum código foi tocado |
 | 2026-08-18 | `git branch --unset-upstream` na branch de integração | O `git worktree add -b ... origin/main` deixa a branch nova **rastreando `origin/main`**; um `git push` sem argumento iria para a `main` do remoto. Sem upstream, o push exige destino explícito |
+| 2026-08-18 | O script `commit_and_push.ps1` **não é usado** nesta iniciativa | Ele grava a identidade temporária com `git config --local`, e num worktree o `.git` é um arquivo: o comando falha com `could not lock config file .git/config`. Os commits usam `git -c user.name=claude -c user.email=claude@anthropic.com commit`, que não altera configuração nenhuma e por isso dispensa a restauração que o `finally` do script existe para garantir |
+| 2026-08-18 | Protótipo **versionado no repositório**, contra o que este plano previa ("fora do repositório") | A regra existia para impedir código Compose antes da aprovação, e isso já aconteceu. Aprovado, ele virou a especificação visual, e especificação que vive só no scratchpad de uma sessão não sobrevive à sessão seguinte |
 
 ### Bloqueios e riscos abertos
 
@@ -88,11 +109,14 @@ Ao iniciar **qualquer** sessão desta iniciativa:
 
 1. Ler `AGENTS.md` e `CLAUDE.md` integralmente.
 2. Ler este arquivo, começando pelo Ponto de situação.
-3. `git worktree list`, `git status` e `git log --oneline -5` no worktree `usage-monitor-visual`. O
+3. **Abrir `docs/planos/prototipo-visual-opencode.html`** — a especificação visual aprovada. Ele se
+   consulta antes de escrever UI e outra vez ao revisar o que saiu; nenhuma tela é desenhada "de
+   memória" do plano, que descreve execução e não aparência.
+4. `git worktree list`, `git status` e `git log --oneline -5` no worktree `usage-monitor-visual`. O
    checkout principal não é tocado.
-4. Confirmar que a suíte está verde antes de editar:
+5. Confirmar que a suíte está verde antes de editar:
    `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"`.
-5. Executar **a atividade indicada em ▶ Próxima atividade**, e só ela.
+6. Executar **a atividade indicada em ▶ Próxima atividade**, e só ela.
 
 Ao encerrar **cada fase**:
 
@@ -250,10 +274,12 @@ git branch --unset-upstream   # senão um push sem argumento vai para a main do 
 
 ## Fases e commits
 
-### Fase A — Protótipo (fora do repositório, sem commits)
+### Fase A — Protótipo ✅ aprovado em 2026-08-18
 
-Artifact HTML navegável, alternância dark/light, dados de `ScreenshotFixtures` — sintéticos, sem
-nenhuma conta, máquina, caminho ou chave real. Google Fonts serve IBM Plex Mono e Sans reais.
+Entregue em [`prototipo-visual-opencode.html`](prototipo-visual-opencode.html). HTML navegável,
+alternância dark/light, dados de `ScreenshotFixtures` — sintéticos, sem nenhuma conta, máquina,
+caminho ou chave real. Google Fonts serve IBM Plex Mono e Sans reais; sem rede a página cai no
+monoespaçado do sistema e a densidade exibida deixa de ser a real.
 
 Áreas: as 16 do Codex mais as 8 do item 11. Estados: sucesso, carregamento, sucesso parcial, erro
 total, lista vazia, atualização em andamento, card minimizado, quota saudável/atenção/crítica,
