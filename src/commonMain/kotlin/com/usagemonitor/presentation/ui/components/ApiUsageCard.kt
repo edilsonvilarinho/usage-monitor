@@ -104,6 +104,26 @@ import kotlin.math.roundToInt
 
 private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 
+/**
+ * Âncoras estruturais do card.
+ *
+ * O que os testes deste card observam é, na maioria, texto de dado — e texto de
+ * interface não muda nesta refatoração, então esses asserts sobrevivem a ela.
+ * O que **não** sobrevive é assert que depende de onde a coisa está: os dois
+ * testes de empilhamento comparam a posição do rótulo da cota, e o rótulo vai
+ * deixar de ser o nó externo do bloco quando a cota virar linha. Daí a âncora
+ * ser o bloco, não o texto dentro dele.
+ */
+const val API_USAGE_CARD_TAG_PREFIX = "apiUsageCard:"
+const val API_USAGE_CARD_HEADER_TAG = "apiUsageCardHeader"
+const val API_USAGE_CARD_ACTIONS_TAG = "apiUsageCardActions"
+const val QUOTA_BLOCK_TAG_PREFIX = "quotaBlock:"
+
+/** O rótulo da cota é único dentro de um card: é a chave da série. */
+fun quotaBlockTag(label: String): String = "$QUOTA_BLOCK_TAG_PREFIX$label"
+
+fun apiUsageCardTag(apiName: String): String = "$API_USAGE_CARD_TAG_PREFIX$apiName"
+
 /** Opacidade do número de uma janela já vencida — o dado é real, mas velho. */
 private const val STALE_QUOTA_ALPHA = 0.45f
 
@@ -244,6 +264,7 @@ fun ApiUsageCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .testTag(apiUsageCardTag(apiName))
             .hoverable(hoverInteraction)
             .animateContentSize(animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS))
             .pointerInput(source) {
@@ -325,7 +346,7 @@ fun ApiUsageCard(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag(API_USAGE_CARD_HEADER_TAG),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -362,6 +383,7 @@ fun ApiUsageCard(
                     }
 
                     Row(
+                        modifier = Modifier.testTag(API_USAGE_CARD_ACTIONS_TAG),
                         horizontalArrangement = Arrangement.spacedBy(density.actionSpacing),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1080,7 +1102,7 @@ private fun CompactQuotaBadge(
         title = quota.label,
         subtitle = expandedQuotaTitle(quota = quota, language = language),
         metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
-        modifier = modifier
+        modifier = modifier.testTag(quotaBlockTag(quota.label))
     ) {
         Column(
             modifier = Modifier
@@ -1223,7 +1245,7 @@ private fun QuotaColumn(
     val isExpired = quota.isExpiredAt(now)
 
     Column(
-        modifier = modifier,
+        modifier = modifier.testTag(quotaBlockTag(quota.label)),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {

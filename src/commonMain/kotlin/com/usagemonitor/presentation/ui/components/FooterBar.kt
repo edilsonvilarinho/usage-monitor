@@ -48,6 +48,17 @@ const val FOOTER_ADMIN_OVERVIEW_TEST_TAG = "footerAdminOverview"
 
 const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
 
+/**
+ * Âncoras do rodapé.
+ *
+ * A versão e a contagem regressiva são hoje dois emblemas arredondados e viram
+ * texto solto de uma barra de estado. O conteúdo é o mesmo — `v1.1.0`, `02:05` —,
+ * mas o nó que o carrega muda de forma, e o assert por texto encontraria também
+ * qualquer outro lugar da tela onde a versão apareça.
+ */
+const val FOOTER_VERSION_TEST_TAG = "footerVersion"
+const val FOOTER_COUNTDOWN_TEST_TAG = "footerCountdown"
+
 @Composable
 fun FooterBar(
     appVersion: String,
@@ -154,8 +165,16 @@ private fun FooterCompactStatusGroup(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        FooterCompactBadge(text = "v$appVersion", tooltipLabel = versionTooltip)
-        FooterCompactBadge(text = refreshLabel, tooltipLabel = refreshTooltip)
+        FooterCompactBadge(
+            text = "v$appVersion",
+            tooltipLabel = versionTooltip,
+            testTag = FOOTER_VERSION_TEST_TAG
+        )
+        FooterCompactBadge(
+            text = refreshLabel,
+            tooltipLabel = refreshTooltip,
+            testTag = FOOTER_COUNTDOWN_TEST_TAG
+        )
     }
 }
 
@@ -164,7 +183,8 @@ private fun FooterCompactStatusGroup(
 private fun FooterCompactBadge(
     text: String,
     tooltipLabel: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    testTag: String? = null
 ) {
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
@@ -186,7 +206,11 @@ private fun FooterCompactBadge(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                // A tag mora no texto e não no `Surface`: é o texto que o assert
+                // compara, e o nó do `Surface` não carrega nenhum.
+                modifier = Modifier
+                    .let { base -> if (testTag == null) base else base.testTag(testTag) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             )
         }
     }

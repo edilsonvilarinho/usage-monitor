@@ -79,6 +79,7 @@ import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
+import com.usagemonitor.presentation.ui.components.quotaBlockTag
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
@@ -866,8 +867,12 @@ class ComponentTest {
             }
         }
 
-        val fiveHourTop = onNodeWithText("Claude 5h").getBoundsInRoot().top
-        val weeklyTop = onNodeWithText("Claude 7d").getBoundsInRoot().top
+        // Ancorado no bloco e não no texto: o rótulo deixa de ser o nó externo
+        // do badge quando a cota vira linha, e aí a posição medida seria outra.
+        val fiveHourTop = onNodeWithTag(quotaBlockTag("Claude 5h"), useUnmergedTree = true)
+            .getBoundsInRoot().top
+        val weeklyTop = onNodeWithTag(quotaBlockTag("Claude 7d"), useUnmergedTree = true)
+            .getBoundsInRoot().top
 
         assertTrue(
             weeklyTop > fiveHourTop,
@@ -911,8 +916,10 @@ class ComponentTest {
             }
         }
 
-        val fiveHourTop = onNodeWithText("Claude 5h").getBoundsInRoot().top
-        val weeklyTop = onNodeWithText("Claude 7d").getBoundsInRoot().top
+        val fiveHourTop = onNodeWithTag(quotaBlockTag("Claude 5h"), useUnmergedTree = true)
+            .getBoundsInRoot().top
+        val weeklyTop = onNodeWithTag(quotaBlockTag("Claude 7d"), useUnmergedTree = true)
+            .getBoundsInRoot().top
 
         assertEquals(fiveHourTop, weeklyTop)
     }

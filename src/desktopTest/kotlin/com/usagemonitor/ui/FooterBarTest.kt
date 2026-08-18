@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,6 +16,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.FOOTER_ADMIN_OVERVIEW_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_COUNTDOWN_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_TEAM_PRESENCE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -48,8 +51,14 @@ class FooterBarTest {
             }
         }
 
-        onNodeWithText("v1.1.0").assertIsDisplayed()
-        onNodeWithText("02:05").assertIsDisplayed()
+        // Por tag: os dois emblemas viram texto de uma barra de estado, e um
+        // assert por texto encontraria a versão em qualquer outro canto da tela.
+        // `useUnmergedTree`: o emblema é âncora de tooltip, e o `TooltipBox`
+        // agrega os descendentes na árvore merged — a tag só existe na crua.
+        onNodeWithTag(FOOTER_VERSION_TEST_TAG, useUnmergedTree = true)
+            .assertTextEquals("v1.1.0")
+        onNodeWithTag(FOOTER_COUNTDOWN_TEST_TAG, useUnmergedTree = true)
+            .assertTextEquals("02:05")
         onNodeWithContentDescription("Abrir configurações").assertIsDisplayed()
         onAllNodesWithText("Histórico").assertCountEquals(0)
     }
