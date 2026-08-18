@@ -1,5 +1,11 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -97,6 +103,19 @@ const val TAB_BREAKDOWN_TAG = "cliSessionsTabBreakdown"
 const val EXPORT_CSV_TAG = "cliSessionsExportCsv"
 const val EXPORT_JSON_TAG = "cliSessionsExportJson"
 const val EXPORT_PDF_TAG = "cliSessionsExportPdf"
+
+/**
+ * Âncoras da lista de sessões.
+ *
+ * A linha é hoje um card com células de largura fixa e vira uma linha de tabela.
+ * O que os testes usam para encontrá-la é o id truncado em 8 caracteres, que
+ * também aparece dentro do detalhe e no comando de retomada — texto que
+ * identifica a sessão, não a linha.
+ */
+const val CLI_SESSION_ROW_TAG_PREFIX = "cliSessionRow:"
+
+/** O id completo, não o truncado: é ele que identifica a sessão sem ambiguidade. */
+fun cliSessionRowTag(sessionId: String): String = "$CLI_SESSION_ROW_TAG_PREFIX$sessionId"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -244,9 +263,11 @@ private fun CliSessionsList(
             LazyColumn(
                 state = listState,
                 // A barra fica por cima da área de conteúdo; sem a folga à direita
-                // ela cobriria a borda dos cards, que ocupam a largura inteira.
-                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                // ela cobriria a borda do painel, que ocupa a largura inteira.
+                //
+                // Sem espaço entre itens: a linha traz a própria divisória, e um
+                // vão entre elas desfaria a leitura de tabela.
+                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
             ) {
                 items(items = state.sessions, key = { session -> session.sessionId }) { session ->
                     CliSessionRow(
@@ -515,6 +536,18 @@ internal fun LiveBadge(language: AppLanguage) {
  * máquina, com as mesmas colunas e o mesmo veredito de saturação.
  */
 @OptIn(ExperimentalLayoutApi::class)
+/**
+ * Uma sessão como linha de tabela.
+ *
+ * Era um card por sessão, com brilho de acento e 14dp de padding: numa janela de
+ * cinco sessões a lista já pedia rolagem. Aqui a linha tem 32dp de altura
+ * mínima, divisória embaixo e as mesmas células de largura fixa — que continuam
+ * fixas pelo motivo de sempre: sem elas cada linha dimensiona pelo próprio
+ * número e as colunas deixam de alinhar entre as sessões.
+ *
+ * O veredito continua vindo com o número que o gerou, e o status continua sendo
+ * **ponto e palavra**: cor sozinha não informa.
+ */
 @Composable
 internal fun CliSessionRow(
     session: CliSessionSummary,
@@ -527,142 +560,145 @@ internal fun CliSessionRow(
     removeButtonTag: String? = null
 ) {
     val status = session.contextStatus
-    val statusColor = healthColor(status.health)
+    val statusTone = healthTone(status.health)
 
-    DepthSurface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-        contentPadding = 14.dp
+    AppDataRow(
+        modifier = Modifier.testTag(cliSessionRowTag(session.sessionId)),
+        onClick = onOpen
     ) {
+        // `FlowRow` e não `Row`: as células somam quase 900dp e a janela de
+        // sessões abre menor que isso. Numa `Row` a última coluna — que é onde
+        // mora o botão de remover do modo administrativo — simplesmente saía da
+        // área visível, sem rolagem horizontal para alcançá-la.
         FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
         ) {
-            Row(
-                modifier = Modifier.width(170.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(AppShapes.small)
-                        .background(statusColor)
-                )
-                // Com peso, o botão de copiar cabe sempre: a coluna cede espaço em
-                // vez de empurrá-lo para fora da largura fixa da célula.
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = shortSessionId(session.sessionId),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = formatInstant(session.lastTs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                // O clique do botão é consumido por ele: copiar não abre o detalhe.
-                CopySessionCommandButton(
-                    sessionId = session.sessionId,
-                    language = language,
-                    isLocalSession = isLocalSession
-                )
-            }
-
-            Column(modifier = Modifier.width(140.dp)) {
+        Row(
+            modifier = Modifier.width(190.dp),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Com peso, o botão de copiar cabe sempre: a coluna cede espaço em
+            // vez de empurrá-lo para fora da largura fixa da célula.
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = session.projectName ?: "—",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
+                    text = shortSessionId(session.sessionId),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = CliSessionsLabels.turnsLabel(session.turnCount, language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Larguras fixas: sem elas cada linha dimensiona pelo próprio número e
-            // as colunas deixam de alinhar entre as sessões.
-            MetricText(
-                label = CliSessionsLabels.columnTokens(language),
-                value = formatQuantity(session.totalTokens),
-                modifier = Modifier.width(106.dp)
-            )
-
-            Column(modifier = Modifier.width(84.dp)) {
-                MetricText(CliSessionsLabels.columnCache(language), formatPercent(session.cacheHitRate))
-                Spacer(modifier = Modifier.height(4.dp))
-                MeterBar(fraction = session.cacheHitRate, color = CACHE_READ_COLOR, height = 4.dp)
-            }
-
-            MetricText(
-                label = CliSessionsLabels.columnCost(language),
-                value = if (session.isCostComplete) {
-                    formatMicrosUsd(session.costMicros)
-                } else {
-                    "${formatMicrosUsd(session.costMicros)}+"
-                },
-                valueColor = INPUT_COLOR,
-                modifier = Modifier.width(96.dp)
-            )
-
-            // Tempo de trabalho, não duração: as pausas acima de cinco minutos
-            // ficam de fora. Sem medida e sem intervalo saem os dois como "—" —
-            // "0min" seria lido como sessão instantânea.
-            MetricText(
-                label = CliSessionsLabels.activeTime(language),
-                value = session.activeMillis
-                    ?.takeIf { millis -> millis > 0L }
-                    ?.let { millis -> formatActiveTime(millis) }
-                    ?: "—",
-                modifier = Modifier.width(72.dp)
-            )
-
-            // O veredito que antes exigia abrir o detalhe. Vem com o número que o
-            // gerou: status sem a evidência não dá para conferir nem para confiar.
-            Column(modifier = Modifier.width(210.dp)) {
-                Text(
-                    text = CliSessionsLabels.healthShort(status.health, language),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = statusColor
-                )
-                Text(
-                    text = CliSessionsLabels.healthReason(
-                        saturationLabel = status.contextSaturation?.let { value -> formatPercent(value) },
-                        nextCostLabel = formatMicrosUsd(status.nextInteractionCostMicros),
-                        language = language
-                    ),
+                    text = formatInstant(session.lastTs),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1
                 )
             }
+            // O clique do botão é consumido por ele: copiar não abre o detalhe.
+            CopySessionCommandButton(
+                sessionId = session.sessionId,
+                language = language,
+                isLocalSession = isLocalSession
+            )
+        }
 
-            if (onRemove != null) {
-                IconButton(
-                    onClick = onRemove,
-                    modifier = if (removeButtonTag != null) {
-                        Modifier.testTag(removeButtonTag)
-                    } else {
-                        Modifier
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = TeamUsageLabels.removeSession(language),
-                        tint = MaterialTheme.colorScheme.error
-                    )
+        Column(modifier = Modifier.width(140.dp)) {
+            Text(
+                text = session.projectName ?: "—",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = CliSessionsLabels.turnsLabel(session.turnCount, language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+
+        // Larguras fixas: sem elas cada linha dimensiona pelo próprio número e
+        // as colunas deixam de alinhar entre as sessões.
+        // As larguras subiram junto com a fonte: a IBM Plex Mono é mais larga que
+        // a de sistema, e "Tokens (com cache)" quebrava em duas linhas dentro de
+        // 106dp, deixando cada linha da lista com uma altura diferente.
+        MetricText(
+            label = CliSessionsLabels.columnTokens(language),
+            value = formatQuantity(session.totalTokens),
+            modifier = Modifier.width(150.dp)
+        )
+
+        Column(modifier = Modifier.width(96.dp)) {
+            MetricText(CliSessionsLabels.columnCache(language), formatPercent(session.cacheHitRate))
+            Spacer(modifier = Modifier.height(4.dp))
+            MeterBar(fraction = session.cacheHitRate, color = AppAccents.current.cacheRead, height = 4.dp)
+        }
+
+        MetricText(
+            label = CliSessionsLabels.columnCost(language),
+            value = if (session.isCostComplete) {
+                formatMicrosUsd(session.costMicros)
+            } else {
+                "${formatMicrosUsd(session.costMicros)}+"
+            },
+            modifier = Modifier.width(110.dp)
+        )
+
+        // Tempo de trabalho, não duração: as pausas acima de cinco minutos
+        // ficam de fora. Sem medida e sem intervalo saem os dois como "—" —
+        // "0min" seria lido como sessão instantânea.
+        MetricText(
+            label = CliSessionsLabels.activeTime(language),
+            value = session.activeMillis
+                ?.takeIf { millis -> millis > 0L }
+                ?.let { millis -> formatActiveTime(millis) }
+                ?: "—",
+            modifier = Modifier.width(96.dp)
+        )
+
+        // O veredito que antes exigia abrir o detalhe. Vem com o número que o
+        // gerou: status sem a evidência não dá para conferir nem para confiar.
+        Column(modifier = Modifier.width(210.dp)) {
+            AppStatusIndicator(
+                label = CliSessionsLabels.healthShort(status.health, language),
+                tone = statusTone
+            )
+            Text(
+                text = CliSessionsLabels.healthReason(
+                    saturationLabel = status.contextSaturation?.let { value -> formatPercent(value) },
+                    nextCostLabel = formatMicrosUsd(status.nextInteractionCostMicros),
+                    language = language
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (onRemove != null) {
+            AppIconButton(
+                contentDescription = TeamUsageLabels.removeSession(language),
+                onClick = onRemove,
+                tone = AppButtonTone.DANGER,
+                modifier = if (removeButtonTag != null) {
+                    Modifier.testTag(removeButtonTag)
+                } else {
+                    Modifier
                 }
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
+        }
         }
     }
 }
@@ -1244,6 +1280,21 @@ internal fun healthColor(
         CliSessionHealth.HEALTHY -> accents.cacheRead
         CliSessionHealth.ATTENTION -> accents.cacheWrite
         CliSessionHealth.SATURATED -> accents.saturated
+    }
+}
+
+/**
+ * O mesmo veredito como severidade do sistema.
+ *
+ * Convive com [healthColor] em vez de substituí-lo: aquele ainda serve a quem
+ * precisa da cor crua para pintar traço de gráfico, e este entrega o par
+ * ponto + palavra que a lista e o detalhe usam.
+ */
+internal fun healthTone(health: CliSessionHealth): AppTone {
+    return when (health) {
+        CliSessionHealth.HEALTHY -> AppTone.OK
+        CliSessionHealth.ATTENTION -> AppTone.WARNING
+        CliSessionHealth.SATURATED -> AppTone.CRITICAL
     }
 }
 
