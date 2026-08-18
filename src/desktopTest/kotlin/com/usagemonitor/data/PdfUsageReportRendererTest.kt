@@ -10,7 +10,9 @@ import com.usagemonitor.presentation.ui.report.UsageReportEntry
 import com.usagemonitor.presentation.ui.report.UsageReportSection
 import kotlinx.datetime.DayOfWeek
 import org.apache.pdfbox.Loader
+import org.apache.pdfbox.rendering.PDFRenderer
 import org.apache.pdfbox.text.PDFTextStripper
+import java.awt.Color
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -69,7 +71,9 @@ class PdfUsageReportRendererTest {
             val stripper = PDFTextStripper()
             stripper.startPage = 2
             stripper.endPage = 2
-            assertTrue(stripper.getText(pdf).contains("Projeto"), "cabeçalho não voltou na página 2")
+            val secondPage = stripper.getText(pdf)
+            assertTrue(secondPage.contains("Projetos - continuação"), secondPage)
+            assertTrue(secondPage.contains("Projeto"), "cabeçalho não voltou na página 2")
 
             // A última página numera o total, que só existe depois de todas escritas.
             val last = PDFTextStripper()
@@ -87,6 +91,40 @@ class PdfUsageReportRendererTest {
 
         Loader.loadPDF(bytes).use { pdf ->
             assertEquals(1, pdf.numberOfPages)
+        }
+    }
+
+    @Test
+    fun `todas as paginas recebem o fundo dark`() {
+        val rows = (1..120).map { index ->
+            listOf("projeto-$index", index.toString(), "US$ 1.00")
+        }
+        val document = UsageReportDocument(
+            title = "Relatório",
+            subtitle = "tema dark",
+            sections = listOf(
+                UsageReportSection.Table(
+                    heading = "Projetos",
+                    columns = listOf(
+                        UsageReportColumn("Projeto"),
+                        UsageReportColumn("Turnos", alignEnd = true),
+                        UsageReportColumn("Custo", alignEnd = true)
+                    ),
+                    rows = rows
+                )
+            )
+        )
+
+        val bytes = PdfUsageReportRenderer(AppLanguage.PT).render(document)
+
+        Loader.loadPDF(bytes).use { pdf ->
+            val renderer = PDFRenderer(pdf)
+            assertTrue(pdf.numberOfPages > 1)
+            for (pageIndex in 0 until pdf.numberOfPages) {
+                val image = renderer.renderImageWithDPI(pageIndex, 72f)
+                val corner = Color(image.getRGB(1, 1))
+                assertEquals(Color(0x18, 0x18, 0x18), corner, "fundo da página ${pageIndex + 1}")
+            }
         }
     }
 }

@@ -164,7 +164,7 @@ fun reportForTeam(
             UsageReportColumn(CliSessionsLabels.columnCost(language), weight = 1.1f, alignEnd = true),
             UsageReportColumn(CliSessionsLabels.activeTime(language), weight = 0.9f, alignEnd = true)
         ),
-        rows = state.members.map { member ->
+        rows = state.members.sortedByActiveTimeDescending { member -> member.totalActiveMillis }.map { member ->
             listOf(
                 member.alias,
                 member.machineLabel,
@@ -198,10 +198,12 @@ fun reportForTeam(
             UsageReportColumn(CliSessionsLabels.columnCost(language), weight = 1f, alignEnd = true),
             UsageReportColumn(CliSessionsLabels.activeTime(language), weight = 0.8f, alignEnd = true)
         ),
-        rows = state.members.flatMap { member ->
-            member.sessions.map { session ->
+        rows = state.members
+            .flatMap { member -> member.sessions.map { session -> member.alias to session } }
+            .sortedByActiveTimeDescending { (_, session) -> session.activeMillis }
+            .map { (memberAlias, session) ->
                 listOf(
-                    member.alias,
+                    memberAlias,
                     shortSessionId(session.sessionId),
                     session.projectName ?: "-",
                     session.primaryModel ?: "-",
@@ -211,7 +213,6 @@ fun reportForTeam(
                     activeCell(session.activeMillis)
                 )
             }
-        }
     )
 
     if (!state.isTotalCostComplete) {
@@ -268,7 +269,12 @@ private fun bucketTable(
         }
     }
 
-    val rows = buckets.map { bucket ->
+    val rankedBuckets = if (hasActiveTime) {
+        buckets.sortedByActiveTimeDescending { bucket -> bucket.activeMillis }
+    } else {
+        buckets
+    }
+    val rows = rankedBuckets.map { bucket ->
         buildList {
             add(bucket.label ?: unknownLabel)
             add(bucket.sessionCount.toString())
@@ -318,7 +324,7 @@ private fun sessionTable(
             UsageReportColumn(CliSessionsLabels.activeTime(language), weight = 0.9f, alignEnd = true),
             UsageReportColumn(ReportLabels.lastTurn(language), weight = 1.4f)
         ),
-        rows = sessions.map { session ->
+        rows = sessions.sortedByActiveTimeDescending { session -> session.activeMillis }.map { session ->
             listOf(
                 shortSessionId(session.sessionId),
                 session.projectName ?: "-",
@@ -332,6 +338,15 @@ private fun sessionTable(
             )
         }
     )
+}
+
+/**
+ * Ordem exclusiva do PDF: maior tempo ativo primeiro, zero depois e medição
+ * ausente no fim. `sortedWith` é estável, então empates preservam o ranking que
+ * a tela já recebeu (custo, tokens ou último turno, conforme a origem).
+ */
+private fun <T> List<T>.sortedByActiveTimeDescending(activeMillisOf: (T) -> Long?): List<T> {
+    return sortedWith(compareByDescending<T> { item -> activeMillisOf(item) ?: Long.MIN_VALUE })
 }
 
 /** Custo incompleto sai com `+`, como na tela: é piso, não total. */
@@ -452,4 +467,6 @@ internal object ReportLabels {
 
     fun page(current: Int, total: Int, language: AppLanguage) =
         pick(language, "Página $current de $total", "Page $current of $total")
+
+    fun continued(language: AppLanguage) = pick(language, "continuação", "continued")
 }

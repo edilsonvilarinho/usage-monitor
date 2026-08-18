@@ -7,10 +7,13 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
+import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.report.UsageReportSection
 import com.usagemonitor.presentation.ui.report.reportForCliSessions
+import com.usagemonitor.presentation.ui.report.reportForTeam
 import com.usagemonitor.presentation.ui.report.toReportText
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Instant
 import kotlin.test.Test
@@ -117,6 +120,88 @@ class UsageReportBuildersTest {
         assertEquals("Sessões · US$ 1,00 — fim", "Sessões · US$ 1,00 — fim".toReportText())
         assertEquals("?", "→".toReportText())
     }
+
+    @Test
+    fun `sessoes cli saem por tempo ativo e preservam empates`() {
+        val state = successState().copy(
+            sessions = listOf(
+                session("zero", "p", activeMillis = 0L),
+                session("ausente", "p", activeMillis = null),
+                session("maior", "p", activeMillis = 7_200_000L),
+                session("empate-a", "p", activeMillis = 3_600_000L),
+                session("empate-b", "p", activeMillis = 3_600_000L)
+            )
+        )
+
+        val document = reportForCliSessions(state = state, language = AppLanguage.PT, now = NOW)
+        val sessions = document.sections.filterIsInstance<UsageReportSection.Table>().last()
+
+        assertEquals(
+            listOf("maior", "empate-a", "empate-b", "zero", "ausente"),
+            sessions.rows.map { row -> row.first() }
+        )
+    }
+
+    @Test
+    fun `eixos com tempo sao reordenados e modelo preserva o ranking`() {
+        val state = successState()
+        val original = requireNotNull(state.breakdown)
+        val breakdown = original.copy(
+            byProject = listOf(
+                CliUsageBucket(label = "zero", activeMillis = 0L),
+                CliUsageBucket(label = "ausente", activeMillis = null),
+                CliUsageBucket(label = "maior", activeMillis = 7_200_000L),
+                CliUsageBucket(label = "empate-a", activeMillis = 3_600_000L),
+                CliUsageBucket(label = "empate-b", activeMillis = 3_600_000L)
+            ),
+            byModel = listOf(
+                CliUsageBucket(label = "modelo-b", costMicros = 2L),
+                CliUsageBucket(label = "modelo-a", costMicros = 1L)
+            )
+        )
+
+        val document = reportForCliSessions(
+            state = state.copy(breakdown = breakdown),
+            language = AppLanguage.PT,
+            now = NOW
+        )
+        val tables = document.sections.filterIsInstance<UsageReportSection.Table>()
+        val projects = tables.first { table -> table.heading == "Projeto" }
+        val models = tables.first { table -> table.heading == "Modelo" }
+
+        assertEquals(
+            listOf("maior", "empate-a", "empate-b", "zero", "ausente"),
+            projects.rows.map { row -> row.first() }
+        )
+        assertEquals(listOf("modelo-b", "modelo-a"), models.rows.map { row -> row.first() })
+    }
+
+    @Test
+    fun `relatorio do time ordena integrantes e sessoes por tempo ativo`() {
+        val members = listOf(
+            teamMember("zero", session("zero", "p", activeMillis = 0L)),
+            teamMember("ausente", session("ausente", "p", activeMillis = null)),
+            teamMember("maior", session("maior", "p", activeMillis = 7_200_000L)),
+            teamMember("empate-a", session("empate-a", "p", activeMillis = 3_600_000L)),
+            teamMember("empate-b", session("empate-b", "p", activeMillis = 3_600_000L))
+        )
+
+        val document = reportForTeam(
+            state = TeamUsageUiState.Success(members = members),
+            language = AppLanguage.PT,
+            now = NOW
+        )
+        val tables = document.sections.filterIsInstance<UsageReportSection.Table>()
+
+        assertEquals(
+            listOf("maior", "empate-a", "empate-b", "zero", "ausente"),
+            tables.first().rows.map { row -> row.first() }
+        )
+        assertEquals(
+            listOf("maior", "empate-a", "empate-b", "zero", "ausente"),
+            tables.last().rows.map { row -> row.first() }
+        )
+    }
 }
 
 private fun successState(
@@ -161,7 +246,7 @@ private fun successState(
 private fun session(
     sessionId: String,
     projectLabel: String,
-    activeMillis: Long,
+    activeMillis: Long?,
     unpricedTurnCount: Int = 0
 ): CliSessionSummary {
     return CliSessionSummary(
@@ -177,5 +262,14 @@ private fun session(
         costMicros = 250_000L,
         unpricedTurnCount = unpricedTurnCount,
         activeMillis = activeMillis
+    )
+}
+
+private fun teamMember(alias: String, session: CliSessionSummary): TeamMemberUsage {
+    return TeamMemberUsage(
+        deviceId = "device-$alias",
+        alias = alias,
+        hostName = "host-$alias",
+        sessions = listOf(session)
     )
 }
