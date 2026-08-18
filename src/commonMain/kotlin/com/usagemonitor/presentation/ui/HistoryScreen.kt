@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +73,25 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToLong
+
+/**
+ * Âncoras da tela de Histórico.
+ *
+ * Os três seletores — fonte, conta e intervalo — são hoje três blocos com
+ * rótulo próprio e viram uma barra de controles só. O rótulo da conta é o mais
+ * frágil dos três como âncora de teste: é `email — workspace`, texto longo e
+ * livre, que já aparece também no card do dashboard.
+ */
+const val HISTORY_SOURCE_CHIP_TAG_PREFIX = "historySourceChip:"
+const val HISTORY_ACCOUNT_CHIP_TAG_PREFIX = "historyAccountChip:"
+const val HISTORY_RANGE_CHIP_TAG_PREFIX = "historyRangeChip:"
+
+fun historySourceChipTag(source: ApiSource): String = "$HISTORY_SOURCE_CHIP_TAG_PREFIX${source.name}"
+
+fun historyAccountChipTag(account: UsageAccountContext): String =
+    "$HISTORY_ACCOUNT_CHIP_TAG_PREFIX${account.key.providerAccountId}/${account.key.workspaceId}"
+
+fun historyRangeChipTag(range: HistoryRange): String = "$HISTORY_RANGE_CHIP_TAG_PREFIX${range.name}"
 
 @Composable
 fun HistoryScreen(
@@ -354,7 +374,8 @@ private fun HistoryControls(
                         RangeChip(
                             label = sourceLabel(source),
                             selected = source == selectedSource,
-                            onClick = { onSelectSource(source) }
+                            onClick = { onSelectSource(source) },
+                            testTag = historySourceChipTag(source)
                         )
                     }
                 }
@@ -387,7 +408,8 @@ private fun HistoryControls(
                             RangeChip(
                                 label = account.displayLabel,
                                 selected = account.key == selectedAccount?.key,
-                                onClick = { onSelectAccount(account) }
+                                onClick = { onSelectAccount(account) },
+                                testTag = historyAccountChipTag(account)
                             )
                         }
                     }
@@ -409,7 +431,8 @@ private fun HistoryControls(
                     RangeChip(
                         label = rangeLabel(range, language),
                         selected = range == selectedRange,
-                        onClick = { onSelectRange(range) }
+                        onClick = { onSelectRange(range) },
+                        testTag = historyRangeChipTag(range)
                     )
                 }
             }
@@ -421,7 +444,8 @@ private fun HistoryControls(
 private fun RangeChip(
     label: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    testTag: String? = null
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -439,6 +463,7 @@ private fun RangeChip(
     FilterChip(
         selected = selected,
         onClick = onClick,
+        modifier = if (testTag == null) Modifier else Modifier.testTag(testTag),
         label = {
             Text(
                 text = label,

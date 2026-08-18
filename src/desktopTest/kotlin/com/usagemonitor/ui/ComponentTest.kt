@@ -80,6 +80,7 @@ import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
 import com.usagemonitor.presentation.ui.components.quotaBlockTag
+import com.usagemonitor.presentation.ui.historyAccountChipTag
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
@@ -2231,11 +2232,13 @@ class ComponentTest {
             }.getOrDefault(false)
         }
         onNodeWithText("Conta").assertIsDisplayed()
-        onNodeWithText(accountA.displayLabel).assertIsSelected()
-        onNodeWithText(accountB.displayLabel).performClick()
+        // Pela tag: o rótulo da conta é `email — workspace`, texto longo e livre
+        // que também aparece no card do dashboard.
+        onNodeWithTag(historyAccountChipTag(accountA)).assertIsSelected()
+        onNodeWithTag(historyAccountChipTag(accountB)).performClick()
         waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                onNodeWithText(accountB.displayLabel).assertIsSelected()
+                onNodeWithTag(historyAccountChipTag(accountB)).assertIsSelected()
                 true
             }.getOrDefault(false)
         }
