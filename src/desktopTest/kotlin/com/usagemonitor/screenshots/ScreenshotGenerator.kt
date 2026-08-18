@@ -70,15 +70,17 @@ private const val SCALE = 2
 /**
  * Aquecimento antes do frame publicado.
  *
- * `ApiUsageCard` só aparece depois de `delay(index * 90)` seguido de
+ * `ApiUsageCard` só aparece depois de `delay(index * AppMotion.stagger)` seguido de
  * `AnimatedVisibility`, e são dois relógios diferentes: o `delay` roda em
  * `Dispatchers.Unconfined`, que espera **tempo real**, enquanto a animação
  * consome o `nanoTime` passado a `render`. Avançar só um dos dois deixa a cena
  * em branco — foi o que aconteceu na primeira versão deste gerador.
  *
  * Por isso o laço dorme de verdade entre frames e ainda adianta o relógio da
- * cena. Um segundo real cobre com folga o maior `delay` da grade (270ms), e dois
- * segundos de tempo de cena encerram qualquer fade de entrada.
+ * cena. Um segundo real cobre com folga o maior `delay` da grade (180ms com o
+ * stagger de 60), e dois segundos de tempo de cena encerram qualquer fade de
+ * entrada. Encurtar a duração do motion é seguro aqui; **alongar** o stagger
+ * acima de um segundo de acumulado exige subir [WARMUP_FRAMES].
  */
 private const val WARMUP_FRAMES = 20
 private const val WARMUP_SLEEP_MILLIS = 50L

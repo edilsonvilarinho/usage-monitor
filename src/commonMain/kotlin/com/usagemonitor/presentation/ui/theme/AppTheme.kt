@@ -20,20 +20,71 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Durações: 120 para hover e foco, 180 para seleção, 240 para expandir e
+ * recolher.
+ *
+ * São mais curtas que as anteriores (150/250/350) porque a densidade subiu: numa
+ * linha de 32dp de altura, 350ms de transição é tempo suficiente para o olho
+ * perceber atraso onde antes havia um card de 96dp se movendo.
+ *
+ * **Nenhuma animação infinita.** A regra não é estética: animação sem fim trava
+ * o `waitForIdle` dos testes de componente, e o `ShimmerBox` — a única que
+ * existe — fica onde está sem ser replicada.
+ */
 object AppMotion {
-    const val fast:   Int  = 150
-    const val normal: Int  = 250
-    const val slow:   Int  = 350
-    const val stagger: Long = 70L
+    const val fast:   Int  = 120
+    const val normal: Int  = 180
+    const val slow:   Int  = 240
+
+    /**
+     * Atraso entre itens vizinhos na entrada de uma grade ou lista.
+     *
+     * O `ScreenshotGenerator` é calibrado contra ele: o laço de aquecimento
+     * dorme tempo real suficiente para cobrir o maior atraso da grade. Encurtar
+     * é seguro; **alongar exige revalidar o gerador**, ou a captura sai
+     * meio-desenhada.
+     */
+    const val stagger: Long = 60L
 
     val enterEasing: Easing = FastOutSlowInEasing
     val exitEasing:  Easing = FastOutLinearInEasing
 }
 
+/**
+ * Três patamares: 0, 2 e 8.
+ *
+ * A superfície de dados fica em **zero** — quem a separa do fundo é a borda de
+ * 1dp e o espaçamento, não a sombra. Sombra em card de conteúdo foi justamente
+ * o que empilhou containers de mesmo peso na tela anterior. [dialog] é o único
+ * patamar alto, e existe porque diálogo e menu flutuam de fato sobre a janela.
+ */
 object AppElevation {
-    val card:   Dp = 2.dp
+    /** Superfície de dados e banner: separação por borda, não por sombra. */
+    val card:   Dp = 0.dp
+    val banner: Dp = 0.dp
+
+    /** Overlay curto: tooltip e menu suspenso. */
+    val raised: Dp = 2.dp
+
+    /** Diálogo e qualquer coisa que cubra a janela. */
     val dialog: Dp = 8.dp
-    val banner: Dp = 1.dp
+}
+
+/**
+ * Grade de espaçamento: 4 · 8 · 12 · 16 · 24 · 32.
+ *
+ * Existe para o padding parar de ser um literal diferente em cada arquivo. Os
+ * nomes são posicionais de propósito — `sm`/`lg` obrigariam a decidir o que é
+ * "grande" antes de saber onde o valor cai.
+ */
+object AppSpacing {
+    val xs:  Dp = 4.dp
+    val sm:  Dp = 8.dp
+    val md:  Dp = 12.dp
+    val lg:  Dp = 16.dp
+    val xl:  Dp = 24.dp
+    val xxl: Dp = 32.dp
 }
 
 /**
@@ -56,15 +107,31 @@ object AppGlow {
     const val card: Float = 0.22f
 }
 
+/**
+ * Raios: 4 · 6 · 8 · 10, e o teto é 10.
+ *
+ * A escala anterior ia de 10 a 28dp e transformava quase toda superfície num
+ * card grande; com tudo arredondado do mesmo jeito, a hierarquia deixava de ser
+ * lida. [extraLarge] repete 10 de propósito — o nome sobrevive nas chamadas
+ * existentes sem reabrir a porta para um raio maior.
+ */
 object AppShapes {
-    val small      = RoundedCornerShape(10.dp)
-    val medium     = RoundedCornerShape(16.dp)
-    val large      = RoundedCornerShape(20.dp)
-    val extraLarge = RoundedCornerShape(28.dp)
+    /** Marcador, célula, amostra de cor. */
+    val extraSmall = RoundedCornerShape(4.dp)
+
+    /** Botão, campo, banner, bloco de métrica. */
+    val small      = RoundedCornerShape(6.dp)
+
+    /** Superfície de dados e painel de gráfico. */
+    val medium     = RoundedCornerShape(8.dp)
+
+    /** Janela e diálogo — o teto da escala. */
+    val large      = RoundedCornerShape(10.dp)
+    val extraLarge = RoundedCornerShape(10.dp)
 }
 
 private val appShapes = Shapes(
-    extraSmall = AppShapes.small,
+    extraSmall = AppShapes.extraSmall,
     small      = AppShapes.small,
     medium     = AppShapes.medium,
     large      = AppShapes.large,

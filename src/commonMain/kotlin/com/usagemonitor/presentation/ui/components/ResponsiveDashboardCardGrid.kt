@@ -28,6 +28,7 @@ import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import kotlinx.datetime.Instant
 import com.usagemonitor.presentation.ui.resolveDropTargetIndex
 
@@ -128,7 +129,10 @@ internal fun ResponsiveDashboardCardGrid(
                             isBeingDragged = isBeingDragged,
                             isDragTarget = isDropTarget,
                             language = language,
-                            animationDelayMillis = index * 90,
+                            // O atraso de entrada sai do token, não de um
+                            // literal: o `ScreenshotGenerator` é calibrado
+                            // contra ele e precisa de um dono só.
+                            animationDelayMillis = index * AppMotion.stagger.toInt(),
                             onRefresh = { onRefreshCard(stats.targetKey) },
                             onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
                             onOpenCliSessions = if (stats.source == ApiSource.ANTHROPIC) {
