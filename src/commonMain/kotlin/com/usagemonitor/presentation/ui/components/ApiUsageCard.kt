@@ -613,16 +613,12 @@ private fun InlineNotices(
             .toList()
             .sortedBy { notice -> notice.ordinal }
             .forEach { notice ->
-                Text(
-                    text = inlineNoticeText(notice = notice, language = language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = accentColorFor(source),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(AppShapes.medium)
-                        .background(accentColorFor(source).copy(alpha = 0.12f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                // O aviso é do estado da fonte, não da identidade dela: pintá-lo
+                // com a cor da API dizia "Codex" onde precisava dizer "atenção".
+                AppBanner(
+                    title = inlineNoticeText(notice = notice, language = language),
+                    tone = AppTone.WARNING,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
     }
