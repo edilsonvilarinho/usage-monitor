@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -85,13 +86,24 @@ internal fun UsageHistoryLineChart(
     chartSelectionKey: String,
     modifier: Modifier = Modifier,
     tooltipTitle: String? = null,
-    tooltipSubtitle: String? = null
+    tooltipSubtitle: String? = null,
+    /**
+     * Cor da série.
+     *
+     * Entra por parâmetro porque a identidade é da **fonte**: o histórico da
+     * Anthropic é azul, o do Codex é verde-água, e os dois desenhavam a mesma
+     * linha `primary` — a cor que o card do dashboard usa para distingui-los não
+     * chegava até aqui.
+     */
+    accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
-    val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f)
-    val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-    val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    val lineColor = accentColor
+    val fillColor = accentColor.copy(alpha = 0.12f)
+    // A grade é a mesma cor de borda do resto do app, e não o texto com alpha:
+    // duas linhas de referência com tons diferentes numa tela só.
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
     val axisTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val chartIndicatorColor = MaterialTheme.colorScheme.primary
+    val chartIndicatorColor = accentColor
     val chartIndicatorHaloColor = MaterialTheme.colorScheme.surface
     val renderPoints = filteredPoints(points, unit)
 

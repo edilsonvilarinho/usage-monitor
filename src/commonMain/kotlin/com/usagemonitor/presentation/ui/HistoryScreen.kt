@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
+import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataSurface
@@ -807,53 +809,39 @@ private fun HistorySeriesCard(
         language = language
     )
 
-    Card(
+    // Painel neutro com cabeçalho: a faixa de 3dp que atravessava a altura toda
+    // do card virou o marcador de 2dp do cabeçalho, o mesmo que identifica a
+    // fonte no dashboard. A cor sai da moldura e entra na linha do gráfico, que
+    // é onde ela realmente distingue uma série da outra.
+    AppDataSurfaceFlush(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 alpha = cardAlpha
                 translationY = cardOffsetY
             },
-        shape = AppShapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(3.dp)
-                    .background(accentColor.copy(alpha = 0.85f))
+        header = {
+            AppSectionHeader(
+                title = title,
+                subtitle = subtitle,
+                markerColor = accentColor
             )
+        }
+    ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .fillMaxWidth()
+                    .padding(AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = accentColor,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
                 UsageHistoryLineChart(
                     points = series.points,
                     unit = series.unit,
                     language = language,
                     chartSelectionKey = chartSelectionKey,
                     tooltipTitle = title,
-                    tooltipSubtitle = subtitle
+                    tooltipSubtitle = subtitle,
+                    accentColor = accentColor
                 )
 
                 if (weeklySummary != null) {
@@ -877,7 +865,6 @@ private fun HistorySeriesCard(
                     )
                 }
             }
-        }
     }
 }
 
