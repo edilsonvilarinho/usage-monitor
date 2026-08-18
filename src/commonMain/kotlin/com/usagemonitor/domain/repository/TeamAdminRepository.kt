@@ -33,6 +33,12 @@ interface TeamAdminRepository {
     suspend fun unclaimAccount(id: String, accountKey: String): Result<TeamKeyEntry>
 
     /**
+     * Apaga um integrante e os dados enviados por ele usando a autoridade de
+     * administração, independentemente da chave de time dona da conta.
+     */
+    suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit>
+
+    /**
      * Apaga uma conta inteira do servidor: integrantes, sessões, turnos e o
      * vínculo com a chave. **Irreversível.**
      *

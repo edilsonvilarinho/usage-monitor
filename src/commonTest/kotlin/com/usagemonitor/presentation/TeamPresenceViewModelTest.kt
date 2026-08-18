@@ -135,6 +135,9 @@ private class FakePresenceAdminRepository(
     val deletedAccounts = mutableListOf<String>()
     var deleteResult: Result<TeamAccountDeletion>? = null
 
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException())
+
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
         deletedAccounts += accountKey
         return deleteResult ?: Result.success(

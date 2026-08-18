@@ -90,6 +90,14 @@ class UnclaimTeamKeyAccountUseCase(
         repository.unclaimAccount(id = id, accountKey = accountKey)
 }
 
+/** Remove um integrante com o token de administração do servidor. */
+class RemoveAdminTeamMemberUseCase(
+    private val repository: TeamAdminRepository
+) {
+    suspend operator fun invoke(accountKey: String, deviceId: String): Result<Unit> =
+        repository.removeMember(accountKey = accountKey, deviceId = deviceId)
+}
+
 /**
  * Apaga uma conta inteira do servidor. **Irreversível.**
  *

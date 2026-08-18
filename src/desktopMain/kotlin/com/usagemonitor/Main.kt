@@ -94,6 +94,7 @@ import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
 import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
@@ -504,6 +505,7 @@ fun main() = application {
             removeTeamMember = RemoveTeamMemberUseCase(teamUsageRepository),
             getTeamSessionDetail = GetTeamSessionDetailUseCase(teamUsageRepository),
             getAdminOverview = GetAdminTeamOverviewUseCase(teamAdminRepository),
+            removeAdminTeamMember = RemoveAdminTeamMemberUseCase(teamAdminRepository),
             getTeamUsageTrend = GetTeamUsageTrendUseCase(teamUsageRepository),
             exportWriter = usageExportWriter,
             liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS

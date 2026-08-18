@@ -110,6 +110,9 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
         return Result.success(updated)
     }
 
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException())
+
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
         deletedAccounts += accountKey
         return Result.failure(UnsupportedOperationException())

@@ -288,6 +288,38 @@ class TeamUsageScreenTest {
         onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-2").assertExists()
     }
 
+    /** Issue #66: o administrador também pode apagar o histórico da máquina local. */
+    @Test
+    fun `visao global permite remover a maquina local`() = runDesktopComposeUiTest {
+        var removed: String? = null
+
+        renderSuccess(
+            state = TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(session("s1")),
+                        accountKey = "account-a",
+                        accountLabel = "fulano@empresa.com"
+                    )
+                ),
+                expandedAccountKeys = setOf("account-a"),
+                isAdminOverview = true
+            ),
+            localDeviceId = "device-1",
+            onRemoveMember = { memberKey -> removed = memberKey }
+        )
+
+        onNodeWithTag("${TEAM_MEMBER_REMOVE_TAG_PREFIX}device-1").performClick()
+        assertEquals(null, removed)
+
+        onNodeWithTag(TEAM_REMOVE_CONFIRM_TAG).performClick()
+
+        assertEquals("account-a/device-1", removed)
+    }
+
     @Test
     fun `remover so emite depois da confirmacao`() = runDesktopComposeUiTest {
         var removed: String? = null
@@ -864,7 +896,8 @@ class TeamUsageScreenTest {
         height: androidx.compose.ui.unit.Dp = 700.dp,
         onToggleAccount: (String) -> Unit = {},
         onSelectView: (TeamUsageView) -> Unit = {},
-        onExportReport: () -> Unit = {}
+        onExportReport: () -> Unit = {},
+        onRemoveMember: (String) -> Unit = {}
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -877,7 +910,8 @@ class TeamUsageScreenTest {
                         onToggleAccount = onToggleAccount,
                         localDeviceId = localDeviceId,
                         onSelectView = onSelectView,
-                        onExportReport = onExportReport
+                        onExportReport = onExportReport,
+                        onRemoveMember = onRemoveMember
                     )
                 }
             }

@@ -113,6 +113,17 @@ class TeamAdminRepositoryImpl(
         }
     }
 
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
+        return withAdmin { settings ->
+            remoteDataSource.deleteMember(
+                baseUrl = settings.normalizedServerUrl,
+                credential = TeamCredential.AdminToken(settings.adminToken),
+                accountKey = accountKey,
+                deviceId = deviceId
+            )
+        }
+    }
+
     /**
      * Apaga a conta inteira. Não tem desfazer e não tem fallback.
      *

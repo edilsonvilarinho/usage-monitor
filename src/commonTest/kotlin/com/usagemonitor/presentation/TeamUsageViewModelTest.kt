@@ -22,6 +22,7 @@ import com.usagemonitor.domain.repository.TeamUsageTrendData
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
@@ -830,6 +831,9 @@ class TeamUsageViewModelTest {
             getAdminOverview = adminRepository?.let { admin ->
                 GetAdminTeamOverviewUseCase(admin, useCaseClock)
             },
+            removeAdminTeamMember = adminRepository?.let { admin ->
+                RemoveAdminTeamMemberUseCase(admin)
+            },
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = TEAM_LIVE_INTERVAL_MILLIS,
             clock = TeamFixedClock(TEAM_FIXED_NOW)
@@ -945,7 +949,8 @@ class TeamUsageViewModelTest {
         viewModel.removeMember("$OTHER_ACCOUNT_KEY/device-1")
         runCurrent()
 
-        assertEquals(listOf(OTHER_ACCOUNT_KEY to "device-1"), repository.removedTargets)
+        assertEquals(listOf(OTHER_ACCOUNT_KEY to "device-1"), admin.removedMembers)
+        assertTrue(repository.removedTargets.isEmpty())
         viewModel.onDestroy()
     }
 
@@ -1013,6 +1018,8 @@ private const val OTHER_ACCOUNT_KEY = "account-uuid-bbb"
 private class FakeAdminOverviewRepository(
     private val accounts: List<TeamAccountUsage>
 ) : TeamAdminRepository {
+    val removedMembers = mutableListOf<Pair<String, String>>()
+
     override suspend fun validateToken(): Result<Unit> = Result.success(Unit)
 
     override suspend fun listKeys(): Result<List<TeamKeyEntry>> = Result.success(emptyList())
@@ -1034,6 +1041,11 @@ private class FakeAdminOverviewRepository(
 
     override suspend fun unclaimAccount(id: String, accountKey: String): Result<TeamKeyEntry> =
         Result.failure(UnsupportedOperationException())
+
+    override suspend fun removeMember(accountKey: String, deviceId: String): Result<Unit> {
+        removedMembers += accountKey to deviceId
+        return Result.success(Unit)
+    }
 
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> =
         Result.failure(UnsupportedOperationException())

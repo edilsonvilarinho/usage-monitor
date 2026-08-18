@@ -388,10 +388,12 @@ private fun TeamUsageList(
                                 share = state.tokenShareOf(member),
                                 expanded = member.memberKey in state.expandedMemberKeys,
                                 language = language,
-                                // Esta máquina volta no próximo envio, então oferecer
-                                // o botão só entregaria uma remoção que se desfaz
-                                // sozinha — e apagaria o histórico dela no caminho.
-                                removable = localDeviceId != null && member.deviceId != localDeviceId,
+                                // No modal de uma conta, esta máquina volta no próximo
+                                // envio e a remoção se desfaz sozinha. Na visão global,
+                                // porém, quem administra pode apagar qualquer histórico,
+                                // inclusive o enviado pela própria máquina.
+                                removable = state.isAdminOverview ||
+                                    (localDeviceId != null && member.deviceId != localDeviceId),
                                 onToggle = { onToggleMember(member.memberKey) },
                                 onRemove = { onRequestRemoveMember(member) }
                             )

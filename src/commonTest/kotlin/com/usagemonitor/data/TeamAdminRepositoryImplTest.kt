@@ -30,12 +30,27 @@ private val ADMIN = CONFIGURED.copy(adminToken = "token-de-admin-com-tamanho-suf
 private class FakeRemoteTeamDataSource(
     private val claimResult: Result<TeamVerificationDto>,
     private val verifyResult: Result<TeamVerificationDto>,
+    private val deleteMemberResult: Result<Unit> =
+        Result.failure(IllegalStateException("nao deveria chamar")),
     private val deleteAccountResult: Result<TeamAccountDeletionDto> =
         Result.failure(IllegalStateException("nao deveria chamar"))
 ) : RemoteTeamDataSource(HttpClient()) {
     var claimCalls = 0
     var verifyCalls = 0
+    var deleteMemberCalls = 0
     var deleteAccountCalls = 0
+    var lastDeleteMemberCredential: TeamCredential? = null
+
+    override suspend fun deleteMember(
+        baseUrl: String,
+        credential: TeamCredential,
+        accountKey: String,
+        deviceId: String
+    ) {
+        deleteMemberCalls += 1
+        lastDeleteMemberCredential = credential
+        deleteMemberResult.getOrThrow()
+    }
 
     override suspend fun deleteAccount(
         baseUrl: String,
@@ -127,6 +142,25 @@ class TeamAdminRepositoryImplTest {
 
         assertTrue(result.isFailure)
         assertEquals(0, remote.verifyCalls)
+    }
+
+    @Test
+    fun `administrador remove integrante com token de admin mesmo tendo chave de time`() = runTest {
+        val remote = FakeRemoteTeamDataSource(
+            claimResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            verifyResult = Result.failure(IllegalStateException("nao deveria chamar")),
+            deleteMemberResult = Result.success(Unit)
+        )
+        val repository = TeamAdminRepositoryImpl(remote) { ADMIN }
+
+        val result = repository.removeMember(ACCOUNT_KEY, "device-1")
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, remote.deleteMemberCalls)
+        assertEquals(
+            TeamCredential.AdminToken(ADMIN.adminToken),
+            remote.lastDeleteMemberCredential
+        )
     }
 
     @Test

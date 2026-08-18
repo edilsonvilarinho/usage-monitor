@@ -15,6 +15,7 @@ import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
 import com.usagemonitor.domain.usecase.GetTeamSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
+import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
 import com.usagemonitor.domain.usecase.RemoveTeamMemberUseCase
 import com.usagemonitor.presentation.ui.report.reportForTeam
 import com.usagemonitor.presentation.ui.reportRequest
@@ -62,6 +63,8 @@ class TeamUsageViewModel(
      * administração, onde a janela só existe por conta.
      */
     private val getAdminOverview: GetAdminTeamOverviewUseCase? = null,
+    /** Remoção global com token de admin; não pode reutilizar a chave de time. */
+    private val removeAdminTeamMember: RemoveAdminTeamMemberUseCase? = null,
     /**
      * Tendência diária. `null` esconde o gráfico — instalação sem ele continua
      * funcionando, mesmo tratamento dos demais recursos opcionais do time.
@@ -141,7 +144,7 @@ class TeamUsageViewModel(
      * instalação não tem administração.
      */
     fun openForAllAccounts() {
-        if (getAdminOverview == null) {
+        if (getAdminOverview == null || removeAdminTeamMember == null) {
             return
         }
 
@@ -295,10 +298,12 @@ class TeamUsageViewModel(
         val targetAccountKey = member.accountKey ?: accountKey ?: return
 
         viewModelScope.launch {
-            val result = removeTeamMember(
-                accountKey = targetAccountKey,
-                deviceId = member.deviceId
-            )
+            val result = if (adminOverview) {
+                val adminRemover = removeAdminTeamMember ?: return@launch
+                adminRemover(accountKey = targetAccountKey, deviceId = member.deviceId)
+            } else {
+                removeTeamMember(accountKey = targetAccountKey, deviceId = member.deviceId)
+            }
             val error = result.exceptionOrNull()
             if (error != null) {
                 _removalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
