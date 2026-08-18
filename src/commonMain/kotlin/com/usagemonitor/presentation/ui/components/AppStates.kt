@@ -146,6 +146,15 @@ fun AppBanner(
     tone: AppTone,
     modifier: Modifier = Modifier,
     description: String? = null,
+    /**
+     * Terceira linha, opcional.
+     *
+     * Existe porque o aviso de sessão saturada tem três coisas a dizer e as três
+     * são observadas por teste: o veredito, o número que o gerou e o que fazer a
+     * respeito. Emendá-las em um texto só faria o assert por texto do conselho
+     * deixar de casar — foi assim que a necessidade apareceu.
+     */
+    detail: String? = null,
     action: @Composable (RowScope.() -> Unit)? = null
 ) {
     Row(
@@ -161,7 +170,7 @@ fun AppBanner(
         Box(
             modifier = Modifier
                 .width(BANNER_BAR_WIDTH)
-                .height(if (description == null) 16.dp else 32.dp)
+                .height(if (description == null && detail == null) 16.dp else 32.dp)
                 .clip(AppShapes.extraSmall)
                 .background(tone.color())
         )
@@ -176,6 +185,13 @@ fun AppBanner(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (detail != null) {
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }

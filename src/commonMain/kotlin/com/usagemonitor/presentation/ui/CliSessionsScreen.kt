@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppBanner
+import com.usagemonitor.presentation.ui.components.AppDataSurface
+import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
+import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppIconButton
@@ -1163,59 +1167,23 @@ internal fun AdvancedDisclosure(
 @Composable
 internal fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLanguage) {
     val health = analytics.health
-    val accent = healthColor(health)
 
-    DepthSurface(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = 14.dp
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(width = 4.dp, height = 40.dp)
-                    .clip(AppShapes.small)
-                    .background(accent)
-            )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = CliSessionsLabels.healthTitle(health, language),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = accent
-                    )
-                    Text(
-                        text = CliSessionsLabels.healthReason(
-                            saturationLabel = analytics.contextSaturation?.let { value -> formatPercent(value) },
-                            nextCostLabel = formatMicrosUsd(analytics.nextInteractionCostMicros),
-                            language = language
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = CliSessionsLabels.healthAdvice(health, language),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-    }
+    // Vira o aviso do sistema: barra de severidade de 2dp, título e descrição.
+    // O veredito é o título, e o número que o gerou entra na descrição junto com
+    // o conselho — antes eram três textos concorrendo na mesma linha.
+    AppBanner(
+        title = CliSessionsLabels.healthTitle(health, language),
+        tone = healthTone(health),
+        description = CliSessionsLabels.healthReason(
+            saturationLabel = analytics.contextSaturation?.let { value -> formatPercent(value) },
+            nextCostLabel = formatMicrosUsd(analytics.nextInteractionCostMicros),
+            language = language
+        ),
+        detail = CliSessionsLabels.healthAdvice(health, language),
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
-/**
- * Onde a sessão rodou. A máquina não vem do transcript — o Claude Code não a
- * registra — e sim de quem indexou o arquivo, que é a mesma máquina no uso normal.
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguage) {
@@ -1309,42 +1277,30 @@ internal fun DetailSection(
     help: List<GlossaryTerm> = emptyList(),
     content: @Composable () -> Unit
 ) {
-    DepthSurface(
+    AppDataSurfaceFlush(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = 14.dp
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 3.dp, height = 14.dp)
-                        .clip(AppShapes.small)
-                        .background(accent)
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (help.isNotEmpty()) {
-                    HelpDot(terms = help, language = language)
+        header = {
+            AppSectionHeader(
+                title = title,
+                markerColor = accent,
+                trailing = {
+                    if (help.isNotEmpty()) {
+                        HelpDot(terms = help, language = language)
+                    }
+                    if (trailing != null) {
+                        Text(
+                            text = trailing,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-            }
-            if (trailing != null) {
-                Text(
-                    text = trailing,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accent
-                )
-            }
+            )
         }
-        Spacer(modifier = Modifier.height(10.dp))
-        content()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(AppSpacing.md)) {
+            content()
+        }
     }
 }
 
@@ -1358,9 +1314,10 @@ internal fun MetricCard(
     footer: String? = null,
     help: GlossaryTerm? = null
 ) {
-    DepthSurface(
+    AppDataSurface(
         modifier = Modifier.width(168.dp),
-        contentPadding = 12.dp
+        shape = AppShapes.small,
+        contentPadding = AppSpacing.sm
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -1381,11 +1338,13 @@ internal fun MetricCard(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
+        // O valor é o dado, e ele fica na cor do texto. O acento entra no
+        // marcador da seção e na linha do gráfico; repetido em cada número, a
+        // tela inteira vira uma paleta e nada se destaca.
         Text(
             text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = accent,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
