@@ -110,6 +110,14 @@ fun reportForCliSessions(
             timeZone = timeZone
         ),
         sections = sections,
+        period = periodOf(
+            range = state.range,
+            rangeStartsAt = state.rangeStartsAt,
+            earliestActivityAt = state.sessions.minOfOrNull { session -> session.firstTs },
+            language = language,
+            now = now,
+            timeZone = timeZone
+        ),
         footnotes = footnotes
     ).sanitized()
 }
@@ -239,6 +247,17 @@ fun reportForTeam(
             timeZone = timeZone
         ),
         sections = sections,
+        period = periodOf(
+            range = state.range,
+            rangeStartsAt = state.rangeStartsAt,
+            earliestActivityAt = state.members
+                .asSequence()
+                .flatMap { member -> member.sessions.asSequence() }
+                .minOfOrNull { session -> session.firstTs },
+            language = language,
+            now = now,
+            timeZone = timeZone
+        ),
         footnotes = footnotes
     ).sanitized()
 }
@@ -374,14 +393,42 @@ private fun subtitleOf(
     return "$scopeLabel · $rangeLabel · ${ReportLabels.generatedAt(language)} ${formatTimestamp(now, timeZone)}"
 }
 
+/** Faixa absoluta efetivamente representada pelo relatório. */
+private fun periodOf(
+    range: CliSessionRange,
+    rangeStartsAt: Instant?,
+    earliestActivityAt: Instant?,
+    language: AppLanguage,
+    now: Instant,
+    timeZone: TimeZone
+): String {
+    val start = if (range == CliSessionRange.ALL) {
+        earliestActivityAt
+    } else {
+        rangeStartsAt ?: range.durationMillis?.let { durationMillis ->
+            Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - durationMillis)
+        }
+    }
+    val endLabel = formatTimestamp(now, timeZone)
+    if (start == null) {
+        return ReportLabels.allHistoryUntil(endLabel, language)
+    }
+    return ReportLabels.period(
+        start = formatTimestamp(start, timeZone, includeZone = false),
+        end = endLabel,
+        language = language
+    )
+}
+
 /** `2026-08-17 15:42 BRT` — data absoluta, que é o que um relatório arquivado exige. */
-private fun formatTimestamp(instant: Instant, timeZone: TimeZone): String {
+private fun formatTimestamp(instant: Instant, timeZone: TimeZone, includeZone: Boolean = true): String {
     val local = instant.toLocalDateTime(timeZone)
     val month = local.monthNumber.toString().padStart(2, '0')
     val day = local.dayOfMonth.toString().padStart(2, '0')
     val hour = local.hour.toString().padStart(2, '0')
     val minute = local.minute.toString().padStart(2, '0')
-    return "${local.year}-$month-$day $hour:$minute BRT"
+    val zone = if (includeZone) " BRT" else ""
+    return "${local.year}-$month-$day $hour:$minute$zone"
 }
 
 /**
@@ -436,6 +483,18 @@ internal object ReportLabels {
     fun allAccounts(language: AppLanguage) = pick(language, "Todas as contas", "All accounts")
 
     fun generatedAt(language: AppLanguage) = pick(language, "gerado em", "generated at")
+
+    fun period(start: String, end: String, language: AppLanguage) = pick(
+        language,
+        "Período considerado: $start a $end",
+        "Period considered: $start to $end"
+    )
+
+    fun allHistoryUntil(end: String, language: AppLanguage) = pick(
+        language,
+        "Período considerado: todo o histórico disponível até $end",
+        "Period considered: all available history until $end"
+    )
 
     fun activityNote(language: AppLanguage) = pick(
         language,

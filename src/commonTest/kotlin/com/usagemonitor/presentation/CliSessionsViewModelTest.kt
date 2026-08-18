@@ -224,6 +224,10 @@ class CliSessionsViewModelTest {
             CliSessionRange.LAST_7D,
             assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).range
         )
+        assertEquals(
+            Instant.fromEpochMilliseconds(FIXED_NOW.toEpochMilliseconds() - SEVEN_DAYS_MILLIS),
+            assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).rangeStartsAt
+        )
         viewModel.onDestroy()
     }
 
@@ -255,6 +259,10 @@ class CliSessionsViewModelTest {
             repository.lastSinceEpochMillis
         )
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(
+            Instant.fromEpochMilliseconds(resetsAt.toEpochMilliseconds() - FIVE_HOURS_MILLIS),
+            state.rangeStartsAt
+        )
         assertEquals(resetsAt, state.rangeEndsAt)
         assertTrue(state.rangeAnchored)
         viewModel.onDestroy()
@@ -278,6 +286,7 @@ class CliSessionsViewModelTest {
 
         assertEquals(expiredResetAt.toEpochMilliseconds(), repository.lastSinceEpochMillis)
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(expiredResetAt, state.rangeStartsAt)
         assertNull(state.rangeEndsAt)
         assertTrue(state.rangeAnchored)
         viewModel.onDestroy()

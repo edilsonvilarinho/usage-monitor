@@ -32,6 +32,10 @@ class PdfUsageReportRendererTest {
 
             assertTrue(text.contains("Relatório de uso"), text)
             assertTrue(text.contains("Pessoal"), text)
+            assertTrue(
+                text.contains("Período considerado: 2026-08-17 10:30 a 2026-08-17 15:30 BRT"),
+                text
+            )
             assertTrue(text.contains("usage-monitor"), text)
             assertTrue(text.contains("US$ 12.40"), text)
             assertTrue(text.contains("Página 1 de"), text)
@@ -133,6 +137,7 @@ private fun sampleDocument(): UsageReportDocument {
     return UsageReportDocument(
         title = "Relatório de uso — Sessões CLI",
         subtitle = "Pessoal · Últimas 5h · gerado em 2026-08-17 15:30 BRT",
+        period = "Período considerado: 2026-08-17 10:30 a 2026-08-17 15:30 BRT",
         sections = listOf(
             UsageReportSection.KeyValues(
                 heading = "Totais",

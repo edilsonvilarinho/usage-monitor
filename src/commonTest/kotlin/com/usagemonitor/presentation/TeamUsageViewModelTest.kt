@@ -245,6 +245,10 @@ class TeamUsageViewModelTest {
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
         assertEquals(CliSessionRange.LAST_5H, state.range)
         assertEquals(TEAM_FIXED_NOW.toEpochMilliseconds() - TEAM_FIVE_HOURS_MILLIS, repository.lastCutoffMillis)
+        assertEquals(
+            Instant.fromEpochMilliseconds(TEAM_FIXED_NOW.toEpochMilliseconds() - TEAM_FIVE_HOURS_MILLIS),
+            state.rangeStartsAt
+        )
         viewModel.onDestroy()
     }
 
@@ -280,6 +284,10 @@ class TeamUsageViewModelTest {
         // time não fecham com os locais.
         assertEquals(resetAt.toEpochMilliseconds() - TEAM_FIVE_HOURS_MILLIS, repository.lastCutoffMillis)
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(
+            Instant.fromEpochMilliseconds(resetAt.toEpochMilliseconds() - TEAM_FIVE_HOURS_MILLIS),
+            state.rangeStartsAt
+        )
         assertTrue(state.rangeAnchored)
         viewModel.onDestroy()
     }
@@ -299,6 +307,7 @@ class TeamUsageViewModelTest {
 
         assertEquals(expiredResetAt.toEpochMilliseconds(), repository.lastCutoffMillis)
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(expiredResetAt, state.rangeStartsAt)
         assertNull(state.rangeEndsAt)
         assertTrue(state.rangeAnchored)
         viewModel.onDestroy()

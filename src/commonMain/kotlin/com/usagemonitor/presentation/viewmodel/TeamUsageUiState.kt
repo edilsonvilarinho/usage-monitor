@@ -34,6 +34,8 @@ sealed interface TeamUsageUiState {
         /** Integrantes com as sessões já recortadas por [range]. */
         val members: List<TeamMemberUsage>,
         val range: CliSessionRange = CliSessionRange.DEFAULT,
+        /** Início efetivamente aplicado à consulta; nulo somente no filtro Total. */
+        val rangeStartsAt: Instant? = null,
         /** Fim da janela de quota quando o corte está ancorado nela. */
         val rangeEndsAt: Instant? = null,
         /** `true` quando o corte veio do reset da quota, não do relógio. */

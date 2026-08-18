@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 private const val UNKNOWN_ERROR_MESSAGE = "erro desconhecido"
 
@@ -563,6 +564,7 @@ class TeamUsageViewModel(
                     _uiState.value = TeamUsageUiState.Success(
                         members = members,
                         range = range,
+                        rangeStartsAt = result.window.cutoffMillis?.let(Instant::fromEpochMilliseconds),
                         rangeEndsAt = result.window.endsAt,
                         rangeAnchored = result.window.isAnchored,
                         accountLabel = accountLabel,

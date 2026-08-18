@@ -32,8 +32,7 @@ class PdfUsageReportRenderer(private val language: AppLanguage) {
         PDDocument().use { pdf ->
             val writer = PageWriter(pdf, language)
 
-            writer.title(document.title)
-            writer.subtitle(document.subtitle)
+            writer.header(document.title, document.subtitle, document.period)
 
             for ((index, section) in document.sections.withIndex()) {
                 when (section) {
@@ -64,6 +63,7 @@ private val PAGE_SIZE = PDRectangle(PDRectangle.A4.height, PDRectangle.A4.width)
 private const val MARGIN = 32f
 private const val CONTENT_BOTTOM = 36f
 private const val HEADER_CARD_HEIGHT = 58f
+private const val HEADER_CARD_WITH_PERIOD_HEIGHT = 72f
 private const val SECTION_HEADER_HEIGHT = 25f
 private const val TABLE_HEADER_HEIGHT = 21f
 private const val TABLE_ROW_HEIGHT = 16f
@@ -111,7 +111,6 @@ private class PageWriter(private val pdf: PDDocument, private val language: AppL
 
     private var stream: PDPageContentStream = newPage()
     private var cursorY = PAGE_SIZE.height - MARGIN
-    private var headerTop: Float? = null
 
     private fun newPage(): PDPageContentStream {
         val page = PDPage(PAGE_SIZE)
@@ -125,7 +124,6 @@ private class PageWriter(private val pdf: PDDocument, private val language: AppL
         stream.close()
         stream = newPage()
         cursorY = PAGE_SIZE.height - MARGIN
-        headerTop = null
     }
 
     private fun ensureSpace(height: Float) {
@@ -200,28 +198,39 @@ private class PageWriter(private val pdf: PDDocument, private val language: AppL
         return text.take(end) + ellipsis
     }
 
-    fun title(text: String) {
-        ensureSpace(HEADER_CARD_HEIGHT)
+    fun header(title: String, subtitle: String, period: String?) {
+        val height = if (period == null) HEADER_CARD_HEIGHT else HEADER_CARD_WITH_PERIOD_HEIGHT
+        ensureSpace(height)
         val top = cursorY
-        val bottom = top - HEADER_CARD_HEIGHT
-        fillRect(stream, MARGIN, bottom, contentWidth, HEADER_CARD_HEIGHT, SURFACE)
-        fillRect(stream, MARGIN, bottom, 4f, HEADER_CARD_HEIGHT, PRIMARY)
-        drawText(truncate(text, contentWidth - 32f, bold, TITLE_SIZE), MARGIN + 16f, top - 25f, bold, TITLE_SIZE)
-        headerTop = top
-    }
-
-    fun subtitle(text: String) {
-        val top = headerTop ?: cursorY
+        val bottom = top - height
+        fillRect(stream, MARGIN, bottom, contentWidth, height, SURFACE)
+        fillRect(stream, MARGIN, bottom, 4f, height, PRIMARY)
         drawText(
-            truncate(text, contentWidth - 32f, regular, SUBTITLE_SIZE),
+            truncate(title, contentWidth - 32f, bold, TITLE_SIZE),
+            MARGIN + 16f,
+            top - 25f,
+            bold,
+            TITLE_SIZE
+        )
+        drawText(
+            truncate(subtitle, contentWidth - 32f, regular, SUBTITLE_SIZE),
             MARGIN + 16f,
             top - 43f,
             regular,
             SUBTITLE_SIZE,
             ON_SURFACE_VARIANT
         )
-        cursorY = top - HEADER_CARD_HEIGHT - SECTION_GAP
-        headerTop = null
+        if (period != null) {
+            drawText(
+                truncate(period, contentWidth - 32f, regular, SUBTITLE_SIZE),
+                MARGIN + 16f,
+                top - 58f,
+                regular,
+                SUBTITLE_SIZE,
+                ON_SURFACE_VARIANT
+            )
+        }
+        cursorY = bottom - SECTION_GAP
     }
 
     private fun heading(text: String, continuation: Boolean = false) {

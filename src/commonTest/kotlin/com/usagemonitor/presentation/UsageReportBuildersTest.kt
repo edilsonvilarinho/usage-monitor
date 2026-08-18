@@ -45,7 +45,9 @@ class UsageReportBuildersTest {
     @Test
     fun `o subtitulo carrega conta janela e carimbo`() {
         val document = reportForCliSessions(
-            state = successState(profileLabel = "Pessoal"),
+            state = successState(profileLabel = "Pessoal").copy(
+                rangeStartsAt = Instant.parse("2026-08-17T13:30:00Z")
+            ),
             language = AppLanguage.PT,
             now = NOW
         )
@@ -53,6 +55,79 @@ class UsageReportBuildersTest {
         assertTrue(document.subtitle.startsWith("Pessoal · "))
         // 18:30 UTC é 15:30 em BRT: o carimbo é do fuso da apresentação.
         assertTrue(document.subtitle.endsWith("2026-08-17 15:30 BRT"), document.subtitle)
+        assertEquals(
+            "Período considerado: 2026-08-17 10:30 a 2026-08-17 15:30 BRT",
+            document.period
+        )
+    }
+
+    /** O PDF deve usar o corte resolvido, inclusive quando ele não é `now - 5h`. */
+    @Test
+    fun `o periodo usa o inicio efetivamente aplicado`() {
+        val anchoredStart = Instant.parse("2026-08-17T17:45:00Z")
+        val document = reportForCliSessions(
+            state = successState().copy(rangeStartsAt = anchoredStart, rangeAnchored = true),
+            language = AppLanguage.PT,
+            now = NOW
+        )
+
+        assertEquals(
+            "Período considerado: 2026-08-17 14:45 a 2026-08-17 15:30 BRT",
+            document.period
+        )
+    }
+
+    @Test
+    fun `o total com dados começa na atividade mais antiga`() {
+        val state = successState().copy(
+            range = CliSessionRange.ALL,
+            rangeStartsAt = null,
+            sessions = listOf(
+                session("recente", "p", activeMillis = 1L),
+                session("antiga", "p", activeMillis = 1L).copy(
+                    firstTs = Instant.parse("2026-07-01T09:15:00Z")
+                )
+            )
+        )
+
+        val document = reportForCliSessions(state = state, language = AppLanguage.PT, now = NOW)
+
+        assertEquals(
+            "Período considerado: 2026-07-01 06:15 a 2026-08-17 15:30 BRT",
+            document.period
+        )
+    }
+
+    @Test
+    fun `o total vazio nao inventa uma data inicial`() {
+        val state = successState().copy(
+            range = CliSessionRange.ALL,
+            rangeStartsAt = null,
+            sessions = emptyList()
+        )
+
+        val document = reportForCliSessions(state = state, language = AppLanguage.PT, now = NOW)
+
+        assertEquals(
+            "Período considerado: todo o histórico disponível até 2026-08-17 15:30 BRT",
+            document.period
+        )
+    }
+
+    @Test
+    fun `o relatorio do time traduz o periodo para ingles`() {
+        val state = TeamUsageUiState.Success(
+            members = listOf(teamMember("membro", session("a", "p", activeMillis = 1L))),
+            range = CliSessionRange.LAST_7D,
+            rangeStartsAt = Instant.parse("2026-08-10T18:30:00Z")
+        )
+
+        val document = reportForTeam(state = state, language = AppLanguage.EN, now = NOW)
+
+        assertEquals(
+            "Period considered: 2026-08-10 15:30 to 2026-08-17 15:30 BRT",
+            document.period
+        )
     }
 
     /** Custo incompleto é piso, e o `+` da tela tem de existir no PDF também. */

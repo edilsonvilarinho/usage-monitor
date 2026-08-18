@@ -19,6 +19,8 @@ data class UsageReportDocument(
     /** Conta, janela e carimbo de geração — o que responde "de quando é isto?". */
     val subtitle: String,
     val sections: List<UsageReportSection>,
+    /** Faixa temporal absoluta aplicada aos dados, em linha própria no cabeçalho. */
+    val period: String? = null,
     /**
      * Ressalvas do rodapé: custo parcial, hora não medida, janela deslizante.
      *
@@ -40,6 +42,7 @@ data class UsageReportDocument(
             title = title.toReportText(),
             subtitle = subtitle.toReportText(),
             sections = sections.map { section -> section.sanitized() },
+            period = period?.toReportText(),
             footnotes = footnotes.map { note -> note.toReportText() }
         )
     }

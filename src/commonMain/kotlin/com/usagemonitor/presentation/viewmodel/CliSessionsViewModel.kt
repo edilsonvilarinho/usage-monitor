@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 private const val UNKNOWN_ERROR_MESSAGE = "erro desconhecido"
 
@@ -479,6 +480,7 @@ class CliSessionsViewModel(
                 _uiState.value = CliSessionsUiState.Success(
                     sessions = result.sessions,
                     range = range,
+                    rangeStartsAt = result.window.cutoffMillis?.let(Instant::fromEpochMilliseconds),
                     rangeEndsAt = result.window.endsAt,
                     rangeAnchored = result.window.isAnchored,
                     profileLabel = profileLabel,
