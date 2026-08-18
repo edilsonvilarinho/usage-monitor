@@ -16,14 +16,21 @@ import androidx.compose.ui.graphics.Color
  * 1. Não havia nome para "trabalhando agora", então a tela de presença reusou o
  *    verde de *cache read* para dizer outra coisa.
  * 2. As cores eram **fixas nos dois temas**, e várias são usadas como cor de
- *    texto. Contra a `surface` clara (`#F8F9FA`) todas reprovavam o mínimo de
- *    4,5:1 da WCAG AA — `#4CAF50` dava 2,64:1. `AppAccentsContrastTest` fecha a
- *    porta: qualquer valor novo aqui é medido contra as duas superfícies.
+ *    texto. Contra a `surface` clara de então (`#F8F9FA`) todas reprovavam o
+ *    mínimo de 4,5:1 da WCAG AA — `#4CAF50` dava 2,64:1. `AppAccentsContrastTest`
+ *    fecha a porta: qualquer valor novo aqui é medido contra as duas superfícies.
  *
  * Os valores escuros são os que a app já usava, com **uma** exceção deliberada:
- * [saturated] era `#E05252`, que dava 4,06:1 contra `#242424` e também reprovava.
- * É a cor do veredito "saturada" — o status mais importante da tela de sessões —,
- * então foi clareada para o tom aprovado mais próximo.
+ * [saturated] era `#E05252`, que dava 4,06:1 contra a `surface` escura de então
+ * (`#242424`) e também reprovava. É a cor do veredito "saturada" — o status mais
+ * importante da tela de sessões —, então foi clareada para o tom aprovado mais
+ * próximo.
+ *
+ * A refatoração visual trocou as superfícies (`#1B1818` / `#FFFCFC`) e **não**
+ * tocou nestes treze valores: as novas são respectivamente mais escura e mais
+ * clara que as antigas, então cada acento ganhou contraste. O que mudou foi a
+ * área que eles ocupam — de fundo de card inteiro para marcador de 2dp, linha de
+ * gráfico e texto de valor.
  */
 @Immutable
 data class AppAccents(
@@ -63,9 +70,9 @@ data class AppAccents(
 /**
  * Variante escura.
  *
- * Referência de contraste: `#242424` (`surface` escura), e não `#181818`
- * (`background`) — o texto acentuado desta app sempre cai sobre um `DepthSurface`,
- * e a superfície mais clara das duas é o pior caso para acentos claros.
+ * Referência de contraste: `#1B1818` (`surface` escura), e não `#131010`
+ * (`background`) — o texto acentuado desta app cai sobre um painel, não sobre a
+ * moldura da janela.
  */
 val darkAppAccents = AppAccents(
     input      = Color(0xFF4C8DFF),
@@ -87,9 +94,9 @@ val darkAppAccents = AppAccents(
  * Variante clara.
  *
  * Não é a paleta escura com alpha: acento claro sobre fundo claro não tem como
- * chegar a 4,5:1 por transparência. Cada tom foi rebaixado até passar contra
- * `#F8F9FA` mantendo a matiz, para que a codificação de cor continue a mesma ao
- * trocar de tema.
+ * chegar a 4,5:1 por transparência. Cada tom foi rebaixado até passar contra a
+ * `surface` clara mantendo a matiz, para que a codificação de cor continue a
+ * mesma ao trocar de tema.
  */
 val lightAppAccents = AppAccents(
     input      = Color(0xFF1565C0),

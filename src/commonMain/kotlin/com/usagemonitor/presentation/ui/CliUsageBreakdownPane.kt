@@ -508,7 +508,6 @@ private fun BreakdownTotalsCard(
     val totals = breakdown.totals
 
     DepthSurface(
-        accent = CACHE_READ_COLOR,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.large,
         elevation = AppElevation.dialog,
@@ -564,7 +563,6 @@ private fun BudgetCard(
     language: AppLanguage
 ) {
     DepthSurface(
-        accent = INPUT_COLOR,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         elevation = AppElevation.card,
@@ -631,7 +629,6 @@ private fun BurnRateCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
     val burnRate = breakdown.burnRate
 
     DepthSurface(
-        accent = OUTPUT_COLOR,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         elevation = AppElevation.card,
@@ -687,7 +684,6 @@ private fun BurnRateCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
 @Composable
 private fun ToolRow(tool: CliToolUsage, peak: Int, language: AppLanguage) {
     DepthSurface(
-        accent = CACHE_WRITE_COLOR,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         elevation = AppElevation.card,
@@ -728,7 +724,6 @@ private fun ToolRow(tool: CliToolUsage, peak: Int, language: AppLanguage) {
 @Composable
 private fun ActivityCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
     DepthSurface(
-        accent = CACHE_READ_COLOR,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         elevation = AppElevation.card,
@@ -765,7 +760,6 @@ private fun BreakdownRow(
     val share = bucket.costShareOf(totals)
 
     DepthSurface(
-        accent = accent,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         elevation = AppElevation.card,
