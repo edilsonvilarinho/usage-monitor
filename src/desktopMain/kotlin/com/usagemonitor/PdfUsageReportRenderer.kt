@@ -12,6 +12,7 @@ import org.apache.pdfbox.pdmodel.PDPage
 import org.apache.pdfbox.pdmodel.PDPageContentStream
 import org.apache.pdfbox.pdmodel.common.PDRectangle
 import org.apache.pdfbox.pdmodel.font.PDFont
+import org.apache.pdfbox.pdmodel.font.PDType0Font
 import org.apache.pdfbox.pdmodel.font.PDType1Font
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts
 import java.io.ByteArrayOutputStream
@@ -92,21 +93,51 @@ private fun rgb(red: Int, green: Int, blue: Int): ReportColor {
     return ReportColor(red / 255f, green / 255f, blue / 255f)
 }
 
-private val BACKGROUND = rgb(0x18, 0x18, 0x18)
-private val SURFACE = rgb(0x24, 0x24, 0x24)
-private val SURFACE_ALTERNATE = rgb(0x20, 0x20, 0x20)
-private val SURFACE_VARIANT = rgb(0x2C, 0x2C, 0x2C)
-private val ON_SURFACE = rgb(0xE0, 0xE0, 0xE0)
-private val ON_SURFACE_VARIANT = rgb(0xBD, 0xBD, 0xBD)
-private val PRIMARY = rgb(0x82, 0xB1, 0xFF)
+// A paleta escura do app, e não uma paralela: o relatório é o mesmo dado da
+// tela, e duas famílias de cinza para o mesmo produto se notam quando o PDF fica
+// aberto ao lado da janela. Escuro sempre, independente do tema da interface.
+private val BACKGROUND = rgb(0x13, 0x10, 0x10)
+private val SURFACE = rgb(0x1B, 0x18, 0x18)
+private val SURFACE_ALTERNATE = rgb(0x17, 0x14, 0x14)
+private val SURFACE_VARIANT = rgb(0x21, 0x1E, 0x1E)
+private val ON_SURFACE = rgb(0xF2, 0xED, 0xED)
+private val ON_SURFACE_VARIANT = rgb(0xB8, 0xB2, 0xB2)
+private val PRIMARY = rgb(0x4C, 0x8D, 0xFF)
 private val SUCCESS = rgb(0x4C, 0xAF, 0x50)
-private val OUTLINE = rgb(0x3A, 0x3A, 0x3A)
+private val OUTLINE = rgb(0x3D, 0x38, 0x38)
+
+/**
+ * Carrega uma face da IBM Plex do classpath para dentro do documento.
+ *
+ * `PDType0Font.load(..., embedSubset = true)`: o subconjunto guarda só os
+ * glifos usados, e o relatório inteiro cabe em algumas dezenas de caracteres —
+ * embutir a face completa somaria ~170 KB a cada PDF gerado.
+ *
+ * O saneamento WinAnsi de `UsageReportDocument.sanitized` **continua valendo**.
+ * A Plex tem os acentos, mas trocar o contrato de caracteres do relatório é uma
+ * migração à parte, e não é isto que este commit faz.
+ */
+private fun loadPlex(pdf: PDDocument, resource: String): PDFont? {
+    val stream = PdfUsageReportRenderer::class.java.classLoader.getResourceAsStream(resource)
+        ?: return null
+    return stream.use { input -> PDType0Font.load(pdf, input, true) }
+}
 
 /** Escreve de cima para baixo, abrindo página nova quando o espaço acaba. */
 private class PageWriter(private val pdf: PDDocument, private val language: AppLanguage) {
 
-    private val regular: PDFont = PDType1Font(Standard14Fonts.FontName.HELVETICA)
-    private val bold: PDFont = PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD)
+    // A IBM Plex Mono embutida, com o Helvetica base-14 como plano B.
+    //
+    // Embutir recalcula `getStringWidth` de **todas** as colunas: a mono é mais
+    // larga que a Helvetica no mesmo corpo, e é por isso que este commit não
+    // muda mais nada no relatório. Se o recurso não estiver no classpath — um
+    // empacotamento que esqueceu a pasta `fonts/` —, o relatório sai em
+    // Helvetica em vez de não sair: um PDF com a fonte errada ainda responde à
+    // pergunta que o usuário fez.
+    private val regular: PDFont = loadPlex(pdf, "fonts/IBMPlexMono-Regular.ttf")
+        ?: PDType1Font(Standard14Fonts.FontName.HELVETICA)
+    private val bold: PDFont = loadPlex(pdf, "fonts/IBMPlexMono-SemiBold.ttf")
+        ?: PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD)
     private val contentWidth = PAGE_SIZE.width - 2 * MARGIN
 
     private var stream: PDPageContentStream = newPage()
@@ -204,7 +235,7 @@ private class PageWriter(private val pdf: PDDocument, private val language: AppL
         val top = cursorY
         val bottom = top - height
         fillRect(stream, MARGIN, bottom, contentWidth, height, SURFACE)
-        fillRect(stream, MARGIN, bottom, 4f, height, PRIMARY)
+        fillRect(stream, MARGIN, bottom, 2f, height, PRIMARY)
         drawText(
             truncate(title, contentWidth - 32f, bold, TITLE_SIZE),
             MARGIN + 16f,
@@ -242,7 +273,7 @@ private class PageWriter(private val pdf: PDDocument, private val language: AppL
         }
         val bottom = cursorY - SECTION_HEADER_HEIGHT
         fillRect(stream, MARGIN, bottom, contentWidth, SECTION_HEADER_HEIGHT, SURFACE_VARIANT)
-        fillRect(stream, MARGIN, bottom, 4f, SECTION_HEADER_HEIGHT, PRIMARY)
+        fillRect(stream, MARGIN, bottom, 2f, SECTION_HEADER_HEIGHT, PRIMARY)
         drawText(
             truncate(label, contentWidth - 24f, bold, HEADING_SIZE),
             MARGIN + 12f,
@@ -399,12 +430,16 @@ private class PageWriter(private val pdf: PDDocument, private val language: AppL
         }
     }
 
+    /**
+     * Cor do valor de uma métrica.
+     *
+     * Tudo na cor do texto. As duas exceções que existiam — tempo ativo em verde,
+     * custo em azul — pintavam duas das quatro medidas da mesma janela e
+     * sugeriam categorias que não existem. Na tela isso já foi desfeito; aqui
+     * segue o mesmo critério, e a cor semântica fica para o status da sessão.
+     */
     private fun metricColor(label: String): ReportColor {
-        return when (label) {
-            CliSessionsLabels.activeTime(language) -> SUCCESS
-            CliSessionsLabels.columnCost(language) -> PRIMARY
-            else -> ON_SURFACE
-        }
+        return ON_SURFACE
     }
 
     private fun columnWidths(columns: List<UsageReportColumn>): List<Float> {

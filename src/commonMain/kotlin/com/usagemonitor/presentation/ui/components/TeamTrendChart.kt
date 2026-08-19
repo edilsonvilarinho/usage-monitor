@@ -20,11 +20,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.datetime.LocalDate
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberTrend
 import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.presentation.ui.theme.AppShapes
-import kotlinx.datetime.LocalDate
 
 const val TEAM_TREND_CHART_TAG = "teamTrendChart"
 
@@ -168,7 +168,10 @@ private fun TrendRow(
                                 MIN_VISIBLE_FRACTION / 2f
                             }
                         )
-                        .clip(AppShapes.small)
+                        // Raio 4: a barra de um dia é estreita, e um raio de
+                        // botão arredonda tanto que o topo deixa de marcar a
+                        // altura — que é o dado que a barra existe para dar.
+                        .clip(AppShapes.extraSmall)
                         .background(if (point.costMicros > 0L) accent else emptyColor)
                 )
             }

@@ -189,6 +189,93 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 - **A ordem de `toTeamPresence` é total e determinística.** Não é estética: duas leituras iguais têm de produzir listas iguais, ou o `StateFlow` reemite e a tela recompõe a cada 5s. Pelo mesmo motivo o estado não guarda tempo decorrido — a tela mostra hora absoluta, e o desvio entra arredondado em minutos.
 - **O ponto de estado da linha não pisca.** Animação infinita numa lista trava o `waitForIdle` dos testes de componente, e o botão do card de presença também não recebe `pulse`: o pisca significa uma coisa só neste app — sessão em atenção — e o botão de time ao lado já a carrega.
 
+## Sistema visual
+
+Refatoração de agosto de 2026, inspirada na linguagem do OpenCode. O plano de execução com o
+histórico das decisões está em [`docs/planos/refatoracao-visual-opencode-execucao.md`](docs/planos/refatoracao-visual-opencode-execucao.md);
+a especificação de aparência é o protótipo aprovado, [`docs/planos/prototipo-visual-opencode.html`](docs/planos/prototipo-visual-opencode.html).
+Divergência entre o Compose e o protótipo é defeito do Compose.
+
+**Tokens** (`presentation/ui/theme/AppTheme.kt`): quatro superfícies neutras dentro de ~14% de
+luminância (`AppSurfaces`), raios 4/6/8/10 com **teto de 10** (`AppShapes`), elevação 0/2/8 —
+`card` é **zero**, e sombra só em diálogo e overlay —, espaçamento 4/8/12/16/24/32 (`AppSpacing`) e
+motion 120/180/240 (`AppMotion`). A profundidade vem da borda de 1dp e do espaçamento; foi o
+gradiente de acento em toda superfície que fazia a tela ler como pilha de blocos de mesmo peso.
+
+**Tipografia**: IBM Plex Mono e Sans, carregadas do classpath por `appFontFamilies`
+(`expect`/`actual`, TTFs em `desktopMain/resources/fonts/`). `label*`, `title*`, `headline*` e
+`display*` são **mono** — rótulo, número, cabeçalho de coluna, onde a largura fixa do dígito alinha a
+coluna; `body*` é **sans**, onde mora o texto corrido. **Não** usar `composeResources`: a carga é
+assíncrona e o `ScreenshotGenerator` renderiza offscreen com relógio manual — captura com fonte de
+fallback é falha silenciosa.
+
+**Primitivas** (`presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt`):
+todas stateless. Superfície de dados, cabeçalho de seção com marcador de 2dp, linha de dados com
+divisória própria, barra de estado, abas sublinhadas, controle segmentado, chip de alternância,
+botão, botão de ícone, campo, interruptor, tooltip, aviso, vazio, carregando, erro, indicador de
+estado e barra de progresso. Antes de desenhar um retângulo novo, procure aqui.
+
+- **Aba × segmentado × chip**: aba troca **o que** a tela mostra, segmentado troca **como** (janela,
+  ordem, tamanho de página), chip de alternância liga ou desliga **uma** restrição. Desenhá-los igual
+  foi o que fez o app usar a mesma pílula para as três coisas.
+- **Cor nunca informa sozinha**: todo estado carrega ponto e palavra (`AppStatusIndicator`), e o tom
+  sai de `AppTone`, que lê de `AppAccents` e do `ColorScheme` — nunca de um literal novo. Foi assim
+  que o âmbar do semáforo de risco passou anos abaixo de 3:1 contra a superfície clara.
+- **Acento é identidade de fonte, não de valor**: ele vive no marcador de 2dp e na linha do gráfico.
+  Custo em azul e tempo em verde na mesma tabela sugerem categorias que não existem.
+
+**Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
+
+1. `weight` dentro de `FlowRow` não tem referência de largura: o Compose deixa o filho **sem
+   posicionar** e o sintoma é `assertIsDisplayed` falhando com `boundsInRoot` válido.
+2. Ação que virou ícone precisa de `contentDescription` na **semântica**, não só de `onClickLabel` —
+   é `onNodeWithContentDescription` que as suítes usam. `AppIconButton` já traz os dois.
+3. `BasicTextField` mescla descendentes: o placeholder precisa de `clearAndSetSemantics`, ou o campo
+   vazio passa a "conter" o texto de exemplo e duplica nós para o `onNodeWithText`.
+4. Tela que ficou mais alta obriga a subir a altura da **cena** do teste de componente (1024 × 768
+   por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
+5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
+   `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
+
+**Escala da interface** (`AppTheme(uiScalePercent = …)` + `UiScalePreferences.kt` + slider na aba
+Geral): a escala troca a **densidade** da composição, nunca a escala tipográfica. Subir só a
+tipografia deixaria ícone, padding, altura de linha e alvo de clique — todos `Dp` fixos — do tamanho
+anterior, e o rodapé continuaria pequeno ao lado de um texto maior; densidade é o único ponto em que
+dp e sp crescem juntos e as proporções do protótipo permanecem. Só `density` é multiplicado:
+multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
+
+- **O padrão persistido é 115 e o default do parâmetro é 100.** O neutro existe para o
+  `ScreenshotGenerator`, o `TourGifGenerator` e os testes de componente manterem a geometria de
+  referência — as capturas do README **não** são geradas na escala do app.
+- **Cada janela precisa receber o valor.** `Window`/`DialogWindow` do Compose Desktop têm composição
+  própria e a plataforma reprovisiona `LocalDensity` na raiz de cada uma: provisionar na janela pai
+  não atravessa para a filha, e a janela esquecida renderiza a 100% sem erro nenhum.
+- **A moldura não escala sozinha.** Densidade maior mostra o mesmo conteúdo maior dentro da mesma
+  janela, ou seja, menos conteúdo. `scaledWindowSize` corrige a janela principal pela razão entre a
+  escala aplicada e a nova — nunca contra 100, ou duas mudanças seguidas multiplicariam duas vezes —
+  e nos tamanhos default das outras janelas o fator entra na criação. Tamanho **persistido** é
+  escolha do usuário e não é reescalado, com uma exceção de uma vez só: quem já tinha janela salva
+  antes desta versão a recebe corrigida de 100 para o padrão novo, e é `hasPersistedUiScale` — chave
+  presente, não valor igual ao default — que fecha essa porta depois.
+- O redimensionamento acontece no commit do coletor com debounce, não no callback do slider: janela
+  AWT reposicionada por pixel arrastado é inutilizável. O conteúdo, esse, escala ao vivo.
+- O teste que prova a fiação (`AppThemeScaleTest`) mede **pixels** (`boundsInRoot`), não `Dp`: a
+  conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
+  100dp nos dois casos — um teste que passa sem medir nada.
+
+**Regras que continuam valendo**: nenhuma animação infinita nova (trava o `waitForIdle`);
+`ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
+`Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
+
+**Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS a partir do monograma descrito em
+código — `monogram.svg` ao lado é referência e não é lido. O `.icns` só é validado no job
+`build-macos` do release.
+
+**Relatório PDF**: a IBM Plex Mono vai embutida (`PDType0Font.load` com subconjunto) e o
+saneamento WinAnsi de `UsageReportDocument.sanitized` **permanece** — a fonte tem os acentos, mas
+trocar o contrato de caracteres é outra migração. Sem o recurso no classpath, o relatório cai para
+Helvetica em vez de falhar.
+
 ## Convenções de código
 
 - **Nomes em inglês**, comentários em português.

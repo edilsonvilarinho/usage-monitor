@@ -1,73 +1,63 @@
 package com.usagemonitor.presentation.ui.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
-
-private const val ACCENT_GLOW_ALPHA = 0.22f
-private const val ACCENT_GLOW_HEIGHT_FRACTION = 0.7f
-private const val BORDER_ALPHA = 0.6f
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 /**
- * Superfície com profundidade: elevação, borda sutil e um brilho de acento
- * esmaecendo do topo.
+ * Superfície de conteúdo: fundo de painel, borda de 1dp e nada mais.
  *
- * É o mesmo tratamento que `ApiUsageCard` aplica inline há tempos e que dá ao
- * dashboard a sensação de relevo. Extraído aqui para que telas novas não
- * recaiam em retângulos chapados de `surfaceVariant` com alpha.
+ * O nome ficou, o brilho saiu. Até a refatoração visual esta função pintava um
+ * gradiente de acento descendo do topo de **toda** superfície, e era o principal
+ * motivo de a tela ler como uma pilha de cards de mesmo peso: a mesma cor que
+ * identificava a fonte lavava o painel inteiro, e blocos aninhados repetiam o
+ * efeito uns sobre os outros.
+ *
+ * Com o gradiente fora, os parâmetros `accent` e `glowAlpha` deixaram de existir
+ * — e com eles o objeto `AppGlow`, que nomeava os três patamares de brilho. A
+ * cor da fonte volta como marcador de 2dp em [AppSectionHeader], onde orienta a
+ * varredura sem competir com o dado.
+ *
+ * [elevation] fica só onde a superfície **de fato** flutua: diálogo e overlay.
+ * O default é [AppElevation.card], que agora é zero.
  */
 @Composable
 fun DepthSurface(
-    accent: Color,
     modifier: Modifier = Modifier,
     shape: Shape = AppShapes.medium,
     elevation: Dp = AppElevation.card,
-    contentPadding: Dp = 14.dp,
-    glowAlpha: Float = ACCENT_GLOW_ALPHA,
+    contentPadding: Dp = AppSpacing.md,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
+    Surface(
         modifier = modifier,
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = BORDER_ALPHA))
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        // Sombra só quando há elevação; com zero o `Surface` não desenha nada e a
+        // borda abaixo é a única separação, que é justamente a intenção.
+        shadowElevation = elevation
     ) {
         Column(
             modifier = Modifier
-                // A largura cheia não chega sozinha até aqui: o `Surface` do `Card`
-                // propaga a constraint mínima, mas a `Column` que o `Card` põe entre
-                // ele e o conteúdo não. Sem isto esta `Column` mede pelo texto mais
-                // largo e o brilho — que é desenhado sobre o `size` dela — para no
-                // meio do card.
                 .fillMaxWidth()
                 .clip(shape)
-                .drawWithCache {
-                    val glow = Brush.verticalGradient(
-                        colors = listOf(accent.copy(alpha = glowAlpha), Color.Transparent),
-                        startY = 0f,
-                        endY = size.height * ACCENT_GLOW_HEIGHT_FRACTION
-                    )
-                    onDrawBehind {
-                        drawRect(brush = glow)
-                    }
-                }
+                .background(MaterialTheme.colorScheme.surface)
+                .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
                 .padding(contentPadding),
             content = content
         )

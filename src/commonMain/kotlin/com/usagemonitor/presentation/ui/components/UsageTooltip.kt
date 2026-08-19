@@ -13,16 +13,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 
 internal data class TooltipMetric(
@@ -39,11 +40,13 @@ internal fun UsageTooltipContent(
 ) {
     Surface(
         modifier = modifier.widthIn(max = 280.dp),
-        shape = AppShapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
-        shadowElevation = 12.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        shape = AppShapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        // Overlay curto: 2dp de sombra em vez de 12. A tooltip flutua sobre o
+        // gráfico, não sobre a janela inteira.
+        tonalElevation = AppElevation.raised,
+        shadowElevation = AppElevation.raised,
+        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier

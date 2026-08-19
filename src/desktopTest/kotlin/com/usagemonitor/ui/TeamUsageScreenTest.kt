@@ -1082,6 +1082,12 @@ class TeamUsageScreenTest {
         )
     }
 
+    /**
+     * A linha do integrante encolheu de 109dp para 88dp na refatoração visual:
+     * ela deixou de ser um card com padding próprio e virou linha de tabela. O
+     * assert continua existindo pelo mesmo motivo de antes — a linha não pode
+     * voltar a crescer —, com o número novo.
+     */
     @Test
     fun `faixa da conta cresce e linha do integrante fica compacta em 960dp`() =
         runDesktopComposeUiTest {
@@ -1106,7 +1112,7 @@ class TeamUsageScreenTest {
             onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
                 .assertHeightIsEqualTo(57.dp)
             onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
-                .assertHeightIsEqualTo(109.dp)
+                .assertHeightIsEqualTo(88.dp)
         }
 
     @Test

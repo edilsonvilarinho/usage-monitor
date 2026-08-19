@@ -102,16 +102,20 @@ internal fun persistCliSessionsWindowState(
 
 @Composable
 internal fun rememberPersistedCliSessionsWindowState(
-    persistedState: PersistedCliSessionsWindowState
+    persistedState: PersistedCliSessionsWindowState,
+    uiScalePercent: Int
 ): WindowState {
     val initialPosition = if (persistedState.xDp != null && persistedState.yDp != null) {
         WindowPosition(persistedState.xDp.dp, persistedState.yDp.dp)
     } else {
         WindowPosition(Alignment.Center)
     }
+    // Só o tamanho default acompanha a escala: tamanho persistido é escolha do
+    // usuário e é devolvido como ele deixou.
+    val scale = uiScaleFactor(uiScalePercent)
     val initialSize = DpSize(
-        width = (persistedState.widthDp ?: DEFAULT_CLI_SESSIONS_WINDOW_WIDTH_DP).dp,
-        height = (persistedState.heightDp ?: DEFAULT_CLI_SESSIONS_WINDOW_HEIGHT_DP).dp
+        width = persistedState.widthDp?.dp ?: (DEFAULT_CLI_SESSIONS_WINDOW_WIDTH_DP.dp * scale),
+        height = persistedState.heightDp?.dp ?: (DEFAULT_CLI_SESSIONS_WINDOW_HEIGHT_DP.dp * scale)
     )
 
     return rememberWindowState(

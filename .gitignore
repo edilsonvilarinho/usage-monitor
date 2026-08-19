@@ -12,3 +12,7 @@ server/node_modules/
 server/dist/
 server/data/
 server/.env
+
+# Cache do interpretador Python das ferramentas de marca
+tools/brand/__pycache__/
+*.pyc

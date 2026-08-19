@@ -99,7 +99,7 @@ fun TeamIntegrationSection(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
-            Switch(
+            AppSwitch(
                 checked = settings.enabled,
                 onCheckedChange = onEnabledChange,
                 modifier = Modifier.testTag(TEAM_ENABLE_SWITCH_TEST_TAG)
@@ -190,14 +190,14 @@ fun TeamIntegrationSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Button(
+            // Sem servidor, chave e apelido não há o que testar.
+            AppButton(
+                label = if (isPt) "Testar conexão" else "Test connection",
                 onClick = onTestConnection,
-                // Sem servidor, chave e apelido não há o que testar.
                 enabled = settings.isConfigured && connection.status != TeamConnectionUiStatus.CHECKING,
-                modifier = Modifier.testTag(TEAM_TEST_CONNECTION_TEST_TAG)
-            ) {
-                Text(if (isPt) "Testar conexão" else "Test connection")
-            }
+                modifier = Modifier.testTag(TEAM_TEST_CONNECTION_TEST_TAG),
+                tone = AppButtonTone.PRIMARY
+            )
 
             if (connection.status == TeamConnectionUiStatus.CHECKING) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -282,7 +282,7 @@ private fun TeamAdminBlock(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        Switch(
+        AppSwitch(
             checked = adminExpanded,
             onCheckedChange = { checked ->
                 adminExpanded = checked
@@ -323,21 +323,21 @@ private fun TeamAdminBlock(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Button(
+        AppButton(
+            label = if (isPt) "Validar" else "Validate",
             onClick = onValidateAdminToken,
             enabled = settings.isAdminMode && connection.status != TeamConnectionUiStatus.CHECKING,
-            modifier = Modifier.testTag(TEAM_ADMIN_VALIDATE_TEST_TAG)
-        ) {
-            Text(if (isPt) "Validar" else "Validate")
-        }
+            modifier = Modifier.testTag(TEAM_ADMIN_VALIDATE_TEST_TAG),
+            tone = AppButtonTone.PRIMARY
+        )
 
-        Button(
+        AppButton(
+            label = if (isPt) "Configurar chaves das contas" else "Manage account keys",
             onClick = onOpenKeysManager,
             enabled = settings.isAdminMode,
-            modifier = Modifier.testTag(TEAM_ADMIN_KEYS_TEST_TAG)
-        ) {
-            Text(if (isPt) "Configurar chaves das contas" else "Manage account keys")
-        }
+            modifier = Modifier.testTag(TEAM_ADMIN_KEYS_TEST_TAG),
+            tone = AppButtonTone.PRIMARY
+        )
 
         if (connection.status == TeamConnectionUiStatus.CHECKING) {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -358,12 +358,12 @@ private fun TeamAdminBlock(
     }
 
     if (settings.adminToken.isNotBlank()) {
-        TextButton(
+        AppButton(
+            label = if (isPt) "Sair do modo admin" else "Leave admin mode",
             onClick = onExitAdminMode,
-            modifier = Modifier.testTag(TEAM_ADMIN_EXIT_TEST_TAG)
-        ) {
-            Text(if (isPt) "Sair do modo admin" else "Leave admin mode")
-        }
+            modifier = Modifier.testTag(TEAM_ADMIN_EXIT_TEST_TAG),
+            tone = AppButtonTone.GHOST
+        )
     }
 }
 
@@ -377,7 +377,10 @@ private fun TeamProfileCheckboxRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        // Interruptor e não caixa de seleção: a linha diz se a conta participa do
+        // time, que é um estado ligado ou desligado — a mesma coisa que os outros
+        // controles desta tela dizem, e agora com o mesmo desenho.
+        AppSwitch(checked = checked, onCheckedChange = onCheckedChange)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = profile.label,

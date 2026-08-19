@@ -19,10 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import kotlinx.datetime.DayOfWeek
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliActivityHeatmap
 import com.usagemonitor.presentation.ui.theme.AppShapes
-import kotlinx.datetime.DayOfWeek
 
 const val ACTIVITY_HEATMAP_TAG = "activityHeatmap"
 
@@ -87,7 +87,10 @@ fun ActivityHeatmapGrid(
                     Box(
                         modifier = Modifier
                             .size(CELL_SIZE)
-                            .clip(AppShapes.small)
+                            // Raio 4 e não 6: a célula tem 14dp, e um raio de
+                            // botão numa célula desse tamanho a deixa quase
+                            // redonda — a grade deixa de ler como grade.
+                            .clip(AppShapes.extraSmall)
                             .background(cellColor(intensity, accent, emptyColor))
                     )
                 }

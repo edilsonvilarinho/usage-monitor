@@ -1,9 +1,15 @@
 package com.usagemonitor.presentation.ui.components
 
-import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import kotlin.math.roundToInt
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
@@ -14,11 +20,6 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.darkAppAccents
-import kotlinx.datetime.Instant
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.math.roundToInt
 
 internal data class OpenCodeModelSummary(
     val modelName: String,
@@ -264,11 +265,26 @@ internal fun formatBrtDateTime(instant: Instant, language: AppLanguage): String 
     return "${parts.day} ${parts.date} ${parts.time}"
 }
 
+/**
+ * Cor do semáforo de risco.
+ *
+ * Passou a sair de [AppTone] em vez de três literais. Os antigos `0xFFFFC107` e
+ * `0xFFF44336` nunca foram medidos contra as superfícies dos dois temas — o
+ * amarelo dava menos de 3:1 sobre a superfície clara —, e o verde já era, por
+ * coincidência, o mesmo `cacheRead` da paleta. Um dono só para a semântica de
+ * cor, e o `AppAccentsContrastTest` a cobre.
+ */
+@Composable
+@ReadOnlyComposable
 internal fun colorFor(level: UsageRiskLevel): Color {
+    return toneFor(level).color()
+}
+
+internal fun toneFor(level: UsageRiskLevel): AppTone {
     return when (level) {
-        UsageRiskLevel.ON_TRACK -> Color(0xFF4CAF50)
-        UsageRiskLevel.AT_RISK -> Color(0xFFFFC107)
-        UsageRiskLevel.WILL_EXCEED -> Color(0xFFF44336)
+        UsageRiskLevel.ON_TRACK -> AppTone.OK
+        UsageRiskLevel.AT_RISK -> AppTone.WARNING
+        UsageRiskLevel.WILL_EXCEED -> AppTone.CRITICAL
     }
 }
 
@@ -465,11 +481,19 @@ internal fun formatCurrencyAmount(cents: Long, currencyCode: String = "USD"): St
     return "$sign${currencySymbol(currencyCode)}${units}.${remainder.toString().padStart(2, '0')}"
 }
 
+/**
+ * O percentual exibido de uma cota.
+ *
+ * **Truncado, não arredondado**, e é a regra que o resto do app já seguia: o
+ * arco fazia `toInt()` e os alertas da bandeja tratam o limiar como piso — 89,9%
+ * não cruzou 90%. Só esta função arredondava, então o mesmo card mostrava 26% na
+ * cota expandida e 27% no badge minimizado, para o mesmo 12 de 45.
+ */
 internal fun compactPercentageLabel(quota: QuotaInfo): String {
     return when (quota.unit) {
         UsageUnit.CURRENCY_USD -> formatCents(quota.total, quota.currencyCode)
         UsageUnit.PERCENTAGE -> "${quota.used}%"
-        else -> "${(quota.percentageUsed * 100).roundToInt()}%"
+        else -> "${(quota.percentageUsed * 100).toInt()}%"
     }
 }
 

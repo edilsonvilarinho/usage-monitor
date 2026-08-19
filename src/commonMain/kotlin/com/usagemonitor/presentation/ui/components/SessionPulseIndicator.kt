@@ -9,11 +9,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import kotlin.math.abs
+import kotlin.math.floor
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.presentation.ui.healthColor
-import kotlin.math.abs
-import kotlin.math.floor
 
 /** Duração de um passo do pisca — o tempo em cena de cada severidade. */
 const val SESSION_PULSE_STEP_MILLIS = 1_200

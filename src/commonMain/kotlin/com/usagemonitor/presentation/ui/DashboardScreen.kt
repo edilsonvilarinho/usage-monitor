@@ -40,10 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.presentation.ui.theme.AppMotion
+import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import com.usagemonitor.domain.entity.ApiSource
-import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
@@ -51,18 +53,19 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppErrorState
+import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
-import com.usagemonitor.presentation.ui.components.ShimmerBox
+import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.presentation.viewmodel.UiState
-import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
-import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 
 /**
  * Folga somada à espera para o relógio já ter cruzado o `periodEndAt` ao acordar.
@@ -313,36 +316,28 @@ private fun NoApisEnabledContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Button(onClick = onOpenSettings) {
-                Text(actionLabel)
-            }
+            AppButton(
+                label = actionLabel,
+                onClick = onOpenSettings,
+                tone = AppButtonTone.PRIMARY
+            )
         }
     }
 }
 
+/**
+ * Carregando: esqueleto **estático**.
+ *
+ * O `ShimmerBox` sai daqui. Ele é a única animação infinita da app e continua
+ * existindo, mas era usado justamente na tela de abertura — a primeira coisa que
+ * um teste de componente do dashboard encontra, e a que trava o `waitForIdle`.
+ */
 @Composable
 private fun LoadingContent(language: AppLanguage) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        repeat(2) {
-            ShimmerBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
-                cornerRadius = 16.dp
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = if (language == AppLanguage.PT) "Carregando dados das APIs..." else "Loading API data...",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        )
-    }
+    AppLoadingState(
+        message = if (language == AppLanguage.PT) "Carregando dados das APIs..." else "Loading API data...",
+        modifier = Modifier.fillMaxSize()
+    )
 }
 
 @Composable
@@ -382,23 +377,16 @@ private fun ErrorContent(
             }
 
             if (genericErrors.isNotEmpty() || warnings.isEmpty()) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Erro ao carregar dados" else "Failed to load data",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error
+                AppErrorState(
+                    message = if (language == AppLanguage.PT) "Erro ao carregar dados" else "Failed to load data",
+                    // Os erros genéricos entram como uma linha só: são as fontes
+                    // que falharam sem motivo reconhecido, e cada uma tem uma
+                    // frase própria vinda da camada de dados.
+                    detail = genericErrors.joinToString("\n") { error -> error.formattedMessage }
+                        .takeIf { text -> text.isNotEmpty() },
+                    retryLabel = if (language == AppLanguage.PT) "Tentar novamente" else "Retry",
+                    onRetry = onRetryAll
                 )
-
-                genericErrors.forEach { error ->
-                    Text(
-                        text = error.formattedMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Button(onClick = onRetryAll) {
-                    Text(if (language == AppLanguage.PT) "Tentar novamente" else "Retry")
-                }
             }
         }
     }

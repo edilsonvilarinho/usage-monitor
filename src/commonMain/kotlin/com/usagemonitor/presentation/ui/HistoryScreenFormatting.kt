@@ -1,6 +1,10 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.ui.graphics.Color
+import kotlin.math.roundToLong
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
@@ -13,10 +17,6 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.accentColorFor
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.math.roundToLong
 
 /**
  * Delega para [accentColorFor]: a mesma fonte tem de ter a mesma cor no card e no

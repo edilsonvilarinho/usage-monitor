@@ -1,10 +1,10 @@
 package com.usagemonitor.presentation.ui
 
+import kotlinx.datetime.Instant
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
-import kotlinx.datetime.Instant
 
 /**
  * Nome da janela.

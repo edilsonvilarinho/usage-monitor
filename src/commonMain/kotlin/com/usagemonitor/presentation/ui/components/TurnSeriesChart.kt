@@ -44,8 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import kotlin.math.roundToInt
+import com.usagemonitor.presentation.ui.theme.AppShapes
 
 private val CHART_HEIGHT = 148.dp
 private val AXIS_LABEL_WIDTH = 54.dp

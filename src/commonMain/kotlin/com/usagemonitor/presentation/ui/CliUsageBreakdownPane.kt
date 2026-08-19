@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -49,9 +50,16 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.presentation.ui.components.ActivityHeatmapGrid
+import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppSegment
+import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppTab
+import com.usagemonitor.presentation.ui.components.AppTabs
+import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 const val BREAKDOWN_SCROLLBAR_TAG = "breakdownScrollbar"
 const val BREAKDOWN_PANE_TAG = "breakdownPane"
@@ -292,20 +300,21 @@ private fun BreakdownAxisTabs(
     language: AppLanguage,
     onSelect: (BreakdownAxis) -> Unit
 ) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth().testTag(BREAKDOWN_AXIS_TABS_TAG),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        for (entry in axes) {
-            FilterChip(
-                selected = selected == entry,
-                onClick = { onSelect(entry) },
-                label = { Text(BreakdownLabels.axisTab(entry, language)) },
-                modifier = Modifier.testTag("$BREAKDOWN_AXIS_TAB_TAG_PREFIX${entry.name}")
+    // Aba, não pílula: o eixo troca **o que** a pane mostra. Filtro, ordem e
+    // tamanho de página, logo abaixo, escolhem parâmetros do mesmo conteúdo e
+    // por isso são segmentados — desenhá-los igual foi o que fez a tela ter três
+    // fileiras de pílulas idênticas com funções diferentes.
+    AppTabs(
+        tabs = axes.map { entry ->
+            AppTab(
+                label = BreakdownLabels.axisTab(entry, language),
+                testTag = "$BREAKDOWN_AXIS_TAB_TAG_PREFIX${entry.name}"
             )
-        }
-    }
+        },
+        selectedIndex = axes.indexOf(selected).coerceAtLeast(0),
+        onSelect = { index -> onSelect(axes[index]) },
+        modifier = Modifier.fillMaxWidth().testTag(BREAKDOWN_AXIS_TABS_TAG)
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -327,32 +336,30 @@ private fun BreakdownControls(
         // `verticalAlignment`, e sem ele os chips subiriam para o topo do campo.
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
     ) {
-        OutlinedTextField(
+        AppTextField(
             value = query,
             onValueChange = onQueryChange,
-            singleLine = true,
-            placeholder = { Text(BreakdownLabels.filterPlaceholder(language)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Search,
-                    contentDescription = BreakdownLabels.filterPlaceholder(language)
-                )
-            },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(
-                        onClick = { onQueryChange("") },
-                        modifier = Modifier.testTag(BREAKDOWN_FILTER_CLEAR_TAG)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = BreakdownLabels.clearFilter(language)
-                        )
-                    }
-                }
-            },
+            placeholder = BreakdownLabels.filterPlaceholder(language),
             modifier = Modifier.width(FILTER_FIELD_WIDTH).testTag(BREAKDOWN_FILTER_TAG)
         )
+
+        // O botão de limpar sai de dentro do campo e passa a ficar ao lado dele:
+        // um campo de 28dp de altura não tem onde acomodar dois ícones sem
+        // espremer o texto que a pessoa está digitando.
+        if (query.isNotEmpty()) {
+            AppIconButton(
+                contentDescription = BreakdownLabels.clearFilter(language),
+                onClick = { onQueryChange("") },
+                modifier = Modifier.testTag(BREAKDOWN_FILTER_CLEAR_TAG)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         Text(
             text = BreakdownLabels.sortLabel(language),
@@ -360,24 +367,28 @@ private fun BreakdownControls(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        for (entry in BreakdownSort.entries) {
-            FilterChip(
-                selected = sort == entry,
-                onClick = { onSortChange(entry) },
-                label = { Text(BreakdownLabels.sortOption(entry, axis, language)) },
-                modifier = Modifier.testTag("$BREAKDOWN_SORT_TAG_PREFIX${entry.name}")
-            )
-        }
+        AppSegmentedControl(
+            options = BreakdownSort.entries.map { entry ->
+                AppSegment(
+                    label = BreakdownLabels.sortOption(entry, axis, language),
+                    testTag = "$BREAKDOWN_SORT_TAG_PREFIX${entry.name}"
+                )
+            },
+            selectedIndex = BreakdownSort.entries.indexOf(sort),
+            onSelect = { index -> onSortChange(BreakdownSort.entries[index]) }
+        )
 
         // Um botão que inverte, e não dois chips de "crescente/decrescente": a
         // direção é uma propriedade da ordem escolhida, não uma quarta ordem.
-        IconButton(
+        AppIconButton(
+            contentDescription = BreakdownLabels.sortDirection(descending, language),
             onClick = onToggleDirection,
             modifier = Modifier.testTag(BREAKDOWN_SORT_DIRECTION_TAG)
         ) {
             Icon(
                 imageVector = if (descending) Icons.Rounded.ArrowDownward else Icons.Rounded.ArrowUpward,
-                contentDescription = BreakdownLabels.sortDirection(descending, language),
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -488,14 +499,16 @@ private fun BreakdownPager(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        for (size in BREAKDOWN_PAGE_SIZES) {
-            FilterChip(
-                selected = pageSize == size,
-                onClick = { onPageSizeChange(size) },
-                label = { Text(size.toString()) },
-                modifier = Modifier.testTag("$BREAKDOWN_PAGE_SIZE_TAG_PREFIX$size")
-            )
-        }
+        AppSegmentedControl(
+            options = BREAKDOWN_PAGE_SIZES.map { size ->
+                AppSegment(
+                    label = size.toString(),
+                    testTag = "$BREAKDOWN_PAGE_SIZE_TAG_PREFIX$size"
+                )
+            },
+            selectedIndex = BREAKDOWN_PAGE_SIZES.indexOf(pageSize).coerceAtLeast(0),
+            onSelect = { index -> onPageSizeChange(BREAKDOWN_PAGE_SIZES[index]) }
+        )
     }
 }
 
@@ -508,11 +521,8 @@ private fun BreakdownTotalsCard(
     val totals = breakdown.totals
 
     DepthSurface(
-        accent = CACHE_READ_COLOR,
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.large,
-        elevation = AppElevation.dialog,
-        contentPadding = 16.dp
+        contentPadding = AppSpacing.md
     ) {
         Text(
             text = BreakdownLabels.totalCost(totals, language),
@@ -564,11 +574,8 @@ private fun BudgetCard(
     language: AppLanguage
 ) {
     DepthSurface(
-        accent = INPUT_COLOR,
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.medium,
-        elevation = AppElevation.card,
-        contentPadding = 12.dp
+        contentPadding = AppSpacing.md
     ) {
         Text(
             text = BreakdownLabels.budgetTitle(language),
@@ -631,11 +638,8 @@ private fun BurnRateCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
     val burnRate = breakdown.burnRate
 
     DepthSurface(
-        accent = OUTPUT_COLOR,
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.medium,
-        elevation = AppElevation.card,
-        contentPadding = 12.dp
+        contentPadding = AppSpacing.md
     ) {
         Text(
             text = BreakdownLabels.burnRateTitle(language),
@@ -687,11 +691,8 @@ private fun BurnRateCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
 @Composable
 private fun ToolRow(tool: CliToolUsage, peak: Int, language: AppLanguage) {
     DepthSurface(
-        accent = CACHE_WRITE_COLOR,
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.medium,
-        elevation = AppElevation.card,
-        contentPadding = 12.dp
+        contentPadding = AppSpacing.md
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -728,11 +729,8 @@ private fun ToolRow(tool: CliToolUsage, peak: Int, language: AppLanguage) {
 @Composable
 private fun ActivityCard(breakdown: CliUsageBreakdown, language: AppLanguage) {
     DepthSurface(
-        accent = CACHE_READ_COLOR,
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.medium,
-        elevation = AppElevation.card,
-        contentPadding = 12.dp
+        contentPadding = AppSpacing.md
     ) {
         Text(
             text = BreakdownLabels.activityTitle(language),
@@ -765,11 +763,8 @@ private fun BreakdownRow(
     val share = bucket.costShareOf(totals)
 
     DepthSurface(
-        accent = accent,
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.medium,
-        elevation = AppElevation.card,
-        contentPadding = 12.dp
+        contentPadding = AppSpacing.md
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
@@ -37,41 +38,70 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToLong
+import kotlinx.coroutines.delay
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.requiresUsageAccount
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppDataSurface
+import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
+import com.usagemonitor.presentation.ui.components.AppSectionHeader
+import com.usagemonitor.presentation.ui.components.AppSegment
+import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
-import kotlinx.coroutines.delay
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.math.roundToLong
+
+/**
+ * Âncoras da tela de Histórico.
+ *
+ * Os três seletores — fonte, conta e intervalo — são hoje três blocos com
+ * rótulo próprio e viram uma barra de controles só. O rótulo da conta é o mais
+ * frágil dos três como âncora de teste: é `email — workspace`, texto longo e
+ * livre, que já aparece também no card do dashboard.
+ */
+const val HISTORY_SOURCE_CHIP_TAG_PREFIX = "historySourceChip:"
+const val HISTORY_ACCOUNT_CHIP_TAG_PREFIX = "historyAccountChip:"
+const val HISTORY_RANGE_CHIP_TAG_PREFIX = "historyRangeChip:"
+
+fun historySourceChipTag(source: ApiSource): String = "$HISTORY_SOURCE_CHIP_TAG_PREFIX${source.name}"
+
+fun historyAccountChipTag(account: UsageAccountContext): String =
+    "$HISTORY_ACCOUNT_CHIP_TAG_PREFIX${account.key.providerAccountId}/${account.key.workspaceId}"
+
+fun historyRangeChipTag(range: HistoryRange): String = "$HISTORY_RANGE_CHIP_TAG_PREFIX${range.name}"
 
 @Composable
 fun HistoryScreen(
@@ -302,9 +332,8 @@ private fun HistoryHeader(
                     showSourceSelector = showSourceSelector,
                     language = language
                 ),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = historySubtitle(
@@ -312,18 +341,31 @@ private fun HistoryHeader(
                     showSourceSelector = showSourceSelector,
                     language = language
                 ),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         if (showSourceSelector) {
-            androidx.compose.material3.TextButton(onClick = onBack) {
-                Text(if (language == AppLanguage.PT) "Voltar" else "Back")
-            }
+            AppButton(
+                label = if (language == AppLanguage.PT) "Voltar" else "Back",
+                onClick = onBack,
+                tone = AppButtonTone.GHOST
+            )
         }
     }
 }
 
+/**
+ * Fonte, conta e intervalo numa barra só.
+ *
+ * Eram três blocos empilhados, cada um com o próprio título e a própria fileira
+ * de chips: quase duzentos dp de altura antes do primeiro ponto do gráfico. Aqui
+ * os três viram controle segmentado com o rótulo ao lado, e a barra quebra em
+ * mais de uma linha quando a janela é estreita — daí o `FlowRow`, e não `Row`.
+ *
+ * O rótulo de cada grupo continua na tela ("API", "Conta", "Intervalo"): sem
+ * ele, três segmentados lado a lado não dizem o que escolhem.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HistoryControls(
@@ -338,36 +380,26 @@ private fun HistoryControls(
     onSelectAccount: (UsageAccountContext) -> Unit,
     onSelectRange: (HistoryRange) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (showSourceSelector) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (language == AppLanguage.PT) "API" else "API",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    availableSources.forEach { source ->
-                        RangeChip(
-                            label = sourceLabel(source),
-                            selected = source == selectedSource,
-                            onClick = { onSelectSource(source) }
-                        )
-                    }
+    AppDataSurface(contentPadding = AppSpacing.sm) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+        ) {
+            if (showSourceSelector) {
+                HistoryControlGroup(label = if (language == AppLanguage.PT) "API" else "API") {
+                    AppSegmentedControl(
+                        options = availableSources.map { source ->
+                            AppSegment(label = sourceLabel(source), testTag = historySourceChipTag(source))
+                        },
+                        selectedIndex = availableSources.indexOf(selectedSource),
+                        onSelect = { index -> onSelectSource(availableSources[index]) }
+                    )
                 }
             }
-        }
 
-        if (selectedSource.requiresUsageAccount) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Conta" else "Account",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            if (selectedSource.requiresUsageAccount) {
+                HistoryControlGroup(label = if (language == AppLanguage.PT) "Conta" else "Account") {
                 if (availableAccounts.isEmpty()) {
                     Text(
                         text = if (language == AppLanguage.PT) {
@@ -379,81 +411,49 @@ private fun HistoryControls(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        for (account in availableAccounts) {
-                            RangeChip(
+                    AppSegmentedControl(
+                        options = availableAccounts.map { account ->
+                            AppSegment(
                                 label = account.displayLabel,
-                                selected = account.key == selectedAccount?.key,
-                                onClick = { onSelectAccount(account) }
+                                testTag = historyAccountChipTag(account)
                             )
-                        }
-                    }
-                }
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = if (language == AppLanguage.PT) "Intervalo" else "Range",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                HistoryRange.entries.forEach { range ->
-                    RangeChip(
-                        label = rangeLabel(range, language),
-                        selected = range == selectedRange,
-                        onClick = { onSelectRange(range) }
+                        },
+                        selectedIndex = availableAccounts.indexOfFirst { account ->
+                            account.key == selectedAccount?.key
+                        },
+                        onSelect = { index -> onSelectAccount(availableAccounts[index]) }
                     )
                 }
+                }
+            }
+
+            HistoryControlGroup(label = if (language == AppLanguage.PT) "Intervalo" else "Range") {
+                AppSegmentedControl(
+                    options = HistoryRange.entries.map { range ->
+                        AppSegment(label = rangeLabel(range, language), testTag = historyRangeChipTag(range))
+                    },
+                    selectedIndex = HistoryRange.entries.indexOf(selectedRange),
+                    onSelect = { index -> onSelectRange(HistoryRange.entries[index]) }
+                )
             }
         }
     }
 }
 
+/** Rótulo e controle na mesma linha de base, como um par. */
 @Composable
-private fun RangeChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val containerColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
-                      else           MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(durationMillis = AppMotion.fast),
-        label = "chipColor"
-    )
-    val labelColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                      else           MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(durationMillis = AppMotion.fast),
-        label = "chipLabelColor"
-    )
-
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = labelColor
-            )
-        },
-        shape = AppShapes.small,
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor            = containerColor,
-            selectedContainerColor    = containerColor,
-            labelColor                = labelColor,
-            selectedLabelColor        = labelColor
+private fun HistoryControlGroup(label: String, content: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    )
+        content()
+    }
 }
 
 @Composable
@@ -614,30 +614,36 @@ private fun DeepSeekHistoryCard(
                     )
                 }
 
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
-                        value = formatCents(series.currentDisplayUsed)
-                    )
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Gasto no período" else "Spent in range",
-                        value = formatCents(series.deltaDisplayUsed)
-                    )
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Ritmo médio" else "Average pace",
-                        value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
-                    )
-                    if (lastUpdatedAt != null) {
-                        MetricItem(
-                            label = if (language == AppLanguage.PT) "Última coleta" else "Last snapshot",
-                            value = formatInstant(lastUpdatedAt)
+                HistoryMetricTable(
+                    entries = buildList {
+                        add(
+                            HistoryMetricEntry(
+                                label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+                                value = formatCents(series.currentDisplayUsed)
+                            )
                         )
+                        add(
+                            HistoryMetricEntry(
+                                label = if (language == AppLanguage.PT) "Gasto no período" else "Spent in range",
+                                value = formatCents(series.deltaDisplayUsed)
+                            )
+                        )
+                        add(
+                            HistoryMetricEntry(
+                                label = if (language == AppLanguage.PT) "Ritmo médio" else "Average pace",
+                                value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
+                            )
+                        )
+                        if (lastUpdatedAt != null) {
+                            add(
+                                HistoryMetricEntry(
+                                    label = if (language == AppLanguage.PT) "Última coleta" else "Last snapshot",
+                                    value = formatInstant(lastUpdatedAt)
+                                )
+                            )
+                        }
                     }
-                }
+                )
 
                 UsageHistoryLineChart(
                     points = series.points,
@@ -740,33 +746,33 @@ private fun OpenCodeHistoryCard(
                     )
                 )
 
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Requisições nas últimas 5h" else "Requests in last 5h",
-                        value = localizedRequests(modelReport.requests5h, language)
+                HistoryMetricTable(
+                    entries = listOf(
+                        HistoryMetricEntry(
+                            label = if (language == AppLanguage.PT) "Requisições nas últimas 5h" else "Requests in last 5h",
+                            value = localizedRequests(modelReport.requests5h, language)
+                        ),
+                        HistoryMetricEntry(
+                            label = if (language == AppLanguage.PT) "Requisições nos últimos 7 dias" else "Requests in last 7 days",
+                            value = localizedRequests(modelReport.requests7d, language)
+                        ),
+                        HistoryMetricEntry(
+                            label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
+                            value = localizedRequests(modelReport.chartSeries.deltaDisplayUsed, language)
+                        ),
+                        HistoryMetricEntry(
+                            label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+                            value = localizedRequests(
+                                modelReport.chartSeries.averageDisplayConsumptionPerHour.roundToLong(),
+                                language
+                            ) + "/h"
+                        ),
+                        HistoryMetricEntry(
+                            label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
+                            value = if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
+                        )
                     )
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Requisições nos últimos 7 dias" else "Requests in last 7 days",
-                        value = localizedRequests(modelReport.requests7d, language)
-                    )
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
-                        value = localizedRequests(modelReport.chartSeries.deltaDisplayUsed, language)
-                    )
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-                        value = localizedRequests(modelReport.chartSeries.averageDisplayConsumptionPerHour.roundToLong(), language) +
-                            if (language == AppLanguage.PT) "/h" else "/h"
-                    )
-                    MetricItem(
-                        label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
-                        value = if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
-                    )
-                }
+                )
             }
         }
     }
@@ -811,53 +817,39 @@ private fun HistorySeriesCard(
         language = language
     )
 
-    Card(
+    // Painel neutro com cabeçalho: a faixa de 3dp que atravessava a altura toda
+    // do card virou o marcador de 2dp do cabeçalho, o mesmo que identifica a
+    // fonte no dashboard. A cor sai da moldura e entra na linha do gráfico, que
+    // é onde ela realmente distingue uma série da outra.
+    AppDataSurfaceFlush(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 alpha = cardAlpha
                 translationY = cardOffsetY
             },
-        shape = AppShapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(3.dp)
-                    .background(accentColor.copy(alpha = 0.85f))
+        header = {
+            AppSectionHeader(
+                title = title,
+                subtitle = subtitle,
+                markerColor = accentColor
             )
+        }
+    ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .fillMaxWidth()
+                    .padding(AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = accentColor,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
                 UsageHistoryLineChart(
                     points = series.points,
                     unit = series.unit,
                     language = language,
                     chartSelectionKey = chartSelectionKey,
                     tooltipTitle = title,
-                    tooltipSubtitle = subtitle
+                    tooltipSubtitle = subtitle,
+                    accentColor = accentColor
                 )
 
                 if (weeklySummary != null) {
@@ -881,7 +873,6 @@ private fun HistorySeriesCard(
                     )
                 }
             }
-        }
     }
 }
 
@@ -893,22 +884,10 @@ private fun HistoryMetricsPanel(
     series: UsageHistorySeries,
     language: AppLanguage
 ) {
-    Surface(
-        shape = AppShapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+    AppDataSurfaceFlush(
+        header = { AppSectionHeader(title = title) }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold
-            )
+        Column(modifier = Modifier.fillMaxWidth().padding(AppSpacing.sm)) {
             HistoryMetrics(
                 source = source,
                 series = series,
@@ -919,123 +898,202 @@ private fun HistoryMetricsPanel(
 }
 
 @OptIn(ExperimentalLayoutApi::class)
+/**
+ * As métricas da série, em duas colunas de pares rótulo→valor.
+ *
+ * Duas colunas e não uma: com uma, a tela do OpenCode — que tem duas séries por
+ * modelo — passava de 2.400px de altura. Não é `FlowRow`: ali a linha mede pelo
+ * conteúdo, o `weight` do valor fica sem referência e o Compose deixa o texto
+ * **sem posicionar** — `isPlaced` falso, nó na árvore e nada na tela. Duas
+ * `Column` com `weight(1f)` dentro de uma `Row` de largura cheia dão ao peso a
+ * referência que ele precisa.
+ */
 @Composable
 private fun HistoryMetrics(
     source: ApiSource,
     series: UsageHistorySeries,
     language: AppLanguage
 ) {
-    FlowRow(
+    HistoryMetricTable(
+        entries = historyMetricEntries(source = source, series = series, language = language)
+    )
+}
+
+/**
+ * A tabela de métricas: duas colunas de pares rótulo→valor.
+ *
+ * Duas colunas e não uma: com uma, a tela do OpenCode — que tem duas séries por
+ * modelo — passava de 2.400px de altura. E **não** é `FlowRow`: ali a linha mede
+ * pelo conteúdo, o `weight` do valor fica sem referência e o Compose deixa o
+ * texto sem posicionar — `isPlaced` falso, nó presente na árvore e nada na tela,
+ * que é como este layout falhou da primeira vez. Duas `Column` com `weight(1f)`
+ * dentro de uma `Row` de largura cheia dão ao peso a referência que falta.
+ */
+@Composable
+private fun HistoryMetricTable(entries: List<HistoryMetricEntry>) {
+    // Ímpar sobra para a esquerda: um buraco no fim da segunda coluna lê melhor
+    // que um no meio da primeira.
+    val half = (entries.size + 1) / 2
+
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.lg)
     ) {
-        if (series.periodType == PeriodType.REPORTED) {
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
-                value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
-            )
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
-                value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
-            )
-            if (source == ApiSource.CODEX) {
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Último reinício reportado" else "Last reported reset",
-                    value = formatInstant(series.currentPeriodEndAt)
-                )
+        Column(modifier = Modifier.weight(1f)) {
+            entries.take(half).forEach { entry ->
+                MetricItem(label = entry.label, value = entry.value)
             }
-        } else if (series.unit == UsageUnit.CURRENCY_USD) {
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
-                value = formatCents(series.currentDisplayUsed)
-            )
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-                value = formatCents(series.deltaDisplayUsed)
-            )
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-                value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
-            )
-        } else if (series.unit == UsageUnit.REQUESTS) {
-            if (series.currentDisplayTotal > 0L) {
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
-                    value = "${formatQuantity(series.currentDisplayUsed)}/${formatQuantity(series.currentDisplayTotal)} req"
-                )
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-                    value = "${formatQuantity(series.deltaDisplayUsed)} req"
-                )
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-                    value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} req/h"
-                )
-            } else {
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Requisições na janela" else "Requests in window",
-                    value = "${formatQuantity(series.currentDisplayUsed)} req"
-                )
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
-                    value = "${formatQuantity(series.deltaDisplayUsed)} req"
-                )
-                MetricItem(
-                    label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-                    value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} req/h"
-                )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            entries.drop(half).forEach { entry ->
+                MetricItem(label = entry.label, value = entry.value)
             }
-        } else {
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
-                value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
-            )
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-                value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
-            )
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
-                value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
-            )
-        }
-        if (series.periodType != PeriodType.REPORTED) {
-            MetricItem(
-                label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
-                value = if (series.unit == UsageUnit.REQUESTS && series.currentDisplayTotal <= 0L) {
-                    if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
-                } else {
-                    forecastLabel(series.forecast, language)
-                }
-            )
-        }
-        val comparison = series.comparison
-        if (comparison != null) {
-            MetricItem(
-                label = if (language == AppLanguage.PT) "vs. período anterior" else "vs. previous period",
-                value = periodComparisonLabel(comparison, language)
-            )
         }
     }
 }
 
+/** Um par de métrica. Nome e valor já formatados e já traduzidos. */
+private data class HistoryMetricEntry(val label: String, val value: String)
+
+/**
+ * As métricas que a série publica, na ordem em que a tela as mostra.
+ *
+ * Separada do desenho porque a escolha de quais métricas existem depende do
+ * tipo de período, da unidade e da fonte — regra de apresentação que não tem
+ * nada a ver com o layout de duas colunas.
+ */
+private fun historyMetricEntries(
+    source: ApiSource,
+    series: UsageHistorySeries,
+    language: AppLanguage
+): List<HistoryMetricEntry> {
+    val entries = mutableListOf<HistoryMetricEntry>()
+
+    if (series.periodType == PeriodType.REPORTED) {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+            value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
+        )
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
+            value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
+        )
+        if (source == ApiSource.CODEX) {
+            entries += HistoryMetricEntry(
+                label = if (language == AppLanguage.PT) "Último reinício reportado" else "Last reported reset",
+                value = formatInstant(series.currentPeriodEndAt)
+            )
+        }
+    } else if (series.unit == UsageUnit.CURRENCY_USD) {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+            value = formatCents(series.currentDisplayUsed)
+        )
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+            value = formatCents(series.deltaDisplayUsed)
+        )
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+            value = formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"
+        )
+    } else if (series.unit == UsageUnit.REQUESTS) {
+        if (series.currentDisplayTotal > 0L) {
+            entries += HistoryMetricEntry(
+                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+                value = "${formatQuantity(series.currentDisplayUsed)}/${formatQuantity(series.currentDisplayTotal)} req"
+            )
+            entries += HistoryMetricEntry(
+                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+                value = "${formatQuantity(series.deltaDisplayUsed)} req"
+            )
+        } else {
+            entries += HistoryMetricEntry(
+                label = if (language == AppLanguage.PT) "Requisições na janela" else "Requests in window",
+                value = "${formatQuantity(series.currentDisplayUsed)} req"
+            )
+            entries += HistoryMetricEntry(
+                label = if (language == AppLanguage.PT) "Variação observada" else "Observed change",
+                value = "${formatQuantity(series.deltaDisplayUsed)} req"
+            )
+        }
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+            value = "${formatQuantity(series.averageDisplayConsumptionPerHour.roundToLong())} req/h"
+        )
+    } else {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+            value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
+        )
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+            value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
+        )
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
+            value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
+        )
+    }
+
+    if (series.periodType != PeriodType.REPORTED) {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Previsão" else "Forecast",
+            value = if (series.unit == UsageUnit.REQUESTS && series.currentDisplayTotal <= 0L) {
+                if (language == AppLanguage.PT) "Limite indisponível" else "Limit unavailable"
+            } else {
+                forecastLabel(series.forecast, language)
+            }
+        )
+    }
+
+    val comparison = series.comparison
+    if (comparison != null) {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "vs. período anterior" else "vs. previous period",
+            value = periodComparisonLabel(comparison, language)
+        )
+    }
+
+    return entries
+}
+
+/**
+ * Uma métrica: rótulo à esquerda, valor à direita, largura fixa.
+ *
+ * Era rótulo em cima e valor embaixo, num `FlowRow` cujas colunas mudavam de
+ * largura conforme o texto — sete métricas viravam sete larguras diferentes e
+ * nenhum valor alinhava com o de baixo. Com a largura fixa os pares formam
+ * colunas de verdade, e o `FlowRow` decide quantas cabem.
+ */
 @Composable
 private fun MetricItem(
     label: String,
     value: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Row(
+        // Largura cheia: "A janela deve reiniciar antes do limite" é um valor de
+        // métrica, e numa coluna estreita o rótulo ao lado quebrava letra a letra.
+        modifier = Modifier.fillMaxWidth().padding(vertical = AppSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
         )
         Text(
             text = value,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
         )
     }
 }
+
+
 

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Usage Monitor">
+  <!--
+    Monograma do Usage Monitor.
+
+    Três hastes unidas por um bojo: lê como U e M sobrepostos em tamanho grande e
+    mantém silhueta distinta em 16px, que é onde o ícone de bandeja vive. Nenhum
+    asset de terceiros — a construção é geométrica e está repetida em
+    `render_icons.py`, que é quem gera os arquivos de fato.
+
+    As cores são as do tema escuro do app: campo em `--fg` (#F2EDED) e traço em
+    `--bg` (#131010). O ícone não muda com o tema do sistema; ele vive na barra de
+    tarefas e na bandeja, onde o fundo não é nosso.
+  -->
+  <rect width="24" height="24" rx="5" fill="#F2EDED"/>
+  <path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5"
+        stroke="#131010" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+  <path d="M12 6.5v6.6" stroke="#131010" stroke-width="2.1" stroke-linecap="round"/>
+</svg>

@@ -23,10 +23,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.resumeSessionCommand
-import kotlinx.coroutines.delay
 
 /** Quanto tempo o botão fica confirmando a cópia antes de voltar ao normal. */
 private const val COPY_FEEDBACK_MILLIS = 2_000L
@@ -99,11 +99,12 @@ internal fun CopySessionCommandButton(
         title = label,
         modifier = modifier
     ) {
-        IconButton(
-            onClick = onClick,
-            modifier = Modifier
-                .size(28.dp)
-                .semantics { contentDescription = label }
+        // Quadrado de 26dp como todo botão de ícone do app: numa linha de 32dp,
+        // o círculo de 40dp do Material era o item mais alto e definia a altura
+        // da lista inteira.
+        AppIconButton(
+            contentDescription = label,
+            onClick = onClick
         ) {
             CopyStateIcon(copied = copied)
         }
@@ -116,8 +117,10 @@ private fun CopyStateIcon(copied: Boolean) {
         imageVector = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
         contentDescription = null,
         modifier = Modifier.size(16.dp),
+        // Verde de confirmação e não o azul de destaque: o estado que o ícone
+        // relata é "deu certo", que no resto do app é `AppTone.OK`.
         tint = if (copied) {
-            MaterialTheme.colorScheme.primary
+            AppTone.OK.color()
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         }

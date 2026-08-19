@@ -19,17 +19,18 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.datetime.Instant
 import com.usagemonitor.domain.entity.ApiSource
-import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
-import kotlinx.datetime.Instant
 import com.usagemonitor.presentation.ui.resolveDropTargetIndex
+import com.usagemonitor.presentation.ui.theme.AppMotion
 
 // Threshold de largura (em dp) acima do qual o grid alterna de 1 para 2 colunas.
 private val CompactColumnsThreshold = 720.dp
@@ -128,7 +129,10 @@ internal fun ResponsiveDashboardCardGrid(
                             isBeingDragged = isBeingDragged,
                             isDragTarget = isDropTarget,
                             language = language,
-                            animationDelayMillis = index * 90,
+                            // O atraso de entrada sai do token, não de um
+                            // literal: o `ScreenshotGenerator` é calibrado
+                            // contra ele e precisa de um dono só.
+                            animationDelayMillis = index * AppMotion.stagger.toInt(),
                             onRefresh = { onRefreshCard(stats.targetKey) },
                             onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
                             onOpenCliSessions = if (stats.source == ApiSource.ANTHROPIC) {

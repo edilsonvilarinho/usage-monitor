@@ -1,16 +1,22 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -18,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.components.AppBorderWidth
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
@@ -246,7 +255,8 @@ internal fun AppUpdateBanner(
             .testTag(APP_UPDATE_BANNER_TAG),
         shape = AppShapes.small,
         tonalElevation = AppElevation.banner,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f)
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
@@ -255,28 +265,29 @@ internal fun AppUpdateBanner(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "i",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+            // A barra de severidade no lugar do "i" desenhado com o tipo: o mesmo
+            // marcador de 2dp que todos os avisos do app usam.
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .height(16.dp)
+                    .clip(AppShapes.extraSmall)
+                    .background(AppTone.INFO.color())
             )
             // Quem cede espaço numa janela estreita é o título: o rótulo da ação é
             // a única pista de que a faixa é clicável.
             Text(
                 text = content.title,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
             Text(
                 text = "${content.actionLabel} →",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
+                color = AppTone.INFO.color(),
                 maxLines = 1
             )
         }

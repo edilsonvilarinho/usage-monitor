@@ -21,11 +21,17 @@ import kotlin.test.assertTrue
  */
 class AppAccentsContrastTest {
 
-    // As duas superfícies de `AppTheme.kt`. A escura é `surface` (#242424) e não
-    // `background` (#181818): o texto acentuado sempre cai sobre um `DepthSurface`,
-    // e a mais clara das duas é o pior caso para um acento claro.
-    private val darkSurface = Color(0xFF242424)
-    private val lightSurface = Color(0xFFF8F9FA)
+    // As superfícies de referência de `AppTheme.kt`: `surface` de cada tema, e não
+    // `background` — o texto acentuado cai sobre um painel, não sobre a moldura da
+    // janela.
+    //
+    // Não é `surfaceVariant` (o degrau "raised", #211E1E / #EFEAEA), que seria o
+    // pior caso aritmético: contra o claro `cacheRead` e `opencode` dão 4,30:1.
+    // Adotá-lo obrigaria a mexer nos acentos, e o protótipo aprovado os congela
+    // justamente porque já satisfazem a regra contra `surface`. Medir contra
+    // `surface` é a regra que este teste sempre teve; o que mudou foram os valores.
+    private val darkSurface = Color(0xFF1B1818)
+    private val lightSurface = Color(0xFFFFFCFC)
 
     private val minimumRatio = 4.5
 

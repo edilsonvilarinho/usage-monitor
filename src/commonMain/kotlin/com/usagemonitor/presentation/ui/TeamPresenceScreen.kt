@@ -49,10 +49,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberPresence
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppSourceMarker
+import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppToggleChip
+import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppGlow
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
@@ -231,9 +236,11 @@ private fun ConfirmationDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(TeamUsageLabels.cancel(language))
-            }
+            AppButton(
+                label = TeamUsageLabels.cancel(language),
+                onClick = onDismiss,
+                tone = AppButtonTone.GHOST
+            )
         }
     )
 }
@@ -269,9 +276,11 @@ private fun TeamPresenceList(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f).testTag(PRESENCE_ACTION_ERROR_TAG)
                 )
-                TextButton(onClick = onDismissActionError) {
-                    Text(TeamUsageLabels.cancel(language))
-                }
+                AppButton(
+                    label = TeamUsageLabels.cancel(language),
+                    onClick = onDismissActionError,
+                    tone = AppButtonTone.GHOST
+                )
             }
         }
 
@@ -383,7 +392,6 @@ private fun TeamPresenceHeader(
     val accents = AppAccents.current
 
     DepthSurface(
-        accent = accents.cacheRead,
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.large,
         elevation = AppElevation.dialog,
@@ -443,10 +451,13 @@ private fun TeamPresenceHeader(
                 valueColor = MaterialTheme.colorScheme.onSurface
             )
 
-            FilterChip(
+            // Filtro binário: um segmentado de dois estados diria "ou isto, ou
+            // aquilo", e o que existe aqui é uma restrição ligada ou desligada.
+            // O `selectable` mantém a semântica que o teste observa.
+            AppToggleChip(
+                label = TeamPresenceLabels.onlyOnline(language),
                 selected = state.onlyOnline,
                 onClick = { onSetOnlyOnline(!state.onlyOnline) },
-                label = { Text(TeamPresenceLabels.onlyOnline(language)) },
                 modifier = Modifier.testTag(PRESENCE_ONLY_ONLINE_TAG)
             )
         }
@@ -609,13 +620,16 @@ private fun TeamPresenceAccountHeader(
         )
 
         if (deletable) {
-            IconButton(
+            AppIconButton(
+                contentDescription = TeamPresenceLabels.deleteAccount(language),
                 onClick = onDelete,
+                tone = AppButtonTone.DANGER,
                 modifier = Modifier.testTag("$PRESENCE_ACCOUNT_DELETE_TAG_PREFIX${group.groupKey}")
             ) {
                 Icon(
                     imageVector = Icons.Rounded.DeleteForever,
-                    contentDescription = TeamPresenceLabels.deleteAccount(language),
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.error
                 )
             }
@@ -654,20 +668,16 @@ private fun TeamPresenceRow(
         else -> MaterialTheme.colorScheme.outline
     }
 
-    DepthSurface(
-        accent = accent,
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("$PRESENCE_ROW_TAG_PREFIX${entry.memberKey}"),
-        shape = AppShapes.medium,
-        // Sem isto a linha herdava o default de `DepthSurface`, calibrado para os
-        // cards do dashboard: era a superfície mais berrante da app, e por
-        // acidente — nenhuma outra lista deixa de passar o parâmetro.
-        glowAlpha = AppGlow.row,
-        contentPadding = PRESENCE_ROW_CONTENT_PADDING
+    // Linha de tabela, como as outras listas do app: eram painéis empilhados com
+    // vão entre eles, e uma lista de vinte máquinas virava vinte blocos.
+    AppDataRow(
+        modifier = Modifier.testTag("$PRESENCE_ROW_TAG_PREFIX${entry.memberKey}"),
+        horizontalPadding = PRESENCE_ROW_CONTENT_PADDING,
+        verticalPadding = PRESENCE_ROW_CONTENT_PADDING
     ) {
+        AppSourceMarker(color = accent)
         FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -791,15 +801,18 @@ private fun TeamPresenceRow(
             }
 
             if (removable) {
-                IconButton(
+                AppIconButton(
+                    contentDescription = TeamUsageLabels.removeMember(language),
                     onClick = onRemove,
+                    tone = AppButtonTone.DANGER,
                     modifier = Modifier.testTag(
                         "$PRESENCE_MEMBER_REMOVE_TAG_PREFIX${entry.memberKey}"
                     )
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = TeamUsageLabels.removeMember(language),
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
