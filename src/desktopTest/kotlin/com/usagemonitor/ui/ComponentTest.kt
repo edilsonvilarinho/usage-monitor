@@ -63,6 +63,8 @@ import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
+import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
@@ -716,6 +718,106 @@ class ComponentTest {
     }
 
     /**
+     * Abaixo do piso de largura o popup de cota cobre o card inteiro — a janela do
+     * modo somente cards tem ~230dp de largura útil. Ali o hover não abre nada.
+     */
+    @Test
+    fun `ApiUsageCard drops the quota tooltip on a narrow card`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(240.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(
+                            QuotaInfo(
+                                label = "Claude 5h",
+                                used = 45L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                                periodType = PeriodType.INTERVAL,
+                                unit = UsageUnit.TOKENS,
+                                rawUsed = 1800L,
+                                rawTotal = 4000L
+                            )
+                        ),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        isMinimized = true,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {},
+                        now = Instant.parse("2026-04-28T10:00:00Z")
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Claude 5h").performMouseInput { moveTo(center) }
+        waitForIdle()
+
+        // `waitForIdle` e não `waitUntil`: este espera algo aparecer, e aqui a
+        // afirmação é que nada aparece.
+        onAllNodesWithText("Uso atual").assertCountEquals(0)
+        onAllNodesWithText("Restante").assertCountEquals(0)
+
+        // A `testTag` do bloco saiu do `HoverTooltipBox` e desceu para o conteúdo:
+        // sem isso o nó sumiria da árvore junto com a tooltip.
+        onNodeWithTag(quotaBlockTag("Claude 5h"), useUnmergedTree = true).assertExists()
+    }
+
+    /**
+     * O ponto do semáforo nunca teve tooltip própria — os dois usos passam
+     * `showTooltip = false`, porque dois `TooltipBox` aninhados disputam o hover.
+     * A explicação vive no rodapé da tooltip da cota.
+     */
+    @Test
+    fun `ApiUsageCard explains the risk dot in the tooltip footnote`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 7d",
+            used = 60L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.TOKENS
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.ON_TRACK,
+                            estimatedExhaustionAt = null
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-04-28T10:00:00Z")
+                )
+            }
+        }
+
+        onNodeWithText("Semanal").performMouseInput { moveTo(center) }
+
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithText("No ritmo atual, a cota deve resetar antes de esgotar.")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        // O valor continua na métrica; o rodapé diz o que ele significa.
+        onNodeWithText("Projeção de uso").assertIsDisplayed()
+    }
+
+    /**
      * Issue #36: com o reset já vencido o card mostrava o horário passado como se
      * fosse futuro, ao lado do percentual saturado da janela anterior.
      */
@@ -1359,7 +1461,98 @@ class ComponentTest {
         viewModel.onDestroy()
     }
 
+    /**
+     * Issue #70: no modo somente cards a barra de estado sai da janela, e com
+     * ela a versão, a contagem regressiva e as quatro ações do rodapé.
+     */
+    @Test
+    fun `DashboardScreen hides the footer in cards only mode`() = runDesktopComposeUiTest {
+        val enabledApis = MutableStateFlow(emptySet<ApiSource>())
+        val viewModel = emptyDashboardViewModel(enabledApis)
+        viewModel.cancelCountdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = { _, _ -> },
+                    onOpenSettings = {},
+                    showFooter = false,
+                    countdownUpdatesEnabled = false
+                )
+            }
+        }
+
+        onNodeWithTag(FOOTER_VERSION_TEST_TAG, useUnmergedTree = true).assertDoesNotExist()
+        onAllNodesWithContentDescription("Abrir configurações").assertCountEquals(0)
+        onAllNodesWithContentDescription("Atualizar agora").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `DashboardScreen keeps the footer by default`() = runDesktopComposeUiTest {
+        val enabledApis = MutableStateFlow(emptySet<ApiSource>())
+        val viewModel = emptyDashboardViewModel(enabledApis)
+        viewModel.cancelCountdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = { _, _ -> },
+                    onOpenSettings = {},
+                    countdownUpdatesEnabled = false
+                )
+            }
+        }
+
+        onNodeWithTag(FOOTER_VERSION_TEST_TAG, useUnmergedTree = true).assertIsDisplayed()
+        viewModel.onDestroy()
+    }
+
     // ── SettingsDialogContent ───────────────────────────────────────────
+
+    /**
+     * Issue #70: o interruptor que esconde a moldura da janela mora ao lado de
+     * "manter sempre visível" — as duas são propriedades da moldura.
+     */
+    @Test
+    fun `SettingsDialogContent emits the cards only mode change`() = runDesktopComposeUiTest {
+        var enabled: Boolean? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    cardsOnlyMode = false,
+                    onCardsOnlyModeChange = { value -> enabled = value },
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        onNodeWithTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG).performClick()
+
+        assertEquals(true, enabled)
+    }
 
     @Test
     fun `SettingsDialogContent displays localized controls in EN`() = runDesktopComposeUiTest {

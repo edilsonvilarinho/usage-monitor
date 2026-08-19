@@ -34,14 +34,16 @@ private fun member(
     alias: String = "edilson",
     lastSeenAtMillis: Long? = NOW.toEpochMilliseconds(),
     sessions: List<CliSessionSummary> = emptyList(),
-    accountKey: String? = null
+    accountKey: String? = null,
+    accountLabel: String? = null
 ): TeamMemberUsage {
     return TeamMemberUsage(
         deviceId = deviceId,
         alias = alias,
         lastSeenAt = lastSeenAtMillis?.let { millis -> Instant.fromEpochMilliseconds(millis) },
         sessions = sessions,
-        accountKey = accountKey
+        accountKey = accountKey,
+        accountLabel = accountLabel
     )
 }
 
@@ -231,5 +233,101 @@ class TeamPresenceTest {
 
         assertEquals("account-1", entry.accountKey)
         assertEquals("account-1/device-1", entry.memberKey)
+    }
+
+    @Test
+    fun `a conta ordena antes do estado`() {
+        // Caso que a ordem antiga errava: quem estava trabalhando puxava a conta
+        // dele para o topo, e a faixa da conta mudava de lugar sozinha.
+        val workingOnZeta = member(
+            deviceId = "device-zeta",
+            alias = "aaa",
+            accountKey = "account-zeta",
+            accountLabel = "zeta@empresa.com",
+            sessions = listOf(session(lastTsMillis = NOW.toEpochMilliseconds() - 1_000))
+        )
+        val offlineOnAlfa = member(
+            deviceId = "device-alfa",
+            alias = "zzz",
+            accountKey = "account-alfa",
+            accountLabel = "alfa@empresa.com",
+            lastSeenAtMillis = NOW.toEpochMilliseconds() - PRESENCE_ONLINE_WINDOW_MILLIS - 10_000
+        )
+
+        val order = listOf(workingOnZeta, offlineOnAlfa)
+            .toTeamPresence(NOW)
+            .map { entry -> entry.deviceId }
+
+        assertEquals(listOf("device-alfa", "device-zeta"), order)
+    }
+
+    @Test
+    fun `conta sem rotulo vai depois das identificadas`() {
+        val unlabeled = member(
+            deviceId = "device-sem-rotulo",
+            accountKey = "aaa-account",
+            accountLabel = null
+        )
+        val labeled = member(
+            deviceId = "device-com-rotulo",
+            accountKey = "zzz-account",
+            accountLabel = "zeta@empresa.com"
+        )
+
+        val order = listOf(unlabeled, labeled)
+            .toTeamPresence(NOW)
+            .map { entry -> entry.deviceId }
+
+        assertEquals(listOf("device-com-rotulo", "device-sem-rotulo"), order)
+    }
+
+    @Test
+    fun `o heartbeat nao reordena a lista`() {
+        // Reproducao direta do defeito: a batida de 30s de um dos online chega
+        // depois e nada mais muda. A lista tem de sair identica.
+        fun members(romeroLastSeenMillis: Long) = listOf(
+            member(
+                deviceId = "device-romero",
+                alias = "romero",
+                accountKey = "account-helio",
+                accountLabel = "helio@empresa.com",
+                lastSeenAtMillis = romeroLastSeenMillis
+            ),
+            member(
+                deviceId = "device-severino",
+                alias = "severino",
+                accountKey = "account-severino",
+                accountLabel = "severino@empresa.com",
+                lastSeenAtMillis = NOW.toEpochMilliseconds() - 60_000
+            )
+        )
+
+        val before = members(NOW.toEpochMilliseconds() - 60_000).toTeamPresence(NOW)
+        val after = members(NOW.toEpochMilliseconds()).toTeamPresence(NOW)
+
+        assertEquals(
+            before.map { entry -> entry.deviceId },
+            after.map { entry -> entry.deviceId }
+        )
+    }
+
+    @Test
+    fun `o turno mais recente nao reordena quem trabalha`() {
+        val recent = member(
+            deviceId = "device-zzz",
+            alias = "zzz",
+            sessions = listOf(session(lastTsMillis = NOW.toEpochMilliseconds()))
+        )
+        val older = member(
+            deviceId = "device-aaa",
+            alias = "aaa",
+            sessions = listOf(
+                session(lastTsMillis = NOW.toEpochMilliseconds() - ACTIVE_SESSION_WINDOW_MILLIS + 1_000)
+            )
+        )
+
+        val order = listOf(recent, older).toTeamPresence(NOW).map { entry -> entry.alias }
+
+        assertEquals(listOf("aaa", "zzz"), order)
     }
 }

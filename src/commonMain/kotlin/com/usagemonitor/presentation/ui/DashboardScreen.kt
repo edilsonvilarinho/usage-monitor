@@ -62,6 +62,7 @@ import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
@@ -130,6 +131,14 @@ fun DashboardScreen(
      * inventar um `UsageTargetKey` que não corresponde a card nenhum.
      */
     onOpenTeamPresenceOverview: (() -> Unit)? = null,
+    /**
+     * `false` no modo somente cards: a barra de estado sai da janela.
+     *
+     * Com ela saem a versão, a contagem regressiva e as quatro ações do rodapé —
+     * inclusive a engrenagem. Quem liga o modo recebe as saídas por escrito no
+     * próprio interruptor, e a bandeja continua abrindo as Configurações.
+     */
+    showFooter: Boolean = true,
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -169,6 +178,9 @@ fun DashboardScreen(
 
     Scaffold(
         bottomBar = {
+            if (!showFooter) {
+                return@Scaffold
+            }
             FooterBar(
                 appVersion = appVersion,
                 language = language,
@@ -200,13 +212,13 @@ fun DashboardScreen(
                             onOpenRelease = { viewModel.openUpdateReleasePage() },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs)
                         )
                     }
 
                     SnackbarHost(
                         hostState = snackbarHostState,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
                     )
 
                     Box(
@@ -427,18 +439,21 @@ private fun SuccessContent(
     val scrollState = rememberScrollState()
 
     Box(modifier = modifier.fillMaxSize()) {
+        // Sem folga própria para a barra de rolagem: ela flutua sobre o padding
+        // direito da grade, que é largo o bastante para não cobrir card nenhum.
+        // Somada ao padding da grade, a folga antiga deixava o lado direito com
+        // 28dp contra 16 do esquerdo — assimetria que a janela estreita denuncia.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(end = 12.dp)
         ) {
             if (warnings.isNotEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
                 ) {
                     warnings.forEach { warning ->
                         PersistentApiWarningBanner(
@@ -459,7 +474,7 @@ private fun SuccessContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -487,9 +502,12 @@ private fun SuccessContent(
                 cliSessionPulses = cliSessionPulses,
                 teamSessionPulses = teamSessionPulses,
                 now = now,
+                // 12/8 e não 16/12: numa janela estreita — que é como o app
+                // costuma ficar — a margem antiga comia largura que o card usa
+                // para caber sem quebrar as cotas em duas linhas.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
             )
         }
 

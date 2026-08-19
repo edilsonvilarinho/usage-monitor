@@ -283,6 +283,9 @@ fun ApiUsageCard(
                 .clip(AppShapes.medium)
         ) {
             val density = resolveApiUsageCardDensity(maxWidth)
+            // Abaixo do piso o popup de cota cobre o card inteiro. Ver
+            // `shouldShowQuotaTooltip`.
+            val showQuotaTooltip = shouldShowQuotaTooltip(maxWidth)
             val stackCompactQuotas = shouldStackCompactQuotas(
                 cardWidth = maxWidth,
                 quotaCount = orderedQuotas.size
@@ -437,6 +440,7 @@ fun ApiUsageCard(
                             riskByQuotaKey = riskByQuotaKey,
                             density = density,
                             stacked = stackCompactQuotas,
+                            showTooltip = showQuotaTooltip,
                             now = now
                         )
                     } else {
@@ -446,6 +450,7 @@ fun ApiUsageCard(
                             language = language,
                             riskByQuotaKey = riskByQuotaKey,
                             density = density,
+                            showTooltip = showQuotaTooltip,
                             now = now
                         )
                     }
@@ -988,6 +993,7 @@ private fun CompactQuotaSummary(
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     density: ApiUsageCardDensity,
     stacked: Boolean,
+    showTooltip: Boolean,
     now: Instant,
     modifier: Modifier = Modifier
 ) {
@@ -1005,6 +1011,7 @@ private fun CompactQuotaSummary(
                 language = language,
                 risk = riskByQuotaKey[quotas.first().seriesKey],
                 density = density,
+                showTooltip = showTooltip,
                 now = now,
                 modifier = Modifier.fillMaxWidth(badgeWidthFraction)
             )
@@ -1026,6 +1033,7 @@ private fun CompactQuotaSummary(
                     language = language,
                     risk = riskByQuotaKey[quota.seriesKey],
                     density = density,
+                    showTooltip = showTooltip,
                     now = now,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1052,6 +1060,7 @@ private fun CompactQuotaSummary(
                     language = language,
                     risk = riskByQuotaKey[quota.seriesKey],
                     density = density,
+                    showTooltip = showTooltip,
                     now = now,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1068,55 +1077,87 @@ private fun CompactQuotaBadge(
     language: AppLanguage,
     risk: QuotaRiskSummary?,
     density: ApiUsageCardDensity,
+    /** Ver `shouldShowQuotaTooltip`: em card estreito o popup cobre o card. */
+    showTooltip: Boolean,
     now: Instant,
     modifier: Modifier = Modifier
 ) {
-    val isExpired = quota.isExpiredAt(now)
+    // Sem tooltip a `testTag` do bloco desce para o conteúdo: presa ao
+    // `HoverTooltipBox`, o nó sumiria da árvore em card estreito.
+    if (!showTooltip) {
+        CompactQuotaBadgeContent(
+            quota = quota,
+            showUsageDetails = showUsageDetails,
+            language = language,
+            risk = risk,
+            density = density,
+            now = now,
+            modifier = modifier.testTag(quotaBlockTag(quota.label))
+        )
+
+        return
+    }
 
     HoverTooltipBox(
         title = quota.label,
         subtitle = expandedQuotaTitle(quota = quota, language = language),
         metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
+        footnote = risk?.let { riskDotTooltipSubtitle(risk = it, language = language) },
         modifier = modifier.testTag(quotaBlockTag(quota.label))
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(COMPACT_QUOTA_BADGE_TAG)
-                .clip(AppShapes.small)
-                // Fundo neutro e borda: o tom de acento em bloco fazia o card
-                // fechado — que existe para ocupar pouco — chamar mais atenção
-                // que o aberto.
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
-                .padding(
-                    horizontal = density.badgeHorizontalPadding,
-                    vertical = density.badgeVerticalPadding
-                ),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (risk != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // A tooltip do ponto fica desligada: o badge inteiro já tem a
-                    // própria tooltip e dois TooltipBox aninhados disputam o hover.
-                    RiskSemaphoreDot(
-                        risk = risk,
-                        quotaLabel = quota.label,
-                        language = language,
-                        showTooltip = false
-                    )
-                    Text(
-                        text = quota.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            } else {
+        CompactQuotaBadgeContent(
+            quota = quota,
+            showUsageDetails = showUsageDetails,
+            language = language,
+            risk = risk,
+            density = density,
+            now = now,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun CompactQuotaBadgeContent(
+    quota: QuotaInfo,
+    showUsageDetails: Boolean,
+    language: AppLanguage,
+    risk: QuotaRiskSummary?,
+    density: ApiUsageCardDensity,
+    now: Instant,
+    modifier: Modifier = Modifier
+) {
+    val isExpired = quota.isExpiredAt(now)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(COMPACT_QUOTA_BADGE_TAG)
+            .clip(AppShapes.small)
+            // Fundo neutro e borda: o tom de acento em bloco fazia o card
+            // fechado — que existe para ocupar pouco — chamar mais atenção
+            // que o aberto.
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+            .padding(
+                horizontal = density.badgeHorizontalPadding,
+                vertical = density.badgeVerticalPadding
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (risk != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // A tooltip do ponto fica desligada: o badge inteiro já tem a
+                // própria tooltip e dois TooltipBox aninhados disputam o hover.
+                RiskSemaphoreDot(
+                    risk = risk,
+                    quotaLabel = quota.label,
+                    language = language,
+                    showTooltip = false
+                )
                 Text(
                     text = quota.label,
                     style = MaterialTheme.typography.labelSmall,
@@ -1125,29 +1166,37 @@ private fun CompactQuotaBadge(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
+        } else {
             Text(
-                text = compactPercentageLabel(quota),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                // Mesmo tratamento do arco: o numero e o da janela anterior.
-                modifier = Modifier.alpha(if (isExpired) STALE_QUOTA_ALPHA else 1f)
+                text = quota.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+        }
 
-            val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
-            if (detailText != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = detailText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-            }
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = compactPercentageLabel(quota),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            // Mesmo tratamento do arco: o numero e o da janela anterior.
+            modifier = Modifier.alpha(if (isExpired) STALE_QUOTA_ALPHA else 1f)
+        )
+
+        val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
+        if (detailText != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = detailText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -1168,6 +1217,8 @@ private fun ExpandedQuotaSummary(
     language: AppLanguage,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     density: ApiUsageCardDensity,
+    /** Ver `shouldShowQuotaTooltip`: em card estreito o popup cobre o card. */
+    showTooltip: Boolean,
     now: Instant,
     modifier: Modifier = Modifier
 ) {
@@ -1181,6 +1232,7 @@ private fun ExpandedQuotaSummary(
                 showUsageDetails = showUsageDetails,
                 language = language,
                 risk = riskByQuotaKey[quota.seriesKey],
+                showTooltip = showTooltip,
                 now = now
             )
         }
@@ -1201,6 +1253,50 @@ private fun QuotaRow(
     showUsageDetails: Boolean,
     language: AppLanguage,
     risk: QuotaRiskSummary?,
+    /** Ver `shouldShowQuotaTooltip`: em card estreito o popup cobre o card. */
+    showTooltip: Boolean,
+    now: Instant,
+    modifier: Modifier = Modifier
+) {
+    // Sem tooltip a `testTag` do bloco desce para o conteúdo: presa ao
+    // `HoverTooltipBox`, o nó sumiria da árvore em card estreito.
+    if (!showTooltip) {
+        QuotaRowContent(
+            quota = quota,
+            showUsageDetails = showUsageDetails,
+            language = language,
+            risk = risk,
+            now = now,
+            modifier = modifier.testTag(quotaBlockTag(quota.label))
+        )
+
+        return
+    }
+
+    HoverTooltipBox(
+        title = quota.label,
+        subtitle = expandedQuotaTitle(quota = quota, language = language),
+        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
+        footnote = risk?.let { riskDotTooltipSubtitle(risk = it, language = language) },
+        modifier = modifier.testTag(quotaBlockTag(quota.label))
+    ) {
+        QuotaRowContent(
+            quota = quota,
+            showUsageDetails = showUsageDetails,
+            language = language,
+            risk = risk,
+            now = now,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun QuotaRowContent(
+    quota: QuotaInfo,
+    showUsageDetails: Boolean,
+    language: AppLanguage,
+    risk: QuotaRiskSummary?,
     now: Instant,
     modifier: Modifier = Modifier
 ) {
@@ -1208,74 +1304,67 @@ private fun QuotaRow(
     val staleAlpha = if (isExpired) STALE_QUOTA_ALPHA else 1f
     val hasTrack = quota.unit != UsageUnit.CURRENCY_USD || quota.isExtraCreditsQuota
 
-    HoverTooltipBox(
-        title = quota.label,
-        subtitle = expandedQuotaTitle(quota = quota, language = language),
-        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
-        modifier = modifier.testTag(quotaBlockTag(quota.label))
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                if (risk != null) {
-                    RiskSemaphoreDot(
-                        risk = risk,
-                        quotaLabel = quota.label,
-                        language = language,
-                        showTooltip = false
-                    )
-                }
-                Text(
-                    text = expandedQuotaTitle(quota = quota, language = language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = compactPercentageLabel(quota),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    // Mesmo tratamento de antes: janela vencida mostra o último
-                    // dado real da fonte, esmaecido para não passar por corrente.
-                    modifier = Modifier.alpha(staleAlpha)
+            if (risk != null) {
+                RiskSemaphoreDot(
+                    risk = risk,
+                    quotaLabel = quota.label,
+                    language = language,
+                    showTooltip = false
                 )
             }
-
-            if (hasTrack) {
-                AppProgressTrack(
-                    fraction = quota.percentageUsed,
-                    tone = quotaTone(quota = quota, risk = risk),
-                    modifier = Modifier.alpha(staleAlpha)
-                )
-            }
-
-            val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
-            if (detailText != null) {
-                Text(
-                    text = detailText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
             Text(
-                text = resetLabel(quota = quota, language = language, now = now),
+                text = expandedQuotaTitle(quota = quota, language = language),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = compactPercentageLabel(quota),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                // Mesmo tratamento de antes: janela vencida mostra o último
+                // dado real da fonte, esmaecido para não passar por corrente.
+                modifier = Modifier.alpha(staleAlpha)
             )
         }
+
+        if (hasTrack) {
+            AppProgressTrack(
+                fraction = quota.percentageUsed,
+                tone = quotaTone(quota = quota, risk = risk),
+                modifier = Modifier.alpha(staleAlpha)
+            )
+        }
+
+        val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
+        if (detailText != null) {
+            Text(
+                text = detailText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Text(
+            text = resetLabel(quota = quota, language = language, now = now),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2
+        )
     }
 }
 

@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.components.resolveApiUsageCardDensity
+import com.usagemonitor.presentation.ui.components.shouldShowQuotaTooltip
 import com.usagemonitor.presentation.ui.components.shouldStackCompactQuotas
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,4 +71,18 @@ class ApiUsageCardDensityTest {
      * os arcos: a cota virou linha de largura cheia, e linha empilha por
      * construção. O que sobrou aqui vale só para os badges do card minimizado.
      */
+
+    @Test
+    fun `quota tooltip is off below the card width floor`() {
+        // A janela do modo somente cards tem ~230dp de largura útil: ali o popup
+        // de cinco linhas cobre o card inteiro.
+        assertFalse(shouldShowQuotaTooltip(226.dp))
+        assertFalse(shouldShowQuotaTooltip(319.dp))
+    }
+
+    @Test
+    fun `quota tooltip floor is inclusive`() {
+        assertTrue(shouldShowQuotaTooltip(320.dp))
+        assertTrue(shouldShowQuotaTooltip(430.dp))
+    }
 }

@@ -510,9 +510,23 @@ class TeamUsageViewModel(
     /**
      * Junta os integrantes de todas as contas numa lista só.
      *
-     * A ordenação repete a do snapshot por conta — quem mais consumiu primeiro,
-     * sem atividade no fim em ordem alfabética — mas agora sobre o time inteiro,
-     * que é a pergunta que esta tela responde.
+     * **A conta é a chave primária da ordem, e o consumo desce para dentro dela.**
+     * Com o consumo no topo, a faixa de uma conta aparecia onde o integrante que
+     * mais gastou a levasse: a mesma conta subia e descia a lista entre dois
+     * tiques do laço ao vivo, e procurar uma pessoa exigia ler a tela inteira. O
+     * rótulo é o e-mail que o administrador digitou ao emitir a chave e não muda
+     * sozinho, então é ele que dá uma posição estável.
+     *
+     * Dentro da conta continua sendo quem mais consumiu primeiro — é a pergunta
+     * que esta tela responde — e sem atividade no fim, em ordem alfabética.
+     *
+     * [TeamUsageUiState.Success.memberGroups] agrupa por ordem de primeira
+     * aparição, então ordenar os integrantes assim já ordena as faixas de conta;
+     * uma segunda ordenação lá seria um segundo dono da mesma decisão.
+     *
+     * A ordem é **total e determinística**, como a de `toTeamPresence`: duas
+     * leituras iguais têm de produzir listas iguais, ou o `StateFlow` reemite e a
+     * tela recompõe a cada 5s.
      */
     private fun flattenAccounts(accounts: List<TeamAccountUsage>): List<TeamMemberUsage> {
         return accounts
@@ -522,8 +536,16 @@ class TeamUsageViewModel(
                 }
             }
             .sortedWith(
-                compareByDescending<TeamMemberUsage> { member -> member.totalTokens }
-                    .thenBy { member -> member.accountLabel ?: member.accountKey.orEmpty() }
+                // Conta sem rótulo emitido vai depois de todas as identificadas,
+                // por um degrau próprio do comparador e não por uma sentinela de
+                // texto: ela não tem e-mail para comparar, e abrir a lista com um
+                // uuid cru seria pior que fechá-la com ele.
+                compareBy<TeamMemberUsage> { member -> if (member.accountLabel == null) 1 else 0 }
+                    .thenBy { member -> member.accountLabel?.lowercase().orEmpty() }
+                    // Duas contas sem rótulo empatam acima; o uuid as separa e
+                    // mantém a ordem total.
+                    .thenBy { member -> member.accountKey.orEmpty() }
+                    .thenByDescending { member -> member.totalTokens }
                     .thenBy { member -> member.alias.lowercase() }
             )
     }

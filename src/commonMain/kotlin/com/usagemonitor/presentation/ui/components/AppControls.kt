@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -412,6 +413,11 @@ private fun AppSegmentItem(
     val tagged = if (option.testTag != null) Modifier.testTag(option.testTag) else Modifier
     Box(
         modifier = tagged
+            // Preenche a altura do controle, como os divisores já fazem. Sem isto o
+            // segmento tem a altura do texto, sobra uma faixa do fundo do pai dentro
+            // da borda e o canto arredondado do clip do `Row` come o último
+            // segmento — que na tela se lê como botão cortado.
+            .fillMaxHeight()
             .background(container.copy(alpha = container.alpha * alpha))
             .selectable(selected = selected, enabled = enabled, onClick = onClick)
             .padding(horizontal = AppSpacing.sm),

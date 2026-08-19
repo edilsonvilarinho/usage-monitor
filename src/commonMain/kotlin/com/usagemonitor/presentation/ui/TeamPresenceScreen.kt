@@ -52,6 +52,7 @@ import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
 import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppToggleChip
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -59,6 +60,7 @@ import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
@@ -84,13 +86,21 @@ internal const val PRESENCE_COLUMN_HEADER_TAG = "teamPresenceColumnHeader"
 //
 // O somatório não é livre. Quando ele passa da largura útil da janela o `FlowRow`
 // quebra e as colunas deixam de alinhar entre as linhas — que é exatamente o que
-// as larguras fixas existem para impedir. A conta que faltava:
+// as larguras fixas existem para impedir. A conta:
 //
-//     Σ colunas + 16dp × (n − 1) + 64dp (botão de remover) ≤ largura_janela − 72dp
+//     Σ colunas + 16dp × (n − 1) + 14dp (marcador + vão) + 12dp + 26dp (ação)
+//         ≤ largura_janela − 72dp
 //
 // onde os 72dp são 32 de padding da Column + 12 do `SCROLLBAR_GUTTER` + 28 do
-// `contentPadding` da linha. Com a janela em 960dp (`TeamPresenceWindowPreferences`)
-// o teto é 888dp; o pior caso abaixo dá 872dp.
+// `contentPadding` da linha. Com as cinco colunas e a ação o pior caso dá 932dp, e
+// é dele que sai `TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP`. O tamanho default da janela
+// (960dp) sempre coube; o que faltava era impedir o arrasto da borda para baixo do
+// orçamento — foi assim que a faixa da conta apareceu em produção com o botão de
+// apagar numa linha própria.
+//
+// A ação fica **fora** do `FlowRow`, como coluna fixa à direita: dentro dele ela é
+// o último item e portanto o primeiro a quebrar, e o que sobra na tela é um ícone
+// vermelho solto, sem coluna, sem legenda e sem dizer a que linha pertence.
 // As colunas Estado e Trabalhando carregam um carimbo do tipo
 // "último sinal 12/08 10:58 BRT": abaixo de ~150dp de texto ele quebra em duas
 // linhas e a lista fica com alturas irregulares. Estado ainda desconta o ponto
@@ -103,9 +113,18 @@ private val PRESENCE_COLUMN_STATUS = 104.dp
 
 private val PRESENCE_COLUMN_SPACING = 16.dp
 private val PRESENCE_ROW_CONTENT_PADDING = 14.dp
+private val PRESENCE_ACCOUNT_VERTICAL_PADDING = 10.dp
 
-/** Reserva a mesma pegada do `IconButton` de ação, para o cabeçalho alinhar. */
-private val PRESENCE_ACTION_SLOT = 48.dp
+/**
+ * Marcador de 2dp do `AppDataRow` mais o vão que o separa da primeira célula.
+ *
+ * A faixa de legendas não é uma linha de dados e não tem marcador; sem repetir a
+ * soma aqui, ela prometia um alinhamento 14dp à esquerda do que as linhas entregam.
+ */
+private val PRESENCE_MARKER_GUTTER = 14.dp
+
+/** Mesma pegada do `AppIconButton` (26dp), para o cabeçalho reservar a casa certa. */
+private val PRESENCE_ACTION_SLOT = 26.dp
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -322,10 +341,13 @@ private fun TeamPresenceList(
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             val listState = rememberLazyListState()
 
+            // Sem espaço entre itens, como na lista de consumo do time: cada
+            // linha traz a própria divisória e a faixa da conta também, e o vão de
+            // 8dp era justamente o que desfazia a leitura de tabela — conta e
+            // integrante viravam dois blocos soltos do mesmo peso.
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
             ) {
                 for (group in state.presenceGroups) {
                     // Esta máquina participa da conta: apagá-la levaria junto o
@@ -342,6 +364,7 @@ private fun TeamPresenceList(
                                 expanded = state.isAccountExpanded(group),
                                 language = language,
                                 deletable = canManage && !isLocalAccount,
+                                hasActionColumn = canManage,
                                 onToggle = { onToggleAccount(group.groupKey) },
                                 onDelete = { onRequestDeleteAccount(group) }
                             )
@@ -488,6 +511,7 @@ private fun TeamPresenceColumnHeader(
             .fillMaxWidth()
             .padding(end = SCROLLBAR_GUTTER)
             .padding(horizontal = PRESENCE_ROW_CONTENT_PADDING)
+            .padding(start = PRESENCE_MARKER_GUTTER)
             .testTag(PRESENCE_COLUMN_HEADER_TAG),
         horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING)
     ) {
@@ -514,6 +538,9 @@ private fun TeamPresenceColumnHeader(
             )
         }
         if (hasActionColumn) {
+            // A ação é coluna fixa à direita nas linhas e na faixa da conta; o vão
+            // elástico é o que leva a legenda até o mesmo x.
+            Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.width(PRESENCE_ACTION_SLOT))
         }
     }
@@ -546,6 +573,11 @@ private fun SummaryNumber(
  * Mostra o rótulo **e** o `accountUuid` pela mesma razão da tela de consumo: o
  * rótulo é texto que o administrador digitou e o servidor não o verifica, então
  * ele orienta mas não prova.
+ *
+ * A anatomia é a mesma da faixa de conta do modal de consumo: superfície
+ * `surfaceVariant`, marcador de 2dp, a palavra "Conta" e divisória embaixo. Sem
+ * ela, conta e integrante eram dois retângulos transparentes de mesmo peso
+ * separados por um vão, e nada dizia qual dos dois níveis se estava lendo.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -554,86 +586,121 @@ private fun TeamPresenceAccountHeader(
     expanded: Boolean,
     language: AppLanguage,
     deletable: Boolean,
+    /** A lista tem coluna de ação; a faixa reserva a casa mesmo sem botão. */
+    hasActionColumn: Boolean,
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
     val accents = AppAccents.current
 
-    FlowRow(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp)
-            .clickable(onClick = onToggle)
-            .padding(horizontal = PRESENCE_ROW_CONTENT_PADDING)
-            .testTag("$PRESENCE_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
-        horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        // Ícone dentro da coluna de identidade, como na linha do integrante: é o
-        // que mantém as colunas seguintes no mesmo x nas duas.
         Row(
-            modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(
+                    horizontal = PRESENCE_ROW_CONTENT_PADDING,
+                    vertical = PRESENCE_ACCOUNT_VERTICAL_PADDING
+                )
+                .testTag("$PRESENCE_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
+            // Marcador e vão iguais aos do `AppDataRow` da linha do integrante: é o
+            // que mantém os agregados da conta no mesmo x das colunas dela.
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                contentDescription = if (expanded) {
-                    TeamUsageLabels.collapseAccount(language)
-                } else {
-                    TeamUsageLabels.expandAccount(language)
-                },
-                tint = accents.cacheRead
-            )
-            Column {
-                Text(
-                    text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = accents.cacheRead,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = group.accountKey.orEmpty(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        // A faixa da conta agrega, e a coluna Máquina não tem agregado: o vão
-        // mantém as colunas seguintes no mesmo x da linha do integrante.
-        Spacer(modifier = Modifier.width(PRESENCE_COLUMN_MACHINE))
-
-        MetricValue(
-            value = TeamPresenceLabels.groupSummary(group.onlineCount, group.totalCount, language),
-            modifier = Modifier.width(PRESENCE_COLUMN_STATE)
-        )
-
-        MetricValue(
-            value = group.workingCount.toString(),
-            valueColor = accents.cacheRead,
-            modifier = Modifier.width(PRESENCE_COLUMN_WORKING)
-        )
-
-        if (deletable) {
-            AppIconButton(
-                contentDescription = TeamPresenceLabels.deleteAccount(language),
-                onClick = onDelete,
-                tone = AppButtonTone.DANGER,
-                modifier = Modifier.testTag("$PRESENCE_ACCOUNT_DELETE_TAG_PREFIX${group.groupKey}")
+            AppSourceMarker(color = accents.cacheRead)
+            FlowRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.DeleteForever,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.error
+                // Ícone dentro da coluna de identidade, como na linha do integrante: é o
+                // que mantém as colunas seguintes no mesmo x nas duas.
+                Row(
+                    modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        contentDescription = if (expanded) {
+                            TeamUsageLabels.collapseAccount(language)
+                        } else {
+                            TeamUsageLabels.expandAccount(language)
+                        },
+                        tint = accents.cacheRead
+                    )
+                    Column {
+                        // A palavra vem antes do e-mail: sem ela a faixa entregava um
+                        // endereço e um uuid sem dizer que aquilo é a conta, e ao lado de
+                        // uma linha de integrante — que também tem nome e identificador —
+                        // as duas liam igual.
+                        Text(
+                            text = TeamUsageLabels.accountBand(language),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = accents.cacheRead,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = group.accountKey.orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // A faixa da conta agrega, e a coluna Máquina não tem agregado: o vão
+                // mantém as colunas seguintes no mesmo x da linha do integrante.
+                Spacer(modifier = Modifier.width(PRESENCE_COLUMN_MACHINE))
+
+                MetricValue(
+                    value = TeamPresenceLabels.groupSummary(group.onlineCount, group.totalCount, language),
+                    modifier = Modifier.width(PRESENCE_COLUMN_STATE)
+                )
+
+                MetricValue(
+                    value = group.workingCount.toString(),
+                    valueColor = accents.cacheRead,
+                    modifier = Modifier.width(PRESENCE_COLUMN_WORKING)
                 )
             }
+
+            // Fora do `FlowRow` de propósito: dentro dele a ação é o último item e
+            // portanto o primeiro a quebrar, e numa janela estreita o botão de
+            // apagar aparecia sozinho numa linha abaixo do e-mail.
+            if (deletable) {
+                AppIconButton(
+                    contentDescription = TeamPresenceLabels.deleteAccount(language),
+                    onClick = onDelete,
+                    tone = AppButtonTone.DANGER,
+                    modifier = Modifier.testTag("$PRESENCE_ACCOUNT_DELETE_TAG_PREFIX${group.groupKey}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteForever,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            } else if (hasActionColumn) {
+                Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
+            }
         }
+        AppDivider()
     }
 }
 
@@ -799,29 +866,32 @@ private fun TeamPresenceRow(
             } else if (hasHealthColumn) {
                 Spacer(modifier = Modifier.width(PRESENCE_COLUMN_STATUS))
             }
+        }
 
-            if (removable) {
-                AppIconButton(
-                    contentDescription = TeamUsageLabels.removeMember(language),
-                    onClick = onRemove,
-                    tone = AppButtonTone.DANGER,
-                    modifier = Modifier.testTag(
-                        "$PRESENCE_MEMBER_REMOVE_TAG_PREFIX${entry.memberKey}"
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            } else if (hasActionColumn) {
-                // Quadrado, não só largura: a máquina local não tem botão, e sem
-                // reservar também a altura a linha dela sairia mais baixa que as
-                // vizinhas — a lista ganharia um degrau sem motivo.
-                Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
+        // Fora do `FlowRow`, como na faixa da conta: lá dentro a ação é o último
+        // item e o primeiro a quebrar numa janela estreita, e o botão destrutivo
+        // acabava numa linha própria, sem coluna e sem dizer a quem pertence.
+        if (removable) {
+            AppIconButton(
+                contentDescription = TeamUsageLabels.removeMember(language),
+                onClick = onRemove,
+                tone = AppButtonTone.DANGER,
+                modifier = Modifier.testTag(
+                    "$PRESENCE_MEMBER_REMOVE_TAG_PREFIX${entry.memberKey}"
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
+        } else if (hasActionColumn) {
+            // Quadrado, não só largura: a máquina local não tem botão, e sem
+            // reservar também a altura a linha dela sairia mais baixa que as
+            // vizinhas — a lista ganharia um degrau sem motivo.
+            Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
         }
     }
 }

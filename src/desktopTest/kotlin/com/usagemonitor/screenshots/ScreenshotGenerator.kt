@@ -101,6 +101,7 @@ fun main(args: Array<String>) {
     generator.teamUsage()
     generator.presence(isDark = true)
     generator.presence(isDark = false)
+    generator.presenceAccounts()
 
     println("Capturas geradas em ${outputDir.absolutePath}")
 }
@@ -317,12 +318,12 @@ private class ScreenshotGenerator(private val outputDir: File) {
     }
 
     /**
-     * Presença nos dois temas.
+     * Presença de uma conta, nos dois temas.
      *
-     * Vai com `canManage = true` de propósito: o botão de remover é a coluna que
-     * empurrava o `FlowRow` para além da largura útil, e sem ele a captura não
-     * provaria o pior caso. A largura é a mesma da janela real (960dp) — capturar
-     * mais largo esconderia justamente a quebra que se quer conferir.
+     * A largura é a mesma da janela real (960dp) — capturar mais largo esconderia
+     * justamente a quebra de coluna que se quer conferir. O `canManage` aqui é
+     * inerte: `TeamPresenceContent` só libera os botões destrutivos na visão
+     * global, que é o que [presenceAccounts] captura.
      */
     fun presence(isDark: Boolean) {
         val name = if (isDark) "presence" else "presence-light"
@@ -331,6 +332,30 @@ private class ScreenshotGenerator(private val outputDir: File) {
                 state = TeamPresenceUiState.Success(
                     entries = ScreenshotFixtures.teamPresence,
                     accountLabel = "dev@example.com — Example Org",
+                    lastChangedAt = ScreenshotFixtures.NOW
+                ),
+                language = AppLanguage.PT,
+                localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID,
+                canManage = true
+            )
+        }
+    }
+
+    /**
+     * Presença na visão global do administrador.
+     *
+     * É a captura que prova a faixa de conta — superfície, marcador, a palavra
+     * "Conta" e divisória — e a coluna de ação à direita, que é onde o botão de
+     * apagar conta aparecia solto numa linha própria. Largura mínima da janela
+     * (940dp): capturar mais largo esconderia o pior caso do orçamento de colunas.
+     */
+    fun presenceAccounts() {
+        capture("presence-accounts", widthDp = 940, heightDp = 460, isDark = true) {
+            TeamPresenceContent(
+                state = TeamPresenceUiState.Success(
+                    entries = ScreenshotFixtures.teamPresenceAccounts,
+                    isAdminOverview = true,
+                    expandedAccountKeys = setOf("account-primary"),
                     lastChangedAt = ScreenshotFixtures.NOW
                 ),
                 language = AppLanguage.PT,

@@ -148,6 +148,17 @@ internal object TeamUsageLabels {
         }
     }
 
+    /**
+     * Rótulo da faixa que abre uma conta na lista global.
+     *
+     * A faixa mostrava um e-mail e um uuid sem dizer o que eles são, e ao lado de
+     * uma linha de integrante — que também tem nome e identificador — as duas
+     * liam igual. A palavra é o que separa os dois níveis antes da cor e do recuo.
+     */
+    fun accountBand(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Conta" else "Account"
+    }
+
     /** Conta que ainda não tem chave emitida — só o uuid a identifica. */
     fun unlabeledAccount(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Conta sem chave" else "Account without key"

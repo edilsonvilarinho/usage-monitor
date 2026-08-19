@@ -57,6 +57,7 @@ import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
@@ -117,6 +118,14 @@ private val TEAM_ROW_HORIZONTAL_PADDING = 14.dp
 private val TEAM_ACCOUNT_VERTICAL_PADDING = 10.dp
 private val TEAM_MEMBER_VERTICAL_PADDING = 10.dp
 private val TEAM_MEMBER_WRAPPED_ROW_GAP = 4.dp
+
+// Recuo do bloco de sessões de um integrante.
+//
+// O recuo sozinho não estava sendo lido: numa lista onde conta, integrante e
+// sessão flutuam sobre o mesmo fundo, 24dp à esquerda passam por alinhamento
+// diferente, não por nível abaixo. Quem dá o nível é a superfície, como no
+// protótipo: lá o bloco aninhado tem recuo **e** fundo próprio.
+private val TEAM_SESSION_INDENT = AppSpacing.xl
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -469,10 +478,13 @@ private fun TeamUsageList(
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             val listState = rememberLazyListState()
 
+            // Sem espaço entre itens, como na lista da máquina: cada linha traz a
+            // própria divisória, e o vão de 8dp entre elas era justamente o que
+            // desfazia a leitura de tabela — conta, integrante e sessão viravam
+            // três blocos soltos do mesmo peso.
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
             ) {
                 for (group in state.memberGroups) {
                     // Cabeçalho só na visão global: no modal de uma conta só, a
@@ -516,10 +528,18 @@ private fun TeamUsageList(
                                     "${member.memberKey}:${member.sessions[index].sessionId}"
                                 }
                             ) { index ->
+                                // Terceiro degrau da escada de superfícies: a faixa
+                                // da conta em `surfaceVariant`, a linha do
+                                // integrante transparente sobre o fundo da janela e
+                                // o bloco de sessões em `surface`. É `surface` e não
+                                // `surfaceVariant` porque `surfaceVariant` é o realce
+                                // de hover do `AppDataRow`: com ele aqui, passar o
+                                // mouse numa sessão deixaria de dar retorno nenhum.
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(start = 24.dp)
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .padding(start = TEAM_SESSION_INDENT)
                                         .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
                                 ) {
                                     val session = member.sessions[index]
@@ -656,93 +676,126 @@ private fun TeamAccountGroupHeader(
 ) {
     val accents = AppAccents.current
 
-    FlowRow(
+    // Escada de três superfícies neutras, todas já na paleta: a faixa da conta em
+    // `surfaceVariant`, a linha do integrante transparente sobre o fundo da janela
+    // e o bloco de sessões em `surface`. É ela que responde ao "não está claro
+    // identificar os times": até aqui os três níveis eram retângulos de mesmo peso
+    // empilhados, separados só por um vão de 8dp.
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(
-                horizontal = TEAM_ROW_HORIZONTAL_PADDING,
-                vertical = TEAM_ACCOUNT_VERTICAL_PADDING
-            )
-            .testTag("$TEAM_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        // Ícone dentro da coluna de identidade, como na linha do integrante: é o
-        // que mantém as colunas seguintes no mesmo x nas duas.
         Row(
-            modifier = Modifier.width(TEAM_COLUMN_IDENTITY),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(
+                    horizontal = TEAM_ROW_HORIZONTAL_PADDING,
+                    vertical = TEAM_ACCOUNT_VERTICAL_PADDING
+                )
+                .testTag("$TEAM_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
+            // Marcador e vão iguais aos do `AppDataRow` da linha do integrante: é o que
+            // mantém os totais da conta no mesmo x das colunas dela. Sem ele a faixa
+            // começava 14dp à esquerda da linha e as duas colunas de custo não
+            // alinhavam, que é justamente a comparação que a faixa existe para permitir.
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                contentDescription = if (expanded) {
-                    TeamUsageLabels.collapseAccount(language)
-                } else {
-                    TeamUsageLabels.expandAccount(language)
-                },
-                tint = accents.cacheRead
-            )
-            Column {
-                Text(
-                    text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = accents.cacheRead,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            AppSourceMarker(color = accents.cacheRead)
+            FlowRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Ícone dentro da coluna de identidade, como na linha do integrante: é o
+                // que mantém as colunas seguintes no mesmo x nas duas.
+                Row(
+                    modifier = Modifier.width(TEAM_COLUMN_IDENTITY),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        contentDescription = if (expanded) {
+                            TeamUsageLabels.collapseAccount(language)
+                        } else {
+                            TeamUsageLabels.expandAccount(language)
+                        },
+                        tint = accents.cacheRead
+                    )
+                    Column {
+                        // A palavra vem antes do e-mail: sem ela a faixa entregava um
+                        // endereço e um uuid sem dizer que aquilo é a conta, e ao lado de
+                        // uma linha de integrante — que também tem nome e identificador —
+                        // as duas liam igual.
+                        Text(
+                            text = TeamUsageLabels.accountBand(language),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = accents.cacheRead,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = group.accountKey.orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Só o número: o rótulo da coluna já diz o que ele conta, e repetir
+                // "integrantes" no valor deixaria a célula diferente de todas as outras.
+                MetricText(
+                    label = TeamUsageLabels.columnMembers(language),
+                    value = group.activeMemberCount.toString(),
+                    modifier = Modifier.width(TEAM_COLUMN_MACHINE)
                 )
-                Text(
-                    text = group.accountKey.orEmpty(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+
+                MetricText(
+                    label = TeamUsageLabels.sessionCount(group.sessionCount, language),
+                    value = formatQuantity(group.totalTokens),
+                    modifier = Modifier.width(TEAM_COLUMN_TOKENS)
                 )
+
+                MetricText(
+                    label = TeamUsageLabels.columnCost(language),
+                    value = if (group.isCostComplete) {
+                        formatMicrosUsd(group.totalCostMicros)
+                    } else {
+                        "${formatMicrosUsd(group.totalCostMicros)}+"
+                    },
+                    // Custo na cor do texto, como na lista da máquina: azul só no custo
+                    // sugeria uma categoria que as outras colunas não têm.
+                    modifier = Modifier.width(TEAM_COLUMN_COST)
+                )
+
+                Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
+                    MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    MeterBar(fraction = share, color = accents.cacheRead, height = 4.dp)
+                }
+
+                val worstHealth = group.worstHealth
+                if (worstHealth != null) {
+                    TeamHealthCell(
+                        health = worstHealth,
+                        language = language,
+                        modifier = Modifier.width(TEAM_COLUMN_STATUS)
+                    )
+                }
             }
         }
-
-        // Só o número: o rótulo da coluna já diz o que ele conta, e repetir
-        // "integrantes" no valor deixaria a célula diferente de todas as outras.
-        MetricText(
-            label = TeamUsageLabels.columnMembers(language),
-            value = group.activeMemberCount.toString(),
-            modifier = Modifier.width(TEAM_COLUMN_MACHINE)
-        )
-
-        MetricText(
-            label = TeamUsageLabels.sessionCount(group.sessionCount, language),
-            value = formatQuantity(group.totalTokens),
-            modifier = Modifier.width(TEAM_COLUMN_TOKENS)
-        )
-
-        MetricText(
-            label = TeamUsageLabels.columnCost(language),
-            value = if (group.isCostComplete) {
-                formatMicrosUsd(group.totalCostMicros)
-            } else {
-                "${formatMicrosUsd(group.totalCostMicros)}+"
-            },
-            // Custo na cor do texto, como na lista da máquina: azul só no custo
-            // sugeria uma categoria que as outras colunas não têm.
-            modifier = Modifier.width(TEAM_COLUMN_COST)
-        )
-
-        Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
-            MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
-            Spacer(modifier = Modifier.height(4.dp))
-            MeterBar(fraction = share, color = accents.cacheRead, height = 4.dp)
-        }
-
-        val worstHealth = group.worstHealth
-        if (worstHealth != null) {
-            TeamHealthCell(
-                health = worstHealth,
-                language = language,
-                modifier = Modifier.width(TEAM_COLUMN_STATUS)
-            )
-        }
+        AppDivider()
     }
 }
 

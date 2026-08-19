@@ -13,6 +13,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.WindowPlacement
@@ -159,6 +165,7 @@ import java.util.prefs.Preferences
 import java.io.File
 import javax.imageio.ImageIO
 import javax.swing.JFileChooser
+import kotlin.math.roundToInt
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -654,25 +661,34 @@ fun main() = application {
     // daqui e nunca de 100 — duas mudanças seguidas multiplicariam duas vezes.
     var appliedUiScalePercent by remember { mutableStateOf(uiScalePercent) }
     var uiScaleSaveGeneration by remember { mutableStateOf(0) }
+    // A área útil da tela é lida uma vez e vale para as sete janelas: nenhuma delas
+    // tem moldura do sistema, então nascer maior que o monitor é nascer sem botão
+    // de fechar.
+    val screenWorkArea = remember { availableWindowAreaDp() }
     val mainWindowState = rememberPersistedMainWindowState(
         persistedState = persistedMainWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val historyWindowState = rememberPersistedHistoryWindowState(
         persistedState = persistedHistoryWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(
         persistedState = persistedCliSessionsWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val teamUsageWindowState = rememberPersistedTeamUsageWindowState(
         persistedState = persistedTeamUsageWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val teamPresenceWindowState = rememberPersistedTeamPresenceWindowState(
         persistedState = persistedTeamPresenceWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
@@ -815,6 +831,14 @@ fun main() = application {
         }
     }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
+    // Modo somente cards: sem barra de título e sem rodapé. Booleano grava direto,
+    // sem o coletor com debounce que a opacidade e a escala precisam — não há
+    // slider aqui, e um clique não vira uma gravação por pixel.
+    var cardsOnlyMode by remember { mutableStateOf(readPersistedCardsOnlyMode(settings)) }
+    val setCardsOnlyMode: (Boolean) -> Unit = { enabled ->
+        cardsOnlyMode = enabled
+        persistCardsOnlyMode(settings, enabled)
+    }
     val windowOpacitySupported = remember { isWindowOpacitySupported() }
     var windowOpacityPercent by remember { mutableStateOf(readPersistedWindowOpacityPercent(settings)) }
     var opacitySaveGeneration by remember { mutableStateOf(0) }
@@ -1098,6 +1122,24 @@ fun main() = application {
                     text = if (language == AppLanguage.PT) "Atualizar agora" else "Refresh now",
                     onClick = { viewModel.refresh() }
                 )
+                // As duas entram por causa do modo somente cards: com o rodapé
+                // escondido, a engrenagem e a volta ao modo normal não existem em
+                // lugar nenhum da janela até o mouse passar pelo topo dela.
+                Item(
+                    text = if (language == AppLanguage.PT) "Configurações" else "Settings",
+                    onClick = {
+                        isSettingsDialogOpen = true
+                        settingsOpenGeneration++
+                    }
+                )
+                Item(
+                    text = if (cardsOnlyMode) {
+                        if (language == AppLanguage.PT) "Sair do modo somente cards" else "Exit cards only mode"
+                    } else {
+                        if (language == AppLanguage.PT) "Somente os cards" else "Cards only"
+                    },
+                    onClick = { setCardsOnlyMode(!cardsOnlyMode) }
+                )
                 Separator()
                 Item(
                     text = if (language == AppLanguage.PT) "Sair" else "Quit",
@@ -1130,7 +1172,21 @@ fun main() = application {
         icon = iconImage,
         state = mainWindowState,
         undecorated = true,
-        alwaysOnTop = alwaysOnTopEnabled
+        alwaysOnTop = alwaysOnTopEnabled,
+        // Terceira saída do modo somente cards, ao lado da bandeja e da faixa de
+        // hover. Um modo que esconde o botão de fechar precisa de mais de um
+        // caminho de volta, e o teclado é o único que funciona com a janela
+        // coberta por outra.
+        onKeyEvent = { event ->
+            val isToggle = event.type == KeyEventType.KeyDown &&
+                event.isCtrlPressed &&
+                event.isShiftPressed &&
+                event.key == Key.M
+            if (isToggle) {
+                setCardsOnlyMode(!cardsOnlyMode)
+            }
+            isToggle
+        }
     ) {
         LaunchedEffect(window) {
             mainWindowRef = window
@@ -1145,7 +1201,9 @@ fun main() = application {
                 windowState = mainWindowState,
                 onCloseRequest = {
                     shutdownApplication()
-                }
+                },
+                compact = cardsOnlyMode,
+                onExitCompact = { setCardsOnlyMode(false) }
             ) {
                 DashboardScreen(
                     viewModel = viewModel,
@@ -1280,7 +1338,8 @@ fun main() = application {
                         emptySet()
                     },
                     cliSessionPulses = cliSessionPulses,
-                    teamSessionPulses = teamSessionPulses
+                    teamSessionPulses = teamSessionPulses,
+                    showFooter = !cardsOnlyMode
                 )
             }
         }
@@ -1414,6 +1473,35 @@ fun main() = application {
             LaunchedEffect(teamPresenceOpenGeneration) {
                 activateWindow(window)
             }
+            // Largura mínima igual ao orçamento de colunas da lista de presença.
+            // Abaixo dela o `FlowRow` das linhas quebra e as colunas param de
+            // alinhar; o tamanho persistido não protege nada, porque quem arrasta a
+            // borda é o usuário.
+            //
+            // A unidade da janela AWT é a mesma `Dp` do `WindowState` — o Compose
+            // Desktop converte 1:1 (`setSizeImpl` usa `size.width.value`), e a
+            // densidade do sistema fica só no desenho. O que entra aqui é a escala
+            // da interface, pelo mesmo motivo de `scaledWindowSize`: ela multiplica
+            // a densidade do conteúdo, então a 150% a mesma janela mostra menos
+            // colunas e o piso precisa subir junto.
+            //
+            // O piso também é preso à área útil: a 150% ele daria 1410dp de largura,
+            // mais que um monitor de 1366, e um piso maior que a tela não é piso —
+            // é janela que nem arrastando a borda cabe.
+            val presenceMinimumScale = uiScaleFactor(uiScalePercent)
+            LaunchedEffect(presenceMinimumScale, screenWorkArea) {
+                val minimum = fitWindowSize(
+                    DpSize(
+                        width = TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP.dp * presenceMinimumScale,
+                        height = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP.dp * presenceMinimumScale
+                    ),
+                    screenWorkArea
+                )
+                window.minimumSize = java.awt.Dimension(
+                    minimum.width.value.roundToInt(),
+                    minimum.height.value.roundToInt()
+                )
+            }
             AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = presenceTitle,
@@ -1443,10 +1531,16 @@ fun main() = application {
             title = keysTitle,
             icon = iconImage,
             // O tamanho literal acompanha a escala: a 150% o conteúdo cresce e a
-            // moldura fixa o espremeria.
+            // moldura fixa o espremeria. E é preso à área útil pelo mesmo motivo das
+            // janelas: o diálogo também é `undecorated`.
             state = rememberDialogState(
-                width = 760.dp * uiScaleFactor(uiScalePercent),
-                height = 640.dp * uiScaleFactor(uiScalePercent)
+                size = fitWindowSize(
+                    DpSize(
+                        width = 760.dp * uiScaleFactor(uiScalePercent),
+                        height = 640.dp * uiScaleFactor(uiScalePercent)
+                    ),
+                    screenWorkArea
+                )
             ),
             undecorated = true
         ) {
@@ -1474,8 +1568,13 @@ fun main() = application {
             // de 150dp, e em 620 o conteúdo ficava com menos de 470 — estreito
             // demais para as linhas de rótulo + controle das seções de Time.
             state = rememberDialogState(
-                width = 820.dp * uiScaleFactor(uiScalePercent),
-                height = 720.dp * uiScaleFactor(uiScalePercent)
+                size = fitWindowSize(
+                    DpSize(
+                        width = 820.dp * uiScaleFactor(uiScalePercent),
+                        height = 720.dp * uiScaleFactor(uiScalePercent)
+                    ),
+                    screenWorkArea
+                )
             ),
             resizable = true,
             undecorated = true
@@ -1495,6 +1594,7 @@ fun main() = application {
                         enabledApis = enabledApisState,
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
+                        cardsOnlyMode = cardsOnlyMode,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacitySupported,
                         uiScalePercent = uiScalePercent,
@@ -1531,6 +1631,10 @@ fun main() = application {
                             alwaysOnTopEnabled = enabled
                             settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
                             showSettingsToast(SettingsToast.Saved(SettingsField.ALWAYS_ON_TOP))
+                        },
+                        onCardsOnlyModeChange = { enabled ->
+                            setCardsOnlyMode(enabled)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
                         },
                         onWindowOpacityChange = { percent ->
                             // Aviso não sai daqui: quem persiste é o coletor com
@@ -1759,14 +1863,18 @@ fun main() = application {
 @Composable
 private fun rememberPersistedMainWindowState(
     persistedState: PersistedMainWindowState,
-    uiScalePercent: Int
+    uiScalePercent: Int,
+    workArea: ScreenWorkArea
 ) = when {
     persistedState.widthDp != null && persistedState.heightDp != null -> {
         rememberWindowState(
             placement = persistedState.composePlacement,
-            size = DpSize(
-                width = persistedState.composeWidth,
-                height = persistedState.composeHeight
+            size = fitWindowSize(
+                DpSize(
+                    width = persistedState.composeWidth,
+                    height = persistedState.composeHeight
+                ),
+                workArea
             )
         )
     }
@@ -1781,9 +1889,12 @@ private fun rememberPersistedMainWindowState(
     // acompanhar a escala: na primeira execução não há tamanho persistido, e sem
     // isto o app subiria com a moldura de 100% e o conteúdo de 115%.
     else -> rememberWindowState(
-        size = DpSize(
-            width = 800.dp * uiScaleFactor(uiScalePercent),
-            height = 600.dp * uiScaleFactor(uiScalePercent)
+        size = fitWindowSize(
+            DpSize(
+                width = 800.dp * uiScaleFactor(uiScalePercent),
+                height = 600.dp * uiScaleFactor(uiScalePercent)
+            ),
+            workArea
         )
     )
 }

@@ -167,6 +167,29 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 - **`label` da chave é texto livre do admin, não verificado.** É onde ele digita o e-mail da pessoa. Quem prova o vínculo é o `accountUuid` ao lado; a UI mostra os dois juntos de propósito.
 - **`TEAM_API_KEY` virou legado.** Com `TEAM_LEGACY_KEY_MODE=open` (default) ela continua lendo tudo, que é o comportamento anterior; `off` a rejeita e é o passo que efetiva o isolamento. `TEAM_ADMIN_TOKEN` monta `/api/admin/*` e vale como credencial **de leitura** em `/v1/team`, `/v1/session` e `/v1/member` — é o que evita uma família de rotas admin paralela. No `/v1/ingest` ele é recusado: admin lê, não escreve consumo em nome de ninguém.
 - **Modo admin é independente de conta.** `TeamIntegrationSettings.isAdminMode` não entra em `isConfigured`/`isActive`: administrar não exige chave de time, apelido nem conta marcada. O botão da barra inferior (`FooterBar.onOpenAdminOverview`, `null` esconde) abre a mesma `TeamUsageScreen` em modo global.
+- **A ordem da lista global é alfabética pela conta, e o consumo ordena dentro dela**
+  (`TeamUsageViewModel.flattenAccounts`). Com o consumo como chave primária, a faixa de uma conta
+  aparecia onde o integrante que mais gastou a levasse, e a mesma conta subia e descia entre dois
+  tiques do laço de 5s. O rótulo é o e-mail que o admin digitou ao emitir a chave e não muda
+  sozinho. Conta sem rótulo vai para o fim, por um degrau próprio do comparador e não por sentinela
+  de texto. `memberGroups` agrupa por ordem de primeira aparição, então ordenar os integrantes já
+  ordena as faixas — uma segunda ordenação lá seria um segundo dono da mesma decisão.
+- **A hierarquia da lista é uma escada de três superfícies neutras**: faixa da conta em
+  `surfaceVariant` com marcador de 2dp, a palavra "Conta" e divisória; linha do integrante
+  transparente sobre o fundo da janela; bloco de sessões em `surface`, recuado. O bloco aninhado
+  fica **um degrau de distância do fundo da lista** e **nunca** em `surfaceVariant`: aquele é o
+  realce de hover do `AppDataRow`, e com ele ali passar o mouse numa sessão deixa de dar retorno.
+  E a lista **não tem vão entre itens** — cada linha traz a própria divisória, e o vão de 8dp era
+  o que desfazia a leitura de tabela.
+- **A tela de presença global usa a mesma faixa** (`TeamPresenceAccountHeader`), com dois níveis em
+  vez de três: ali não há bloco de sessões. Ela ficou de fora da passada da issue #69 e continuava
+  entregando um e-mail e um uuid sobre fundo transparente — que é exatamente o que a linha do
+  integrante também tem.
+- **A coluna de ação mora fora do `FlowRow` das colunas**, nas duas listas de presença. Dentro dele o
+  botão destrutivo é o último item e portanto o primeiro a quebrar: numa janela estreita ele descia
+  para uma linha própria e virava um ícone vermelho solto, sem coluna e sem dizer a que linha
+  pertence. O orçamento de largura (`PRESENCE_COLUMN_*`) virou piso de janela em
+  `TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP` — comentário não impede o usuário de arrastar a borda.
 - **`TeamMemberUsage.memberKey`** (`accountKey/deviceId`, ou só `deviceId` fora do modo global) é a identidade da linha na tela. O `deviceId` sozinho não serve: na visão global a mesma máquina em duas contas expandiria as duas juntas e a remoção acertaria a conta errada.
 - **Na visão global o recorte de 5h é deslizante.** Cada conta reseta a quota numa hora, e ancorar numa delas daria um número que não corresponde a nenhuma. `GetAdminTeamOverviewUseCase` resolve a janela com `CliQuotaWindows()` vazio e a tela avisa.
 - **Configuração** em `~/.usage-monitor/team.json` (`LocalTeamSettingsDataSource`), com escrita atômica e `restrictToOwnerReadWrite`. Nunca em `PreferencesSettings`: a chave do servidor é segredo e as preferências vão em claro para o registro.
@@ -186,7 +209,7 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 - **Presença é rota própria** (`POST /api/v1/presence`, servidor 0.4.0+), e não uma leitura de `team.ts`: é escrita, com a conta no **corpo**, `x-admin-token` recusado (401) e `allowClaim: true` — o oposto da família de leitura nos três eixos. Ela escreve na `team_members.last_seen_at` que já existia: **nenhuma coluna nova, nenhuma migração**. Contra servidor anterior a rota dá 404 e `TeamUsageRepositoryImpl` cai num ingest só-membro, que carimba o mesmo campo; o 404 é lembrado **por URL** (`presenceRouteMissingFor`), senão seriam 404 a cada 30s para sempre. Só o 404 cai no fallback — 401/403/500 continuam falha, senão chave errada viraria batida "bem-sucedida".
 - **Duas camadas de estado, não uma escala.** *Online* = heartbeat dentro de `PRESENCE_ONLINE_WINDOW_MILLIS` (90s = três batidas de 30s do `TeamSyncService`); *trabalhando agora* = turno dentro de `ACTIVE_SESSION_WINDOW_MILLIS` (5 min). Colapsá-las esconderia o caso que a tela existe para mostrar: quem está com o app aberto e parado. `TeamMemberPresence` deriva de `TeamMemberUsage` e usa **dois booleanos, não um enum** — enum novo obrigaria `when` exaustivos na tela. O corte da consulta vai como `cutoffMillis` cru, **nunca** um valor novo em `CliSessionRange`.
 - **`last_seen_at` é o relógio do servidor**, e a rota o devolve na resposta justamente para o cliente medir o desvio (`TeamServerClockOffset`). Comparar o carimbo do servidor com `Clock.System.now()` local deixaria um cliente atrasado vendo o time inteiro online **para sempre** — falha silenciosa. `clockSkewSuspected` denuncia carimbo no futuro; sem medida (admin puro, servidor antigo) o offset fica em zero. Instalação em modo admin puro **não bate presença** e isso é intencional: admin não é integrante.
-- **A ordem de `toTeamPresence` é total e determinística.** Não é estética: duas leituras iguais têm de produzir listas iguais, ou o `StateFlow` reemite e a tela recompõe a cada 5s. Pelo mesmo motivo o estado não guarda tempo decorrido — a tela mostra hora absoluta, e o desvio entra arredondado em minutos.
+- **A ordem de `toTeamPresence` é total, determinística e sem carimbo de tempo nenhum**: conta (rótulo, com a conta sem rótulo por último e o `accountKey` desempatando), depois trabalhando, depois online, e o alias como desempate. Não é estética: duas leituras iguais têm de produzir listas iguais, ou o `StateFlow` reemite e a tela recompõe a cada 5s. **A conta é a chave primária pelo mesmo motivo de `flattenAccounts`** — `presenceGroups` agrupa por ordem de primeira aparição, então quem ordena os integrantes ordena as faixas de conta, e com o estado no topo as três contas trocavam de lugar entre dois tiques. **`lastSeenAt` e `lastActivityAt` saíram do comparador**: o primeiro é o heartbeat de 30s e entre dois online não informa nada — os dois estão dentro dos mesmos 90s —, e o segundo anda a cada turno de quem trabalha; qualquer um deles como critério reordena a lista sem nada ter mudado. As duas horas continuam impressas nas colunas. Pelo mesmo motivo o estado não guarda tempo decorrido — a tela mostra hora absoluta, e o desvio entra arredondado em minutos.
 - **O ponto de estado da linha não pisca.** Animação infinita numa lista trava o `waitForIdle` dos testes de componente, e o botão do card de presença também não recebe `pulse`: o pisca significa uma coisa só neste app — sessão em atenção — e o botão de time ao lado já a carrega.
 
 ## Sistema visual
@@ -262,6 +285,45 @@ multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
 - O teste que prova a fiação (`AppThemeScaleTest`) mede **pixels** (`boundsInRoot`), não `Dp`: a
   conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
   100dp nos dois casos — um teste que passa sem medir nada.
+
+**Densidade do dashboard** (`DashboardScreen.SuccessContent` + `ResponsiveDashboardCardGrid`): a
+janela principal usa o **corpo denso** do protótipo — `AppSpacing.md` na horizontal, `AppSpacing.sm`
+na vertical e `AppSpacing.md` entre cards —, e não o `AppSpacing.lg` das outras cinco. É a única
+janela que o usuário deixa estreita ao lado do editor, e ali 16dp de margem mais 16dp de vão eram
+largura que faltava dentro do card. A coluna rolável **não** reserva folga para a barra de rolagem:
+ela flutua sobre o padding direito da grade. Somadas, as duas davam 28dp à direita contra 16 à
+esquerda.
+
+**Modo somente cards** (`DesktopWindowFrame(compact)` + `DashboardScreen(showFooter)` +
+`CardsOnlyModePreferences.kt`): a janela sem barra de título e sem rodapé. **Não é valor novo em
+enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `Boolean` em
+`PreferencesSettings`, ao lado de "manter sempre visível".
+- **A faixa de título só é composta durante o hover.** Ela carrega a `WindowDraggableArea`, que usa
+  arrasto **imediato**; o card usa `detectDragGesturesAfterLongPress`. Com a faixa presente o tempo
+  todo, o arrasto da janela venceria a pressão longa e reordenar o primeiro card seria impossível.
+  Invisível ela também não pode ser clicável: um botão de fechar transparente é pior que nenhum.
+- **Três saídas, e nenhuma é dispensável**: a faixa, o item na bandeja e `Ctrl+Shift+M`. O modo
+  esconde o botão de fechar e a engrenagem; com a janela coberta por outra, só o teclado resta. A
+  bandeja também passou a abrir as Configurações, que só existiam no rodapé.
+- A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
+  as capturas do README continuam com a moldura inteira.
+
+**Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
+abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e
+a janela do modo somente cards tem ~230dp úteis — ali a tooltip cobre o card inteiro, escondendo
+justamente o número que o ponteiro apontava. Constante **própria** e não reuso de
+`NarrowCardWidthThreshold`, que coincide no valor mas responde a outra pergunta: uma é sobre apertar
+padding, a outra é sobre o popup caber. O preço está aceito: em card estreito não há caminho visual
+para a projeção de uso, e ela volta abrindo a janela. Só as tooltips de **cota** caem — as de uma
+linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
+- **A `testTag` do bloco de cota mora no conteúdo, não no `HoverTooltipBox`.** Presa à tooltip, ela
+  desapareceria da árvore junto com ela em card estreito, e os testes que buscam `quotaBlockTag`
+  passariam a não encontrar nó nenhum.
+- **A explicação do semáforo é o `footnote` da tooltip da cota.** O ponto colorido nunca teve
+  tooltip própria — os dois usos de `RiskSemaphoreDot` passam `showTooltip = false`, porque dois
+  `TooltipBox` aninhados disputam o mesmo hover —, e por isso a frase de `riskDotTooltipSubtitle`
+  não chegava à tela em tamanho nenhum de janela. A métrica `Projeção de uso` continua ao lado: ela
+  diz qual é o estado, o rodapé diz o que ele significa.
 
 **Regras que continuam valendo**: nenhuma animação infinita nova (trava o `waitForIdle`);
 `ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum

@@ -75,3 +75,26 @@ internal fun shouldStackCompactQuotas(cardWidth: Dp, quotaCount: Int): Boolean {
 // A regra de empilhamento das colunas expandidas saiu junto com os arcos: a cota
 // expandida virou linha de largura cheia, e linha empilha por construção. O que
 // sobrou de decisão de largura vale só para os badges do card minimizado.
+
+/**
+ * Largura mínima de card para o tooltip de cota abrir.
+ *
+ * Coincide hoje com [NarrowCardWidthThreshold], mas responde a outra pergunta e por
+ * isso é constante própria: não é "como apertar o padding", é "o popup de cinco
+ * linhas cabe sem cobrir o dado que está sendo lido". Amarrar as duas faria ajustar
+ * uma mexer na outra.
+ */
+internal val QuotaTooltipMinCardWidth = 320.dp
+
+/**
+ * Abaixo de [QuotaTooltipMinCardWidth] o tooltip de cota cobre o card inteiro — a
+ * janela do modo somente cards tem ~230dp de largura útil, e o popup tem piso de
+ * 180dp mais cinco a seis linhas de métrica. Ali ele esconde justamente o número que
+ * o ponteiro estava apontando.
+ *
+ * O preço é conhecido e aceito: em card estreito não há caminho visual para a
+ * projeção de uso. Ela volta abrindo a janela.
+ */
+internal fun shouldShowQuotaTooltip(cardWidth: Dp): Boolean {
+    return cardWidth >= QuotaTooltipMinCardWidth
+}
