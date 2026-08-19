@@ -181,6 +181,15 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
   realce de hover do `AppDataRow`, e com ele ali passar o mouse numa sessão deixa de dar retorno.
   E a lista **não tem vão entre itens** — cada linha traz a própria divisória, e o vão de 8dp era
   o que desfazia a leitura de tabela.
+- **A tela de presença global usa a mesma faixa** (`TeamPresenceAccountHeader`), com dois níveis em
+  vez de três: ali não há bloco de sessões. Ela ficou de fora da passada da issue #69 e continuava
+  entregando um e-mail e um uuid sobre fundo transparente — que é exatamente o que a linha do
+  integrante também tem.
+- **A coluna de ação mora fora do `FlowRow` das colunas**, nas duas listas de presença. Dentro dele o
+  botão destrutivo é o último item e portanto o primeiro a quebrar: numa janela estreita ele descia
+  para uma linha própria e virava um ícone vermelho solto, sem coluna e sem dizer a que linha
+  pertence. O orçamento de largura (`PRESENCE_COLUMN_*`) virou piso de janela em
+  `TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP` — comentário não impede o usuário de arrastar a borda.
 - **`TeamMemberUsage.memberKey`** (`accountKey/deviceId`, ou só `deviceId` fora do modo global) é a identidade da linha na tela. O `deviceId` sozinho não serve: na visão global a mesma máquina em duas contas expandiria as duas juntas e a remoção acertaria a conta errada.
 - **Na visão global o recorte de 5h é deslizante.** Cada conta reseta a quota numa hora, e ancorar numa delas daria um número que não corresponde a nenhuma. `GetAdminTeamOverviewUseCase` resolve a janela com `CliQuotaWindows()` vazio e a tela avisa.
 - **Configuração** em `~/.usage-monitor/team.json` (`LocalTeamSettingsDataSource`), com escrita atômica e `restrictToOwnerReadWrite`. Nunca em `PreferencesSettings`: a chave do servidor é segredo e as preferências vão em claro para o registro.

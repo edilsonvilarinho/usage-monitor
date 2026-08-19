@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -41,6 +42,7 @@ import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private val NOW = Instant.parse("2026-08-11T12:00:00Z")
 
@@ -488,11 +490,60 @@ class TeamPresenceScreenTest {
         waitForIdle()
     }
 
+    @Test
+    fun `a faixa da conta diz que aquele nivel e uma conta`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
+                ),
+                isAdminOverview = true
+            )
+        )
+
+        // Sem a palavra, a faixa entregava um e-mail e um uuid — exatamente o que
+        // a linha do integrante também tem — e os dois níveis liam igual.
+        onNodeWithTag("${PRESENCE_ACCOUNT_GROUP_TAG_PREFIX}acc-a").assertTextContains("Conta")
+    }
+
+    @Test
+    fun `em janela estreita o botao de apagar continua na coluna de acao`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
+                ),
+                isAdminOverview = true
+            ),
+            localDeviceId = "device-outro",
+            canManage = true,
+            // Largura das capturas do defeito: abaixo do orçamento das colunas, que
+            // é justamente onde o `FlowRow` quebra.
+            widthDp = 800
+        )
+
+        // Dentro do `FlowRow` a ação era o último item e o primeiro a quebrar: o
+        // botão descia para uma linha própria e aparecia colado à esquerda, um ícone
+        // vermelho solto abaixo do e-mail. Fora dele a coluna de ação é fixa e o
+        // botão encosta na borda direita da faixa, quebrem as colunas ou não.
+        val button = onNodeWithTag("${PRESENCE_ACCOUNT_DELETE_TAG_PREFIX}acc-a")
+            .getUnclippedBoundsInRoot()
+        val band = onNodeWithTag("${PRESENCE_ACCOUNT_GROUP_TAG_PREFIX}acc-a")
+            .getUnclippedBoundsInRoot()
+
+        assertTrue(
+            (band.right - button.right).value < 20f,
+            "botão termina em ${button.right}, faixa em ${band.right}"
+        )
+    }
+
     private fun ComposeUiTest.renderSuccess(
         state: TeamPresenceUiState.Success,
         localDeviceId: String? = null,
         canManage: Boolean = false,
         actionError: String? = null,
+        /** A quebra de coluna só se mede na largura em que a janela real para. */
+        widthDp: Int = 900,
         onToggleAccount: (String) -> Unit = {},
         onSetOnlyOnline: (Boolean) -> Unit = {},
         onRemoveMember: (String) -> Unit = {},
@@ -500,7 +551,7 @@ class TeamPresenceScreenTest {
     ) {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                Box(modifier = Modifier.width(widthDp.dp).height(700.dp)) {
                     TeamPresenceContent(
                         state = state,
                         language = AppLanguage.PT,

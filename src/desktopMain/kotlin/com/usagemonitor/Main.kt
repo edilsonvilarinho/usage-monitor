@@ -165,6 +165,7 @@ import java.util.prefs.Preferences
 import java.io.File
 import javax.imageio.ImageIO
 import javax.swing.JFileChooser
+import kotlin.math.roundToInt
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -1462,6 +1463,24 @@ fun main() = application {
         ) {
             LaunchedEffect(teamPresenceOpenGeneration) {
                 activateWindow(window)
+            }
+            // Largura mínima igual ao orçamento de colunas da lista de presença.
+            // Abaixo dela o `FlowRow` das linhas quebra e as colunas param de
+            // alinhar; o tamanho persistido não protege nada, porque quem arrasta a
+            // borda é o usuário.
+            //
+            // A unidade da janela AWT é a mesma `Dp` do `WindowState` — o Compose
+            // Desktop converte 1:1 (`setSizeImpl` usa `size.width.value`), e a
+            // densidade do sistema fica só no desenho. O que entra aqui é a escala
+            // da interface, pelo mesmo motivo de `scaledWindowSize`: ela multiplica
+            // a densidade do conteúdo, então a 150% a mesma janela mostra menos
+            // colunas e o piso precisa subir junto.
+            val presenceMinimumScale = uiScaleFactor(uiScalePercent)
+            LaunchedEffect(presenceMinimumScale) {
+                window.minimumSize = java.awt.Dimension(
+                    (TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP * presenceMinimumScale).roundToInt(),
+                    (TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP * presenceMinimumScale).roundToInt()
+                )
             }
             AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(

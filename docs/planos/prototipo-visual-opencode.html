@@ -388,6 +388,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#time">Uso do time</a>
   <a href="#tendencia">Tendência do time</a>
   <a href="#presenca">Presença</a>
+  <a href="#presenca-contas">Presença · todas as contas</a>
   <a href="#chaves">Administração de chaves</a>
   <div class="grp">Configurações</div>
   <a href="#cfg-geral">Geral</a>
@@ -1161,6 +1162,58 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <p class="note" style="margin:0"><b>Duas camadas, não uma escala.</b> <i>Conectado</i> é heartbeat dentro de 90s; <i>trabalhando agora</i> é turno dentro de 5min. Colapsá-las esconderia exatamente o caso que a tela existe para mostrar: quem está com o app aberto e parado. O ponto de estado <b>não pisca</b> — animação infinita numa lista trava o teste de componente. A própria máquina não tem botão de remover.</p>
   </div>
 </div>
+
+
+<h2 id="presenca-contas">10b · Presença — todas as contas</h2>
+<p class="lede">A mesma tela na visão global do administrador, onde a lista mistura contas. Janela em 940 × 620 dp: abaixo disso as cinco colunas mais a coluna de ação não cabem.</p>
+<div class="win">
+  <div class="titlebar"><span class="t">Conectados agora — todas as contas</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="hstack" style="gap:var(--s4)"><span class="st ok">2 conectados</span><span class="st warn">1 trabalhando</span><span class="st off">3 conhecidos</span></div>
+      <span class="sp"></span>
+      <button class="btn" type="button">Somente conectados</button>
+    </div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row" style="background:var(--raised)">
+        <span class="srcmark" style="background:var(--cread)"></span>
+        <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
+        <div class="stack" style="gap:0;min-width:150px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <span class="sp"></span>
+        <span class="v sm">2 de 2 conectados</span><span class="v sm">1</span>
+        <button class="btn icon danger" type="button" disabled aria-label="Apagar conta">×</button>
+      </div>
+      <div class="row">
+        <span class="srcmark" style="background:var(--cread)"></span>
+        <div class="stack" style="gap:0;min-width:150px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
+        <span class="v sm">DESKTOP-A1</span>
+        <span class="st ok">Conectado</span>
+        <span class="sp"></span>
+        <span class="v sm">2 sessões</span>
+        <button class="btn icon danger" type="button" disabled aria-label="Remover integrante">×</button>
+      </div>
+      <div class="row">
+        <span class="srcmark" style="background:var(--info)"></span>
+        <div class="stack" style="gap:0;min-width:150px"><span class="v sm">dev-02</span></div>
+        <span class="v sm">NOTE-B2</span>
+        <span class="st info" style="color:var(--info)">Conectado</span>
+        <span class="sp"></span>
+        <span class="v sm dim">Parado</span>
+        <button class="btn icon danger" type="button" aria-label="Remover integrante">×</button>
+      </div>
+      <div class="row" style="background:var(--raised)">
+        <span class="srcmark" style="background:var(--cread)"></span>
+        <button class="btn ghost icon" type="button" aria-label="Expandir conta">▸</button>
+        <div class="stack" style="gap:0;min-width:150px"><span class="k">Conta</span><span class="v sm">bruno@example.com</span><span class="k">account-sandbox</span></div>
+        <span class="sp"></span>
+        <span class="v sm">0 de 1 conectados</span><span class="v sm">0</span>
+        <button class="btn icon danger" type="button" aria-label="Apagar conta">×</button>
+      </div>
+    </div></div>
+  </div>
+</div>
+<p class="note"><b>A faixa da conta é a mesma da lista de consumo</b>: superfície <code>--raised</code>, marcador de 2dp, a palavra "Conta" antes do e-mail e divisória embaixo. Sem ela, conta e integrante eram dois retângulos transparentes de mesmo peso separados por um vão de 8dp — e a faixa entregava um e-mail e um uuid, que é exatamente o que a linha do integrante também tem. Aqui há dois níveis, não três: a presença não abre sessões.</p>
+<p class="note"><b>A coluna de ação fica fora do bloco que quebra.</b> Enquanto o botão destrutivo era o último item do <code>FlowRow</code> das colunas, ele era o primeiro a cair para a linha seguinte quando a janela encolhia — e o que aparecia era um ícone vermelho solto abaixo do e-mail, sem coluna, sem legenda e sem dizer a que linha pertence. Ele é coluna fixa à direita, e a janela tem largura mínima para as colunas nunca chegarem lá.</p>
 
 <!-- ═══════════════════════════════ CHAVES ════════════════════════════ -->
 <h2 id="chaves">11 · Administração de chaves</h2>

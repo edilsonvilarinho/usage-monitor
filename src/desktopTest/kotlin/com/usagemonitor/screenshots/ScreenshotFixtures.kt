@@ -529,6 +529,19 @@ internal object ScreenshotFixtures {
         )
     )
 
+    /**
+     * A mesma presença, agora na visão global do administrador.
+     *
+     * É ela que exercita a faixa de conta e a coluna de ação: o `canManage` da
+     * captura de uma conta só é inerte, porque `TeamPresenceContent` só libera os
+     * botões destrutivos quando o estado é global.
+     */
+    val teamPresenceAccounts: List<TeamMemberPresence> = listOf(
+        teamPresence[0].withAccount("account-primary", "ana@example.com"),
+        teamPresence[1].withAccount("account-primary", "ana@example.com"),
+        teamPresence[2].withAccount("account-sandbox", "bruno@example.com")
+    )
+
     // --- Configurações -------------------------------------------------------
 
     val anthropicProfiles: List<AnthropicProfileUiModel> = listOf(
@@ -581,3 +594,10 @@ private fun Instant.minusHours(hours: Int): Instant =
 
 private fun Instant.minusMinutes(minutes: Int): Instant =
     Instant.fromEpochMilliseconds(toEpochMilliseconds() - minutes * 60_000L)
+
+private fun TeamMemberPresence.withAccount(
+    accountKey: String,
+    accountLabel: String
+): TeamMemberPresence {
+    return copy(member = member.copy(accountKey = accountKey, accountLabel = accountLabel))
+}

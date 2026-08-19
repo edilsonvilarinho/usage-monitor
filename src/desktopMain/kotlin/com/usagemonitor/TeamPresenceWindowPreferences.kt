@@ -26,6 +26,18 @@ private const val DEFAULT_TEAM_PRESENCE_WINDOW_WIDTH_DP = 960
 private const val DEFAULT_TEAM_PRESENCE_WINDOW_HEIGHT_DP = 620
 
 /**
+ * Piso da janela, aplicado em `Main.kt` via `minimumSize` da janela AWT.
+ *
+ * O tamanho default já cabia; o que faltava era impedir o arrasto da borda para
+ * baixo do orçamento. Em ~800dp a soma das colunas mais a coluna de ação passa da
+ * largura útil, o `FlowRow` quebra e o botão de apagar conta cai numa linha
+ * própria. 940dp é o pior caso de `TeamPresenceScreen.PRESENCE_COLUMN_*` — as cinco
+ * colunas, a ação e os 72dp de cromo dão 932 — arredondado para cima.
+ */
+internal const val TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP = 940
+internal const val TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP = 460
+
+/**
  * Geometria da janela de presença.
  *
  * Chaves próprias pelo mesmo motivo das outras janelas: as três costumam ficar
