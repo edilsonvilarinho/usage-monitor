@@ -12,7 +12,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fases A–H concluídas — as seis telas no vocabulário novo, pronto para a Fase I`
+**Estado atual:** `Fases A–L concluídas — falta só a Fase M (fechamento)`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
@@ -34,16 +34,11 @@ e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b
 
 ### ▶ Próxima atividade
 
-**Fase I** — chrome das janelas: `DesktopWindowFrame.kt` (barra de título de 34dp, raio da janela na
-escala nova, `applyWindowShape` continuando a reagir a `componentResized`) e depois só constantes de
-tamanho em `Main.kt`.
+**Fase M — fechamento.** `allTests` → `build` → `createDistributable` e o QA visual manual da lista
+no fim deste documento. Todas as fases já estão fundidas em `refactor/visual-opencode`.
 
-Regra dura da fase: **nenhuma composable nova em `main()`** — o `OutOfMemoryError` no ASM está
-documentado no `gradle.properties`. Se o layout exigir estado novo ali, extrair antes, em commit
-próprio.
-
-Depois de I: **J** (marca), **K** (relatório PDF), **L** (capturas e documentação) e **M**
-(fechamento).
+A `main` permanece intocada. Merge para ela **só sob pedido explícito**, por PR — o CI já roda
+`allTests` em `windows-latest` em todo PR.
 
 ### Progresso por fase
 
@@ -57,10 +52,10 @@ Depois de I: **J** (marca), **K** (relatório PDF), **L** (capturas e documenta�
 | F — Sessões CLI | `visual/f-cli-sessions` | ✅ concluída | 4/5 | 2026-08-18 |
 | G — Time | `visual/g-team` | ✅ concluída | 2/5 | 2026-08-18 |
 | H — Configurações | `visual/h-settings` | ✅ concluída | 1/4 | 2026-08-18 |
-| I — Chrome das janelas | `visual/i-window-chrome` | ⬜ pendente | 0/2 | — |
-| J — Marca | `visual/j-brand` | ⬜ pendente | 0/2 | — |
-| K — Relatório PDF | `visual/k-report` | ⬜ pendente | 0/2 | — |
-| L — Capturas e docs | `visual/l-docs` | ⬜ pendente | 0/3 | — |
+| I — Chrome das janelas | `visual/i-window-chrome` | ✅ concluída | 1/2 | 2026-08-18 |
+| J — Marca | `visual/j-brand` | ✅ concluída | 1/2 | 2026-08-18 |
+| K — Relatório PDF | `visual/k-report` | ✅ concluída | 1/2 | 2026-08-18 |
+| L — Capturas e docs | `visual/l-docs` | ✅ concluída | 2/3 | 2026-08-18 |
 | M — Fechamento | — | ⬜ pendente | 0/0 | — |
 
 Legenda: ⬜ pendente · 🟡 em andamento · ✅ concluída e fundida na integração · ⛔ bloqueada
@@ -71,6 +66,11 @@ Uma linha por commit, em ordem cronológica.
 
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
+| 2026-08-18 | L3 | `docs: record the visual system and its constraints` | n/a — documentos |
+| 2026-08-18 | L1–L2 | `chore(screenshots): regenerate README captures and the tour gif` | `allTests` — verde |
+| 2026-08-18 | K | `feat(report): embed IBM Plex in the PDF and apply the new palette` | `allTests` — verde; PDFs curto e longo renderizados em PNG e inspecionados |
+| 2026-08-18 | J | `feat(brand): add the deterministic icon renderer and apply the new mark` | `allTests` — verde; folha de contato de 16 a 128px inspecionada |
+| 2026-08-18 | I | `refactor(window): standardize the title bar and window frame` | `allTests` — verde |
 | 2026-08-18 | H | `refactor(settings): replace the tab chips with side navigation and restyle the controls` | `allTests` — verde; capturas inspecionadas |
 | 2026-08-18 | G3–G5 | `refactor(team): restyle trend, presence and the keys admin screen` | `allTests` — verde; capturas inspecionadas |
 | 2026-08-18 | G2 | `refactor(team): render member usage as aligned rows` (inclui as âncoras do G1) | `ui.*` — verde |
@@ -131,6 +131,9 @@ motivo.
 | 2026-08-18 | O card minimizado mantém os **badges por cota**, em vez do resumo "68% · 41%" do protótipo | A forma do protótipo apaga o rótulo da cota e a tooltip por cota, que são dado e ação existentes. Os badges foram reestilizados (superfície neutra, borda, raio 6) em vez de removidos |
 | 2026-08-18 | `compactPercentageLabel` passou a **truncar** em vez de arredondar | Era o único lugar do app que arredondava: o arco fazia `toInt()` e os limiares da bandeja são piso. O mesmo card mostrava 26% na cota expandida e 27% no badge minimizado para o mesmo 12 de 45 |
 | 2026-08-18 | `colorFor(UsageRiskLevel)` passou a sair de `AppTone` | Os três literais (`0xFF4CAF50`, `0xFFFFC107`, `0xFFF44336`) nunca foram medidos contra as superfícies dos dois temas — o âmbar dava menos de 3:1 sobre a clara — e escapavam do `AppAccentsContrastTest` |
+| 2026-08-18 | As fases I, J, K e L saíram com **menos commits** que o plano previa | Cada uma tinha dois ou três commits que tocavam o mesmo arquivo na mesma região (moldura + constantes, gerador + saída, fonte + paleta, capturas + gif). Separá-los daria commits que não representam estados verificáveis distintos |
+| 2026-08-18 | As linhas da tela de presença viraram `AppDataRow` só na Fase L | A Fase G converteu botões e filtro mas deixou as linhas como painéis empilhados; a captura de fim de L mostrou vinte blocos onde as outras listas já eram tabela. Corrigido no commit das capturas, que é onde o defeito apareceu |
+| 2026-08-18 | O PDF cai para Helvetica se o TTF não estiver no classpath | Um empacotamento que esqueça a pasta `fonts/` produz um relatório com a fonte errada em vez de nenhum relatório. A largura das colunas se recalcula sozinha; o dado continua correto |
 | 2026-08-18 | A Fase H saiu **num commit só**, em vez dos quatro previstos | A navegação lateral e a conversão dos controles (campo com debounce, interruptores, botões, seletor de idioma) tocam os mesmos três arquivos nas mesmas regiões. Quatro commits se sobreporiam sem entregar quatro estados testáveis |
 | 2026-08-18 | O `modifier` do `DebouncedTextField` desce até o campo, e não fica na coluna | Ele traz a `testTag`, e a ação de digitar mora no campo: tag na coluna deixa `performTextInput` sem o `RequestFocus` que ele exige |
 | 2026-08-18 | A caixa de seleção de participação no time virou interruptor | A linha diz se a conta participa — estado ligado ou desligado, o mesmo que os outros controles da tela dizem, agora com o mesmo desenho |
