@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,8 +49,16 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
-private val WindowCornerRadius = 16.dp
+// 10dp é o teto da escala de raios; 16 vinha da escala antiga, que ia até 28.
+// `applyWindowShape` continua reagindo a `componentResized`, senão a máscara
+// ficaria com o tamanho da janela anterior depois de qualquer redimensionamento.
+private val WindowCornerRadius = 10.dp
+
+/** Altura da barra de título das seis janelas. */
+private val TITLE_BAR_HEIGHT = 34.dp
 
 private fun WindowScope.applyWindowShape(density: androidx.compose.ui.unit.Density, cornerRadius: Dp) {
     val arcDiameter = with(density) { cornerRadius.toPx() * 2 }
@@ -199,9 +207,11 @@ private fun WindowScope.DesktopTitleBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(42.dp)
+                // 34dp: a barra é cromo, e oito dp a menos por janela são oito
+                // dp a mais de dado em seis janelas.
+                .height(TITLE_BAR_HEIGHT)
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 16.dp),
+                .padding(start = AppSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -222,7 +232,7 @@ private fun WindowScope.DesktopTitleBar(
                     text = title,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium
+                    maxLines = 1
                 )
             }
 
@@ -267,9 +277,11 @@ private fun WindowScope.DesktopDialogTitleBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(42.dp)
+                // 34dp: a barra é cromo, e oito dp a menos por janela são oito
+                // dp a mais de dado em seis janelas.
+                .height(TITLE_BAR_HEIGHT)
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 16.dp),
+                .padding(start = AppSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -290,7 +302,7 @@ private fun WindowScope.DesktopDialogTitleBar(
                     text = title,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium
+                    maxLines = 1
                 )
             }
 
@@ -337,9 +349,12 @@ private fun TitleBarButton(
 
     Box(
         modifier = modifier
-            .width(46.dp)
-            .height(40.dp)
-            .clip(RoundedCornerShape(10.dp))
+            // Retângulo que preenche a altura da barra, como numa janela de
+            // sistema: o botão arredondado flutuando dentro dela era o único
+            // lugar do app onde um controle não encostava na própria moldura.
+            .width(40.dp)
+            .height(TITLE_BAR_HEIGHT - 1.dp)
+            .clip(AppShapes.extraSmall)
             .background(if (isHovered) hoverColor else defaultColor)
             .hoverable(hoverInteraction)
             .clickable(onClick = onClick),
@@ -348,7 +363,7 @@ private fun TitleBarButton(
         Text(
             text = label,
             color = textColor,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.labelLarge,
             textAlign = TextAlign.Center
         )
     }

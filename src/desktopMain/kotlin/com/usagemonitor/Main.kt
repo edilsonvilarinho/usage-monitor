@@ -1390,7 +1390,10 @@ fun main() = application {
             onCloseRequest = { isSettingsDialogOpen = false },
             title = if (language == AppLanguage.PT) "Configurações" else "Settings",
             icon = iconImage,
-            state = rememberDialogState(width = 620.dp, height = 700.dp),
+            // 820 de largura: as Configurações passaram a ter navegação lateral
+            // de 150dp, e em 620 o conteúdo ficava com menos de 470 — estreito
+            // demais para as linhas de rótulo + controle das seções de Time.
+            state = rememberDialogState(width = 820.dp, height = 720.dp),
             resizable = true,
             undecorated = true
         ) {
