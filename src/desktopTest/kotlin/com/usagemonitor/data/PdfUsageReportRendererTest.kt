@@ -127,7 +127,9 @@ class PdfUsageReportRendererTest {
             for (pageIndex in 0 until pdf.numberOfPages) {
                 val image = renderer.renderImageWithDPI(pageIndex, 72f)
                 val corner = Color(image.getRGB(1, 1))
-                assertEquals(Color(0x18, 0x18, 0x18), corner, "fundo da página ${pageIndex + 1}")
+                // O fundo é o `background` da paleta do app — o relatório usa a
+                // mesma família de cinzas da tela, não uma paralela.
+                assertEquals(Color(0x13, 0x10, 0x10), corner, "fundo da página ${pageIndex + 1}")
             }
         }
     }
