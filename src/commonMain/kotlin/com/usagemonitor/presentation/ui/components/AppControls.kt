@@ -41,6 +41,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -158,11 +160,12 @@ fun AppIconButton(
             .background(container.copy(alpha = container.alpha * alpha))
             .border(AppBorderWidth, colors.border.copy(alpha = colors.border.alpha * alpha), AppShapes.small)
             .hoverable(interactionSource, enabled = enabled)
-            .clickable(
-                enabled = enabled,
-                onClickLabel = contentDescription,
-                onClick = onClick
-            ),
+            .clickable(enabled = enabled, onClick = onClick)
+            // `contentDescription` na semântica, e não só `onClickLabel`: o
+            // rótulo do clique descreve a **ação** para o leitor de tela, mas
+            // não é o que `onNodeWithContentDescription` encontra — e é assim
+            // que as suítes localizam toda ação que virou ícone neste app.
+            .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center
     ) {
         CompositionLocalProvider(

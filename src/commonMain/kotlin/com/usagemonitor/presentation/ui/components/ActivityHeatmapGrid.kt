@@ -87,7 +87,10 @@ fun ActivityHeatmapGrid(
                     Box(
                         modifier = Modifier
                             .size(CELL_SIZE)
-                            .clip(AppShapes.small)
+                            // Raio 4 e não 6: a célula tem 14dp, e um raio de
+                            // botão numa célula desse tamanho a deixa quase
+                            // redonda — a grade deixa de ler como grade.
+                            .clip(AppShapes.extraSmall)
                             .background(cellColor(intensity, accent, emptyColor))
                     )
                 }
