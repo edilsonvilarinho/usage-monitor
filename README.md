@@ -50,8 +50,8 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Contagem regressiva de refresh persiste entre reinicios da app e avisa antes de um refresh manual.
 - Modais de Historico e Configuracoes voltam ao topo automaticamente ao reabrir, mesmo se ficaram atras de outra janela.
 - Scrollbar com contraste ajustado para o tema escuro.
-- Modal de Configuracoes em abas (Geral, Alertas, APIs, Contas, Time), uma
-  secao por vez em vez de uma coluna unica de cartoes empilhados.
+- Modal de Configuracoes com navegacao lateral (Geral, Alertas, APIs, Contas,
+  Time), uma secao por vez em vez de uma coluna unica de cartoes empilhados.
 - Opacidade da janela principal ajustavel entre 50% e 100% nas Configuracoes, com persistencia local.
 
 ## Screenshots
