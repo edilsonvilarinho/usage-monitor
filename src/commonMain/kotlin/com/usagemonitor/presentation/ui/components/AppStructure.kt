@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -327,6 +328,17 @@ fun AppDataRow(
             AppDivider()
         }
     }
+}
+
+/** A mesma divisória na vertical, para colunas lado a lado. */
+@Composable
+fun AppVerticalDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(AppBorderWidth)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
 }
 
 /** Divisória de 1dp na cor da borda. O único traço horizontal do sistema. */

@@ -82,14 +82,17 @@ fun AlertSettingsSection(
         ) {
             offered.forEach { percent ->
                 val isSelected = percent in selected
-                FilterChip(
+                // Chip de alternância: os limiares são escolha múltipla — 75 e 90
+                // podem estar ligados ao mesmo tempo —, então nem segmentado nem
+                // aba servem aqui.
+                AppToggleChip(
+                    label = "$percent%",
                     selected = isSelected,
                     enabled = settings.quotaAlertsEnabled,
                     onClick = {
                         val updated = if (isSelected) selected - percent else selected + percent
                         onSettingsChange(settings.copy(quotaPercents = updated.sorted()))
-                    },
-                    label = { Text("$percent%") }
+                    }
                 )
             }
         }
@@ -174,11 +177,11 @@ fun AlertSettingsSection(
         )
 
         if (settings.quotaPercents != DEFAULT_QUOTA_ALERT_PERCENTS) {
-            TextButton(
-                onClick = { onSettingsChange(settings.copy(quotaPercents = DEFAULT_QUOTA_ALERT_PERCENTS)) }
-            ) {
-                Text(if (isPt) "Voltar aos limiares padrão" else "Restore default thresholds")
-            }
+            AppButton(
+                label = if (isPt) "Voltar aos limiares padrão" else "Restore default thresholds",
+                onClick = { onSettingsChange(settings.copy(quotaPercents = DEFAULT_QUOTA_ALERT_PERCENTS)) },
+                tone = AppButtonTone.GHOST
+            )
         }
     }
 }
@@ -200,7 +203,7 @@ private fun AlertToggleRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f).padding(end = 8.dp)
         )
-        Switch(
+        AppSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             modifier = Modifier.testTag(testTag)
@@ -222,17 +225,21 @@ private fun HourStepper(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = 6.dp)
         )
-        TextButton(onClick = { onHourChange(wrapHour(hour - 1)) }) {
-            Text("−")
-        }
+        AppButton(
+            label = "−",
+            onClick = { onHourChange(wrapHour(hour - 1)) },
+            tone = AppButtonTone.GHOST
+        )
         Text(
             text = "${hour.toString().padStart(2, '0')}h",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
-        TextButton(onClick = { onHourChange(wrapHour(hour + 1)) }) {
-            Text("+")
-        }
+        AppButton(
+            label = "+",
+            onClick = { onHourChange(wrapHour(hour + 1)) },
+            tone = AppButtonTone.GHOST
+        )
     }
 }
 

@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -191,7 +192,9 @@ fun AppTextField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String? = null,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    /** A chave de time é mascarada até o usuário pedir para revelá-la. */
+    visualTransformation: VisualTransformation = VisualTransformation.None
 ) {
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     // A moldura entra por `decorationBox`, e o [modifier] do chamador fica no
@@ -208,6 +211,7 @@ fun AppTextField(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
         ),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        visualTransformation = visualTransformation,
         decorationBox = { innerTextField ->
             Box(
                 modifier = Modifier

@@ -12,7 +12,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fases A–G concluídas — as cinco telas de dados no vocabulário novo, pronto para a Fase H`
+**Estado atual:** `Fases A–H concluídas — as seis telas no vocabulário novo, pronto para a Fase I`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
@@ -34,22 +34,16 @@ e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b
 
 ### ▶ Próxima atividade
 
-**Fase H, commit H1** — âncoras de teste das Configurações, depois H2 (navegação lateral no lugar dos
-chips de aba), H3 (Geral, Alertas e APIs) e H4 (Contas e Time).
+**Fase I** — chrome das janelas: `DesktopWindowFrame.kt` (barra de título de 34dp, raio da janela na
+escala nova, `applyWindowShape` continuando a reagir a `componentResized`) e depois só constantes de
+tamanho em `Main.kt`.
 
-`SettingsTab` continua sem valor novo, cada aba mantém o próprio `ScrollState` começando no topo e
-só a aba escolhida entra na composição.
+Regra dura da fase: **nenhuma composable nova em `main()`** — o `OutOfMemoryError` no ASM está
+documentado no `gradle.properties`. Se o layout exigir estado novo ali, extrair antes, em commit
+próprio.
 
-Depois de H: **I** (chrome das janelas), **J** (marca), **K** (relatório PDF), **L** (capturas e
-documentação) e **M** (fechamento).
-
-**Armadilhas acumuladas, todas já pagas uma vez:**
-
-1. `weight` dentro de `FlowRow` não posiciona o filho (`isPlaced` falso).
-2. Ação que virou ícone precisa de `contentDescription` na semântica.
-3. `BasicTextField` mescla descendentes: placeholder sem `clearAndSetSemantics` entra no texto do
-   campo e duplica nós para o `onNodeWithText`.
-4. Tela mais alta obriga a subir a altura da **cena** do teste, nunca a do `Box` interno.
+Depois de I: **J** (marca), **K** (relatório PDF), **L** (capturas e documentação) e **M**
+(fechamento).
 
 ### Progresso por fase
 
@@ -62,7 +56,7 @@ documentação) e **M** (fechamento).
 | E — Histórico | `visual/e-history` | ✅ concluída | 4/4 | 2026-08-18 |
 | F — Sessões CLI | `visual/f-cli-sessions` | ✅ concluída | 4/5 | 2026-08-18 |
 | G — Time | `visual/g-team` | ✅ concluída | 2/5 | 2026-08-18 |
-| H — Configurações | `visual/h-settings` | ⬜ pendente | 0/4 | — |
+| H — Configurações | `visual/h-settings` | ✅ concluída | 1/4 | 2026-08-18 |
 | I — Chrome das janelas | `visual/i-window-chrome` | ⬜ pendente | 0/2 | — |
 | J — Marca | `visual/j-brand` | ⬜ pendente | 0/2 | — |
 | K — Relatório PDF | `visual/k-report` | ⬜ pendente | 0/2 | — |
@@ -77,6 +71,7 @@ Uma linha por commit, em ordem cronológica.
 
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
+| 2026-08-18 | H | `refactor(settings): replace the tab chips with side navigation and restyle the controls` | `allTests` — verde; capturas inspecionadas |
 | 2026-08-18 | G3–G5 | `refactor(team): restyle trend, presence and the keys admin screen` | `allTests` — verde; capturas inspecionadas |
 | 2026-08-18 | G2 | `refactor(team): render member usage as aligned rows` (inclui as âncoras do G1) | `ui.*` — verde |
 | 2026-08-18 | F5 | `refactor(cli-sessions): restyle the header, export and glossary surfaces` | `allTests` — verde; capturas inspecionadas |
@@ -136,6 +131,9 @@ motivo.
 | 2026-08-18 | O card minimizado mantém os **badges por cota**, em vez do resumo "68% · 41%" do protótipo | A forma do protótipo apaga o rótulo da cota e a tooltip por cota, que são dado e ação existentes. Os badges foram reestilizados (superfície neutra, borda, raio 6) em vez de removidos |
 | 2026-08-18 | `compactPercentageLabel` passou a **truncar** em vez de arredondar | Era o único lugar do app que arredondava: o arco fazia `toInt()` e os limiares da bandeja são piso. O mesmo card mostrava 26% na cota expandida e 27% no badge minimizado para o mesmo 12 de 45 |
 | 2026-08-18 | `colorFor(UsageRiskLevel)` passou a sair de `AppTone` | Os três literais (`0xFF4CAF50`, `0xFFFFC107`, `0xFFF44336`) nunca foram medidos contra as superfícies dos dois temas — o âmbar dava menos de 3:1 sobre a clara — e escapavam do `AppAccentsContrastTest` |
+| 2026-08-18 | A Fase H saiu **num commit só**, em vez dos quatro previstos | A navegação lateral e a conversão dos controles (campo com debounce, interruptores, botões, seletor de idioma) tocam os mesmos três arquivos nas mesmas regiões. Quatro commits se sobreporiam sem entregar quatro estados testáveis |
+| 2026-08-18 | O `modifier` do `DebouncedTextField` desce até o campo, e não fica na coluna | Ele traz a `testTag`, e a ação de digitar mora no campo: tag na coluna deixa `performTextInput` sem o `RequestFocus` que ele exige |
+| 2026-08-18 | A caixa de seleção de participação no time virou interruptor | A linha diz se a conta participa — estado ligado ou desligado, o mesmo que os outros controles da tela dizem, agora com o mesmo desenho |
 | 2026-08-18 | G3, G4 e G5 saíram **num commit só** | As três telas do time compartilham os mesmos componentes e a conversão dos `TextButton` foi uma passada única sobre os três arquivos. Separá-las daria três commits que se sobrepõem no mesmo trecho |
 | 2026-08-18 | `AppToggleChip` é primitiva nova, fora das dezessete previstas | O filtro "só conectados" é uma restrição ligada ou desligada. Segmentado de duas opções afirmaria uma escolha entre alternativas, e reusar `AppButton` perderia o `selectable` que o teste observa |
 | 2026-08-18 | O placeholder do `AppTextField` sai da árvore semântica | O `BasicTextField` mescla descendentes: um campo vazio passava a "conter" o texto de exemplo, e `onNodeWithText` do exemplo encontrava dois nós |

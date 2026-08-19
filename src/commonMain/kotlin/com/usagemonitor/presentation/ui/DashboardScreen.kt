@@ -53,6 +53,8 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.FooterBar
@@ -314,9 +316,11 @@ private fun NoApisEnabledContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Button(onClick = onOpenSettings) {
-                Text(actionLabel)
-            }
+            AppButton(
+                label = actionLabel,
+                onClick = onOpenSettings,
+                tone = AppButtonTone.PRIMARY
+            )
         }
     }
 }

@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Visibility
@@ -17,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextRange
@@ -24,6 +28,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import kotlinx.coroutines.delay
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 /** Pausa de digitação que caracteriza uma edição terminada. */
 const val DEFAULT_COMMIT_DEBOUNCE_MILLIS = 800L
@@ -186,30 +191,49 @@ private fun DebouncedTextFieldCore(
         }
     }
 
-    OutlinedTextField(
-        value = fieldValue,
-        onValueChange = { newValue -> fieldValue = newValue },
-        singleLine = true,
-        isError = errorMessage != null,
-        label = { Text(label) },
-        placeholder = if (placeholder != null) {
-            { Text(placeholder) }
-        } else {
-            null
-        },
-        supportingText = errorMessage?.let { message ->
-            {
-                Text(text = message, color = MaterialTheme.colorScheme.error)
+    // Rótulo em cima, campo embaixo, erro abaixo do campo — em vez do rótulo
+    // flutuante e do `supportingText` do Material. O rótulo que sobe por cima da
+    // borda precisa de 56dp de altura, e o campo deste app tem 28.
+    // O [modifier] do chamador desce até o campo, não fica na coluna: ele traz a
+    // `testTag`, e a ação de digitar mora no campo — tag na coluna deixa
+    // `performTextInput` sem o `RequestFocus` que ele exige.
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+        ) {
+            AppTextField(
+                value = fieldValue.text,
+                onValueChange = { text -> fieldValue = fieldValue.copy(text = text) },
+                placeholder = placeholder,
+                visualTransformation = visualTransformation,
+                modifier = modifier
+                    .weight(1f)
+                    .onFocusChanged { focusState ->
+                        if (!focusState.isFocused) {
+                            commit(fieldValue.text, revertWhenInvalid = true)
+                        }
+                    }
+            )
+            if (trailingIcon != null) {
+                trailingIcon()
             }
-        },
-        visualTransformation = visualTransformation,
-        trailingIcon = trailingIcon,
-        modifier = modifier
-            .fillMaxWidth()
-            .onFocusChanged { focusState ->
-                if (!focusState.isFocused) {
-                    commit(fieldValue.text, revertWhenInvalid = true)
-                }
-            }
-    )
+        }
+        val message = errorMessage
+        if (message != null) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+    }
 }

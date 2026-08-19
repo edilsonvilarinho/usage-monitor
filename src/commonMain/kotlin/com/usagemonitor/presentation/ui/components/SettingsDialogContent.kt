@@ -1,7 +1,9 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +15,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -29,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -45,6 +50,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +66,7 @@ import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
@@ -180,25 +188,25 @@ fun SettingsDialogContent(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Preso no topo fica só a fileira de abas: ela é o controle de
-            // navegação, e rolar o conteúdo não pode tirá-la da vista.
-            SettingsTabRow(
+        Row(modifier = Modifier.fillMaxSize()) {
+            // A navegação fica à esquerda e não rola: ela é o controle, e o
+            // conteúdo rolando não pode tirá-la da vista.
+            SettingsSideNav(
                 selected = selectedTab,
                 language = currentLanguage,
                 onSelect = { tab -> selectedTab = tab }
             )
+            AppVerticalDivider()
 
             // A barra de rolagem mora dentro da área rolável, e não sobre o
-            // diálogo inteiro: no topo ela não teria o que rolar e ficaria por
-            // cima das abas.
-            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            // diálogo inteiro: fora dela ficaria por cima da navegação.
+            Box(modifier = Modifier.fillMaxHeight().weight(1f)) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(AppSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
                 when (selectedTab) {
                     SettingsTab.GENERAL -> GeneralSettingsTab(
@@ -391,12 +399,16 @@ private fun AnthropicAccountsTab(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = onRescanAnthropicProfiles) {
-                    Text(if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan")
-                }
-                Button(onClick = onAddAnthropicProfile) {
-                    Text(if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add")
-                }
+                AppButton(
+                    label = if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan",
+                    onClick = onRescanAnthropicProfiles,
+                    tone = AppButtonTone.GHOST
+                )
+                AppButton(
+                    label = if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add",
+                    onClick = onAddAnthropicProfile,
+                    tone = AppButtonTone.PRIMARY
+                )
             }
 
             if (anthropicProfiles.isEmpty()) {
@@ -429,34 +441,83 @@ private fun AnthropicAccountsTab(
 }
 
 /**
- * Fileira de abas em `FilterChip`, que é como o app já desenha aba — os chips do
- * resumo por eixo e os do modal do time seguem o mesmo desenho. Um `TabRow` aqui
- * seria um segundo vocabulário visual para a mesma função.
+ * Navegação lateral das Configurações.
+ *
+ * Era uma fileira de chips presa no topo. Cinco chips numa janela estreita
+ * quebravam em duas linhas e empurravam o conteúdo para baixo; na lateral eles
+ * ocupam largura fixa e a lista cresce sem mexer no que está sendo lido.
+ *
+ * Continua sendo o **enum existente**: nenhuma seção nova, nenhum valor novo em
+ * `SettingsTab`, e a `testTag` de cada uma é a mesma.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SettingsTabRow(
+private fun SettingsSideNav(
     selected: SettingsTab,
     language: AppLanguage,
     onSelect: (SettingsTab) -> Unit
 ) {
-    FlowRow(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .width(SETTINGS_NAV_WIDTH)
+            .fillMaxHeight()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(AppSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
+        Text(
+            text = if (language == AppLanguage.PT) "Seções" else "Sections",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs)
+        )
         SettingsTab.entries.forEach { tab ->
-            FilterChip(
+            SettingsNavItem(
+                label = settingsTabLabel(tab, language),
                 selected = tab == selected,
                 onClick = { onSelect(tab) },
-                label = { Text(settingsTabLabel(tab, language)) },
                 modifier = Modifier.testTag(settingsTabTestTag(tab))
             )
         }
     }
 }
+
+@Composable
+private fun SettingsNavItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val container = if (selected) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        Color.Transparent
+    }
+    val content = if (selected) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(AppShapes.small)
+            .background(container)
+            .selectable(selected = selected, onClick = onClick)
+            .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = content,
+            maxLines = 1
+        )
+    }
+}
+
+/** Largura da coluna de navegação: cabe "Configurações" sem quebrar. */
+private val SETTINGS_NAV_WIDTH = 150.dp
 
 @Composable
 private fun SettingsSectionCard(
@@ -465,7 +526,8 @@ private fun SettingsSectionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.card)
     ) {
         Box(modifier = Modifier.padding(16.dp)) {
@@ -532,7 +594,7 @@ private fun AnthropicProfileRow(
                     color = statusColor,
                     modifier = Modifier.padding(end = 8.dp)
                 )
-                Switch(
+                AppSwitch(
                     checked = profile.enabled,
                     onCheckedChange = { checked -> onToggle(profile.id, checked) }
                 )
@@ -561,9 +623,11 @@ private fun AnthropicProfileRow(
                     color = statusColor
                 )
                 if (profile.removable) {
-                    TextButton(onClick = { onRemove(profile.id) }) {
-                        Text(if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor")
-                    }
+                    AppButton(
+                        label = if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor",
+                        onClick = { onRemove(profile.id) },
+                        tone = AppButtonTone.GHOST
+                    )
                 }
             }
         }
@@ -597,9 +661,12 @@ fun ThemeToggle(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(end = 8.dp)
         )
-        Switch(
+        // Sem callback próprio: quem alterna é a linha inteira, que já carrega o
+        // `toggleable` com `Role.Switch`. Um segundo alvo de clique aqui dentro
+        // daria dois caminhos para a mesma ação.
+        AppSwitch(
             checked = isDark,
-            onCheckedChange = null
+            onCheckedChange = { onToggle() }
         )
     }
 }
@@ -622,7 +689,7 @@ fun AutoStartToggle(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = 4.dp)
         )
-        Switch(
+        AppSwitch(
             checked = enabled,
             onCheckedChange = { onToggle(it) }
         )
@@ -647,7 +714,7 @@ fun AlwaysOnTopToggle(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = 4.dp)
         )
-        Switch(
+        AppSwitch(
             checked = enabled,
             onCheckedChange = { onToggle(it) }
         )
@@ -691,6 +758,14 @@ fun WindowOpacitySlider(
             // de 1 ponto percentual já vem do roundToInt e do valor Int devolvido pelo estado.
             steps = 0,
             enabled = enabled,
+            // Trilha na cor da superfície e polegar na cor do texto: o azul cheio
+            // do Material era o elemento mais forte da tela de Configurações, para
+            // ajustar transparência de janela.
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.onSurface,
+                activeTrackColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            ),
             modifier = Modifier.fillMaxWidth()
         )
         if (!enabled) {
@@ -746,28 +821,13 @@ fun LanguageSelector(
     onLanguageChange: (AppLanguage) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier) {
-        AppLanguage.entries.forEach { language ->
-            val isSelected = language == currentLanguage
-            TextButton(
-                onClick = { onLanguageChange(language) },
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (isSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-            ) {
-                Text(
-                    text = language.name,
-                    style = if (isSelected) {
-                        MaterialTheme.typography.labelLarge
-                    } else {
-                        MaterialTheme.typography.labelMedium
-                    }
-                )
-            }
-        }
-    }
+    // Segmentado: idioma é uma escolha entre alternativas mutuamente exclusivas,
+    // que é exatamente o que este controle diz. Dois botões de texto lado a lado
+    // deixavam a diferença entre escolhido e não escolhido só na cor.
+    AppSegmentedControl(
+        options = AppLanguage.entries.map { language -> AppSegment(label = language.name) },
+        selectedIndex = AppLanguage.entries.indexOf(currentLanguage),
+        onSelect = { index -> onLanguageChange(AppLanguage.entries[index]) },
+        modifier = modifier
+    )
 }
