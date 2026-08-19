@@ -1,6 +1,12 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppSegment
+import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppTab
+import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppBanner
+import com.usagemonitor.presentation.ui.components.AppBorderWidth
 import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
@@ -12,6 +18,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -305,21 +312,18 @@ private fun CliSessionsHeader(
 ) {
     DepthSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.large,
-        elevation = AppElevation.dialog,
-        contentPadding = 16.dp
+        contentPadding = AppSpacing.md
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (state.profileLabel != null) {
                 Text(
                     text = state.profileLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = CACHE_READ_COLOR,
-                    fontWeight = FontWeight.SemiBold
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             LiveBadge(language = language)
@@ -343,7 +347,7 @@ private fun CliSessionsHeader(
                 Text(
                     text = CliSessionsLabels.sessionCount(state.sessions.size, language),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 // O veredito por sessão está na linha, mas some da vista assim que
                 // a lista rola. Aqui ele responde de uma vez se há sessão pedindo
@@ -357,11 +361,13 @@ private fun CliSessionsHeader(
             }
 
             Column {
+                // Os quatro totais são o mesmo tipo de coisa e ficam na mesma
+                // cor. Um verde, um azul e um roxo lado a lado sugeriam três
+                // categorias onde há só quatro medidas da mesma janela.
                 Text(
                     text = formatQuantity(state.totalTokens),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = CACHE_READ_COLOR
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = CliSessionsLabels.columnTokens(language),
@@ -391,8 +397,7 @@ private fun CliSessionsHeader(
                         "${formatMicrosUsdShort(state.totalCostMicros)}+"
                     },
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = INPUT_COLOR
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = if (state.range == CliSessionRange.ALL) {
@@ -418,8 +423,7 @@ private fun CliSessionsHeader(
                     Text(
                         text = formatActiveTime(activeMillis),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = OUTPUT_COLOR
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = CliSessionsLabels.activeTime(language),
@@ -439,59 +443,61 @@ private fun CliSessionsHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            for (entry in CliSessionRange.entries) {
-                FilterChip(
-                    selected = state.range == entry,
-                    onClick = { onSelectRange(entry) },
-                    label = { Text(CliSessionsLabels.rangeLabel(entry, language)) }
-                )
-            }
+            AppSegmentedControl(
+                options = CliSessionRange.entries.map { entry ->
+                    AppSegment(label = CliSessionsLabels.rangeLabel(entry, language))
+                },
+                selectedIndex = CliSessionRange.entries.indexOf(state.range),
+                onSelect = { index -> onSelectRange(CliSessionRange.entries[index]) }
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         // Abas depois dos chips de janela: a janela vale para as duas leituras,
         // então trocá-la é a escolha de fora e a aba é a de dentro.
-        FlowRow(
+        //
+        // `Row` e não `FlowRow`: as abas levam `weight` para empurrar os botões
+        // de exportação para a direita, e peso dentro de um `FlowRow` fica sem
+        // referência de largura.
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            FilterChip(
-                selected = state.view == CliSessionsView.SESSIONS,
-                onClick = { onSelectView(CliSessionsView.SESSIONS) },
-                label = { Text(BreakdownLabels.tabSessions(language)) },
-                modifier = Modifier.testTag(TAB_SESSIONS_TAG)
-            )
-            FilterChip(
-                selected = state.view == CliSessionsView.BREAKDOWN,
-                onClick = { onSelectView(CliSessionsView.BREAKDOWN) },
-                label = { Text(BreakdownLabels.tabBreakdown(language)) },
-                modifier = Modifier.testTag(TAB_BREAKDOWN_TAG)
+            AppTabs(
+                tabs = listOf(
+                    AppTab(label = BreakdownLabels.tabSessions(language), testTag = TAB_SESSIONS_TAG),
+                    AppTab(label = BreakdownLabels.tabBreakdown(language), testTag = TAB_BREAKDOWN_TAG)
+                ),
+                selectedIndex = if (state.view == CliSessionsView.BREAKDOWN) 1 else 0,
+                onSelect = { index ->
+                    onSelectView(
+                        if (index == 1) CliSessionsView.BREAKDOWN else CliSessionsView.SESSIONS
+                    )
+                },
+                modifier = Modifier.weight(1f)
             )
 
             // A exportação segue a aba aberta e a janela escolhida: exportar um
             // recorte diferente do que está na tela seria surpresa.
-            TextButton(
+            AppButton(
+                label = ExportLabels.exportCsv(language),
                 onClick = { onExport(UsageExportFormat.CSV) },
                 modifier = Modifier.testTag(EXPORT_CSV_TAG)
-            ) {
-                Text(ExportLabels.exportCsv(language))
-            }
-            TextButton(
+            )
+            AppButton(
+                label = ExportLabels.exportJson(language),
                 onClick = { onExport(UsageExportFormat.JSON) },
                 modifier = Modifier.testTag(EXPORT_JSON_TAG)
-            ) {
-                Text(ExportLabels.exportJson(language))
-            }
+            )
             // O relatório não segue a aba: ele é o recorte inteiro da janela, com
             // sessões e resumo juntos. Seguir a aba daria dois PDFs pela metade.
-            TextButton(
+            AppButton(
+                label = ExportLabels.exportPdf(language),
                 onClick = onExportReport,
                 modifier = Modifier.testTag(EXPORT_PDF_TAG)
-            ) {
-                Text(ExportLabels.exportPdf(language))
-            }
+            )
         }
 
         val exportOutcome = state.exportOutcome
@@ -1450,14 +1456,13 @@ internal fun HelpDot(terms: List<GlossaryTerm>, language: AppLanguage) {
         Box(
             modifier = Modifier
                 .size(14.dp)
-                .clip(AppShapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(AppShapes.extraSmall)
+                .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.extraSmall),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "?",
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -1476,46 +1481,45 @@ internal fun GlossaryPanel(
     language: AppLanguage,
     onToggle: () -> Unit
 ) {
-    DepthSurface(
+    AppDataSurfaceFlush(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
-        contentPadding = 14.dp
+        header = {
+            AppSectionHeader(
+                title = CliSessionsLabels.glossaryTitle(language),
+                trailing = {
+                    Text(
+                        text = if (expanded) "▾" else "▸",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+        }
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (expanded) "▾" else "▸",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = CliSessionsLabels.glossaryTitle(language),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
         if (!expanded) {
-            return@DepthSurface
+            return@AppDataSurfaceFlush
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
+        // Cada termo é uma linha do painel: título em mono, explicação em sans.
+        // O glossário é o único lugar da tela com texto de duas ou três linhas
+        // seguidas, e monoespaçada em texto corrido é ~8% mais larga e mais
+        // lenta de ler.
         for (term in CliSessionsGlossary.readingOrder) {
             val entry = CliSessionsGlossary.entry(term, language)
-            Text(
-                text = entry.title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = entry.explanation,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+            AppDataRow(showDivider = term != CliSessionsGlossary.readingOrder.last()) {
+                Column {
+                    Text(
+                        text = entry.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = entry.explanation,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
@@ -1530,18 +1534,16 @@ internal fun MeterBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(height)
-            .clip(AppShapes.small)
+            .clip(AppShapes.extraSmall)
             .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
+        // Cor chapada: o gradiente horizontal fazia a barra parecer mais curta
+        // do lado esquerdo, onde ela justamente começa.
         Box(
             modifier = Modifier
                 .fillMaxWidth(fraction.coerceIn(0.0, 1.0).toFloat())
                 .fillMaxHeight()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(color.copy(alpha = 0.7f), color)
-                    )
-                )
+                .background(color)
         )
     }
 }
