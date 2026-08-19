@@ -63,6 +63,8 @@ import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
+import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
@@ -1359,7 +1361,98 @@ class ComponentTest {
         viewModel.onDestroy()
     }
 
+    /**
+     * Issue #70: no modo somente cards a barra de estado sai da janela, e com
+     * ela a versão, a contagem regressiva e as quatro ações do rodapé.
+     */
+    @Test
+    fun `DashboardScreen hides the footer in cards only mode`() = runDesktopComposeUiTest {
+        val enabledApis = MutableStateFlow(emptySet<ApiSource>())
+        val viewModel = emptyDashboardViewModel(enabledApis)
+        viewModel.cancelCountdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = { _, _ -> },
+                    onOpenSettings = {},
+                    showFooter = false,
+                    countdownUpdatesEnabled = false
+                )
+            }
+        }
+
+        onNodeWithTag(FOOTER_VERSION_TEST_TAG, useUnmergedTree = true).assertDoesNotExist()
+        onAllNodesWithContentDescription("Abrir configurações").assertCountEquals(0)
+        onAllNodesWithContentDescription("Atualizar agora").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `DashboardScreen keeps the footer by default`() = runDesktopComposeUiTest {
+        val enabledApis = MutableStateFlow(emptySet<ApiSource>())
+        val viewModel = emptyDashboardViewModel(enabledApis)
+        viewModel.cancelCountdown()
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = { _, _ -> },
+                    onOpenSettings = {},
+                    countdownUpdatesEnabled = false
+                )
+            }
+        }
+
+        onNodeWithTag(FOOTER_VERSION_TEST_TAG, useUnmergedTree = true).assertIsDisplayed()
+        viewModel.onDestroy()
+    }
+
     // ── SettingsDialogContent ───────────────────────────────────────────
+
+    /**
+     * Issue #70: o interruptor que esconde a moldura da janela mora ao lado de
+     * "manter sempre visível" — as duas são propriedades da moldura.
+     */
+    @Test
+    fun `SettingsDialogContent emits the cards only mode change`() = runDesktopComposeUiTest {
+        var enabled: Boolean? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = ThemeMode.DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    cardsOnlyMode = false,
+                    onCardsOnlyModeChange = { value -> enabled = value },
+                    onThemeToggle = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        onNodeWithTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG).performClick()
+
+        assertEquals(true, enabled)
+    }
 
     @Test
     fun `SettingsDialogContent displays localized controls in EN`() = runDesktopComposeUiTest {

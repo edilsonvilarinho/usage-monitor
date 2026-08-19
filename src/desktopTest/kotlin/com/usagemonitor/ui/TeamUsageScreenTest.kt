@@ -1109,8 +1109,11 @@ class TeamUsageScreenTest {
                 width = 960.dp
             )
 
+            // 62 e não 57: a faixa ganhou a palavra "Conta" acima do e-mail
+            // (issue #69). Cinco dp é o preço de dizer o que a linha é; o assert
+            // continua existindo para ela não voltar a crescer sem motivo.
             onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
-                .assertHeightIsEqualTo(57.dp)
+                .assertHeightIsEqualTo(62.dp)
             onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
                 .assertHeightIsEqualTo(88.dp)
         }
@@ -1149,6 +1152,26 @@ class TeamUsageScreenTest {
             // Conta sem chave emitida não fica sem identificação na tela.
             onNodeWithText("Conta sem chave").assertIsDisplayed()
         }
+
+    /**
+     * Issue #69: a faixa entregava um e-mail e um uuid sem dizer o que eles
+     * eram, e ao lado de uma linha de integrante — que também tem nome e
+     * identificador — as duas liam igual.
+     */
+    @Test
+    fun `a faixa da conta se anuncia como conta`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = twoAccountMembers(),
+                isAdminOverview = true
+            ),
+            width = 1_200.dp
+        )
+
+        onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
+            .assertIsDisplayed()
+            .assertTextContains("Conta")
+    }
 
     /**
      * Issue #45: sem o totalizador, comparar duas contas exige somar as linhas

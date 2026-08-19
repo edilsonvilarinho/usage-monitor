@@ -189,6 +189,22 @@ motivo.
 | `.icns` não verificável em Windows — só no job `build-macos` do release | J2 | ⚠ risco aceito |
 | Embutir Plex no PDFBox recalcula `getStringWidth` de todas as colunas | K1 | ⚠ risco conhecido, commit isolado |
 
+### Ajustes posteriores ao fechamento
+
+A iniciativa está fechada; o sistema visual, não. O que muda a aparência depois do merge entra
+aqui, com o motivo — e **o protótipo muda junto**, ou a regra "divergência entre o Compose e o
+protótipo é defeito do Compose" fica sem árbitro.
+
+| Data | Origem | O que mudou | Por quê |
+|---|---|---|---|
+| 2026-08-19 | issue #71 | Dashboard passa a usar o corpo denso: padding `--s3`/`--s2` no lugar de `--s4`, e o vão da grade cai de 16 para 12dp (`AppSpacing.md`). | É a janela que o usuário deixa estreita ao lado do editor. Com 16dp de margem mais 16dp entre cards, a largura que sobrava não bastava para as cotas caberem numa linha. **O vão de 12 já era o do protótipo** (`.g2 { gap: var(--s3) }`) — era o Compose que usava 16. As demais janelas continuam em `--s4`. |
+| 2026-08-19 | issue #70 | Modo somente cards: `DesktopWindowFrame(compact = true)` tira a barra de título do fluxo e `DashboardScreen(showFooter = false)` tira o rodapé. A moldura volta como faixa sobreposta enquanto o ponteiro está nos 34dp do topo. | A janela tinha 64dp verticais de cromo permanente para mostrar dois cards. A faixa **só é composta durante o hover**: ela carrega a `WindowDraggableArea`, que usa arrasto imediato, e o card usa arrasto depois de pressão longa — presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível. Três saídas (faixa, bandeja, `Ctrl+Shift+M`) porque o modo esconde o botão de fechar. |
+| 2026-08-19 | issue #69 | Lista do time: some o vão de 8dp entre itens (cada linha já traz divisória), a faixa da conta ganha `surfaceVariant`, marcador de 2dp, a palavra "Conta" e divisória, e o bloco de sessões ganha `surface` além do recuo. | Conta, integrante e sessão eram três retângulos de mesmo peso empilhados sobre o mesmo fundo. O protótipo já resolvia isso com `.row` sem vão e bloco aninhado com fundo próprio; o Compose é que tinha divergido. **Correção no próprio protótipo:** o bloco aninhado era `--raised`, que é o realce de `.row:hover` — com ele ali, passar o mouse numa sessão deixava de dar retorno. Passou a `--bg` lá e a `--surface` no Compose — a regra é **um degrau de distância do fundo da lista**, na direção que houver —, e `--raised` ficou reservado à faixa da conta e ao hover. |
+
+Uma decisão de ordenação entrou junto, e ela não é visual: as contas da visão global passaram a sair
+em ordem alfabética pelo e-mail, com o consumo ordenando dentro de cada uma. Ordenar as contas por
+consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s.
+
 ---
 
 ## Protocolo de retomada de sessão

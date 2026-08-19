@@ -78,6 +78,9 @@ const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 /** Mesma razão da tag de opacidade: "115%" também é rótulo de chip no cartão de alertas. */
 const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 
+/** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
+const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
+
 /**
  * Seções das Configurações, uma por aba.
  *
@@ -121,6 +124,7 @@ fun SettingsDialogContent(
     enabledApis: Set<ApiSource>,
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean = false,
+    cardsOnlyMode: Boolean = false,
     windowOpacityPercent: Int = MAX_WINDOW_OPACITY_PERCENT,
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
@@ -129,6 +133,8 @@ fun SettingsDialogContent(
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit = {},
+    /** Default vazio para não arrastar os geradores de captura e os testes de componente. */
+    onCardsOnlyModeChange: (Boolean) -> Unit = {},
     onWindowOpacityChange: (Int) -> Unit = {},
     alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT,
     onAlertSettingsChange: (UsageAlertSettings) -> Unit = {},
@@ -223,6 +229,7 @@ fun SettingsDialogContent(
                         currentLanguage = currentLanguage,
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
+                        cardsOnlyMode = cardsOnlyMode,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacityEnabled,
                         uiScalePercent = uiScalePercent,
@@ -230,6 +237,7 @@ fun SettingsDialogContent(
                         onLanguageChange = onLanguageChange,
                         onAutoStartChange = onAutoStartChange,
                         onAlwaysOnTopChange = onAlwaysOnTopChange,
+                        onCardsOnlyModeChange = onCardsOnlyModeChange,
                         onWindowOpacityChange = onWindowOpacityChange,
                         onUiScaleChange = onUiScaleChange
                     )
@@ -306,6 +314,7 @@ private fun GeneralSettingsTab(
     currentLanguage: AppLanguage,
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean,
+    cardsOnlyMode: Boolean,
     windowOpacityPercent: Int,
     windowOpacityEnabled: Boolean,
     uiScalePercent: Int,
@@ -313,6 +322,7 @@ private fun GeneralSettingsTab(
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit,
+    onCardsOnlyModeChange: (Boolean) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit
 ) {
@@ -334,6 +344,14 @@ private fun GeneralSettingsTab(
                 enabled = alwaysOnTopEnabled,
                 language = currentLanguage,
                 onToggle = onAlwaysOnTopChange
+            )
+
+            // Ao lado de "manter sempre visível": as duas são propriedades da
+            // moldura da janela, não do conteúdo dela.
+            CardsOnlyModeToggle(
+                enabled = cardsOnlyMode,
+                language = currentLanguage,
+                onToggle = onCardsOnlyModeChange
             )
 
             WindowOpacitySlider(
@@ -736,6 +754,50 @@ fun AlwaysOnTopToggle(
         AppSwitch(
             checked = enabled,
             onCheckedChange = { onToggle(it) }
+        )
+    }
+}
+
+/**
+ * Modo "somente os cards": esconde a barra de título e o rodapé da janela.
+ *
+ * O texto de apoio não é decoração. Ligado, o modo tira da tela o botão de
+ * fechar e a engrenagem das configurações, e quem não souber como voltar fica
+ * com um app que não consegue desligar — as três saídas têm de estar escritas
+ * onde o interruptor é acionado.
+ */
+@Composable
+fun CardsOnlyModeToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isPt = language == AppLanguage.PT
+    val label = if (isPt) "Somente os cards" else "Cards only"
+    val hint = if (isPt) {
+        "Esconde a barra de título e o rodapé. Para voltar: Ctrl+Shift+M, o ícone na bandeja ou a faixa que aparece ao passar o mouse no topo da janela."
+    } else {
+        "Hides the title bar and the footer. To return: Ctrl+Shift+M, the tray icon, or the strip that appears when hovering the top of the window."
+    }
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+            AppSwitch(
+                checked = enabled,
+                onCheckedChange = { onToggle(it) },
+                modifier = Modifier.testTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG)
+            )
+        }
+        Text(
+            text = hint,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

@@ -31,12 +31,18 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CardGridSlot
 import com.usagemonitor.presentation.ui.resolveDropTargetIndex
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 // Threshold de largura (em dp) acima do qual o grid alterna de 1 para 2 colunas.
 private val CompactColumnsThreshold = 720.dp
 
 // Espaçamento horizontal e vertical entre os cards.
-private val CardSpacing = 16.dp
+//
+// 12 e não 16: o vão largo vinha do card com sombra, que precisava de ar em volta
+// para a sombra não encostar na do vizinho. Sem sombra quem separa é a borda de
+// 1dp, e 16dp entre dois cards numa janela estreita é largura que falta dentro
+// deles.
+private val CardSpacing = AppSpacing.md
 
 /**
  * Grid responsivo de cards de uso de API.

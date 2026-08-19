@@ -41,6 +41,8 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -56,6 +58,9 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 // `applyWindowShape` continua reagindo a `componentResized`, senão a máscara
 // ficaria com o tamanho da janela anterior depois de qualquer redimensionamento.
 private val WindowCornerRadius = 10.dp
+
+/** Descrição semântica do botão que devolve a moldura completa da janela. */
+internal const val COMPACT_EXIT_DESCRIPTION = "Sair do modo somente cards"
 
 /** Altura da barra de título das seis janelas. */
 private val TITLE_BAR_HEIGHT = 34.dp
@@ -77,6 +82,13 @@ fun WindowScope.DesktopWindowFrame(
     iconPainter: Painter?,
     windowState: WindowState,
     onCloseRequest: () -> Unit,
+    /**
+     * Modo somente cards: a barra de título sai do fluxo e vira uma faixa
+     * revelada ao passar o mouse no topo da janela.
+     */
+    compact: Boolean = false,
+    /** Volta ao modo normal; `null` esconde o botão correspondente na faixa. */
+    onExitCompact: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
@@ -103,12 +115,14 @@ fun WindowScope.DesktopWindowFrame(
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            DesktopTitleBar(
-                title = title,
-                iconPainter = iconPainter,
-                windowState = windowState,
-                onCloseRequest = onCloseRequest
-            )
+            if (!compact) {
+                DesktopTitleBar(
+                    title = title,
+                    iconPainter = iconPainter,
+                    windowState = windowState,
+                    onCloseRequest = onCloseRequest
+                )
+            }
 
             Box(
                 modifier = Modifier
@@ -116,7 +130,73 @@ fun WindowScope.DesktopWindowFrame(
                     .background(MaterialTheme.colorScheme.background)
             ) {
                 content()
+
+                if (compact) {
+                    CompactTitleBarOverlay(
+                        title = title,
+                        iconPainter = iconPainter,
+                        windowState = windowState,
+                        onCloseRequest = onCloseRequest,
+                        onExitCompact = onExitCompact,
+                        modifier = Modifier.align(Alignment.TopStart)
+                    )
+                }
             }
+        }
+    }
+}
+
+/**
+ * A barra de título do modo somente cards: existe só enquanto o mouse está nela.
+ *
+ * **Sobreposta, e não linha da `Column`.** Entrando no fluxo, revelar a barra
+ * empurraria os cards para baixo a cada passagem do mouse pelo topo.
+ *
+ * **Só é composta quando o ponteiro está dentro.** A `WindowDraggableArea` que ela
+ * carrega usa arrasto imediato, e o card usa arrasto **depois de pressão longa**:
+ * com a faixa sempre presente, o arrasto da janela venceria a pressão longa e
+ * reordenar o primeiro card ficaria impossível na faixa superior. Fora do hover
+ * não há área de arrasto nenhuma; dentro dela, mover a janela é o que se espera.
+ *
+ * A transição é única, não um laço: animação infinita trava o `waitForIdle`.
+ */
+@Composable
+private fun WindowScope.CompactTitleBarOverlay(
+    title: String,
+    iconPainter: Painter?,
+    windowState: WindowState,
+    onCloseRequest: () -> Unit,
+    onExitCompact: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
+    val revealAlpha by animateFloatAsState(
+        targetValue = if (isHovered) 1f else 0f,
+        animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.enterEasing),
+        label = "compactTitleBarAlpha"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(TITLE_BAR_HEIGHT)
+            .hoverable(hoverInteraction)
+    ) {
+        // Invisível não pode continuar clicável: um botão de fechar transparente
+        // no canto superior direito é pior que botão nenhum.
+        if (revealAlpha <= 0.01f) {
+            return@Box
+        }
+
+        Column(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = revealAlpha }) {
+            DesktopTitleBar(
+                title = title,
+                iconPainter = iconPainter,
+                windowState = windowState,
+                onCloseRequest = onCloseRequest,
+                onExitCompact = onExitCompact
+            )
         }
     }
 }
@@ -201,7 +281,9 @@ private fun WindowScope.DesktopTitleBar(
     title: String,
     iconPainter: Painter?,
     windowState: WindowState,
-    onCloseRequest: () -> Unit
+    onCloseRequest: () -> Unit,
+    /** Presente só na faixa do modo somente cards. */
+    onExitCompact: (() -> Unit)? = null
 ) {
     WindowDraggableArea {
         Row(
@@ -240,6 +322,13 @@ private fun WindowScope.DesktopTitleBar(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (onExitCompact != null) {
+                    TitleBarButton(
+                        label = "▣",
+                        description = COMPACT_EXIT_DESCRIPTION,
+                        onClick = onExitCompact
+                    )
+                }
                 TitleBarButton(
                     label = "—",
                     onClick = { windowState.isMinimized = true }
@@ -340,6 +429,13 @@ private fun TitleBarButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Descrição semântica de ações cujo glifo não se explica.
+     *
+     * Minimizar, maximizar e fechar são o vocabulário de janela que todo sistema
+     * desenha igual; o quadrado do modo somente cards, não.
+     */
+    description: String? = null,
     hoverColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
 ) {
     val defaultColor = Color.Transparent
@@ -357,7 +453,14 @@ private fun TitleBarButton(
             .clip(AppShapes.extraSmall)
             .background(if (isHovered) hoverColor else defaultColor)
             .hoverable(hoverInteraction)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .then(
+                if (description == null) {
+                    Modifier
+                } else {
+                    Modifier.semantics { contentDescription = description }
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(

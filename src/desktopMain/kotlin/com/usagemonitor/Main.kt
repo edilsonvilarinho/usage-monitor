@@ -13,6 +13,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.WindowPlacement
@@ -815,6 +821,14 @@ fun main() = application {
         }
     }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
+    // Modo somente cards: sem barra de título e sem rodapé. Booleano grava direto,
+    // sem o coletor com debounce que a opacidade e a escala precisam — não há
+    // slider aqui, e um clique não vira uma gravação por pixel.
+    var cardsOnlyMode by remember { mutableStateOf(readPersistedCardsOnlyMode(settings)) }
+    val setCardsOnlyMode: (Boolean) -> Unit = { enabled ->
+        cardsOnlyMode = enabled
+        persistCardsOnlyMode(settings, enabled)
+    }
     val windowOpacitySupported = remember { isWindowOpacitySupported() }
     var windowOpacityPercent by remember { mutableStateOf(readPersistedWindowOpacityPercent(settings)) }
     var opacitySaveGeneration by remember { mutableStateOf(0) }
@@ -1098,6 +1112,24 @@ fun main() = application {
                     text = if (language == AppLanguage.PT) "Atualizar agora" else "Refresh now",
                     onClick = { viewModel.refresh() }
                 )
+                // As duas entram por causa do modo somente cards: com o rodapé
+                // escondido, a engrenagem e a volta ao modo normal não existem em
+                // lugar nenhum da janela até o mouse passar pelo topo dela.
+                Item(
+                    text = if (language == AppLanguage.PT) "Configurações" else "Settings",
+                    onClick = {
+                        isSettingsDialogOpen = true
+                        settingsOpenGeneration++
+                    }
+                )
+                Item(
+                    text = if (cardsOnlyMode) {
+                        if (language == AppLanguage.PT) "Sair do modo somente cards" else "Exit cards only mode"
+                    } else {
+                        if (language == AppLanguage.PT) "Somente os cards" else "Cards only"
+                    },
+                    onClick = { setCardsOnlyMode(!cardsOnlyMode) }
+                )
                 Separator()
                 Item(
                     text = if (language == AppLanguage.PT) "Sair" else "Quit",
@@ -1130,7 +1162,21 @@ fun main() = application {
         icon = iconImage,
         state = mainWindowState,
         undecorated = true,
-        alwaysOnTop = alwaysOnTopEnabled
+        alwaysOnTop = alwaysOnTopEnabled,
+        // Terceira saída do modo somente cards, ao lado da bandeja e da faixa de
+        // hover. Um modo que esconde o botão de fechar precisa de mais de um
+        // caminho de volta, e o teclado é o único que funciona com a janela
+        // coberta por outra.
+        onKeyEvent = { event ->
+            val isToggle = event.type == KeyEventType.KeyDown &&
+                event.isCtrlPressed &&
+                event.isShiftPressed &&
+                event.key == Key.M
+            if (isToggle) {
+                setCardsOnlyMode(!cardsOnlyMode)
+            }
+            isToggle
+        }
     ) {
         LaunchedEffect(window) {
             mainWindowRef = window
@@ -1145,7 +1191,9 @@ fun main() = application {
                 windowState = mainWindowState,
                 onCloseRequest = {
                     shutdownApplication()
-                }
+                },
+                compact = cardsOnlyMode,
+                onExitCompact = { setCardsOnlyMode(false) }
             ) {
                 DashboardScreen(
                     viewModel = viewModel,
@@ -1280,7 +1328,8 @@ fun main() = application {
                         emptySet()
                     },
                     cliSessionPulses = cliSessionPulses,
-                    teamSessionPulses = teamSessionPulses
+                    teamSessionPulses = teamSessionPulses,
+                    showFooter = !cardsOnlyMode
                 )
             }
         }
@@ -1495,6 +1544,7 @@ fun main() = application {
                         enabledApis = enabledApisState,
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
+                        cardsOnlyMode = cardsOnlyMode,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacitySupported,
                         uiScalePercent = uiScalePercent,
@@ -1531,6 +1581,10 @@ fun main() = application {
                             alwaysOnTopEnabled = enabled
                             settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
                             showSettingsToast(SettingsToast.Saved(SettingsField.ALWAYS_ON_TOP))
+                        },
+                        onCardsOnlyModeChange = { enabled ->
+                            setCardsOnlyMode(enabled)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
                         },
                         onWindowOpacityChange = { percent ->
                             // Aviso não sai daqui: quem persiste é o coletor com

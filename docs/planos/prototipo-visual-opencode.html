@@ -575,6 +575,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
 <!-- ═══════════════════════════════ DASHBOARD ═════════════════════════ -->
 <h2 id="dashboard">4 · Dashboard</h2>
 <p class="lede">Cada cota vira uma <b>linha compacta</b>: rótulo, valor, percentual, barra e reinício. O card deixa de ser um bloco colorido e passa a ser um painel neutro identificado por um marcador de 2px e pelo nome.</p>
+<p class="note"><b>Corpo denso (<code>--s3</code> de padding, <code>--s2</code> de vão), não o padrão de <code>--s4</code>.</b> Esta é a janela que o usuário deixa estreita ao lado do editor: com 16px de margem externa mais 16px entre os cards, a largura que sobrava não era suficiente para as cotas caberem numa linha só. As demais janelas continuam em <code>--s4</code> — elas abrem largas. O vão da grade já era <code>--s3</code> aqui; era o Compose que usava 16.</p>
 
 <div class="win">
   <div class="titlebar">
@@ -582,7 +583,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <span class="t">Usage Monitor</span>
     <span class="wbtn">–</span><span class="wbtn">□</span><span class="wbtn close">×</span>
   </div>
-  <div class="body">
+  <div class="body tight">
     <div class="g2">
 
       <!-- Anthropic padrão -->
@@ -711,6 +712,19 @@ table.dt td.num, table.dt th.num { text-align: right; }
   </div>
 </div>
 <p class="note">O rodapé vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e configurações. Preservados: múltiplos perfis Anthropic, as seis integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
+
+<h3>Modo somente cards</h3>
+<p class="lede">A mesma janela sem barra de título e sem rodapé: o app fica do tamanho do que ele informa. A moldura não some para sempre — ela volta como faixa sobreposta enquanto o mouse está nos 34px do topo.</p>
+
+<div class="win narrow">
+  <div class="body tight">
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · Padrão</span></div>
+    <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">0%</span></div><div class="track ok"><i style="width:0%"></i></div></div></div></div></div>
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · INFORMATA</span></div>
+    <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 7d</span><span class="sp"></span><span class="v">8%</span></div><div class="track ok"><i style="width:8%"></i></div></div></div></div></div>
+  </div>
+</div>
+<p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
 
 <h2 id="dash-estados">4b · Dashboard — os estados que o card precisa cobrir</h2>
 <div class="g2">
@@ -1046,6 +1060,14 @@ table.dt td.num, table.dt th.num { text-align: right; }
     </div>
 
     <div class="panel"><div class="pbody flush">
+      <div class="row" style="background:var(--raised)">
+        <span class="srcmark" style="background:var(--cread)"></span>
+        <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
+        <div class="stack" style="gap:0;min-width:150px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <span class="sp"></span>
+        <span class="v sm">3 integrantes</span><span class="v sm">8,97 M</span>
+        <span class="v sm">US$ 14,2092</span><span class="v sm">100%</span>
+      </div>
       <div class="row">
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
@@ -1055,7 +1077,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
         <span class="v sm">2 sessões</span><span class="v sm">6,32 M</span>
         <span class="v sm">US$ 9,0892</span><span class="v sm">3h 19min</span>
       </div>
-      <div class="row" style="padding-left:44px;background:var(--raised)">
+      <div class="row" style="padding-left:44px;background:var(--bg)">
         <div class="scroller" style="flex:1"><table class="dt">
           <thead><tr><th>Sessão</th><th>Projeto</th><th>Branch</th><th>Modelo</th><th class="num">Turnos</th><th class="num">Tokens</th><th class="num">Custo</th><th class="num">Tempo ativo</th></tr></thead>
           <tbody>
@@ -1086,6 +1108,8 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <div class="statusbar"><span class="st ok">AO VIVO · 5s</span><span class="sp"></span><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
   </div>
 </div>
+<p class="note"><b>Um degrau de superfície por nível, e <code>--raised</code> fica reservado ao hover.</b> A faixa da conta é o único nível que o usa como fundo fixo; o bloco de sessões fica <b>um degrau de distância do fundo da lista</b>, na direção que houver — aqui a lista mora num <code>.panel</code> em <code>--surface</code> e o bloco desce para <code>--bg</code>; no Compose a lista mora sobre <code>--bg</code> e o bloco sobe para <code>--surface</code>. O bloco aninhado era <code>--raised</code> nesta página e isso estava tecnicamente errado: <code>--raised</code> é o realce de <code>.row:hover</code>, e com ele no bloco passar o mouse numa sessão deixava de dar retorno nenhum. A faixa só aparece na visão de todas as contas — no modal de uma conta ela seria repetição do título da janela.</p>
+<p class="note"><b>A ordem das contas é alfabética pelo e-mail</b>, e o consumo ordena de novo dentro de cada uma. Ordenar as contas por consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s. Conta sem chave emitida vai para o fim: sem e-mail não há o que comparar, e abrir a lista com um uuid cru seria pior que fechá-la com ele.</p>
 
 <h2 id="tendencia">9b · Tendência do time</h2>
 <div class="win mid" style="max-width:none">

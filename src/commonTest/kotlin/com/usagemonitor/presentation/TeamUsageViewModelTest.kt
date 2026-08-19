@@ -465,6 +465,88 @@ class TeamUsageViewModelTest {
         viewModel.onDestroy()
     }
 
+    /**
+     * Issue #69: a conta que mais gastou abria a lista, e como o consumo muda a
+     * cada tique do laço ao vivo, a mesma conta subia e descia entre duas
+     * leituras. Procurar uma pessoa exigia varrer a tela inteira.
+     */
+    @Test
+    fun `a visao global ordena as contas por e-mail`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                // A conta que mais gastou é a última do alfabeto: com a ordem por
+                // consumo ela abria a lista.
+                accountWith(
+                    "acc-z",
+                    "zulmira@empresa.com",
+                    member("device-z1", "zeca", listOf(session("s1", tokens = 900L))),
+                    member("device-z2", "zilda", listOf(session("s2", tokens = 100L)))
+                ),
+                accountWith(
+                    "acc-a",
+                    "ana@empresa.com",
+                    member("device-a1", "andre", listOf(session("s3", tokens = 10L))),
+                    member("device-a2", "alice", listOf(session("s4", tokens = 50L)))
+                ),
+                // Conta sem chave emitida: vai para o fim mesmo sendo a que mais
+                // consumiu. Abrir a lista com um uuid cru seria pior.
+                accountWith(
+                    "acc-sem-rotulo",
+                    null,
+                    member("device-x", "xisto", listOf(session("s5", tokens = 5_000L)))
+                )
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(
+            listOf("ana@empresa.com", "zulmira@empresa.com", null),
+            state.memberGroups.map { group -> group.accountLabel }
+        )
+        // Dentro da conta continua sendo quem mais consumiu primeiro: é a
+        // pergunta que esta tela responde.
+        assertEquals(listOf("alice", "andre"), state.memberGroups[0].members.map { it.alias })
+        assertEquals(listOf("zeca", "zilda"), state.memberGroups[1].members.map { it.alias })
+        viewModel.onDestroy()
+    }
+
+    /**
+     * Ordem total: duas leituras iguais têm de dar listas iguais, ou o
+     * `StateFlow` reemite e a tela recompõe a cada tique de 5s.
+     */
+    @Test
+    fun `a ordem das contas nao muda entre dois tiques do laco ao vivo`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                accountWith("acc-b", "bruno@empresa.com", member("device-b", "bruno")),
+                accountWith("acc-a", "ana@empresa.com", member("device-a", "ana")),
+                accountWith("acc-c", null, member("device-c", "carlos"))
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        val first = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+            .members
+            .map { member -> member.memberKey }
+
+        advanceTimeBy(TEAM_LIVE_INTERVAL_MILLIS + 1)
+        runCurrent()
+
+        val second = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+            .members
+            .map { member -> member.memberKey }
+
+        assertEquals(first, second)
+        viewModel.onDestroy()
+    }
+
     @Test
     fun `a visao global nao oferece a aba de tendencia`() = runTest {
         val repository = FakeTeamRepository()
@@ -854,11 +936,16 @@ class TeamUsageViewModelTest {
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
         assertTrue(state.isAdminOverview)
-        // Ordena pelo consumo do time inteiro, não por conta.
-        assertEquals("device-2", state.members.first().deviceId)
-        assertEquals(OTHER_ACCOUNT_KEY, state.members.first().accountKey)
+        // Issue #69: a conta é a chave primária da ordem. A conta rotulada vem
+        // primeiro mesmo consumindo menos, e a sem rótulo fecha a lista — antes
+        // era o consumo do time inteiro que mandava, e a faixa de uma conta
+        // mudava de lugar a cada tique do laço ao vivo.
+        assertEquals("device-1", state.members.first().deviceId)
+        assertEquals(ACCOUNT_KEY, state.members.first().accountKey)
         assertEquals(2, state.memberGroups.size)
-        assertEquals("fulano@empresa.com", state.memberGroups.last().accountLabel)
+        assertEquals("fulano@empresa.com", state.memberGroups.first().accountLabel)
+        assertEquals(OTHER_ACCOUNT_KEY, state.memberGroups.last().accountKey)
+        assertNull(state.memberGroups.last().accountLabel)
         assertEquals(0, repository.fetchCalls)
         viewModel.onDestroy()
     }
@@ -1162,6 +1249,19 @@ private class FakeAdminOverviewRepository(
 
     override suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification> =
         Result.success(TeamKeyVerification(authorized = true, claimed = true))
+}
+
+/** Conta da visão global com quantos integrantes o teste precisar. */
+private fun accountWith(
+    accountKey: String,
+    label: String?,
+    vararg members: TeamMemberUsage
+): TeamAccountUsage {
+    return TeamAccountUsage(
+        accountKey = accountKey,
+        label = label,
+        snapshot = TeamUsageSnapshot(members = members.toList())
+    )
 }
 
 private fun overviewAccount(

@@ -167,6 +167,20 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 - **`label` da chave é texto livre do admin, não verificado.** É onde ele digita o e-mail da pessoa. Quem prova o vínculo é o `accountUuid` ao lado; a UI mostra os dois juntos de propósito.
 - **`TEAM_API_KEY` virou legado.** Com `TEAM_LEGACY_KEY_MODE=open` (default) ela continua lendo tudo, que é o comportamento anterior; `off` a rejeita e é o passo que efetiva o isolamento. `TEAM_ADMIN_TOKEN` monta `/api/admin/*` e vale como credencial **de leitura** em `/v1/team`, `/v1/session` e `/v1/member` — é o que evita uma família de rotas admin paralela. No `/v1/ingest` ele é recusado: admin lê, não escreve consumo em nome de ninguém.
 - **Modo admin é independente de conta.** `TeamIntegrationSettings.isAdminMode` não entra em `isConfigured`/`isActive`: administrar não exige chave de time, apelido nem conta marcada. O botão da barra inferior (`FooterBar.onOpenAdminOverview`, `null` esconde) abre a mesma `TeamUsageScreen` em modo global.
+- **A ordem da lista global é alfabética pela conta, e o consumo ordena dentro dela**
+  (`TeamUsageViewModel.flattenAccounts`). Com o consumo como chave primária, a faixa de uma conta
+  aparecia onde o integrante que mais gastou a levasse, e a mesma conta subia e descia entre dois
+  tiques do laço de 5s. O rótulo é o e-mail que o admin digitou ao emitir a chave e não muda
+  sozinho. Conta sem rótulo vai para o fim, por um degrau próprio do comparador e não por sentinela
+  de texto. `memberGroups` agrupa por ordem de primeira aparição, então ordenar os integrantes já
+  ordena as faixas — uma segunda ordenação lá seria um segundo dono da mesma decisão.
+- **A hierarquia da lista é uma escada de três superfícies neutras**: faixa da conta em
+  `surfaceVariant` com marcador de 2dp, a palavra "Conta" e divisória; linha do integrante
+  transparente sobre o fundo da janela; bloco de sessões em `surface`, recuado. O bloco aninhado
+  fica **um degrau de distância do fundo da lista** e **nunca** em `surfaceVariant`: aquele é o
+  realce de hover do `AppDataRow`, e com ele ali passar o mouse numa sessão deixa de dar retorno.
+  E a lista **não tem vão entre itens** — cada linha traz a própria divisória, e o vão de 8dp era
+  o que desfazia a leitura de tabela.
 - **`TeamMemberUsage.memberKey`** (`accountKey/deviceId`, ou só `deviceId` fora do modo global) é a identidade da linha na tela. O `deviceId` sozinho não serve: na visão global a mesma máquina em duas contas expandiria as duas juntas e a remoção acertaria a conta errada.
 - **Na visão global o recorte de 5h é deslizante.** Cada conta reseta a quota numa hora, e ancorar numa delas daria um número que não corresponde a nenhuma. `GetAdminTeamOverviewUseCase` resolve a janela com `CliQuotaWindows()` vazio e a tela avisa.
 - **Configuração** em `~/.usage-monitor/team.json` (`LocalTeamSettingsDataSource`), com escrita atômica e `restrictToOwnerReadWrite`. Nunca em `PreferencesSettings`: a chave do servidor é segredo e as preferências vão em claro para o registro.
@@ -262,6 +276,28 @@ multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
 - O teste que prova a fiação (`AppThemeScaleTest`) mede **pixels** (`boundsInRoot`), não `Dp`: a
   conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
   100dp nos dois casos — um teste que passa sem medir nada.
+
+**Densidade do dashboard** (`DashboardScreen.SuccessContent` + `ResponsiveDashboardCardGrid`): a
+janela principal usa o **corpo denso** do protótipo — `AppSpacing.md` na horizontal, `AppSpacing.sm`
+na vertical e `AppSpacing.md` entre cards —, e não o `AppSpacing.lg` das outras cinco. É a única
+janela que o usuário deixa estreita ao lado do editor, e ali 16dp de margem mais 16dp de vão eram
+largura que faltava dentro do card. A coluna rolável **não** reserva folga para a barra de rolagem:
+ela flutua sobre o padding direito da grade. Somadas, as duas davam 28dp à direita contra 16 à
+esquerda.
+
+**Modo somente cards** (`DesktopWindowFrame(compact)` + `DashboardScreen(showFooter)` +
+`CardsOnlyModePreferences.kt`): a janela sem barra de título e sem rodapé. **Não é valor novo em
+enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `Boolean` em
+`PreferencesSettings`, ao lado de "manter sempre visível".
+- **A faixa de título só é composta durante o hover.** Ela carrega a `WindowDraggableArea`, que usa
+  arrasto **imediato**; o card usa `detectDragGesturesAfterLongPress`. Com a faixa presente o tempo
+  todo, o arrasto da janela venceria a pressão longa e reordenar o primeiro card seria impossível.
+  Invisível ela também não pode ser clicável: um botão de fechar transparente é pior que nenhum.
+- **Três saídas, e nenhuma é dispensável**: a faixa, o item na bandeja e `Ctrl+Shift+M`. O modo
+  esconde o botão de fechar e a engrenagem; com a janela coberta por outra, só o teclado resta. A
+  bandeja também passou a abrir as Configurações, que só existiam no rodapé.
+- A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
+  as capturas do README continuam com a moldura inteira.
 
 **Regras que continuam valendo**: nenhuma animação infinita nova (trava o `waitForIdle`);
 `ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
