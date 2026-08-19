@@ -98,7 +98,11 @@ internal fun TeamKeysAdminContent(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag(TEAM_KEYS_ERROR_TAG)
                 )
-                Button(onClick = onRetry) { Text(TeamKeysLabels.retry(language)) }
+                AppButton(
+                    label = TeamKeysLabels.retry(language),
+                    onClick = onRetry,
+                    tone = AppButtonTone.PRIMARY
+                )
             }
 
             is TeamKeysUiState.Success -> TeamKeysList(
@@ -223,17 +227,17 @@ private fun CreateKeyRow(
             enabled = enabled,
             onChange = { value -> maxAccounts = value }
         )
-        Button(
+        AppButton(
+            label = TeamKeysLabels.create(language),
             onClick = {
                 onCreate(label, maxAccounts)
                 label = ""
                 maxAccounts = 1
             },
             enabled = enabled && label.isNotBlank(),
-            modifier = Modifier.testTag(TEAM_KEYS_CREATE_BUTTON_TAG)
-        ) {
-            Text(TeamKeysLabels.create(language))
-        }
+            modifier = Modifier.testTag(TEAM_KEYS_CREATE_BUTTON_TAG),
+            tone = AppButtonTone.PRIMARY
+        )
     }
 }
 
@@ -440,15 +444,15 @@ private fun RenameRow(
             enabled = enabled,
             modifier = Modifier.weight(1f)
         )
-        Button(
+        AppButton(
+            label = TeamKeysLabels.save(language),
             onClick = {
                 onRename(entry.id, draft)
                 editing = false
             },
-            enabled = enabled && draft.isNotBlank()
-        ) {
-            Text(TeamKeysLabels.save(language))
-        }
+            enabled = enabled && draft.isNotBlank(),
+            tone = AppButtonTone.PRIMARY
+        )
         AppButton(
             label = TeamKeysLabels.cancel(language),
             onClick = {
