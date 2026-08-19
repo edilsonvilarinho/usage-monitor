@@ -2,7 +2,14 @@
 
 ## Estado
 
-- Status: **planejado, não iniciado**.
+> **SUPERSEDED em 2026-08-18.** A iniciativa foi executada, e a fonte de verdade passou a ser
+> [`refatoracao-visual-opencode-execucao.md`](refatoracao-visual-opencode-execucao.md), com o
+> protótipo aprovado em [`prototipo-visual-opencode.html`](prototipo-visual-opencode.html). O
+> diagnóstico deste documento continua correto; o levantamento técnico e o plano de fases não —
+> foram escritos contra um estado do repositório que já havia mudado. Mantido como registro do
+> raciocínio inicial.
+
+- Status: **planejado, não iniciado** *(histórico — ver o aviso acima)*.
 - Próxima etapa obrigatória: criar e aprovar o protótipo visual completo.
 - Nenhuma implementação Compose deve começar antes da aprovação explícita do protótipo.
 - Este documento é a fonte de verdade desta iniciativa e amplia o escopo do `UI_REDESIGN_PLAN.md`, que tratava apenas de uma rodada visual parcial.

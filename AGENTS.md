@@ -154,6 +154,26 @@ conta Anthropic.
 - `DashboardScreen` e o ponto stateful principal da UI.
 - `UiState` aceita sucesso parcial: se pelo menos uma API responder, a tela mostra os dados e lista erros das APIs que falharam.
 
+## Sistema visual
+
+A app passou por uma refatoracao visual integral em agosto de 2026 (linguagem do OpenCode). O
+detalhamento esta em `CLAUDE.md`, secao "Sistema visual"; o plano com as decisoes em
+`docs/planos/refatoracao-visual-opencode-execucao.md` e a especificacao de aparencia em
+`docs/planos/prototipo-visual-opencode.html`.
+
+O essencial para nao quebrar nada:
+
+- Tokens em `presentation/ui/theme/AppTheme.kt`: superficies neutras, raio maximo 10dp, elevacao 0
+  para superficie de dados, espacamento em `AppSpacing`, motion 120/180/240.
+- Tipografia IBM Plex: mono em rotulo/numero/titulo, sans em texto corrido. Os TTFs vivem em
+  `desktopMain/resources/fonts/` e sao carregados por `appFontFamilies` (expect/actual).
+- Primitivas em `presentation/ui/components/App{Structure,Controls,States}.kt`. Componente novo de
+  UI deve sair delas.
+- Cor nunca informa sozinha: `AppStatusIndicator` traz ponto e palavra, e o tom sai de `AppTone`.
+- `weight` nao funciona dentro de `FlowRow`; acao com icone precisa de `contentDescription` na
+  semantica; placeholder de campo precisa de `clearAndSetSemantics`.
+- Tela mais alta exige subir a altura da **cena** do teste de componente, nao a do `Box` interno.
+
 ## Testing
 
 - `commonTest` cobre domain, mappers e `DashboardViewModel`

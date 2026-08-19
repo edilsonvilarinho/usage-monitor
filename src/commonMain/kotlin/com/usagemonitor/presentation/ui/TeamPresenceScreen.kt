@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppSourceMarker
+import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppToggleChip
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -666,15 +668,16 @@ private fun TeamPresenceRow(
         else -> MaterialTheme.colorScheme.outline
     }
 
-    DepthSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("$PRESENCE_ROW_TAG_PREFIX${entry.memberKey}"),
-        shape = AppShapes.medium,
-        contentPadding = PRESENCE_ROW_CONTENT_PADDING
+    // Linha de tabela, como as outras listas do app: eram painéis empilhados com
+    // vão entre eles, e uma lista de vinte máquinas virava vinte blocos.
+    AppDataRow(
+        modifier = Modifier.testTag("$PRESENCE_ROW_TAG_PREFIX${entry.memberKey}"),
+        horizontalPadding = PRESENCE_ROW_CONTENT_PADDING,
+        verticalPadding = PRESENCE_ROW_CONTENT_PADDING
     ) {
+        AppSourceMarker(color = accent)
         FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
