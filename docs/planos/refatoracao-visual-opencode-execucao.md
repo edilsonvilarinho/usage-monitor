@@ -12,7 +12,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fases A–L concluídas — falta só a Fase M (fechamento)`
+**Estado atual:** `Concluída. Doze fases fundidas em refactor/visual-opencode; a main permanece intocada`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
@@ -34,11 +34,16 @@ e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b
 
 ### ▶ Próxima atividade
 
-**Fase M — fechamento.** `allTests` → `build` → `createDistributable` e o QA visual manual da lista
-no fim deste documento. Todas as fases já estão fundidas em `refactor/visual-opencode`.
+**Nenhuma.** A refatoração está completa na branch de integração `refactor/visual-opencode`.
 
-A `main` permanece intocada. Merge para ela **só sob pedido explícito**, por PR — o CI já roda
-`allTests` em `windows-latest` em todo PR.
+O que falta é decisão do usuário: **abrir o PR para a `main`**. O CI roda `allTests` em
+`windows-latest` em todo PR, e o release depende do job `build-macos` para o `.dmg` — é lá que o
+`.icns` novo é validado pela primeira vez, o único item desta iniciativa que nenhuma máquina Windows
+consegue verificar.
+
+Antes do merge, o que só o usuário pode fazer: rodar `gradlew.bat run` e olhar as seis janelas em
+uso real — hover, foco, arrasto de card, redimensionamento, escala do Windows em 150% e as duas
+línguas. O que foi verificado aqui está na seção de fechamento abaixo.
 
 ### Progresso por fase
 
@@ -56,7 +61,7 @@ A `main` permanece intocada. Merge para ela **só sob pedido explícito**, por P
 | J — Marca | `visual/j-brand` | ✅ concluída | 1/2 | 2026-08-18 |
 | K — Relatório PDF | `visual/k-report` | ✅ concluída | 1/2 | 2026-08-18 |
 | L — Capturas e docs | `visual/l-docs` | ✅ concluída | 2/3 | 2026-08-18 |
-| M — Fechamento | — | ⬜ pendente | 0/0 | — |
+| M — Fechamento | — | ✅ concluída | 1/1 | 2026-08-18 |
 
 Legenda: ⬜ pendente · 🟡 em andamento · ✅ concluída e fundida na integração · ⛔ bloqueada
 
@@ -66,6 +71,7 @@ Uma linha por commit, em ordem cronológica.
 
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
+| 2026-08-18 | M | `docs(plan): close the visual refactor` | `clean build` + `allTests` (1082, 0 falhas) + `createDistributable` + capturas nos dois temas |
 | 2026-08-18 | L3 | `docs: record the visual system and its constraints` | n/a — documentos |
 | 2026-08-18 | L1–L2 | `chore(screenshots): regenerate README captures and the tour gif` | `allTests` — verde |
 | 2026-08-18 | K | `feat(report): embed IBM Plex in the PDF and apply the new palette` | `allTests` — verde; PDFs curto e longo renderizados em PNG e inspecionados |
@@ -106,6 +112,30 @@ oito lugares com a causa ambígua.
 **Linha de base — `allTests` no worktree limpo em `2947b4d`, antes de qualquer edição:
 1068 testes, 0 falhas, 0 ignorados, 3m28s.** Toda falha posterior é comparada contra este número;
 sem ele, "quebrou agora" e "já estava assim" são indistinguíveis.
+
+### Fechamento — o que foi verificado
+
+| Verificação | Resultado |
+|---|---|
+| `gradlew.bat clean build` | ✅ |
+| `gradlew.bat allTests` | ✅ 1.082 testes, 0 falhas, 0 ignorados |
+| `gradlew.bat createDistributable` | ✅ `Usage Monitor.exe` + runtime image gerados |
+| `gradlew.bat generateScreenshots` | ✅ nove capturas, determinísticas (segunda execução não muda byte) |
+| `gradlew.bat generateTourGif` | ✅ |
+| Dashboard, Histórico, Sessões CLI, Resumo, Time, Presença, Configurações | ✅ inspecionadas em captura |
+| Tema claro | ✅ dashboard e presença inspecionados; contraste dos acentos coberto por `AppAccentsContrastTest` |
+| Relatório PDF curto e longo | ✅ renderizados em PNG e inspecionados: colunas alinhadas, truncamento, cabeçalho repetido na continuação |
+| Ícone de 16 a 128px | ✅ folha de contato inspecionada |
+
+**Contagem de testes: 1.068 → 1.082.** As catorze linhas novas são os testes das primitivas; nenhum
+teste existente foi removido.
+
+**O que continua sem verificação e por quê:**
+
+- **`.icns`** — nenhuma máquina Windows abre o formato. Validação no job `build-macos` do release.
+- **Escala do Windows em 150%, hover, foco, arrasto e redimensionamento** — o `ScreenshotGenerator`
+  renderiza offscreen com relógio manual e densidade fixa; nada disso passa por ele.
+- **Instalador NSIS** — fora do escopo desta refatoração; nada aqui toca o `.nsi`.
 
 ### Decisões tomadas durante a execução
 
