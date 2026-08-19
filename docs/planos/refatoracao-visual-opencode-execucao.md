@@ -12,7 +12,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fases A–F concluídas — dashboard, histórico e sessões CLI no vocabulário novo, pronto para a Fase G`
+**Estado atual:** `Fases A–G concluídas — as cinco telas de dados no vocabulário novo, pronto para a Fase H`
 **Última atualização:** 2026-08-18
 **Branch de integração:** `refactor/visual-opencode` (criada a partir de `origin/main` @ `2947b4d`)
 **Worktree:** `C:\Users\edils\workspace\usage-monitor-visual`
@@ -34,23 +34,22 @@ e no artifact `https://claude.ai/code/artifact/c054eb5b-1077-4bdc-8f50-c0e41c80b
 
 ### ▶ Próxima atividade
 
-**Fase G, commit G1** — âncoras de teste do Time.
+**Fase H, commit H1** — âncoras de teste das Configurações, depois H2 (navegação lateral no lugar dos
+chips de aba), H3 (Geral, Alertas e APIs) e H4 (Contas e Time).
 
-Criar a branch `visual/g-team` a partir da integração e ancorar por `testTag` o que a Fase G vai
-mexer de forma em `TeamUsageScreen.kt`. Depois G2 (linhas de integrante), G3 (`TeamTrendChart`, com a
-escala única entre integrantes preservada), G4 (`TeamPresenceScreen`, com o ponto de estado que
-continua sem piscar) e G5 (`TeamKeysAdminScreen`).
+`SettingsTab` continua sem valor novo, cada aba mantém o próprio `ScrollState` começando no topo e
+só a aba escolhida entra na composição.
 
-Nenhuma mudança de contrato do servidor. Confirmações destrutivas preservadas; a própria máquina
-continua protegida contra remoção.
+Depois de H: **I** (chrome das janelas), **J** (marca), **K** (relatório PDF), **L** (capturas e
+documentação) e **M** (fechamento).
 
-**Duas armadilhas que a Fase F cobrou caro** e valem para as próximas telas:
+**Armadilhas acumuladas, todas já pagas uma vez:**
 
-1. **`weight` dentro de `FlowRow` não tem referência de largura** — o Compose deixa o filho **sem
-   posicionar** (`isPlaced` falso), e o sintoma é `assertIsDisplayed` falhando com `boundsInRoot`
-   válido. Peso só dentro de `Row`/`Column` de largura definida.
-2. **Ação que virou ícone precisa de `contentDescription` na semântica**, não só de `onClickLabel`:
-   é `onNodeWithContentDescription` que as suítes usam. `AppIconButton` já traz os dois.
+1. `weight` dentro de `FlowRow` não posiciona o filho (`isPlaced` falso).
+2. Ação que virou ícone precisa de `contentDescription` na semântica.
+3. `BasicTextField` mescla descendentes: placeholder sem `clearAndSetSemantics` entra no texto do
+   campo e duplica nós para o `onNodeWithText`.
+4. Tela mais alta obriga a subir a altura da **cena** do teste, nunca a do `Box` interno.
 
 ### Progresso por fase
 
@@ -62,7 +61,7 @@ continua protegida contra remoção.
 | D — Dashboard | `visual/d-dashboard` | ✅ concluída | 5/5 | 2026-08-18 |
 | E — Histórico | `visual/e-history` | ✅ concluída | 4/4 | 2026-08-18 |
 | F — Sessões CLI | `visual/f-cli-sessions` | ✅ concluída | 4/5 | 2026-08-18 |
-| G — Time | `visual/g-team` | ⬜ pendente | 0/5 | — |
+| G — Time | `visual/g-team` | ✅ concluída | 2/5 | 2026-08-18 |
 | H — Configurações | `visual/h-settings` | ⬜ pendente | 0/4 | — |
 | I — Chrome das janelas | `visual/i-window-chrome` | ⬜ pendente | 0/2 | — |
 | J — Marca | `visual/j-brand` | ⬜ pendente | 0/2 | — |
@@ -78,6 +77,8 @@ Uma linha por commit, em ordem cronológica.
 
 | Data | Fase | Commit | Testes |
 |---|---|---|---|
+| 2026-08-18 | G3–G5 | `refactor(team): restyle trend, presence and the keys admin screen` | `allTests` — verde; capturas inspecionadas |
+| 2026-08-18 | G2 | `refactor(team): render member usage as aligned rows` (inclui as âncoras do G1) | `ui.*` — verde |
 | 2026-08-18 | F5 | `refactor(cli-sessions): restyle the header, export and glossary surfaces` | `allTests` — verde; capturas inspecionadas |
 | 2026-08-18 | F4 | `refactor(cli-sessions): restyle the breakdown pane and activity grid` | `ui.*` — verde |
 | 2026-08-18 | F3 | `refactor(cli-sessions): restyle the session detail` | `ui.*` — verde |
@@ -135,6 +136,10 @@ motivo.
 | 2026-08-18 | O card minimizado mantém os **badges por cota**, em vez do resumo "68% · 41%" do protótipo | A forma do protótipo apaga o rótulo da cota e a tooltip por cota, que são dado e ação existentes. Os badges foram reestilizados (superfície neutra, borda, raio 6) em vez de removidos |
 | 2026-08-18 | `compactPercentageLabel` passou a **truncar** em vez de arredondar | Era o único lugar do app que arredondava: o arco fazia `toInt()` e os limiares da bandeja são piso. O mesmo card mostrava 26% na cota expandida e 27% no badge minimizado para o mesmo 12 de 45 |
 | 2026-08-18 | `colorFor(UsageRiskLevel)` passou a sair de `AppTone` | Os três literais (`0xFF4CAF50`, `0xFFFFC107`, `0xFFF44336`) nunca foram medidos contra as superfícies dos dois temas — o âmbar dava menos de 3:1 sobre a clara — e escapavam do `AppAccentsContrastTest` |
+| 2026-08-18 | G3, G4 e G5 saíram **num commit só** | As três telas do time compartilham os mesmos componentes e a conversão dos `TextButton` foi uma passada única sobre os três arquivos. Separá-las daria três commits que se sobrepõem no mesmo trecho |
+| 2026-08-18 | `AppToggleChip` é primitiva nova, fora das dezessete previstas | O filtro "só conectados" é uma restrição ligada ou desligada. Segmentado de duas opções afirmaria uma escolha entre alternativas, e reusar `AppButton` perderia o `selectable` que o teste observa |
+| 2026-08-18 | O placeholder do `AppTextField` sai da árvore semântica | O `BasicTextField` mescla descendentes: um campo vazio passava a "conter" o texto de exemplo, e `onNodeWithText` do exemplo encontrava dois nós |
+| 2026-08-18 | A linha do integrante do time encolheu de 109dp para 88dp | Deixou de ser card e virou linha de tabela. O assert de altura continua existindo pelo motivo de antes — a linha não pode voltar a crescer — com o número novo |
 | 2026-08-18 | F1 e F2 saíram **no mesmo commit** | O F1 seria um commit cujo único conteúdo é uma constante que nada referencia ainda. A prova de neutralidade que a separação existe para dar continua nos testes, verdes antes e depois |
 | 2026-08-18 | A lista de sessões **não** ganhou cabeçalho de coluna único; cada célula mantém o próprio rótulo | As células somam quase 1.000dp e a janela abre menor: a linha precisa quebrar, e cabeçalho fixo sobre linha que quebra desalinha. O protótipo resolve com rolagem horizontal, que esconderia colunas dos asserts de componente |
 | 2026-08-18 | As células da linha de sessão ficam num `FlowRow`, não numa `Row` | Numa `Row` a última coluna — onde mora o botão de remover do modo administrativo — saía da área visível sem rolagem horizontal para alcançá-la. A suíte do time pegou isso |
