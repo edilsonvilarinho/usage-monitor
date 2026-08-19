@@ -60,8 +60,12 @@ import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
+import com.usagemonitor.domain.entity.DEFAULT_UI_SCALE_PERCENT
+import com.usagemonitor.domain.entity.MAX_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MAX_WINDOW_OPACITY_PERCENT
+import com.usagemonitor.domain.entity.MIN_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MIN_WINDOW_OPACITY_PERCENT
+import com.usagemonitor.domain.entity.UI_SCALE_STEP_PERCENT
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AppElevation
@@ -70,6 +74,9 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
+
+/** Mesma razão da tag de opacidade: "115%" também é rótulo de chip no cartão de alertas. */
+const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 
 /**
  * Seções das Configurações, uma por aba.
@@ -116,6 +123,8 @@ fun SettingsDialogContent(
     alwaysOnTopEnabled: Boolean = false,
     windowOpacityPercent: Int = MAX_WINDOW_OPACITY_PERCENT,
     windowOpacityEnabled: Boolean = true,
+    uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
+    onUiScaleChange: (Int) -> Unit = {},
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
@@ -216,11 +225,13 @@ fun SettingsDialogContent(
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacityEnabled,
+                        uiScalePercent = uiScalePercent,
                         onThemeToggle = onThemeToggle,
                         onLanguageChange = onLanguageChange,
                         onAutoStartChange = onAutoStartChange,
                         onAlwaysOnTopChange = onAlwaysOnTopChange,
-                        onWindowOpacityChange = onWindowOpacityChange
+                        onWindowOpacityChange = onWindowOpacityChange,
+                        onUiScaleChange = onUiScaleChange
                     )
 
                     SettingsTab.ALERTS -> SettingsSectionCard {
@@ -297,11 +308,13 @@ private fun GeneralSettingsTab(
     alwaysOnTopEnabled: Boolean,
     windowOpacityPercent: Int,
     windowOpacityEnabled: Boolean,
+    uiScalePercent: Int,
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit,
-    onWindowOpacityChange: (Int) -> Unit
+    onWindowOpacityChange: (Int) -> Unit,
+    onUiScaleChange: (Int) -> Unit
 ) {
     SettingsSectionCard {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -328,6 +341,12 @@ private fun GeneralSettingsTab(
                 language = currentLanguage,
                 enabled = windowOpacityEnabled,
                 onPercentChange = onWindowOpacityChange
+            )
+
+            UiScaleSlider(
+                percent = uiScalePercent,
+                language = currentLanguage,
+                onPercentChange = onUiScaleChange
             )
 
             Text(
@@ -780,6 +799,72 @@ fun WindowOpacitySlider(
             )
         }
     }
+}
+
+/**
+ * Escala global da interface.
+ *
+ * Mesma anatomia do [WindowOpacitySlider] logo acima — rótulo, valor à direita e
+ * trilha neutra —, porque os dois respondem à mesma pergunta ("quanto?") sobre a
+ * própria janela. A diferença é a granularidade: os `steps` prendem o valor à
+ * grade de [UI_SCALE_STEP_PERCENT], já que a distância entre 113% e 114% não é
+ * visível e só multiplicaria gravações.
+ */
+@Composable
+fun UiScaleSlider(
+    percent: Int,
+    language: AppLanguage = AppLanguage.PT,
+    onPercentChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val label = if (language == AppLanguage.PT) "Tamanho da interface" else "Interface size"
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "$percent%",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.testTag(UI_SCALE_VALUE_TEST_TAG)
+            )
+        }
+        Slider(
+            value = percent.toFloat(),
+            onValueChange = { value -> onPercentChange(snapUiScalePercent(value)) },
+            valueRange = MIN_UI_SCALE_PERCENT.toFloat()..MAX_UI_SCALE_PERCENT.toFloat(),
+            // Pontos intermediários da grade de 5, sem contar as duas pontas.
+            steps = (MAX_UI_SCALE_PERCENT - MIN_UI_SCALE_PERCENT) / UI_SCALE_STEP_PERCENT - 1,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.onSurface,
+                activeTrackColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = if (language == AppLanguage.PT) {
+                "Vale para todas as janelas do app."
+            } else {
+                "Applies to every window of the app."
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Prende o valor do slider à grade de [UI_SCALE_STEP_PERCENT] dentro da faixa. */
+internal fun snapUiScalePercent(value: Float): Int {
+    val steps = (value / UI_SCALE_STEP_PERCENT).roundToInt()
+    return (steps * UI_SCALE_STEP_PERCENT).coerceIn(MIN_UI_SCALE_PERCENT, MAX_UI_SCALE_PERCENT)
 }
 
 @Composable

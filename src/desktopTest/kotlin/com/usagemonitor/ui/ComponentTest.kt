@@ -72,6 +72,7 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
 import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
+import com.usagemonitor.presentation.ui.components.UI_SCALE_VALUE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.WINDOW_OPACITY_VALUE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
@@ -1370,6 +1371,7 @@ class ComponentTest {
                     enabledApis = setOf(ApiSource.ANTHROPIC, ApiSource.CODEX),
                     autoStartEnabled = false,
                     windowOpacityPercent = 75,
+                    uiScalePercent = 115,
                     onThemeToggle = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
@@ -1395,6 +1397,9 @@ class ComponentTest {
         onNodeWithText("Window opacity").assertIsDisplayed()
         // Por tag: "75%" também é rótulo de limiar no cartão de alertas.
         onNodeWithTag(WINDOW_OPACITY_VALUE_TEST_TAG).assertTextEquals("75%")
+        onNodeWithText("Interface size").assertIsDisplayed()
+        // Mesma razão da tag de opacidade: "115%" também aparece como limiar.
+        onNodeWithTag(UI_SCALE_VALUE_TEST_TAG).assertTextEquals("115%")
         onNodeWithText("Language").assertIsDisplayed()
 
         onNodeWithTag(settingsTabTestTag(SettingsTab.APIS)).performClick()

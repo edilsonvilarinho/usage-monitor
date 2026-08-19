@@ -237,6 +237,32 @@ estado e barra de progresso. Antes de desenhar um retângulo novo, procure aqui.
 5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
    `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
 
+**Escala da interface** (`AppTheme(uiScalePercent = …)` + `UiScalePreferences.kt` + slider na aba
+Geral): a escala troca a **densidade** da composição, nunca a escala tipográfica. Subir só a
+tipografia deixaria ícone, padding, altura de linha e alvo de clique — todos `Dp` fixos — do tamanho
+anterior, e o rodapé continuaria pequeno ao lado de um texto maior; densidade é o único ponto em que
+dp e sp crescem juntos e as proporções do protótipo permanecem. Só `density` é multiplicado:
+multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
+
+- **O padrão persistido é 115 e o default do parâmetro é 100.** O neutro existe para o
+  `ScreenshotGenerator`, o `TourGifGenerator` e os testes de componente manterem a geometria de
+  referência — as capturas do README **não** são geradas na escala do app.
+- **Cada janela precisa receber o valor.** `Window`/`DialogWindow` do Compose Desktop têm composição
+  própria e a plataforma reprovisiona `LocalDensity` na raiz de cada uma: provisionar na janela pai
+  não atravessa para a filha, e a janela esquecida renderiza a 100% sem erro nenhum.
+- **A moldura não escala sozinha.** Densidade maior mostra o mesmo conteúdo maior dentro da mesma
+  janela, ou seja, menos conteúdo. `scaledWindowSize` corrige a janela principal pela razão entre a
+  escala aplicada e a nova — nunca contra 100, ou duas mudanças seguidas multiplicariam duas vezes —
+  e nos tamanhos default das outras janelas o fator entra na criação. Tamanho **persistido** é
+  escolha do usuário e não é reescalado, com uma exceção de uma vez só: quem já tinha janela salva
+  antes desta versão a recebe corrigida de 100 para o padrão novo, e é `hasPersistedUiScale` — chave
+  presente, não valor igual ao default — que fecha essa porta depois.
+- O redimensionamento acontece no commit do coletor com debounce, não no callback do slider: janela
+  AWT reposicionada por pixel arrastado é inutilizável. O conteúdo, esse, escala ao vivo.
+- O teste que prova a fiação (`AppThemeScaleTest`) mede **pixels** (`boundsInRoot`), não `Dp`: a
+  conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
+  100dp nos dois casos — um teste que passa sem medir nada.
+
 **Regras que continuam valendo**: nenhuma animação infinita nova (trava o `waitForIdle`);
 `ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
 `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.

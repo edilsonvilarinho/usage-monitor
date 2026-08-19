@@ -1,11 +1,15 @@
 package com.usagemonitor
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import com.russhwolf.settings.PreferencesSettings
 import java.util.UUID
 import java.util.prefs.Preferences
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MainWindowPreferencesTest {
 
@@ -111,6 +115,68 @@ class MainWindowPreferencesTest {
             assertEquals("840", settings.getStringOrNull("windowHeight"))
             assertEquals("MAXIMIZED", settings.getStringOrNull("windowPlacement"))
         }
+    }
+
+    @Test
+    fun `scaled window size applies the ratio between the two scales`() {
+        val scaled = scaledWindowSize(
+            current = DpSize(400.dp, 800.dp),
+            fromPercent = 100,
+            toPercent = 150,
+            maxSize = DpSize(4000.dp, 4000.dp)
+        )
+
+        assertEquals(600.dp, scaled.width)
+        assertEquals(1200.dp, scaled.height)
+    }
+
+    @Test
+    fun `scaled window size shrinks when the new scale is smaller`() {
+        val scaled = scaledWindowSize(
+            current = DpSize(600.dp, 1200.dp),
+            fromPercent = 150,
+            toPercent = 100,
+            maxSize = DpSize(4000.dp, 4000.dp)
+        )
+
+        assertEquals(400.dp, scaled.width)
+        assertEquals(800.dp, scaled.height)
+    }
+
+    @Test
+    fun `scaled window size returns the current size when the scale did not change`() {
+        val current = DpSize(400.dp, 800.dp)
+
+        assertEquals(
+            current,
+            scaledWindowSize(current, fromPercent = 115, toPercent = 115, maxSize = DpSize(4000.dp, 4000.dp))
+        )
+    }
+
+    @Test
+    fun `scaled window size never exceeds the available screen area`() {
+        val scaled = scaledWindowSize(
+            current = DpSize(1000.dp, 900.dp),
+            fromPercent = 100,
+            toPercent = 150,
+            maxSize = DpSize(1280.dp, 1000.dp)
+        )
+
+        assertEquals(1280.dp, scaled.width)
+        assertEquals(1000.dp, scaled.height)
+    }
+
+    @Test
+    fun `scaled window size keeps unspecified dimensions untouched`() {
+        val scaled = scaledWindowSize(
+            current = DpSize(Dp.Unspecified, 800.dp),
+            fromPercent = 100,
+            toPercent = 150,
+            maxSize = DpSize(Dp.Unspecified, Dp.Unspecified)
+        )
+
+        assertTrue(scaled.width.value.isNaN())
+        assertEquals(1200.dp, scaled.height)
     }
 
     private fun withTestSettings(block: (PreferencesSettings) -> Unit) {

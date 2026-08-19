@@ -29,6 +29,18 @@ class SettingsToastMessageTest {
             "Apelido salvo",
             settingsToastMessage(SettingsToast.Saved(SettingsField.TEAM_ALIAS), AppLanguage.PT)
         )
+        assertEquals(
+            "Tamanho da interface salvo",
+            settingsToastMessage(SettingsToast.Saved(SettingsField.UI_SCALE), AppLanguage.PT)
+        )
+    }
+
+    @Test
+    fun `escala da interface tem texto em ingles`() {
+        assertEquals(
+            "Interface size saved",
+            settingsToastMessage(SettingsToast.Saved(SettingsField.UI_SCALE), AppLanguage.EN)
+        )
     }
 
     @Test

@@ -97,6 +97,7 @@ Regras importantes:
   - `language`
   - `autoStart`
   - `windowOpacityPercent`
+  - `uiScalePercent` (escala global da interface; troca a densidade em `AppTheme`, nao a tipografia)
   - `teamUsageWindow*` (geometria da janela de Sessoes do time)
   - `teamPresenceWindow*` (geometria da janela de Conectados agora)
 - `AutoStartManager` escreve em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`

@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Notification
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.isTraySupported
@@ -646,12 +647,33 @@ fun main() = application {
     }
 
     val iconImage = remember { loadWindowIcon() }
-    val mainWindowState = rememberPersistedMainWindowState(persistedMainWindowState)
-    val historyWindowState = rememberPersistedHistoryWindowState(persistedHistoryWindowState)
-    val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(persistedCliSessionsWindowState)
-    val teamUsageWindowState = rememberPersistedTeamUsageWindowState(persistedTeamUsageWindowState)
-    val teamPresenceWindowState =
-        rememberPersistedTeamPresenceWindowState(persistedTeamPresenceWindowState)
+    // A escala é lida antes das janelas: é ela que dimensiona o tamanho default de
+    // cada uma quando não há nada persistido.
+    var uiScalePercent by remember { mutableStateOf(readPersistedUiScalePercent(settings)) }
+    // A escala que a janela principal já reflete. A razão do redimensionamento sai
+    // daqui e nunca de 100 — duas mudanças seguidas multiplicariam duas vezes.
+    var appliedUiScalePercent by remember { mutableStateOf(uiScalePercent) }
+    var uiScaleSaveGeneration by remember { mutableStateOf(0) }
+    val mainWindowState = rememberPersistedMainWindowState(
+        persistedState = persistedMainWindowState,
+        uiScalePercent = uiScalePercent
+    )
+    val historyWindowState = rememberPersistedHistoryWindowState(
+        persistedState = persistedHistoryWindowState,
+        uiScalePercent = uiScalePercent
+    )
+    val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(
+        persistedState = persistedCliSessionsWindowState,
+        uiScalePercent = uiScalePercent
+    )
+    val teamUsageWindowState = rememberPersistedTeamUsageWindowState(
+        persistedState = persistedTeamUsageWindowState,
+        uiScalePercent = uiScalePercent
+    )
+    val teamPresenceWindowState = rememberPersistedTeamPresenceWindowState(
+        persistedState = persistedTeamPresenceWindowState,
+        uiScalePercent = uiScalePercent
+    )
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -810,6 +832,52 @@ fun main() = application {
                 opacitySaveGeneration += 1
             }
     }
+    // Primeira execução depois da atualização: a escala default subiu de 100 para
+    // 115 e a janela persistida ficou do tamanho de antes, ou seja, passaria a
+    // caber menos conteúdo. Vale a mesma regra do slider, uma vez só — gravar a
+    // escala fecha a porta, porque a chave passa a existir.
+    LaunchedEffect(settings, mainWindowState) {
+        if (hasPersistedUiScale(settings)) {
+            return@LaunchedEffect
+        }
+        persistUiScalePercent(settings, uiScalePercent)
+        if (persistedMainWindowState.widthDp == null ||
+            mainWindowState.placement != WindowPlacement.Floating
+        ) {
+            return@LaunchedEffect
+        }
+        mainWindowState.size = scaledWindowSize(
+            current = mainWindowState.size,
+            fromPercent = 100,
+            toPercent = uiScalePercent,
+            maxSize = availableWindowSizeDp()
+        )
+    }
+    // Mesma anatomia do coletor de opacidade, e pelo mesmo motivo: gravar e
+    // redimensionar no commit, não a cada tique do slider. O conteúdo já escala ao
+    // vivo pela densidade; o que espera o debounce é o disco e a moldura da janela.
+    LaunchedEffect(settings, mainWindowState) {
+        snapshotFlow { uiScalePercent }
+            .distinctUntilChanged()
+            .drop(1)
+            .debounce(250.milliseconds)
+            .collect { percent ->
+                persistUiScalePercent(settings, percent)
+                val previous = appliedUiScalePercent
+                appliedUiScalePercent = percent
+                // Maximizada não tem tamanho próprio para escalar; o sistema já a
+                // prende à tela inteira.
+                if (mainWindowState.placement == WindowPlacement.Floating) {
+                    mainWindowState.size = scaledWindowSize(
+                        current = mainWindowState.size,
+                        fromPercent = previous,
+                        toPercent = percent,
+                        maxSize = availableWindowSizeDp()
+                    )
+                }
+                uiScaleSaveGeneration += 1
+            }
+    }
     val alertSettingsState by alertSettingsFlow.collectAsState()
     var monthlyBudgetMicros by remember { mutableStateOf(readPersistedBudgetMicros(settings)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
@@ -938,6 +1006,13 @@ fun main() = application {
             showSettingsToast(SettingsToast.Saved(SettingsField.WINDOW_OPACITY))
         }
     }
+    // Mesma razão do bloco acima: quem grava é o coletor com debounce, e a geração
+    // inicial não conta porque ninguém mexeu em nada.
+    LaunchedEffect(uiScaleSaveGeneration) {
+        if (uiScaleSaveGeneration > 0) {
+            showSettingsToast(SettingsToast.Saved(SettingsField.UI_SCALE))
+        }
+    }
 
     // Os filtros de 5h e 7d da tela de sessões recortam a janela de quota da
     // conta, não as últimas horas corridas. O reset vem do mesmo `resets_at` que
@@ -1063,7 +1138,7 @@ fun main() = application {
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
-        AppTheme(isDark = isDark) {
+        AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
             DesktopWindowFrame(
                 title = "Usage Monitor",
                 iconPainter = iconImage,
@@ -1223,7 +1298,7 @@ fun main() = application {
             LaunchedEffect(historyOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(isDark = isDark) {
+            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = historyWindowTitle(source, language),
                     iconPainter = iconImage,
@@ -1261,7 +1336,7 @@ fun main() = application {
             LaunchedEffect(cliSessionsOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(isDark = isDark) {
+            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = cliSessionsTitle,
                     iconPainter = iconImage,
@@ -1300,7 +1375,7 @@ fun main() = application {
             LaunchedEffect(teamUsageOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(isDark = isDark) {
+            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = teamTitle,
                     iconPainter = iconImage,
@@ -1339,7 +1414,7 @@ fun main() = application {
             LaunchedEffect(teamPresenceOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(isDark = isDark) {
+            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = presenceTitle,
                     iconPainter = iconImage,
@@ -1367,10 +1442,15 @@ fun main() = application {
             onCloseRequest = { isTeamKeysOpen = false },
             title = keysTitle,
             icon = iconImage,
-            state = rememberDialogState(width = 760.dp, height = 640.dp),
+            // O tamanho literal acompanha a escala: a 150% o conteúdo cresce e a
+            // moldura fixa o espremeria.
+            state = rememberDialogState(
+                width = 760.dp * uiScaleFactor(uiScalePercent),
+                height = 640.dp * uiScaleFactor(uiScalePercent)
+            ),
             undecorated = true
         ) {
-            AppTheme(isDark = isDark) {
+            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = keysTitle,
                     iconPainter = iconImage,
@@ -1393,14 +1473,17 @@ fun main() = application {
             // 820 de largura: as Configurações passaram a ter navegação lateral
             // de 150dp, e em 620 o conteúdo ficava com menos de 470 — estreito
             // demais para as linhas de rótulo + controle das seções de Time.
-            state = rememberDialogState(width = 820.dp, height = 720.dp),
+            state = rememberDialogState(
+                width = 820.dp * uiScaleFactor(uiScalePercent),
+                height = 720.dp * uiScaleFactor(uiScalePercent)
+            ),
             resizable = true,
             undecorated = true
         ) {
             LaunchedEffect(settingsOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(isDark = isDark) {
+            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = if (language == AppLanguage.PT) "Configurações" else "Settings",
                     iconPainter = iconImage,
@@ -1414,6 +1497,12 @@ fun main() = application {
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacitySupported,
+                        uiScalePercent = uiScalePercent,
+                        onUiScaleChange = { percent ->
+                            // Aviso e gravação não saem daqui pelo mesmo motivo da
+                            // opacidade: quem persiste é o coletor com debounce.
+                            uiScalePercent = clampUiScalePercent(percent)
+                        },
                         onThemeToggle = {
                             isDark = !isDark
                             settings.putBoolean(IS_DARK_KEY, isDark)
@@ -1669,7 +1758,8 @@ fun main() = application {
 
 @Composable
 private fun rememberPersistedMainWindowState(
-    persistedState: PersistedMainWindowState
+    persistedState: PersistedMainWindowState,
+    uiScalePercent: Int
 ) = when {
     persistedState.widthDp != null && persistedState.heightDp != null -> {
         rememberWindowState(
@@ -1687,7 +1777,15 @@ private fun rememberPersistedMainWindowState(
         )
     }
 
-    else -> rememberWindowState()
+    // 800×600 é o default do próprio `rememberWindowState`, agora explícito para
+    // acompanhar a escala: na primeira execução não há tamanho persistido, e sem
+    // isto o app subiria com a moldura de 100% e o conteúdo de 115%.
+    else -> rememberWindowState(
+        size = DpSize(
+            width = 800.dp * uiScaleFactor(uiScalePercent),
+            height = 600.dp * uiScaleFactor(uiScalePercent)
+        )
+    )
 }
 
 private fun readApiSourceCollection(

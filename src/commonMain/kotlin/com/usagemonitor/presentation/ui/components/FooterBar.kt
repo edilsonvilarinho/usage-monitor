@@ -62,9 +62,15 @@ const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
 const val FOOTER_VERSION_TEST_TAG = "footerVersion"
 const val FOOTER_COUNTDOWN_TEST_TAG = "footerCountdown"
 
-/** Alvo de clique do rodapé: quadrado, na altura da barra de 30dp. */
-private val FOOTER_ACTION_SIZE = 26.dp
-private val FOOTER_ICON_SIZE = 14.dp
+/**
+ * Alvo de clique do rodapé: quadrado, dentro da barra de estado de 30dp.
+ *
+ * Era 26/14 e ficava pequeno demais em tela real — o ícone ocupava pouco mais da
+ * metade do alvo. 28 é o máximo que cabe na barra sem encostar na divisória de
+ * cima, e 16 é o tamanho de ícone que o resto do app já usa.
+ */
+private val FOOTER_ACTION_SIZE = 28.dp
+private val FOOTER_ICON_SIZE = 16.dp
 
 @Composable
 fun FooterBar(

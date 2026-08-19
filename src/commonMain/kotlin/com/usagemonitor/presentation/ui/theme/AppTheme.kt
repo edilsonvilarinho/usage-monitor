@@ -10,7 +10,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -359,10 +362,24 @@ private val rememberedTypography by lazy { appTypography(appFontFamilies) }
  * É como um componente Vue.js: recebe props e renderiza filhos.
  *
  * `content: @Composable () -> Unit` é o equivalente ao `<slot>` do Vue.
+ *
+ * [uiScalePercent] é a escala global da interface. Ela troca a **densidade**, não
+ * a escala tipográfica: subir só a tipografia deixaria ícone, padding, altura de
+ * linha e alvo de clique — todos `Dp` fixos — do tamanho anterior, e o rodapé de
+ * 26dp continuaria pequeno ao lado de um texto maior. Densidade é o único ponto
+ * em que dp e sp crescem juntos e as proporções do protótipo permanecem.
+ *
+ * O default é **100 (neutro)**, e não [DEFAULT_UI_SCALE_PERCENT]: é o que mantém
+ * a geometria de referência do `ScreenshotGenerator`, do `TourGifGenerator` e dos
+ * testes de componente. Quem escolhe a escala do app é o `Main`, e **cada janela
+ * precisa receber o valor**: `Window`/`DialogWindow` do Compose Desktop têm
+ * composição própria e a plataforma reprovisiona `LocalDensity` na raiz de cada
+ * uma — provisionar na janela pai não atravessa para a filha.
  */
 @Composable
 fun AppTheme(
     isDark: Boolean = true,
+    uiScalePercent: Int = 100,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (isDark) {
@@ -375,6 +392,20 @@ fun AppTheme(
     // e reconstruir catorze `TextStyle` a cada troca seria trabalho sem efeito.
     val typography = rememberedTypography
 
+    // Só `density` é multiplicado: `sp` já deriva dela, e multiplicar `fontScale`
+    // junto aplicaria a escala duas vezes ao texto e uma só ao resto.
+    val baseDensity = LocalDensity.current
+    val scaledDensity = remember(baseDensity, uiScalePercent) {
+        if (uiScalePercent == 100) {
+            baseDensity
+        } else {
+            Density(
+                density = baseDensity.density * uiScalePercent / 100f,
+                fontScale = baseDensity.fontScale
+            )
+        }
+    }
+
     MaterialTheme(
         colorScheme = colorScheme,
         shapes      = appShapes,
@@ -385,6 +416,7 @@ fun AppTheme(
             hoverColor   = colorScheme.onSurface.copy(alpha = 0.5f)
         )
         CompositionLocalProvider(
+            LocalDensity provides scaledDensity,
             LocalScrollbarStyle provides scrollbarStyle,
             LocalAppAccents provides accents
         ) {

@@ -1,9 +1,11 @@
 package com.usagemonitor
 
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import com.russhwolf.settings.PreferencesSettings
+import java.awt.GraphicsEnvironment
 import kotlin.math.roundToInt
 
 private const val WINDOW_WIDTH_KEY = "windowWidth"
@@ -80,6 +82,65 @@ internal fun persistMainWindowState(
     if (heightDp != null) {
         settings.putString(WINDOW_HEIGHT_KEY, heightDp.toString())
     }
+}
+
+/**
+ * Tamanho da janela após uma troca de escala da interface.
+ *
+ * A escala mexe na densidade da composição, não no tamanho da janela: sem isto,
+ * subir para 150% mostraria o mesmo conteúdo maior dentro da mesma moldura, ou
+ * seja, menos conteúdo. A razão é entre a escala **aplicada** e a nova, nunca
+ * contra 100 — duas mudanças seguidas multiplicariam o tamanho duas vezes.
+ *
+ * Dimensão não especificada é devolvida como está: `Dp.Unspecified` significa que
+ * a janela nunca teve tamanho próprio e multiplicá-lo daria `NaN`.
+ */
+internal fun scaledWindowSize(
+    current: DpSize,
+    fromPercent: Int,
+    toPercent: Int,
+    maxSize: DpSize
+): DpSize {
+    if (fromPercent == toPercent || fromPercent <= 0 || toPercent <= 0) {
+        return current
+    }
+
+    val ratio = toPercent.toFloat() / fromPercent.toFloat()
+    return DpSize(
+        width = current.width.scaledBy(ratio, maxSize.width),
+        height = current.height.scaledBy(ratio, maxSize.height)
+    )
+}
+
+// `Dp.Unspecified` é `NaN`, e comparar NaN por igualdade é justamente o teste que
+// falha em silêncio: quem decide aqui é `isFinite`.
+private fun Dp.scaledBy(ratio: Float, max: Dp): Dp {
+    if (!value.isFinite()) {
+        return this
+    }
+
+    val scaled = this * ratio
+    if (!max.value.isFinite()) {
+        return scaled
+    }
+
+    return minOf(scaled, max)
+}
+
+/**
+ * Área útil da tela, para a escala alta não jogar a janela para fora dela.
+ *
+ * `maximumWindowBounds` vem em espaço de usuário — já dividido pela escala do
+ * sistema —, o que a aproxima de `Dp` mas **não** a iguala em todo monitor. É
+ * rede de segurança, não medida exata: o pior caso é a janela ficar um pouco
+ * maior que o desejado, nunca inacessível. Falha na consulta devolve
+ * `Dp.Unspecified`, que o [scaledWindowSize] trata como "sem limite".
+ */
+internal fun availableWindowSizeDp(): DpSize {
+    return runCatching {
+        val bounds = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+        DpSize(bounds.width.dp, bounds.height.dp)
+    }.getOrDefault(DpSize(Dp.Unspecified, Dp.Unspecified))
 }
 
 private fun MainWindowSnapshot.toPersistedPlacement(): PersistedWindowPlacement {

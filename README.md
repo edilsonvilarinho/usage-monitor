@@ -53,6 +53,9 @@ Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLi
 - Modal de Configuracoes com navegacao lateral (Geral, Alertas, APIs, Contas,
   Time), uma secao por vez em vez de uma coluna unica de cartoes empilhados.
 - Opacidade da janela principal ajustavel entre 50% e 100% nas Configuracoes, com persistencia local.
+- Tamanho da interface ajustavel entre 80% e 150% nas Configuracoes (padrao 115%), valendo para todas
+  as janelas. Mudar a escala redimensiona a janela principal na mesma razao, para caber o mesmo
+  conteudo.
 
 ## Screenshots
 
@@ -304,6 +307,7 @@ Chaves persistidas:
 - `cardOrder`
 - `minimizedCards`
 - `windowOpacityPercent`
+- `uiScalePercent` (escala da interface)
 - `teamUsageWindow*` (geometria da janela de Sessoes do time)
 - `teamPresenceWindow*` (geometria da janela de Conectados agora)
 

@@ -9,6 +9,7 @@ enum class SettingsField {
     AUTO_START,
     ALWAYS_ON_TOP,
     WINDOW_OPACITY,
+    UI_SCALE,
     ALERTS,
     MONITORED_APIS,
     ANTHROPIC_PROFILES,
@@ -85,6 +86,7 @@ private fun savedMessage(field: SettingsField, isPt: Boolean): String {
         SettingsField.AUTO_START -> "Inicialização com sistema salva"
         SettingsField.ALWAYS_ON_TOP -> "Preferência de janela salva"
         SettingsField.WINDOW_OPACITY -> "Opacidade salva"
+        SettingsField.UI_SCALE -> "Tamanho da interface salvo"
         SettingsField.ALERTS -> "Preferências de alerta salvas"
         SettingsField.MONITORED_APIS -> "APIs monitoradas salvas"
         SettingsField.ANTHROPIC_PROFILES -> "Contas Anthropic salvas"
@@ -105,6 +107,7 @@ private fun fieldLabel(field: SettingsField, isPt: Boolean): String {
         SettingsField.AUTO_START -> if (isPt) "inicialização com sistema" else "System startup"
         SettingsField.ALWAYS_ON_TOP -> if (isPt) "manter sempre visível" else "Always on top"
         SettingsField.WINDOW_OPACITY -> if (isPt) "opacidade da janela" else "Window opacity"
+        SettingsField.UI_SCALE -> if (isPt) "tamanho da interface" else "Interface size"
         SettingsField.ALERTS -> if (isPt) "preferências de alerta" else "Alert preferences"
         SettingsField.MONITORED_APIS -> if (isPt) "APIs monitoradas" else "Monitored APIs"
         SettingsField.ANTHROPIC_PROFILES -> if (isPt) "contas Anthropic" else "Anthropic accounts"
