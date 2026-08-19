@@ -98,11 +98,38 @@ data class TeamMemberPresence(
  * comparar dois relógios diferentes é o que faz um time inteiro aparecer online
  * para sempre quando a máquina que lê está atrasada.
  *
- * A ordem é total e determinística — trabalhando primeiro, depois online parado,
- * depois offline; dentro de cada faixa, atividade mais recente primeiro, último
- * sinal como segundo critério e o alias como desempate final. Isso é requisito
- * anti-flicker, não estética: duas leituras iguais têm de produzir listas iguais,
- * ou o `StateFlow` reemite e a tela recompõe sozinha a cada 5 segundos.
+ * A ordem é total, determinística e **imune a carimbo de tempo**: conta primeiro,
+ * depois trabalhando, depois online parado, e o alias como desempate dentro de
+ * cada faixa.
+ *
+ * **A conta é a chave primária**, pela mesma razão de
+ * `TeamUsageViewModel.flattenAccounts`: a tela agrupa por ordem de primeira
+ * aparição, então quem ordena os integrantes ordena as faixas de conta. Com o
+ * estado no topo, a faixa de uma conta ia parar onde o integrante que bateu o
+ * heartbeat mais tarde a levasse, e as três contas trocavam de lugar entre dois
+ * tiques do laço de 5s. O rótulo é o e-mail que o administrador digitou ao emitir
+ * a chave e não muda sozinho — é ele que dá uma posição estável; conta sem rótulo
+ * vai depois de todas as identificadas, por um degrau próprio do comparador e não
+ * por sentinela de texto, com o `accountKey` separando duas sem rótulo.
+ *
+ * **Nenhum carimbo de tempo entra na ordenação.** `lastSeenAt` é o heartbeat de
+ * 30s do `TeamSyncService`: entre dois integrantes online ele muda a cada batida e
+ * não informa nada — os dois estão dentro dos mesmos [PRESENCE_ONLINE_WINDOW_MILLIS].
+ * `lastActivityAt` anda a cada turno de quem está trabalhando. Qualquer um dos
+ * dois como critério reordena a lista sem nada ter mudado de fato. A informação
+ * não se perde: as duas horas continuam impressas nas colunas Estado e
+ * "Trabalhando agora".
+ *
+ * `isWorkingNow` e `isOnline` continuam antes do alias porque são a pergunta que
+ * esta tela responde, e mudam de estado — não de posição relativa a cada tique.
+ *
+ * Na janela de **uma** conta o bloco da conta é no-op (todos os integrantes têm o
+ * mesmo `accountKey`), então não existem dois caminhos de ordenação para manter em
+ * acordo.
+ *
+ * Nada disso é estética: é requisito anti-flicker. Duas leituras iguais têm de
+ * produzir listas iguais, ou o `StateFlow` reemite e a tela recompõe sozinha a
+ * cada 5 segundos.
  */
 fun Iterable<TeamMemberUsage>.toTeamPresence(referenceNow: Instant): List<TeamMemberPresence> {
     val nowMillis = referenceNow.toEpochMilliseconds()
@@ -123,10 +150,11 @@ fun Iterable<TeamMemberUsage>.toTeamPresence(referenceNow: Instant): List<TeamMe
     }
 
     return entries.sortedWith(
-        compareByDescending<TeamMemberPresence> { entry -> entry.isWorkingNow }
+        compareBy<TeamMemberPresence> { entry -> if (entry.accountLabel == null) 1 else 0 }
+            .thenBy { entry -> entry.accountLabel?.lowercase().orEmpty() }
+            .thenBy { entry -> entry.accountKey.orEmpty() }
+            .thenByDescending { entry -> entry.isWorkingNow }
             .thenByDescending { entry -> entry.isOnline }
-            .thenByDescending { entry -> entry.lastActivityAt?.toEpochMilliseconds() ?: Long.MIN_VALUE }
-            .thenByDescending { entry -> entry.lastSeenAt?.toEpochMilliseconds() ?: Long.MIN_VALUE }
             .thenBy { entry -> entry.alias.lowercase() }
             .thenBy { entry -> entry.deviceId }
     )
