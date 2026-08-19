@@ -1,15 +1,7 @@
 package com.usagemonitor.presentation.ui
 
-import com.usagemonitor.presentation.ui.components.AppButtonTone
-import com.usagemonitor.presentation.ui.components.AppDataRow
-import com.usagemonitor.presentation.ui.components.AppIconButton
-import com.usagemonitor.presentation.ui.components.AppSourceMarker
-import com.usagemonitor.presentation.ui.components.AppButton
-import com.usagemonitor.presentation.ui.components.AppSegment
-import com.usagemonitor.presentation.ui.components.AppSegmentedControl
-import com.usagemonitor.presentation.ui.components.AppTab
-import com.usagemonitor.presentation.ui.components.AppTabs
-import com.usagemonitor.presentation.ui.theme.AppSpacing
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,16 +15,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -64,12 +54,22 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageTrend
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppSegment
+import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppSourceMarker
+import com.usagemonitor.presentation.ui.components.AppTab
+import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
@@ -288,9 +288,11 @@ private fun RemoveMemberConfirmation(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(TeamUsageLabels.cancel(language))
-            }
+            AppButton(
+                label = TeamUsageLabels.cancel(language),
+                onClick = onDismiss,
+                tone = AppButtonTone.GHOST
+            )
         }
     )
 }
@@ -326,9 +328,11 @@ private fun RemoveSessionConfirmation(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(TeamUsageLabels.cancel(language))
-            }
+            AppButton(
+                label = TeamUsageLabels.cancel(language),
+                onClick = onDismiss,
+                tone = AppButtonTone.GHOST
+            )
         }
     )
 }
@@ -406,9 +410,11 @@ private fun TeamUsageList(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = onDismissRemovalError) {
-                    Text(TeamUsageLabels.cancel(language))
-                }
+                AppButton(
+                    label = TeamUsageLabels.cancel(language),
+                    onClick = onDismissRemovalError,
+                    tone = AppButtonTone.GHOST
+                )
             }
         }
 
@@ -424,9 +430,11 @@ private fun TeamUsageList(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = onDismissSessionRemovalError) {
-                    Text(TeamUsageLabels.cancel(language))
-                }
+                AppButton(
+                    label = TeamUsageLabels.cancel(language),
+                    onClick = onDismissSessionRemovalError,
+                    tone = AppButtonTone.GHOST
+                )
             }
         }
 
@@ -716,7 +724,8 @@ private fun TeamAccountGroupHeader(
             } else {
                 "${formatMicrosUsd(group.totalCostMicros)}+"
             },
-            valueColor = accents.input,
+            // Custo na cor do texto, como na lista da máquina: azul só no custo
+            // sugeria uma categoria que as outras colunas não têm.
             modifier = Modifier.width(TEAM_COLUMN_COST)
         )
 
@@ -1061,7 +1070,6 @@ private fun TeamMemberRow(
                 } else {
                     "${formatMicrosUsd(member.totalCostMicros)}+"
                 },
-                valueColor = accents.input,
                 modifier = Modifier.width(TEAM_COLUMN_COST)
             )
 
@@ -1144,9 +1152,11 @@ private fun TeamSessionDetailPane(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onCloseDetail) {
-                Text(TeamUsageLabels.back(language))
-            }
+            AppButton(
+                label = TeamUsageLabels.back(language),
+                onClick = onCloseDetail,
+                tone = AppButtonTone.GHOST
+            )
             Text(
                 text = shortSessionId(detail.sessionId),
                 style = MaterialTheme.typography.titleMedium,

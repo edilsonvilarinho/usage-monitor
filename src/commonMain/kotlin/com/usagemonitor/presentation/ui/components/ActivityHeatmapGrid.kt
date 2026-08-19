@@ -19,10 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import kotlinx.datetime.DayOfWeek
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliActivityHeatmap
 import com.usagemonitor.presentation.ui.theme.AppShapes
-import kotlinx.datetime.DayOfWeek
 
 const val ACTIVITY_HEATMAP_TAG = "activityHeatmap"
 

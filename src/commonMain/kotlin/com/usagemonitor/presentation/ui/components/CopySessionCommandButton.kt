@@ -23,10 +23,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.resumeSessionCommand
-import kotlinx.coroutines.delay
 
 /** Quanto tempo o botão fica confirmando a cópia antes de voltar ao normal. */
 private const val COPY_FEEDBACK_MILLIS = 2_000L

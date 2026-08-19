@@ -2,7 +2,6 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import com.usagemonitor.presentation.ui.theme.AppMotion
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.theme.AppMotion
 
 /**
  * Componente de arco de progresso para exibir uso de tokens/requisições.

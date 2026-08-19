@@ -1,14 +1,14 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -38,9 +38,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -217,10 +218,16 @@ fun AppTextField(
                 contentAlignment = Alignment.CenterStart
             ) {
                 if (value.isEmpty() && placeholder != null) {
+                    // Fora da árvore semântica: o `BasicTextField` mescla os
+                    // descendentes, e o placeholder acabava dentro do texto do
+                    // próprio campo — um campo vazio passava a "conter" o texto
+                    // de exemplo, e um `onNodeWithText` do exemplo encontrava
+                    // dois nós.
                     Text(
                         text = placeholder,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                        modifier = Modifier.clearAndSetSemantics { }
                     )
                 }
                 innerTextField()
@@ -318,6 +325,58 @@ fun AppSegmentedControl(
                 onClick = { onSelect(index) }
             )
         }
+    }
+}
+
+/**
+ * Chip de alternância: uma restrição ligada ou desligada.
+ *
+ * Não é [AppSegmentedControl] com duas opções — segmentado diz "ou isto, ou
+ * aquilo", e aqui existe um estado só, que está ativo ou não. Carrega
+ * `selectable` pela mesma razão do segmentado: é o que `assertIsSelected`
+ * observa.
+ */
+@Composable
+fun AppToggleChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    val container = if (selected) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val border = if (selected) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    val content = if (selected) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val alpha = if (enabled) 1f else DISABLED_ALPHA
+
+    Box(
+        modifier = modifier
+            .clip(AppShapes.small)
+            .background(container.copy(alpha = container.alpha * alpha))
+            .border(AppBorderWidth, border.copy(alpha = alpha), AppShapes.small)
+            .selectable(selected = selected, enabled = enabled, onClick = onClick)
+            .defaultMinSize(minHeight = CONTROL_HEIGHT)
+            .padding(horizontal = AppSpacing.sm),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = content.copy(alpha = alpha),
+            maxLines = 1
+        )
     }
 }
 

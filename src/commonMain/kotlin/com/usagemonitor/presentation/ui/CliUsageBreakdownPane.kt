@@ -1,12 +1,5 @@
 package com.usagemonitor.presentation.ui
 
-import com.usagemonitor.presentation.ui.components.AppIconButton
-import com.usagemonitor.presentation.ui.components.AppSegment
-import com.usagemonitor.presentation.ui.components.AppSegmentedControl
-import com.usagemonitor.presentation.ui.components.AppTab
-import com.usagemonitor.presentation.ui.components.AppTabs
-import com.usagemonitor.presentation.ui.components.AppTextField
-import com.usagemonitor.presentation.ui.theme.AppSpacing
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,9 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -57,9 +50,16 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.presentation.ui.components.ActivityHeatmapGrid
+import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppSegment
+import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppTab
+import com.usagemonitor.presentation.ui.components.AppTabs
+import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 const val BREAKDOWN_SCROLLBAR_TAG = "breakdownScrollbar"
 const val BREAKDOWN_PANE_TAG = "breakdownPane"
