@@ -308,6 +308,23 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
 - A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
   as capturas do README continuam com a moldura inteira.
 
+**Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
+abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e
+a janela do modo somente cards tem ~230dp úteis — ali a tooltip cobre o card inteiro, escondendo
+justamente o número que o ponteiro apontava. Constante **própria** e não reuso de
+`NarrowCardWidthThreshold`, que coincide no valor mas responde a outra pergunta: uma é sobre apertar
+padding, a outra é sobre o popup caber. O preço está aceito: em card estreito não há caminho visual
+para a projeção de uso, e ela volta abrindo a janela. Só as tooltips de **cota** caem — as de uma
+linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
+- **A `testTag` do bloco de cota mora no conteúdo, não no `HoverTooltipBox`.** Presa à tooltip, ela
+  desapareceria da árvore junto com ela em card estreito, e os testes que buscam `quotaBlockTag`
+  passariam a não encontrar nó nenhum.
+- **A explicação do semáforo é o `footnote` da tooltip da cota.** O ponto colorido nunca teve
+  tooltip própria — os dois usos de `RiskSemaphoreDot` passam `showTooltip = false`, porque dois
+  `TooltipBox` aninhados disputam o mesmo hover —, e por isso a frase de `riskDotTooltipSubtitle`
+  não chegava à tela em tamanho nenhum de janela. A métrica `Projeção de uso` continua ao lado: ela
+  diz qual é o estado, o rodapé diz o que ele significa.
+
 **Regras que continuam valendo**: nenhuma animação infinita nova (trava o `waitForIdle`);
 `ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
 `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.

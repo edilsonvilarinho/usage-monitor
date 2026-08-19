@@ -718,6 +718,106 @@ class ComponentTest {
     }
 
     /**
+     * Abaixo do piso de largura o popup de cota cobre o card inteiro — a janela do
+     * modo somente cards tem ~230dp de largura útil. Ali o hover não abre nada.
+     */
+    @Test
+    fun `ApiUsageCard drops the quota tooltip on a narrow card`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(240.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(
+                            QuotaInfo(
+                                label = "Claude 5h",
+                                used = 45L,
+                                total = 100L,
+                                periodEndAt = Instant.parse("2026-04-28T17:40:00Z"),
+                                periodType = PeriodType.INTERVAL,
+                                unit = UsageUnit.TOKENS,
+                                rawUsed = 1800L,
+                                rawTotal = 4000L
+                            )
+                        ),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        isMinimized = true,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {},
+                        now = Instant.parse("2026-04-28T10:00:00Z")
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Claude 5h").performMouseInput { moveTo(center) }
+        waitForIdle()
+
+        // `waitForIdle` e não `waitUntil`: este espera algo aparecer, e aqui a
+        // afirmação é que nada aparece.
+        onAllNodesWithText("Uso atual").assertCountEquals(0)
+        onAllNodesWithText("Restante").assertCountEquals(0)
+
+        // A `testTag` do bloco saiu do `HoverTooltipBox` e desceu para o conteúdo:
+        // sem isso o nó sumiria da árvore junto com a tooltip.
+        onNodeWithTag(quotaBlockTag("Claude 5h"), useUnmergedTree = true).assertExists()
+    }
+
+    /**
+     * O ponto do semáforo nunca teve tooltip própria — os dois usos passam
+     * `showTooltip = false`, porque dois `TooltipBox` aninhados disputam o hover.
+     * A explicação vive no rodapé da tooltip da cota.
+     */
+    @Test
+    fun `ApiUsageCard explains the risk dot in the tooltip footnote`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 7d",
+            used = 60L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.TOKENS
+        )
+
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.ON_TRACK,
+                            estimatedExhaustionAt = null
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-04-28T10:00:00Z")
+                )
+            }
+        }
+
+        onNodeWithText("Semanal").performMouseInput { moveTo(center) }
+
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithText("No ritmo atual, a cota deve resetar antes de esgotar.")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        // O valor continua na métrica; o rodapé diz o que ele significa.
+        onNodeWithText("Projeção de uso").assertIsDisplayed()
+    }
+
+    /**
      * Issue #36: com o reset já vencido o card mostrava o horário passado como se
      * fosse futuro, ao lado do percentual saturado da janela anterior.
      */

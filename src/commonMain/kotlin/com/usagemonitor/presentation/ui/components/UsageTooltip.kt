@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,7 +37,16 @@ internal fun UsageTooltipContent(
     metrics: List<TooltipMetric>,
     modifier: Modifier = Modifier,
     title: String? = null,
-    subtitle: String? = null
+    subtitle: String? = null,
+    /**
+     * Frase que explica o estado, abaixo de uma divisória.
+     *
+     * Existe porque a métrica sozinha diz *qual* é o estado e não o que ele
+     * significa: "Projeção de uso — Normal" não conta que a leitura é sobre a cota
+     * resetar antes de esgotar. É `bodySmall` — sans, texto corrido — e não `label*`,
+     * que nesta escala é rótulo e número.
+     */
+    footnote: String? = null
 ) {
     Surface(
         modifier = modifier.widthIn(max = 280.dp),
@@ -96,6 +106,15 @@ internal fun UsageTooltipContent(
                     )
                 }
             }
+
+            if (!footnote.isNullOrBlank()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text(
+                    text = footnote,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -107,6 +126,7 @@ internal fun HoverTooltipBox(
     modifier: Modifier = Modifier,
     title: String? = null,
     subtitle: String? = null,
+    footnote: String? = null,
     content: @Composable () -> Unit
 ) {
     TooltipBox(
@@ -115,7 +135,8 @@ internal fun HoverTooltipBox(
             UsageTooltipContent(
                 title = title,
                 subtitle = subtitle,
-                metrics = metrics
+                metrics = metrics,
+                footnote = footnote
             )
         },
         state = rememberTooltipState(isPersistent = true)
