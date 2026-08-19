@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,16 +15,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -54,12 +54,22 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageTrend
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppSegment
+import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppSourceMarker
+import com.usagemonitor.presentation.ui.components.AppTab
+import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
@@ -278,9 +288,11 @@ private fun RemoveMemberConfirmation(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(TeamUsageLabels.cancel(language))
-            }
+            AppButton(
+                label = TeamUsageLabels.cancel(language),
+                onClick = onDismiss,
+                tone = AppButtonTone.GHOST
+            )
         }
     )
 }
@@ -316,9 +328,11 @@ private fun RemoveSessionConfirmation(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(TeamUsageLabels.cancel(language))
-            }
+            AppButton(
+                label = TeamUsageLabels.cancel(language),
+                onClick = onDismiss,
+                tone = AppButtonTone.GHOST
+            )
         }
     )
 }
@@ -396,9 +410,11 @@ private fun TeamUsageList(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = onDismissRemovalError) {
-                    Text(TeamUsageLabels.cancel(language))
-                }
+                AppButton(
+                    label = TeamUsageLabels.cancel(language),
+                    onClick = onDismissRemovalError,
+                    tone = AppButtonTone.GHOST
+                )
             }
         }
 
@@ -414,9 +430,11 @@ private fun TeamUsageList(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = onDismissSessionRemovalError) {
-                    Text(TeamUsageLabels.cancel(language))
-                }
+                AppButton(
+                    label = TeamUsageLabels.cancel(language),
+                    onClick = onDismissSessionRemovalError,
+                    tone = AppButtonTone.GHOST
+                )
             }
         }
 
@@ -578,8 +596,6 @@ private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
         ) {
             DepthSurface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = AppShapes.large,
-                elevation = AppElevation.dialog,
                 contentPadding = 16.dp
             ) {
                 Text(
@@ -708,7 +724,8 @@ private fun TeamAccountGroupHeader(
             } else {
                 "${formatMicrosUsd(group.totalCostMicros)}+"
             },
-            valueColor = accents.input,
+            // Custo na cor do texto, como na lista da máquina: azul só no custo
+            // sugeria uma categoria que as outras colunas não têm.
             modifier = Modifier.width(TEAM_COLUMN_COST)
         )
 
@@ -783,8 +800,6 @@ private fun TeamUsageHeader(
 
     DepthSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.large,
-        elevation = AppElevation.dialog,
         contentPadding = 16.dp
     ) {
         Row(
@@ -887,58 +902,57 @@ private fun TeamUsageHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            for (entry in CliSessionRange.entries) {
-                FilterChip(
-                    selected = state.range == entry,
-                    onClick = { onSelectRange(entry) },
-                    label = { Text(TeamUsageLabels.rangeLabel(entry, language)) }
-                )
-            }
+            AppSegmentedControl(
+                options = CliSessionRange.entries.map { entry ->
+                    AppSegment(label = TeamUsageLabels.rangeLabel(entry, language))
+                },
+                selectedIndex = CliSessionRange.entries.indexOf(state.range),
+                onSelect = { index -> onSelectRange(CliSessionRange.entries[index]) }
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         // Abas depois dos chips de janela, como no modal da máquina: a janela vale
         // para as leituras de dentro, então trocá-la é a escolha de fora.
-        FlowRow(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             val view = state.effectiveView
-
-            FilterChip(
-                selected = view == TeamUsageView.MEMBERS,
-                onClick = { onSelectView(TeamUsageView.MEMBERS) },
-                label = { Text(TeamUsageLabels.tabMembers(language)) },
-                modifier = Modifier.testTag(TEAM_TAB_MEMBERS_TAG)
-            )
-            FilterChip(
-                selected = view == TeamUsageView.BREAKDOWN,
-                onClick = { onSelectView(TeamUsageView.BREAKDOWN) },
-                label = { Text(BreakdownLabels.tabBreakdown(language)) },
-                modifier = Modifier.testTag(TEAM_TAB_BREAKDOWN_TAG)
-            )
             // Na visão global a série nunca é carregada — uma linha por conta não
-            // caberia num gráfico só — e um chip que nunca mostra nada é pior que
-            // chip nenhum.
-            if (state.isTrendAvailable) {
-                FilterChip(
-                    selected = view == TeamUsageView.TREND,
-                    onClick = { onSelectView(TeamUsageView.TREND) },
-                    label = { Text(TeamUsageLabels.tabTrend(language)) },
-                    modifier = Modifier.testTag(TEAM_TAB_TREND_TAG)
-                )
+            // caberia num gráfico só — e uma aba que nunca mostra nada é pior que
+            // aba nenhuma.
+            val tabs = buildList {
+                add(AppTab(label = TeamUsageLabels.tabMembers(language), testTag = TEAM_TAB_MEMBERS_TAG))
+                add(AppTab(label = BreakdownLabels.tabBreakdown(language), testTag = TEAM_TAB_BREAKDOWN_TAG))
+                if (state.isTrendAvailable) {
+                    add(AppTab(label = TeamUsageLabels.tabTrend(language), testTag = TEAM_TAB_TREND_TAG))
+                }
             }
+            val views = buildList {
+                add(TeamUsageView.MEMBERS)
+                add(TeamUsageView.BREAKDOWN)
+                if (state.isTrendAvailable) {
+                    add(TeamUsageView.TREND)
+                }
+            }
+
+            AppTabs(
+                tabs = tabs,
+                selectedIndex = views.indexOf(view).coerceAtLeast(0),
+                onSelect = { index -> onSelectView(views[index]) },
+                modifier = Modifier.weight(1f)
+            )
 
             // O relatorio nao segue a aba: ele e o recorte inteiro da janela, com
             // integrantes, resumo e sessoes juntos.
-            TextButton(
+            AppButton(
+                label = ExportLabels.exportPdf(language),
                 onClick = onExportReport,
                 modifier = Modifier.testTag(TEAM_EXPORT_PDF_TAG)
-            ) {
-                Text(ExportLabels.exportPdf(language))
-            }
+            )
         }
 
         val exportOutcome = state.exportOutcome
@@ -974,20 +988,18 @@ private fun TeamMemberRow(
     // quem consumiu daria a impressão de atividade que não houve.
     val accent = if (member.hasActivity) accents.cacheRead else MaterialTheme.colorScheme.outline
 
-    DepthSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = member.hasActivity, onClick = onToggle)
-            .testTag("$TEAM_MEMBER_ROW_TAG_PREFIX${member.deviceId}"),
-        contentPadding = 0.dp
+    // Linha de tabela, não card: eram até vinte cards empilhados numa janela de
+    // time grande. O marcador de 2dp mantém a leitura de "esta pessoa produziu"
+    // que o acento do card dava, sem pintar a linha inteira.
+    AppDataRow(
+        modifier = Modifier.testTag("$TEAM_MEMBER_ROW_TAG_PREFIX${member.deviceId}"),
+        onClick = if (member.hasActivity) onToggle else null,
+        horizontalPadding = TEAM_ROW_HORIZONTAL_PADDING,
+        verticalPadding = TEAM_MEMBER_VERTICAL_PADDING
     ) {
+        AppSourceMarker(color = accent)
         FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = TEAM_ROW_HORIZONTAL_PADDING,
-                    vertical = TEAM_MEMBER_VERTICAL_PADDING
-                ),
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(TEAM_MEMBER_WRAPPED_ROW_GAP)
         ) {
@@ -1058,7 +1070,6 @@ private fun TeamMemberRow(
                 } else {
                     "${formatMicrosUsd(member.totalCostMicros)}+"
                 },
-                valueColor = accents.input,
                 modifier = Modifier.width(TEAM_COLUMN_COST)
             )
 
@@ -1094,14 +1105,17 @@ private fun TeamMemberRow(
             }
 
             if (removable) {
-                IconButton(
+                AppIconButton(
+                    contentDescription = TeamUsageLabels.removeMember(language),
                     onClick = onRemove,
+                    tone = AppButtonTone.DANGER,
                     modifier = Modifier.testTag("$TEAM_MEMBER_REMOVE_TAG_PREFIX${member.deviceId}")
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = TeamUsageLabels.removeMember(language),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.error
                     )
                 }
             }
@@ -1138,9 +1152,11 @@ private fun TeamSessionDetailPane(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onCloseDetail) {
-                Text(TeamUsageLabels.back(language))
-            }
+            AppButton(
+                label = TeamUsageLabels.back(language),
+                onClick = onCloseDetail,
+                tone = AppButtonTone.GHOST
+            )
             Text(
                 text = shortSessionId(detail.sessionId),
                 style = MaterialTheme.typography.titleMedium,

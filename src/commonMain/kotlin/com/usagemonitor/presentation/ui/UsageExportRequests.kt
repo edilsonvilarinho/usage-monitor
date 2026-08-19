@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui
 
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.data.export.UsageExporter
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
@@ -8,9 +11,6 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.presentation.ui.report.UsageReportDocument
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 /**
  * O que gravar, já pronto, e o nome sugerido no diálogo de arquivo.

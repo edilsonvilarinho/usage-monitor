@@ -1,10 +1,15 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import kotlin.math.roundToInt
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
@@ -15,11 +20,6 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.darkAppAccents
-import kotlinx.datetime.Instant
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.math.roundToInt
 
 internal data class OpenCodeModelSummary(
     val modelName: String,

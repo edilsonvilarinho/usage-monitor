@@ -30,9 +30,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamKeyEntry
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppTextField
+import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
-import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamKeysUiState
 
@@ -150,7 +153,11 @@ private fun TeamKeysList(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f).testTag(TEAM_KEYS_ERROR_TAG)
                 )
-                TextButton(onClick = onDismissError) { Text(TeamKeysLabels.dismiss(language)) }
+                AppButton(
+                    label = TeamKeysLabels.dismiss(language),
+                    onClick = onDismissError,
+                    tone = AppButtonTone.GHOST
+                )
             }
         }
 
@@ -195,12 +202,18 @@ private fun CreateKeyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedTextField(
+        // O rótulo do campo vira texto ao lado, e não `label` flutuante: um
+        // campo de 28dp não tem altura para acomodar o rótulo subindo por cima
+        // da borda, que é como o Material o desenha.
+        Text(
+            text = TeamKeysLabels.labelField(language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        AppTextField(
             value = label,
             onValueChange = { text -> label = text },
-            label = { Text(TeamKeysLabels.labelField(language)) },
-            placeholder = { Text(TeamKeysLabels.labelPlaceholder(language)) },
-            singleLine = true,
+            placeholder = TeamKeysLabels.labelPlaceholder(language),
             enabled = enabled,
             modifier = Modifier.weight(1f).testTag(TEAM_KEYS_CREATE_FIELD_TAG)
         )
@@ -235,9 +248,12 @@ private fun MaxAccountsStepper(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TextButton(onClick = { onChange(value - 1) }, enabled = enabled && value > 1) {
-            Text("−")
-        }
+        AppButton(
+            label = "−",
+            onClick = { onChange(value - 1) },
+            enabled = enabled && value > 1,
+            tone = AppButtonTone.GHOST
+        )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = "$value", style = MaterialTheme.typography.titleSmall)
             Text(
@@ -246,7 +262,12 @@ private fun MaxAccountsStepper(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        TextButton(onClick = { onChange(value + 1) }, enabled = enabled) { Text("+") }
+        AppButton(
+            label = "+",
+            onClick = { onChange(value + 1) },
+            enabled = enabled,
+            tone = AppButtonTone.GHOST
+        )
     }
 }
 
@@ -307,14 +328,16 @@ private fun TeamKeyCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            TextButton(onClick = { revealed = !revealed }) {
-                Text(
-                    if (revealed) TeamKeysLabels.hide(language) else TeamKeysLabels.show(language)
-                )
-            }
-            TextButton(onClick = { clipboard.setText(AnnotatedString(entry.key)) }) {
-                Text(TeamKeysLabels.copy(language))
-            }
+            AppButton(
+                label = if (revealed) TeamKeysLabels.hide(language) else TeamKeysLabels.show(language),
+                onClick = { revealed = !revealed },
+                tone = AppButtonTone.GHOST
+            )
+            AppButton(
+                label = TeamKeysLabels.copy(language),
+                onClick = { clipboard.setText(AnnotatedString(entry.key)) },
+                tone = AppButtonTone.GHOST
+            )
         }
 
         // O vínculo é a prova de a quem a chave pertence — o rótulo acima é só
@@ -343,12 +366,12 @@ private fun TeamKeyCard(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(
+                        AppButton(
+                            label = TeamKeysLabels.unlink(language),
                             onClick = { onUnclaim(entry.id, accountKey) },
-                            enabled = enabled
-                        ) {
-                            Text(TeamKeysLabels.unlink(language))
-                        }
+                            enabled = enabled,
+                            tone = AppButtonTone.GHOST
+                        )
                     }
                 }
             }
@@ -366,12 +389,18 @@ private fun TeamKeyCard(
                 onChange = { value -> onSetMaxAccounts(entry.id, value) }
             )
             Box(modifier = Modifier.weight(1f))
-            TextButton(onClick = { onRegenerate(entry.id) }, enabled = enabled) {
-                Text(TeamKeysLabels.regenerate(language))
-            }
-            TextButton(onClick = { onRevoke(entry.id) }, enabled = enabled && !entry.isRevoked) {
-                Text(TeamKeysLabels.revoke(language))
-            }
+            AppButton(
+                label = TeamKeysLabels.regenerate(language),
+                onClick = { onRegenerate(entry.id) },
+                enabled = enabled,
+                tone = AppButtonTone.GHOST
+            )
+            AppButton(
+                label = TeamKeysLabels.revoke(language),
+                onClick = { onRevoke(entry.id) },
+                enabled = enabled && !entry.isRevoked,
+                tone = AppButtonTone.GHOST
+            )
         }
 
         RenameRow(entry = entry, language = language, enabled = enabled, onRename = onRename)
@@ -389,9 +418,12 @@ private fun RenameRow(
     var draft by remember(entry.id) { mutableStateOf(entry.label) }
 
     if (!editing) {
-        TextButton(onClick = { editing = true }, enabled = enabled) {
-            Text(TeamKeysLabels.rename(language))
-        }
+        AppButton(
+            label = TeamKeysLabels.rename(language),
+            onClick = { editing = true },
+            enabled = enabled,
+            tone = AppButtonTone.GHOST
+        )
         return
     }
 
@@ -417,12 +449,14 @@ private fun RenameRow(
         ) {
             Text(TeamKeysLabels.save(language))
         }
-        TextButton(onClick = {
+        AppButton(
+            label = TeamKeysLabels.cancel(language),
+            onClick = {
             draft = entry.label
             editing = false
-        }) {
-            Text(TeamKeysLabels.cancel(language))
-        }
+        },
+            tone = AppButtonTone.GHOST
+        )
     }
 }
 

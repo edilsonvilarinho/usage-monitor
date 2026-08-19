@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithTag
@@ -113,7 +112,9 @@ class AppControlsTest {
             }
         }
 
-        onNodeWithText("Filtrar").assertIsDisplayed()
+        // O placeholder não entra na árvore semântica de propósito: o
+        // `BasicTextField` mescla descendentes, e um campo vazio passaria a
+        // "conter" o texto de exemplo. Quem o vê é o olho, não o assert.
         onNodeWithTag("field").performTextInput("alpha")
 
         assertEquals("alpha", typed)

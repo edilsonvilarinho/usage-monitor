@@ -1,13 +1,13 @@
 package com.usagemonitor.presentation.ui
 
+import kotlin.math.abs
+import kotlin.math.roundToLong
+import kotlinx.datetime.Instant
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.MICROS_PER_USD
-import kotlinx.datetime.Instant
-import kotlin.math.abs
-import kotlin.math.roundToLong
 
 /** Formata micros de USD como `$1.2345` — quatro casas, porque turnos custam centavos de centavo. */
 internal fun formatMicrosUsd(micros: Long): String {
