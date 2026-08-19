@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithTag
@@ -165,4 +166,32 @@ class AppControlsTest {
 
         assertEquals(2, chosen)
     }
+
+    @Test
+    fun `todo segmento preenche a altura do controle`() = runDesktopComposeUiTest {
+        // O ultimo segmento e o que denuncia: sem preencher a altura, o canto
+        // arredondado do clip do controle o corta e a tela mostra botao cortado.
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    AppSegmentedControl(
+                        options = listOf(
+                            AppSegment("5h", testTag = "segment-5h"),
+                            AppSegment("Total", testTag = "segment-total")
+                        ),
+                        selectedIndex = 0,
+                        onSelect = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag("segment-5h").assertHeightIsEqualTo(SEGMENT_CONTROL_HEIGHT)
+        onNodeWithTag("segment-total").assertHeightIsEqualTo(SEGMENT_CONTROL_HEIGHT)
+    }
 }
+
+// Espelha `CONTROL_HEIGHT` de `AppControls.kt`, que e privado. O teste existe para
+// prender a altura do segmento a do controle, entao um valor divergente aqui falha
+// exatamente como deveria.
+private val SEGMENT_CONTROL_HEIGHT = 28.dp

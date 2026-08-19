@@ -661,25 +661,34 @@ fun main() = application {
     // daqui e nunca de 100 — duas mudanças seguidas multiplicariam duas vezes.
     var appliedUiScalePercent by remember { mutableStateOf(uiScalePercent) }
     var uiScaleSaveGeneration by remember { mutableStateOf(0) }
+    // A área útil da tela é lida uma vez e vale para as sete janelas: nenhuma delas
+    // tem moldura do sistema, então nascer maior que o monitor é nascer sem botão
+    // de fechar.
+    val screenWorkArea = remember { availableWindowAreaDp() }
     val mainWindowState = rememberPersistedMainWindowState(
         persistedState = persistedMainWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val historyWindowState = rememberPersistedHistoryWindowState(
         persistedState = persistedHistoryWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val cliSessionsWindowState = rememberPersistedCliSessionsWindowState(
         persistedState = persistedCliSessionsWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val teamUsageWindowState = rememberPersistedTeamUsageWindowState(
         persistedState = persistedTeamUsageWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     val teamPresenceWindowState = rememberPersistedTeamPresenceWindowState(
         persistedState = persistedTeamPresenceWindowState,
-        uiScalePercent = uiScalePercent
+        uiScalePercent = uiScalePercent,
+        workArea = screenWorkArea
     )
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
@@ -1475,11 +1484,22 @@ fun main() = application {
             // da interface, pelo mesmo motivo de `scaledWindowSize`: ela multiplica
             // a densidade do conteúdo, então a 150% a mesma janela mostra menos
             // colunas e o piso precisa subir junto.
+            //
+            // O piso também é preso à área útil: a 150% ele daria 1410dp de largura,
+            // mais que um monitor de 1366, e um piso maior que a tela não é piso —
+            // é janela que nem arrastando a borda cabe.
             val presenceMinimumScale = uiScaleFactor(uiScalePercent)
-            LaunchedEffect(presenceMinimumScale) {
+            LaunchedEffect(presenceMinimumScale, screenWorkArea) {
+                val minimum = fitWindowSize(
+                    DpSize(
+                        width = TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP.dp * presenceMinimumScale,
+                        height = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP.dp * presenceMinimumScale
+                    ),
+                    screenWorkArea
+                )
                 window.minimumSize = java.awt.Dimension(
-                    (TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP * presenceMinimumScale).roundToInt(),
-                    (TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP * presenceMinimumScale).roundToInt()
+                    minimum.width.value.roundToInt(),
+                    minimum.height.value.roundToInt()
                 )
             }
             AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
@@ -1511,10 +1531,16 @@ fun main() = application {
             title = keysTitle,
             icon = iconImage,
             // O tamanho literal acompanha a escala: a 150% o conteúdo cresce e a
-            // moldura fixa o espremeria.
+            // moldura fixa o espremeria. E é preso à área útil pelo mesmo motivo das
+            // janelas: o diálogo também é `undecorated`.
             state = rememberDialogState(
-                width = 760.dp * uiScaleFactor(uiScalePercent),
-                height = 640.dp * uiScaleFactor(uiScalePercent)
+                size = fitWindowSize(
+                    DpSize(
+                        width = 760.dp * uiScaleFactor(uiScalePercent),
+                        height = 640.dp * uiScaleFactor(uiScalePercent)
+                    ),
+                    screenWorkArea
+                )
             ),
             undecorated = true
         ) {
@@ -1542,8 +1568,13 @@ fun main() = application {
             // de 150dp, e em 620 o conteúdo ficava com menos de 470 — estreito
             // demais para as linhas de rótulo + controle das seções de Time.
             state = rememberDialogState(
-                width = 820.dp * uiScaleFactor(uiScalePercent),
-                height = 720.dp * uiScaleFactor(uiScalePercent)
+                size = fitWindowSize(
+                    DpSize(
+                        width = 820.dp * uiScaleFactor(uiScalePercent),
+                        height = 720.dp * uiScaleFactor(uiScalePercent)
+                    ),
+                    screenWorkArea
+                )
             ),
             resizable = true,
             undecorated = true
@@ -1832,14 +1863,18 @@ fun main() = application {
 @Composable
 private fun rememberPersistedMainWindowState(
     persistedState: PersistedMainWindowState,
-    uiScalePercent: Int
+    uiScalePercent: Int,
+    workArea: ScreenWorkArea
 ) = when {
     persistedState.widthDp != null && persistedState.heightDp != null -> {
         rememberWindowState(
             placement = persistedState.composePlacement,
-            size = DpSize(
-                width = persistedState.composeWidth,
-                height = persistedState.composeHeight
+            size = fitWindowSize(
+                DpSize(
+                    width = persistedState.composeWidth,
+                    height = persistedState.composeHeight
+                ),
+                workArea
             )
         )
     }
@@ -1854,9 +1889,12 @@ private fun rememberPersistedMainWindowState(
     // acompanhar a escala: na primeira execução não há tamanho persistido, e sem
     // isto o app subiria com a moldura de 100% e o conteúdo de 115%.
     else -> rememberWindowState(
-        size = DpSize(
-            width = 800.dp * uiScaleFactor(uiScalePercent),
-            height = 600.dp * uiScaleFactor(uiScalePercent)
+        size = fitWindowSize(
+            DpSize(
+                width = 800.dp * uiScaleFactor(uiScalePercent),
+                height = 600.dp * uiScaleFactor(uiScalePercent)
+            ),
+            workArea
         )
     )
 }
