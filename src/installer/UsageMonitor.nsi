@@ -46,6 +46,20 @@ SetCompressor zlib
 !define PRODUCT_VERSION "37.0.0"
 !endif
 
+; Payload e destino parametrizaveis. Os defaults sao exatamente os caminhos que o
+; buildNsisInstaller do Gradle usa hoje, entao o build de release nao muda: quem
+; passa /D e o roteiro de cenarios (src/installer/test/Invoke-UpdateScenarios.ps1),
+; que precisa compilar ESTE arquivo -- e nao uma copia dele -- contra um payload
+; minusculo. Cenario que testa um .nsi paralelo nao testa o instalador que sai no
+; release.
+!ifndef APP_FILES_DIR
+!define APP_FILES_DIR "..\..\build\installer\files"
+!endif
+
+!ifndef OUTPUT_FILE
+!define OUTPUT_FILE "..\..\build\installer\UsageMonitor-Setup-${PRODUCT_VERSION}.exe"
+!endif
+
 !define PRODUCT_NAME "Usage Monitor"
 !define PRODUCT_PUBLISHER "Usage Monitor"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
@@ -55,7 +69,7 @@ SetCompressor zlib
 ; Installer attributes
 ; -----------------------------------------------
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "..\..\build\installer\UsageMonitor-Setup-${PRODUCT_VERSION}.exe"
+OutFile "${OUTPUT_FILE}"
 InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
 InstallDirRegKey HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation"
 RequestExecutionLevel user
@@ -134,7 +148,7 @@ Section "Usage Monitor" SEC_APP
 
     SetOutPath "$INSTDIR"
     SetDetailsPrint none
-    File /r "..\..\build\installer\files\*.*"
+    File /r "${APP_FILES_DIR}\*.*"
     SetDetailsPrint both
 
     ; Write registry for uninstaller (user-level)
