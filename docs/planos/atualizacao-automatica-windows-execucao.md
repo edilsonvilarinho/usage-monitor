@@ -85,8 +85,14 @@ Este trabalho toca três pontos:
 a árvore nova está completa faz dois `Rename` no mesmo volume: `$INSTDIR` → `$INSTDIR.old` e
 `$INSTDIR.new` → `$INSTDIR`. Qualquer falha antes do primeiro `Rename` aborta com `$INSTDIR`
 **intacto**; falha no segundo desfaz o primeiro. A janela em que a instalação não está inteira é a
-distância entre dois `MoveFile` no mesmo volume. Isso remove por construção a dependência de
-`.onInstFailed` — que o caminho anterior tinha e que nunca rodava.
+distância entre dois `MoveFile` no mesmo volume.
+
+Com isso o caminho de recuperação **não depende de `.onInstFailed`** — não porque o callback não
+funcione, mas porque não precisa existir para o `$INSTDIR` sobreviver. A A02 mediu: `Abort` dentro de
+`Section` sob `/S` **roda `.onInstFailed`**, sai com exit code 2 e não roda `.onInstSuccess`. A
+suposição herdada da auditoria anterior — de que o callback nunca rodava — está **errada**, e o
+`.onInstFailed` entra como segunda linha de defesa para o caso de `File /r` abortar a instalação por
+conta própria.
 
 **2. O `Rename` é a sonda de liveness, não o `taskkill /F`.** No Windows não se renomeia diretório
 que contém imagem de executável em uso: `Rename` que **funciona** prova que o processo saiu. O
@@ -167,19 +173,35 @@ existe.
 | **A19** | `MIN_UPDATABLE_TARGET_VERSION` recebe a versão desta release; README alinhado ao comportamento real | ligação da funcionalidade |
 | **A20** | Smoke test empacotado nesta máquina, roteiro abaixo | registro nos Pontos de situação |
 
-## A02 — medir o NSIS antes de escrever o NSIS
+## A02 — o que foi medido no NSIS
 
-O `makensis.exe` está em `C:/Program Files (x86)/NSIS/` na máquina de desenvolvimento e o CI já o
-instala (`release-linux.yml:200`). Três semânticas são load-bearing e **não podem ser assumidas**;
-medir com scripts descartáveis e registrar o resultado como comentário no `.nsi`:
+Seis instaladores-sonda compilados com o `makensis` da máquina e **executados de verdade**. O bloco de
+comentário no topo de `src/installer/UsageMonitor.nsi` guarda o resumo; os resultados completos:
 
-1. `MessageBox` sem `/SD` num instalador `/S` — exibe, bloqueia, ou é pulado? (`.onInit:66` tem um.)
-2. A flag de erro sobrevive a `RMDir /r` sobre diretório inexistente e a `${GetOptions}` com opção
-   ausente? `IfErrors` limpa a flag ao desviar?
-3. `Abort` dentro de `Section` dispara `.onInstFailed`? Qual o exit code do processo?
+| # | Pergunta | Resultado medido |
+|---|---|---|
+| 1 | `MessageBox` sem `/SD` sob `/S` | **Exibe e bloqueia.** Sonda morta por timeout de 12 s com o log parado antes do desvio. O `MessageBox` do `.onInit` atual **trava para sempre** qualquer execução silenciosa deste instalador. |
+| 2 | Comando bem-sucedido limpa a flag de erro? | **Não.** `CreateDirectory` e `Rename` com sucesso deixaram um `SetErrors` anterior intacto. A flag é sticky. |
+| 3 | `IfErrors` limpa a flag ao ler? | **Sim.** Duas leituras seguidas de um `SetErrors` deram `SET` e depois `clean`. |
+| 4 | `RMDir /r` sobre diretório inexistente seta a flag? | **Não.** |
+| 5 | `${GetOptions}` com opção ausente seta a flag? | **Sim** — daí o `ClearErrors` obrigatório antes de cada leitura de parâmetro. |
+| 6 | `${GetOptions} "/UPDATE"` casa com `/UPDATEPID=123`? | **Sim, e devolve `PID=123`.** Prefixo é ambíguo: `/UPDATE` + `/PID=` servem, `/UPDATE` + `/UPDATEPID=` não. |
+| 7 | `Abort` dentro de `Section` sob `/S` | **Exit code 2, `.onInstFailed` roda**, `.onInstSuccess` não, Sections seguintes não rodam, sem travar. |
+| 8 | `SetErrorLevel n` + `Quit` dentro de `Section` | Sai com exit `n` e **não** roda nenhum dos dois callbacks. |
+| 9 | `SectionSetFlags` em `.onInit` | Só compila com a `Function` declarada **depois** das `Section` — índice de seção é resolvido em tempo de compilação. Guardar o corpo da `Section` por variável tem o mesmo efeito sem reordenar o arquivo; as duas formas foram medidas e funcionam. |
 
-O desenho da A16 já é imune a (3) — mas o código precisa ser escrito contra comportamento medido, não
-contra documentação lembrada.
+**Duas medições corrigem o plano:**
+
+- (1) eleva o item 8 das decisões de arquitetura de "risco" a **certeza**: passar `/S /UPDATE` a um
+  instalador que não conhece a opção não é "pode travar", é uma execução silenciosa que **para no
+  `MessageBox` e nunca mais sai**. `MIN_UPDATABLE_TARGET_VERSION` deixa de ser precaução e vira
+  requisito.
+- (7) desmente a auditoria anterior, que afirmava que `.onInstFailed` nunca rodava no caminho de
+  `Abort`. Ele roda; o desenho continua não dependendo dele, mas ele entra como segunda linha de
+  defesa.
+
+Um efeito colateral fica registrado e **não é corrigido aqui**: o `MessageBox` do `.onInit` continua
+sem `/SD`, o que é inerte hoje (ninguém roda este instalador em silêncio) e passa a importar na A16.
 
 ## A16 — fluxo do `/UPDATE`
 
@@ -305,7 +327,7 @@ hash, e preencher o hash depois quebraria a regra de escrever a linha no mesmo c
 |---|---|---|---|---|---|
 | A00 | 2026-08-22 | — | Linha de base da suíte em `main` (`8aa6e73`) | concluída | `gradlew.bat allTests` voltou `UP-TO-DATE` **sem executar nada** — cache do Gradle; `allTests` sozinho não serve de linha de base. `gradlew.bat desktopTest --rerun`: BUILD SUCCESSFUL em 1m25s, **105 classes / 1126 testes / 0 falhas / 0 erros / 0 pulados** |
 | A01 | 2026-08-22 | `docs: require prototype updates and atomic commits…` | Duas regras novas no `CLAUDE.md` + este plano | concluída | `CLAUDE.md` §Sistema visual (protótipo) e §Convenções de código (commit atômico + pontos de situação); este arquivo |
-| A02 | — | — | Medição das três semânticas do NSIS | pendente | — |
+| A02 | 2026-08-22 | `docs(installer): record the measured NSIS semantics…` | Medição das semânticas do NSIS | concluída | Seis sondas compiladas e executadas; resultados na seção A02. Primeira rodada foi **inválida** — o Git Bash converte `/S` em caminho POSIX e as sondas rodaram sem silêncio; refeitas com `MSYS2_ARG_CONV_EXCL='*'`. `MessageBox` sob `/S` trava (timeout 12 s); `Abort` em Section dá exit 2 **e roda `.onInstFailed`**, contra o que a auditoria anterior afirmava; `/UPDATE` casa com `/UPDATEPID=`. `.nsi` recompilado com `makensis /DPRODUCT_VERSION=37.0.0`: OK, 2 warnings pré-existentes de `MUI_TEXT_FINISH_RUN` |
 | A03 | — | — | `size` e `digest` no DTO de asset | pendente | — |
 | A04 | — | — | `AppUpdateArtifact` e seleção por plataforma | pendente | — |
 | A05 | — | — | Contrato `AppUpdateInstaller` no domain | pendente | — |

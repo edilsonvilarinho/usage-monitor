@@ -5,6 +5,41 @@
 SetCompressor zlib
 
 ; -----------------------------------------------
+; Semantica do NSIS medida nesta base (atividade A02 do plano de auto-update,
+; docs/planos/atualizacao-automatica-windows-execucao.md). Medido com o makensis
+; 3.x desta maquina, instalador compilado e executado de verdade -- nao e
+; documentacao lembrada. Refazer as medidas antes de contrariar qualquer item.
+;
+; 1. MessageBox sem /SD EXIBE E BLOQUEIA mesmo com /S. O probe rodou 12s e foi
+;    morto por timeout com o log parado antes do desvio. O MessageBox do .onInit
+;    abaixo, portanto, TRAVA para sempre qualquer execucao silenciosa deste
+;    instalador. Quem for rodar em /S precisa desviar dele antes.
+;
+; 2. Flag de erro:
+;    - comando bem-sucedido NAO limpa a flag; ela e sticky ate ClearErrors ou
+;      IfErrors (CreateDirectory e Rename com sucesso deixaram SET um SetErrors
+;      anterior);
+;    - IfErrors LIMPA a flag ao ler: duas leituras seguidas de um SetErrors dao
+;      SET e depois clean;
+;    - RMDir /r sobre diretorio inexistente NAO seta a flag;
+;    - ${GetOptions} com a opcao ausente SETA a flag;
+;    - ${GetOptions} "/UPDATE" CASA com "/UPDATEPID=123" e devolve "PID=123":
+;      prefixo e ambiguo, opcoes precisam de nomes que nao sejam prefixo um do
+;      outro (/UPDATE e /PID= servem, /UPDATE e /UPDATEPID= nao).
+;    Consequencia: ClearErrors imediatamente antes da operacao cuja falha
+;    importa, e IfErrors imediatamente depois -- que ja consome a flag.
+;
+; 3. Abort dentro de Section sob /S: exit code 2, .onInstFailed RODA,
+;    .onInstSuccess nao roda, e as Sections seguintes nao rodam. Nao trava.
+;    SetErrorLevel n + Quit sai com exit n e nao roda nenhuma das duas.
+;
+; 4. SectionSetFlags exige que a Function que a chama esteja declarada DEPOIS
+;    das Sections -- indice de secao e resolvido em tempo de compilacao, e a
+;    referencia adiantada nao compila. Guardar o corpo da Section por variavel
+;    tem o mesmo efeito e nao exige reordenar o arquivo.
+; -----------------------------------------------
+
+; -----------------------------------------------
 ; General
 ; -----------------------------------------------
 !ifndef PRODUCT_VERSION
