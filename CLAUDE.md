@@ -72,7 +72,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
 - `RemoteApiDataSource`: Anthropic faz `GET /api/oauth/usage` (headers `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-code/1.0.0`) e lê a utilização das janelas direto do corpo JSON. MiniMax faz `GET /v1/token_plan/remains`.
 - **Créditos de uso (Anthropic)** (`AnthropicCreditsResolution.kt`): `extra_usage` é a fonte primária — `monthly_limit` e `used_credits` vêm em unidades menores da moeda (55000 = R$ 550,00) e `currency` traz a moeda real da conta, que **não é sempre USD**. O rótulo `AnthropicQuotaLabels.EXTRA_CREDITS` é chave da série histórica e não pode ser renomeado.
   - **`spend` é fonte secundária, não só reforço.** Ele descreve o mesmo gasto (`amount_minor`/`currency`/`exponent`) e cobre quando `extra_usage` vem sem `monthly_limit` ou não vem. Em agosto de 2026 a resposta parou de trazer os créditos por cinco dias e a linha sumiu da tela, do cache e do histórico sem deixar rastro — o `return null` único não distinguia "conta sem créditos" de "contrato mudou". O `percent` do `spend` continua fora do cálculo: chega arredondado, e o `utilization` do `extra_usage` não.
-  - **`is_enabled` falso continua escondendo a linha em silêncio** — é o estado normal de quem não contratou créditos, e avisar ali viraria alerta permanente. Só `LIMIT_ABSENT` e `UNSUPPORTED_EXPONENT` (`AnthropicCreditsOutcome.signalsFailure`) viram `ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE`, que a `ApiUsageCard` mostra **também com o card minimizado**: foi o card fechado que escondeu o episódio.
+  - **`is_enabled` falso continua escondendo a linha em silêncio** — é o estado normal de quem não contratou créditos, e avisar ali viraria alerta permanente. Só `LIMIT_ABSENT` e `UNSUPPORTED_EXPONENT` (`AnthropicCreditsOutcome.signalsFailure`) viram `ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE`, que a `ApiUsageCard` mostra **também com o card minimizado**: foi o card fechado que escondeu o episódio. O aviso vive no **cabeçalho**, que é composto nos dois estados — ver `CardNoticeHint`.
   - **Expoente monetário diferente de 2 não vira cota.** `formatCents` assume duas casas; aceitar outro expoente mostraria o valor errado por um fator de dez, o que é pior que omitir a linha.
   - **Diagnóstico opt-in** (`USAGE_MONITOR_DEBUG_ANTHROPIC_CREDITS=1` → `~/.usage-monitor/diagnostics/anthropic-credits.jsonl`, mesmo desenho do recorder do Codex): guarda os nós `extra_usage` e `spend` **crus**, porque campo derivado não revela campo renomeado. Com o registro desligado o corpo continua sendo lido uma vez só, pelo `ContentNegotiation`.
 - `MiniMaxRepositoryImpl` lê `System.getenv("MINIMAX_API_KEY")` — nunca hardcode.
@@ -324,6 +324,19 @@ linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
   `TooltipBox` aninhados disputam o mesmo hover —, e por isso a frase de `riskDotTooltipSubtitle`
   não chegava à tela em tamanho nenhum de janela. A métrica `Projeção de uso` continua ao lado: ela
   diz qual é o estado, o rodapé diz o que ele significa.
+
+**Aviso de fonte é hint, não banner** (`CardNoticeHint` em `ApiUsageCard.kt`): os
+`ApiUsageNotice` saem como uma exclamação âmbar (`Icons.Rounded.ErrorOutline`) no cabeçalho, ao
+lado do badge de status, e o texto vive na tooltip. Eram `AppBanner` empilhados abaixo das cotas,
+e como o texto deles não muda entre coletas, na janela estreita os dois avisos do Codex ocupavam
+mais altura que o `39%` que o card existe para mostrar (issue #76). Um ícone por card, não um por
+aviso: a tooltip lista todos, com bullet só a partir do segundo.
+- **Este hint não tem piso de largura**, ao contrário da tooltip de cota: aquele piso existe porque
+  o popup cobre o número que o ponteiro apontava, e este não aponta número nenhum. Sem tooltip o
+  aviso ficaria inacessível justamente na janela estreita, que é onde ele mais atrapalhava.
+- **As frases inteiras vão no `contentDescription` do ícone.** Sem hover a tooltip não existe na
+  árvore, então é por ela que leitor de tela e testes chegam ao aviso — os dois asserts de notice
+  em `ComponentTest` usam `onNodeWithContentDescription(..., substring = true)`.
 
 **Regras que continuam valendo**: nenhuma animação infinita nova (trava o `waitForIdle`);
 `ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
