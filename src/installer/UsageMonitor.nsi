@@ -60,7 +60,30 @@ SetCompressor zlib
 !define OUTPUT_FILE "..\..\build\installer\UsageMonitor-Setup-${PRODUCT_VERSION}.exe"
 !endif
 
+; Estado do modo /UPDATE.
+Var UpdateMode        ; 1 quando o instalador foi chamado com /UPDATE
+Var UpdatePid         ; pid do processo que esta saindo; so vai para o recibo
+Var UpdateStaging     ; $INSTDIR.new -- arvore nova antes da troca
+Var UpdateBackup      ; $INSTDIR.old -- instalacao anterior durante a troca
+Var PreviousVersion   ; DisplayVersion lido antes de o registro ser sobrescrito
+
+; Parametrizavel pela mesma razao de APP_FILES_DIR, e com um motivo mais forte: a
+; chave HKCU de desinstalacao, o atalho do Menu Iniciar e o do desktop derivam
+; deste nome. Um cenario de teste rodando com o nome de producao APAGARIA o atalho
+; e sobrescreveria o registro da instalacao real de quem roda a suite.
+!ifndef PRODUCT_NAME
 !define PRODUCT_NAME "Usage Monitor"
+!endif
+
+; O nome do valor na chave Run NAO deriva de PRODUCT_NAME -- ele e literal e o
+; AutoStartManager do app le exatamente esta string. Por isso precisa de um
+; !ifndef proprio: sem ele, um cenario de teste rodando com outro PRODUCT_NAME
+; ainda assim sobrescreve a entrada de inicializacao REAL de quem roda a suite,
+; apontando-a para o diretorio descartavel do teste. Aconteceu ao validar a
+; atividade A16, e o valor teve de ser restaurado a mao.
+!ifndef AUTO_START_VALUE_NAME
+!define AUTO_START_VALUE_NAME "UsageMonitor"
+!endif
 !define PRODUCT_PUBLISHER "Usage Monitor"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define LOG_FILE "$INSTDIR\install.log"
@@ -107,25 +130,96 @@ LangString MUI_TEXT_FINISH_RUN ${LANG_ENGLISH} "&Launch Usage Monitor now"
 ; -----------------------------------------------
 Function .onInit
     SetShellVarContext current
+
+    StrCpy $UpdateMode 0
+    StrCpy $UpdatePid ""
+    StrCpy $UpdateStaging "$INSTDIR.new"
+    StrCpy $UpdateBackup "$INSTDIR.old"
+
+    ${GetParameters} $R0
+    ClearErrors
+    ${GetOptions} $R0 "/UPDATE" $R1
+    ${IfNot} ${Errors}
+        StrCpy $UpdateMode 1
+    ${EndIf}
+    ; /PID= e nao /UPDATEPID=: medido na A02 que ${GetOptions} "/UPDATE" casa com
+    ; "/UPDATEPID=123" e devolve "PID=123". Opcoes que sao prefixo uma da outra
+    ; nao dao para distinguir.
+    ClearErrors
+    ${GetOptions} $R0 "/PID=" $UpdatePid
+
+    ; Versao que esta instalada, lida ANTES de o registro ser sobrescrito: e ela
+    ; que o recibo chama de previousVersion.
+    ClearErrors
+    ReadRegStr $PreviousVersion HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion"
+
+    ${If} $UpdateMode == 1
+        ; O caminho de update nao pergunta nada e nao desinstala nada. O
+        ; MessageBox abaixo EXIBE E BLOQUEIA mesmo sob /S (medido na A02): passar
+        ; por ele numa execucao silenciosa deixaria o processo pendurado num
+        ; dialogo que ninguem ve, para sempre.
+        Return
+    ${EndIf}
+
     ; Check if already installed
     ReadRegStr $0 HKCU "${PRODUCT_UNINST_KEY}" "UninstallString"
     StrCmp $0 "" done notdone
 
 notdone:
-    MessageBox MB_YESNO|MB_ICONQUESTION "${PRODUCT_NAME} ja esta instalado. Deseja remover a versao anterior?" IDYES uninst IDNO done
+    ; /SD IDNO: uma execucao silenciosa que chegue aqui responde "nao" em vez de
+    ; travar. Inerte no fluxo interativo, que continua perguntando.
+    MessageBox MB_YESNO|MB_ICONQUESTION "${PRODUCT_NAME} ja esta instalado. Deseja remover a versao anterior?" /SD IDNO IDYES uninst IDNO done
 
 uninst:
     ExecWait '$0'
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}"
     RMDir /r "$INSTDIR"
 
 done:
-    !insertmacro MUI_LANGDLL_DISPLAY
+    ${IfNot} ${Silent}
+        !insertmacro MUI_LANGDLL_DISPLAY
+    ${EndIf}
 FunctionEnd
 
 Function .onInstSuccess
+    ${If} $UpdateMode == 1
+        ; Exec e nao ExecWait: bloquear o fluxo de sucesso e o congelamento na
+        ; tela final que a skill do instalador documenta. O recibo ja foi escrito
+        ; na secao, antes daqui.
+        Exec '"$INSTDIR\Usage Monitor.exe"'
+    ${EndIf}
+FunctionEnd
+
+; Segunda linha de defesa. O desenho da secao ja deixa o $INSTDIR intacto em todo
+; caminho de erro que ele controla, mas `File /r` sem /nonfatal ABORTA a
+; instalacao por conta propria, sem passar por rotulo nenhum. Medido na A02:
+; Abort dentro de Section sob /S roda este callback.
+Function .onInstFailed
+    ${If} $UpdateMode == 1
+    ${AndIf} ${FileExists} "$UpdateBackup\*.*"
+    ${AndIfNot} ${FileExists} "$INSTDIR\*.*"
+        Rename "$UpdateBackup" "$INSTDIR"
+        DetailPrint "Update failed; previous installation restored."
+    ${EndIf}
+FunctionEnd
+
+; Recibo da tentativa, em $R5 (status) e $R6 (motivo). Escrito antes do
+; relancamento e tambem nos caminhos de falha: atualizacao silenciosa que falha e
+; invisivel por natureza, e sem isto nada no disco registra que houve tentativa.
+Function WriteUpdateReceipt
+    CreateDirectory "$PROFILE\.usage-monitor"
+    ClearErrors
+    FileOpen $R4 "$PROFILE\.usage-monitor\update-receipt.properties" w
+    IfErrors receiptDone
+    FileWrite $R4 "version=${PRODUCT_VERSION}$\r$\n"
+    FileWrite $R4 "previousVersion=$PreviousVersion$\r$\n"
+    FileWrite $R4 "status=$R5$\r$\n"
+    FileWrite $R4 "reason=$R6$\r$\n"
+    FileWrite $R4 "pid=$UpdatePid$\r$\n"
+    FileClose $R4
+receiptDone:
 FunctionEnd
 
 ; -----------------------------------------------
@@ -135,9 +229,18 @@ Section "Usage Monitor" SEC_APP
     SectionIn RO
     SetShellVarContext current
 
+    StrCpy $UpdateStaging "$INSTDIR.new"
+    StrCpy $UpdateBackup "$INSTDIR.old"
+
+    ${If} $UpdateMode == 1
+        Goto updateExtract
+    ${EndIf}
+
+    ; ---------- instalacao normal (interativa ou /S sem /UPDATE) ----------
+
     ; Limpar Run keys antigos (ambos os nomes ? migra??o de vers?es anteriores)
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}"
 
     ; Create log file
     DetailPrint "Initializing installation..."
@@ -150,6 +253,90 @@ Section "Usage Monitor" SEC_APP
     SetDetailsPrint none
     File /r "${APP_FILES_DIR}\*.*"
     SetDetailsPrint both
+    Goto updateDone
+
+    ; ---------- modo /UPDATE: extrair, entao trocar ----------
+    ;
+    ; A ordem e a garantia: nada destrutivo acontece antes de a arvore nova estar
+    ; INTEIRA no disco. A unica janela em que a instalacao nao esta completa e a
+    ; distancia entre dois Rename no mesmo volume, e a falha do segundo desfaz o
+    ; primeiro. As Run keys nao sao tocadas aqui -- atualizacao silenciosa nao
+    ; reimpoe escolha que o usuario desfez.
+updateExtract:
+    DetailPrint "Preparing update..."
+    ClearErrors
+    RMDir /r "$UpdateStaging"
+    CreateDirectory "$UpdateStaging"
+    IfErrors updateStagingFailed updateStagingReady
+
+updateStagingFailed:
+    StrCpy $R6 "staging-unavailable"
+    Goto updateFailIntact
+
+updateStagingReady:
+    SetOutPath "$UpdateStaging"
+    SetDetailsPrint none
+    ; Sem /nonfatal de proposito: falha aqui ABORTA a instalacao, e como nada foi
+    ; movido ainda, o $INSTDIR continua intacto. O .onInstFailed cobre o resto.
+    File /r "${APP_FILES_DIR}\*.*"
+    SetDetailsPrint both
+    WriteUninstaller "$UpdateStaging\Uninstall.exe"
+
+    ; Tirar o diretorio de trabalho de dentro do staging ANTES de mexer nele. O
+    ; SetOutPath acima aponta o CWD do proprio instalador para $INSTDIR.new, e o
+    ; Windows nao renomeia nem apaga o diretorio de trabalho de um processo vivo:
+    ; sem esta linha o segundo Rename falha sempre, e o cenario S2 reprovava com
+    ; reason=swap-failed e um $INSTDIR.new orfao que o RMDir tambem nao removia.
+    SetOutPath "$TEMP"
+
+    ; O Rename E a sonda de liveness: no Windows nao se renomeia diretorio que
+    ; contem imagem de executavel em uso, entao um Rename que FUNCIONA prova que
+    ; o processo saiu. Nenhum taskkill: matar o app durante a escrita do SQLite e
+    ; pior que nao atualizar.
+    ClearErrors
+    RMDir /r "$UpdateBackup"
+    StrCpy $R7 0
+
+updateRenameLoop:
+    ClearErrors
+    Rename "$INSTDIR" "$UpdateBackup"
+    IfErrors updateRenameRetry updateRenameOk
+
+updateRenameRetry:
+    IntOp $R7 $R7 + 1
+    IntCmp $R7 30 updateStillLocked updateRenameWait updateStillLocked
+
+updateRenameWait:
+    Sleep 500
+    Goto updateRenameLoop
+
+updateStillLocked:
+    StrCpy $R6 "locked"
+    Goto updateFailIntact
+
+updateRenameOk:
+    ClearErrors
+    Rename "$UpdateStaging" "$INSTDIR"
+    IfErrors updateSwapFailed updateSwapOk
+
+updateSwapFailed:
+    ; Desfaz o primeiro Rename. A partir daqui o $INSTDIR volta a ser o que era.
+    Rename "$UpdateBackup" "$INSTDIR"
+    StrCpy $R6 "swap-failed"
+    Goto updateFailIntact
+
+updateFailIntact:
+    RMDir /r "$UpdateStaging"
+    StrCpy $R5 "failed"
+    Call WriteUpdateReceipt
+    DetailPrint "Update aborted ($R6); the installed version was left untouched."
+    SetErrorLevel 3
+    Abort
+
+updateSwapOk:
+    SetOutPath "$INSTDIR"
+
+updateDone:
 
     ; Write registry for uninstaller (user-level)
     DetailPrint "Writing registry entries..."
@@ -177,19 +364,42 @@ Section "Usage Monitor" SEC_APP
     FileWrite $0 "Installation completed successfully!$\r$\n"
     FileClose $0
 
+    ${If} $UpdateMode == 1
+        ; Recibo ANTES do relancamento: o .onInstSuccess dispara o app novo sem
+        ; bloquear, e ele le este arquivo no arranque. Escrito depois disto, o
+        ; recibo perderia a corrida.
+        StrCpy $R5 "success"
+        StrCpy $R6 ""
+        Call WriteUpdateReceipt
+        ; O backup so sai depois de o registro e o atalho ja apontarem para a
+        ; instalacao nova.
+        RMDir /r "$UpdateBackup"
+        DetailPrint "Update applied."
+    ${EndIf}
+
     DetailPrint "Installation complete!"
 SectionEnd
 
 Section "Desktop Shortcut" SEC_DESKTOP
     SetShellVarContext current
+    ; Atalho de desktop e chave Run sao escolha do usuario. Recria-los a cada
+    ; atualizacao silenciosa desfaria, sem aviso, quem os tivesse removido.
+    ${If} $UpdateMode == 1
+        DetailPrint "Update mode: desktop shortcut left as the user had it."
+        Return
+    ${EndIf}
     DetailPrint "Creating desktop shortcut..."
     CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\Usage Monitor.exe" "" "$INSTDIR\Usage Monitor.exe" 0 SW_SHOWNORMAL "" "${PRODUCT_NAME}"
 SectionEnd
 
 Section "Start with Windows" SEC_AUTO_START
     SetShellVarContext current
+    ${If} $UpdateMode == 1
+        DetailPrint "Update mode: auto-start left as the user had it."
+        Return
+    ${EndIf}
     DetailPrint "Configuring auto-start..."
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor" '"$INSTDIR\Usage Monitor.exe"'
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}" '"$INSTDIR\Usage Monitor.exe"'
 SectionEnd
 
 ; -----------------------------------------------
@@ -219,7 +429,7 @@ Section "Uninstall"
     DetailPrint "Removing registry entries..."
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UsageMonitor"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}"
 
     ; Remove files and directories
     DetailPrint "Removing application files..."
