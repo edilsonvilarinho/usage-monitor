@@ -1283,6 +1283,11 @@ table.dt td.num, table.dt th.num { text-align: right; }
       <div class="panel"><div class="phead"><span class="ptitle">Sistema</span></div><div class="pbody flush">
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Iniciar com o sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sempre visível</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Mantém a janela acima das demais.</span></div><span class="sw"></span></div>
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
+      </div></div>
+
+      <div class="panel"><div class="phead"><span class="ptitle">Atualização automática — indisponível, com o motivo</span></div><div class="pbody flush">
+        <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Disponível apenas na instalação feita pelo instalador .exe. Esta cópia veio do MSI ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação.</span></div><span class="sw"></span></div>
       </div></div>
       <div class="panel"><div class="phead"><span class="ptitle">Orçamento mensal</span></div><div class="pbody">
         <div class="hstack"><input class="field" type="text" value="150.00" style="max-width:120px"><span class="k">USD · teto contra o custo estimado do índice CLI no mês corrente</span></div>
@@ -1293,6 +1298,10 @@ table.dt td.num, table.dt th.num { text-align: right; }
     </div>
   </div>
 </div>
+
+<p class="note"><b>Por que o interruptor de atualização diz o tamanho e o momento.</b> Os dois surpreendem: são ~120 MB por versão, sem atualização delta, e a troca dos arquivos acontece <b>sem nenhuma confirmação</b> no instante em que o usuário fecha a janela. Ele vem <b>desmarcado</b>, e o texto de apoio existe porque um interruptor que não avisa disso liga uma coisa que ninguém escolheu.</p>
+
+<p class="note"><b>Desabilitado, ele carrega o motivo</b> — plataforma, origem da instalação ou build sem o mecanismo. Um controle cinza sem explicação é pior que controle nenhum: o usuário não descobre se é limitação ou defeito. E sem suporte o interruptor <b>mostra desligado</b>, e não o valor guardado: ligado-mas-inerte seria promessa falsa. A linha do recibo só aparece depois da primeira atualização silenciosa, e diz explicitamente quando ela falhou — atualização automática que falha é invisível por natureza.</p>
 
 <h2 id="cfg-alertas">12b · Configurações — Alertas</h2>
 <div class="win mid" style="max-width:none">

@@ -58,6 +58,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppUpdateReceipt
+import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
+import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
 import com.usagemonitor.domain.entity.DEFAULT_UI_SCALE_PERCENT
@@ -80,6 +83,8 @@ const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
 const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
+const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
+const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
 
 /**
  * Seções das Configurações, uma por aba.
@@ -135,6 +140,14 @@ fun SettingsDialogContent(
     onAlwaysOnTopChange: (Boolean) -> Unit = {},
     /** Default vazio para não arrastar os geradores de captura e os testes de componente. */
     onCardsOnlyModeChange: (Boolean) -> Unit = {},
+    autoUpdateEnabled: Boolean = false,
+    /**
+     * Default `UNAVAILABLE`: quem não passa a origem não tem o mecanismo, e o
+     * interruptor aparece desabilitado com o motivo em vez de prometer algo.
+     */
+    autoUpdateSupport: AppUpdateSupport = AppUpdateSupport.UNAVAILABLE,
+    lastUpdateReceipt: AppUpdateReceipt? = null,
+    onAutoUpdateChange: (Boolean) -> Unit = {},
     onWindowOpacityChange: (Int) -> Unit = {},
     alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT,
     onAlertSettingsChange: (UsageAlertSettings) -> Unit = {},
@@ -233,11 +246,15 @@ fun SettingsDialogContent(
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacityEnabled,
                         uiScalePercent = uiScalePercent,
+                        autoUpdateEnabled = autoUpdateEnabled,
+                        autoUpdateSupport = autoUpdateSupport,
+                        lastUpdateReceipt = lastUpdateReceipt,
                         onThemeToggle = onThemeToggle,
                         onLanguageChange = onLanguageChange,
                         onAutoStartChange = onAutoStartChange,
                         onAlwaysOnTopChange = onAlwaysOnTopChange,
                         onCardsOnlyModeChange = onCardsOnlyModeChange,
+                        onAutoUpdateChange = onAutoUpdateChange,
                         onWindowOpacityChange = onWindowOpacityChange,
                         onUiScaleChange = onUiScaleChange
                     )
@@ -318,11 +335,15 @@ private fun GeneralSettingsTab(
     windowOpacityPercent: Int,
     windowOpacityEnabled: Boolean,
     uiScalePercent: Int,
+    autoUpdateEnabled: Boolean,
+    autoUpdateSupport: AppUpdateSupport,
+    lastUpdateReceipt: AppUpdateReceipt?,
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit,
     onCardsOnlyModeChange: (Boolean) -> Unit,
+    onAutoUpdateChange: (Boolean) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit
 ) {
@@ -352,6 +373,16 @@ private fun GeneralSettingsTab(
                 enabled = cardsOnlyMode,
                 language = currentLanguage,
                 onToggle = onCardsOnlyModeChange
+            )
+
+            // Junto de "iniciar com o sistema": as duas descrevem o que o app faz
+            // sem ninguém pedir.
+            AutoUpdateToggle(
+                enabled = autoUpdateEnabled,
+                support = autoUpdateSupport,
+                language = currentLanguage,
+                lastReceipt = lastUpdateReceipt,
+                onToggle = onAutoUpdateChange
             )
 
             WindowOpacitySlider(
@@ -799,6 +830,113 @@ fun CardsOnlyModeToggle(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * Atualização automática: baixar a versão nova em segundo plano e aplicá-la ao
+ * fechar o app.
+ *
+ * O texto de apoio diz o tamanho e o momento porque **os dois surpreendem**: são
+ * ~120 MB por versão, sem atualização delta, e a troca dos arquivos acontece sem
+ * nenhuma confirmação no instante em que o usuário fecha a janela. Interruptor
+ * que não avisa disso liga uma coisa que o usuário não escolheu.
+ *
+ * Desabilitado, ele carrega **o motivo**. Um controle cinza sem explicação é pior
+ * que controle nenhum: o usuário não descobre se é limitação da plataforma, da
+ * instalação, ou defeito.
+ */
+@Composable
+fun AutoUpdateToggle(
+    enabled: Boolean,
+    support: AppUpdateSupport,
+    language: AppLanguage = AppLanguage.PT,
+    lastReceipt: AppUpdateReceipt? = null,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isPt = language == AppLanguage.PT
+    val isSupported = support == AppUpdateSupport.SUPPORTED
+    val label = if (isPt) "Atualização automática" else "Automatic updates"
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+            AppSwitch(
+                // Sem suporte o interruptor mostra desligado, e não o que está
+                // guardado: ligado-mas-inerte seria uma promessa falsa.
+                checked = enabled && isSupported,
+                onCheckedChange = { onToggle(it) },
+                enabled = isSupported,
+                modifier = Modifier.testTag(AUTO_UPDATE_SWITCH_TEST_TAG)
+            )
+        }
+        Text(
+            text = autoUpdateHint(support = support, isPt = isPt),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (lastReceipt != null) {
+            Text(
+                text = lastUpdateReceiptLine(receipt = lastReceipt, isPt = isPt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(AUTO_UPDATE_RECEIPT_TEST_TAG)
+            )
+        }
+    }
+}
+
+internal fun autoUpdateHint(support: AppUpdateSupport, isPt: Boolean): String {
+    return when (support) {
+        AppUpdateSupport.SUPPORTED -> if (isPt) {
+            "Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app."
+        } else {
+            "Downloads the new version in the background (~120 MB) and applies it on exit."
+        }
+
+        AppUpdateSupport.UNSUPPORTED_PLATFORM -> if (isPt) {
+            "Disponível apenas no Windows: no Linux a instalação passa pelo gerenciador de pacotes e no macOS o pacote não é assinado."
+        } else {
+            "Windows only: on Linux the install goes through the package manager, and on macOS the package is unsigned."
+        }
+
+        AppUpdateSupport.UNSUPPORTED_INSTALL_ORIGIN -> if (isPt) {
+            "Disponível apenas na instalação feita pelo instalador .exe. Esta cópia veio do MSI ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação."
+        } else {
+            "Only available for installs made by the .exe installer. This copy came from the MSI or from outside it, and updating it here would create a second install."
+        }
+
+        AppUpdateSupport.UNAVAILABLE -> if (isPt) {
+            "Esta versão do aplicativo ainda não traz a atualização automática."
+        } else {
+            "This build does not ship automatic updates yet."
+        }
+    }
+}
+
+internal fun lastUpdateReceiptLine(receipt: AppUpdateReceipt, isPt: Boolean): String {
+    val from = receipt.previousVersion?.let { previous -> "$previous → " }.orEmpty()
+    return when (receipt.status) {
+        AppUpdateReceiptStatus.SUCCESS -> if (isPt) {
+            "Última atualização: $from${receipt.version}, concluída."
+        } else {
+            "Last update: $from${receipt.version}, completed."
+        }
+
+        AppUpdateReceiptStatus.FAILED -> {
+            val reason = receipt.reason?.let { value -> " ($value)" }.orEmpty()
+            if (isPt) {
+                "Última atualização: $from${receipt.version} falhou$reason. A versão instalada não foi alterada."
+            } else {
+                "Last update: $from${receipt.version} failed$reason. The installed version was left untouched."
+            }
+        }
     }
 }
 
