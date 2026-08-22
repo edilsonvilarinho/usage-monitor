@@ -1,5 +1,20 @@
 # Atualização automática (issue #75) — Windows, opt-in
 
+| | |
+|---|---|
+| **Modelo** | Claude Opus 5 (1M context) — `claude-opus-5[1m]` |
+| **Nível de esforço** | `max` |
+| **Ferramenta** | Claude Code (CLI) |
+| **Data** | 2026-08-22 |
+| **Branch** | `feat/auto-update-windows-75` |
+| **Autor dos commits** | `claude <claude@anthropic.com>` |
+
+O modelo e o esforço ficam registrados porque este documento é o rastro de auditoria de um trabalho
+feito por agente: o que decidiu, o que mediu e o que deixou por verificar depende de quem executou, e
+uma auditoria posterior precisa saber sob quais condições as conclusões foram tiradas. Todas as
+atividades desta tabela foram executadas nessas condições; qualquer continuação sob modelo ou esforço
+diferente deve registrar a mudança aqui.
+
 Plano de execução. A seção **Pontos de situação**, no fim, é atualizada a cada atividade, no mesmo
 commit da atividade — é o registro de auditoria do trabalho.
 
@@ -450,6 +465,7 @@ hash, e preencher o hash depois quebraria a regra de escrever a linha no mesmo c
 | A16 | 2026-08-22 | `feat(installer): apply updates silently with an extract-then-swap flow` | Modo `/UPDATE` no instalador | concluída | **Dois defeitos encontrados por rodar, não por ler.** (1) `SetOutPath "$INSTDIR.new"` deixa o diretório de trabalho do próprio instalador dentro do staging, e o Windows não renomeia nem apaga o CWD de um processo vivo: o cenário S2 reprovava com `reason=swap-failed` e um `.new` órfão que o `RMDir` também não removia. Corrigido com `SetOutPath "$TEMP"` antes da troca. (2) O nome do valor na chave `Run` é **literal**, não derivado de `PRODUCT_NAME`: a instalação de cenário sobrescreveu a entrada de inicialização **real** desta máquina, apontando-a para o diretório descartável do teste. Restaurada à mão para o executável instalado (a preferência do app dizia `auto/Start = true`), e o `.nsi` ganhou `AUTO_START_VALUE_NAME` com `!ifndef` para o cenário poder se isolar. `MessageBox` do `.onInit` ganhou `/SD IDNO` — inerte no fluxo interativo, e a diferença entre travar e não travar numa execução silenciosa. **22 asserções em S1/S2/S3/S6, 0 falhas.** Build de produção recompilado: 122.309.088 bytes, 1.450 a mais que antes — o código do `/UPDATE` |
 | A17 | 2026-08-22 | `test(installer): cover the silent update scenarios end to end` | Seis cenários do instalador | concluída | `src/installer/test/Invoke-UpdateScenarios.ps1`, **33 verificações nos seis cenários, 0 falhas**. Compila o `UsageMonitor.nsi` de produção — não uma cópia — com os quatro `!ifndef` sobrescritos. O isolamento por `PRODUCT_NAME` e `AUTO_START_VALUE_NAME` não é detalhe: sem eles os cenários apagam o atalho do Menu Iniciar e sobrescrevem a chave `Run` da instalação real, o que **aconteceu de verdade** na A16. Limpeza em bloco `finally`, e o ambiente real foi conferido depois da execução: chave `Run` no executável instalado, atalhos intactos, nenhum recibo deixado para trás |
 | A18 | 2026-08-22 | `ci: run the installer update scenarios on windows` | Cenários no CI e no gate de release | concluída | Job **separado** no `ci.yml` (`installer-scenarios`), com recorte por path próprio: o roteiro instala e desinstala de verdade e leva minutos, e amarrá-lo ao job rápido faria toda mudança de Kotlin esperar por ele. Também no `verify` do `release-linux.yml` — ali é o gate que decide se um release sai, e release com o `/UPDATE` quebrado atualiza a máquina de quem instalou. YAML dos dois arquivos validado (`yaml.safe_load`); a execução real só na primeira PR |
+| — | 2026-08-22 | `docs(plan): record the model and effort level used` | Cabeçalho de procedência | concluída | Modelo, nível de esforço, ferramenta, branch e autor dos commits no topo do documento. O rastro de auditoria de um trabalho feito por agente precisa dizer sob quais condições as conclusões foram tiradas — sem isso, "medido" e "verificado" não têm dono |
 | — | 2026-08-22 | `docs(plan): consolidate the deviations found while executing` | Seção **Desvios do plano e achados da execução** | concluída | Fecha o PR 1 e o PR 2 com a leitura consolidada do que a execução descobriu e o plano não previa: 3 medições no NSIS — duas delas contradizendo premissas herdadas da auditoria anterior —, 2 defeitos que só apareceram ao executar, 4 ajustes na estrutura das atividades, 4 armadilhas de ambiente, 1 restrição relativizada e 4 itens por verificar. O plano previa 2 `!ifndef` no `.nsi`; foram necessários **4** — isolamento de cenário era requisito, não detalhe |
 | A19 | — | — | Ligação da funcionalidade | pendente | — |
 | A20 | — | — | Smoke test empacotado | pendente | — |
