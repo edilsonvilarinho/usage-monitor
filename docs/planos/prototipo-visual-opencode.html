@@ -1448,6 +1448,8 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Fonte embutida no PDFBox recalcula largura de todas as colunas</span><span class="k">commit K1</span></div>
   <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhum texto de interface muda — ~390 asserts observam essas strings</span><span class="k">todas as fases</span></div>
   <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhuma ação, filtro, gráfico, exportação ou mensagem é removida</span><span class="k">todas as fases</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Com <code>USAGE_MONITOR_UPDATE_FEED_URL</code> definida, o feed de releases é outro — e o SHA-256 que barra artefato adulterado vem de lá. A aba Geral mostra um aviso em tom âmbar enquanto ela estiver ativa</span><span class="k">issue #75</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>Setup.exe</code> não é assinado: SmartScreen ou antivírus podem barrar a atualização silenciosa, que então cai na faixa "Baixar manualmente"</span><span class="k">issue #75</span></div>
 </div></div>
 <p class="note">Aprovado o protótipo, a execução começa pela Fase C (fundação): fontes, paleta, escala tipográfica, tokens de forma e as dezessete primitivas — oito commits antes de qualquer tela mudar de aparência.</p>
 

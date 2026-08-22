@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdateSupport
@@ -36,6 +37,8 @@ internal class AutoUpdateController(
     val installer: AppUpdateInstaller?,
     val enabled: MutableStateFlow<Boolean>,
     val lastReceipt: AppUpdateReceipt?,
+    /** Valor de USAGE_MONITOR_UPDATE_FEED_URL, quando definida. */
+    val feedUrlOverride: String?,
     private val persist: (Boolean) -> Unit
 ) {
 
@@ -92,6 +95,7 @@ internal fun rememberAutoUpdateController(
             // enquanto o app está fechado, e reler a cada recomposição seria
             // I/O de disco para um valor que não muda com a janela aberta.
             lastReceipt = readUpdateReceipt(),
+            feedUrlOverride = System.getenv(UPDATE_FEED_URL_ENV_VAR),
             persist = { value -> persistAutoUpdateEnabled(settings, value) }
         )
     }

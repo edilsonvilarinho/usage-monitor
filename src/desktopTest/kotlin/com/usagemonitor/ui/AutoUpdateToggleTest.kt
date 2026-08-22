@@ -18,6 +18,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
 import com.usagemonitor.domain.repository.AppUpdateSupport
+import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_RECEIPT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AutoUpdateToggle
@@ -149,6 +150,32 @@ class AutoUpdateToggleTest {
         ).assertIsDisplayed()
     }
 
+    /**
+     * O aviso existe para ninguem rodar com o feed trocado sem perceber: o
+     * SHA-256 que barra artefato adulterado vem do mesmo feed.
+     */
+    @Test
+    fun `an overridden release feed is announced on screen`() = runDesktopComposeUiTest {
+        showToggle(
+            enabled = true,
+            support = AppUpdateSupport.SUPPORTED,
+            feedOverride = "http://localhost:8099/release.json"
+        )
+
+        onNodeWithTag(AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG).assertIsDisplayed()
+        onNodeWithText(
+            "Aviso: o feed de releases está sobrescrito por USAGE_MONITOR_UPDATE_FEED_URL " +
+                "(http://localhost:8099/release.json). Só para teste."
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `no override means no warning`() = runDesktopComposeUiTest {
+        showToggle(enabled = true, support = AppUpdateSupport.SUPPORTED, feedOverride = null)
+
+        onNodeWithTag(AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG).assertDoesNotExist()
+    }
+
     @Test
     fun `english translates the hint and the receipt`() = runDesktopComposeUiTest {
         setContent {
@@ -180,6 +207,7 @@ class AutoUpdateToggleTest {
         enabled: Boolean,
         support: AppUpdateSupport,
         receipt: AppUpdateReceipt? = null,
+        feedOverride: String? = null,
         onToggle: (Boolean) -> Unit = {}
     ) {
         setContent {
@@ -190,6 +218,7 @@ class AutoUpdateToggleTest {
                         support = support,
                         language = AppLanguage.PT,
                         lastReceipt = receipt,
+                        feedUrlOverride = feedOverride,
                         onToggle = onToggle
                     )
                 }

@@ -60,6 +60,7 @@ import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
+import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppTheme
@@ -85,6 +86,7 @@ const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
+const val AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG = "autoUpdateFeedOverride"
 
 /**
  * Seções das Configurações, uma por aba.
@@ -147,6 +149,7 @@ fun SettingsDialogContent(
      */
     autoUpdateSupport: AppUpdateSupport = AppUpdateSupport.UNAVAILABLE,
     lastUpdateReceipt: AppUpdateReceipt? = null,
+    autoUpdateFeedOverride: String? = null,
     onAutoUpdateChange: (Boolean) -> Unit = {},
     onWindowOpacityChange: (Int) -> Unit = {},
     alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT,
@@ -249,6 +252,7 @@ fun SettingsDialogContent(
                         autoUpdateEnabled = autoUpdateEnabled,
                         autoUpdateSupport = autoUpdateSupport,
                         lastUpdateReceipt = lastUpdateReceipt,
+                        autoUpdateFeedOverride = autoUpdateFeedOverride,
                         onThemeToggle = onThemeToggle,
                         onLanguageChange = onLanguageChange,
                         onAutoStartChange = onAutoStartChange,
@@ -338,6 +342,7 @@ private fun GeneralSettingsTab(
     autoUpdateEnabled: Boolean,
     autoUpdateSupport: AppUpdateSupport,
     lastUpdateReceipt: AppUpdateReceipt?,
+    autoUpdateFeedOverride: String?,
     onThemeToggle: () -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
@@ -382,6 +387,7 @@ private fun GeneralSettingsTab(
                 support = autoUpdateSupport,
                 language = currentLanguage,
                 lastReceipt = lastUpdateReceipt,
+                feedUrlOverride = autoUpdateFeedOverride,
                 onToggle = onAutoUpdateChange
             )
 
@@ -852,6 +858,12 @@ fun AutoUpdateToggle(
     support: AppUpdateSupport,
     language: AppLanguage = AppLanguage.PT,
     lastReceipt: AppUpdateReceipt? = null,
+    /**
+     * Valor de `USAGE_MONITOR_UPDATE_FEED_URL`, quando definida. Nunca nulo em
+     * ambiente de teste e sempre nulo em produção — o aviso na tela é o que
+     * impede alguém de rodar com o feed trocado sem perceber.
+     */
+    feedUrlOverride: String? = null,
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -887,6 +899,20 @@ fun AutoUpdateToggle(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag(AUTO_UPDATE_RECEIPT_TEST_TAG)
+            )
+        }
+        if (!feedUrlOverride.isNullOrBlank()) {
+            // Tom de aviso porque é isso que ele é: com o feed trocado, o
+            // SHA-256 que barra artefato adulterado passa a vir de outro lugar.
+            Text(
+                text = if (isPt) {
+                    "Aviso: o feed de releases está sobrescrito por $UPDATE_FEED_URL_ENV_VAR ($feedUrlOverride). Só para teste."
+                } else {
+                    "Warning: the release feed is overridden by $UPDATE_FEED_URL_ENV_VAR ($feedUrlOverride). Testing only."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = AppTone.WARNING.color(),
+                modifier = Modifier.testTag(AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG)
             )
         }
     }

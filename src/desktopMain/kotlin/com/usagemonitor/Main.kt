@@ -1666,6 +1666,7 @@ fun main() = application {
                         autoUpdateEnabled = autoUpdate.isEnabled(),
                         autoUpdateSupport = autoUpdate.support,
                         lastUpdateReceipt = autoUpdate.lastReceipt,
+                        autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
                         onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },
                         onWindowOpacityChange = { percent ->
                             // Aviso não sai daqui: quem persiste é o coletor com

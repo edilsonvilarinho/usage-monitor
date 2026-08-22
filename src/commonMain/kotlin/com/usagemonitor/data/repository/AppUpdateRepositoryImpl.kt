@@ -14,15 +14,29 @@ private const val RELEASE_REPOSITORY_NAME = "usage-monitor"
 
 private const val SHA256_DIGEST_PREFIX = "sha256:"
 
+/**
+ * Nome da variável de ambiente que substitui o feed de releases.
+ *
+ * Existe para o smoke test da atualização automática: sem ela, cada tentativa
+ * exigiria publicar uma release de verdade no GitHub. **A UI mostra um aviso
+ * quando ela está ativa** — quem esquecer de desligá-la precisa esbarrar nisso,
+ * porque o SHA-256 que barra artefato trocado vem do mesmo feed.
+ */
+const val UPDATE_FEED_URL_ENV_VAR = "USAGE_MONITOR_UPDATE_FEED_URL"
+
 class AppUpdateRepositoryImpl(
-    private val remoteApiDataSource: RemoteApiDataSource
+    private val remoteApiDataSource: RemoteApiDataSource,
+    // Costura de teste, no mesmo desenho de MiniMaxRepositoryImpl: leitor
+    // injetável em vez de System.getenv global.
+    private val envVarReader: () -> String? = { System.getenv(UPDATE_FEED_URL_ENV_VAR) }
 ) : AppUpdateRepository {
 
     override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
         return Result.runCatching {
             val latestRelease = remoteApiDataSource.fetchLatestGitHubRelease(
                 owner = RELEASE_REPOSITORY_OWNER,
-                repository = RELEASE_REPOSITORY_NAME
+                repository = RELEASE_REPOSITORY_NAME,
+                feedUrlOverride = envVarReader()
             )
             val latestVersion = latestRelease.tagName.removePrefix("v")
 

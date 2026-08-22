@@ -235,10 +235,58 @@ class AppUpdateRepositoryImplTest {
         assertEquals(false, isVersionNewer(candidateVersion = "8.0.0-beta", currentVersion = "8.0.0"))
     }
 
+    /**
+     * Sem a sobrescrita, cada tentativa de smoke test da atualizacao automatica
+     * exigiria publicar uma release de verdade no GitHub.
+     */
+    @Test
+    fun `the release feed url can be overridden by the environment`() = runTest {
+        var seenOverride: String? = "nao lido"
+        val remote = object : RemoteApiDataSource(noopHttpClient()) {
+            override suspend fun fetchLatestGitHubRelease(
+                owner: String,
+                repository: String,
+                feedUrlOverride: String?
+            ): GitHubReleaseDto {
+                seenOverride = feedUrlOverride
+                return release(tag = "v9.0.0")
+            }
+        }
+        val repo = AppUpdateRepositoryImpl(remote) { "http://localhost:8099/release.json" }
+
+        repo.getLatestAvailableUpdate(currentVersion = currentVersion)
+
+        assertEquals("http://localhost:8099/release.json", seenOverride)
+    }
+
+    @Test
+    fun `without the environment variable the override is null`() = runTest {
+        var seenOverride: String? = "nao lido"
+        val remote = object : RemoteApiDataSource(noopHttpClient()) {
+            override suspend fun fetchLatestGitHubRelease(
+                owner: String,
+                repository: String,
+                feedUrlOverride: String?
+            ): GitHubReleaseDto {
+                seenOverride = feedUrlOverride
+                return release(tag = "v9.0.0")
+            }
+        }
+        val repo = AppUpdateRepositoryImpl(remote) { null }
+
+        repo.getLatestAvailableUpdate(currentVersion = currentVersion)
+
+        assertNull(seenOverride)
+    }
+
     @Test
     fun `propagates failure when remote fetch throws`() = runTest {
         val throwingRemote = object : RemoteApiDataSource(noopHttpClient()) {
-            override suspend fun fetchLatestGitHubRelease(owner: String, repository: String): GitHubReleaseDto {
+            override suspend fun fetchLatestGitHubRelease(
+                owner: String,
+                repository: String,
+                feedUrlOverride: String?
+            ): GitHubReleaseDto {
                 throw IllegalStateException("network down")
             }
         }
@@ -297,7 +345,11 @@ class AppUpdateRepositoryImplTest {
 
     private fun fakeRemote(release: GitHubReleaseDto): RemoteApiDataSource {
         return object : RemoteApiDataSource(noopHttpClient()) {
-            override suspend fun fetchLatestGitHubRelease(owner: String, repository: String): GitHubReleaseDto {
+            override suspend fun fetchLatestGitHubRelease(
+                owner: String,
+                repository: String,
+                feedUrlOverride: String?
+            ): GitHubReleaseDto {
                 return release
             }
         }
