@@ -313,6 +313,110 @@ powershell -ExecutionPolicy Bypass -File src\installer\test\Invoke-UpdateScenari
   interruptor vir desmarcado e do subtítulo dizer o tamanho.
 - **Instalação por MSI não é atualizada.** Detectada e desabilitada, nunca convertida em silêncio.
 
+## Desvios do plano e achados da execução
+
+O que a execução descobriu e o plano não previa. A tabela de Pontos de situação registra isto linha a
+linha, na atividade em que apareceu; esta seção é a leitura consolidada — o que mudou, e por quê.
+
+### Medições que contradisseram premissas herdadas
+
+**`MessageBox` sem `/SD` exibe e bloqueia mesmo sob `/S`.** A sonda foi morta por timeout de 12 s com o
+log parado antes do desvio. Isso reclassificou a decisão 8: passar `/S /UPDATE` a um instalador que não
+conhece a opção não é "pode travar", é uma execução silenciosa que para no `MessageBox` do `.onInit` e
+**nunca mais sai**. `MIN_UPDATABLE_TARGET_VERSION` deixou de ser precaução e virou requisito, com teste
+guardando o valor.
+
+**`Abort` dentro de `Section` sob `/S` roda `.onInstFailed`.** A auditoria da tentativa anterior
+afirmava que o callback nunca rodava, e o plano herdou essa afirmação na justificativa da decisão 1. A
+medição a desmentiu: exit code 2, `.onInstFailed` roda, `.onInstSuccess` não. O desenho continua não
+dependendo do callback — mas agora por escolha, não por impossibilidade, e ele entrou como segunda
+linha de defesa para o caso de `File /r` abortar por conta própria.
+
+**`${GetOptions} "/UPDATE"` casa com `/UPDATEPID=123` e devolve `PID=123`.** A ambiguidade de prefixo
+tinha sido prevista no plano e agora está medida. `/UPDATE` + `/PID=` são nomes que se distinguem;
+`/UPDATE` + `/UPDATEPID=` não.
+
+### Defeitos que só apareceram ao executar
+
+Os dois vieram dos cenários do instalador, na atividade A16. Nenhum deles seria pego lendo o código, e
+é essa a razão de os cenários existirem.
+
+**`SetOutPath "$INSTDIR.new"` deixa o diretório de trabalho do próprio instalador dentro do staging.**
+O Windows não renomeia nem apaga o CWD de um processo vivo, então o segundo `Rename` falhava
+**sempre**: o cenário S2 reprovava com `reason=swap-failed` e um `$INSTDIR.new` órfão que o `RMDir`
+também não removia. Corrigido com `SetOutPath "$TEMP"` antes da troca.
+
+**O nome do valor na chave `Run` é literal e não deriva de `PRODUCT_NAME`.** A instalação de cenário
+sobrescreveu a entrada de inicialização **real da máquina de desenvolvimento**, apontando-a para o
+diretório descartável do teste. O valor foi restaurado à mão para o executável instalado — a
+preferência do app (`auto/Start = true`) confirmou qual era o estado correto — e o `.nsi` ganhou
+`AUTO_START_VALUE_NAME` com `!ifndef`, mantendo o default de produção intacto porque o
+`AutoStartManager` lê exatamente aquela string.
+
+**Consequência para o plano:** ele previa dois `!ifndef` (`APP_FILES_DIR` e `OUTPUT_FILE`). Foram
+necessários **quatro**. Sem `PRODUCT_NAME` próprio os cenários apagam o atalho do Menu Iniciar da
+instalação real; sem `AUTO_START_VALUE_NAME` próprio sobrescrevem a chave `Run`. Isolamento de cenário
+não era detalhe de implementação — era requisito, e o plano não o enxergou.
+
+### Ajustes na estrutura das atividades
+
+**A07 e A08 foram redivididas.** `prepare()` e `schedule()` são membros da mesma interface, e
+entregá-los em commits separados obrigaria a um `schedule()` stub — um commit que mente sobre o que
+faz. O download saiu como classe própria (`UpdateArtifactDownloader`), que não tem nada de Windows, e a
+A08 passou a entregar o `WindowsAppUpdateInstaller` inteiro.
+
+**A12a não estava no plano.** Ao escrever o teste do interruptor, o `AppSwitch` mostrou não publicar
+`ToggleableState`: usava `clickable` em vez de `toggleable`, e o estado era invisível para leitor de
+tela e para teste, que só conseguia afirmar o clique. Corrigir uma primitiva compartilhada é decisão
+própria e virou commit próprio, antes do que dependia dela.
+
+**A A09 seguiu o padrão do projeto, não o do plano.** O plano dizia `MapSettings`; as funções de
+preferência do projeto recebem `PreferencesSettings` concreto, e o padrão estabelecido é um nó
+`Preferences` descartável com `removeNode()` no `finally`. O defeito D24 da auditoria era outra coisa —
+nó de **nome fixo**, sem remoção. Fica registrada a dívida: `withTestSettings` está duplicado em seis
+arquivos de `desktopTest` e merece extração num commit próprio.
+
+**A coluna `Commit` da tabela guarda o assunto, não o hash.** Um commit não pode conter o próprio hash,
+e preencher depois quebraria a regra de escrever a linha no mesmo commit da atividade.
+
+### Armadilhas do ambiente, pagas uma vez cada
+
+**O Git Bash converte `/S` em caminho POSIX.** A primeira rodada inteira de medições do NSIS foi
+**inválida**: as sondas rodaram sem silêncio nenhum e `${Silent}` respondia `NO`. Refeitas com
+`MSYS2_ARG_CONV_EXCL='*'`. Vale para qualquer argumento iniciado por barra, `taskkill /F` incluído.
+
+**`gradlew.bat allTests` cacheia e não serve de linha de base.** Ele voltou `UP-TO-DATE` sem executar
+teste nenhum — um "BUILD SUCCESSFUL" que não prova nada. A linha de base real exigiu
+`gradlew.bat desktopTest --rerun`. O `CLAUDE.md` e o `AGENTS.md` recomendam `allTests`, o que é
+correto para verificar, mas não para medir.
+
+**O `SingleInstanceGuard` invalida `gradlew.bat run` com o app instalado aberto.** A primeira tentativa
+de verificar a fiação do `main()` terminou em 2 s com `BUILD SUCCESSFUL` sem compor nada. Só com o
+`Usage Monitor.exe` instalado encerrado o `run` sustentou 45 s sem exceção.
+
+**Salto relativo do NSIS não atravessa macro.** `IfSilent 0 +2` com uma macro de quatro instruções no
+caminho aterrissa no meio dela. As sondas passaram a usar LogicLib, e o `.nsi` usa rótulos nomeados em
+todo desvio que importa.
+
+### Uma restrição do plano que a execução relativizou
+
+O plano lista "teste nunca escreve no registro real da máquina". Os cenários do instalador **escrevem**
+— não há como exercitar um instalador NSIS sem que ele instale. O que os torna aceitáveis é serem
+explicitamente **fora do `allTests`**, usarem nomes isolados nas quatro superfícies que tocam
+(diretório, chave de desinstalação, atalhos e chave `Run`) e limparem tudo em bloco `finally`. A
+restrição continua valendo para a suíte unitária, que é para onde foi escrita.
+
+### O que ficou por verificar
+
+- **Estado visível do interruptor na tela.** O app sobe, mas confirmar que a linha aparece desabilitada
+  com o texto certo exige interação com a janela. Vai junto da A20.
+- **Qual fonte o runtime preenche** — `jpackage.app-path` ou `ProcessHandle` — no app-image real. O
+  resolvedor aceita as duas justamente por isso, mas qual delas responde não foi medido.
+- **Execução real dos jobs de CI.** O YAML foi validado por parser; a primeira execução de verdade só
+  acontece na primeira PR.
+- **Comportamento do SmartScreen e do antivírus** diante do `Setup.exe` sem assinatura lançado em
+  silêncio. Está na lista de riscos aceitos e é hipótese não confirmada até a A20.
+
 ## Pontos de situação
 
 Uma linha por atividade, escrita **no mesmo commit** da atividade. `Evidência` é o comando que rodou e
@@ -346,5 +450,6 @@ hash, e preencher o hash depois quebraria a regra de escrever a linha no mesmo c
 | A16 | 2026-08-22 | `feat(installer): apply updates silently with an extract-then-swap flow` | Modo `/UPDATE` no instalador | concluída | **Dois defeitos encontrados por rodar, não por ler.** (1) `SetOutPath "$INSTDIR.new"` deixa o diretório de trabalho do próprio instalador dentro do staging, e o Windows não renomeia nem apaga o CWD de um processo vivo: o cenário S2 reprovava com `reason=swap-failed` e um `.new` órfão que o `RMDir` também não removia. Corrigido com `SetOutPath "$TEMP"` antes da troca. (2) O nome do valor na chave `Run` é **literal**, não derivado de `PRODUCT_NAME`: a instalação de cenário sobrescreveu a entrada de inicialização **real** desta máquina, apontando-a para o diretório descartável do teste. Restaurada à mão para o executável instalado (a preferência do app dizia `auto/Start = true`), e o `.nsi` ganhou `AUTO_START_VALUE_NAME` com `!ifndef` para o cenário poder se isolar. `MessageBox` do `.onInit` ganhou `/SD IDNO` — inerte no fluxo interativo, e a diferença entre travar e não travar numa execução silenciosa. **22 asserções em S1/S2/S3/S6, 0 falhas.** Build de produção recompilado: 122.309.088 bytes, 1.450 a mais que antes — o código do `/UPDATE` |
 | A17 | 2026-08-22 | `test(installer): cover the silent update scenarios end to end` | Seis cenários do instalador | concluída | `src/installer/test/Invoke-UpdateScenarios.ps1`, **33 verificações nos seis cenários, 0 falhas**. Compila o `UsageMonitor.nsi` de produção — não uma cópia — com os quatro `!ifndef` sobrescritos. O isolamento por `PRODUCT_NAME` e `AUTO_START_VALUE_NAME` não é detalhe: sem eles os cenários apagam o atalho do Menu Iniciar e sobrescrevem a chave `Run` da instalação real, o que **aconteceu de verdade** na A16. Limpeza em bloco `finally`, e o ambiente real foi conferido depois da execução: chave `Run` no executável instalado, atalhos intactos, nenhum recibo deixado para trás |
 | A18 | 2026-08-22 | `ci: run the installer update scenarios on windows` | Cenários no CI e no gate de release | concluída | Job **separado** no `ci.yml` (`installer-scenarios`), com recorte por path próprio: o roteiro instala e desinstala de verdade e leva minutos, e amarrá-lo ao job rápido faria toda mudança de Kotlin esperar por ele. Também no `verify` do `release-linux.yml` — ali é o gate que decide se um release sai, e release com o `/UPDATE` quebrado atualiza a máquina de quem instalou. YAML dos dois arquivos validado (`yaml.safe_load`); a execução real só na primeira PR |
+| — | 2026-08-22 | `docs(plan): consolidate the deviations found while executing` | Seção **Desvios do plano e achados da execução** | concluída | Fecha o PR 1 e o PR 2 com a leitura consolidada do que a execução descobriu e o plano não previa: 3 medições no NSIS — duas delas contradizendo premissas herdadas da auditoria anterior —, 2 defeitos que só apareceram ao executar, 4 ajustes na estrutura das atividades, 4 armadilhas de ambiente, 1 restrição relativizada e 4 itens por verificar. O plano previa 2 `!ifndef` no `.nsi`; foram necessários **4** — isolamento de cenário era requisito, não detalhe |
 | A19 | — | — | Ligação da funcionalidade | pendente | — |
 | A20 | — | — | Smoke test empacotado | pendente | — |
