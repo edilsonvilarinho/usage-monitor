@@ -219,6 +219,14 @@ histórico das decisões está em [`docs/planos/refatoracao-visual-opencode-exec
 a especificação de aparência é o protótipo aprovado, [`docs/planos/prototipo-visual-opencode.html`](docs/planos/prototipo-visual-opencode.html).
 Divergência entre o Compose e o protótipo é defeito do Compose.
 
+**Toda alteração de tela é registrada no protótipo, no mesmo commit da mudança.** A regra de
+precedência do parágrafo acima só se sustenta enquanto o protótipo descrever o app inteiro; um
+protótipo desatualizado a transforma em ponteiro para um documento que não descreve mais o produto.
+Tela nova ou estado que ainda não existe ganha seção `<h2 id="…">N · …</h2>` própria mais o link em
+`nav.index`; controle, coluna ou texto novo dentro de tela já desenhada vira linha no mockup dela;
+risco conhecido e decisão pendente vão para `§15 #checklist`. Vale para qualquer superfície visível —
+janela, diálogo, faixa, bandeja e relatório PDF.
+
 **Tokens** (`presentation/ui/theme/AppTheme.kt`): quatro superfícies neutras dentro de ~14% de
 luminância (`AppSurfaces`), raios 4/6/8/10 com **teto de 10** (`AppShapes`), elevação 0/2/8 —
 `card` é **zero**, e sombra só em diálogo e overlay —, espaçamento 4/8/12/16/24/32 (`AppSpacing`) e
@@ -356,6 +364,13 @@ Helvetica em vez de falhar.
 - **Nomes em inglês**, comentários em português.
 - Evitar scope functions aninhadas (`let`, `apply`, `run`). Preferir fluxo explícito.
 - Commits: Conventional Commits em inglês + `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`.
+- **Uma atividade, um commit.** Cada unidade de trabalho fecha sozinha: código, teste e documentação
+  da mesma decisão entram juntos. Commit que só compila com o próximo não é atômico, e commit que
+  junta duas decisões impede reverter uma sem perder a outra.
+- **Trabalho com plano em `docs/planos/` mantém ali a tabela de pontos de situação**, uma linha por
+  atividade, escrita **no mesmo commit** da atividade que ela descreve — em commit separado a linha
+  pode existir sem a mudança e vice-versa, e o registro deixa de servir para auditoria. Cada entrada
+  carrega o comando que rodou e o resultado, nunca a intenção.
 
 ## Endpoints externos
 
