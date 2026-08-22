@@ -29,6 +29,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.UiApiError
 
@@ -238,20 +239,37 @@ internal fun warningFor(
  * A faixa inteira é clicável e não há botão: a descrição só repetia em prosa o que
  * o rótulo da ação já diz, e uma linha clicável entrega a mesma ação com um terço
  * da altura.
+ *
+ * Com a atualização automática ligada a faixa ganhou mais três estados. O
+ * progresso é **texto**, nunca indicador animado: animação sem fim trava o
+ * `waitForIdle` dos testes de componente, e é a mesma regra que já vale para o
+ * resto do app.
  */
 @Composable
 internal fun AppUpdateBanner(
     state: AppUpdateUiState,
     language: AppLanguage,
     onOpenRelease: () -> Unit,
+    onRestartAndUpdate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val content = updateBannerContent(state = state, language = language)
 
+    // O despacho da ação mora junto dos rótulos que a descrevem: separá-los
+    // deixaria a tela decidindo o que "a ação da faixa" significa em cada estado.
+    val action: (() -> Unit)? = when (state) {
+        is AppUpdateUiState.Available -> onOpenRelease
+        is AppUpdateUiState.Ready -> onRestartAndUpdate
+        is AppUpdateUiState.Failed -> onOpenRelease
+        // Baixando não tem ação: uma faixa clicável sem rótulo de ação seria um
+        // alvo de clique invisível.
+        is AppUpdateUiState.Downloading -> null
+    }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onOpenRelease)
+            .then(if (action != null) Modifier.clickable(onClick = action) else Modifier)
             .testTag(APP_UPDATE_BANNER_TAG),
         shape = AppShapes.small,
         tonalElevation = AppElevation.banner,
@@ -272,7 +290,7 @@ internal fun AppUpdateBanner(
                     .width(2.dp)
                     .height(16.dp)
                     .clip(AppShapes.extraSmall)
-                    .background(AppTone.INFO.color())
+                    .background(content.tone.color())
             )
             // Quem cede espaço numa janela estreita é o título: o rótulo da ação é
             // a única pista de que a faixa é clicável.
@@ -284,12 +302,14 @@ internal fun AppUpdateBanner(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            Text(
-                text = "${content.actionLabel} →",
-                style = MaterialTheme.typography.labelLarge,
-                color = AppTone.INFO.color(),
-                maxLines = 1
-            )
+            if (content.actionLabel != null) {
+                Text(
+                    text = "${content.actionLabel} →",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = content.tone.color(),
+                    maxLines = 1
+                )
+            }
         }
     }
 }
@@ -298,21 +318,65 @@ internal fun updateBannerContent(
     state: AppUpdateUiState,
     language: AppLanguage
 ): UpdateBannerContent {
+    val isPt = language == AppLanguage.PT
+    val version = state.update.version
+
     return when (state) {
-        is AppUpdateUiState.Available -> {
-            val title = if (language == AppLanguage.PT) {
-                "Nova versão ${state.update.version} disponível"
+        is AppUpdateUiState.Available -> UpdateBannerContent(
+            title = if (isPt) "Nova versão $version disponível" else "Version $version is available",
+            actionLabel = if (isPt) "Baixar atualização" else "Download update",
+            tone = AppTone.INFO
+        )
+
+        is AppUpdateUiState.Downloading -> UpdateBannerContent(
+            title = when {
+                // Sem tamanho declarado não há porcentagem, e inventar uma seria
+                // pior que dizer só "baixando".
+                state.percent == null && isPt -> "Baixando a versão $version…"
+                state.percent == null -> "Downloading version $version…"
+                isPt -> "Baixando a versão $version — ${state.percent}%"
+                else -> "Downloading version $version — ${state.percent}%"
+            },
+            actionLabel = null,
+            tone = AppTone.INFO
+        )
+
+        is AppUpdateUiState.Ready -> UpdateBannerContent(
+            title = if (isPt) {
+                "Versão $version pronta — será aplicada ao fechar"
             } else {
-                "Version ${state.update.version} is available"
-            }
-            UpdateBannerContent(
-                title = title,
-                actionLabel = if (language == AppLanguage.PT) {
-                    "Baixar atualização"
-                } else {
-                    "Download update"
-                }
-            )
+                "Version $version is ready — it will be applied on exit"
+            },
+            actionLabel = if (isPt) "Reiniciar e atualizar agora" else "Restart and update now",
+            tone = AppTone.OK
+        )
+
+        is AppUpdateUiState.Failed -> UpdateBannerContent(
+            title = updateFailureTitle(version = version, reason = state.reason, isPt = isPt),
+            // O caminho manual é o comportamento que o app sempre teve; a falha
+            // do automático devolve o usuário a ele em vez de deixá-lo sem saída.
+            actionLabel = if (isPt) "Baixar manualmente" else "Download manually",
+            tone = AppTone.WARNING
+        )
+    }
+}
+
+private fun updateFailureTitle(
+    version: String,
+    reason: AppUpdateFailureReason,
+    isPt: Boolean
+): String {
+    return when (reason) {
+        AppUpdateFailureReason.DOWNLOAD -> if (isPt) {
+            "Falha ao baixar a versão $version"
+        } else {
+            "Could not download version $version"
+        }
+
+        AppUpdateFailureReason.SCHEDULE -> if (isPt) {
+            "Falha ao iniciar a instalação da versão $version"
+        } else {
+            "Could not start the version $version install"
         }
     }
 }
@@ -329,5 +393,7 @@ internal data class DashboardWarning(
 
 internal data class UpdateBannerContent(
     val title: String,
-    val actionLabel: String
+    /** Nulo quando o estado não oferece ação — a faixa deixa de ser clicável. */
+    val actionLabel: String?,
+    val tone: AppTone
 )

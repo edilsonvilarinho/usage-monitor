@@ -381,6 +381,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <div class="grp">Telas</div>
   <a href="#dashboard">Dashboard</a>
   <a href="#dash-estados">Dashboard · estados</a>
+  <a href="#atualizacao">Faixa de atualização</a>
   <a href="#historico">Histórico</a>
   <a href="#sessoes">Sessões CLI</a>
   <a href="#detalhe">Detalhe de sessão</a>
@@ -801,6 +802,28 @@ table.dt td.num, table.dt th.num { text-align: right; }
     </div>
   </div>
 </div>
+
+<!-- ══════════════════════ FAIXA DE ATUALIZAÇÃO ═══════════════════════ -->
+<h2 id="atualizacao">4c · Faixa de atualização — os quatro estados</h2>
+<p class="lede">A faixa de uma linha da issue #67 ganhou os estados da atualização automática (issue #75). Ela continua sendo <b>uma linha de 28dp no topo do dashboard</b>, com o marcador de 2dp à esquerda, o título cedendo espaço numa janela estreita e o rótulo da ação como única pista de que a linha é clicável. Sem botão, sem parágrafo de descrição.</p>
+
+<div class="panel"><div class="pbody">
+  <div class="cap">Disponível — atualização automática desligada, que é o padrão</div>
+  <div class="banner info"><span class="bar"></span><span class="bt" style="flex:1">Nova versão 38.0.0 disponível</span><span class="bt" style="color:var(--info)">Baixar atualização →</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Baixando — em segundo plano, com o interruptor ligado</div>
+  <div class="banner info"><span class="bar"></span><span class="bt" style="flex:1">Baixando a versão 38.0.0 — 42%</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Pronta — será aplicada ao fechar o app</div>
+  <div class="banner"><span class="bar" style="background:var(--ok)"></span><span class="bt" style="flex:1">Versão 38.0.0 pronta — será aplicada ao fechar</span><span class="bt" style="color:var(--ok)">Reiniciar e atualizar agora →</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Falhou — a versão instalada continua intacta</div>
+  <div class="banner warn"><span class="bar"></span><span class="bt" style="flex:1">Falha ao baixar a versão 38.0.0</span><span class="bt" style="color:var(--warn)">Baixar manualmente →</span></div>
+</div></div>
+
+<p class="note"><b>Três decisões que a imagem não mostra.</b> O progresso é <b>texto</b>, nunca indicador animado: animação infinita trava o <code>waitForIdle</code> dos testes de componente, e é a mesma regra que já vale para o resto do app. <b>Baixando não tem rótulo de ação e a faixa deixa de ser clicável</b> — faixa clicável sem rótulo seria um alvo de clique invisível. E <b>falha devolve o caminho manual</b>, que é o comportamento que o app sempre teve: a atualização automática que não deu certo não pode deixar o usuário sem saída.</p>
+
+<p class="note">Sem tamanho declarado no asset não há porcentagem, e a faixa diz só <span class="v sm">Baixando a versão 38.0.0…</span> — inventar um percentual seria pior que omiti-lo.</p>
 
 <!-- ═══════════════════════════════ HISTÓRICO ═════════════════════════ -->
 <h2 id="historico">5 · Histórico</h2>
