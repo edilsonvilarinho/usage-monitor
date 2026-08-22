@@ -382,9 +382,75 @@ class ComponentTest {
         onNodeWithText("42%").assertIsDisplayed()
         onNodeWithText("Uso atual").assertIsDisplayed()
         onNodeWithText("Reinício reportado: Ter 28/04 17h00 BRT").assertIsDisplayed()
-        onNodeWithText("Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar.").assertIsDisplayed()
-        onNodeWithText("Quota 7d indisponível na fonte semanal do Codex").assertIsDisplayed()
+        // Os dois avisos deixaram de ser banner e viraram uma exclamação no
+        // cabeçalho (issue #76): o texto vive na descrição do ícone e na tooltip,
+        // não mais no corpo do card.
+        onNodeWithContentDescription(
+            "Quota 7d indisponível na fonte semanal do Codex",
+            substring = true
+        ).assertIsDisplayed()
+        onNodeWithContentDescription(
+            "Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar.",
+            substring = true
+        ).assertIsDisplayed()
+        onAllNodesWithText("Quota 7d indisponível na fonte semanal do Codex").assertCountEquals(0)
         onAllNodesWithText("Codex 7d").assertCountEquals(0)
+    }
+
+    /**
+     * O texto que saiu do corpo do card tem de continuar alcançável: o hint é o
+     * único caminho até ele, e um ícone cuja tooltip não abre é aviso perdido.
+     */
+    @Test
+    fun `ApiUsageCard notice hint opens the notice texts on hover`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex atual",
+                            used = 42L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.REPORTED,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    notices = setOf(
+                        ApiUsageNotice.SOURCE_UNSTABLE,
+                        ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-04-28T10:00:00Z")
+                )
+            }
+        }
+
+        onAllNodesWithText("Avisos").assertCountEquals(0)
+
+        onNodeWithContentDescription("Avisos:", substring = true)
+            .performMouseInput { moveTo(center) }
+
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithText("Avisos").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Com dois avisos cada frase entra com bullet, e as duas moram no mesmo
+        // nó de texto da tooltip.
+        onNodeWithText(
+            "• Quota 7d indisponível na fonte semanal do Codex",
+            substring = true
+        ).assertIsDisplayed()
+        onNodeWithText(
+            "• Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar.",
+            substring = true
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -425,9 +491,13 @@ class ComponentTest {
         }
 
         // Com o card fechado o aviso continua visível: foi o card minimizado que
-        // escondeu o sumiço dos créditos em agosto/2026.
-        onNodeWithText("Créditos de uso não vieram nesta coleta. O saldo no claude.ai continua valendo.")
-            .assertIsDisplayed()
+        // escondeu o sumiço dos créditos em agosto/2026. Como exclamação no
+        // cabeçalho ele sobrevive aos dois estados — o cabeçalho é composto nos
+        // dois.
+        onNodeWithContentDescription(
+            "Créditos de uso não vieram nesta coleta. O saldo no claude.ai continua valendo.",
+            substring = true
+        ).assertIsDisplayed()
         onNodeWithText("Claude 7d").assertIsDisplayed()
     }
 

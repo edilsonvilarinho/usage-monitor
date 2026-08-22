@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
@@ -343,6 +344,19 @@ fun ApiUsageCard(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
+
+                        // O aviso da fonte sai aqui, no cabeçalho, e não como
+                        // banner abaixo das cotas: o cabeçalho é composto tanto
+                        // com o card aberto quanto fechado — a garantia que o
+                        // aviso de créditos exige — e ocupa a altura que já
+                        // existe.
+                        if (notices.isNotEmpty()) {
+                            CardNoticeHint(
+                                notices = notices,
+                                language = language,
+                                iconSize = density.actionIconSize
+                            )
+                        }
                     }
 
                     Row(
@@ -456,17 +470,6 @@ fun ApiUsageCard(
                     }
                 }
 
-                // O aviso sai também com o card fechado: foi exatamente o card
-                // minimizado que escondeu o sumiço dos créditos de agosto/2026 —
-                // quem monitora três contas mantém todos fechados.
-                if (notices.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    InlineNotices(
-                        notices = notices,
-                        source = source,
-                        language = language
-                    )
-                }
             }
 
             // As quatro ações de navegação desceram do cabeçalho para uma barra
@@ -603,33 +606,78 @@ private fun AccountIdentityLabel(
     }
 }
 
+/**
+ * Avisos não fatais da fonte, condensados numa exclamação.
+ *
+ * Eram `AppBanner` empilhados abaixo das cotas, e o texto deles não muda entre
+ * coletas: na janela estreita do modo somente cards os dois avisos do Codex
+ * ocupavam mais altura que o número que o card existe para mostrar (issue #76).
+ *
+ * O sinal continua sem hover — é o ícone âmbar, e ele mora no cabeçalho, que é
+ * composto também com o card minimizado. O que passou a exigir hover é o texto.
+ *
+ * Sem piso de largura, ao contrário da tooltip de cota: aquele piso existe
+ * porque o popup cobre o número que o ponteiro apontava, e este não aponta
+ * número nenhum. Sem a tooltip o aviso ficaria inacessível justamente na janela
+ * estreita, que é onde ele mais atrapalhava.
+ */
 @Composable
-private fun InlineNotices(
+private fun CardNoticeHint(
     notices: Set<ApiUsageNotice>,
-    source: ApiSource,
     language: AppLanguage,
+    iconSize: Dp,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
+    // Mesma ordem estável dos banners que este hint substituiu.
+    val texts = remember(notices, language) {
         notices
             .toList()
             .sortedBy { notice -> notice.ordinal }
-            .forEach { notice ->
-                // O aviso é do estado da fonte, não da identidade dela: pintá-lo
-                // com a cor da API dizia "Codex" onde precisava dizer "atenção".
-                AppBanner(
-                    title = inlineNoticeText(notice = notice, language = language),
-                    tone = AppTone.WARNING,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            .map { notice -> noticeText(notice = notice, language = language) }
+    }
+    if (texts.isEmpty()) return
+
+    val title = noticeHintTitle(count = texts.size, language = language)
+    // Bullet só com dois ou mais: marcador solto numa frase única é ruído.
+    val body = remember(texts) {
+        if (texts.size == 1) {
+            texts.first()
+        } else {
+            texts.joinToString(separator = "\n") { text -> "• $text" }
+        }
+    }
+    // A descrição carrega as frases inteiras: sem hover a tooltip não existe na
+    // árvore, e é por ela que leitor de tela e testes chegam ao aviso.
+    val description = remember(title, texts) {
+        "$title: ${texts.joinToString(separator = " ")}"
+    }
+
+    HoverTooltipBox(
+        title = title,
+        metrics = emptyList(),
+        footnote = body,
+        modifier = modifier
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.ErrorOutline,
+            contentDescription = description,
+            modifier = Modifier.size(iconSize),
+            // O aviso é do estado da fonte, não da identidade dela: pintá-lo com
+            // a cor da API diria "Codex" onde precisa dizer "atenção".
+            tint = AppTone.WARNING.color()
+        )
     }
 }
 
-private fun inlineNoticeText(notice: ApiUsageNotice, language: AppLanguage): String {
+private fun noticeHintTitle(count: Int, language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        if (count == 1) "Aviso" else "Avisos"
+    } else {
+        if (count == 1) "Notice" else "Notices"
+    }
+}
+
+private fun noticeText(notice: ApiUsageNotice, language: AppLanguage): String {
     return when (notice) {
         ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE -> {
             if (language == AppLanguage.PT) {
