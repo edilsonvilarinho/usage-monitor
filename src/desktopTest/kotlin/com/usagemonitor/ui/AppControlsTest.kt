@@ -7,7 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -139,6 +142,48 @@ class AppControlsTest {
         onNodeWithTag("switch").performClick()
 
         assertTrue(checked)
+    }
+
+    /**
+     * Com `clickable` no lugar de `toggleable` o nó não publicava
+     * `ToggleableState` nenhum, e o estado do interruptor era invisível para
+     * leitor de tela e para teste — que só conseguia afirmar o clique, nunca o
+     * valor.
+     */
+    @Test
+    fun `o interruptor publica o estado na semantica`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    AppSwitch(checked = true, onCheckedChange = {}, modifier = Modifier.testTag("on"))
+                    AppSwitch(checked = false, onCheckedChange = {}, modifier = Modifier.testTag("off"))
+                }
+            }
+        }
+
+        onNodeWithTag("on").assertIsOn()
+        onNodeWithTag("off").assertIsOff()
+    }
+
+    @Test
+    fun `o interruptor desabilitado nao dispara`() = runDesktopComposeUiTest {
+        var changes = 0
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    AppSwitch(
+                        checked = false,
+                        onCheckedChange = { changes += 1 },
+                        enabled = false,
+                        modifier = Modifier.testTag("switch")
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag("switch").assertIsNotEnabled().performClick()
+
+        assertEquals(0, changes)
     }
 
     @Test

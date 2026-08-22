@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -278,7 +280,17 @@ fun AppSwitch(
             .clip(shape)
             .background(track.copy(alpha = track.alpha * alpha))
             .border(AppBorderWidth, border.copy(alpha = alpha), shape)
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            // `toggleable` com `Role.Switch`, e não `clickable`: com o clique
+            // simples o nó não publica `ToggleableState` nenhum, e o estado do
+            // interruptor fica **invisível** para leitor de tela e para teste de
+            // componente — que só conseguia afirmar o clique, nunca o valor. É a
+            // mesma armadilha do `contentDescription` em botão de ícone.
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange
+            )
             .padding(SWITCH_PADDING),
         contentAlignment = Alignment.CenterStart
     ) {
