@@ -97,3 +97,54 @@ jobs:
           name: test-reports
           path: build/reports/tests/**
           if-no-files-found: ignore
+
+  # Job separado do `tests` de proposito: o roteiro instala e desinstala de
+  # verdade, mexe no registro do runner e leva alguns minutos. Amarra-lo ao job
+  # rapido faria toda mudanca de Kotlin esperar por ele.
+  #
+  # O `allTests` NAO cobre nada disto: o modo /UPDATE e script NSIS, e a unica
+  # forma de exercita-lo e compilar o instalador e roda-lo. Foi exatamente assim
+  # que os dois defeitos da atividade A16 apareceram -- nenhum deles seria pego
+  # lendo o codigo.
+  installer-scenarios:
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect installer changes
+        id: filter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ github.event_name }}' -ne 'pull_request') {
+            "relevant=true" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          git fetch --no-tags --depth=1 origin '${{ github.event.pull_request.base.ref }}'
+          $changed = git diff --name-only "origin/${{ github.event.pull_request.base.ref }}...HEAD"
+          $relevant = $false
+          foreach ($file in $changed) {
+            if ($file -like 'src/installer/*' -or $file -like 'src/desktopMain/kotlin/com/usagemonitor/update/*') {
+              Write-Host "Installer-related change: $file"
+              $relevant = $true
+              break
+            }
+          }
+          "relevant=$($relevant.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Install NSIS
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: choco install nsis -y
+
+      - name: Run installer update scenarios
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\src\installer\test\Invoke-UpdateScenarios.ps1

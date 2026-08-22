@@ -40,6 +40,20 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\gradlew.bat allTests
 
+      # O modo /UPDATE do instalador e script NSIS: o allTests nao o executa, e a
+      # unica forma de exercita-lo e compilar o instalador e roda-lo. Aqui, e nao
+      # so no ci.yml, porque este e o gate que decide se um release sai -- uma
+      # release com o /UPDATE quebrado atualiza a maquina de quem instalou.
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis -y
+
+      - name: Run installer update scenarios
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\src\installer\test\Invoke-UpdateScenarios.ps1
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
