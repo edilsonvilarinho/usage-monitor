@@ -5,6 +5,9 @@ import com.usagemonitor.data.dto.GitHubReleaseAssetDto
 import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.isVersionNewer
+import com.usagemonitor.domain.entity.AppUpdateArchitecture
+import com.usagemonitor.domain.entity.AppUpdateArtifactKind
+import com.usagemonitor.domain.entity.AppUpdatePlatform
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -65,66 +68,163 @@ class AppUpdateRepositoryImplTest {
         assertEquals("9.0.0", update?.version)
     }
 
+    /**
+     * Regressão sobre os **nomes reais** publicados no v37.0.0. Renomear um asset
+     * no workflow de release desliga a atualização automática em silêncio: o
+     * classificador deixa de reconhecer o pacote, a lista de artefatos perde o
+     * candidato e o app volta a só avisar. Este teste é o que transforma isso em
+     * suíte vermelha.
+     */
     @Test
-    fun `prefers NSIS setup exe for windows installer url`() = runTest {
+    fun `classifies the real v37 asset names`() = runTest {
+        val repo = AppUpdateRepositoryImpl(fakeRemote(release(tag = "v37.0.0", assets = realV37Assets())))
+
+        val artifacts = repo.getLatestAvailableUpdate(currentVersion = currentVersion)
+            .getOrNull()
+            ?.artifacts
+            .orEmpty()
+            .associateBy { it.assetName }
+
+        assertEquals(
+            AppUpdateArtifactKind.WINDOWS_NSIS,
+            artifacts.getValue("UsageMonitor-Setup-37.0.0.exe").kind
+        )
+        assertEquals(AppUpdateArtifactKind.WINDOWS_MSI, artifacts.getValue("Usage.Monitor-37.0.0.msi").kind)
+        assertEquals(
+            AppUpdateArtifactKind.LINUX_TARBALL,
+            artifacts.getValue("usage-monitor_37.0.0_linux_x64.tar.gz").kind
+        )
+        assertEquals(AppUpdateArtifactKind.LINUX_DEB, artifacts.getValue("usage-monitor_37.0.0-1_amd64.deb").kind)
+        assertEquals(AppUpdateArtifactKind.LINUX_RPM, artifacts.getValue("usage-monitor-37.0.0-1.x86_64.rpm").kind)
+        assertEquals(
+            AppUpdateArtifactKind.MACOS_DMG,
+            artifacts.getValue("usage-monitor_37.0.0_macos_arm64.dmg").kind
+        )
+
+        // Os sete assets da release são sete pacotes reconhecíveis: nenhum se perde.
+        assertEquals(7, artifacts.size)
+    }
+
+    @Test
+    fun `derives platform and architecture from the real asset names`() = runTest {
+        val repo = AppUpdateRepositoryImpl(fakeRemote(release(tag = "v37.0.0", assets = realV37Assets())))
+
+        val artifacts = repo.getLatestAvailableUpdate(currentVersion = currentVersion)
+            .getOrNull()
+            ?.artifacts
+            .orEmpty()
+            .associateBy { it.assetName }
+
+        assertEquals(AppUpdatePlatform.WINDOWS, artifacts.getValue("UsageMonitor-Setup-37.0.0.exe").platform)
+        assertEquals(AppUpdatePlatform.LINUX, artifacts.getValue("usage-monitor_37.0.0-1_amd64.deb").platform)
+        assertEquals(AppUpdatePlatform.MACOS, artifacts.getValue("usage-monitor_37.0.0_macos_x64.dmg").platform)
+
+        // Só os DMGs carregam token de arquitetura hoje; o resto é x64 por default explícito.
+        assertEquals(
+            AppUpdateArchitecture.ARM64,
+            artifacts.getValue("usage-monitor_37.0.0_macos_arm64.dmg").architecture
+        )
+        assertEquals(
+            AppUpdateArchitecture.X64,
+            artifacts.getValue("usage-monitor_37.0.0_macos_x64.dmg").architecture
+        )
+        assertEquals(
+            AppUpdateArchitecture.X64,
+            artifacts.getValue("UsageMonitor-Setup-37.0.0.exe").architecture
+        )
+        assertEquals(
+            AppUpdateArchitecture.X64,
+            artifacts.getValue("usage-monitor-37.0.0-1.x86_64.rpm").architecture
+        )
+    }
+
+    @Test
+    fun `strips the sha256 prefix and carries the size`() = runTest {
         val release = release(
             tag = "v9.0.0",
             assets = listOf(
-                asset("UsageMonitor-Setup-9.0.0.exe", "https://example.test/win-setup.exe"),
-                asset("Usage.Monitor-9.0.0.exe", "https://example.test/win-jpackage.exe"),
-                asset("UsageMonitor-9.0.0.msi", "https://example.test/win.msi"),
-                asset("UsageMonitor-9.0.0.deb", "https://example.test/lin.deb")
+                asset(
+                    name = "UsageMonitor-Setup-9.0.0.exe",
+                    url = "https://example.test/win-setup.exe",
+                    size = 120054859L,
+                    digest = "sha256:23222796BB56197309FB3FEC5A6705DD4C016EC65996F4DDF0470AF7D3CC40E3"
+                )
+            )
+        )
+        val repo = AppUpdateRepositoryImpl(fakeRemote(release))
+
+        val artifact = repo.getLatestAvailableUpdate(currentVersion = currentVersion)
+            .getOrNull()
+            ?.artifacts
+            ?.single()
+
+        assertEquals(
+            "23222796bb56197309fb3fec5a6705dd4c016ec65996f4ddf0470af7d3cc40e3",
+            artifact?.sha256
+        )
+        assertEquals(120054859L, artifact?.sizeBytes)
+    }
+
+    @Test
+    fun `asset without digest keeps a null sha256 instead of an empty one`() = runTest {
+        val release = release(
+            tag = "v9.0.0",
+            assets = listOf(asset("UsageMonitor-Setup-9.0.0.exe", "https://example.test/win-setup.exe"))
+        )
+        val repo = AppUpdateRepositoryImpl(fakeRemote(release))
+
+        val artifact = repo.getLatestAvailableUpdate(currentVersion = currentVersion)
+            .getOrNull()
+            ?.artifacts
+            ?.single()
+
+        assertNull(artifact?.sha256)
+        assertNull(artifact?.sizeBytes)
+    }
+
+    @Test
+    fun `digest in another algorithm is discarded, never carried as a sha256`() = runTest {
+        val release = release(
+            tag = "v9.0.0",
+            assets = listOf(
+                asset(
+                    name = "UsageMonitor-Setup-9.0.0.exe",
+                    url = "https://example.test/win-setup.exe",
+                    digest = "sha512:aaaa"
+                )
+            )
+        )
+        val repo = AppUpdateRepositoryImpl(fakeRemote(release))
+
+        val artifact = repo.getLatestAvailableUpdate(currentVersion = currentVersion)
+            .getOrNull()
+            ?.artifacts
+            ?.single()
+
+        assertNull(artifact?.sha256)
+    }
+
+    /**
+     * Um `.exe` que não diz `setup` não é o instalador NSIS — pode ser o `.exe`
+     * do jpackage. Ele não pode virar candidato: só o NSIS entende `/UPDATE`, e
+     * mandar `/S /UPDATE` para o outro produz uma instalação silenciosa que para
+     * no `MessageBox` do `.onInit` e nunca mais sai.
+     */
+    @Test
+    fun `discards assets that are not recognizable packages`() = runTest {
+        val release = release(
+            tag = "v9.0.0",
+            assets = listOf(
+                asset("notes.txt", "https://example.test/notes.txt"),
+                asset("checksums.txt", "https://example.test/checksums.txt"),
+                asset("Usage.Monitor-9.0.0.exe", "https://example.test/win-jpackage.exe")
             )
         )
         val repo = AppUpdateRepositoryImpl(fakeRemote(release))
 
         val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion).getOrNull()
 
-        assertEquals("https://example.test/win-setup.exe", update?.windowsInstallerDownloadUrl)
-    }
-
-    @Test
-    fun `falls back to msi asset for windows installer url when setup exe is unavailable`() = runTest {
-        val release = release(
-            tag = "v9.0.0",
-            assets = listOf(
-                asset("UsageMonitor-9.0.0.msi", "https://example.test/win.msi"),
-                asset("UsageMonitor-9.0.0.deb", "https://example.test/lin.deb")
-            )
-        )
-        val repo = AppUpdateRepositoryImpl(fakeRemote(release))
-
-        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion).getOrNull()
-
-        assertEquals("https://example.test/win.msi", update?.windowsInstallerDownloadUrl)
-    }
-
-    @Test
-    fun `picks deb asset for linux installer url`() = runTest {
-        val release = release(
-            tag = "v9.0.0",
-            assets = listOf(asset("usage-monitor_9.0.0.deb", "https://example.test/lin.deb"))
-        )
-        val repo = AppUpdateRepositoryImpl(fakeRemote(release))
-
-        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion).getOrNull()
-
-        assertEquals("https://example.test/lin.deb", update?.linuxDebInstallerDownloadUrl)
-        assertNull(update?.windowsInstallerDownloadUrl)
-    }
-
-    @Test
-    fun `returns null download urls when no matching assets`() = runTest {
-        val release = release(
-            tag = "v9.0.0",
-            assets = listOf(asset("notes.txt", "https://example.test/notes.txt"))
-        )
-        val repo = AppUpdateRepositoryImpl(fakeRemote(release))
-
-        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion).getOrNull()
-
-        assertNull(update?.windowsInstallerDownloadUrl)
-        assertNull(update?.linuxDebInstallerDownloadUrl)
+        assertEquals(emptyList(), update?.artifacts)
     }
 
     @Test
@@ -161,8 +261,38 @@ class AppUpdateRepositoryImplTest {
         )
     }
 
-    private fun asset(name: String, url: String): GitHubReleaseAssetDto {
-        return GitHubReleaseAssetDto(name = name, browserDownloadUrl = url)
+    private fun asset(
+        name: String,
+        url: String,
+        size: Long? = null,
+        digest: String? = null
+    ): GitHubReleaseAssetDto {
+        return GitHubReleaseAssetDto(
+            name = name,
+            browserDownloadUrl = url,
+            size = size,
+            digest = digest
+        )
+    }
+
+    /** Os sete nomes publicados no v37.0.0, copiados da resposta real da API. */
+    private fun realV37Assets(): List<GitHubReleaseAssetDto> {
+        return listOf(
+            "usage-monitor-37.0.0-1.x86_64.rpm",
+            "usage-monitor_37.0.0-1_amd64.deb",
+            "usage-monitor_37.0.0_linux_x64.tar.gz",
+            "usage-monitor_37.0.0_macos_arm64.dmg",
+            "usage-monitor_37.0.0_macos_x64.dmg",
+            "Usage.Monitor-37.0.0.msi",
+            "UsageMonitor-Setup-37.0.0.exe"
+        ).map { name ->
+            asset(
+                name = name,
+                url = "https://github.com/edilsonvilarinho/usage-monitor/releases/download/v37.0.0/$name",
+                size = 1_000L,
+                digest = "sha256:${name.hashCode().toString(16)}"
+            )
+        }
     }
 
     private fun fakeRemote(release: GitHubReleaseDto): RemoteApiDataSource {
