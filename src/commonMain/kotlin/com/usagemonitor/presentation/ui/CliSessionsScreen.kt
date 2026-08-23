@@ -1380,7 +1380,7 @@ internal fun MetricValue(
 ) {
     Text(
         text = value,
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.SemiBold,
         color = valueColor,
         maxLines = 1,
@@ -1407,6 +1407,11 @@ internal fun ColumnHeaderLabel(
 
 // `internal`, e não `private`, porque a tela de time reaproveita estes blocos:
 // duas listas com a mesma anatomia não podem ter duas implementações de célula.
+//
+// O valor é `label*` — mono — e não `body*`. A escala divide as duas famílias por
+// papel, não por tamanho: `body*` é sans e existe para texto corrido, e estas são
+// as células de valor de duas listas tabulares. Número em fonte proporcional não
+// alinha coluna, que é a razão de a mono estar aqui.
 @Composable
 internal fun MetricText(
     label: String,
@@ -1422,7 +1427,7 @@ internal fun MetricText(
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = valueColor
         )
