@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -231,7 +230,7 @@ fun SettingsDialogContent(
                         onUiScaleChange = onUiScaleChange
                     )
 
-                    SettingsTab.ALERTS -> SettingsSectionCard {
+                    SettingsTab.ALERTS -> {
                         AlertSettingsSection(
                             settings = alertSettings,
                             language = currentLanguage,
@@ -443,30 +442,31 @@ private fun AnthropicAccountsTab(
     onRescanAnthropicProfiles: () -> Unit,
     onToggleProfileExpanded: (String) -> Unit
 ) {
-    SettingsSectionCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (currentLanguage == AppLanguage.PT) "Contas Anthropic" else "Anthropic accounts",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                AppButton(
-                    label = if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan",
-                    onClick = onRescanAnthropicProfiles,
-                    tone = AppButtonTone.GHOST
-                )
-                AppButton(
-                    label = if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add",
-                    onClick = onAddAnthropicProfile,
-                    tone = AppButtonTone.PRIMARY
-                )
-            }
-
+    // As duas ações vão para o `trailing` do cabeçalho, como no protótipo: elas
+    // agem sobre a lista inteira, e no corpo competiam com as linhas de perfil.
+    AppDataSurfaceFlush(
+        header = {
+            AppSectionHeader(
+                title = if (currentLanguage == AppLanguage.PT) "Contas Anthropic" else "Anthropic accounts",
+                trailing = {
+                    AppButton(
+                        label = if (currentLanguage == AppLanguage.PT) "Redetectar" else "Rescan",
+                        onClick = onRescanAnthropicProfiles,
+                        tone = AppButtonTone.GHOST
+                    )
+                    AppButton(
+                        label = if (currentLanguage == AppLanguage.PT) "Adicionar" else "Add",
+                        onClick = onAddAnthropicProfile,
+                        tone = AppButtonTone.PRIMARY
+                    )
+                }
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+        ) {
             if (anthropicProfiles.isEmpty()) {
                 Text(
                     text = if (currentLanguage == AppLanguage.PT) {
@@ -576,17 +576,6 @@ private fun SettingsNavItem(
 private val SETTINGS_NAV_WIDTH = 150.dp
 
 @Composable
-private fun SettingsSectionCard(
-    content: @Composable () -> Unit
-) {
-    // Superfície de dados do sistema: o `Card` do Material repetia à mão a
-    // borda, a forma e a elevação zero que ela já traz.
-    AppDataSurface(contentPadding = AppSpacing.lg) {
-        content()
-    }
-}
-
-@Composable
 private fun AnthropicProfileRow(
     profile: AnthropicProfileUiModel,
     language: AppLanguage,
@@ -602,31 +591,24 @@ private fun AnthropicProfileRow(
         AnthropicProfileUiStatus.INVALID -> if (language == AppLanguage.PT) "Inválido" else "Invalid"
         AnthropicProfileUiStatus.DUPLICATE -> if (language == AppLanguage.PT) "Conta duplicada" else "Duplicate account"
     }
-    val statusColor = if (profile.status == AnthropicProfileUiStatus.READY) {
-        MaterialTheme.colorScheme.primary
+    val statusTone = if (profile.status == AnthropicProfileUiStatus.READY) {
+        AppTone.OK
     } else {
-        MaterialTheme.colorScheme.error
+        AppTone.CRITICAL
     }
     val editLabel = if (language == AppLanguage.PT) "Editar" else "Edit"
     val collapseLabel = if (language == AppLanguage.PT) "Recolher" else "Collapse"
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+    // Linha de dados, não bloco em `surfaceVariant`: aquele é o realce de hover
+    // das listas, e com ele como fundo fixo passar o mouse deixava de dar
+    // retorno. O estado do perfil vira ponto e palavra, como no resto do app.
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+            AppDataRow(showDivider = false, horizontalPadding = 0.dp) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = profile.label,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     val identity = profile.identityLabel
@@ -638,12 +620,7 @@ private fun AnthropicProfileRow(
                         )
                     }
                 }
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = statusColor,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
+                AppStatusIndicator(label = statusText, tone = statusTone)
                 AppSwitch(
                     checked = profile.enabled,
                     onCheckedChange = { checked -> onToggle(profile.id, checked) }
@@ -675,7 +652,7 @@ private fun AnthropicProfileRow(
                 Text(
                     text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
                     style = MaterialTheme.typography.labelSmall,
-                    color = statusColor
+                    color = statusTone.color()
                 )
                 if (profile.removable) {
                     AppButton(
