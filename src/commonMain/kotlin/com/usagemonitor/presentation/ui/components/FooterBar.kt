@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
@@ -123,16 +121,14 @@ fun FooterBar(
     AppStatusBar(modifier = modifier) {
         FooterCompactStatusGroup(
             appVersion = appVersion,
-            language = language,
             secondsUntilRefresh = secondsUntilRefresh,
-            dense = true,
+            language = language,
             modifier = Modifier.weight(1f)
         )
         FooterActionGroup(
             language = language,
             onRefresh = onRefresh,
             onOpenSettings = onOpenSettings,
-            iconOnly = true,
             onOpenAdminOverview = onOpenAdminOverview,
             onOpenTeamPresence = onOpenTeamPresence
         )
@@ -143,19 +139,11 @@ fun FooterBar(
 @Composable
 private fun FooterCompactStatusGroup(
     appVersion: String,
-    language: AppLanguage,
     secondsUntilRefresh: Int,
-    dense: Boolean = false,
+    language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
-    val countdown = formatRefreshCountdown(secondsUntilRefresh)
-    val refreshLabel = if (dense) {
-        countdown
-    } else if (language == AppLanguage.PT) {
-        "Próx. $countdown"
-    } else {
-        "Next $countdown"
-    }
+    val refreshLabel = formatRefreshCountdown(secondsUntilRefresh)
     val versionTooltip = if (language == AppLanguage.PT) "Versão do app" else "App version"
     val refreshTooltip = if (language == AppLanguage.PT) {
         "Próxima atualização automática"
@@ -219,7 +207,6 @@ private fun FooterActionGroup(
     language: AppLanguage,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
-    iconOnly: Boolean = false,
     modifier: Modifier = Modifier,
     onOpenAdminOverview: (() -> Unit)? = null,
     onOpenTeamPresence: (() -> Unit)? = null
@@ -282,28 +269,16 @@ private fun FooterActionGroup(
             )
         }
 
-        if (iconOnly) {
-            FooterIconActionButton(
-                label = if (language == AppLanguage.PT) "Abrir configurações" else "Open settings",
-                onClick = onOpenSettings
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Settings,
-                    contentDescription = null,
-                    modifier = Modifier.size(FOOTER_ICON_SIZE),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            TextButton(
-                onClick = onOpenSettings,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Configurações" else "Settings",
-                    style = MaterialTheme.typography.labelLarge
-                )
-            }
+        FooterIconActionButton(
+            label = if (language == AppLanguage.PT) "Abrir configurações" else "Open settings",
+            onClick = onOpenSettings
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Settings,
+                contentDescription = null,
+                modifier = Modifier.size(FOOTER_ICON_SIZE),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
