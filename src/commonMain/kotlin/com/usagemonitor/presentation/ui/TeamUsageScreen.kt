@@ -722,7 +722,7 @@ private fun TeamAccountGroupHeader(
                         } else {
                             TeamUsageLabels.expandAccount(language)
                         },
-                        tint = accents.cacheRead
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Column {
                         // A palavra vem antes do e-mail: sem ela a faixa entregava um
@@ -735,10 +735,13 @@ private fun TeamAccountGroupHeader(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
                         )
+                        // O e-mail é o dado, e dado fica na cor do texto. Quem
+                        // identifica a faixa como conta é o marcador de 2dp à
+                        // esquerda e a palavra logo acima.
                         Text(
                             text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
                             style = MaterialTheme.typography.titleSmall,
-                            color = accents.cacheRead,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -849,8 +852,6 @@ private fun TeamUsageHeader(
     onSelectView: (TeamUsageView) -> Unit,
     onExportReport: () -> Unit
 ) {
-    val accents = AppAccents.current
-
     DepthSurface(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = 16.dp
@@ -864,7 +865,7 @@ private fun TeamUsageHeader(
                 Text(
                     text = state.accountLabel,
                     style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -872,7 +873,7 @@ private fun TeamUsageHeader(
                 Text(
                     text = TeamUsageLabels.allAccounts(state.memberGroups.size, language),
                     style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.testTag(TEAM_ADMIN_OVERVIEW_TAG)
                 )
@@ -910,12 +911,16 @@ private fun TeamUsageHeader(
                 HealthTallyText(tally = state.healthTally, language = language)
             }
 
+            // Os totais são o mesmo tipo de coisa e ficam na mesma cor — a mesma
+            // decisão que `CliSessionsHeader` já carrega. O acento é identidade
+            // de fonte, não de valor: tokens em verde ao lado de custo em azul
+            // sugere duas categorias onde há duas medidas da mesma janela.
             Column {
                 Text(
                     text = formatQuantity(state.totalTokens),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = accents.cacheRead
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = TeamUsageLabels.columnTokens(language),
@@ -933,7 +938,7 @@ private fun TeamUsageHeader(
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = accents.input
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = TeamUsageLabels.estimatedTotalInRange(
