@@ -125,6 +125,9 @@ private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 const val API_USAGE_CARD_TAG_PREFIX = "apiUsageCard:"
 const val API_USAGE_CARD_HEADER_TAG = "apiUsageCardHeader"
 const val API_USAGE_CARD_ACTIONS_TAG = "apiUsageCardActions"
+
+/** Badge de estado do cabeçalho: ponto e palavra do pior risco entre as cotas. */
+const val API_USAGE_CARD_STATUS_TAG = "apiUsageCardStatus"
 const val QUOTA_BLOCK_TAG_PREFIX = "quotaBlock:"
 
 /** O rótulo da cota é único dentro de um card: é a chave da série. */
@@ -302,9 +305,13 @@ fun ApiUsageCard(
                         vertical = density.contentVerticalPadding
                     )
             ) {
+                // `spacedBy` e não `SpaceBetween`: a coluna do título já leva
+                // `weight(1f)` e empurra o resto para a direita sozinha, e o
+                // arranjo por espaço não deixava vão entre o badge de estado e o
+                // primeiro botão — a palavra encostava no ícone.
                 Row(
                     modifier = Modifier.fillMaxWidth().testTag(API_USAGE_CARD_HEADER_TAG),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(density.headerSpacing),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -358,6 +365,25 @@ fun ApiUsageCard(
                                 iconSize = density.actionIconSize
                             )
                         }
+                    }
+
+                    // Estado da fonte com **ponto e palavra**, ao lado das ações,
+                    // como no protótipo. O `RiskSemaphoreDot` de cada cota é só
+                    // ponto: sozinho, ele deixa a cor informando o estado, que é
+                    // exatamente o que este sistema visual não faz. Aqui a
+                    // palavra aparece uma vez, para o card inteiro, e continua
+                    // sendo lida com o card minimizado — o cabeçalho é composto
+                    // nos dois estados.
+                    worstQuotaRisk(
+                        quotas = orderedQuotas,
+                        riskByQuotaKey = riskByQuotaKey,
+                        now = now
+                    )?.let { (_, worstRisk) ->
+                        AppStatusIndicator(
+                            label = riskLevelLabel(worstRisk.level, language),
+                            tone = toneFor(worstRisk.level),
+                            modifier = Modifier.testTag(API_USAGE_CARD_STATUS_TAG)
+                        )
                     }
 
                     Row(
