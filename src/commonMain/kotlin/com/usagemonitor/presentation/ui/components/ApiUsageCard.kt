@@ -297,20 +297,24 @@ fun ApiUsageCard(
             )
 
             Column(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = density.contentHorizontalPadding,
-                        vertical = density.contentVerticalPadding
-                    )
-            ) {
+                // O cabeçalho carrega o próprio padding e o conteúdo abaixo dele
+                // encosta na borda: é o `.pbody.flush` do protótipo, onde a
+                // divisória de cada cota atravessa o card de ponta a ponta. Com o
+                // padding num bloco só em volta de tudo, a divisória parava a 12dp
+                // de cada lado e a lista deixava de ler como tabela.
+                //
                 // `spacedBy` e não `SpaceBetween`: a coluna do título já leva
                 // `weight(1f)` e empurra o resto para a direita sozinha, e o
                 // arranjo por espaço não deixava vão entre o badge de estado e o
                 // primeiro botão — a palavra encostava no ícone.
                 Row(
-                    modifier = Modifier.fillMaxWidth().testTag(API_USAGE_CARD_HEADER_TAG),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = density.contentHorizontalPadding,
+                            vertical = density.contentVerticalPadding
+                        )
+                        .testTag(API_USAGE_CARD_HEADER_TAG),
                     horizontalArrangement = Arrangement.spacedBy(density.headerSpacing),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -323,19 +327,33 @@ fun ApiUsageCard(
                         // fundo inteiro do card, e com quatro cards abertos o
                         // dashboard virava quatro retângulos coloridos disputando
                         // a atenção que os números deviam ter.
-                        AppSourceMarker(color = accentColorFor(source = source, accents = AppAccents.current))
-                        HoverTooltipBox(
-                            title = apiName,
-                            metrics = emptyList(),
-                            modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            Text(
-                                text = apiName,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        AppSourceMarker(
+                            color = accentColorFor(source = source, accents = AppAccents.current),
+                            height = if (accountContext == null) 18.dp else 28.dp
+                        )
+                        // Título e conta na mesma coluna, como o `.ptitle`/`.psub`
+                        // do protótipo. A conta era uma linha de largura cheia
+                        // abaixo do cabeçalho inteiro, alinhada à borda do card e
+                        // não ao título de que ela é o subtítulo.
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
+                            HoverTooltipBox(
+                                title = apiName,
+                                metrics = emptyList()
+                            ) {
+                                Text(
+                                    text = apiName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (accountContext != null) {
+                                AccountIdentityLabel(
+                                    account = accountContext,
+                                    language = language
+                                )
+                            }
                         }
                         source.statusBadgeLabel(language)?.let { badgeLabel ->
                             Text(
@@ -437,16 +455,7 @@ fun ApiUsageCard(
                     }
                 }
 
-                if (accountContext != null) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    AccountIdentityLabel(
-                        account = accountContext,
-                        language = language,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
+                AppDivider()
 
                 AnimatedContent(
                     targetState = isMinimized,
@@ -465,12 +474,21 @@ fun ApiUsageCard(
                     },
                     label = "cardLayoutMode"
                 ) { minimized ->
+                    // Só a cota expandida é linha de tabela e traz a própria
+                    // divisória de ponta a ponta. Badge e resumo do OpenCode são
+                    // blocos, e bloco encostado na borda não tem onde respirar:
+                    // esses dois recebem o padding do card.
+                    val blockPadding = Modifier.padding(
+                        horizontal = density.contentHorizontalPadding,
+                        vertical = density.contentVerticalPadding
+                    )
                     if (source.isObservedActivitySource()) {
                         OpenCodeUsageSummary(
                             source = source,
                             quotas = orderedQuotas,
                             language = language,
-                            compact = minimized
+                            compact = minimized,
+                            modifier = blockPadding
                         )
                     } else if (minimized) {
                         CompactQuotaSummary(
@@ -482,7 +500,8 @@ fun ApiUsageCard(
                             density = density,
                             stacked = stackCompactQuotas,
                             showTooltip = showQuotaTooltip,
-                            now = now
+                            now = now,
+                            modifier = blockPadding
                         )
                     } else {
                         ExpandedQuotaSummary(
@@ -496,8 +515,6 @@ fun ApiUsageCard(
                         )
                     }
                 }
-
-            }
 
             // As quatro ações de navegação desceram do cabeçalho para uma barra
             // própria. No topo elas dividiam espaço com atualizar e minimizar, que
@@ -1289,19 +1306,27 @@ private fun ExpandedQuotaSummary(
     now: Instant,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing)
-    ) {
-        quotas.forEach { quota ->
-            QuotaRow(
-                quota = quota,
-                showUsageDetails = showUsageDetails,
-                language = language,
-                risk = riskByQuotaKey[quota.seriesKey],
-                showTooltip = showTooltip,
-                now = now
-            )
+    // Linha de dados, com divisória própria e sem vão entre elas: é a mesma
+    // decisão da lista do time. O vão fazia três cotas lerem como três blocos
+    // empilhados, e sem a divisória o rótulo de uma encostava no reinício da
+    // anterior sem nada dizendo onde uma termina.
+    Column(modifier = modifier.fillMaxWidth()) {
+        quotas.forEachIndexed { index, quota ->
+            AppDataRow(
+                showDivider = index != quotas.lastIndex,
+                horizontalPadding = density.contentHorizontalPadding,
+                verticalPadding = density.contentVerticalPadding
+            ) {
+                QuotaRow(
+                    quota = quota,
+                    showUsageDetails = showUsageDetails,
+                    language = language,
+                    risk = riskByQuotaKey[quota.seriesKey],
+                    showTooltip = showTooltip,
+                    now = now,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
