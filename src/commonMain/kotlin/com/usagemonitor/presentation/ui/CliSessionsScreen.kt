@@ -53,6 +53,9 @@ import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppBorderWidth
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppCellValue
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppIconButton
@@ -64,6 +67,7 @@ import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
+import com.usagemonitor.presentation.ui.components.AppToolbar
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.BinMode
@@ -142,6 +146,32 @@ const val CLI_SESSION_ROW_TAG_PREFIX = "cliSessionRow:"
 
 /** O id completo, não o truncado: é ele que identifica a sessão sem ambiguidade. */
 fun cliSessionRowTag(sessionId: String): String = "$CLI_SESSION_ROW_TAG_PREFIX$sessionId"
+
+/** Faixa de legendas da lista de sessões, na tela da máquina e no bloco do time. */
+const val CLI_SESSION_COLUMN_HEADER_TAG = "cliSessionColumnHeader"
+
+// Larguras das colunas da lista de sessões, num lugar só: a faixa de legendas e
+// as linhas têm de cair no mesmo x.
+//
+// O somatório não é livre e é ele que sustenta a faixa de cabeçalho. Com a janela
+// em 960dp, as seis colunas mais o vão de 12dp entre elas dão 766; somados os
+// 24dp de padding da linha, os 12 da barra de rolagem, os 32 do corpo da janela e
+// os 26 do botão de remover do modo administrativo, sobram 874 — abaixo do piso
+// da janela. Passar disso faria a linha quebrar, e uma faixa de legendas sobre
+// linha quebrada promete um alinhamento que o conteúdo não cumpre.
+//
+// O veredito de saturação **não** é coluna: ele desceu para uma segunda linha da
+// própria linha, com a razão que o gerou ao lado. Como coluna ele media 210dp e
+// era o que estourava o orçamento.
+private val SESSION_COLUMN_ID = 170.dp
+private val SESSION_COLUMN_PROJECT = 130.dp
+private val SESSION_COLUMN_TOKENS = 136.dp
+private val SESSION_COLUMN_CACHE = 90.dp
+private val SESSION_COLUMN_COST = 96.dp
+private val SESSION_COLUMN_ACTIVE_TIME = 84.dp
+
+/** Mesma pegada do `AppIconButton`, para o cabeçalho reservar a casa certa. */
+private val SESSION_ACTION_SLOT = 26.dp
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -303,6 +333,13 @@ private fun CliSessionsList(
             return@AppWindowScaffold
         }
 
+        // Fora da `LazyColumn`, e não `stickyHeader`: a faixa é do painel, não da
+        // rolagem, e é o mesmo desenho que a tela de presença já usa.
+        CliSessionColumnHeader(
+            language = language,
+            modifier = Modifier.padding(end = SCROLLBAR_GUTTER)
+        )
+
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             val listState = rememberLazyListState()
 
@@ -345,27 +382,77 @@ private fun CliSessionsHeader(
     onExport: (UsageExportFormat) -> Unit = {},
     onExportReport: () -> Unit = {}
 ) {
-    DepthSurface(
+    // Sem painel em volta: o corpo da janela já é a superfície, e um retângulo
+    // com borda envolvendo barra de controles, métricas e abas transformava o
+    // cabeçalho inteiro num bloco só — que é o que o protótipo desenha solto.
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = AppSpacing.md
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // Abas **antes** das métricas, como no protótipo: a aba escolhe o que a
+        // janela mostra, e os totais são conteúdo dela. Depois delas, os totais
+        // pareciam pertencer só à aba de sessões.
+        //
+        // `Row` e não `FlowRow`: as abas levam `weight` para empurrar o resto para
+        // a direita, e peso dentro de um `FlowRow` fica sem referência de largura.
+        AppToolbar(spacing = AppSpacing.sm) {
+            AppTabs(
+                tabs = listOf(
+                    AppTab(label = BreakdownLabels.tabSessions(language), testTag = TAB_SESSIONS_TAG),
+                    AppTab(label = BreakdownLabels.tabBreakdown(language), testTag = TAB_BREAKDOWN_TAG)
+                ),
+                selectedIndex = if (state.view == CliSessionsView.BREAKDOWN) 1 else 0,
+                onSelect = { index ->
+                    onSelectView(
+                        if (index == 1) CliSessionsView.BREAKDOWN else CliSessionsView.SESSIONS
+                    )
+                },
+                modifier = Modifier.weight(1f)
+            )
+
             if (state.profileLabel != null) {
                 Text(
                     text = state.profileLabel,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             // O carimbo da última alteração desceu para a barra de estado; aqui
             // fica só o selo de leitura ao vivo, que é estado do laço e não dado.
             LiveBadge(language = language)
+
+            // A janela vale para as duas leituras, então trocá-la é a escolha de
+            // fora e a aba é a de dentro — as duas na mesma faixa.
+            AppSegmentedControl(
+                options = CliSessionRange.entries.map { entry ->
+                    AppSegment(label = CliSessionsLabels.rangeLabel(entry, language))
+                },
+                selectedIndex = CliSessionRange.entries.indexOf(state.range),
+                onSelect = { index -> onSelectRange(CliSessionRange.entries[index]) }
+            )
+
+            // A exportação segue a aba aberta e a janela escolhida: exportar um
+            // recorte diferente do que está na tela seria surpresa.
+            AppButton(
+                label = ExportLabels.exportCsv(language),
+                onClick = { onExport(UsageExportFormat.CSV) },
+                modifier = Modifier.testTag(EXPORT_CSV_TAG)
+            )
+            AppButton(
+                label = ExportLabels.exportJson(language),
+                onClick = { onExport(UsageExportFormat.JSON) },
+                modifier = Modifier.testTag(EXPORT_JSON_TAG)
+            )
+            // O relatório não segue a aba: ele é o recorte inteiro da janela, com
+            // sessões e resumo juntos. Seguir a aba daria dois PDFs pela metade.
+            AppButton(
+                label = ExportLabels.exportPdf(language),
+                onClick = onExportReport,
+                modifier = Modifier.testTag(EXPORT_PDF_TAG)
+            )
         }
-        Spacer(modifier = Modifier.height(6.dp))
 
         // Blocos de métrica, não colunas de texto soltas: eram quatro pares
         // valor/rótulo flutuando sobre o mesmo painel, e o cabeçalho lia como
@@ -456,75 +543,8 @@ private fun CliSessionsHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Linha própria: junto das métricas, a quebra do FlowRow dependia da
-        // largura dos números, então os chips mudavam de lugar conforme os dados.
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            AppSegmentedControl(
-                options = CliSessionRange.entries.map { entry ->
-                    AppSegment(label = CliSessionsLabels.rangeLabel(entry, language))
-                },
-                selectedIndex = CliSessionRange.entries.indexOf(state.range),
-                onSelect = { index -> onSelectRange(CliSessionRange.entries[index]) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Abas depois dos chips de janela: a janela vale para as duas leituras,
-        // então trocá-la é a escolha de fora e a aba é a de dentro.
-        //
-        // `Row` e não `FlowRow`: as abas levam `weight` para empurrar os botões
-        // de exportação para a direita, e peso dentro de um `FlowRow` fica sem
-        // referência de largura.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AppTabs(
-                tabs = listOf(
-                    AppTab(label = BreakdownLabels.tabSessions(language), testTag = TAB_SESSIONS_TAG),
-                    AppTab(label = BreakdownLabels.tabBreakdown(language), testTag = TAB_BREAKDOWN_TAG)
-                ),
-                selectedIndex = if (state.view == CliSessionsView.BREAKDOWN) 1 else 0,
-                onSelect = { index ->
-                    onSelectView(
-                        if (index == 1) CliSessionsView.BREAKDOWN else CliSessionsView.SESSIONS
-                    )
-                },
-                modifier = Modifier.weight(1f)
-            )
-
-            // A exportação segue a aba aberta e a janela escolhida: exportar um
-            // recorte diferente do que está na tela seria surpresa.
-            AppButton(
-                label = ExportLabels.exportCsv(language),
-                onClick = { onExport(UsageExportFormat.CSV) },
-                modifier = Modifier.testTag(EXPORT_CSV_TAG)
-            )
-            AppButton(
-                label = ExportLabels.exportJson(language),
-                onClick = { onExport(UsageExportFormat.JSON) },
-                modifier = Modifier.testTag(EXPORT_JSON_TAG)
-            )
-            // O relatório não segue a aba: ele é o recorte inteiro da janela, com
-            // sessões e resumo juntos. Seguir a aba daria dois PDFs pela metade.
-            AppButton(
-                label = ExportLabels.exportPdf(language),
-                onClick = onExportReport,
-                modifier = Modifier.testTag(EXPORT_PDF_TAG)
-            )
-        }
-
         val exportOutcome = state.exportOutcome
         if (exportOutcome != null) {
-            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = exportOutcomeMessage(exportOutcome, language),
                 style = MaterialTheme.typography.labelSmall,
@@ -567,18 +587,76 @@ internal fun LiveBadge(language: AppLanguage) {
  * sessão de um colega tem de ser lida exatamente como a sessão da própria
  * máquina, com as mesmas colunas e o mesmo veredito de saturação.
  */
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Faixa de legendas da lista de sessões, uma vez para a lista inteira.
+ *
+ * `internal` porque o bloco de sessões do modal do time reaproveita a mesma
+ * lista: duas faixas com as mesmas colunas divergiriam no primeiro ajuste.
+ *
+ * [hasActionColumn] reserva a casa do botão de remover do modo administrativo,
+ * que fica fora do fluxo de colunas.
+ */
+@Composable
+internal fun CliSessionColumnHeader(
+    language: AppLanguage,
+    modifier: Modifier = Modifier,
+    hasActionColumn: Boolean = false
+) {
+    AppColumnHeaderRow(
+        // Sem marcador na linha de sessão: a faixa começa onde a primeira célula
+        // começa.
+        startGutter = 0.dp,
+        modifier = modifier.testTag(CLI_SESSION_COLUMN_HEADER_TAG)
+    ) {
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.columnSession(language),
+            modifier = Modifier.width(SESSION_COLUMN_ID)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.columnProject(language),
+            modifier = Modifier.width(SESSION_COLUMN_PROJECT)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.columnTokens(language),
+            modifier = Modifier.width(SESSION_COLUMN_TOKENS)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.columnCache(language),
+            modifier = Modifier.width(SESSION_COLUMN_CACHE)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.columnCost(language),
+            modifier = Modifier.width(SESSION_COLUMN_COST)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.activeTime(language),
+            modifier = Modifier.width(SESSION_COLUMN_ACTIVE_TIME)
+        )
+        if (hasActionColumn) {
+            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(SESSION_ACTION_SLOT))
+        }
+    }
+}
+
 /**
  * Uma sessão como linha de tabela.
  *
  * Era um card por sessão, com brilho de acento e 14dp de padding: numa janela de
- * cinco sessões a lista já pedia rolagem. Aqui a linha tem 32dp de altura
- * mínima, divisória embaixo e as mesmas células de largura fixa — que continuam
- * fixas pelo motivo de sempre: sem elas cada linha dimensiona pelo próprio
- * número e as colunas deixam de alinhar entre as sessões.
+ * cinco sessões a lista já pedia rolagem. Depois virou linha, mas com o rótulo
+ * repetido dentro de cada célula — a concessão que a passada de agosto registrou,
+ * porque as células somavam quase 1.000dp e a janela abre em 960.
  *
- * O veredito continua vindo com o número que o gerou, e o status continua sendo
- * **ponto e palavra**: cor sozinha não informa.
+ * O que desfaz a concessão é o veredito sair do fluxo de colunas: ele media 210dp
+ * e desceu para uma **segunda linha** da própria linha, junto da razão que o
+ * gerou, que é como o protótipo desenha. Com ele fora, as seis colunas cabem, a
+ * linha não quebra e a legenda pode viver uma vez só na faixa de cabeçalho.
+ *
+ * `Row` e não `FlowRow` justamente por isso: quebrar é o que a faixa de legendas
+ * não admite.
+ *
+ * O status continua sendo **ponto e palavra** — cor sozinha não informa — e
+ * continua vindo com o número que o gerou.
  */
 @Composable
 internal fun CliSessionRow(
@@ -589,7 +667,9 @@ internal fun CliSessionRow(
     isLocalSession: Boolean = true,
     /** Ação destrutiva opcional; ausente nas listas locais e para não administradores. */
     onRemove: (() -> Unit)? = null,
-    removeButtonTag: String? = null
+    removeButtonTag: String? = null,
+    /** A lista tem coluna de ação; esta linha reserva a casa mesmo sem botão. */
+    hasActionColumn: Boolean = onRemove != null
 ) {
     val status = session.contextStatus
     val statusTone = healthTone(status.health)
@@ -598,120 +678,111 @@ internal fun CliSessionRow(
         modifier = Modifier.testTag(cliSessionRowTag(session.sessionId)),
         onClick = onOpen
     ) {
-        // `FlowRow` e não `Row`: as células somam quase 900dp e a janela de
-        // sessões abre menor que isso. Numa `Row` a última coluna — que é onde
-        // mora o botão de remover do modo administrativo — simplesmente saía da
-        // área visível, sem rolagem horizontal para alcançá-la.
-        FlowRow(
+        Column(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
         ) {
-        Row(
-            modifier = Modifier.width(190.dp),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Com peso, o botão de copiar cabe sempre: a coluna cede espaço em
-            // vez de empurrá-lo para fora da largura fixa da célula.
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.width(SESSION_COLUMN_ID),
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Com peso, o botão de copiar cabe sempre: a coluna cede
+                    // espaço em vez de empurrá-lo para fora da largura fixa.
+                    Column(modifier = Modifier.weight(1f)) {
+                        // Identidade e o carimbo que a qualifica, não duas
+                        // medidas: a legenda "Sessão" nomeia as duas linhas.
+                        AppCellValue(value = shortSessionId(session.sessionId))
+                        Text(
+                            text = formatInstant(session.lastTs),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    // O clique do botão é consumido por ele: copiar não abre o detalhe.
+                    CopySessionCommandButton(
+                        sessionId = session.sessionId,
+                        language = language,
+                        isLocalSession = isLocalSession
+                    )
+                }
+
+                Column(modifier = Modifier.width(SESSION_COLUMN_PROJECT)) {
+                    AppCellValue(value = session.projectName ?: "—")
+                    Text(
+                        text = CliSessionsLabels.turnsLabel(session.turnCount, language),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+
+                AppCellValue(
+                    value = formatQuantity(session.totalTokens),
+                    modifier = Modifier.width(SESSION_COLUMN_TOKENS)
+                )
+
+                Column(modifier = Modifier.width(SESSION_COLUMN_CACHE)) {
+                    AppCellValue(value = formatPercent(session.cacheHitRate))
+                    Spacer(modifier = Modifier.height(AppSpacing.xs))
+                    AppProgressTrack(fraction = session.cacheHitRate.toFloat(), tone = AppTone.OK)
+                }
+
+                AppCellValue(
+                    value = if (session.isCostComplete) {
+                        formatMicrosUsd(session.costMicros)
+                    } else {
+                        "${formatMicrosUsd(session.costMicros)}+"
+                    },
+                    modifier = Modifier.width(SESSION_COLUMN_COST)
+                )
+
+                // Tempo de trabalho, não duração: as pausas acima de cinco
+                // minutos ficam de fora. Sem medida e sem intervalo sai o
+                // travessão — "0min" seria lido como sessão instantânea.
+                AppCellValue(
+                    value = session.activeMillis
+                        ?.takeIf { millis -> millis > 0L }
+                        ?.let { millis -> formatActiveTime(millis) }
+                        ?: "—",
+                    modifier = Modifier.width(SESSION_COLUMN_ACTIVE_TIME)
+                )
+            }
+
+            // Segunda linha, e não sétima coluna: como coluna o veredito media
+            // 210dp e era ele que fazia a linha quebrar. Aqui ele atravessa a
+            // largura inteira, que é o que a frase precisa.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppStatusIndicator(
+                    label = CliSessionsLabels.healthShort(status.health, language),
+                    tone = statusTone
+                )
                 Text(
-                    text = shortSessionId(session.sessionId),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = CliSessionsLabels.healthReason(
+                        saturationLabel = status.contextSaturation?.let { value -> formatPercent(value) },
+                        nextCostLabel = formatMicrosUsd(status.nextInteractionCostMicros),
+                        language = language
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = formatInstant(session.lastTs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
             }
-            // O clique do botão é consumido por ele: copiar não abre o detalhe.
-            CopySessionCommandButton(
-                sessionId = session.sessionId,
-                language = language,
-                isLocalSession = isLocalSession
-            )
         }
 
-        Column(modifier = Modifier.width(140.dp)) {
-            Text(
-                text = session.projectName ?: "—",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = CliSessionsLabels.turnsLabel(session.turnCount, language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-        }
-
-        // Larguras fixas: sem elas cada linha dimensiona pelo próprio número e
-        // as colunas deixam de alinhar entre as sessões.
-        // As larguras subiram junto com a fonte: a IBM Plex Mono é mais larga que
-        // a de sistema, e "Tokens (com cache)" quebrava em duas linhas dentro de
-        // 106dp, deixando cada linha da lista com uma altura diferente.
-        MetricText(
-            label = CliSessionsLabels.columnTokens(language),
-            value = formatQuantity(session.totalTokens),
-            modifier = Modifier.width(150.dp)
-        )
-
-        Column(modifier = Modifier.width(96.dp)) {
-            MetricText(CliSessionsLabels.columnCache(language), formatPercent(session.cacheHitRate))
-            Spacer(modifier = Modifier.height(4.dp))
-            AppProgressTrack(fraction = session.cacheHitRate.toFloat(), tone = AppTone.OK)
-        }
-
-        MetricText(
-            label = CliSessionsLabels.columnCost(language),
-            value = if (session.isCostComplete) {
-                formatMicrosUsd(session.costMicros)
-            } else {
-                "${formatMicrosUsd(session.costMicros)}+"
-            },
-            modifier = Modifier.width(110.dp)
-        )
-
-        // Tempo de trabalho, não duração: as pausas acima de cinco minutos
-        // ficam de fora. Sem medida e sem intervalo saem os dois como "—" —
-        // "0min" seria lido como sessão instantânea.
-        MetricText(
-            label = CliSessionsLabels.activeTime(language),
-            value = session.activeMillis
-                ?.takeIf { millis -> millis > 0L }
-                ?.let { millis -> formatActiveTime(millis) }
-                ?: "—",
-            modifier = Modifier.width(96.dp)
-        )
-
-        // O veredito que antes exigia abrir o detalhe. Vem com o número que o
-        // gerou: status sem a evidência não dá para conferir nem para confiar.
-        Column(modifier = Modifier.width(210.dp)) {
-            AppStatusIndicator(
-                label = CliSessionsLabels.healthShort(status.health, language),
-                tone = statusTone
-            )
-            Text(
-                text = CliSessionsLabels.healthReason(
-                    saturationLabel = status.contextSaturation?.let { value -> formatPercent(value) },
-                    nextCostLabel = formatMicrosUsd(status.nextInteractionCostMicros),
-                    language = language
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
+        // Fora do fluxo de colunas, como nas listas de time e de presença: lá
+        // dentro a ação é o último item e o primeiro a sair numa janela estreita.
         if (onRemove != null) {
             AppIconButton(
                 contentDescription = TeamUsageLabels.removeSession(language),
@@ -730,7 +801,10 @@ internal fun CliSessionRow(
                     tint = MaterialTheme.colorScheme.error
                 )
             }
-        }
+        } else if (hasActionColumn) {
+            // Quadrado, não só largura: sem reservar a altura a linha sem botão
+            // sairia mais baixa que as vizinhas.
+            Spacer(modifier = Modifier.size(SESSION_ACTION_SLOT))
         }
     }
 }
