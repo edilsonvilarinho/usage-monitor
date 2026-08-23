@@ -60,6 +60,7 @@ import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
@@ -644,7 +645,7 @@ internal fun CliSessionRow(
         Column(modifier = Modifier.width(96.dp)) {
             MetricText(CliSessionsLabels.columnCache(language), formatPercent(session.cacheHitRate))
             Spacer(modifier = Modifier.height(4.dp))
-            MeterBar(fraction = session.cacheHitRate, color = AppAccents.current.cacheRead, height = 4.dp)
+            AppProgressTrack(fraction = session.cacheHitRate.toFloat(), tone = AppTone.OK)
         }
 
         MetricText(
@@ -1014,7 +1015,7 @@ internal fun SessionAdvancedSections(
         help = listOf(GlossaryTerm.CACHE_HIT_RATE),
         language = language
     ) {
-        MeterBar(fraction = analytics.cacheHitRate, color = CACHE_READ_COLOR)
+        AppProgressTrack(fraction = analytics.cacheHitRate.toFloat(), tone = AppTone.OK)
     }
 
     DetailSection(
@@ -1525,30 +1526,6 @@ internal fun GlossaryPanel(
                 }
             }
         }
-    }
-}
-
-@Composable
-internal fun MeterBar(
-    fraction: Double,
-    color: Color,
-    height: androidx.compose.ui.unit.Dp = 10.dp
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(AppShapes.extraSmall)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        // Cor chapada: o gradiente horizontal fazia a barra parecer mais curta
-        // do lado esquerdo, onde ela justamente começa.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(fraction.coerceIn(0.0, 1.0).toFloat())
-                .fillMaxHeight()
-                .background(color)
-        )
     }
 }
 

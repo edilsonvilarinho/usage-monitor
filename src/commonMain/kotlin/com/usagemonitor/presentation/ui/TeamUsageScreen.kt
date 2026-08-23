@@ -59,11 +59,13 @@ import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
@@ -785,7 +787,7 @@ private fun TeamAccountGroupHeader(
                 Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
                     MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
                     Spacer(modifier = Modifier.height(4.dp))
-                    MeterBar(fraction = share, color = accents.cacheRead, height = 4.dp)
+                    AppProgressTrack(fraction = share.toFloat(), tone = AppTone.INFO)
                 }
 
                 val worstHealth = group.worstHealth
@@ -1145,7 +1147,7 @@ private fun TeamMemberRow(
             Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
                 MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
                 Spacer(modifier = Modifier.height(4.dp))
-                MeterBar(fraction = share, color = accent, height = 4.dp)
+                AppProgressTrack(fraction = share.toFloat(), tone = AppTone.INFO)
             }
 
             // Pior status entre as sessões deste integrante. Sem ele, a única

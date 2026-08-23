@@ -108,6 +108,7 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 
@@ -714,14 +715,19 @@ private fun OpenCodeUsageSummary(
     val modelSummaries = remember(quotas) { buildOpenCodeModelSummaries(quotas) }
 
     if (modelSummaries.isEmpty()) {
+        // Superfície neutra com borda, como todo bloco de dado do sistema. O
+        // fundo pintado com a cor da fonte era o resto do card colorido que a
+        // refatoração tirou do resto do dashboard: aqui ele sobreviveu porque
+        // OpenCode e Kilo não entram nas capturas.
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .clip(AppShapes.extraLarge)
-                .background(accentColorFor(source).copy(alpha = 0.1f))
-                .padding(horizontal = 16.dp, vertical = 18.dp),
+                .clip(AppShapes.small)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
         ) {
             Text(
                 text = if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected",
@@ -803,13 +809,17 @@ private fun OpenCodeModelRowContent(
     compact: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // A identidade da fonte fica no marcador de 2dp do cabeçalho do card, como em
+    // todos os outros. Aqui ela pintava o bloco inteiro, e num card com três
+    // modelos eram três retângulos coloridos dentro de um card já identificado.
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(AppShapes.extraLarge)
-            .background(accentColorFor(source).copy(alpha = 0.12f))
-            .padding(horizontal = 14.dp, vertical = if (compact) 10.dp else 12.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 12.dp)
+            .clip(AppShapes.small)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+            .padding(horizontal = AppSpacing.md, vertical = if (compact) AppSpacing.sm else AppSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else AppSpacing.md)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -841,8 +851,8 @@ private fun OpenCodeModelRowContent(
                 Text(
                     text = localizedRequestCount(summary.requestsFiveHours, language),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = openCodePrimaryWindowLabel(language),
@@ -896,7 +906,6 @@ private fun OpenCodeInlineComparisonChart(
             label = "5h",
             value = summary.requestsFiveHours,
             fraction = summary.requestsFiveHours / maxValue,
-            accentColor = accentColorFor(source),
             language = language
         )
         OpenCodeInlineBar(
@@ -904,7 +913,6 @@ private fun OpenCodeInlineComparisonChart(
             label = "7d",
             value = summary.requestsSevenDays,
             fraction = summary.requestsSevenDays / maxValue,
-            accentColor = accentColorFor(source),
             language = language
         )
     }
@@ -916,7 +924,6 @@ private fun OpenCodeInlineBar(
     label: String,
     value: Long,
     fraction: Float,
-    accentColor: Color,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
@@ -948,25 +955,11 @@ private fun OpenCodeInlineBar(
                     value = value.toString()
                 )
             ),
-            modifier = Modifier
-                .weight(1f)
-                .height(8.dp)
+            modifier = Modifier.weight(1f)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(AppShapes.small)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                        .height(8.dp)
-                        .clip(AppShapes.small)
-                        .background(accentColor.copy(alpha = 0.82f))
-                )
-            }
+            // A barra do sistema: 4dp, com borda e trilha neutra. Esta era a
+            // única do app com 8dp e superfície com alpha própria.
+            AppProgressTrack(fraction = fraction, tone = AppTone.INFO)
         }
 
         Text(
