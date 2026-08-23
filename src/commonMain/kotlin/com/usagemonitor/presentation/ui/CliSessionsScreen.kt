@@ -68,6 +68,7 @@ import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.BinMode
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
@@ -226,7 +227,37 @@ private fun CliSessionsList(
     onExport: (UsageExportFormat) -> Unit = {},
     onExportReport: () -> Unit = {}
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // Aviso de recarga à esquerda e carimbo da última alteração à direita, como
+    // no protótipo. Os dois eram linhas no topo, empurrando a lista para baixo a
+    // cada tique — e o aviso de recarga aparece e some, então ali ele deslocava
+    // tudo o que estava sendo lido.
+    AppWindowScaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = AppSpacing.lg,
+        spacing = AppSpacing.md,
+        statusBar = {
+            if (state.isRefreshing) {
+                Text(
+                    text = BreakdownLabels.refreshing(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(REFRESHING_NOTICE_TAG)
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = CliSessionsLabels.lastChange(
+                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
+                    language = language
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    ) {
         CliSessionsHeader(
             state = state,
             language = language,
@@ -240,16 +271,6 @@ private fun CliSessionsList(
             NoticeText(state.indexWarning, MaterialTheme.colorScheme.error)
         }
 
-        // Acima das duas abas: a troca de janela desatualiza a lista e o resumo.
-        if (state.isRefreshing) {
-            Text(
-                text = BreakdownLabels.refreshing(language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().testTag(REFRESHING_NOTICE_TAG)
-            )
-        }
-
         if (state.view == CliSessionsView.BREAKDOWN) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 CliUsageBreakdownPane(
@@ -260,12 +281,12 @@ private fun CliSessionsList(
                     accountCredits = state.accountCredits
                 )
             }
-            return@Column
+            return@AppWindowScaffold
         }
 
         if (state.sessions.isEmpty()) {
             CenteredMessage(CliSessionsLabels.emptyInRange(state.range, state.rangeAnchored, language))
-            return@Column
+            return@AppWindowScaffold
         }
 
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -326,15 +347,9 @@ private fun CliSessionsHeader(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
+            // O carimbo da última alteração desceu para a barra de estado; aqui
+            // fica só o selo de leitura ao vivo, que é estado do laço e não dado.
             LiveBadge(language = language)
-            Text(
-                text = CliSessionsLabels.lastChange(
-                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
-                    language = language
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
         Spacer(modifier = Modifier.height(6.dp))
 
