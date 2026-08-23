@@ -60,6 +60,7 @@ import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppMetricBlock
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSegment
@@ -105,6 +106,15 @@ internal val SAVINGS_COLOR = darkAppAccents.savings
 /** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
 internal val SCROLLBAR_GUTTER = 12.dp
 
+/**
+ * Largura de um bloco de métrica.
+ *
+ * Fixa e igual para todos: é ela que faz a fileira alinhar. Com cada bloco
+ * medindo pelo próprio conteúdo, o de tokens ficava três vezes mais largo que o
+ * de sessões e a grade deixava de ser grade.
+ */
+internal val METRIC_BLOCK_WIDTH = 168.dp
+
 /** Mais baixo que o default de `TurnSeriesChart`: são vários numa página só. */
 private val DETAIL_CHART_HEIGHT = 120.dp
 
@@ -115,6 +125,15 @@ const val TAB_BREAKDOWN_TAG = "cliSessionsTabBreakdown"
 const val EXPORT_CSV_TAG = "cliSessionsExportCsv"
 const val EXPORT_JSON_TAG = "cliSessionsExportJson"
 const val EXPORT_PDF_TAG = "cliSessionsExportPdf"
+
+/**
+ * Bloco de total de sessões do cabeçalho.
+ *
+ * O número deixou de vir emendado à palavra ("1 sessão") e virou valor de um
+ * bloco com rótulo próprio, então não há mais um texto único que prove a
+ * contagem: a âncora é o bloco, e o assert procura o número dentro dele.
+ */
+const val TOTAL_SESSIONS_BLOCK_TAG = "cliSessionsTotalSessions"
 
 /**
  * Âncoras da lista de sessões.
@@ -353,101 +372,94 @@ private fun CliSessionsHeader(
         }
         Spacer(modifier = Modifier.height(6.dp))
 
+        // Blocos de métrica, não colunas de texto soltas: eram quatro pares
+        // valor/rótulo flutuando sobre o mesmo painel, e o cabeçalho lia como
+        // parágrafo. A borda de cada bloco é o que separa uma medida da outra.
+        //
+        // O rótulo vem em cima e o valor embaixo: numa fileira de quatro, o olho
+        // varre os rótulos para achar o que procura, não os números.
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
         ) {
-            Column {
-                Text(
-                    text = CliSessionsLabels.sessionCount(state.sessions.size, language),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                // O veredito por sessão está na linha, mas some da vista assim que
-                // a lista rola. Aqui ele responde de uma vez se há sessão pedindo
-                // /compact, sem varrer a lista inteira.
-                HealthTallyText(tally = state.healthTally, language = language)
-                Text(
-                    text = CliSessionsLabels.estimatedCostNotice(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            AppMetricBlock(
+                label = CliSessionsLabels.columnSessions(language),
+                value = state.sessions.size.toString(),
+                // O veredito por sessão está na linha, mas some da vista assim
+                // que a lista rola. Aqui ele responde de uma vez se há sessão
+                // pedindo /compact, sem varrer a lista inteira.
+                footer = CliSessionsLabels.healthTally(state.healthTally, language),
+                footerColor = healthTallyColor(state.healthTally),
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH).testTag(TOTAL_SESSIONS_BLOCK_TAG)
+            )
 
-            Column {
-                // Os quatro totais são o mesmo tipo de coisa e ficam na mesma
-                // cor. Um verde, um azul e um roxo lado a lado sugeriam três
-                // categorias onde há só quatro medidas da mesma janela.
-                Text(
-                    text = formatQuantity(state.totalTokens),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = CliSessionsLabels.columnTokens(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                // Sem a composição o total parece volume de conteúdo, quando é
-                // dominado por cache lido: cada turno relê o contexto inteiro.
-                Text(
-                    text = CliSessionsLabels.tokensBreakdown(
-                        inputTokens = state.totalInputTokens,
-                        outputTokens = state.totalOutputTokens,
-                        cacheReadTokens = state.totalCacheReadTokens,
-                        cacheWriteTokens = state.totalCacheWriteTokens,
-                        language = language
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            AppMetricBlock(
+                label = CliSessionsLabels.columnTokens(language),
+                value = formatQuantity(state.totalTokens),
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+            )
 
-            Column {
-                Text(
-                    text = if (state.isTotalCostComplete) {
-                        formatMicrosUsdShort(state.totalCostMicros)
-                    } else {
-                        "${formatMicrosUsdShort(state.totalCostMicros)}+"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (state.range == CliSessionRange.ALL) {
-                        CliSessionsLabels.estimatedTotal(language)
-                    } else {
-                        CliSessionsLabels.estimatedTotalInRange(
-                            range = state.range,
-                            endsAt = state.rangeEndsAt,
-                            isAnchored = state.rangeAnchored,
-                            language = language
-                        )
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            AppMetricBlock(
+                label = CliSessionsLabels.columnCost(language),
+                value = if (state.isTotalCostComplete) {
+                    formatMicrosUsdShort(state.totalCostMicros)
+                } else {
+                    "${formatMicrosUsdShort(state.totalCostMicros)}+"
+                },
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+            )
 
-            // Só aparece quando há tempo medido: uma coluna com "—" no cabeçalho
-            // ocuparia espaço para não dizer nada.
+            // Só aparece quando há tempo medido: um bloco com "—" ocuparia
+            // espaço para não dizer nada.
             val activeMillis = state.totalActiveMillis
             if (activeMillis != null && activeMillis > 0L) {
-                Column {
-                    Text(
-                        text = formatActiveTime(activeMillis),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = CliSessionsLabels.activeTime(language),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                AppMetricBlock(
+                    label = CliSessionsLabels.activeTime(language),
+                    value = formatActiveTime(activeMillis),
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+                )
             }
         }
+
+        // As qualificações longas ficam fora dos blocos: dentro deles, o footer
+        // de tokens sozinho media três vezes a largura do bloco de sessões e a
+        // fileira perdia o alinhamento que a grade de métricas existe para dar.
+        //
+        // Sem a composição o total parece volume de conteúdo, quando é dominado
+        // por cache lido: cada turno relê o contexto inteiro.
+        Text(
+            text = CliSessionsLabels.tokensBreakdown(
+                inputTokens = state.totalInputTokens,
+                outputTokens = state.totalOutputTokens,
+                cacheReadTokens = state.totalCacheReadTokens,
+                cacheWriteTokens = state.totalCacheWriteTokens,
+                language = language
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
+            text = if (state.range == CliSessionRange.ALL) {
+                CliSessionsLabels.estimatedTotal(language)
+            } else {
+                CliSessionsLabels.estimatedTotalInRange(
+                    range = state.range,
+                    endsAt = state.rangeEndsAt,
+                    isAnchored = state.rangeAnchored,
+                    language = language
+                )
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
+            text = CliSessionsLabels.estimatedCostNotice(language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -1237,6 +1249,24 @@ internal fun SessionMetadataCard(summary: CliSessionSummary, language: AppLangua
  * `internal` porque os dois modais têm o mesmo problema — o do time ainda pior,
  * já que lá o veredito vive dois níveis abaixo, dentro de um integrante recolhido.
  */
+/**
+ * Cor do resumo de vereditos: a do pior estado presente.
+ *
+ * `null` quando não há aviso nenhum — aí o texto também não existe, e devolver
+ * uma cor faria o chamador achar que há algo a pintar.
+ */
+@Composable
+internal fun healthTallyColor(tally: CliSessionHealthTally): Color? {
+    if (!tally.hasWarnings) {
+        return null
+    }
+    return if (tally.saturated > 0) {
+        healthColor(CliSessionHealth.SATURATED, AppAccents.current)
+    } else {
+        healthColor(CliSessionHealth.ATTENTION, AppAccents.current)
+    }
+}
+
 @Composable
 internal fun HealthTallyText(tally: CliSessionHealthTally, language: AppLanguage) {
     val label = CliSessionsLabels.healthTally(tally, language) ?: return
@@ -1325,6 +1355,13 @@ internal fun DetailSection(
     }
 }
 
+/**
+ * O bloco de métrica da tela de sessões.
+ *
+ * O desenho é [AppMetricBlock], que é a primitiva compartilhada; aqui ficam só
+ * as duas coisas que pertencem a esta tela: a largura fixa das fileiras de
+ * métrica do detalhe e o `?` do glossário.
+ */
 @Composable
 internal fun MetricCard(
     label: String,
@@ -1335,49 +1372,16 @@ internal fun MetricCard(
     footer: String? = null,
     help: GlossaryTerm? = null
 ) {
-    AppDataSurface(
-        modifier = Modifier.width(168.dp),
-        shape = AppShapes.small,
-        contentPadding = AppSpacing.sm
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // O rótulo cede a largura ao `?`: truncado ele ainda se lê, mas o
-                // ícone empurrado para fora do card some.
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            if (help != null) {
-                HelpDot(terms = listOf(help), language = language)
-            }
+    AppMetricBlock(
+        label = label,
+        value = value,
+        modifier = Modifier.width(METRIC_BLOCK_WIDTH),
+        footer = footer,
+        footerColor = accent,
+        labelTrailing = help?.let { term ->
+            { HelpDot(terms = listOf(term), language = language) }
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        // O valor é o dado, e ele fica na cor do texto. O acento entra no
-        // marcador da seção e na linha do gráfico; repetido em cada número, a
-        // tela inteira vira uma paleta e nada se destaca.
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (footer != null) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = footer,
-                style = MaterialTheme.typography.labelSmall,
-                color = accent
-            )
-        }
-    }
+    )
 }
 
 /**
