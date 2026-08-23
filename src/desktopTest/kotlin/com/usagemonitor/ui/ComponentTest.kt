@@ -57,6 +57,7 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_TAG
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
@@ -1108,6 +1109,164 @@ class ComponentTest {
         assertEquals(fiveHourTop, weeklyTop)
     }
 
+    // ── Badge de estado do cabeçalho ─────────────────────────────────────
+
+    @Test
+    fun `card header shows the worst risk among quotas as dot and word`() = runDesktopComposeUiTest {
+        val now = Instant.parse("2026-04-28T15:00:00Z")
+        val fiveHour = QuotaInfo(
+            label = "Claude 5h",
+            used = 40L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.TOKENS
+        )
+        val weekly = QuotaInfo(
+            label = "Claude 7d",
+            used = 80L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.TOKENS
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(fiveHour, weekly),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(fiveHour.label, fiveHour.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.ON_TRACK,
+                            estimatedExhaustionAt = null
+                        ),
+                        QuotaSeriesKey(weekly.label, weekly.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.AT_RISK,
+                            estimatedExhaustionAt = Instant.parse("2026-05-02T12:00:00Z")
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    now = now,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        // O pior entre as duas, não a primeira: a ordem do enum é quem decide.
+        onNodeWithTag(API_USAGE_CARD_STATUS_TAG).assertIsDisplayed()
+        onNodeWithText("Atenção").assertIsDisplayed()
+    }
+
+    @Test
+    fun `card header keeps the status badge while minimized`() = runDesktopComposeUiTest {
+        val now = Instant.parse("2026-04-28T15:00:00Z")
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 95L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.TOKENS
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.WILL_EXCEED,
+                            estimatedExhaustionAt = Instant.parse("2026-04-28T18:00:00Z")
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    now = now,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithTag(API_USAGE_CARD_STATUS_TAG).assertIsDisplayed()
+        onNodeWithText("Crítico").assertIsDisplayed()
+    }
+
+    @Test
+    fun `card header has no status badge when no quota has a projection`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    now = Instant.parse("2026-04-28T15:00:00Z"),
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithTag(API_USAGE_CARD_STATUS_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `card header drops the status badge when the only projected quota expired`() = runDesktopComposeUiTest {
+        // A janela descreve um período que já não existe: a projeção sobre ela
+        // não diz nada sobre agora, e afirmar "Normal" ali seria uma garantia
+        // que ninguém deu.
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 45L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-04-28T12:00:00Z"),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.TOKENS
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.ON_TRACK,
+                            estimatedExhaustionAt = null
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    now = Instant.parse("2026-04-28T15:00:00Z"),
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithTag(API_USAGE_CARD_STATUS_TAG).assertDoesNotExist()
+    }
+
     // ── RiskSemaphoreDot ─────────────────────────────────────────────────
 
     @Test
@@ -1347,7 +1506,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("🌙 Escuro").assertIsDisplayed()
+        onNodeWithText("Escuro").assertIsSelected()
     }
 
     @Test
@@ -1358,7 +1517,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("☀️ Claro").assertIsDisplayed()
+        onNodeWithText("Claro").assertIsSelected()
     }
 
     @Test
@@ -1371,7 +1530,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("🌙 Escuro").performClick()
+        onNodeWithText("Claro").performClick()
         assertEquals(true, toggled)
     }
 

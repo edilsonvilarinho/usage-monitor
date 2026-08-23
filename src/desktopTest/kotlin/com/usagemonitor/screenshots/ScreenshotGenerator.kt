@@ -36,6 +36,7 @@ import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
@@ -231,16 +232,15 @@ private class ScreenshotGenerator(private val outputDir: File) {
      * time fora do quadro.
      */
     fun settingsTeam() = capture("settings-team", widthDp = 620, heightDp = 610) {
+        // Sem envoltório: a seção ja monta o próprio painel com borda, e o
+        // `Surface` com alpha que existia aqui era um quinto degrau de
+        // superfície — inventado pela captura, ausente do app.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(AppSpacing.lg)
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                shape = MaterialTheme.shapes.medium
-            ) {
+            run {
                 TeamIntegrationSection(
                     settings = ScreenshotFixtures.teamSettings,
                     language = AppLanguage.PT,
@@ -252,7 +252,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
                     onAliasChange = {},
                     onProfileParticipationChange = { _, _ -> },
                     onTestConnection = {},
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier
                 )
             }
         }

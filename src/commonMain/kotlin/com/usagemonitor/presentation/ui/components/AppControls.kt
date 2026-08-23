@@ -47,7 +47,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -255,7 +254,11 @@ fun AppSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    // Verde, não o azul de `primary`: ligado é um estado — o mesmo "ok" do
+    // indicador de estado e da barra de progresso saudável —, e o azul deste
+    // sistema é a cor de informação, que já é a linha do gráfico e o realce de
+    // seleção. Com ele aqui, um interruptor ligado lia como item selecionado.
+    val accent = AppTone.OK.color()
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     val knobOffset by animateDpAsState(
         targetValue = if (checked) SWITCH_WIDTH - SWITCH_KNOB - SWITCH_PADDING * 2 else 0.dp,

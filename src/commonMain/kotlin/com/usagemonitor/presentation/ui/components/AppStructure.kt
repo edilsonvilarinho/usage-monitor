@@ -330,6 +330,74 @@ fun AppDataRow(
     }
 }
 
+/**
+ * Bloco de métrica: rótulo em cima, valor abaixo, dentro de uma borda.
+ *
+ * É o `.metric` do protótipo, e a ordem importa: o rótulo diz o que o número
+ * significa e vem primeiro, porque numa fileira de quatro blocos o olho varre os
+ * rótulos para achar o que procura, não os valores.
+ *
+ * O valor fica **na cor do texto**. O acento é identidade de fonte e vive no
+ * marcador de seção e na linha do gráfico; repetido em cada número, a fileira
+ * inteira vira paleta e nada se destaca. [footerColor] é a exceção — ali a cor
+ * qualifica o rodapé, que é comentário sobre o valor, não o valor.
+ *
+ * [labelTrailing] existe para o `?` do glossário: ele pertence ao rótulo, e um
+ * slot é o que evita a primitiva importar o vocabulário da tela de sessões.
+ */
+@Composable
+fun AppMetricBlock(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    footer: String? = null,
+    footerColor: Color? = null,
+    labelTrailing: @Composable (() -> Unit)? = null
+) {
+    Column(
+        modifier = modifier
+            .clip(AppShapes.small)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+            .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // O rótulo cede a largura ao que vier depois: truncado ele ainda
+                // se lê, mas um ícone empurrado para fora do bloco some.
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (labelTrailing != null) {
+                labelTrailing()
+            }
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (footer != null) {
+            Text(
+                text = footer,
+                style = MaterialTheme.typography.labelSmall,
+                color = footerColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 /** A mesma divisória na vertical, para colunas lado a lado. */
 @Composable
 fun AppVerticalDivider(modifier: Modifier = Modifier) {

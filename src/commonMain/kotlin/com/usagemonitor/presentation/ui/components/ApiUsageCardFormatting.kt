@@ -15,9 +15,11 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
+import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.darkAppAccents
 
@@ -278,6 +280,37 @@ internal fun formatBrtDateTime(instant: Instant, language: AppLanguage): String 
 @ReadOnlyComposable
 internal fun colorFor(level: UsageRiskLevel): Color {
     return toneFor(level).color()
+}
+
+/**
+ * O pior risco entre as cotas de um card, para o badge do cabeçalho.
+ *
+ * "Pior" é o maior [UsageRiskLevel.ordinal]: a ordem do enum vai de `ON_TRACK`
+ * a `WILL_EXCEED`, e é ela que decide — comparar por percentual daria outra
+ * resposta, porque 40% às onze da manhã pode ser pior que 80% dez minutos antes
+ * do reinício.
+ *
+ * Cota **vencida** não entra: a janela dela descreve um período que já não
+ * existe, e a projeção sobre ele diria respeito a nada. É a mesma exclusão que
+ * `evaluateUsageAlerts` faz antes de notificar.
+ *
+ * Devolve `null` quando nenhuma cota do card tem projeção conhecida — sem risco
+ * calculado não há estado a afirmar, e um badge "Normal" ali seria uma garantia
+ * que ninguém deu.
+ */
+internal fun worstQuotaRisk(
+    quotas: List<QuotaInfo>,
+    riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
+    now: Instant
+): Pair<QuotaInfo, QuotaRiskSummary>? {
+    if (riskByQuotaKey.isEmpty()) {
+        return null
+    }
+    return quotas
+        .asSequence()
+        .filterNot { quota -> quota.isExpiredAt(now) }
+        .mapNotNull { quota -> riskByQuotaKey[quota.seriesKey]?.let { risk -> quota to risk } }
+        .maxByOrNull { (_, risk) -> risk.level.ordinal }
 }
 
 internal fun toneFor(level: UsageRiskLevel): AppTone {

@@ -8,12 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -436,11 +433,13 @@ private fun RenameRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedTextField(
+        // Campo do sistema: 28dp e sem rotulo flutuante. O `OutlinedTextField`
+        // tem 56dp de altura minima, e nesta linha ele ficava o dobro dos dois
+        // botoes ao lado.
+        AppTextField(
             value = draft,
             onValueChange = { text -> draft = text },
-            label = { Text(TeamKeysLabels.labelField(language)) },
-            singleLine = true,
+            placeholder = TeamKeysLabels.labelField(language),
             enabled = enabled,
             modifier = Modifier.weight(1f)
         )

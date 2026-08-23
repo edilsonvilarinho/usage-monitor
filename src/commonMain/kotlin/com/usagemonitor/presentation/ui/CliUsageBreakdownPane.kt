@@ -24,12 +24,8 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,7 +53,6 @@ import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.DepthSurface
-import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
@@ -462,14 +457,16 @@ private fun BreakdownPager(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
     ) {
-        IconButton(
+        AppIconButton(
+            contentDescription = BreakdownLabels.previousPage(language),
             onClick = { onPageChange(page.pageIndex - 1) },
             enabled = page.hasPrevious,
             modifier = Modifier.testTag(BREAKDOWN_PREVIOUS_PAGE_TAG)
         ) {
             Icon(
                 imageVector = Icons.Rounded.ChevronLeft,
-                contentDescription = BreakdownLabels.previousPage(language),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -481,14 +478,16 @@ private fun BreakdownPager(
             modifier = Modifier.testTag(BREAKDOWN_PAGE_SUMMARY_TAG)
         )
 
-        IconButton(
+        AppIconButton(
+            contentDescription = BreakdownLabels.nextPage(language),
             onClick = { onPageChange(page.pageIndex + 1) },
             enabled = page.hasNext,
             modifier = Modifier.testTag(BREAKDOWN_NEXT_PAGE_TAG)
         ) {
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = BreakdownLabels.nextPage(language),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
