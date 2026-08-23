@@ -22,7 +22,7 @@ O cabeçalho do plano original declara `Claude Opus 5 (1M context)`, esforço `m
 
 ## 2. Veredito executivo
 
-> **REPROVADA para ativação da atualização automática, publicação de release e encerramento da issue #75.**
+> **REPROVADA para ativação da atualização automática, publicação de release com o auto-update habilitado e encerramento da issue #75.**
 
 A branch contém uma base defensiva tecnicamente relevante: opt-in desligado por padrão, gate explícito de ativação, seleção conservadora de plataforma/origem, download retomável com SHA-256, extração antes da troca, ausência de `taskkill /F` no caminho de update e preservação de `SetCompressor zlib`.
 
@@ -350,14 +350,32 @@ A branch não entrega atualização automática utilizável. Esse estado é deli
 **Impacto:** downloads incompletos de várias versões podem acumular no diretório local.
 **Confiança:** 100%.
 
+### P2-15 — a restrição de host vale somente para a URL inicial, não para redirects
+
+**Evidência:** `UpdateArtifactDownloader.kt:199-204` valida a URL antes do `httpClient.get()`. O cliente compartilhado criado em `src/desktopMain/kotlin/com/usagemonitor/Main.kt:245-261` não desabilita redirects. O projeto usa Ktor 3.0.3 (`gradle/libs.versions.toml:4`); a fonte dessa versão, inspecionada no cache Gradle, define `followRedirects=true`, bloqueia downgrade HTTPS→HTTP, mas aceita mudança de autoridade HTTPS e apenas remove `Authorization`.
+
+**Impacto:** o corpo final não possui garantia de origem GitHub. Se o servidor da URL inicial responder com redirect para outra autoridade HTTPS, o downloader segue a nova URL sem reaplicar `TRUSTED_DOWNLOAD_HOSTS`. A validação implementada comprova somente a URL inicial.
+
+**Classificação:** lacuna de validação de origem do artefato após redirect.
+**Confiança:** 100% quanto ao comportamento do cliente e à ausência de revalidação.
+
+### P2-16 — a detecção de origem não foi validada no app-image real
+
+**Evidência:** o plano registra em `docs/planos/atualizacao-automatica-windows-execucao.md:424-429` que não foi medido se o runtime empacotado fornece `jpackage.app-path` ou se o fallback por `ProcessHandle` é a fonte efetiva. A13 validou permanência de 45 segundos via `gradlew run`, não execução a partir do app-image/Setup instalado.
+
+**Impacto:** a lógica é conservadora no código, mas não existe evidência de que uma instalação NSIS real seja reconhecida como elegível pelo runtime empacotado. Sem essa prova, origem suportada no código não equivale a suporte validado no pacote.
+
+**Classificação:** lacuna de validação empacotada A06/A13.
+**Confiança:** 100% quanto à ausência da medição.
+
 ## 7. Rastreabilidade, escopo e processo
 
-### P2-15 — a issue #75 contém requisito Linux ainda não rastreado separadamente
+### P2-17 — a issue #75 contém requisito Linux ainda não rastreado separadamente
 
 **Evidência**
 
 - `gh issue view 75` exige seleção por sistema/arquitetura e atualização Linux user-space por `.tar.gz`.
-- O plano exclui Linux em `docs/planos/atualizacao-automatica-windows-execucao.md:55-61` e afirma que ele será tratado em issue própria.
+- O plano exclui Linux em `docs/planos/atualizacao-automatica-windows-execucao.md:55-64` e afirma que ele será tratado em issue própria.
 - A busca atual de issues relacionadas não encontrou issue substituta; #75 permanece aberta.
 - O plano afirma que A20 fecha a issue em `:297`.
 
@@ -418,7 +436,7 @@ A branch não entrega atualização automática utilizável. Esse estado é deli
 | A03 | Entregue | Contrato de assets/tamanho/digest é coerente com os assets avaliados. |
 | A04 | Entregue | Classificação de artefatos está coberta, embora o reconhecimento de NSIS seja amplo demais para o gate final. |
 | A05 | Entregue | Contrato permanece puro no domínio. |
-| A06 | Parcial | Implementa origem NSIS/unmanaged de modo conservador; o plano previa também classificação explícita MSI. |
+| A06 | Parcial | Implementa origem NSIS/unmanaged de modo conservador; o plano previa também classificação explícita MSI e a fonte efetiva da origem não foi medida no app-image real. |
 | A07 | Entregue | Resume, timeout, tamanho, SHA-256 e promoção atômica têm implementação e testes. |
 | A08 | Parcial | O app envia PID; o instalador não aguarda esse PID. |
 | A09 | Entregue | Preferência persistida com default `false`. |
@@ -426,9 +444,9 @@ A branch não entrega atualização automática utilizável. Esse estado é deli
 | A11 | Parcial | Deduplicação, cancelamento e backoff em memória existem; falha de schedule e garantia “exactly once” não estão fechadas. |
 | A12a | Entregue com dívida de processo | Semântica do switch foi corrigida; status entrou no commit seguinte. |
 | A12 | Entregue | Configuração, motivos de indisponibilidade, receipt e protótipo existem. |
-| A13 | Parcial | Wiring está presente e deliberadamente inativo; não houve inspeção visual/runtime completa. |
+| A13 | Parcial | Wiring está presente e deliberadamente inativo; `gradlew run` sustentou 45 s, mas não houve inspeção visual nem validação da origem no app-image/Setup real. |
 | A14 | Parcial | Override do feed existe, mas não viabiliza o `Setup.exe` local exigido pelo A20. |
-| A15 | Entregue | Guardas e preparação para o modo do instalador foram registradas. |
+| A15 | Entregue com evidência histórica não repetida | `APP_FILES_DIR` e `OUTPUT_FILE` usam `!ifndef` com defaults preservados. O plano registra comparação byte a byte do build e compilação com payload reduzido, mas esta auditoria não repetiu essa comparação. |
 | A16 | Parcial/reprovada | Happy path existe; PID não é aguardado, falhas não relançam, extração pode falhar sem receipt e sucesso não comprova saúde. |
 | A17 | Parcial | Seis cenários e 33 asserções existem; rollback real, PID, relaunch e isolamento do receipt não são cobertos. |
 | A18 | Parcial | YAML foi criado e analisado; não houve run real e o filtro pode falhar aberto. |
@@ -446,7 +464,7 @@ Os itens abaixo foram confirmados e devem ser preservados em eventual correção
 - plataforma/arquitetura/origem desconhecidas falham de forma conservadora;
 - artefato exige SHA-256 e tamanho é validado quando informado;
 - nomes com separadores ou `..` são rejeitados;
-- URL de download é restringida a HTTPS/GitHub;
+- a URL inicial de download é restringida a HTTPS/GitHub; redirects não são revalidados e permanecem como risco separado;
 - download usa `.part`, suporta 206 e reinicia corretamente quando o servidor ignora Range com 200;
 - timeout total curto do cliente comum foi substituído no download por timeout de conexão/socket adequado;
 - publicação final usa movimento atômico quando suportado;
@@ -507,7 +525,9 @@ Para reavaliar o recurso, seria necessário demonstrar, no mínimo:
 8. E2E isolado de receipt, registro, atalhos e diretório de trabalho reais;
 9. filtro CI que falha fechado e cobre todos os arquivos que alteram o fluxo;
 10. smoke empacotado executável, incluindo app real, dados preservados, update, relaunch e rollback;
-11. rastreamento separado do requisito Linux antes de encerrar #75.
+11. origem NSIS reconhecida no app-image/Setup real, com evidência de qual fonte do runtime foi usada;
+12. host final do download validado depois de cada redirect;
+13. rastreamento separado do requisito Linux antes de encerrar #75.
 
 Esta lista registra critérios de reauditoria. Nenhuma correção foi implementada como parte deste trabalho.
 
@@ -531,6 +551,7 @@ A conclusão não depende de preferência arquitetural: ela decorre diretamente 
 
 - Nenhum arquivo de código, teste, configuração, workflow ou plano original foi alterado.
 - Nenhuma API, schema, contrato ou comportamento da aplicação foi modificado.
-- Nenhum commit, push, PR ou release foi criado.
+- Esta auditoria não executou `git commit`, `git push`, criação de PR ou release.
+- Durante a validação final, o repositório avançou externamente para o commit `36bf529b5aad767dd0f0f1fea6a0c94386fa41de` (`doc: auditado`), que adicionou somente este relatório e foi enviado ao remoto. Nenhum agente participante da auditoria executou esse commit ou push.
 - Este documento é o único artefato autorizado.
 - O julgamento está vinculado ao snapshot `31bd8507baf3578eae3316d1e3637390a0444a74`; qualquer mudança posterior exige nova auditoria.
