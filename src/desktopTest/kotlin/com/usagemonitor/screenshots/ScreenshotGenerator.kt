@@ -44,6 +44,7 @@ import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
+import com.usagemonitor.presentation.viewmodel.TeamUsageView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -101,6 +102,7 @@ fun main(args: Array<String>) {
     generator.cliBreakdown()
     generator.cliSessionDetail()
     generator.teamUsage()
+    generator.teamTrend()
     generator.presence(isDark = true)
     generator.presence(isDark = false)
     generator.presenceAccounts()
@@ -317,6 +319,24 @@ private class ScreenshotGenerator(private val outputDir: File) {
             onSelectRange = {},
             onOpenSession = {},
             onCloseDetail = {}
+        )
+    }
+
+    fun teamTrend() = capture("team-trend", widthDp = 960, heightDp = 560) {
+        TeamUsageContent(
+            state = TeamUsageUiState.Success(
+                members = ScreenshotFixtures.teamMembers,
+                trend = ScreenshotFixtures.teamTrend,
+                view = TeamUsageView.TREND,
+                range = CliSessionRange.LAST_5H,
+                rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
+                rangeAnchored = true,
+                accountLabel = "dev@example.com — Example Org",
+                lastChangedAt = ScreenshotFixtures.NOW
+            ),
+            language = AppLanguage.PT,
+            onSelectRange = {},
+            onToggleMember = {}
         )
     }
 

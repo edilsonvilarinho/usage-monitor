@@ -101,13 +101,9 @@ internal object TeamUsageLabels {
         }
     }
 
-    fun trendTitle(dayCount: Int, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
-            "Tendência dos últimos $dayCount dias"
-        } else {
-            "Trend over the last $dayCount days"
-        }
-    }
+    // `trendTitle` saiu: era o título de um painel de explicação acima do
+    // gráfico, e o painel deixou de existir. A aba já se chama "Tendência" e o
+    // `trendHint` já diz quantos dias a série cobre.
 
     /**
      * A tendência não segue o filtro de janela da lista, e a tela precisa

@@ -692,31 +692,26 @@ private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
                 .padding(end = SCROLLBAR_GUTTER),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            DepthSurface(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = 16.dp
-            ) {
-                Text(
-                    text = TeamUsageLabels.trendTitle(trend.days.size, language),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = OUTPUT_COLOR
-                )
-                // O que a tendência é, antes de como lê-la: sem esta frase o
-                // painel entrega barras sem dizer que grandeza elas medem.
-                Text(
-                    text = TeamUsageLabels.trendHint(trend.days.size, language),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = TeamUsageLabels.trendNotice(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            // O gráfico primeiro e a explicação depois, como no protótipo: um
+            // painel de três linhas acima dele empurrava as barras para baixo da
+            // dobra numa janela baixa, e a frase que diz o que ele mede já vive
+            // na linha de cabeçalho do próprio gráfico.
+            TeamTrendChart(trend = trend, language = language)
 
-            TeamTrendChart(trend = trend, accent = OUTPUT_COLOR, language = language)
+            Text(
+                text = TeamUsageLabels.trendHint(trend.days.size, language),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // O fuso e a independência do filtro de janela: sem esta frase, um
+            // gráfico de dias ao lado de números de 5h é lido como o mesmo
+            // recorte.
+            Text(
+                text = TeamUsageLabels.trendNotice(language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         VerticalScrollbar(
