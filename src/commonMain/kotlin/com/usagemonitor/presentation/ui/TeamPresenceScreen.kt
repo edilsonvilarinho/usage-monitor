@@ -48,6 +48,8 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
+import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppToggleChip
@@ -56,7 +58,6 @@ import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
@@ -412,24 +413,24 @@ private fun TeamPresenceHeader(
     language: AppLanguage,
     onSetOnlyOnline: (Boolean) -> Unit
 ) {
-    val accents = AppAccents.current
-
+    // Superfície de dados como as outras: `AppElevation.dialog` num painel dentro
+    // da janela punha 8dp de sombra sob um bloco que não flutua sobre nada.
     DepthSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.large,
-        elevation = AppElevation.dialog,
-        contentPadding = 16.dp
+        contentPadding = AppSpacing.md
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // O e-mail é dado, e dado fica na cor do texto — a mesma decisão do
+            // cabeçalho do modal de consumo.
             if (state.accountLabel != null) {
                 Text(
                     text = state.accountLabel,
                     style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -437,7 +438,7 @@ private fun TeamPresenceHeader(
                 Text(
                     text = TeamUsageLabels.allAccounts(state.presenceGroups.size, language),
                     style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -458,20 +459,23 @@ private fun TeamPresenceHeader(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SummaryNumber(
-                value = state.workingCount.toString(),
-                caption = TeamPresenceLabels.workingSummary(state.workingCount, language),
-                valueColor = accents.cacheRead
+            // Indicador de estado, não bloco de métrica: aqui o texto já traz o
+            // número ("2 conectados"), e o protótipo desenha esta tela com ponto
+            // e palavra. Eram três números soltos e coloridos — verde, azul e
+            // branco — sem nada dizendo o que a cor significava. Os tons são os
+            // mesmos das linhas abaixo, ou a mesma ideia teria duas cores na
+            // mesma tela.
+            AppStatusIndicator(
+                label = TeamPresenceLabels.workingSummary(state.workingCount, language),
+                tone = AppTone.OK
             )
-            SummaryNumber(
-                value = state.onlineCount.toString(),
-                caption = TeamPresenceLabels.onlineSummary(state.onlineCount, language),
-                valueColor = accents.input
+            AppStatusIndicator(
+                label = TeamPresenceLabels.onlineSummary(state.onlineCount, language),
+                tone = AppTone.INFO
             )
-            SummaryNumber(
-                value = state.totalCount.toString(),
-                caption = TeamPresenceLabels.knownSummary(state.totalCount, language),
-                valueColor = MaterialTheme.colorScheme.onSurface
+            AppStatusIndicator(
+                label = TeamPresenceLabels.knownSummary(state.totalCount, language),
+                tone = AppTone.NEUTRAL
             )
 
             // Filtro binário: um segmentado de dois estados diria "ou isto, ou
@@ -546,39 +550,6 @@ private fun TeamPresenceColumnHeader(
     }
 }
 
-@Composable
-private fun SummaryNumber(
-    value: String,
-    caption: String,
-    valueColor: androidx.compose.ui.graphics.Color
-) {
-    Column {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = valueColor
-        )
-        Text(
-            text = caption,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/**
- * Faixa que separa uma conta da seguinte na visão global.
- *
- * Mostra o rótulo **e** o `accountUuid` pela mesma razão da tela de consumo: o
- * rótulo é texto que o administrador digitou e o servidor não o verifica, então
- * ele orienta mas não prova.
- *
- * A anatomia é a mesma da faixa de conta do modal de consumo: superfície
- * `surfaceVariant`, marcador de 2dp, a palavra "Conta" e divisória embaixo. Sem
- * ela, conta e integrante eram dois retângulos transparentes de mesmo peso
- * separados por um vão, e nada dizia qual dos dois níveis se estava lendo.
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TeamPresenceAccountHeader(
@@ -632,7 +603,7 @@ private fun TeamPresenceAccountHeader(
                         } else {
                             TeamUsageLabels.expandAccount(language)
                         },
-                        tint = accents.cacheRead
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Column {
                         // A palavra vem antes do e-mail: sem ela a faixa entregava um
@@ -648,7 +619,7 @@ private fun TeamPresenceAccountHeader(
                         Text(
                             text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
                             style = MaterialTheme.typography.titleSmall,
-                            color = accents.cacheRead,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -674,7 +645,6 @@ private fun TeamPresenceAccountHeader(
 
                 MetricValue(
                     value = group.workingCount.toString(),
-                    valueColor = accents.cacheRead,
                     modifier = Modifier.width(PRESENCE_COLUMN_WORKING)
                 )
             }
