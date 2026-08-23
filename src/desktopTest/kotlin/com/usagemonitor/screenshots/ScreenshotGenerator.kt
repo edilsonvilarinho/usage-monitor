@@ -360,14 +360,14 @@ private class ScreenshotGenerator(private val outputDir: File) {
     /**
      * Presença de uma conta, nos dois temas.
      *
-     * A largura é a mesma da janela real (960dp) — capturar mais largo esconderia
+     * A largura é a mesma do piso da janela real (1030dp) — capturar mais largo esconderia
      * justamente a quebra de coluna que se quer conferir. O `canManage` aqui é
      * inerte: `TeamPresenceContent` só libera os botões destrutivos na visão
      * global, que é o que [presenceAccounts] captura.
      */
     fun presence(isDark: Boolean) {
         val name = if (isDark) "presence" else "presence-light"
-        capture(name, widthDp = 960, heightDp = 460, isDark = isDark) {
+        capture(name, widthDp = 1_030, heightDp = 460, isDark = isDark) {
             TeamPresenceContent(
                 state = TeamPresenceUiState.Success(
                     entries = ScreenshotFixtures.teamPresence,
@@ -387,10 +387,10 @@ private class ScreenshotGenerator(private val outputDir: File) {
      * É a captura que prova a faixa de conta — superfície, marcador, a palavra
      * "Conta" e divisória — e a coluna de ação à direita, que é onde o botão de
      * apagar conta aparecia solto numa linha própria. Largura mínima da janela
-     * (940dp): capturar mais largo esconderia o pior caso do orçamento de colunas.
+     * (1030dp): capturar mais largo esconderia o pior caso do orçamento de colunas.
      */
     fun presenceAccounts() {
-        capture("presence-accounts", widthDp = 940, heightDp = 460, isDark = true) {
+        capture("presence-accounts", widthDp = 1_030, heightDp = 460, isDark = true) {
             TeamPresenceContent(
                 state = TeamPresenceUiState.Success(
                     entries = ScreenshotFixtures.teamPresenceAccounts,

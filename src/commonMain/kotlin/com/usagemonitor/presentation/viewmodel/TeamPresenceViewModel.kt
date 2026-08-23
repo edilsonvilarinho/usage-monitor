@@ -146,6 +146,20 @@ class TeamPresenceViewModel(
         _uiState.value = current.copy(onlyOnline = value)
     }
 
+    /**
+     * Texto do campo "Filtrar integrante".
+     *
+     * Pelo mesmo motivo de [setOnlyOnline], não dispara rede: a lista completa
+     * está em memória e o filtro é uma projeção dela.
+     */
+    fun setQuery(value: String) {
+        val current = _uiState.value
+        if (current !is TeamPresenceUiState.Success || current.query == value) {
+            return
+        }
+        _uiState.value = current.copy(query = value)
+    }
+
     /** Abre ou fecha os integrantes de uma conta, por `TeamPresenceAccountGroup.groupKey`. */
     fun toggleAccount(groupKey: String) {
         val current = _uiState.value
@@ -291,6 +305,7 @@ class TeamPresenceViewModel(
                         // Estado de UI, não do servidor: sem carregá-lo daqui o
                         // filtro se desfaria a cada tique.
                         onlyOnline = current?.onlyOnline ?: false,
+                        query = current?.query.orEmpty(),
                         // Mesmo tratamento. Conta que sumiu da resposta sai do
                         // conjunto, senão reapareceria aberta se voltasse depois.
                         expandedAccountKeys = current?.expandedAccountKeys

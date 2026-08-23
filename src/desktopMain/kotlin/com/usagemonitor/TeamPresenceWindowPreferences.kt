@@ -22,19 +22,25 @@ private const val TEAM_PRESENCE_WINDOW_PLACEMENT_KEY = "teamPresenceWindowPlacem
 // largura útil — o `FlowRow` quebrava e as colunas deixavam de alinhar entre as
 // linhas, que é justamente o que as larguras fixas existem para impedir. A conta
 // está em `TeamPresenceScreen.PRESENCE_COLUMN_*`.
-private const val DEFAULT_TEAM_PRESENCE_WINDOW_WIDTH_DP = 960
+private const val DEFAULT_TEAM_PRESENCE_WINDOW_WIDTH_DP = 1_030
 private const val DEFAULT_TEAM_PRESENCE_WINDOW_HEIGHT_DP = 620
 
 /**
  * Piso da janela, aplicado em `Main.kt` via `minimumSize` da janela AWT.
  *
  * O tamanho default já cabia; o que faltava era impedir o arrasto da borda para
- * baixo do orçamento. Em ~800dp a soma das colunas mais a coluna de ação passa da
- * largura útil, o `FlowRow` quebra e o botão de apagar conta cai numa linha
- * própria. 940dp é o pior caso de `TeamPresenceScreen.PRESENCE_COLUMN_*` — as cinco
- * colunas, a ação e os 72dp de cromo dão 932 — arredondado para cima.
+ * baixo do orçamento. Abaixo dele a soma das colunas mais a coluna de ação passa
+ * da largura útil, a linha quebra e o botão de apagar conta cai numa linha
+ * própria.
+ *
+ * Subiu de 940 para 1030 na issue #81: os dois carimbos que moravam dentro das
+ * células de Estado e de Trabalhando viraram colunas próprias, e são sete colunas
+ * onde antes eram cinco. As 802dp somadas em `TeamPresenceScreen.PRESENCE_COLUMN_*`
+ * mais o vão, o marcador, a barra de rolagem, a ação e o cromo da janela dão 1022,
+ * arredondado para cima. A janela de presença é a mais larga das três porque é a
+ * única que imprime dois carimbos de data por linha.
  */
-internal const val TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP = 940
+internal const val TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP = 1_030
 internal const val TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP = 460
 
 /**
