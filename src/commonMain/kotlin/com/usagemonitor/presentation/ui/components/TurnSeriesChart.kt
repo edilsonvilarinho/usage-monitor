@@ -52,7 +52,11 @@ private val AXIS_LABEL_WIDTH = 54.dp
 private val TOOLTIP_WIDTH = 150.dp
 private const val LINE_STROKE_PX = 2.2f
 private const val GRID_STROKE_PX = 1f
-private const val AREA_TOP_ALPHA = 0.32f
+// 0.32 era o topo de um gradiente que se apagava até a base. Com o preenchimento
+// chapado — o sistema visual não tem degradê —, aquele valor pinta a área toda no
+// tom mais forte, e a mancha passa a pesar mais que a própria linha, que é onde o
+// dado está.
+private const val AREA_TOP_ALPHA = 0.14f
 private const val GRID_ALPHA = 0.35f
 private const val MIN_BAR_WIDTH_PX = 3f
 private const val BAR_GAP_FRACTION = 0.28f
