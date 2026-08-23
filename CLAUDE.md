@@ -103,7 +103,11 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
   - **A página se prende ao intervalo que existe** (`paginate`): a lista encolhe a cada tique do laço ao vivo, e a página que sumiu mostraria vazio em vez do fim dos dados. Lista vazia continua tendo uma página — "página 1 de 0" não é uma frase. Trocar eixo, filtro, ordem ou tamanho volta para a primeira página, via `remember(chaves)`.
   - **Filtro, ordem e página moram num `remember` da pane, não no ViewModel.** Ali só ficam as escolhas que a carga precisa conhecer; estas não mudam o que é lido do índice nem do servidor, e o `remember` sobrevive às emissões do laço ao vivo porque a pane não sai da composição entre elas.
 
-- **Configurações em abas** (`SettingsTab` em `SettingsDialogContent.kt`): as cinco seções (Geral, Alertas, APIs, Contas, Time) eram uma coluna única de cartões empilhados, e achar qualquer uma exigia rolagem. Enum próprio e chips `FilterChip`, que é como o app já desenha aba nas outras telas — um `TabRow` seria um segundo vocabulário visual para a mesma função. **Só a aba escolhida entra na composição**, e não apenas fica fora da vista: com todas montadas as abas seriam decoração sobre a mesma coluna. A escolha mora num `remember` do próprio diálogo, que é uma janela separada e cujo estado nenhuma outra parte do app precisa conhecer; `initialTab` existe para os geradores de captura escolherem a seção. Cada aba tem seu próprio `ScrollState` começando no topo — reaproveitar um só faria a aba curta abrir rolada pela posição que a longa deixou.
+- **Configurações em abas** (`SettingsTab` em `SettingsDialogContent.kt`): as cinco seções (Geral, Alertas, APIs, Contas, Time) eram uma coluna única de cartões empilhados, e achar qualquer uma exigia rolagem. Enum próprio e **navegação lateral**, com a coluna de seções fixa à esquerda — ela é o controle, e o conteúdo rolando não pode tirá-la da vista. **Só a aba escolhida entra na composição**, e não apenas fica fora da vista: com todas montadas as abas seriam decoração sobre a mesma coluna. A escolha mora num `remember` do próprio diálogo, que é uma janela separada e cujo estado nenhuma outra parte do app precisa conhecer; `initialTab` existe para os geradores de captura escolherem a seção. Cada aba tem seu próprio `ScrollState` começando no topo — reaproveitar um só faria a aba curta abrir rolada pela posição que a longa deixou.
+  - **Cada aba monta o próprio painel** (`AppDataSurfaceFlush` + `AppSectionHeader`), com uma linha de dados por opção: rótulo em mono, descrição em sans, controle à direita, divisória entre elas. Não existe mais um cartão genérico envolvendo tudo — sete controles empilhados sem divisória e com todo rótulo em sans obrigavam a ler a lista inteira para achar uma opção.
+  - **Ação que age sobre a lista inteira vai no `trailing` do cabeçalho** — "Redetectar" e "Adicionar" na aba Contas, o interruptor da integração na aba Time. No corpo elas competiam com as linhas.
+  - **`PRIMARY` é uma por tela.** A aba Time tinha três botões primários ao mesmo tempo; primária é a ação que a tela propõe, e três delas não propõem nada.
+  - **Tema é segmentado, não interruptor.** Interruptor diz ligado/desligado, e tema é escolha entre duas alternativas — a mesma pergunta que o seletor de idioma logo abaixo já respondia com um segmentado. O rótulo com emoji que existia ali era o único emoji da interface.
 
 - **Banner de erro por alvo** (`DashboardWarning.target` + `warningTargetLabel`): o título usa `UiApiError.targetLabel` ("Anthropic — <perfil>") e cai no rótulo da fonte só quando não há alvo nomeado. Com várias contas Anthropic o título fixo produzia dois banners textualmente idênticos e ninguém sabia qual conta falhou. A ação recarrega **só o alvo do banner** (`refresh(target)`), não a fonte inteira — refazer a coleta dos perfis saudáveis é justamente o custo que um botão por banner evita. A ordem dos testes em `warningFor` importa: 429 e 503 são avaliados **antes** de credencial, então renovação que falha por limite ou indisponibilidade continua no banner de "aguarde" em vez de pedir login.
 
@@ -233,10 +237,31 @@ assíncrona e o `ScreenshotGenerator` renderiza offscreen com relógio manual �
 fallback é falha silenciosa.
 
 **Primitivas** (`presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt`):
-todas stateless. Superfície de dados, cabeçalho de seção com marcador de 2dp, linha de dados com
-divisória própria, barra de estado, abas sublinhadas, controle segmentado, chip de alternância,
-botão, botão de ícone, campo, interruptor, tooltip, aviso, vazio, carregando, erro, indicador de
-estado e barra de progresso. Antes de desenhar um retângulo novo, procure aqui.
+todas stateless. Corpo de janela com barra de estado, barra de controles, superfície de dados,
+cabeçalho de seção com marcador de 2dp, linha de dados com divisória própria, bloco de métrica,
+abas sublinhadas, controle segmentado, chip de alternância, botão, botão de ícone, campo,
+interruptor, tooltip, aviso, vazio, carregando, erro, indicador de estado e barra de progresso.
+Antes de desenhar um retângulo novo, procure aqui.
+
+- **Primitiva construída e não adotada não conserta nada.** A refatoração de agosto fechou com
+  `AppWindowScaffold` e `AppToolbar` em **zero** telas e `AppStatusIndicator` em uma — a fundação
+  existia e cada tela continuava montando o próprio retângulo. A passada de conformidade de
+  2026-08-23 fez a adoção; ao criar primitiva nova, o commit que a cria e o que a consome andam
+  juntos.
+- **Bloco de métrica** (`AppMetricBlock`): rótulo em cima, valor embaixo, borda em volta, largura
+  fixa e igual entre os blocos da mesma fileira. A ordem não é estética — numa fileira de quatro, o
+  olho varre os rótulos para achar o que procura, não os números. Qualificação longa fica **fora**
+  do bloco: dentro dele, um rodapé de quatro medidas mede três vezes a largura do bloco vizinho e a
+  fileira perde o alinhamento que a grade existe para dar.
+- **Número é `label*`, não `body*`.** A divisão entre as duas famílias é por papel: `body*` é sans e
+  existe para texto corrido, e número em fonte proporcional não alinha coluna — que é a razão de a
+  mono estar na escala. Vale para célula de tabela, valor de métrica e rótulo de controle.
+- **Controle deslizante** usa os slots `track`/`thumb` do `Slider` do Material com o desenho do
+  sistema (trilha de 4dp, polegar de 12dp). Não é um controle próprio: a semântica de progresso, que
+  é o que `SetProgress` dos testes exercita, tem de continuar vindo do `Slider`.
+- **`AppSwitch` ligado é verde**, não azul: ligado é um estado, o mesmo "ok" do indicador e da barra
+  saudável. O azul deste sistema é informação — linha de gráfico e realce de seleção —, e com ele
+  ali um interruptor ligado lia como item selecionado.
 
 - **Aba × segmentado × chip**: aba troca **o que** a tela mostra, segmentado troca **como** (janela,
   ordem, tamanho de página), chip de alternância liga ou desliga **uma** restrição. Desenhá-los igual
@@ -324,6 +349,13 @@ linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
   `TooltipBox` aninhados disputam o mesmo hover —, e por isso a frase de `riskDotTooltipSubtitle`
   não chegava à tela em tamanho nenhum de janela. A métrica `Projeção de uso` continua ao lado: ela
   diz qual é o estado, o rodapé diz o que ele significa.
+- **O estado da fonte tem ponto e palavra no cabeçalho** (`API_USAGE_CARD_STATUS_TAG` +
+  `worstQuotaRisk`): o `RiskSemaphoreDot` de cada cota é só ponto, e sozinho ele deixava a cor
+  informando o estado — que é exatamente o que este sistema visual não faz. O badge resume o **pior**
+  risco entre as cotas pela ordem do enum, não pelo percentual: 40% às onze da manhã pode ser pior
+  que 80% dez minutos antes do reinício. Cota vencida não entra, e sem projeção conhecida não há
+  badge — "Normal" ali seria uma garantia que ninguém deu. Os rótulos saem de `riskLevelLabel`, que
+  já existia.
 
 **Aviso de fonte é hint, não banner** (`CardNoticeHint` em `ApiUsageCard.kt`): os
 `ApiUsageNotice` saem como uma exclamação âmbar (`Icons.Rounded.ErrorOutline`) no cabeçalho, ao

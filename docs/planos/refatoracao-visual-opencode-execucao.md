@@ -206,6 +206,47 @@ Uma decisão de ordenação entrou junto, e ela não é visual: as contas da vis
 em ordem alfabética pelo e-mail, com o consumo ordenando dentro de cada uma. Ordenar as contas por
 consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s.
 
+### Passada de conformidade — 2026-08-23
+
+Levantamento a pedido do usuário: **a fundação (Fase C) foi construída e a adoção nas telas ficou
+parcial.** `AppWindowScaffold` e `AppToolbar` tinham **zero** usos em tela nenhuma;
+`AppStatusIndicator` tinha um. E havia regras do próprio sistema violadas em produção — acento como
+cor de valor no modal do time, elevação 6/10dp em três lugares, dois gradientes, superfície com
+alpha, número em IBM Plex Sans nas duas listas tabulares, e as cinco abas das Configurações sem
+painel, sem divisória e com rótulo em sans.
+
+Escopo executado: regras **e** anatomia. Onze commits, `allTests` verde em cada fase.
+
+| O que mudou | Por quê |
+|---|---|
+| Elevação, gradiente e superfície com alpha voltam aos tokens | Os cards de histórico da DeepSeek e do OpenCode nunca passaram pela Fase E — aquela tela só é composta com essas fontes selecionadas, e nenhuma captura passava por ali. As duas tooltips de gráfico flutuavam mais alto que a tooltip padrão do app |
+| O acento sai da cor de valor no modal do time | `CliSessionsHeader` já tinha a decisão oposta, com o comentário explicando. As duas telas dizem a mesma coisa e liam diferente |
+| Valor numérico passa a `label*` (mono) nas duas listas | `body*` é sans e existe para texto corrido; número em fonte proporcional não alinha coluna, que é a razão de a mono estar na escala |
+| Badge de estado com **ponto e palavra** no cabeçalho do card | O único indicador de risco do dashboard era o `RiskSemaphoreDot`, um ponto colorido sem palavra nenhuma — cor informando sozinha |
+| O card ganha a anatomia de painel: cabeçalho com divisória, cotas como linhas de dados | O padding num bloco só em volta de tudo fazia a divisória parar a 12dp de cada lado, e a lista de cotas deixava de ler como tabela |
+| `AppWindowScaffold` e a barra de estado entram no Histórico, nas Sessões CLI e no modal do time | O aviso de recarga aparece e some a cada troca de janela; no topo, ele deslocava para baixo tudo o que estava sendo lido |
+| Totais viram blocos de métrica, e `MetricCard` sobe para `AppMetricBlock` | Primitiva consumida por três telas morava num arquivo de tela — o padrão que a Fase C existiu para acabar |
+| As cinco abas das Configurações viram painéis com cabeçalho e linhas de dados | Sete controles empilhados sem divisória e todo rótulo em sans: achar uma opção era ler a lista inteira |
+| Os dois controles deslizantes recebem trilha e polegar do sistema | Trilha de 16dp, indicadores de parada e polegar em cápsula — três coisas que este sistema não tem em lugar nenhum. A semântica de progresso continua vindo do `Slider` |
+| `AppSwitch` ligado passa de `primary` para o verde de estado | O azul deste sistema é informação — linha de gráfico e realce de seleção —, e com ele ali um interruptor ligado lia como item selecionado |
+| Sai o Material residual: `TextButton`, `IconButton`, `OutlinedTextField`, `Checkbox`, `HorizontalDivider`, `Card` e 85 imports mortos | Cada um trazia altura, raio e cor próprios ao lado de controles que já são retângulo de raio 6 |
+
+**Duas mudanças de texto de interface**, as únicas: o seletor de tema deixou de ser `🌙 Escuro` /
+`☀️ Claro` — único emoji da interface — e virou segmentado `Escuro` / `Claro`; e o bloco de total de
+sessões ganhou o rótulo `Sessões` / `Sessions`, porque o número deixou de vir emendado à palavra.
+Os asserts que observavam os textos antigos mudaram nos mesmos commits.
+
+**O protótipo cedeu em três pontos**, por decisão explícita do usuário, e o HTML foi atualizado:
+rodapé do card em botões de **ícone** (a `contentDescription` carrega a explicação do pisca, e botão
+de texto não teria onde levá-la); card minimizado com **badges por cota** (o resumo `68% · 41%` apaga
+o rótulo e a tooltip de cada cota); lista de sessões com **rótulo por célula** (as células somam
+quase 1.000dp e cabeçalho fixo sobre linha que quebra desalinha).
+
+**Um item do protótipo não foi implementado:** a contagem `4 fontes` na barra de estado do
+dashboard. Ela afirma um estado agregado que o app não calcula, e com uma fonte em erro o verde
+mentiria — escolher o tom seria inventar semântica que o protótipo não define. Falha de fonte já tem
+o banner por alvo. Registrado no próprio HTML.
+
 ---
 
 ## Protocolo de retomada de sessão

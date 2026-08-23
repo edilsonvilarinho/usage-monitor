@@ -624,10 +624,10 @@ table.dt td.num, table.dt th.num { text-align: right; }
           </div>
         </div>
         <div class="statusbar">
-          <button class="btn ghost" type="button">Histórico</button>
-          <button class="btn ghost" type="button">Sessões CLI</button>
-          <button class="btn ghost" type="button">Time</button>
-          <button class="btn ghost" type="button">Conectados</button>
+          <button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button>
+          <button class="btn icon" type="button" aria-label="Sessões CLI" title="Sessões CLI">▣</button>
+          <button class="btn icon" type="button" aria-label="Uso do time" title="Uso do time">◫</button>
+          <button class="btn icon" type="button" aria-label="Conectados agora" title="Conectados agora">◉</button>
         </div>
       </div>
 
@@ -657,8 +657,8 @@ table.dt td.num, table.dt th.num { text-align: right; }
           </div></div>
         </div>
         <div class="statusbar">
-          <button class="btn ghost" type="button">Histórico</button>
-          <button class="btn ghost" type="button">Sessões CLI</button>
+          <button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button>
+          <button class="btn icon" type="button" aria-label="Sessões CLI" title="Sessões CLI">▣</button>
         </div>
       </div>
 
@@ -680,7 +680,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
           <div class="row"><span class="st warn">Janela reportada pelo Codex (fonte instável)</span></div>
           <div class="row"><span class="st off">Quota semanal indisponível</span></div>
         </div>
-        <div class="statusbar"><button class="btn ghost" type="button">Histórico</button></div>
+        <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
       </div>
 
       <!-- DeepSeek -->
@@ -698,7 +698,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
             <span class="k dim">Saldo não expira</span>
           </div></div>
         </div>
-        <div class="statusbar"><button class="btn ghost" type="button">Histórico</button></div>
+        <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
       </div>
 
     </div>
@@ -712,7 +712,13 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <button class="btn ghost" type="button">Configurações</button>
   </div>
 </div>
-<p class="note">O rodapé vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e configurações. Preservados: múltiplos perfis Anthropic, as seis integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
+<p class="note"><b>As ações de navegação do card são botões de ícone, não de texto.</b> A
+<code>contentDescription</code> de cada uma carrega a explicação do pisca do semáforo ("1 sessão ativa agora pede
+atenção: …"), que é a razão de o semáforo existir e o que os testes de componente observam — botão de texto não teria
+onde levá-la. O rodapé da janela vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e
+configurações. A contagem de fontes desenhada aqui como <code>4 fontes</code> <b>não foi implementada</b>: ela afirma um
+estado agregado que o app não calcula, e com uma fonte em erro o verde mentiria — escolher o tom seria inventar
+semântica que este protótipo não define. Falha de fonte já tem o banner por alvo. Preservados: múltiplos perfis Anthropic, as seis integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
 
 <h3>Modo somente cards</h3>
 <p class="lede">A mesma janela sem barra de título e sem rodapé: o app fica do tamanho do que ele informa. A moldura não some para sempre — ela volta como faixa sobreposta enquanto o mouse está nos 34px do topo.</p>
@@ -735,16 +741,24 @@ table.dt td.num, table.dt th.num { text-align: right; }
       <div class="phead">
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <span class="ptitle">Anthropic · Padrão</span>
-        <span class="v sm dim">68% · 41%</span>
         <span class="sp"></span>
         <span class="st warn">Atenção</span>
         <button class="btn icon" type="button" aria-label="Expandir card">+</button>
       </div>
       <div class="pbody" style="padding:var(--s2) var(--s3)">
+        <div class="hstack">
+          <div class="metric" style="flex:1;align-items:center"><span class="k">Sessão 5h</span><span class="v big">68%</span></div>
+          <div class="metric" style="flex:1;align-items:center"><span class="k">Semanal</span><span class="v big">41%</span></div>
+        </div>
+      </div>
+      <div class="pbody" style="padding:var(--s2) var(--s3)">
         <div class="banner crit"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Créditos de uso indisponíveis</span><span class="bd">Aviso visível mesmo com o card fechado.</span></div></div>
       </div>
     </div>
-    <p class="note">Foi o card fechado que escondeu o episódio dos créditos em agosto. O aviso <b>continua visível minimizado</b>.</p>
+    <p class="note">Foi o card fechado que escondeu o episódio dos créditos em agosto. O aviso <b>continua visível
+    minimizado</b>. O resumo "68% · 41%" que esta prancha desenhava antes <b>não foi implementado</b>: aquela forma apaga
+    o rótulo de cada cota e a tooltip por cota, que são dado e ação existentes. O card fechado mostra um badge por cota,
+    com rótulo, percentual e a mesma tooltip do card aberto.</p>
   </div>
 
   <div>
@@ -886,39 +900,36 @@ table.dt td.num, table.dt th.num { text-align: right; }
       <div class="metric"><span class="k">Tempo ativo</span><span class="v big">4h 3min</span></div>
     </div>
 
-    <div class="panel"><div class="pbody flush"><div class="scroller"><table class="dt">
-      <thead><tr>
-        <th>Status</th><th>Sessão</th><th>Projeto</th><th>Branch</th><th>Modelo</th>
-        <th class="num">Turnos</th><th class="num">Tokens</th><th class="num">Contexto</th>
-        <th class="num">Custo</th><th class="num">Tempo ativo</th><th>Quando</th><th></th>
-      </tr></thead>
-      <tbody>
-        <tr>
-          <td><span class="st crit">Saturada</span></td>
-          <td>7c4a1f92</td><td>api-gateway</td><td>feat/checkout</td><td>claude-opus-5</td>
-          <td class="num">48</td><td class="num">4,40 M</td>
-          <td class="num" style="color:var(--crit)">720 K / 1 M</td>
-          <td class="num">US$ 5,4792</td><td class="num">2h 14min</td><td>há 2min</td>
-          <td><button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button></td>
-        </tr>
-        <tr>
-          <td><span class="st warn">Atenção</span></td>
-          <td>b81e35c0</td><td>checkout-web</td><td>main</td><td>claude-opus-5</td>
-          <td class="num">26</td><td class="num">1,92 M</td>
-          <td class="num" style="color:var(--warn)">460 K / 1 M</td>
-          <td class="num">US$ 3,6100</td><td class="num">1h 5min</td><td>há 27min</td>
-          <td><button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button></td>
-        </tr>
-        <tr>
-          <td><span class="st ok">Saudável</span></td>
-          <td>2f9d64ba</td><td>api-gateway</td><td>main</td><td>claude-sonnet-5</td>
-          <td class="num">9</td><td class="num">0,26 M</td>
-          <td class="num">48 K / 1 M</td>
-          <td class="num">US$ 0,4120</td><td class="num">38min</td><td>há 1h 36min</td>
-          <td><button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button></td>
-        </tr>
-      </tbody>
-    </table></div></div></div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
+        <div class="hstack wrap" style="gap:var(--s4)">
+          <div class="stack" style="gap:0;min-width:150px"><span class="v sm">7c4a1f92</span><span class="k">12/08 10:58 BRT</span></div>
+          <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
+          <div class="stack" style="gap:0;min-width:140px"><span class="v sm">api-gateway</span><span class="k">48 turnos</span></div>
+          <div class="stack" style="gap:0"><span class="k">Tokens (com cache)</span><span class="v sm">4,40 M</span></div>
+          <div class="stack" style="gap:0;min-width:96px"><span class="k">Cache</span><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
+          <div class="stack" style="gap:0"><span class="k">Custo</span><span class="v sm">US$ 5,4792</span></div>
+          <div class="stack" style="gap:0"><span class="k">Tempo ativo</span><span class="v sm">2h 14min</span></div>
+        </div>
+        <div class="hstack" style="gap:var(--s2)"><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
+      </div></div>
+      <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
+        <div class="hstack wrap" style="gap:var(--s4)">
+          <div class="stack" style="gap:0;min-width:150px"><span class="v sm">b81e35c0</span><span class="k">12/08 10:33 BRT</span></div>
+          <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
+          <div class="stack" style="gap:0;min-width:140px"><span class="v sm">checkout-web</span><span class="k">26 turnos</span></div>
+          <div class="stack" style="gap:0"><span class="k">Tokens (com cache)</span><span class="v sm">1,92 M</span></div>
+          <div class="stack" style="gap:0;min-width:96px"><span class="k">Cache</span><span class="v sm">95%</span><div class="track ok"><i style="width:95%"></i></div></div>
+          <div class="stack" style="gap:0"><span class="k">Custo</span><span class="v sm">US$ 3,6100</span></div>
+          <div class="stack" style="gap:0"><span class="k">Tempo ativo</span><span class="v sm">1h 5min</span></div>
+        </div>
+        <div class="hstack" style="gap:var(--s2)"><span class="st warn">Atenção</span><span class="k">46% da janela · US$ 0,2300 por mensagem</span></div>
+      </div></div>
+    </div></div>
+    <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>Cada célula traz o próprio rótulo; não há cabeçalho de coluna
+    único.</b> As células somam quase 1.000dp e a janela abre menor: a linha precisa quebrar, e cabeçalho fixo sobre linha
+    que quebra desalinha. A rolagem horizontal que resolveria isso esconderia colunas dos asserts de componente. O preço é
+    o rótulo repetido em cada linha; o ganho é a linha continuar legível em qualquer largura.</p>
 
     <div class="g2">
       <div><div class="cap">Lista vazia</div><div class="panel"><div class="state"><span class="msg">Nenhum turno nesta janela.</span></div></div></div>
