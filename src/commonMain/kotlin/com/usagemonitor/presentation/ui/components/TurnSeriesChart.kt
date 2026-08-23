@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 
 private val CHART_HEIGHT = 148.dp
@@ -231,8 +232,12 @@ private fun ChartTooltip(
                 .width(TOOLTIP_WIDTH)
                 .offset { IntOffset(clampedX.roundToInt(), 0) },
             shape = AppShapes.small,
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 10.dp
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            // Overlay curto, como as outras tooltips de gráfico: 2dp e borda de
+            // 1dp. Os 10dp de sombra a punham na altura de um diálogo.
+            tonalElevation = AppElevation.raised,
+            shadowElevation = AppElevation.raised,
+            border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                 Text(
@@ -371,13 +376,12 @@ private fun DrawScope.seriesPath(values: List<Long>, ceiling: Long, closeToBasel
 
 private fun DrawScope.drawSeriesArea(series: TurnSeries, ceiling: Long) {
     val path = seriesPath(series.values, ceiling, closeToBaseline = true) ?: return
+    // Preenchimento chapado, não gradiente: o sistema visual não tem degradê em
+    // lugar nenhum, e o fade fazia a mesma série parecer mais fraca embaixo — onde
+    // o valor é maior, porque a área cresce da linha até a base.
     drawPath(
         path = path,
-        brush = Brush.verticalGradient(
-            colors = listOf(series.color.copy(alpha = AREA_TOP_ALPHA), Color.Transparent),
-            startY = 0f,
-            endY = size.height
-        )
+        color = series.color.copy(alpha = AREA_TOP_ALPHA)
     )
 }
 

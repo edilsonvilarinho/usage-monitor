@@ -39,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -1564,11 +1563,13 @@ internal fun CostDistributionBar(analytics: CliSessionAnalytics) {
             if (weight <= 0f) {
                 continue
             }
+            // Segmento chapado: o gradiente vertical dava a cada faixa dois tons
+            // da mesma cor, e quatro faixas lado a lado viravam oito.
             Box(
                 modifier = Modifier
                     .weight(weight)
                     .fillMaxHeight()
-                    .background(Brush.verticalGradient(listOf(color, color.copy(alpha = 0.72f))))
+                    .background(color)
             )
         }
     }
