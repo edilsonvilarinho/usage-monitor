@@ -8,6 +8,9 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
@@ -363,6 +366,55 @@ internal object ScreenshotFixtures {
         saturatedSession,
         attentionSession,
         healthySession
+    )
+
+    /**
+     * Resumo por eixo com um balde por projeto e hora medida.
+     *
+     * Sai do mesmo dobrador que a tela usa (`toUsageBreakdown`), e não de baldes
+     * escritos à mão: uma captura montada com números inventados não prova que a
+     * fatia, o total e a ordem batem.
+     */
+    val cliBreakdown: CliUsageBreakdown = listOf(
+        CliUsageGroupRow(
+            sessionId = "7c4a1f92",
+            cwd = "/workspace/api-gateway",
+            gitBranch = "feat/checkout",
+            model = "claude-opus-5",
+            turnCount = 57,
+            inputTokens = 31_400L,
+            outputTokens = 62_800L,
+            cacheReadTokens = 4_120_000L,
+            cacheWrite5mTokens = 186_000L
+        ),
+        CliUsageGroupRow(
+            sessionId = "b81e35c0",
+            cwd = "/workspace/checkout-web",
+            gitBranch = "main",
+            model = "claude-opus-5",
+            turnCount = 26,
+            inputTokens = 12_100L,
+            outputTokens = 24_500L,
+            cacheReadTokens = 1_780_000L,
+            cacheWrite5mTokens = 94_000L
+        ),
+        CliUsageGroupRow(
+            sessionId = "3ac09d41",
+            cwd = "/workspace/usage-monitor",
+            gitBranch = "fix/visual",
+            model = "claude-sonnet-5",
+            turnCount = 18,
+            inputTokens = 8_400L,
+            outputTokens = 15_200L,
+            cacheReadTokens = 960_000L,
+            cacheWrite5mTokens = 52_000L
+        )
+    ).toUsageBreakdown(
+        activeTimes = mapOf(
+            "7c4a1f92" to 2 * 3_600_000L + 52 * 60_000L,
+            "b81e35c0" to 3_600_000L + 5 * 60_000L,
+            "3ac09d41" to 41 * 60_000L
+        )
     )
 
     /**

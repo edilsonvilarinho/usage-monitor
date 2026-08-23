@@ -98,6 +98,7 @@ fun main(args: Array<String>) {
     generator.settings()
     generator.settingsTeam()
     generator.cliSessions()
+    generator.cliBreakdown()
     generator.cliSessionDetail()
     generator.teamUsage()
     generator.presence(isDark = true)
@@ -262,6 +263,25 @@ private class ScreenshotGenerator(private val outputDir: File) {
         CliSessionsContent(
             state = CliSessionsUiState.Success(
                 sessions = ScreenshotFixtures.cliSessions,
+                range = CliSessionRange.LAST_5H,
+                rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
+                rangeAnchored = true,
+                profileLabel = "Padrão",
+                lastChangedAt = ScreenshotFixtures.NOW
+            ),
+            language = AppLanguage.PT,
+            onSelectRange = {},
+            onOpenSession = {},
+            onCloseDetail = {}
+        )
+    }
+
+    fun cliBreakdown() = capture("cli-breakdown", widthDp = 960, heightDp = 760) {
+        CliSessionsContent(
+            state = CliSessionsUiState.Success(
+                sessions = ScreenshotFixtures.cliSessions,
+                view = com.usagemonitor.presentation.viewmodel.CliSessionsView.BREAKDOWN,
+                breakdown = ScreenshotFixtures.cliBreakdown,
                 range = CliSessionRange.LAST_5H,
                 rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
                 rangeAnchored = true,

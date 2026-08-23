@@ -362,7 +362,8 @@ fun AppColumnHeaderRow(
     horizontalPadding: Dp = AppSpacing.md,
     /** Vão até a primeira coluna; o default acompanha o marcador da linha de dados. */
     startGutter: Dp = AppMarkerGutter,
-    spacing: Dp = AppSpacing.lg,
+    /** O default é o vão entre células do [AppDataRow]; passar outro obriga a linha a passar o mesmo. */
+    spacing: Dp = AppSpacing.md,
     content: @Composable RowScope.() -> Unit
 ) {
     Row(
