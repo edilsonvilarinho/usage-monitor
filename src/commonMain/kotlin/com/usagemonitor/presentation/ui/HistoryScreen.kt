@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
@@ -71,6 +73,7 @@ import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -114,18 +117,40 @@ fun HistoryScreen(
         HistoryUiState.Loading -> focusedSource
     }
 
-    Surface(
+    // Sem `Success` não há coleta a datar, e uma barra de 30dp vazia é cromo que
+    // não informa nada. O tipo da variável é anotado porque é ele que faz a
+    // lambda de dentro do `let` ser reconhecida como `@Composable`.
+    val statusBarContent: (@Composable RowScope.() -> Unit)? =
+        (state as? HistoryUiState.Success)?.let { success ->
+            {
+                Text(
+                    text = lastUpdatedLabel(success.report.lastUpdatedAt, language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+    // Corpo de janela do sistema: fundo, grade de espaçamento e a barra de estado
+    // como última linha, fora da área rolável. O padding entra na coluna interna,
+    // não no scaffold, porque é ela que rola — com o padding no scaffold, a
+    // margem de baixo cortaria o conteúdo em vez de acompanhá-lo.
+    AppWindowScaffold(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        contentPadding = 0.dp,
+        spacing = 0.dp,
+        statusBar = statusBarContent
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 20.dp, vertical = 24.dp)
-                    .padding(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(AppSpacing.lg)
+                    .padding(end = AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
                 HistoryHeader(
                     language = language,
@@ -223,12 +248,6 @@ fun HistoryScreen(
                                         )
                                     } else if (current.report.source == ApiSource.CODEX) {
                                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                            Text(
-                                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-
                                             current.report.series.forEachIndexed { index, series ->
                                                 key(
                                                     series.quotaLabel +
@@ -257,12 +276,6 @@ fun HistoryScreen(
                                         }
 
                                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                            Text(
-                                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-
                                             cardModels.forEachIndexed { index, model ->
                                                 key(
                                                     model.baseLabel +
@@ -305,6 +318,15 @@ fun HistoryScreen(
         }
     }
 }
+
+/**
+ * O rótulo da última coleta, agora no rodapé.
+ *
+ * Ele era um `Text` solto acima da primeira série, repetido em dois dos quatro
+ * ramos por fonte — o do Codex e o genérico —, e ausente nos outros dois. Como
+ * barra de estado ele vale para as quatro, sai da área rolável e para de
+ * competir com o gráfico pelo topo da janela.
+ */
 
 @Composable
 private fun HistoryHeader(
