@@ -59,6 +59,7 @@ import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppMetricBlock
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
@@ -99,6 +100,15 @@ const val TEAM_TAB_TREND_TAG = "teamUsageTabTrend"
 internal const val TEAM_TREND_PANE_TAG = "teamUsageTrendPane"
 internal const val TEAM_TREND_SCROLLBAR_TAG = "teamUsageTrendScrollbar"
 const val TEAM_EXPORT_PDF_TAG = "teamUsageExportPdf"
+
+/**
+ * Bloco de total de integrantes do cabeçalho.
+ *
+ * O número deixou de vir emendado à palavra ("3 integrantes") e virou valor de
+ * um bloco com rótulo próprio, então não há mais um texto único que prove a
+ * contagem: a âncora é o bloco.
+ */
+const val TEAM_TOTAL_MEMBERS_BLOCK_TAG = "teamUsageTotalMembers"
 
 /** Compartilhada com o modal da máquina: as duas telas dão o mesmo aviso. */
 const val REFRESHING_NOTICE_TAG = "usageRefreshingNotice"
@@ -903,68 +913,63 @@ private fun TeamUsageHeader(
         }
         Spacer(modifier = Modifier.height(6.dp))
 
+        // Blocos de métrica de largura igual, como no modal da máquina: eram
+        // três pares valor/rótulo flutuando sobre o mesmo painel.
+        //
+        // Os totais são o mesmo tipo de coisa e ficam na mesma cor. O acento é
+        // identidade de fonte, não de valor: tokens em verde ao lado de custo em
+        // azul sugere duas categorias onde há duas medidas da mesma janela.
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
         ) {
-            Column {
-                Text(
-                    text = TeamUsageLabels.memberCount(state.activeMemberCount, language),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = TeamUsageLabels.sessionCount(state.sessionCount, language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            AppMetricBlock(
+                label = TeamUsageLabels.columnMembers(language),
+                value = state.activeMemberCount.toString(),
                 // O veredito por sessão vive dois níveis abaixo, dentro de um
                 // integrante recolhido. Aqui ele aparece sem nenhum clique.
-                HealthTallyText(tally = state.healthTally, language = language)
-            }
+                footer = CliSessionsLabels.healthTally(state.healthTally, language),
+                footerColor = healthTallyColor(state.healthTally),
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH).testTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG)
+            )
 
-            // Os totais são o mesmo tipo de coisa e ficam na mesma cor — a mesma
-            // decisão que `CliSessionsHeader` já carrega. O acento é identidade
-            // de fonte, não de valor: tokens em verde ao lado de custo em azul
-            // sugere duas categorias onde há duas medidas da mesma janela.
-            Column {
-                Text(
-                    text = formatQuantity(state.totalTokens),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = TeamUsageLabels.columnTokens(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            AppMetricBlock(
+                label = TeamUsageLabels.columnTokens(language),
+                value = formatQuantity(state.totalTokens),
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+            )
 
-            Column {
-                Text(
-                    text = if (state.isTotalCostComplete) {
-                        formatMicrosUsdShort(state.totalCostMicros)
-                    } else {
-                        "${formatMicrosUsdShort(state.totalCostMicros)}+"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = TeamUsageLabels.estimatedTotalInRange(
-                        range = state.range,
-                        endsAt = state.rangeEndsAt,
-                        isAnchored = state.rangeAnchored,
-                        language = language
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            AppMetricBlock(
+                label = TeamUsageLabels.columnCost(language),
+                value = if (state.isTotalCostComplete) {
+                    formatMicrosUsdShort(state.totalCostMicros)
+                } else {
+                    "${formatMicrosUsdShort(state.totalCostMicros)}+"
+                },
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+            )
         }
+
+        // Fora dos blocos, pela mesma razão do modal da máquina: a janela do
+        // custo é uma frase, e dentro do bloco ela media três vezes a largura
+        // dele.
+        Text(
+            text = TeamUsageLabels.sessionCount(state.sessionCount, language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
+            text = TeamUsageLabels.estimatedTotalInRange(
+                range = state.range,
+                endsAt = state.rangeEndsAt,
+                isAnchored = state.rangeAnchored,
+                language = language
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 

@@ -13,6 +13,9 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,6 +40,7 @@ import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.TEAM_ACCOUNT_GROUP_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.TEAM_SLIDING_WINDOW_NOTICE_TAG
+import com.usagemonitor.presentation.ui.TEAM_TOTAL_MEMBERS_BLOCK_TAG
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
@@ -82,7 +86,8 @@ class TeamUsageScreenTest {
             )
         )
 
-        onNodeWithText("1 integrante").assertIsDisplayed()
+        onNode(hasTestTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG) and hasAnyDescendant(hasText("1")))
+            .assertIsDisplayed()
         onNodeWithText("$1.23").assertIsDisplayed()
         onNodeWithText("custo estimado · últimas 5h").assertIsDisplayed()
     }
@@ -229,7 +234,8 @@ class TeamUsageScreenTest {
         onNodeWithText("joao").assertIsDisplayed()
         onNodeWithText("sem uso no período").assertIsDisplayed()
         // Quem não usou não conta como integrante ativo do período.
-        onNodeWithText("1 integrante").assertIsDisplayed()
+        onNode(hasTestTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG) and hasAnyDescendant(hasText("1")))
+            .assertIsDisplayed()
     }
 
     @Test
@@ -1205,7 +1211,8 @@ class TeamUsageScreenTest {
                 .assertTextContains("$0.1000")
 
             // O cabeçalho continua somando tudo: nenhuma faixa o substitui.
-            onNodeWithText("3 integrantes").assertIsDisplayed()
+            onNode(hasTestTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG) and hasAnyDescendant(hasText("3")))
+                .assertIsDisplayed()
             onNodeWithText("4 sessões").assertIsDisplayed()
         }
 
