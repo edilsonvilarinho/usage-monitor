@@ -432,28 +432,18 @@ private fun MonitoredApisTab(
     enabledApis: Set<ApiSource>,
     onApiToggle: (ApiSource, Boolean) -> Unit
 ) {
-    SettingsSectionCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = if (currentLanguage == AppLanguage.PT) "APIs monitoradas" else "Monitored APIs",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
+    AppDataSurfaceFlush(
+        header = {
+            AppSectionHeader(
+                title = if (currentLanguage == AppLanguage.PT) "APIs monitoradas" else "Monitored APIs"
             )
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ApiSource.entries.forEach { api ->
-                    ApiCheckboxRow(
-                        api = api,
-                        language = currentLanguage,
-                        isChecked = api in enabledApis,
-                        onCheckedChange = { checked -> onApiToggle(api, checked) }
-                    )
-                }
-            }
         }
+    ) {
+        ApiSelector(
+            enabledApis = enabledApis,
+            language = currentLanguage,
+            onToggle = onApiToggle
+        )
     }
 }
 
