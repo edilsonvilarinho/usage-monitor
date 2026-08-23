@@ -59,6 +59,17 @@ val AppBorderWidth: Dp = 1.dp
 /** Largura do marcador semântico que identifica fonte ou severidade. */
 private val MARKER_WIDTH = 2.dp
 
+/**
+ * Do começo da linha até a primeira célula: o marcador mais o vão que o segue.
+ *
+ * [AppDataRow] separa os filhos por [AppSpacing.md], e o primeiro deles é o
+ * [AppSourceMarker] de 2dp. Uma faixa de legendas não é linha de dados e não tem
+ * marcador; sem repetir esta soma ela prometeria um alinhamento deslocado do que
+ * as linhas entregam. Existe aqui, e não como literal em cada tela, porque são
+ * duas listas que precisam concordar com a mesma linha de dados.
+ */
+val AppMarkerGutter: Dp = MARKER_WIDTH + AppSpacing.md
+
 /** Altura da barra de controles e da barra de estado. */
 private val TOOLBAR_HEIGHT = 34.dp
 private val STATUS_BAR_HEIGHT = 30.dp
@@ -328,6 +339,86 @@ fun AppDataRow(
             AppDivider()
         }
     }
+}
+
+/**
+ * Faixa de legendas de coluna, uma vez para a lista inteira.
+ *
+ * É o `thead` do protótipo. A alternativa — cada célula reimprimindo o próprio
+ * rótulo — dobra o texto da tela e o ruído cresce com o número de linhas: a
+ * legenda pertence à coluna, não à célula.
+ *
+ * Ela só cumpre a promessa se a linha **não quebrar**: as células precisam ser
+ * `Row` de largura fixa, e a soma das larguras tem de caber na largura mínima da
+ * janela. Onde isso não for verdade, a faixa mente sobre o alinhamento.
+ *
+ * Fora da `LazyColumn`, nunca `stickyHeader`: na visão global de time já há
+ * faixas de conta rolando dentro da lista, e dois níveis de cabeçalho grudado
+ * empilhariam.
+ */
+@Composable
+fun AppColumnHeaderRow(
+    modifier: Modifier = Modifier,
+    horizontalPadding: Dp = AppSpacing.md,
+    /** Vão até a primeira coluna; o default acompanha o marcador da linha de dados. */
+    startGutter: Dp = AppMarkerGutter,
+    spacing: Dp = AppSpacing.lg,
+    content: @Composable RowScope.() -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding)
+            .padding(start = startGutter),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.Bottom,
+        content = content
+    )
+}
+
+/**
+ * Uma legenda de coluna.
+ *
+ * Morava em `CliSessionsScreen.kt` — arquivo de tela — e já era consumida por
+ * três telas, o mesmo defeito que fez `MetricCard` virar [AppMetricBlock].
+ */
+@Composable
+fun AppColumnHeaderLabel(
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+/**
+ * Valor de célula, sem rótulo: quem nomeia a coluna é [AppColumnHeaderLabel].
+ *
+ * `label*` — mono — e não `body*`: a escala divide as duas famílias por papel, e
+ * número em fonte proporcional não alinha coluna, que é a razão de a mono estar
+ * aqui.
+ */
+@Composable
+fun AppCellValue(
+    value: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    maxLines: Int = 1
+) {
+    Text(
+        text = value,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
 }
 
 /**

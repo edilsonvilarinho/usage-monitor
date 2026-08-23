@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -112,14 +114,6 @@ private val PRESENCE_COLUMN_STATUS = 104.dp
 private val PRESENCE_COLUMN_SPACING = 16.dp
 private val PRESENCE_ROW_CONTENT_PADDING = 14.dp
 private val PRESENCE_ACCOUNT_VERTICAL_PADDING = 10.dp
-
-/**
- * Marcador de 2dp do `AppDataRow` mais o vão que o separa da primeira célula.
- *
- * A faixa de legendas não é uma linha de dados e não tem marcador; sem repetir a
- * soma aqui, ela prometia um alinhamento 14dp à esquerda do que as linhas entregam.
- */
-private val PRESENCE_MARKER_GUTTER = 14.dp
 
 /** Mesma pegada do `AppIconButton` (26dp), para o cabeçalho reservar a casa certa. */
 private val PRESENCE_ACTION_SLOT = 26.dp
@@ -510,33 +504,31 @@ private fun TeamPresenceColumnHeader(
     hasHealthColumn: Boolean,
     hasActionColumn: Boolean
 ) {
-    Row(
+    AppColumnHeaderRow(
         modifier = Modifier
-            .fillMaxWidth()
             .padding(end = SCROLLBAR_GUTTER)
-            .padding(horizontal = PRESENCE_ROW_CONTENT_PADDING)
-            .padding(start = PRESENCE_MARKER_GUTTER)
             .testTag(PRESENCE_COLUMN_HEADER_TAG),
-        horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING)
+        horizontalPadding = PRESENCE_ROW_CONTENT_PADDING,
+        spacing = PRESENCE_COLUMN_SPACING
     ) {
-        ColumnHeaderLabel(
+        AppColumnHeaderLabel(
             label = TeamPresenceLabels.columnMember(language),
             modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY)
         )
-        ColumnHeaderLabel(
+        AppColumnHeaderLabel(
             label = CliSessionsLabels.machine(language),
             modifier = Modifier.width(PRESENCE_COLUMN_MACHINE)
         )
-        ColumnHeaderLabel(
+        AppColumnHeaderLabel(
             label = TeamPresenceLabels.columnState(language),
             modifier = Modifier.width(PRESENCE_COLUMN_STATE)
         )
-        ColumnHeaderLabel(
+        AppColumnHeaderLabel(
             label = TeamPresenceLabels.columnWorking(language),
             modifier = Modifier.width(PRESENCE_COLUMN_WORKING)
         )
         if (hasHealthColumn) {
-            ColumnHeaderLabel(
+            AppColumnHeaderLabel(
                 label = TeamUsageLabels.columnStatus(language),
                 modifier = Modifier.width(PRESENCE_COLUMN_STATUS)
             )

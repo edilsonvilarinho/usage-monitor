@@ -1406,22 +1406,6 @@ internal fun MetricValue(
     )
 }
 
-/** Legenda de coluna, na faixa de cabeçalho de uma lista tabular. */
-@Composable
-internal fun ColumnHeaderLabel(
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-    )
-}
-
 // `internal`, e não `private`, porque a tela de time reaproveita estes blocos:
 // duas listas com a mesma anatomia não podem ter duas implementações de célula.
 //
