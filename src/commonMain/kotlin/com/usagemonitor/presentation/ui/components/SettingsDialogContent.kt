@@ -10,16 +10,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -28,12 +31,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -308,6 +313,41 @@ fun SettingsDialogContent(
     }
 }
 
+/**
+ * Linha de opção: rótulo em mono, descrição em sans, controle à direita.
+ *
+ * A divisão entre as duas famílias é por papel: o rótulo é rótulo — largura fixa
+ * de dígito, mesma classe do cabeçalho de coluna — e a descrição é texto corrido,
+ * que é onde a sans existe. As duas estavam em `bodySmall`, ou seja, as duas em
+ * sans, e o rótulo lia como mais uma frase.
+ */
+@Composable
+private fun SettingsOptionRow(
+    label: String,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+    showDivider: Boolean = true,
+    control: @Composable RowScope.() -> Unit
+) {
+    AppDataRow(modifier = modifier, showDivider = showDivider) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (description != null) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        control()
+    }
+}
+
 @Composable
 private fun GeneralSettingsTab(
     currentTheme: AppTheme,
@@ -326,57 +366,62 @@ private fun GeneralSettingsTab(
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit
 ) {
-    SettingsSectionCard {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val isPt = currentLanguage == AppLanguage.PT
+
+    // Dois painéis nomeados no lugar de uma coluna de controles empilhados: com
+    // sete opções seguidas sem divisória nem título, achar uma delas era ler a
+    // lista inteira. Aparência é o que a janela mostra; Sistema é o que ela faz
+    // fora dela.
+    AppDataSurfaceFlush(
+        header = { AppSectionHeader(title = if (isPt) "Aparência" else "Appearance") }
+    ) {
+        SettingsOptionRow(label = if (isPt) "Tema" else "Theme") {
             ThemeToggle(
                 isDark = currentTheme == AppTheme.DARK,
                 language = currentLanguage,
                 onToggle = onThemeToggle
             )
-
-            AutoStartToggle(
-                enabled = autoStartEnabled,
-                language = currentLanguage,
-                onToggle = onAutoStartChange
-            )
-
-            AlwaysOnTopToggle(
-                enabled = alwaysOnTopEnabled,
-                language = currentLanguage,
-                onToggle = onAlwaysOnTopChange
-            )
-
-            // Ao lado de "manter sempre visível": as duas são propriedades da
-            // moldura da janela, não do conteúdo dela.
-            CardsOnlyModeToggle(
-                enabled = cardsOnlyMode,
-                language = currentLanguage,
-                onToggle = onCardsOnlyModeChange
-            )
-
-            WindowOpacitySlider(
-                percent = windowOpacityPercent,
-                language = currentLanguage,
-                enabled = windowOpacityEnabled,
-                onPercentChange = onWindowOpacityChange
-            )
-
-            UiScaleSlider(
-                percent = uiScalePercent,
-                language = currentLanguage,
-                onPercentChange = onUiScaleChange
-            )
-
-            Text(
-                text = if (currentLanguage == AppLanguage.PT) "Idioma" else "Language",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        }
+        SettingsOptionRow(label = if (isPt) "Idioma" else "Language") {
             LanguageSelector(
                 currentLanguage = currentLanguage,
                 onLanguageChange = onLanguageChange
             )
         }
+        WindowOpacitySlider(
+            percent = windowOpacityPercent,
+            language = currentLanguage,
+            enabled = windowOpacityEnabled,
+            onPercentChange = onWindowOpacityChange
+        )
+        UiScaleSlider(
+            percent = uiScalePercent,
+            language = currentLanguage,
+            onPercentChange = onUiScaleChange
+        )
+    }
+
+    AppDataSurfaceFlush(
+        header = { AppSectionHeader(title = if (isPt) "Sistema" else "System") }
+    ) {
+        AutoStartToggle(
+            enabled = autoStartEnabled,
+            language = currentLanguage,
+            onToggle = onAutoStartChange
+        )
+        AlwaysOnTopToggle(
+            enabled = alwaysOnTopEnabled,
+            language = currentLanguage,
+            onToggle = onAlwaysOnTopChange
+        )
+        // Ao lado de "manter sempre visível": as duas são propriedades da
+        // moldura da janela, não do conteúdo dela.
+        CardsOnlyModeToggle(
+            enabled = cardsOnlyMode,
+            language = currentLanguage,
+            onToggle = onCardsOnlyModeChange,
+            showDivider = false
+        )
     }
 }
 
@@ -671,6 +716,14 @@ private fun AnthropicProfileRow(
     }
 }
 
+/**
+ * Seletor de tema: segmentado de duas opções, como no protótipo.
+ *
+ * Era um rótulo com emoji ao lado de um interruptor, e a forma mentia sobre a
+ * natureza da escolha: interruptor diz ligado/desligado, e tema é uma escolha
+ * entre duas alternativas — a mesma pergunta que o seletor de idioma logo
+ * abaixo já respondia com um segmentado. Era também o único emoji da interface.
+ */
 @Composable
 fun ThemeToggle(
     isDark: Boolean,
@@ -678,34 +731,19 @@ fun ThemeToggle(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val label = when {
-        isDark && language == AppLanguage.PT -> "🌙 Escuro"
-        isDark -> "🌙 Dark"
-        language == AppLanguage.PT -> "☀️ Claro"
-        else -> "☀️ Light"
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.toggleable(
-            value = isDark,
-            role = Role.Switch,
-            onValueChange = { onToggle() }
-        )
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(end = 8.dp)
-        )
-        // Sem callback próprio: quem alterna é a linha inteira, que já carrega o
-        // `toggleable` com `Role.Switch`. Um segundo alvo de clique aqui dentro
-        // daria dois caminhos para a mesma ação.
-        AppSwitch(
-            checked = isDark,
-            onCheckedChange = { onToggle() }
-        )
-    }
+    val isPt = language == AppLanguage.PT
+    val options = listOf(
+        AppSegment(label = if (isPt) "Escuro" else "Dark"),
+        AppSegment(label = if (isPt) "Claro" else "Light")
+    )
+    AppSegmentedControl(
+        options = options,
+        selectedIndex = if (isDark) 0 else 1,
+        // O callback do app alterna, não escolhe: clicar na opção já ativa não
+        // pode inverter o tema.
+        onSelect = { index -> if ((index == 0) != isDark) onToggle() },
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -713,23 +751,21 @@ fun AutoStartToggle(
     enabled: Boolean,
     language: AppLanguage = AppLanguage.PT,
     onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
 ) {
-    val label = if (language == AppLanguage.PT) "Inicialização com Sistema" else "System Startup"
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Inicialização com Sistema" else "System Startup",
+        description = if (isPt) {
+            "Registra a aplicação na inicialização do usuário atual."
+        } else {
+            "Registers the app to launch with the current user session."
+        },
+        showDivider = showDivider,
         modifier = modifier
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 4.dp)
-        )
-        AppSwitch(
-            checked = enabled,
-            onCheckedChange = { onToggle(it) }
-        )
+        AppSwitch(checked = enabled, onCheckedChange = { onToggle(it) })
     }
 }
 
@@ -738,28 +774,26 @@ fun AlwaysOnTopToggle(
     enabled: Boolean,
     language: AppLanguage = AppLanguage.PT,
     onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
 ) {
-    val label = if (language == AppLanguage.PT) "Manter sempre visível" else "Always on top"
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Manter sempre visível" else "Always on top",
+        description = if (isPt) {
+            "Mantém a janela acima das demais."
+        } else {
+            "Keeps the window above the others."
+        },
+        showDivider = showDivider,
         modifier = modifier
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 4.dp)
-        )
-        AppSwitch(
-            checked = enabled,
-            onCheckedChange = { onToggle(it) }
-        )
+        AppSwitch(checked = enabled, onCheckedChange = { onToggle(it) })
     }
 }
 
 /**
- * Modo "somente os cards": esconde a barra de título e o rodapé da janela.
+ * Modo somente cards: esconde a barra de título e o rodapé da janela.
  *
  * O texto de apoio não é decoração. Ligado, o modo tira da tela o botão de
  * fechar e a engrenagem das configurações, e quem não souber como voltar fica
@@ -771,154 +805,151 @@ fun CardsOnlyModeToggle(
     enabled: Boolean,
     language: AppLanguage = AppLanguage.PT,
     onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
 ) {
     val isPt = language == AppLanguage.PT
-    val label = if (isPt) "Somente os cards" else "Cards only"
-    val hint = if (isPt) {
-        "Esconde a barra de título e o rodapé. Para voltar: Ctrl+Shift+M, o ícone na bandeja ou a faixa que aparece ao passar o mouse no topo da janela."
-    } else {
-        "Hides the title bar and the footer. To return: Ctrl+Shift+M, the tray icon, or the strip that appears when hovering the top of the window."
-    }
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 4.dp)
-            )
-            AppSwitch(
-                checked = enabled,
-                onCheckedChange = { onToggle(it) },
-                modifier = Modifier.testTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG)
-            )
-        }
-        Text(
-            text = hint,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    SettingsOptionRow(
+        label = if (isPt) "Somente os cards" else "Cards only",
+        description = if (isPt) {
+            "Esconde a barra de título e o rodapé. Para voltar: Ctrl+Shift+M, o ícone na bandeja ou a faixa que aparece ao passar o mouse no topo da janela."
+        } else {
+            "Hides the title bar and the footer. To return: Ctrl+Shift+M, the tray icon, or the strip that appears when hovering the top of the window."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG)
         )
     }
 }
 
+/**
+ * Trilha e polegar de um controle deslizante, no desenho do sistema.
+ *
+ * O `Slider` do Material tem trilha de 16dp de altura, indicadores de parada
+ * desenhados nela e um polegar em cápsula — três coisas que este sistema visual
+ * não tem em lugar nenhum. Os dois slots trocam só o desenho: a semântica de
+ * progresso, que é o que `SetProgress` dos testes exercita, continua vindo do
+ * próprio `Slider`.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppSliderTrack(state: SliderState) {
+    val span = state.valueRange.endInclusive - state.valueRange.start
+    val fraction = if (span > 0f) (state.value - state.valueRange.start) / span else 0f
+    AppProgressTrack(fraction = fraction, tone = AppTone.NEUTRAL)
+}
+
+@Composable
+private fun AppSliderThumb() {
+    Box(
+        modifier = Modifier
+            .size(SLIDER_THUMB_SIZE)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.onSurface)
+    )
+}
+
+/** Lado do polegar: alvo de arrasto sem virar a peça mais pesada da tela. */
+private val SLIDER_THUMB_SIZE = 12.dp
+
+/** Largura reservada ao controle deslizante dentro da linha de opção. */
+private val SLIDER_WIDTH = 180.dp
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WindowOpacitySlider(
     percent: Int,
     language: AppLanguage = AppLanguage.PT,
     enabled: Boolean = true,
     onPercentChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
 ) {
-    val label = if (language == AppLanguage.PT) "Opacidade da janela" else "Window opacity"
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "$percent%",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                // Marcado porque "75%" também é rótulo de chip no cartão de
-                // alertas: buscar pelo texto encontraria os dois.
-                modifier = Modifier.testTag(WINDOW_OPACITY_VALUE_TEST_TAG)
-            )
-        }
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Opacidade da janela" else "Window opacity",
+        description = if (enabled) {
+            null
+        } else if (isPt) {
+            "Transparência não suportada neste sistema."
+        } else {
+            "Transparency is not supported on this system."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        Text(
+            text = "$percent%",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            // Marcado porque 75% também é rótulo de chip no cartão de alertas:
+            // buscar pelo texto encontraria os dois.
+            modifier = Modifier.testTag(WINDOW_OPACITY_VALUE_TEST_TAG)
+        )
         Slider(
             value = percent.toFloat(),
             onValueChange = { value -> onPercentChange(value.roundToInt()) },
             valueRange = MIN_WINDOW_OPACITY_PERCENT.toFloat()..MAX_WINDOW_OPACITY_PERCENT.toFloat(),
-            // Sem steps: 51 tick marks desenhados na trilha só poluiriam. A granularidade
-            // de 1 ponto percentual já vem do roundToInt e do valor Int devolvido pelo estado.
+            // Sem steps: 51 indicadores de parada na trilha só poluiriam. A
+            // granularidade de 1 ponto percentual já vem do roundToInt e do
+            // valor Int devolvido pelo estado.
             steps = 0,
             enabled = enabled,
-            // Trilha na cor da superfície e polegar na cor do texto: o azul cheio
-            // do Material era o elemento mais forte da tela de Configurações, para
-            // ajustar transparência de janela.
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.onSurface,
-                activeTrackColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier.fillMaxWidth()
+            track = { state -> AppSliderTrack(state) },
+            thumb = { AppSliderThumb() },
+            modifier = Modifier.width(SLIDER_WIDTH)
         )
-        if (!enabled) {
-            Text(
-                text = if (language == AppLanguage.PT) {
-                    "Transparência não suportada neste sistema."
-                } else {
-                    "Transparency is not supported on this system."
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
 
 /**
  * Escala global da interface.
  *
- * Mesma anatomia do [WindowOpacitySlider] logo acima — rótulo, valor à direita e
- * trilha neutra —, porque os dois respondem à mesma pergunta ("quanto?") sobre a
- * própria janela. A diferença é a granularidade: os `steps` prendem o valor à
- * grade de [UI_SCALE_STEP_PERCENT], já que a distância entre 113% e 114% não é
- * visível e só multiplicaria gravações.
+ * Mesma anatomia do [WindowOpacitySlider] logo acima, porque os dois respondem à
+ * mesma pergunta sobre a própria janela. A diferença é a granularidade: os
+ * `steps` prendem o valor à grade de [UI_SCALE_STEP_PERCENT], já que a distância
+ * entre 113% e 114% não é visível e só multiplicaria gravações.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UiScaleSlider(
     percent: Int,
     language: AppLanguage = AppLanguage.PT,
     onPercentChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
 ) {
-    val label = if (language == AppLanguage.PT) "Tamanho da interface" else "Interface size"
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "$percent%",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.testTag(UI_SCALE_VALUE_TEST_TAG)
-            )
-        }
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Tamanho da interface" else "Interface size",
+        description = if (isPt) {
+            "Vale para todas as janelas do app."
+        } else {
+            "Applies to every window of the app."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        Text(
+            text = "$percent%",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.testTag(UI_SCALE_VALUE_TEST_TAG)
+        )
         Slider(
             value = percent.toFloat(),
             onValueChange = { value -> onPercentChange(snapUiScalePercent(value)) },
             valueRange = MIN_UI_SCALE_PERCENT.toFloat()..MAX_UI_SCALE_PERCENT.toFloat(),
             // Pontos intermediários da grade de 5, sem contar as duas pontas.
             steps = (MAX_UI_SCALE_PERCENT - MIN_UI_SCALE_PERCENT) / UI_SCALE_STEP_PERCENT - 1,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.onSurface,
-                activeTrackColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text(
-            text = if (language == AppLanguage.PT) {
-                "Vale para todas as janelas do app."
-            } else {
-                "Applies to every window of the app."
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            track = { state -> AppSliderTrack(state) },
+            thumb = { AppSliderThumb() },
+            modifier = Modifier.width(SLIDER_WIDTH)
         )
     }
 }

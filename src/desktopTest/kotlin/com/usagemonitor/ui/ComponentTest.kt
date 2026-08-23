@@ -1506,7 +1506,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("🌙 Escuro").assertIsDisplayed()
+        onNodeWithText("Escuro").assertIsSelected()
     }
 
     @Test
@@ -1517,7 +1517,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("☀️ Claro").assertIsDisplayed()
+        onNodeWithText("Claro").assertIsSelected()
     }
 
     @Test
@@ -1530,7 +1530,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("🌙 Escuro").performClick()
+        onNodeWithText("Claro").performClick()
         assertEquals(true, toggled)
     }
 
