@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 
 /** Resultado do botão "Testar conexão". */
@@ -81,27 +82,28 @@ fun TeamIntegrationSection(
 ) {
     val isPt = language == AppLanguage.PT
 
-    Column(
+    // Painel com cabeçalho e divisória, como as duas seções da aba Geral: o
+    // interruptor da integração inteira mora no cabeçalho, que é onde ele
+    // pertence — ele liga e desliga tudo o que está abaixo dele.
+    AppDataSurfaceFlush(
         modifier = modifier.fillMaxWidth().testTag(TEAM_SECTION_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (isPt) "Integração com time" else "Team integration",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            AppSwitch(
-                checked = settings.enabled,
-                onCheckedChange = onEnabledChange,
-                modifier = Modifier.testTag(TEAM_ENABLE_SWITCH_TEST_TAG)
+        header = {
+            AppSectionHeader(
+                title = if (isPt) "Integração com time" else "Team integration",
+                trailing = {
+                    AppSwitch(
+                        checked = settings.enabled,
+                        onCheckedChange = onEnabledChange,
+                        modifier = Modifier.testTag(TEAM_ENABLE_SWITCH_TEST_TAG)
+                    )
+                }
             )
         }
-
+    ) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(AppSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+      ) {
         Text(
             text = if (isPt) {
                 "Envia ao servidor da empresa apenas os totais de tokens das sessões — " +
@@ -175,7 +177,8 @@ fun TeamIntegrationSection(
                         checked = profile.id in settings.participatingProfileIds,
                         onCheckedChange = { checked ->
                             onProfileParticipationChange(profile.id, checked)
-                        }
+                        },
+                        showDivider = profile !== profiles.last()
                     )
                 }
             }
@@ -191,24 +194,21 @@ fun TeamIntegrationSection(
                 label = if (isPt) "Testar conexão" else "Test connection",
                 onClick = onTestConnection,
                 enabled = settings.isConfigured && connection.status != TeamConnectionUiStatus.CHECKING,
-                modifier = Modifier.testTag(TEAM_TEST_CONNECTION_TEST_TAG),
-                tone = AppButtonTone.PRIMARY
+                modifier = Modifier.testTag(TEAM_TEST_CONNECTION_TEST_TAG)
             )
 
             if (connection.status == TeamConnectionUiStatus.CHECKING) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             }
 
+            // Ponto e palavra: a mensagem dizia o resultado só pela cor do
+            // texto — vermelho para falha, azul para sucesso —, e azul neste
+            // sistema é informação, não confirmação.
             val statusMessage = connection.message
             if (statusMessage != null) {
-                Text(
-                    text = statusMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (connection.status == TeamConnectionUiStatus.FAILED) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
+                AppStatusIndicator(
+                    label = statusMessage,
+                    tone = connectionTone(connection.status),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -239,6 +239,7 @@ fun TeamIntegrationSection(
             onOpenKeysManager = onOpenKeysManager,
             onExitAdminMode = onExitAdminMode
         )
+      }
     }
 }
 
@@ -323,16 +324,14 @@ private fun TeamAdminBlock(
             label = if (isPt) "Validar" else "Validate",
             onClick = onValidateAdminToken,
             enabled = settings.isAdminMode && connection.status != TeamConnectionUiStatus.CHECKING,
-            modifier = Modifier.testTag(TEAM_ADMIN_VALIDATE_TEST_TAG),
-            tone = AppButtonTone.PRIMARY
+            modifier = Modifier.testTag(TEAM_ADMIN_VALIDATE_TEST_TAG)
         )
 
         AppButton(
             label = if (isPt) "Configurar chaves das contas" else "Manage account keys",
             onClick = onOpenKeysManager,
             enabled = settings.isAdminMode,
-            modifier = Modifier.testTag(TEAM_ADMIN_KEYS_TEST_TAG),
-            tone = AppButtonTone.PRIMARY
+            modifier = Modifier.testTag(TEAM_ADMIN_KEYS_TEST_TAG)
         )
 
         if (connection.status == TeamConnectionUiStatus.CHECKING) {
@@ -342,15 +341,7 @@ private fun TeamAdminBlock(
 
     val adminMessage = connection.message
     if (adminMessage != null) {
-        Text(
-            text = adminMessage,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (connection.status == TeamConnectionUiStatus.FAILED) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
-            }
-        )
+        AppStatusIndicator(label = adminMessage, tone = connectionTone(connection.status))
     }
 
     if (settings.adminToken.isNotBlank()) {
@@ -367,20 +358,17 @@ private fun TeamAdminBlock(
 private fun TeamProfileCheckboxRow(
     profile: AnthropicProfileUiModel,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    showDivider: Boolean = true
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Interruptor e não caixa de seleção: a linha diz se a conta participa do
-        // time, que é um estado ligado ou desligado — a mesma coisa que os outros
-        // controles desta tela dizem, e agora com o mesmo desenho.
-        AppSwitch(checked = checked, onCheckedChange = onCheckedChange)
+    // Linha de dados como as opções da aba Geral: rótulo em mono à esquerda,
+    // controle à direita. O interruptor abria a linha, e a coluna de identidade
+    // começava depois dele — desalinhada de tudo o que vem acima.
+    AppDataRow(showDivider = showDivider, horizontalPadding = 0.dp) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = profile.label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             val identity = profile.identityLabel
@@ -392,6 +380,24 @@ private fun TeamProfileCheckboxRow(
                 )
             }
         }
+        // Interruptor e não caixa de seleção: a linha diz se a conta participa do
+        // time, que é um estado ligado ou desligado — a mesma coisa que os outros
+        // controles desta tela dizem, e agora com o mesmo desenho.
+        AppSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
+
+/**
+ * Tom do resultado de uma verificação de conexão.
+ *
+ * Enquanto checa não há veredito: neutro. Sem tentativa, também não — mas ali
+ * não há mensagem, e o indicador nem chega a ser composto.
+ */
+private fun connectionTone(status: TeamConnectionUiStatus): AppTone {
+    return when (status) {
+        TeamConnectionUiStatus.OK -> AppTone.OK
+        TeamConnectionUiStatus.FAILED -> AppTone.CRITICAL
+        TeamConnectionUiStatus.CHECKING, TeamConnectionUiStatus.IDLE -> AppTone.NEUTRAL
+    }
+}

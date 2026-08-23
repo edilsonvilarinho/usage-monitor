@@ -259,7 +259,7 @@ fun SettingsDialogContent(
                         onToggleProfileExpanded = onToggleProfileExpanded
                     )
 
-                    SettingsTab.TEAM -> SettingsSectionCard {
+                    SettingsTab.TEAM -> {
                         TeamIntegrationSection(
                             settings = teamSettings,
                             language = currentLanguage,
