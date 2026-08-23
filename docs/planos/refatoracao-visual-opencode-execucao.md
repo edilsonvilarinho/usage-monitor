@@ -247,6 +247,66 @@ dashboard. Ela afirma um estado agregado que o app não calcula, e com uma fonte
 mentiria — escolher o tom seria inventar semântica que o protótipo não define. Falha de fonte já tem
 o banner por alvo. Registrado no próprio HTML.
 
+
+### Passada de conformidade — 2026-08-24 (issue #81)
+
+Levantamento do usuário, de novo por captura: cinco comparações lado a lado — protótipo à esquerda,
+app à direita — das seções **8 · Resumo por eixo**, **9 · Uso do time**, **9b · Tendência do time**,
+**10 · Presença** e **10b · Presença — todas as contas**. A passada de 23/08 corrigiu as regras e a
+anatomia do dashboard, do histórico e das Configurações; estas cinco telas ficaram com a anatomia
+antiga.
+
+O eixo da passada é um só: **a legenda pertence à coluna, não à célula.** Quatro listas repetiam o
+rótulo dentro de cada célula — "Máquina", "Custo", "Tempo ativo", "do time" — e numa lista de time
+isso dobra o texto da tela, com o ruído crescendo com o número de linhas.
+
+| O que mudou | Por quê |
+|---|---|
+| `AppColumnHeaderRow`, `AppColumnHeaderLabel` e `AppCellValue` entram em `AppStructure` | `ColumnHeaderLabel` e `MetricValue` moravam em `CliSessionsScreen.kt`, arquivo de tela, consumidos por três telas — o mesmo defeito que fez `MetricCard` virar `AppMetricBlock` |
+| Resumo por eixo: totais viram três blocos de métrica e as linhas viram tabela | Eram dois painéis com título em azul e em verde, e um card por balde com barra de largura total — quatro elementos para dizer o que uma linha de tabela diz com colunas alinhadas |
+| Resumo por eixo: o paginador sobe para a faixa de controles | No rodapé ele é a primeira coisa a sair da tela numa janela baixa, que é justamente quando a lista é longa. Filtro, ordem e página escolhem parâmetros do mesmo conteúdo e ficam juntos |
+| Lista de sessões e lista do time ganham faixa de legendas | A legenda pertence à coluna. Ver a reversão abaixo |
+| Cabeçalho das duas janelas sai do `DepthSurface`, e as abas vêm antes das métricas | O corpo da janela já é a superfície; o retângulo com borda transformava barra de controles, métricas e abas num bloco só. A aba escolhe o que a janela mostra, e os totais são conteúdo dela |
+| Tendência: faixa por integrante vira barras agrupadas com legenda e grade | Da faixa dava para ver que houve um pico, não em que dia nem de quem |
+| Presença: sete colunas na ordem do protótipo, com o Estado primeiro | Estado e Trabalhando carregavam **dois dados por célula** — a palavra e um carimbo —, e célula com dois dados não tem uma legenda |
+| Presença ganha o campo "Filtrar integrante" | O chip liga uma restrição; num time de vinte máquinas ele sozinho não acha ninguém. O texto mora no `Success` ao lado de `onlyOnline`, um dono só para "o que a lista mostra" |
+| Sessões CLI e Uso do time ganham piso de janela; o da Presença sobe de 940 para 1030 | Faixa de legendas sobre linha que quebra promete um alinhamento que o conteúdo não cumpre, e quem arrasta a borda é o usuário |
+
+**A concessão do rótulo por célula foi revertida**, e ela era a primeira dos três pontos em que "o
+protótipo cedeu" na passada anterior. O motivo original era largura: as células da linha de sessão
+somavam quase 1.000dp contra uma janela de 960. O que a desfez foi o **veredito de saturação sair do
+fluxo de colunas** — ele media 210dp e desceu para uma segunda linha da própria linha, junto da razão
+que o gerou, que é como a §6 do protótipo já desenhava a linha. Com ele fora as seis colunas somam
+766dp com o vão, e o piso de janela garante que continuem cabendo. As outras duas concessões — botões
+de ícone no rodapé do card e badges por cota no card minimizado — seguem valendo.
+
+**Uma exceção consciente entra no lugar**: na tendência do time **a cor identifica o integrante**,
+contra a regra de que acento é identidade de fonte e não de valor. Num gráfico agrupado a cor é o
+único jeito de dizer de quem é a barra; é o que o protótipo desenha e foi decisão explícita do
+usuário. A paleta reusa os acentos de fonte já medidos por `AppAccentsContrastTest` e **cicla** — do
+sétimo integrante em diante duas séries repetem o tom, e quem as separa é a legenda.
+
+**Larguras de coluna são orçamento, não gosto.** Cada lista carrega a conta no comentário das
+constantes: soma das colunas + vão × (n − 1) + marcador + barra de rolagem + coluna de ação ≤ largura
+da janela − cromo. Sessões CLI e Uso do time cabem em 960dp; a Presença precisa de 1030 porque é a
+única que imprime dois carimbos `12/08 10:58 BRT` por linha, e truncá-los apagaria justamente o fuso
+que a frase existe para dizer.
+
+**Três textos de interface mudaram**, e nenhum é cosmético: `lastSeen` perdeu a palavra "último"
+(a frase mora na terceira linha da coluna de identidade e as duas palavras a faziam truncar no
+carimbo); `TeamPresenceLabels.columnWorking` virou `workingNow`, que é o valor da coluna Estado e não
+o nome de uma coluna; e `CliSessionsLabels.columnShare` nasceu como "Participação", porque
+`TeamUsageLabels.columnShare` é "do time" — rótulo de uma célula que já traz o número junto, e como
+legenda de coluna ele diria a preposição sem o substantivo. `trendTitle` saiu: era o título de um
+painel de explicação que deixou de existir.
+
+**O protótipo mudou junto** nas seis seções: §6 (a nota da concessão reescrita e a lista com faixa de
+legendas), §8 (paginador no topo, "Por página", ordem e rótulo das abas alinhados ao código, grade
+7 × 24 no lugar da fileira de 24 horas), §9 (colunas do integrante, faixa da conta reservando as
+mesmas colunas, bloco de sessões com o cabeçalho da §6), §9b (piso e teto de largura de barra, e a
+nota da cor por integrante), §10 (colunas de Último turno e Status, chip e campo de filtro juntos) e
+§10b (faixa de legendas e os agregados da conta numa célula que atravessa as colunas vazias).
+
 ---
 
 ## Protocolo de retomada de sessão

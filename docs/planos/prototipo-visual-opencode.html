@@ -310,6 +310,12 @@ table.dt tr:hover td { background: var(--raised); }
 table.dt td.num, table.dt th.num { text-align: right; }
 .scroller { overflow-x: auto; }
 
+/* Faixa de legendas de coluna, acima de uma lista de .row. A legenda pertence a
+   coluna, nao a celula: repetida em cada linha ela dobra o texto da tela. */
+.colhead { display: flex; gap: var(--s3); padding: 0 var(--s3) var(--s2) calc(var(--s3) + 14px);
+  font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); white-space: nowrap; }
+
 /* Grades utilitárias */
 .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 .g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--s3); }
@@ -341,7 +347,8 @@ table.dt td.num, table.dt th.num { text-align: right; }
 .spark { display: block; width: 100%; height: auto; }
 
 /* Heatmap */
-.heat { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; }
+.heat { display: grid; grid-template-columns: 32px repeat(24, 1fr); gap: 2px; align-items: center; }
+.heat > .k { justify-self: start; }
 .heat i { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--raised);
   border: 1px solid var(--border); }
 
@@ -900,36 +907,43 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="metric"><span class="k">Tempo ativo</span><span class="v big">4h 3min</span></div>
     </div>
 
+    <div class="colhead">
+      <span style="width:170px">Sessão</span><span style="width:130px">Projeto</span>
+      <span style="width:136px">Tokens (com cache)</span><span style="width:90px">Cache</span>
+      <span style="width:96px">Custo</span><span style="width:84px">Tempo ativo</span>
+    </div>
     <div class="panel"><div class="pbody flush">
       <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
-        <div class="hstack wrap" style="gap:var(--s4)">
-          <div class="stack" style="gap:0;min-width:150px"><span class="v sm">7c4a1f92</span><span class="k">12/08 10:58 BRT</span></div>
+        <div class="hstack" style="gap:var(--s3)">
+          <div class="stack" style="gap:0;width:170px"><span class="v sm">7c4a1f92</span><span class="k">12/08 10:58 BRT</span></div>
           <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
-          <div class="stack" style="gap:0;min-width:140px"><span class="v sm">api-gateway</span><span class="k">48 turnos</span></div>
-          <div class="stack" style="gap:0"><span class="k">Tokens (com cache)</span><span class="v sm">4,40 M</span></div>
-          <div class="stack" style="gap:0;min-width:96px"><span class="k">Cache</span><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
-          <div class="stack" style="gap:0"><span class="k">Custo</span><span class="v sm">US$ 5,4792</span></div>
-          <div class="stack" style="gap:0"><span class="k">Tempo ativo</span><span class="v sm">2h 14min</span></div>
+          <div class="stack" style="gap:0;width:130px"><span class="v sm">api-gateway</span><span class="k">48 turnos</span></div>
+          <span class="v sm" style="width:136px">4,40 M</span>
+          <div class="stack" style="gap:0;width:90px"><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
+          <span class="v sm" style="width:96px">US$ 5,4792</span>
+          <span class="v sm" style="width:84px">2h 14min</span>
         </div>
         <div class="hstack" style="gap:var(--s2)"><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
       </div></div>
       <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
-        <div class="hstack wrap" style="gap:var(--s4)">
-          <div class="stack" style="gap:0;min-width:150px"><span class="v sm">b81e35c0</span><span class="k">12/08 10:33 BRT</span></div>
+        <div class="hstack" style="gap:var(--s3)">
+          <div class="stack" style="gap:0;width:170px"><span class="v sm">b81e35c0</span><span class="k">12/08 10:33 BRT</span></div>
           <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
-          <div class="stack" style="gap:0;min-width:140px"><span class="v sm">checkout-web</span><span class="k">26 turnos</span></div>
-          <div class="stack" style="gap:0"><span class="k">Tokens (com cache)</span><span class="v sm">1,92 M</span></div>
-          <div class="stack" style="gap:0;min-width:96px"><span class="k">Cache</span><span class="v sm">95%</span><div class="track ok"><i style="width:95%"></i></div></div>
-          <div class="stack" style="gap:0"><span class="k">Custo</span><span class="v sm">US$ 3,6100</span></div>
-          <div class="stack" style="gap:0"><span class="k">Tempo ativo</span><span class="v sm">1h 5min</span></div>
+          <div class="stack" style="gap:0;width:130px"><span class="v sm">checkout-web</span><span class="k">26 turnos</span></div>
+          <span class="v sm" style="width:136px">1,92 M</span>
+          <div class="stack" style="gap:0;width:90px"><span class="v sm">95%</span><div class="track ok"><i style="width:95%"></i></div></div>
+          <span class="v sm" style="width:96px">US$ 3,6100</span>
+          <span class="v sm" style="width:84px">1h 5min</span>
         </div>
         <div class="hstack" style="gap:var(--s2)"><span class="st warn">Atenção</span><span class="k">46% da janela · US$ 0,2300 por mensagem</span></div>
       </div></div>
     </div></div>
-    <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>Cada célula traz o próprio rótulo; não há cabeçalho de coluna
-    único.</b> As células somam quase 1.000dp e a janela abre menor: a linha precisa quebrar, e cabeçalho fixo sobre linha
-    que quebra desalinha. A rolagem horizontal que resolveria isso esconderia colunas dos asserts de componente. O preço é
-    o rótulo repetido em cada linha; o ganho é a linha continuar legível em qualquer largura.</p>
+    <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>A legenda vive uma vez só, numa faixa acima da lista.</b>
+    Esta seção dizia o contrário até a issue #81: o rótulo era repetido em cada célula porque elas somavam quase 1.000dp
+    e a janela abre em 960, então a linha precisava quebrar — e cabeçalho fixo sobre linha que quebra desalinha. O que
+    desfez a concessão foi o <b>veredito sair do fluxo de colunas</b>: ele media 210dp e desceu para a segunda linha da
+    própria linha, junto da razão que o gerou. Com ele fora as seis colunas somam 766dp com o vão, a linha não quebra, e a
+    janela ganha piso de 960dp para que ela continue não quebrando quando o usuário arrasta a borda.</p>
 
     <div class="g2">
       <div><div class="cap">Lista vazia</div><div class="panel"><div class="state"><span class="msg">Nenhum turno nesta janela.</span></div></div></div>
@@ -1007,7 +1021,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 
 <!-- ═══════════════════════════════ RESUMO ════════════════════════════ -->
 <h2 id="resumo">8 · Resumo por eixo</h2>
-<p class="lede">Uma aba por eixo, com filtro, ordem e paginação presos no topo. Os cards de totais e de ritmo entram na área rolável: com altura fixa lá em cima, numa janela baixa eles empurram o paginador para fora justamente quando a lista é longa.</p>
+<p class="lede">Uma aba por eixo, com filtro, ordem e paginação presos no topo — os três escolhem parâmetros do mesmo conteúdo e por isso vivem na mesma faixa. Os totais entram na área rolável: com altura fixa lá em cima, numa janela baixa eles empurram a lista para fora. Os totais são blocos de métrica e as qualificações longas ficam fora deles, porque dentro um rodapé de quatro medidas mede três vezes a largura do bloco vizinho.</p>
 
 <div class="win">
   <div class="titlebar"><span class="t">Sessões CLI — Resumo</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
@@ -1016,22 +1030,29 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="tabs" style="flex:1"><button type="button">Sessões</button><button class="on" type="button">Resumo</button></div>
       <div class="seg"><button class="on" type="button">5h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
     </div>
-    <div class="tabs"><button class="on" type="button">Por projeto</button><button type="button">Por branch</button><button type="button">Por modelo</button><button type="button">Ferramentas</button><button type="button">Atividade</button></div>
+    <div class="tabs"><button class="on" type="button">Projeto</button><button type="button">Modelo</button><button type="button">Branch</button><button type="button">Ferramentas</button><button type="button">Atividade</button></div>
     <div class="hstack wrap">
-      <input class="field" type="text" placeholder="Filtrar" style="max-width:280px">
-      <span class="k">Ordenar</span>
+      <input class="field" type="text" placeholder="Filtrar" style="max-width:220px">
+      <span class="k">Ordenar por</span>
       <div class="seg"><button class="on" type="button">Custo</button><button type="button">Tokens</button><button type="button">Nome</button></div>
-      <div class="seg"><button class="on" type="button">Maior primeiro</button><button type="button">Menor primeiro</button></div>
-      <span class="sp"></span>
+      <button class="btn icon" type="button" aria-label="Maior primeiro" title="Maior primeiro">↓</button>
       <button class="btn ghost" type="button">‹ Página anterior</button>
-      <span class="k">1 de 1</span>
+      <span class="k">1–2 de 2</span>
       <button class="btn ghost" type="button">Próxima página ›</button>
+      <span class="k">Por página</span>
+      <div class="seg"><button type="button">5</button><button class="on" type="button">10</button><button type="button">50</button><button type="button">100</button></div>
     </div>
 
     <div class="g3">
       <div class="metric"><span class="k">Custo estimado</span><span class="v big">US$ 9,5012</span></div>
-      <div class="metric"><span class="k">Economia do cache</span><span class="v big" style="color:var(--savings)">US$ 62,4</span></div>
+      <div class="metric"><span class="k">Economia do cache</span><span class="v big">US$ 62,4</span></div>
       <div class="metric"><span class="k">Ritmo de queima</span><span class="v big">US$ 2,34/h</span><span class="k dim">medido sobre o tempo decorrido</span></div>
+    </div>
+    <div class="stack" style="gap:var(--s1)">
+      <span class="k">3 sessões · 101 turnos · 7,3M tokens · 4h38 tempo ativo</span>
+      <span class="k">Cache economizou US$ 62,4 (79% do que seria gasto) · reaproveitamento 95%</span>
+      <span class="k">815,5K tokens por hora. Medido sobre 2h30 decorridos da janela, não sobre a duração nominal dela.</span>
+      <span class="k">As seções descrevem os mesmos turnos por eixos diferentes — não se somam.</span>
     </div>
 
     <div class="panel"><div class="pbody flush"><div class="scroller"><table class="dt">
@@ -1045,8 +1066,11 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="panel">
       <div class="phead"><span class="ptitle">Atividade por hora</span><span class="sp"></span><span class="k">intensidade pelo custo, relativa ao pico da janela</span></div>
       <div class="pbody">
+        <!-- 7 x 24: dia da semana por hora local, e nao uma fileira de 24 horas.
+             Agrupar so por hora perderia a diferenca entre a terca de manha e o
+             sabado de manha, que e o padrao que a grade existe para mostrar. -->
         <div class="heat" id="heat"></div>
-        <div class="hstack"><span class="k">00h</span><span class="sp"></span><span class="k">12h</span><span class="sp"></span><span class="k">23h BRT</span></div>
+        <div class="hstack" style="padding-left:34px"><span class="k">00h</span><span class="sp"></span><span class="k">12h</span><span class="sp"></span><span class="k">23h BRT</span></div>
       </div>
     </div>
     <p class="note" style="margin:0"><b>As três listas descrevem os mesmos turnos.</b> Somar baldes de listas diferentes contaria o mesmo gasto três vezes — e a tela diz isso em texto. Modelo sem tarifa não vira custo zero: o valor exibido leva <code>+</code>, marcando piso e não total.</p>
@@ -1061,9 +1085,11 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="body">
     <div class="hstack wrap">
       <div class="tabs" style="flex:1"><button class="on" type="button">Integrantes</button><button type="button">Resumo</button><button type="button">Tendência</button></div>
+      <span class="st ok">AO VIVO</span>
       <div class="seg"><button class="on" type="button">5h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
       <button class="btn" type="button">Relatório PDF</button>
     </div>
+    <span class="k">ana@example.com — Example Org</span>
 
     <div class="g3">
       <div class="metric"><span class="k">Integrantes</span><span class="v big">3</span></div>
@@ -1071,50 +1097,75 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="metric"><span class="k">Custo estimado</span><span class="v big">US$ 14,2092</span></div>
     </div>
 
+    <div class="colhead">
+      <span style="width:180px">Integrante</span><span style="width:60px">Sessões</span>
+      <span style="width:136px">Tokens (com cache)</span><span style="width:96px">Custo</span>
+      <span style="width:76px">Tempo ativo</span><span style="width:96px">Participação</span>
+      <span style="width:96px">Status</span>
+    </div>
     <div class="panel"><div class="pbody flush">
       <div class="row" style="background:var(--raised)">
         <span class="srcmark" style="background:var(--cread)"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
-        <div class="stack" style="gap:0;min-width:150px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
-        <span class="sp"></span>
-        <span class="v sm">3 integrantes</span><span class="v sm">8,97 M</span>
-        <span class="v sm">US$ 14,2092</span><span class="v sm">100%</span>
+        <div class="stack" style="gap:0;width:142px"><span class="k">Conta · 3 integrantes</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <span class="v sm" style="width:60px">4</span>
+        <span class="v sm" style="width:136px">8,97 M</span>
+        <span class="v sm" style="width:96px">US$ 14,2092</span>
+        <span style="width:76px"></span>
+        <span class="v sm" style="width:96px">100%</span>
       </div>
       <div class="row">
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
-        <div class="stack" style="gap:0;min-width:150px"><span class="v sm">dev-01</span><span class="k">DESKTOP-A1</span></div>
-        <span class="st ok">Trabalhando agora</span>
-        <span class="sp"></span>
-        <span class="v sm">2 sessões</span><span class="v sm">6,32 M</span>
-        <span class="v sm">US$ 9,0892</span><span class="v sm">3h 19min</span>
+        <div class="stack" style="gap:0;width:142px"><span class="v sm">dev-01</span><span class="k">DESKTOP-A1</span><span class="k">envio 12/08 10:58 BRT</span></div>
+        <span class="v sm" style="width:60px">2</span>
+        <span class="v sm" style="width:136px">6,32 M</span>
+        <span class="v sm" style="width:96px">US$ 9,0892</span>
+        <span class="v sm" style="width:76px">3h19</span>
+        <div class="stack" style="gap:2px;width:96px"><span class="v sm">70%</span><div class="track info"><i style="width:70%"></i></div></div>
+        <span class="st crit" style="width:96px">Saturada</span>
       </div>
-      <div class="row" style="padding-left:44px;background:var(--bg)">
-        <div class="scroller" style="flex:1"><table class="dt">
-          <thead><tr><th>Sessão</th><th>Projeto</th><th>Branch</th><th>Modelo</th><th class="num">Turnos</th><th class="num">Tokens</th><th class="num">Custo</th><th class="num">Tempo ativo</th></tr></thead>
-          <tbody>
-            <tr><td>7c4a1f92</td><td>api-gateway</td><td>feat/checkout</td><td>claude-opus-5</td><td class="num">48</td><td class="num">4,40 M</td><td class="num">US$ 5,4792</td><td class="num">2h 14min</td></tr>
-            <tr><td>b81e35c0</td><td>checkout-web</td><td>main</td><td>claude-opus-5</td><td class="num">26</td><td class="num">1,92 M</td><td class="num">US$ 3,6100</td><td class="num">1h 5min</td></tr>
-          </tbody>
-        </table></div>
+      <div class="row" style="padding-left:38px;background:var(--bg)">
+        <div class="stack" style="gap:var(--s2);flex:1">
+          <div class="colhead" style="padding-left:0">
+            <span style="width:170px">Sessão</span><span style="width:130px">Projeto</span>
+            <span style="width:136px">Tokens (com cache)</span><span style="width:90px">Cache</span>
+            <span style="width:96px">Custo</span><span style="width:84px">Tempo ativo</span>
+          </div>
+          <div class="stack" style="gap:var(--s1)">
+            <div class="hstack" style="gap:var(--s3)">
+              <div class="stack" style="gap:0;width:170px"><span class="v sm">7c4a1f92</span><span class="k">12/08 10:58 BRT</span></div>
+              <div class="stack" style="gap:0;width:130px"><span class="v sm">api-gateway</span><span class="k">48 turnos</span></div>
+              <span class="v sm" style="width:136px">4,40 M</span>
+              <div class="stack" style="gap:0;width:90px"><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
+              <span class="v sm" style="width:96px">US$ 5,4792</span>
+              <span class="v sm" style="width:84px">2h 14min</span>
+            </div>
+            <div class="hstack" style="gap:var(--s2)"><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
+          </div>
+        </div>
       </div>
       <div class="row">
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <button class="btn ghost icon" type="button" aria-label="Expandir integrante">▸</button>
-        <div class="stack" style="gap:0;min-width:150px"><span class="v sm">dev-02</span><span class="k">NOTE-B2</span></div>
-        <span class="st ok">Conectado</span>
-        <span class="sp"></span>
-        <span class="v sm">1 sessão</span><span class="v sm">2,65 M</span>
-        <span class="v sm">US$ 5,1200</span><span class="v sm">1h 27min</span>
+        <div class="stack" style="gap:0;width:142px"><span class="v sm">dev-02</span><span class="k">NOTE-B2</span><span class="k">envio 12/08 10:49 BRT</span></div>
+        <span class="v sm" style="width:60px">1</span>
+        <span class="v sm" style="width:136px">2,65 M</span>
+        <span class="v sm" style="width:96px">US$ 5,1200</span>
+        <span class="v sm" style="width:76px">1h27</span>
+        <div class="stack" style="gap:2px;width:96px"><span class="v sm">30%</span><div class="track info"><i style="width:30%"></i></div></div>
+        <span class="st warn" style="width:96px">Atenção</span>
       </div>
       <div class="row">
-        <span class="srcmark" style="background:var(--anthropic)"></span>
-        <button class="btn ghost icon" type="button" aria-label="Expandir integrante">▸</button>
-        <div class="stack" style="gap:0;min-width:150px"><span class="v sm">dev-03</span><span class="k">NOTE-C3</span></div>
-        <span class="st off">Desconectado</span>
-        <span class="sp"></span>
-        <span class="v sm dim">sem sessões</span><span class="v sm dim">—</span>
-        <span class="v sm dim">—</span><span class="v sm dim">—</span>
+        <span class="srcmark" style="background:var(--border)"></span>
+        <span style="width:26px"></span>
+        <div class="stack" style="gap:0;width:142px"><span class="v sm">dev-03</span><span class="k">NOTE-C3</span><span class="k">envio 12/08 02:00 BRT</span></div>
+        <span class="v sm" style="width:60px">0</span>
+        <span class="v sm dim" style="width:136px">sem uso no período</span>
+        <span class="v sm" style="width:96px">US$ 0,0000</span>
+        <span class="v sm dim" style="width:76px">—</span>
+        <div class="stack" style="gap:2px;width:96px"><span class="v sm">0%</span><div class="track info"><i style="width:0%"></i></div></div>
+        <span style="width:96px"></span>
       </div>
     </div></div>
     <div class="statusbar"><span class="st ok">AO VIVO · 5s</span><span class="sp"></span><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
@@ -1128,7 +1179,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="body">
     <div class="tabs"><button type="button">Integrantes</button><button type="button">Resumo</button><button class="on" type="button">Tendência</button></div>
     <div class="chart">
-      <div class="hstack" style="margin-bottom:var(--s2)"><span class="k">Custo por dia · escala única entre integrantes</span><span class="sp"></span><span class="legend"><span><i style="background:var(--anthropic)"></i>dev-01</span><span><i style="background:var(--codex)"></i>dev-02</span><span><i style="background:var(--deepseek)"></i>dev-03</span></span></div>
+      <div class="hstack" style="margin-bottom:var(--s2)"><span class="k">Custo por dia · escala única entre integrantes</span><span class="sp"></span><span class="legend"><span><i style="background:var(--anthropic)"></i>dev-01 · US$ 47,60 no período</span><span><i style="background:var(--codex)"></i>dev-02 · US$ 24,00 no período</span><span><i style="background:var(--deepseek)"></i>dev-03 · US$ 3,60 no período</span></span></div>
       <svg class="spark" viewBox="0 0 700 150" role="img" aria-label="Custo diário por integrante nos últimos sete dias">
         <g stroke="var(--border)" stroke-width="1"><line x1="0" y1="40" x2="700" y2="40"/><line x1="0" y1="80" x2="700" y2="80"/><line x1="0" y1="120" x2="700" y2="120"/></g>
         <g>
@@ -1147,6 +1198,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       </svg>
     </div>
     <p class="note" style="margin:0">Todo integrante ganha ponto em todo dia — série com buracos desenharia continuidade onde houve silêncio. Barra de altura mínima visível é <b>zero explícito</b>, não ausência de dado.</p>
+    <p class="note" style="margin:var(--s3) 0 0"><b>A largura da barra tem piso e teto.</b> Esta página desenha sete dias por três integrantes, que é o caso confortável; a janela padrão do app é de <b>trinta</b> dias, e com cinco integrantes seriam 150 barras — sem piso o gráfico vira um borrão, e abaixo dele a área de plotagem passa a rolar na horizontal, o mesmo recurso da grade de atividade. Sem teto, o caso desta página daria barras de mais de 40dp: retângulo desse tamanho lê como bloco e o vão entre os dias some. O que sobra depois do teto vira distância entre grupos, que é o que faz um grupo ser um dia.</p>
+    <p class="note" style="margin:var(--s3) 0 0"><b>A cor identifica o integrante</b>, e é a única exceção à regra de que acento é identidade de fonte e não de valor: num gráfico agrupado a cor é o único jeito de dizer de quem é a barra. A paleta reusa os acentos de fonte já medidos contra as duas superfícies e <b>cicla</b> — com sete ou mais integrantes duas séries repetem o tom, e quem as separa é a legenda.</p>
   </div>
 </div>
 
@@ -1157,74 +1210,92 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="body">
     <div class="hstack wrap">
       <div class="hstack" style="gap:var(--s4)">
-        <span class="st ok">2 conectados</span><span class="st warn">1 trabalhando</span><span class="st off">1 desconectado</span>
+        <span class="st ok">1 trabalhando</span><span class="st info" style="color:var(--info)">2 conectados</span><span class="st off">3 conhecidos</span>
       </div>
-      <span class="sp"></span>
-      <input class="field" type="text" placeholder="Filtrar integrante" style="max-width:220px">
+      <button class="btn" type="button">Somente conectados</button>
+      <input class="field" type="text" placeholder="Filtrar integrante" style="max-width:200px">
     </div>
     <div class="panel"><div class="pbody flush"><div class="scroller"><table class="dt">
-      <thead><tr><th>Estado</th><th>Integrante</th><th>Máquina</th><th class="num">Sessões ativas</th><th>Último sinal</th><th></th></tr></thead>
+      <thead><tr><th>Estado</th><th>Integrante</th><th>Máquina</th><th class="num">Sessões ativas</th><th>Último sinal</th><th>Último turno</th><th>Status</th><th></th></tr></thead>
       <tbody>
-        <tr><td><span class="st ok">Trabalhando agora</span></td><td>dev-01 <span class="dim">· esta máquina</span></td><td>DESKTOP-A1</td><td class="num">2</td><td>12/08 10:58 BRT</td><td><button class="btn icon" type="button" disabled aria-label="Remover integrante">×</button></td></tr>
-        <tr><td><span class="st info" style="color:var(--info)">Conectado</span></td><td>dev-02</td><td>NOTE-B2</td><td class="num">0</td><td>12/08 10:49 BRT</td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
-        <tr><td><span class="st off">Desconectado</span></td><td>dev-03</td><td>NOTE-C3</td><td class="num">0</td><td>12/08 02:00 BRT</td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
+        <tr><td><span class="st ok">Trabalhando agora</span></td><td>dev-01 <span class="dim">· esta máquina</span></td><td>DESKTOP-A1</td><td class="num">2</td><td>12/08 10:58 BRT</td><td>12/08 10:58 BRT</td><td><span class="st crit">Saturada</span></td><td><button class="btn icon" type="button" disabled aria-label="Remover integrante">×</button></td></tr>
+        <tr><td><span class="st info" style="color:var(--info)">Conectado</span></td><td>dev-02</td><td>NOTE-B2</td><td class="num">0</td><td>12/08 10:49 BRT</td><td>12/08 10:49 BRT</td><td><span class="st warn">Atenção</span></td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
+        <tr><td><span class="st off">Desconectado</span></td><td>dev-03</td><td>NOTE-C3</td><td class="num">0</td><td>12/08 02:00 BRT</td><td class="dim">—</td><td></td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
       </tbody>
     </table></div></div></div>
-    <p class="note" style="margin:0"><b>Duas camadas, não uma escala.</b> <i>Conectado</i> é heartbeat dentro de 90s; <i>trabalhando agora</i> é turno dentro de 5min. Colapsá-las esconderia exatamente o caso que a tela existe para mostrar: quem está com o app aberto e parado. O ponto de estado <b>não pisca</b> — animação infinita numa lista trava o teste de componente. A própria máquina não tem botão de remover.</p>
+    <p class="note" style="margin:0"><b>Duas camadas, não uma escala.</b> <i>Conectado</i> é heartbeat dentro de 90s; <i>trabalhando agora</i> é turno dentro de 5min. Colapsá-las esconderia exatamente o caso que a tela existe para mostrar: quem está com o app aberto e parado. As três combinações que existem — trabalhar implica estar online — cabem numa coluna só, e ela é <b>ponto e palavra</b>. O ponto <b>não pisca</b>: animação infinita numa lista trava o teste de componente. A própria máquina não tem botão de remover.</p>
+    <p class="note" style="margin:var(--s3) 0 0"><b>Um dado por célula, e por isso sete colunas.</b> Os dois carimbos moravam dentro das células de Estado e de Trabalhando, junto da palavra e da contagem — e uma célula com dois dados não tem uma legenda. Cada carimbo é <code>12/08 10:58 BRT</code> por extenso, então as sete colunas somam 802dp e a janela ganha piso de <b>1030 × 460 dp</b>: truncar em <code>12/08 10:58 B…</code> apagaria justamente o fuso que a frase existe para dizer. É a mais larga das três janelas de lista, porque é a única que imprime duas datas por linha. O chip liga uma restrição e o campo estreita por nome — num time de vinte máquinas o chip sozinho não acha ninguém.</p>
   </div>
 </div>
 
 
 <h2 id="presenca-contas">10b · Presença — todas as contas</h2>
-<p class="lede">A mesma tela na visão global do administrador, onde a lista mistura contas. Janela em 940 × 620 dp: abaixo disso as cinco colunas mais a coluna de ação não cabem.</p>
+<p class="lede">A mesma tela na visão global do administrador, onde a lista mistura contas. Janela em 1030 × 620 dp: abaixo disso as sete colunas mais a coluna de ação não cabem.</p>
 <div class="win">
   <div class="titlebar"><span class="t">Conectados agora — todas as contas</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
   <div class="body">
     <div class="hstack wrap">
-      <div class="hstack" style="gap:var(--s4)"><span class="st ok">2 conectados</span><span class="st warn">1 trabalhando</span><span class="st off">3 conhecidos</span></div>
-      <span class="sp"></span>
+      <div class="hstack" style="gap:var(--s4)"><span class="st ok">1 trabalhando</span><span class="st info" style="color:var(--info)">2 conectados</span><span class="st off">3 conhecidos</span></div>
       <button class="btn" type="button">Somente conectados</button>
+      <input class="field" type="text" placeholder="Filtrar integrante" style="max-width:200px">
+    </div>
+    <div class="colhead">
+      <span style="width:132px">Estado</span><span style="width:150px">Integrante</span>
+      <span style="width:104px">Máquina</span><span style="width:96px">Sessões ativas</span>
+      <span style="width:116px">Último sinal</span><span style="width:116px">Último turno</span>
+      <span style="width:88px">Status</span>
     </div>
     <div class="panel"><div class="pbody flush">
       <div class="row" style="background:var(--raised)">
         <span class="srcmark" style="background:var(--cread)"></span>
+        <span style="width:132px"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
-        <div class="stack" style="gap:0;min-width:150px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <span style="width:104px"></span>
+        <span class="v sm dim" style="width:328px">2 de 2 conectados · 1 trabalhando</span>
         <span class="sp"></span>
-        <span class="v sm">2 de 2 conectados</span><span class="v sm">1</span>
         <button class="btn icon danger" type="button" disabled aria-label="Apagar conta">×</button>
       </div>
       <div class="row">
         <span class="srcmark" style="background:var(--cread)"></span>
-        <div class="stack" style="gap:0;min-width:150px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
-        <span class="v sm">DESKTOP-A1</span>
-        <span class="st ok">Conectado</span>
+        <span class="st ok" style="width:132px">Trabalhando agora</span>
+        <div class="stack" style="gap:0;width:150px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
+        <span class="v sm" style="width:104px">DESKTOP-A1</span>
+        <span class="v sm" style="width:96px">2</span>
+        <span class="v sm dim" style="width:116px">12/08 10:58 BRT</span>
+        <span class="v sm dim" style="width:116px">12/08 10:58 BRT</span>
+        <span class="st crit" style="width:88px">Saturada</span>
         <span class="sp"></span>
-        <span class="v sm">2 sessões</span>
         <button class="btn icon danger" type="button" disabled aria-label="Remover integrante">×</button>
       </div>
       <div class="row">
         <span class="srcmark" style="background:var(--info)"></span>
-        <div class="stack" style="gap:0;min-width:150px"><span class="v sm">dev-02</span></div>
-        <span class="v sm">NOTE-B2</span>
-        <span class="st info" style="color:var(--info)">Conectado</span>
+        <span class="st info" style="color:var(--info);width:132px">Conectado</span>
+        <div class="stack" style="gap:0;width:150px"><span class="v sm">dev-02</span></div>
+        <span class="v sm" style="width:104px">NOTE-B2</span>
+        <span class="v sm dim" style="width:96px">0</span>
+        <span class="v sm dim" style="width:116px">12/08 10:49 BRT</span>
+        <span class="v sm dim" style="width:116px">12/08 10:49 BRT</span>
+        <span style="width:88px"></span>
         <span class="sp"></span>
-        <span class="v sm dim">Parado</span>
         <button class="btn icon danger" type="button" aria-label="Remover integrante">×</button>
       </div>
       <div class="row" style="background:var(--raised)">
         <span class="srcmark" style="background:var(--cread)"></span>
+        <span style="width:132px"></span>
         <button class="btn ghost icon" type="button" aria-label="Expandir conta">▸</button>
-        <div class="stack" style="gap:0;min-width:150px"><span class="k">Conta</span><span class="v sm">bruno@example.com</span><span class="k">account-sandbox</span></div>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">bruno@example.com</span><span class="k">account-sandbox</span></div>
+        <span style="width:104px"></span>
+        <span class="v sm dim" style="width:328px">0 de 1 conectados · 0 trabalhando</span>
         <span class="sp"></span>
-        <span class="v sm">0 de 1 conectados</span><span class="v sm">0</span>
         <button class="btn icon danger" type="button" aria-label="Apagar conta">×</button>
       </div>
     </div></div>
   </div>
 </div>
 <p class="note"><b>A faixa da conta é a mesma da lista de consumo</b>: superfície <code>--raised</code>, marcador de 2dp, a palavra "Conta" antes do e-mail e divisória embaixo. Sem ela, conta e integrante eram dois retângulos transparentes de mesmo peso separados por um vão de 8dp — e a faixa entregava um e-mail e um uuid, que é exatamente o que a linha do integrante também tem. Aqui há dois níveis, não três: a presença não abre sessões.</p>
-<p class="note"><b>A coluna de ação fica fora do bloco que quebra.</b> Enquanto o botão destrutivo era o último item do <code>FlowRow</code> das colunas, ele era o primeiro a cair para a linha seguinte quando a janela encolhia — e o que aparecia era um ícone vermelho solto abaixo do e-mail, sem coluna, sem legenda e sem dizer a que linha pertence. Ele é coluna fixa à direita, e a janela tem largura mínima para as colunas nunca chegarem lá.</p>
+<p class="note"><b>Os agregados da conta são uma célula só, atravessando as três colunas que a conta não tem.</b> Com a faixa reservando as mesmas colunas da linha, nenhuma delas tem por valor "1 trabalhando" — e um número cru sob a legenda "Último turno" diria uma coisa e valeria outra. A frase se descreve, então pode atravessar; o número não pode.</p>
+<p class="note"><b>A coluna de ação fica fora do bloco que quebra.</b> Enquanto o botão destrutivo era o último item do bloco de colunas, ele era o primeiro a cair para a linha seguinte quando a janela encolhia — e o que aparecia era um ícone vermelho solto abaixo do e-mail, sem coluna, sem legenda e sem dizer a que linha pertence. Ele é coluna fixa à direita, e a janela tem largura mínima para as colunas nunca chegarem lá.</p>
 
 <!-- ═══════════════════════════════ CHAVES ════════════════════════════ -->
 <h2 id="chaves">11 · Administração de chaves</h2>
@@ -1461,17 +1532,29 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     apply(root.getAttribute('data-app-theme') === 'dark' ? 'light' : 'dark');
   });
 
-  // Grade de atividade: intensidade determinística, sem Math.random.
+  // Grade de atividade 7 x 24: dia da semana por hora local, intensidade
+  // determinística e sem Math.random. Sete linhas e não uma: agrupar só por hora
+  // perderia a diferença entre a terça de manhã e o sábado de manhã.
   var heat = document.getElementById('heat');
+  var days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
   var pattern = [0,0,0,0,0,0,0,2,6,14,22,31,26,12,34,41,38,29,18,9,4,2,1,0];
+  // Peso do dia: a semana concentra, o fim de semana quase some.
+  var weight = [1, 0.9, 1, 0.85, 0.7, 0.15, 0.1];
   var peak = Math.max.apply(null, pattern);
-  pattern.forEach(function (v) {
-    var i = document.createElement('i');
-    if (v > 0) {
-      i.style.background = 'color-mix(in srgb, var(--info) ' + Math.round((v / peak) * 100) + '%, var(--raised))';
-    }
-    i.title = v + ' turnos';
-    heat.appendChild(i);
+  days.forEach(function (day, row) {
+    var label = document.createElement('span');
+    label.className = 'k';
+    label.textContent = day;
+    heat.appendChild(label);
+    pattern.forEach(function (v, hour) {
+      var value = Math.round(v * weight[row]);
+      var i = document.createElement('i');
+      if (value > 0) {
+        i.style.background = 'color-mix(in srgb, var(--info) ' + Math.round((value / peak) * 100) + '%, var(--raised))';
+      }
+      i.title = day + ' ' + hour + 'h · ' + value + ' turnos';
+      heat.appendChild(i);
+    });
   });
 })();
 </script>

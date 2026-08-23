@@ -8,6 +8,9 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
@@ -16,7 +19,10 @@ import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamMemberPresence
+import com.usagemonitor.domain.entity.TeamMemberTrend
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamTrendPoint
+import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageForecast
@@ -29,7 +35,10 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 
 /**
  * Dados sintéticos das capturas do README.
@@ -363,6 +372,93 @@ internal object ScreenshotFixtures {
         saturatedSession,
         attentionSession,
         healthySession
+    )
+
+    /**
+     * Tendência de sete dias para três integrantes.
+     *
+     * Sete e não trinta: é o recorte que cabe na captura sem rolagem horizontal,
+     * e é o mesmo que o protótipo desenha. O gráfico com trinta dias continua
+     * coberto pelo piso de largura de barra, que é código e não captura.
+     */
+    val teamTrend: TeamUsageTrend = run {
+        val days = (0..6).map { offset ->
+            LocalDate(2026, 8, 6).plus(offset, DateTimeUnit.DAY)
+        }
+        // Micros por dia, por integrante: o primeiro domina, o segundo acompanha
+        // e o terceiro quase não aparece — é o caso que a escala única existe
+        // para mostrar.
+        val series = listOf(
+            Triple("device-a1", "dev-01", listOf(4_800L, 7_400L, 3_200L, 9_000L, 6_200L, 10_200L, 6_800L)),
+            Triple("device-b2", "dev-02", listOf(1_600L, 2_800L, 5_400L, 4_000L, 2_200L, 4_600L, 3_400L)),
+            Triple("device-c3", "dev-03", listOf(200L, 200L, 800L, 200L, 1_400L, 200L, 600L))
+        )
+        TeamUsageTrend(
+            days = days,
+            members = series.map { (deviceId, alias, costs) ->
+                TeamMemberTrend(
+                    deviceId = deviceId,
+                    alias = alias,
+                    points = days.mapIndexed { index, date ->
+                        TeamTrendPoint(
+                            date = date,
+                            costMicros = costs[index] * 1_000L,
+                            totalTokens = costs[index] * 400L,
+                            turnCount = (costs[index] / 200L).toInt()
+                        )
+                    }
+                )
+            }
+        )
+    }
+
+    /**
+     * Resumo por eixo com um balde por projeto e hora medida.
+     *
+     * Sai do mesmo dobrador que a tela usa (`toUsageBreakdown`), e não de baldes
+     * escritos à mão: uma captura montada com números inventados não prova que a
+     * fatia, o total e a ordem batem.
+     */
+    val cliBreakdown: CliUsageBreakdown = listOf(
+        CliUsageGroupRow(
+            sessionId = "7c4a1f92",
+            cwd = "/workspace/api-gateway",
+            gitBranch = "feat/checkout",
+            model = "claude-opus-5",
+            turnCount = 57,
+            inputTokens = 31_400L,
+            outputTokens = 62_800L,
+            cacheReadTokens = 4_120_000L,
+            cacheWrite5mTokens = 186_000L
+        ),
+        CliUsageGroupRow(
+            sessionId = "b81e35c0",
+            cwd = "/workspace/checkout-web",
+            gitBranch = "main",
+            model = "claude-opus-5",
+            turnCount = 26,
+            inputTokens = 12_100L,
+            outputTokens = 24_500L,
+            cacheReadTokens = 1_780_000L,
+            cacheWrite5mTokens = 94_000L
+        ),
+        CliUsageGroupRow(
+            sessionId = "3ac09d41",
+            cwd = "/workspace/usage-monitor",
+            gitBranch = "fix/visual",
+            model = "claude-sonnet-5",
+            turnCount = 18,
+            inputTokens = 8_400L,
+            outputTokens = 15_200L,
+            cacheReadTokens = 960_000L,
+            cacheWrite5mTokens = 52_000L
+        )
+    ).toUsageBreakdown(
+        activeTimes = mapOf(
+            "7c4a1f92" to 2 * 3_600_000L + 52 * 60_000L,
+            "b81e35c0" to 3_600_000L + 5 * 60_000L,
+            "3ac09d41" to 41 * 60_000L
+        )
     )
 
     /**

@@ -20,6 +20,17 @@ private const val DEFAULT_TEAM_USAGE_WINDOW_WIDTH_DP = 960
 private const val DEFAULT_TEAM_USAGE_WINDOW_HEIGHT_DP = 780
 
 /**
+ * Piso da janela, aplicado em `Main.kt` via `minimumSize` da janela AWT.
+ *
+ * Mesma razão da janela de Sessões CLI e da de presença: a lista ganhou faixa de
+ * legendas de coluna, e faixa sobre linha que quebra promete um alinhamento que o
+ * conteúdo não cumpre. As sete colunas de `TeamUsageScreen.TEAM_COLUMN_*` somam
+ * 740dp e o cromo em volta come o resto dos 960.
+ */
+internal const val TEAM_USAGE_MIN_WINDOW_WIDTH_DP = 960
+internal const val TEAM_USAGE_MIN_WINDOW_HEIGHT_DP = 460
+
+/**
  * Geometria da janela de Sessões do time.
  *
  * Chaves próprias, e não compartilhadas com a janela de sessões da máquina: as

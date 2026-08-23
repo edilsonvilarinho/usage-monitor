@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -33,6 +34,9 @@ import com.usagemonitor.presentation.ui.PRESENCE_LOCAL_BADGE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_ONLY_ONLINE_TAG
 import com.usagemonitor.presentation.ui.PRESENCE_REMOVE_CONFIRM_TAG
+import com.usagemonitor.TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP
+import com.usagemonitor.presentation.ui.PRESENCE_FILTER_TAG
+import com.usagemonitor.presentation.ui.PRESENCE_LAST_SEEN_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_STATE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_WORKING_TAG_PREFIX
@@ -122,8 +126,12 @@ class TeamPresenceScreenTest {
             )
         )
 
+        // O carimbo saiu da célula de estado e virou coluna própria; sem sinal
+        // nenhum ela mostra o travessão. O estado continua dizendo a palavra.
         onNodeWithTag("$PRESENCE_STATE_TAG_PREFIX" + "device-1")
-            .assertTextContains("nunca reportou")
+            .assertTextContains("Desconectado")
+        onNodeWithTag("$PRESENCE_LAST_SEEN_TAG_PREFIX" + "device-1")
+            .assertTextContains("—")
     }
 
     @Test
@@ -137,10 +145,15 @@ class TeamPresenceScreenTest {
             )
         )
 
+        // A coluna passou a ser "Sessões ativas" e carrega só o número: a palavra
+        // "Parado" que existia ali virou o estado da coluna Estado, e a contagem
+        // deixou de repetir a legenda em cada linha (issue #81).
         onNodeWithTag("$PRESENCE_WORKING_TAG_PREFIX" + "device-working")
-            .assertTextContains("2 sessões")
+            .assertTextContains("2")
         onNodeWithTag("$PRESENCE_WORKING_TAG_PREFIX" + "device-idle")
-            .assertTextContains("Parado")
+            .assertTextContains("0")
+        onNodeWithTag("$PRESENCE_STATE_TAG_PREFIX" + "device-working")
+            .assertTextContains("Trabalhando agora")
     }
 
     @Test
@@ -276,6 +289,57 @@ class TeamPresenceScreenTest {
     }
 
     @Test
+    fun `o filtro de texto estreita a lista por apelido e por maquina`() = runDesktopComposeUiTest {
+        var typed: String? = null
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", alias = "edilson"),
+                    entry(deviceId = "device-2", alias = "maria")
+                )
+            ),
+            onQueryChange = { value -> typed = value }
+        )
+
+        onNodeWithTag(PRESENCE_FILTER_TAG).performTextInput("mar")
+
+        assertEquals("mar", typed)
+    }
+
+    @Test
+    fun `o filtro aplicado esconde quem nao casa`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(
+                    entry(deviceId = "device-1", alias = "edilson"),
+                    entry(deviceId = "device-2", alias = "maria")
+                ),
+                // O texto casa contra a máquina também: quem digita "desktop"
+                // está atrás dela, e filtrar só pelo apelido não acharia nada —
+                // nenhum dos dois apelidos contém a palavra.
+                query = "desktop"
+            )
+        )
+
+        onNodeWithTag("$PRESENCE_ROW_TAG_PREFIX" + "device-1").assertIsDisplayed()
+        onNodeWithTag("$PRESENCE_ROW_TAG_PREFIX" + "device-2").assertIsDisplayed()
+    }
+
+    @Test
+    fun `filtro sem resultado explica o texto digitado`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamPresenceUiState.Success(
+                entries = listOf(entry(deviceId = "device-1", alias = "edilson")),
+                query = "zzz"
+            )
+        )
+
+        // Mensagem diferente da do chip "somente conectados": "desligue o filtro
+        // para ver o time inteiro" não ajuda quem digitou um nome que não existe.
+        onNodeWithText("Ninguém com \"zzz\" no apelido ou na máquina.").assertIsDisplayed()
+    }
+
+    @Test
     fun `a faixa da conta mostra quantos dela estao conectados`() = runDesktopComposeUiTest {
         renderSuccess(
             TeamPresenceUiState.Success(
@@ -294,7 +358,7 @@ class TeamPresenceScreenTest {
         )
 
         onNodeWithTag("${PRESENCE_ACCOUNT_GROUP_TAG_PREFIX}acc-a")
-            .assertTextContains("1 de 2 conectados")
+            .assertTextContains("1 de 2 conectados", substring = true)
     }
 
     @Test
@@ -543,9 +607,10 @@ class TeamPresenceScreenTest {
         canManage: Boolean = false,
         actionError: String? = null,
         /** A quebra de coluna só se mede na largura em que a janela real para. */
-        widthDp: Int = 900,
+        widthDp: Int = TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP,
         onToggleAccount: (String) -> Unit = {},
         onSetOnlyOnline: (Boolean) -> Unit = {},
+        onQueryChange: (String) -> Unit = {},
         onRemoveMember: (String) -> Unit = {},
         onDeleteAccount: (String) -> Unit = {}
     ) {
@@ -560,6 +625,7 @@ class TeamPresenceScreenTest {
                         actionError = actionError,
                         onToggleAccount = onToggleAccount,
                         onSetOnlyOnline = onSetOnlyOnline,
+                        onQueryChange = onQueryChange,
                         onRemoveMember = onRemoveMember,
                         onDeleteAccount = onDeleteAccount
                     )

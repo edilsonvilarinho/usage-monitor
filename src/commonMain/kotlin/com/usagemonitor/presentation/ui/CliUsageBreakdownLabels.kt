@@ -64,6 +64,56 @@ internal object BreakdownLabels {
         }
     }
 
+    /**
+     * Nome da primeira coluna da tabela, que é o eixo.
+     *
+     * Singular como a aba, e não o "Por projeto" do plural: a legenda nomeia o
+     * conteúdo da célula, não o recorte.
+     */
+    fun columnAxis(axis: BreakdownAxis, language: AppLanguage): String {
+        val portuguese = language == AppLanguage.PT
+        return when (axis) {
+            BreakdownAxis.MEMBER -> if (portuguese) "Integrante" else "Member"
+            BreakdownAxis.PROJECT -> if (portuguese) "Projeto" else "Project"
+            BreakdownAxis.MODEL -> if (portuguese) "Modelo" else "Model"
+            BreakdownAxis.BRANCH -> if (portuguese) "Branch" else "Branch"
+            BreakdownAxis.TOOL -> if (portuguese) "Ferramenta" else "Tool"
+            BreakdownAxis.ACTIVITY -> if (portuguese) "Hora" else "Hour"
+        }
+    }
+
+    fun columnTurns(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Turnos" else "Turns"
+    }
+
+    fun columnCalls(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Chamadas" else "Calls"
+    }
+
+    /** Rótulo do bloco de métrica; o valor sai de [bucketCost]. */
+    fun estimatedCostLabel(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Custo estimado" else "Estimated cost"
+    }
+
+    fun cacheSavingsLabel(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Economia do cache" else "Cache savings"
+    }
+
+    /**
+     * Rodapé curto do bloco de ritmo.
+     *
+     * A frase inteira — quantas horas decorreram — é [burnRateElapsed] e fica
+     * **fora** do bloco: dentro dele, um rodapé de uma linha longa mede três
+     * vezes a largura do bloco vizinho e a fileira perde o alinhamento.
+     */
+    fun burnRateFooter(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "medido sobre o tempo decorrido"
+        } else {
+            "measured over elapsed time"
+        }
+    }
+
     /** Texto que a linha sem rótulo mostra, por eixo. */
     fun unknownLabel(axis: BreakdownAxis, language: AppLanguage): String {
         return when (axis) {
@@ -333,18 +383,25 @@ internal object BreakdownLabels {
     }
 
     /**
-     * Ritmo em dinheiro e tokens por hora.
+     * Ritmo em dinheiro por hora — o valor do bloco de métrica.
      *
      * Diferente do consumo médio do histórico, que mede **percentual de quota**
      * sobre snapshots. As duas convivem e o rótulo precisa separá-las.
+     *
+     * Os tokens por hora saem em [burnRateTokensPerHour], numa linha própria: os
+     * dois juntos não cabem num bloco de largura fixa sem truncar, e truncado o
+     * valor deixa de ser conferível.
      */
-    fun burnRateValue(costMicrosPerHour: Long, tokensPerHour: Double, language: AppLanguage): String {
-        val cost = formatMicrosUsdShort(costMicrosPerHour)
+    fun burnRateCostPerHour(costMicrosPerHour: Long): String {
+        return "${formatMicrosUsdShort(costMicrosPerHour)}/h"
+    }
+
+    fun burnRateTokensPerHour(tokensPerHour: Double, language: AppLanguage): String {
         val tokens = formatQuantity(tokensPerHour.toLong())
         return if (language == AppLanguage.PT) {
-            "$cost/h · $tokens tokens/h"
+            "$tokens tokens por hora."
         } else {
-            "$cost/h · $tokens tokens/h"
+            "$tokens tokens per hour."
         }
     }
 

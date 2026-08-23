@@ -59,25 +59,48 @@ internal object TeamPresenceLabels {
         return if (language == AppLanguage.PT) "Estado" else "State"
     }
 
-    fun columnWorking(language: AppLanguage): String {
+    /**
+     * O terceiro estado da coluna Estado.
+     *
+     * Era a legenda de uma coluna própria — "Trabalhando agora" — que carregava a
+     * contagem de sessões e o carimbo do último turno. As duas viraram colunas, e
+     * a palavra virou o valor que o estado assume quando há turno nos últimos
+     * cinco minutos.
+     */
+    fun workingNow(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Trabalhando agora" else "Working now"
     }
 
-    /** Valor da coluna "trabalhando agora" para quem não tem sessão ativa. */
-    fun idle(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Parado" else "Idle"
+    fun columnActiveSessions(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Sessões ativas" else "Active sessions"
     }
 
-    fun activeSessions(count: Int, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
-            if (count == 1) "1 sessão" else "$count sessões"
-        } else {
-            if (count == 1) "1 session" else "$count sessions"
-        }
+    fun columnLastSeen(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Último sinal" else "Last signal"
     }
+
+    fun columnLastTurn(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Último turno" else "Last turn"
+    }
+
+    /** Célula sem carimbo: a máquina nunca reportou nada. */
+    fun neverSeen(language: AppLanguage): String = "—"
 
     fun onlyOnline(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Somente conectados" else "Connected only"
+    }
+
+    fun filterPlaceholder(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Filtrar integrante" else "Filter member"
+    }
+
+    /** Nenhuma linha sobreviveu ao texto digitado, e o time não está vazio. */
+    fun emptyQuery(query: String, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "Ninguém com \"$query\" no apelido ou na máquina."
+        } else {
+            "Nobody matching \"$query\" in alias or machine."
+        }
     }
 
     fun thisMachine(language: AppLanguage): String {
@@ -142,6 +165,23 @@ internal object TeamPresenceLabels {
         } else {
             "$online of $total connected"
         }
+    }
+
+    /**
+     * Os dois agregados da conta numa frase só, para a faixa da visão global.
+     *
+     * Juntos e não em células separadas porque a faixa reserva as mesmas colunas
+     * da linha, e nenhuma delas tem por valor "1 trabalhando": um número cru sob
+     * a legenda "Último turno" diria uma coisa e valeria outra. A frase se
+     * descreve e por isso pode atravessar as três colunas que a conta não tem.
+     */
+    fun accountBandSummary(
+        online: Int,
+        total: Int,
+        working: Int,
+        language: AppLanguage
+    ): String {
+        return "${groupSummary(online, total, language)} · ${workingSummary(working, language)}"
     }
 
     fun empty(language: AppLanguage): String {

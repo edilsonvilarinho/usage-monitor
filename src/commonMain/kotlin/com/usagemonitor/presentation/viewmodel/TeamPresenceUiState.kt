@@ -37,6 +37,15 @@ sealed interface TeamPresenceUiState {
          */
         val onlyOnline: Boolean = false,
         /**
+         * Texto do campo "Filtrar integrante".
+         *
+         * Mora aqui, ao lado de [onlyOnline], e não num `remember` da tela: os
+         * dois respondem à mesma pergunta — o que a lista mostra — e dois donos
+         * dariam duas respostas para [isFilteredEmpty]. Como [onlyOnline], é
+         * preservado nas emissões do laço de 5s.
+         */
+        val query: String = "",
+        /**
          * Contas com os integrantes à mostra, por [TeamPresenceAccountGroup.groupKey].
          *
          * Mesmo tratamento de [onlyOnline], e vazio por padrão: a visão global
@@ -71,9 +80,25 @@ sealed interface TeamPresenceUiState {
         val isEmpty: Boolean
             get() = entries.isEmpty()
 
-        /** Entradas depois do filtro; é o que a lista percorre. */
+        /**
+         * Entradas depois dos dois filtros; é o que a lista percorre.
+         *
+         * O texto casa por trecho, sem diferenciar maiúsculas, contra apelido
+         * **e** nome de máquina: quem procura "note" está atrás da máquina, e
+         * filtrar só pelo apelido esconderia a linha que a tela mostra ao lado.
+         */
         val visibleEntries: List<TeamMemberPresence>
-            get() = if (onlyOnline) entries.filter { entry -> entry.isOnline } else entries
+            get() {
+                val trimmed = query.trim()
+                return entries.filter { entry ->
+                    (!onlyOnline || entry.isOnline) &&
+                        (
+                            trimmed.isEmpty() ||
+                                entry.alias.contains(trimmed, ignoreCase = true) ||
+                                entry.machineLabel.contains(trimmed, ignoreCase = true)
+                            )
+                }
+            }
 
         /** `true` quando o filtro escondeu tudo — estado vazio diferente de lista vazia. */
         val isFilteredEmpty: Boolean

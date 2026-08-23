@@ -287,6 +287,17 @@ internal object CliSessionsLabels {
 
     fun columnCache(language: AppLanguage): String = "Cache"
 
+    /**
+     * Nome da coluna da fatia.
+     *
+     * Não é o `TeamUsageLabels.columnShare`, que é "do time": aquele é o rótulo
+     * de uma célula que já traz o número junto ("15% do time"), e como legenda de
+     * coluna ele diria a preposição sem o substantivo.
+     */
+    fun columnShare(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Participação" else "Share"
+    }
+
     fun columnCost(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Custo" else "Cost"
     }
