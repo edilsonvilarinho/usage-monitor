@@ -26,13 +26,10 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,7 +54,6 @@ import com.usagemonitor.presentation.ui.components.AppBorderWidth
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
-import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppMetricBlock
@@ -78,7 +74,6 @@ import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.components.TurnSeries
 import com.usagemonitor.presentation.ui.components.TurnSeriesChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.darkAppAccents
@@ -756,9 +751,11 @@ private fun CliSessionDetailPane(
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onCloseDetail) {
-                Text(CliSessionsLabels.back(language))
-            }
+            AppButton(
+                label = CliSessionsLabels.back(language),
+                onClick = onCloseDetail,
+                tone = AppButtonTone.GHOST
+            )
             Text(
                 text = shortSessionId(detail.sessionId),
                 style = MaterialTheme.typography.titleMedium,

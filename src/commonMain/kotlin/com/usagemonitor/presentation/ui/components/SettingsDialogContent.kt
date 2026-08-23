@@ -1,6 +1,5 @@
 package com.usagemonitor.presentation.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -8,44 +7,32 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SliderState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,8 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
@@ -73,7 +58,6 @@ import com.usagemonitor.domain.entity.MIN_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.domain.entity.UI_SCALE_STEP_PERCENT
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
-import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
@@ -595,16 +579,10 @@ private val SETTINGS_NAV_WIDTH = 150.dp
 private fun SettingsSectionCard(
     content: @Composable () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.card)
-    ) {
-        Box(modifier = Modifier.padding(16.dp)) {
-            content()
-        }
+    // Superfície de dados do sistema: o `Card` do Material repetia à mão a
+    // borda, a forma e a elevação zero que ela já traz.
+    AppDataSurface(contentPadding = AppSpacing.lg) {
+        content()
     }
 }
 
@@ -670,10 +648,15 @@ private fun AnthropicProfileRow(
                     checked = profile.enabled,
                     onCheckedChange = { checked -> onToggle(profile.id, checked) }
                 )
-                IconButton(onClick = onToggleExpanded) {
+                AppIconButton(
+                    contentDescription = if (expanded) collapseLabel else editLabel,
+                    onClick = onToggleExpanded
+                ) {
                     Icon(
                         imageVector = if (expanded) Icons.Rounded.Close else Icons.Rounded.Edit,
-                        contentDescription = if (expanded) collapseLabel else editLabel
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -948,39 +931,6 @@ fun UiScaleSlider(
 internal fun snapUiScalePercent(value: Float): Int {
     val steps = (value / UI_SCALE_STEP_PERCENT).roundToInt()
     return (steps * UI_SCALE_STEP_PERCENT).coerceIn(MIN_UI_SCALE_PERCENT, MAX_UI_SCALE_PERCENT)
-}
-
-@Composable
-fun RefreshControl(
-    secondsUntilRefresh: Int,
-    language: AppLanguage,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val countdownText = if (language == AppLanguage.PT) {
-        "Próxima atualização: ${formatRefreshCountdown(secondsUntilRefresh)}"
-    } else {
-        "Next update: ${formatRefreshCountdown(secondsUntilRefresh)}"
-    }
-
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
-        Text(
-            text = countdownText,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Start,
-            modifier = Modifier
-                .widthIn(max = 140.dp)
-                .padding(end = 4.dp)
-        )
-        IconButton(onClick = onRefresh) {
-            Text(
-                text = "↻",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
 }
 
 @Composable

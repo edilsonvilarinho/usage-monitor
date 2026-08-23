@@ -2,7 +2,6 @@ package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -10,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,19 +16,14 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,8 +44,6 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.AppLanguage
@@ -60,10 +51,8 @@ import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageAccountContext
-import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.requiresUsageAccount
 import com.usagemonitor.presentation.ui.components.AppButton

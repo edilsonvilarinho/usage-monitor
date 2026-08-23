@@ -4,11 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -48,9 +45,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
@@ -67,12 +62,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -82,13 +74,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
-import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
@@ -97,7 +85,6 @@ import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountContext
-import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isExtraCreditsQuota

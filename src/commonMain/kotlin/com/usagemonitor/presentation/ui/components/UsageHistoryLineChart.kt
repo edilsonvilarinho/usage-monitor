@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -197,15 +196,12 @@ internal fun UsageHistoryLineChart(
                 .onSizeChanged { frameSize = it }
         ) {
             if (zoomRange != 0f..1f) {
-                TextButton(
+                AppButton(
+                    label = if (language == AppLanguage.PT) "Ver tudo" else "View all",
                     onClick = { zoomRange = 0f..1f },
+                    tone = AppButtonTone.GHOST,
                     modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    Text(
-                        text = if (language == AppLanguage.PT) "Ver tudo" else "View all",
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
+                )
             }
 
             if (valueLabels.isNotEmpty()) {

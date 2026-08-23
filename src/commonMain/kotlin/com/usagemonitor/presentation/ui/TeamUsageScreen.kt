@@ -28,13 +28,10 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,8 +69,6 @@ import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
@@ -299,15 +294,12 @@ private fun RemoveMemberConfirmation(
         title = { Text(TeamUsageLabels.removeMemberTitle(language)) },
         text = { Text(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
         confirmButton = {
-            TextButton(
+            AppButton(
+                label = TeamUsageLabels.confirmRemoval(language),
                 onClick = onConfirm,
+                tone = AppButtonTone.DANGER,
                 modifier = Modifier.testTag(TEAM_REMOVE_CONFIRM_TAG)
-            ) {
-                Text(
-                    text = TeamUsageLabels.confirmRemoval(language),
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
+            )
         },
         dismissButton = {
             AppButton(
@@ -339,15 +331,12 @@ private fun RemoveSessionConfirmation(
             )
         },
         confirmButton = {
-            TextButton(
+            AppButton(
+                label = TeamUsageLabels.confirmSessionRemoval(language),
                 onClick = onConfirm,
+                tone = AppButtonTone.DANGER,
                 modifier = Modifier.testTag(TEAM_SESSION_REMOVE_CONFIRM_TAG)
-            ) {
-                Text(
-                    text = TeamUsageLabels.confirmSessionRemoval(language),
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
+            )
         },
         dismissButton = {
             AppButton(

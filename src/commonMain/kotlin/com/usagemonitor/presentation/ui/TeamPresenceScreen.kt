@@ -27,12 +27,9 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -250,9 +247,12 @@ private fun ConfirmationDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm, modifier = Modifier.testTag(confirmTag)) {
-                Text(text = confirmLabel, color = MaterialTheme.colorScheme.error)
-            }
+            AppButton(
+                label = confirmLabel,
+                onClick = onConfirm,
+                tone = AppButtonTone.DANGER,
+                modifier = Modifier.testTag(confirmTag)
+            )
         },
         dismissButton = {
             AppButton(

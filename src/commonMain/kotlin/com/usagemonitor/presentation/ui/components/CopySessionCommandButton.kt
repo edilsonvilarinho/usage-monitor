@@ -1,15 +1,11 @@
 package com.usagemonitor.presentation.ui.components
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +17,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.usagemonitor.domain.entity.AppLanguage
@@ -79,18 +74,16 @@ internal fun CopySessionCommandButton(
     }
 
     if (showLabel) {
-        TextButton(
+        // Botão do sistema, com o ícone no slot de `leading`: o `TextButton` do
+        // Material trazia altura, raio e cor próprios, e este fica ao lado de
+        // botões que já são retângulo de raio 6.
+        AppButton(
+            label = label,
             onClick = onClick,
+            tone = AppButtonTone.GHOST,
+            leading = { CopyStateIcon(copied = copied) },
             modifier = modifier.semantics { contentDescription = label }
-        ) {
-            CopyStateIcon(copied = copied)
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 6.dp)
-            )
-        }
+        )
         return
     }
 

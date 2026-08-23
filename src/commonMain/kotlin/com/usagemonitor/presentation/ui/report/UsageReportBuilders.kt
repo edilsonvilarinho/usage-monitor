@@ -5,7 +5,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliToolUsage
-import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.presentation.ui.BreakdownAxis
 import com.usagemonitor.presentation.ui.BreakdownLabels

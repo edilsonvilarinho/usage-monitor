@@ -12,17 +12,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -33,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,8 +47,6 @@ import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.domain.entity.displayName
-import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppErrorState
@@ -63,7 +57,6 @@ import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
-import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.presentation.viewmodel.UiState
