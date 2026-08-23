@@ -66,6 +66,7 @@ import com.usagemonitor.presentation.ui.components.AppSourceMarker
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
@@ -367,9 +368,36 @@ private fun TeamUsageList(
 ) {
     val view = state.effectiveView
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    // Aviso de recarga a esquerda e carimbo da ultima alteracao a direita, fora
+    // da area que rola. Os dois eram linhas no topo: o aviso aparece e some a
+    // cada troca de janela e deslocava a lista inteira, e o carimbo muda a cada
+    // tique do laco de 5s ao lado do rotulo da conta.
+    AppWindowScaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = AppSpacing.lg,
+        spacing = AppSpacing.md,
+        statusBar = {
+            if (state.isRefreshing) {
+                Text(
+                    text = BreakdownLabels.refreshing(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(REFRESHING_NOTICE_TAG)
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = TeamUsageLabels.lastChange(
+                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
+                    language = language
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     ) {
         TeamUsageHeader(
             state = state,
@@ -392,17 +420,6 @@ private fun TeamUsageList(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().testTag(TEAM_SLIDING_WINDOW_NOTICE_TAG)
-            )
-        }
-
-        // Acima do despacho de aba: vale para as três, porque a troca de janela
-        // deixa desatualizado tudo o que elas mostram.
-        if (state.isRefreshing) {
-            Text(
-                text = BreakdownLabels.refreshing(language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().testTag(REFRESHING_NOTICE_TAG)
             )
         }
 
@@ -453,7 +470,7 @@ private fun TeamUsageList(
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 TeamTrendPane(trend = state.trend, language = language)
             }
-            return@Column
+            return@AppWindowScaffold
         }
 
         if (view == TeamUsageView.BREAKDOWN) {
@@ -467,14 +484,14 @@ private fun TeamUsageList(
                     hint = TeamUsageLabels.breakdownHint(language)
                 )
             }
-            return@Column
+            return@AppWindowScaffold
         }
 
         if (state.isEmpty) {
             CenteredMessage(
                 TeamUsageLabels.emptyInRange(state.range, state.rangeAnchored, language)
             )
-            return@Column
+            return@AppWindowScaffold
         }
 
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -880,15 +897,9 @@ private fun TeamUsageHeader(
                     modifier = Modifier.testTag(TEAM_ADMIN_OVERVIEW_TAG)
                 )
             }
+            // O carimbo da última alteração desceu para a barra de estado; aqui
+            // fica só o selo de leitura ao vivo, que é estado do laço e não dado.
             LiveBadge(language = language)
-            Text(
-                text = TeamUsageLabels.lastChange(
-                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
-                    language = language
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
         Spacer(modifier = Modifier.height(6.dp))
 
