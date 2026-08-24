@@ -436,7 +436,7 @@ hash. `git log --grep` recupera o commit pelo assunto.
 | A06 | 2026-08-24 | `fix(installer): stop asking about a stale previous install` | Fim do `MessageBox` e guarda da chave órfã | concluída | O `MessageBox` do `.onInit` saiu. O ramo passa a ler `InstallLocation` da própria chave — julgar pelo conteúdo de `$INSTDIR` daria a resposta errada para chave que aponta para outra pasta — e decide por `${FileExists} "$6\Uninstall.exe"`: presente, roda o desinstalador e limpa; ausente, **só apaga a chave**, sem `ExecWait` num arquivo inexistente e sem apagar árvore que não é dele. **Prova em execução (é o S8 antecipado):** chave órfã apontando para um `Uninstall.exe` inexistente + árvore estranha com 2 arquivos → setup exit **0 em 0,5 s** (terminou, logo não ficou preso em diálogo), **uma** entrada em ARP atualizada para 2.0.0, `Uninstall.exe` agora presente, payload novo no lugar e **o jar da versão anterior não sobreviveu** — a segunda guarda da A05 limpou antes da cópia. `makensis` exit 0. Comentário 1 do cabeçalho do `.nsi` atualizado: resta um só `MessageBox`, no caminho de falha de `RemoveForeignInstall`. **Achado não previsto (R13)**, que apareceu ao conferir o tamanho do instalador de produção |
 | A06b | 2026-08-24 | `fix(packaging): clear the installer payload before staging it` | `prepareInstallerFiles` limpa o destino antes de copiar | concluída | **Atividade não prevista, descoberta ao conferir o tamanho do instalador de produção** (R13). `Copy` do Gradle é aditivo e nunca remove do destino o que sumiu da origem; como o jpackage nomeia jar com versão + hash, todo build local com dependência alterada deixava o jar antigo em `build/installer/files`, e ele **entrava no instalador**. Antes: payload com 223 arquivos / 200.679.009 bytes contra 221 / 196.214.286 do distributable, e `Setup.exe` de 126.532.759 bytes. Depois do `doFirst { delete(installerFilesDir) }`: payload **idêntico** ao distributable (221 / 196.214.286 nos dois) e `Setup.exe` de **122.309.054 bytes**, na faixa das medidas da A15/A16 da #75 (122.307.638 e 122.309.088) |
 | A07 | 2026-08-24 | `test(installer): cover the msi takeover scenarios` | Cenários S7 e S8 + WiX no CI | concluída | **Correção de segurança que faltava:** o `Build-Installer` não passava `MSI_UPGRADE_CODE`, então os cenários compilariam com o UpgradeCode de **produção** e a primeira instalação do roteiro desinstalaria o Usage Monitor real de quem roda a suíte. Agora são **cinco** `/D` sobrescritos. Pela mesma razão, o `taskkill` da A05 passou a derivar o nome da imagem de `PRODUCT_NAME` — era o único comando da função com alcance fora do diretório de instalação. `ScenarioMsi.wxs` novo: produto per-user mínimo, UpgradeCode próprio, destino escolhido por `INSTALLFOLDER` na linha de comando. **S6 reprovou e era regressão real da A06** — ver *Desvios*. Resultado final: `powershell -File src/installer/test/Invoke-UpdateScenarios.ps1`: **47 verificações, 0 falhas, exit 0** nos oito cenários. Isolamento conferido depois: nenhuma chave `UM *`, nenhum UpgradeCode de cenário e o de produção intocado. `yaml.safe_load` nos dois workflows; `gradlew.bat packageInstaller` em 122.309.065 bytes |
-| A08 | — | — | Verificação final e leitura de auditoria | pendente | — |
+| A08 | 2026-08-24 | `docs(plan): close the single installer execution` | Verificação final e leitura de auditoria | concluída | **`gradlew.bat allTests` devolveu `BUILD SUCCESSFUL in 2s` sem executar nada** — o mesmo cache que a A00 da #75 registrou; refeito com `desktopTest --rerun`: **114 classes / 1222 testes / 0 falhas / 0 erros / 0 pulados**. `gradlew.bat tasks --all` sem nenhuma task com "msi". `gradlew.bat packageInstaller` em 122.309.065 bytes. Roteiro de cenários: **47 verificações, 0 falhas, exit 0** nos oito. `yaml.safe_load` nos dois workflows. Por leitura: o job `build-windows` copia **um** arquivo para `dist-build`, e o `files: dist-build/*` com `fail_on_unmatched_files: true` continua satisfeito. Seção *Desvios* fechada com 3 medições que contradisseram premissas, 3 defeitos achados ao rodar, 2 acidentes de isolamento evitados, 3 ajustes de estrutura e 4 itens por verificar |
 
 ---
 
@@ -468,6 +468,67 @@ a auditoria final da A08.
 
 ## Desvios do plano e achados da execução
 
-Preenchida na A08, no molde da seção equivalente da #75: o que a execução descobriu e o plano não
-previa, com as medições que contradisseram premissas, os defeitos que só apareceram ao rodar, os
-ajustes de estrutura e o que ficou por verificar.
+### Três medições que contradisseram premissas da issue
+
+1. **O Restart Manager não fecha o app sob `msiexec /x /qn`.** A issue tratava `3010` como código
+   aceitável, ao lado de `0` e `1605`. Medido: com o app rodando, `3010`, os dois processos vivos e
+   **69 arquivos** mantidos na pasta — exatamente o estado que a cópia de arquivos não pode
+   encontrar. `3010` passou a ser falha, e a A05 fecha o app antes.
+2. **`taskkill` gracioso não fecha o app.** Um dos dois processos sobreviveu a 20 s. Só `/F` fecha, e
+   em 0,1 s. A alternativa "pedir fechamento gracioso e esperar", que o plano deixava em aberto,
+   morreu aqui.
+3. **Detecção por UpgradeCode não basta** (sonda M5, não prevista). Depois de um `3010` a entrada de
+   ARP some e o vínculo de UpgradeCode é apagado **com os arquivos ainda no disco**:
+   `MsiEnumRelatedProductsW` devolve 259 e o instalador concluiria que não há nada a remover. Foi
+   isto que criou a segunda guarda por ausência de `Uninstall.exe`.
+
+### Três defeitos que só apareceram ao rodar
+
+1. **`ExecWait` sobre o desinstalador do NSIS não espera** (R15). O S6 reprovou com `v1` esperado e
+   `<ausente>` obtido: o desinstalador se copia para `%TEMP%`, o processo original retorna na hora, a
+   instalação grava os arquivos novos e a cópia temporária apaga tudo em seguida. A armadilha estava
+   latente desde antes — o caminho nunca havia sido exercitado em execução silenciosa, porque a
+   resposta default era não desinstalar. Corrigido com `_?=`.
+2. **`prepareInstallerFiles` embutia jars de builds anteriores no instalador** (R13). `Copy` do
+   Gradle é aditivo, e o jpackage nomeia jar com versão + hash: 2 jars órfãos, 4.464.723 bytes e um
+   `Setup.exe` de 126.532.759 bytes contra os ~122,3 MB do build limpo. É o mesmo defeito de jar
+   órfão que o instalador passou a tratar do lado do usuário, só que dentro do build.
+3. **Um daemon do Gradle retém `~/.usage-monitor/app.lock`** (R11) e o `SingleInstanceGuard` derruba
+   o app instalado em silêncio, com exit 0. Invalidou a primeira passada de M1.
+
+### Dois acidentes de isolamento evitados na A07
+
+Ambos teriam agido sobre a máquina **real** de quem roda a suíte, e são a mesma família dos dois
+acidentes já ocorridos na A16 da #75:
+
+1. `Build-Installer` não passava `MSI_UPGRADE_CODE`: os cenários compilariam com o UpgradeCode de
+   produção e **desinstalariam o Usage Monitor real**.
+2. O `taskkill` da A05 nasceu com o nome de imagem literal: uma rodada do roteiro **mataria o app
+   real** de quem executa a suíte. Passou a derivar de `PRODUCT_NAME`.
+
+### Três ajustes na estrutura das atividades
+
+1. **A06 não existia na issue.** O tratamento da chave NSIS órfã é a metade que faltava do requisito
+   "sem ação do usuário": sem ele o instalador continuava perguntando, e a resposta "Sim" disparava
+   `ExecWait` num arquivo ausente seguido de remoção recursiva da árvore do Windows Installer. Virou
+   atividade própria e cenário próprio (S8).
+2. **A06b não estava prevista** — correção de build descoberta ao conferir o tamanho do instalador.
+   Commit próprio, e não dentro da atividade que a descobriu.
+3. **A A05 cresceu duas partes** que a issue não tinha: fechar o app e a segunda guarda. As duas
+   vieram de medição, não de leitura.
+
+### O que fica por verificar
+
+1. **O pipeline de release só é provado na primeira tag publicada** depois desta mudança. O que foi
+   verificado aqui é leitura do YAML, `yaml.safe_load` e o fato de o job de Windows contribuir com
+   **um** arquivo para o `dist-build` que o `fail_on_unmatched_files: true` consome.
+2. **R14 continua aberto e não foi tocado:** a Section `Uninstall` roda `taskkill /F /IM java.exe`,
+   que mata toda JVM da máquina — inclusive durante os cenários, via o desinstalador. É
+   pré-existente, e mexer nele mudaria a semântica de desinstalação em produção. Merece issue
+   própria.
+3. **R7 não foi medido:** MSI instalado elevado (per-machine) exigiria UAC no `/x`. O
+   `build.gradle.kts` sempre usou `perUserInstall = true`, mas isso não prova o que há na máquina
+   alheia. O código já trata: código de erro diferente de `0`/`1605` vira falha visível com motivo.
+4. **A máquina de desenvolvimento ficou sem o app instalado**, por consequência da limpeza da A02. O
+   valor `UsageMonitor` na chave `Run` continua apontando para o caminho antigo e volta ao normal na
+   próxima instalação do `Setup.exe`.
