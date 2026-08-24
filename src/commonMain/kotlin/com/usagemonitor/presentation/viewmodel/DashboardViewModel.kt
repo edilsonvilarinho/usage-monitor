@@ -88,6 +88,19 @@ class DashboardViewModel(
      * O view model não sabe fechar a aplicação; quem sabe é o `Main.kt`.
      */
     private val onRestartAndUpdateRequested: () -> Unit = {},
+    /**
+     * Registra que a entrega do pacote ao sistema falhou, com o motivo.
+     *
+     * Existe porque essa falha é **invisível por construção**: ela acontece com o
+     * app já saindo, e quem escreve o recibo é o instalador — que, justamente,
+     * não chegou a rodar. Sem isto o usuário fecha o app esperando a atualização,
+     * o app não volta, e não há nada no disco dizendo por quê. Foi o que a
+     * atividade A20 mediu.
+     *
+     * Recebe `(versão, motivo)`. A escrita fica no desktop; o view model não
+     * conhece arquivo.
+     */
+    private val onUpdateScheduleFailure: (String, String) -> Unit = { _, _ -> },
     private val currentAppVersion: String = "0.0.0",
     private val clock: Clock = Clock.System,
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
@@ -886,7 +899,16 @@ class DashboardViewModel(
             return
         }
         val preparation = preparedUpdate ?: return
-        installer.schedule(preparation)
+        // O Result não pode ser descartado aqui. Este é o último ponto do
+        // processo em que ainda se sabe alguma coisa: se a entrega falhar, o
+        // instalador não roda, não escreve recibo, e o usuário vê o app fechar e
+        // não voltar — sem uma linha no disco explicando.
+        installer.schedule(preparation).onFailure { error ->
+            val reason = error.message?.takeIf { it.isNotBlank() }
+                ?: error::class.simpleName
+                ?: "unknown"
+            onUpdateScheduleFailure(preparation.version, reason)
+        }
     }
 
     /** Ação da faixa no estado pronto. Sem artefato preparado não faz nada. */

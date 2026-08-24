@@ -49,3 +49,30 @@ internal fun readUpdateReceipt(file: File = defaultUpdateReceiptFile()): AppUpda
         reason = properties.getProperty("reason")?.trim()?.takeIf { it.isNotEmpty() }
     )
 }
+
+/**
+ * Escreve um recibo de falha quando o pacote nem chegou a ser entregue.
+ *
+ * O recibo é normalmente escrito pelo instalador NSIS. Quando `schedule` falha,
+ * o instalador **não roda**, então ninguém escreve nada: o usuário fecha o app
+ * esperando a atualização, o app não volta, e o disco fica sem rastro. Medido na
+ * atividade A20 do plano de atualização automática.
+ *
+ * Mesmo formato e mesmo caminho do recibo do instalador, para o leitor e a tela
+ * não ganharem um segundo caso. `previousVersion` não vai: quem a conhece é o
+ * instalador, e inventá-la aqui seria afirmar o que não se sabe.
+ */
+internal fun writeUpdateScheduleFailureReceipt(
+    version: String,
+    reason: String,
+    file: File = defaultUpdateReceiptFile()
+) {
+    runCatching {
+        file.parentFile?.mkdirs()
+        val properties = Properties()
+        properties.setProperty("version", version)
+        properties.setProperty("status", "failed")
+        properties.setProperty("reason", reason)
+        file.outputStream().use { properties.store(it, "usage-monitor update schedule failure") }
+    }
+}

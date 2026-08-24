@@ -146,6 +146,7 @@ import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import com.usagemonitor.update.isEnabled
 import com.usagemonitor.update.rememberAutoUpdateController
+import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -470,6 +471,7 @@ fun main() = application {
             appUpdateInstaller = autoUpdate.installer,
             autoUpdateEnabled = autoUpdate.enabled,
             onRestartAndUpdateRequested = { autoUpdate.requestRestart() },
+            onUpdateScheduleFailure = ::writeUpdateScheduleFailureReceipt,
             currentAppVersion = CURRENT_APP_VERSION,
             isAppVisible = isAppVisible,
             anthropicProfiles = enabledAnthropicProfiles,
