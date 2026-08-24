@@ -199,7 +199,14 @@ Function RemoveForeignInstall
     ; O msiexec /qn nao consegue fechar o app sozinho, e o `File /r` adiante nao
     ; sobrescreve executavel em uso. Retorno 128 significa apenas que nao havia
     ; processo, e nao e falha.
-    ExecWait '"$SYSDIR\taskkill.exe" /F /IM "Usage Monitor.exe"' $7
+    ;
+    ; O nome da imagem deriva de PRODUCT_NAME em vez de ser literal, e nao e
+    ; detalhe: este e o unico comando desta funcao com alcance fora do diretorio
+    ; de instalacao. Com o nome fixo, uma rodada do roteiro de cenarios mataria o
+    ; Usage Monitor REAL de quem executa a suite -- a mesma familia de acidente
+    ; que ja custou a chave Run e o atalho do Menu Iniciar na A16. Em producao o
+    ; valor e identico, porque o executavel se chama "Usage Monitor.exe".
+    ExecWait '"$SYSDIR\taskkill.exe" /F /IM "${PRODUCT_NAME}.exe"' $7
 
     StrCpy $5 0
 
@@ -321,7 +328,17 @@ Function .onInit
     ${If} ${FileExists} "$6\Uninstall.exe"
         ; Desinstalador presente: a chave descreve uma instalacao deste
         ; instalador, e ele fecha o app por conta propria antes de apagar.
-        ExecWait '$0'
+        ;
+        ; `_?=` nao e opcional. Sem ele o desinstalador do NSIS se COPIA para
+        ; %TEMP% e o processo original retorna imediatamente: o ExecWait termina
+        ; na hora, a instalacao grava os arquivos novos e a copia em %TEMP%
+        ; apaga tudo logo depois. Com `_?=` ele roda no lugar e o ExecWait espera
+        ; de verdade -- em troca, o desinstalador nao se remove, e por isso o
+        ; RMDir abaixo continua sendo necessario.
+        ;
+        ; Medido: o cenario S6 reprovou com 'v1' esperado e '<ausente>' obtido, e
+        ; com atalho e chave Run tambem apagados por baixo da instalacao nova.
+        ExecWait '$0 _?=$6'
         DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
         DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
         DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}"

@@ -142,6 +142,14 @@ jobs:
         shell: pwsh
         run: choco install nsis -y
 
+      # So o cenario S7 usa: ele compila um MSI minimo para o instalador
+      # encontrar e remover. Sem WiX o roteiro pula esse cenario com aviso em vez
+      # de falhar, entao este passo e o que faz o S7 rodar de verdade aqui.
+      - name: Install WiX
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: choco install wixtoolset -y
+
       - name: Run installer update scenarios
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
