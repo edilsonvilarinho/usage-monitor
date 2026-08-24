@@ -84,6 +84,18 @@ Var PreviousVersion   ; DisplayVersion lido antes de o registro ser sobrescrito
 !ifndef AUTO_START_VALUE_NAME
 !define AUTO_START_VALUE_NAME "UsageMonitor"
 !endif
+
+; UpgradeCode das instalacoes MSI que este instalador remove por baixo. E o mesmo
+; valor de `upgradeUuid` no build.gradle.kts -- ate a v37 o release publicava
+; tambem um .msi, e os dois gravavam nesta mesma pasta.
+;
+; !ifndef pelo mesmo motivo de AUTO_START_VALUE_NAME, e com um motivo mais forte:
+; um cenario de teste rodando com o UpgradeCode de producao DESINSTALARIA o MSI
+; real da maquina de quem roda a suite. E literalmente o acidente ja ocorrido
+; duas vezes na A16 -- com a chave Run e com o atalho do Menu Iniciar.
+!ifndef MSI_UPGRADE_CODE
+!define MSI_UPGRADE_CODE "{D26C4B79-9F2B-4CE5-B94E-E2E6A2A9E4A4}"
+!endif
 !define PRODUCT_PUBLISHER "Usage Monitor"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define LOG_FILE "$INSTDIR\install.log"
@@ -128,6 +140,126 @@ LangString MUI_TEXT_FINISH_RUN ${LANG_ENGLISH} "&Launch Usage Monitor now"
 ; -----------------------------------------------
 ; Installer Functions
 ; -----------------------------------------------
+
+; Remove por baixo o que nao foi escrito por este instalador, sem perguntar nada.
+;
+; Motivo: ate a v37 o release publicava tambem um .msi, e os dois instaladores
+; gravavam no MESMO %LOCALAPPDATA%\Usage Monitor. Sem este tratamento, quem esta
+; no MSI e roda o Setup.exe nao ve aviso nenhum -- sem a chave HKCU do NSIS o
+; .onInit pula direto para `done` -- e o `File /r` grava por cima, deixando duas
+; entradas em "Aplicativos e recursos", os jars da versao antiga na pasta (o
+; jpackage nomeia com versao + hash, entao o arquivo novo nao substitui o velho)
+; e um registro do Windows Installer capaz de remover arquivos da versao nova.
+;
+; Semantica medida em 2026-08-24 sobre o MSI real do v37.0.0 (A02 do plano em
+; docs/planos/instalador-unico-windows-execucao.md). Refazer as medidas antes de
+; contrariar qualquer item:
+;
+; 1. O Restart Manager NAO fecha o app sob `msiexec /x /qn`. Com o app rodando:
+;    exit 3010, os dois processos vivos e 69 arquivos na pasta. Com o app
+;    fechado, duas passadas: exit 0 e pasta removida por completo. Por isso o
+;    taskkill vem antes, e por isso 3010 NAO e sucesso aqui.
+; 2. `taskkill` sem /F nao fecha: 1 dos 2 processos sobreviveu a 20 s. Com /F
+;    encerra em 0,1 s. NAO replicar o `taskkill /F /IM java.exe` que a Section
+;    "Uninstall" usa: aquele mata toda JVM da maquina, inclusive daemons de build
+;    e IDEs de quem instala.
+; 3. Depois de um 3010 a entrada de ARP some e o vinculo de UpgradeCode e
+;    apagado, com os arquivos ainda no disco: MsiEnumRelatedProducts devolve 259
+;    e nao ve o residuo. Por isso a deteccao por UpgradeCode nao basta e existe a
+;    segunda guarda, por ausencia do Uninstall.exe -- o mesmo sinal que o
+;    WindowsInstallOriginResolver usa, e que cobre tambem a copia manual de pasta.
+; 4. `ExecWait` nao pendura com o mutex _MSIExecute tomado: a segunda operacao
+;    esperou 1,98 s e completou.
+Function RemoveForeignInstall
+    ; $2 = precisa agir  $3 = ProductCode  $4 = retorno do msi.dll
+    ; $5 = remocoes feitas  $7 = exit code do processo
+    StrCpy $2 0
+
+    System::Call 'msi::MsiEnumRelatedProductsW(w "${MSI_UPGRADE_CODE}", i 0, i 0, w .r3) i .r4'
+    ${If} $4 == 0
+        StrCpy $2 1
+    ${EndIf}
+
+    ; Arvore que existe e nao tem o desinstalador do NSIS nao foi escrita por
+    ; este instalador. Cobre o residuo de um 3010 anterior, em que ja nao ha
+    ; produto MSI registrado para encontrar.
+    ${If} ${FileExists} "$INSTDIR\*.*"
+    ${AndIfNot} ${FileExists} "$INSTDIR\Uninstall.exe"
+        StrCpy $2 1
+    ${EndIf}
+
+    ${If} $2 == 0
+        Return
+    ${EndIf}
+
+    DetailPrint "Removing a previous installation that was not created by this installer..."
+
+    ; O msiexec /qn nao consegue fechar o app sozinho, e o `File /r` adiante nao
+    ; sobrescreve executavel em uso. Retorno 128 significa apenas que nao havia
+    ; processo, e nao e falha.
+    ExecWait '"$SYSDIR\taskkill.exe" /F /IM "Usage Monitor.exe"' $7
+
+    StrCpy $5 0
+
+msiRemoveLoop:
+    ; Sempre o indice 0: cada remocao bem-sucedida encolhe a enumeracao, e
+    ; incrementar o indice pularia o produto seguinte. O teto de 8 existe para
+    ; que um produto que se recusa a sair nao vire laco infinito.
+    ${If} $5 >= 8
+        StrCpy $R6 "msi-removal-loop"
+        Goto msiRemoveFailed
+    ${EndIf}
+
+    System::Call 'msi::MsiEnumRelatedProductsW(w "${MSI_UPGRADE_CODE}", i 0, i 0, w .r3) i .r4'
+    ${If} $4 != 0
+        ; 259 = ERROR_NO_MORE_ITEMS. Qualquer outro retorno tambem encerra o
+        ; laco: nao ha produto que se possa nomear para remover.
+        Goto msiRemoveDone
+    ${EndIf}
+
+    DetailPrint "Removing MSI product $3..."
+    ExecWait '"$SYSDIR\msiexec.exe" /x $3 /qn REBOOT=ReallySuppress' $7
+
+    ; 0 = removido. 1605 = produto ausente, ou seja, ja nao esta la.
+    ; 3010 NAO entra: medido, ele significa "registro removido, arquivos
+    ; mantidos", que e exatamente o estado que o `File /r` nao pode encontrar.
+    ${If} $7 != 0
+    ${AndIf} $7 != 1605
+        StrCpy $R6 "msi-removal-failed-$7"
+        Goto msiRemoveFailed
+    ${EndIf}
+
+    IntOp $5 $5 + 1
+    Goto msiRemoveLoop
+
+msiRemoveDone:
+    ; Segunda guarda, e a razao dela esta no item 3 do bloco acima.
+    ${If} ${FileExists} "$INSTDIR\*.*"
+    ${AndIfNot} ${FileExists} "$INSTDIR\Uninstall.exe"
+        DetailPrint "Clearing files left behind by the previous installation..."
+        RMDir /r "$INSTDIR"
+        ${If} ${FileExists} "$INSTDIR\*.*"
+            StrCpy $R6 "foreign-tree-not-removed"
+            Goto msiRemoveFailed
+        ${EndIf}
+    ${EndIf}
+    Return
+
+msiRemoveFailed:
+    ; Continuar produziria justamente a instalacao dupla que esta funcao existe
+    ; para evitar, entao a instalacao para. O usuario nao escolhe nada aqui, so
+    ; fica sabendo que nao deu -- falhar visivel e melhor que corromper invisivel.
+    ;
+    ; /SD IDOK porque MessageBox sem /SD EXIBE E BLOQUEIA mesmo sob /S (item 1 do
+    ; cabecalho deste arquivo). SetErrorLevel + Quit e nao Abort: Abort aqui e no
+    ; .onInit, fora de Section, e o par medido na A02 e este.
+    MessageBox MB_OK|MB_ICONSTOP "Nao foi possivel remover a instalacao anterior do ${PRODUCT_NAME} ($R6). A instalacao foi cancelada para nao deixar duas instalacoes na mesma pasta." /SD IDOK
+    StrCpy $R5 "failed"
+    Call WriteUpdateReceipt
+    SetErrorLevel 4
+    Quit
+FunctionEnd
+
 Function .onInit
     SetShellVarContext current
 
@@ -160,6 +292,13 @@ Function .onInit
         ; dialogo que ninguem ve, para sempre.
         Return
     ${EndIf}
+
+    ; Antes de qualquer escrita: os dois instaladores usam a mesma pasta, e
+    ; instalar primeiro para desinstalar depois faria o msiexec apagar o que este
+    ; instalador acabou de gravar. Fora do caminho /UPDATE de proposito -- la o
+    ; portao de origem ja garante que nao ha MSI, e um ExecWait a mais no fluxo
+    ; silencioso seria risco sem contrapartida.
+    Call RemoveForeignInstall
 
     ; Check if already installed
     ReadRegStr $0 HKCU "${PRODUCT_UNINST_KEY}" "UninstallString"
