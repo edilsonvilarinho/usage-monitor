@@ -208,6 +208,17 @@ val installerFilesDir = file("build/installer/files")
 tasks.register<Copy>("prepareInstallerFiles") {
     dependsOn("createDistributable")
 
+    // O destino e limpo antes da copia porque `Copy` do Gradle e aditivo: ele
+    // nunca remove do destino um arquivo que sumiu da origem. O jpackage nomeia
+    // os jars com versao + hash, entao qualquer mudanca de dependencia gera nome
+    // novo -- e o jar antigo ficava aqui e ENTRAVA no instalador. Medido em
+    // 2026-08-24: 2 jars orfaos, 4.464.723 bytes a mais no payload e um
+    // Setup.exe de 126.532.759 bytes contra os ~122,3 MB do build limpo.
+    //
+    // Nao aparece no CI, onde o workspace nasce vazio; e defeito de build local,
+    // e e o mesmo problema que o instalador trata do lado do usuario.
+    doFirst { delete(installerFilesDir) }
+
     from(file("build/compose/binaries/main/app/Usage Monitor"))
     into(installerFilesDir)
 }
