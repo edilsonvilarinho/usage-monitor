@@ -11,9 +11,11 @@ SetCompressor zlib
 ; documentacao lembrada. Refazer as medidas antes de contrariar qualquer item.
 ;
 ; 1. MessageBox sem /SD EXIBE E BLOQUEIA mesmo com /S. O probe rodou 12s e foi
-;    morto por timeout com o log parado antes do desvio. O MessageBox do .onInit
-;    abaixo, portanto, TRAVA para sempre qualquer execucao silenciosa deste
-;    instalador. Quem for rodar em /S precisa desviar dele antes.
+;    morto por timeout com o log parado antes do desvio. Todo MessageBox deste
+;    arquivo precisa, portanto, de /SD -- sem ele qualquer execucao silenciosa
+;    fica pendurada num dialogo que ninguem ve. Hoje resta um so, no caminho de
+;    falha de RemoveForeignInstall, com /SD IDOK. O MessageBox que perguntava
+;    sobre a instalacao anterior saiu: ver o comentario no .onInit.
 ;
 ; 2. Flag de erro:
 ;    - comando bem-sucedido NAO limpa a flag; ela e sticky ate ClearErrors ou
@@ -300,21 +302,43 @@ Function .onInit
     ; silencioso seria risco sem contrapartida.
     Call RemoveForeignInstall
 
-    ; Check if already installed
+    ; Instalacao anterior deste instalador. NAO ha pergunta aqui, e a remocao do
+    ; MessageBox que existia e o ponto da mudanca: ele nunca ofereceu escolha
+    ; real. "Nao" produzia instalacao dupla, e "Sim" so era seguro quando o
+    ; desinstalador existia de fato -- coisa que o instalador sabe checar melhor
+    ; que o usuario. Alem disso, qualquer pergunta aqui contraria o requisito de
+    ; a migracao acontecer por baixo, sem acao de quem instala.
     ReadRegStr $0 HKCU "${PRODUCT_UNINST_KEY}" "UninstallString"
-    StrCmp $0 "" done notdone
+    StrCmp $0 "" done
 
-notdone:
-    ; /SD IDNO: uma execucao silenciosa que chegue aqui responde "nao" em vez de
-    ; travar. Inerte no fluxo interativo, que continua perguntando.
-    MessageBox MB_YESNO|MB_ICONQUESTION "${PRODUCT_NAME} ja esta instalado. Deseja remover a versao anterior?" /SD IDNO IDYES uninst IDNO done
+    ; Onde a chave diz que a instalacao esta. Julgar pelo conteudo de $INSTDIR
+    ; daria a resposta errada para uma chave que aponta para outra pasta.
+    ReadRegStr $6 HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation"
+    ${If} $6 == ""
+        StrCpy $6 "$INSTDIR"
+    ${EndIf}
 
-uninst:
-    ExecWait '$0'
-    DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}"
-    RMDir /r "$INSTDIR"
+    ${If} ${FileExists} "$6\Uninstall.exe"
+        ; Desinstalador presente: a chave descreve uma instalacao deste
+        ; instalador, e ele fecha o app por conta propria antes de apagar.
+        ExecWait '$0'
+        DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+        DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+        DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}"
+        RMDir /r "$INSTDIR"
+    ${Else}
+        ; Chave orfa: aponta para um Uninstall.exe que nao existe. Foi o estado
+        ; medido nesta maquina em 2026-08-24 -- chave do NSIS em 23.0.0 sobrevivendo
+        ; a uma migracao para o MSI, com o desinstalador ja apagado. Aqui o codigo
+        ; antigo perguntava, e o "Sim" rodava ExecWait num arquivo ausente, que
+        ; falha em silencio, e em seguida apagava recursivamente a arvore que o
+        ; Windows Installer registra.
+        ;
+        ; So a chave sai. Os arquivos, se havia, ja foram tratados por
+        ; RemoveForeignInstall, que roda antes justamente por isto.
+        DetailPrint "Clearing a stale uninstall entry from a previous version..."
+        DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+    ${EndIf}
 
 done:
     ${IfNot} ${Silent}
