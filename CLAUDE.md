@@ -99,11 +99,16 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
   - `projectNameFromCwd` é compartilhada com `CliSessionSummary.projectName`: duas derivações do mesmo caminho divergiriam em algum caso de borda e a tela mostraria dois rótulos para um projeto só.
   - **Um eixo por aba, com filtro, ordem e paginação** (`CliUsageBreakdownPaging.kt` + `CliUsageBreakdownPane`): as seções empilhadas somavam projeto + modelo + branch + ferramentas + grade numa coluna só, e em produção isso é rolagem sem fim. `BreakdownAxis` é enum próprio — `CliSessionsView`/`TeamUsageView` escolhem a tela, este escolhe o recorte dentro dela, e um enum só carregaria combinações que não existem. **Só entram as abas com dado**: no modal do time não há ferramenta nem grade. `ACTIVITY` não tem filtro nem paginador porque não é lista — controle desligado é pior que controle ausente. `BreakdownSort` tem três valores e não seis: baldes e ferramentas respondem à mesma pergunta com números diferentes, e o rótulo da opção muda com o eixo (a ferramenta não tem custo nem tokens).
   - **O filtro casa por trecho e contra o texto exibido**, não contra o rótulo cru: o que identifica um caminho está no meio, e filtrar pelo `null` esconderia a linha que a tela chama "Sem branch".
-  - **Preso na tela fica só o cromo pequeno** — abas, filtro e paginador. Os cards de totais e de ritmo entram na área rolável: com ~200dp de altura fixa no topo, numa janela baixa eles empurram o paginador para fora, e o controle deixa de existir justamente onde a lista é longa. Filtro sem resultado **não apaga os totais**, que continuam verdadeiros.
+  - **Preso na tela fica só o cromo pequeno** — abas e, numa faixa só, filtro, ordem e paginação. Os três escolhem parâmetros do mesmo conteúdo, e o paginador no rodapé era a primeira coisa a sair da tela numa janela baixa, justamente quando a lista é longa e ele serve para alguma coisa. Os totais entram na área rolável, pela mesma razão invertida: ~200dp de altura fixa no topo empurram a lista para fora. Filtro sem resultado **não apaga os totais**, que continuam verdadeiros.
+  - **As linhas do eixo são tabela, não card**: uma faixa de legendas e `AppDataRow` por balde, com as colunas de `CliUsageBreakdownPane`. A coluna de tempo ativo aparece **uma vez para a lista inteira** ou não aparece — modelo e ferramenta não têm hora, e coluna que existe em algumas linhas e some em outras desloca tudo o que vem depois.
   - **A página se prende ao intervalo que existe** (`paginate`): a lista encolhe a cada tique do laço ao vivo, e a página que sumiu mostraria vazio em vez do fim dos dados. Lista vazia continua tendo uma página — "página 1 de 0" não é uma frase. Trocar eixo, filtro, ordem ou tamanho volta para a primeira página, via `remember(chaves)`.
   - **Filtro, ordem e página moram num `remember` da pane, não no ViewModel.** Ali só ficam as escolhas que a carga precisa conhecer; estas não mudam o que é lido do índice nem do servidor, e o `remember` sobrevive às emissões do laço ao vivo porque a pane não sai da composição entre elas.
 
-- **Configurações em abas** (`SettingsTab` em `SettingsDialogContent.kt`): as cinco seções (Geral, Alertas, APIs, Contas, Time) eram uma coluna única de cartões empilhados, e achar qualquer uma exigia rolagem. Enum próprio e chips `FilterChip`, que é como o app já desenha aba nas outras telas — um `TabRow` seria um segundo vocabulário visual para a mesma função. **Só a aba escolhida entra na composição**, e não apenas fica fora da vista: com todas montadas as abas seriam decoração sobre a mesma coluna. A escolha mora num `remember` do próprio diálogo, que é uma janela separada e cujo estado nenhuma outra parte do app precisa conhecer; `initialTab` existe para os geradores de captura escolherem a seção. Cada aba tem seu próprio `ScrollState` começando no topo — reaproveitar um só faria a aba curta abrir rolada pela posição que a longa deixou.
+- **Configurações em abas** (`SettingsTab` em `SettingsDialogContent.kt`): as cinco seções (Geral, Alertas, APIs, Contas, Time) eram uma coluna única de cartões empilhados, e achar qualquer uma exigia rolagem. Enum próprio e **navegação lateral**, com a coluna de seções fixa à esquerda — ela é o controle, e o conteúdo rolando não pode tirá-la da vista. **Só a aba escolhida entra na composição**, e não apenas fica fora da vista: com todas montadas as abas seriam decoração sobre a mesma coluna. A escolha mora num `remember` do próprio diálogo, que é uma janela separada e cujo estado nenhuma outra parte do app precisa conhecer; `initialTab` existe para os geradores de captura escolherem a seção. Cada aba tem seu próprio `ScrollState` começando no topo — reaproveitar um só faria a aba curta abrir rolada pela posição que a longa deixou.
+  - **Cada aba monta o próprio painel** (`AppDataSurfaceFlush` + `AppSectionHeader`), com uma linha de dados por opção: rótulo em mono, descrição em sans, controle à direita, divisória entre elas. Não existe mais um cartão genérico envolvendo tudo — sete controles empilhados sem divisória e com todo rótulo em sans obrigavam a ler a lista inteira para achar uma opção.
+  - **Ação que age sobre a lista inteira vai no `trailing` do cabeçalho** — "Redetectar" e "Adicionar" na aba Contas, o interruptor da integração na aba Time. No corpo elas competiam com as linhas.
+  - **`PRIMARY` é uma por tela.** A aba Time tinha três botões primários ao mesmo tempo; primária é a ação que a tela propõe, e três delas não propõem nada.
+  - **Tema é segmentado, não interruptor.** Interruptor diz ligado/desligado, e tema é escolha entre duas alternativas — a mesma pergunta que o seletor de idioma logo abaixo já respondia com um segmentado. O rótulo com emoji que existia ali era o único emoji da interface.
 
 - **Banner de erro por alvo** (`DashboardWarning.target` + `warningTargetLabel`): o título usa `UiApiError.targetLabel` ("Anthropic — <perfil>") e cai no rótulo da fonte só quando não há alvo nomeado. Com várias contas Anthropic o título fixo produzia dois banners textualmente idênticos e ninguém sabia qual conta falhou. A ação recarrega **só o alvo do banner** (`refresh(target)`), não a fonte inteira — refazer a coleta dos perfis saudáveis é justamente o custo que um botão por banner evita. A ordem dos testes em `warningFor` importa: 429 e 503 são avaliados **antes** de credencial, então renovação que falha por limite ou indisponibilidade continua no banner de "aguarde" em vez de pedir login.
 
@@ -185,11 +190,24 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
   vez de três: ali não há bloco de sessões. Ela ficou de fora da passada da issue #69 e continuava
   entregando um e-mail e um uuid sobre fundo transparente — que é exatamente o que a linha do
   integrante também tem.
-- **A coluna de ação mora fora do `FlowRow` das colunas**, nas duas listas de presença. Dentro dele o
+- **A coluna de ação mora fora do `Row` das colunas**, nas duas listas de presença. Dentro dele o
   botão destrutivo é o último item e portanto o primeiro a quebrar: numa janela estreita ele descia
   para uma linha própria e virava um ícone vermelho solto, sem coluna e sem dizer a que linha
   pertence. O orçamento de largura (`PRESENCE_COLUMN_*`) virou piso de janela em
   `TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP` — comentário não impede o usuário de arrastar a borda.
+- **A legenda pertence à coluna, não à célula** (issue #81). As quatro listas tabulares — sessões da
+  máquina, sessões do time, integrantes e presença — têm uma faixa `AppColumnHeaderRow` acima da
+  `LazyColumn`, e a célula carrega só o valor. Isso só se sustenta se a linha **não quebrar**: por
+  isso elas são `Row` e não `FlowRow`, cada arquivo carrega o orçamento de largura no comentário das
+  constantes `*_COLUMN_*`, e as três janelas de lista têm piso de arrasto (`*_MIN_WINDOW_WIDTH_DP`,
+  aplicado por `ApplyWindowMinimumSize` em `Main.kt`). Faixa de legendas sobre linha quebrada promete
+  um alinhamento que o conteúdo não cumpre.
+  - O que liberou a linha de sessão foi o **veredito de saturação sair do fluxo de colunas**: ele
+    media 210dp e desceu para uma segunda linha da própria linha, junto da razão que o gerou. Foi ele
+    que forçou a concessão do "rótulo por célula" registrada em agosto, e é ele que a desfaz.
+  - Na presença, o Estado virou **uma** coluna de três palavras — trabalhar implica estar online, e
+    as três combinações que existem cabem numa coluna só. Continuam duas camadas e não uma escala:
+    colapsá-las em duas é que esconderia quem está com o app aberto e parado.
 - **`TeamMemberUsage.memberKey`** (`accountKey/deviceId`, ou só `deviceId` fora do modo global) é a identidade da linha na tela. O `deviceId` sozinho não serve: na visão global a mesma máquina em duas contas expandiria as duas juntas e a remoção acertaria a conta errada.
 - **Na visão global o recorte de 5h é deslizante.** Cada conta reseta a quota numa hora, e ancorar numa delas daria um número que não corresponde a nenhuma. `GetAdminTeamOverviewUseCase` resolve a janela com `CliQuotaWindows()` vazio e a tela avisa.
 - **Configuração** em `~/.usage-monitor/team.json` (`LocalTeamSettingsDataSource`), com escrita atômica e `restrictToOwnerReadWrite`. Nunca em `PreferencesSettings`: a chave do servidor é segredo e as preferências vão em claro para o registro.
@@ -200,7 +218,7 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 - **Desvincular não apaga nada, e não faz a conta sumir.** `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` mexe em uma linha de `team_key_accounts`; a visão global é derivada de `team_members` ∪ `team_turns`, então a conta desvinculada continua na lista, agora com `label: null` — pior do que antes. Quem a remove é `DELETE /api/admin/v1/accounts/:accountKey` (servidor 0.5.0+), que apaga integrantes, sessões, turnos e o vínculo. Na rota a **ordem é dados primeiro, vínculo depois**: falhando o segundo passo sobra um vínculo sem dados, inócuo; o inverso deixaria a conta órfã e adotável por outra chave com o histórico ainda no banco. **Apagar não impede a conta de voltar** — ingest e presença reivindicam sozinhos, e as travas são o cliente desmarcar a conta ou o `maxAccounts` da chave encher.
 - **A tela de presença deixou de ser só leitura em modo admin.** `TeamPresenceViewModel` ganhou `removeTeamMember`/`deleteTeamAccount` **opcionais** (`null` = instalação sem administração, mesmo tratamento de `getAdminTeamPresence`) e um segundo flow, `actionError`, fora do `Success` pelo motivo de sempre: o laço de 5s republica o estado e apagaria a mensagem antes de ela ser lida. Os dois botões são bloqueados pelo `localDeviceId` — a própria máquina e a conta de que ela participa voltam no envio seguinte, então removê-las só apagaria histórico à toa.
 - **Tempo ativo do time é campo novo em rota existente** (`activity` em `GET /v1/team` e no `overview` do admin, servidor 0.7.0+), e não rota nova: por isso não há gate por 404 como o da tendência — servidor antigo simplesmente omite o campo, o DTO cai no default vazio e o cliente lê "não medido". O corte entre turnos viaja na query (`gapCutoffMs`), pelo mesmo motivo pelo qual o servidor não precifica: `TURN_GAP_CUTOFF_MILLIS` é do domínio do app, e um segundo dono do valor daria duas respostas. `teamQuerySchema` é `z.object` não-estrito, então o parâmetro enviado a um servidor anterior é ignorado sem 400.
-- **Tendência é rota própria** (`GET /api/v1/team/trend`, servidor 0.6.0+), da mesma família de leitura de `/v1/team`: `requireTeamAccess` com a conta na query, nenhum `GET` reivindica. Devolve linhas cruas por `(máquina, dia UTC, modelo)` — o servidor continua **sem precificar**, e o cliente aplica `ModelPricingTable`, como já faz com `/v1/team` e `/v1/session`. O dia sai em **UTC** porque o servidor não conhece o fuso de quem consulta; quem traduz é o cliente, igual à grade de atividade local. Contra servidor anterior a rota dá 404 e a leitura devolve `null` — "indisponível", não erro —, lembrado **por URL** (`trendRouteMissingFor`, precedente exato do `presenceRouteMissingFor`); só o 404 cai aí, senão chave errada viraria "servidor antigo". O eixo de dias é montado no cliente e **todo integrante ganha ponto em todo dia**: série com buracos desenharia uma linha que pula dias e sugeriria continuidade onde houve silêncio. A leitura é **uma por abertura**, fora do laço de 5s: a série é de dias e recarregá-la a cada tique seria uma consulta por segundo para redesenhar o mesmo gráfico. As barras de todos os integrantes usam **uma escala só** — normalizar cada um pelo próprio pico faria quem gasta centavos parecer igual a quem gasta dezenas de dólares.
+- **Tendência é rota própria** (`GET /api/v1/team/trend`, servidor 0.6.0+), da mesma família de leitura de `/v1/team`: `requireTeamAccess` com a conta na query, nenhum `GET` reivindica. Devolve linhas cruas por `(máquina, dia UTC, modelo)` — o servidor continua **sem precificar**, e o cliente aplica `ModelPricingTable`, como já faz com `/v1/team` e `/v1/session`. O dia sai em **UTC** porque o servidor não conhece o fuso de quem consulta; quem traduz é o cliente, igual à grade de atividade local. Contra servidor anterior a rota dá 404 e a leitura devolve `null` — "indisponível", não erro —, lembrado **por URL** (`trendRouteMissingFor`, precedente exato do `presenceRouteMissingFor`); só o 404 cai aí, senão chave errada viraria "servidor antigo". O eixo de dias é montado no cliente e **todo integrante ganha ponto em todo dia**: série com buracos desenharia uma linha que pula dias e sugeriria continuidade onde houve silêncio. A leitura é **uma por abertura**, fora do laço de 5s: a série é de dias e recarregá-la a cada tique seria uma consulta por segundo para redesenhar o mesmo gráfico. As barras de todos os integrantes usam **uma escala só** — normalizar cada um pelo próprio pico faria quem gasta centavos parecer igual a quem gasta dezenas de dólares. O desenho é **um grupo de barras por dia, uma cor por integrante**, com legenda e três linhas de grade (`TeamTrendChart`): a cor identificando o integrante é a **única exceção** à regra de que acento é identidade de fonte e não de valor, porque num gráfico agrupado ela é o único jeito de dizer de quem é a barra. A paleta reusa os acentos de fonte e cicla — do sétimo integrante em diante duas séries repetem o tom, e quem as separa é a legenda. A largura da barra tem piso e teto: sem piso, 30 dias × 5 pessoas viram 150 barras num borrão, e abaixo dele a área rola na horizontal; sem teto, sete dias numa janela larga dão barras de 40dp que leem como bloco e comem o vão entre os dias.
 - **O modal do time tem três abas** (`TeamUsageView`: `MEMBERS`, `BREAKDOWN`, `TREND`), no mesmo lugar e na mesma ordem dos chips do modal da máquina — a janela vale para as três, então trocá-la é a escolha de fora e a aba é a de dentro. A tendência **era um painel fixo** acima da lista: comia metade do modal para mostrar dias, que nem obedecem ao filtro de janela logo acima deles. Enum próprio, não valor a mais em `CliSessionRange`. A aba escolhida mora no `Success` e `loadTeam` a carrega do estado anterior, senão o tique de 5s devolveria à lista quem está lendo o resumo. **O chip de tendência não existe na visão global** — a série é por conta e ali a janela mistura várias —, e `effectiveView` derruba para `MEMBERS` a escolha guardada que deixou de existir, em vez de desenhar painel nenhum. O aviso de janela deslizante só sai nas abas que respeitam o filtro. O erro de remoção fica **acima** do despacho de aba: é retorno de uma ação do usuário, e trocar de aba não pode escondê-lo — mesmo motivo pelo qual ele não mora no `uiState`.
 - **O resumo por eixo do time reusa `toUsageBreakdown`**, o dobrador do resumo local, sobre as linhas cruas que o servidor já mandou. `TeamUsageRowDto` é `(deviceId, sessionId, cwd, gitBranch, model, tokens)` — a mesma forma de `CliUsageGroupRow` —, e o mapper as guarda em `TeamMemberUsage.groupRows`. Sair das sessões já dobradas **não serviria**: `toSummary()` colapsa os modelos num `primaryModel` só e o eixo "por modelo" sumiria. Vem na **mesma resposta** que a lista, então é entregue por `GetTeamUsageUseCase`/`GetAdminTeamOverviewUseCase` e não por um caso de uso próprio, que pediria ao servidor o que já está em memória. `CliUsageBreakdown.byMember` é o quarto eixo, vazio no índice local onde a máquina é uma só; o balde de cada pessoa é o `totals` do resumo dela, para não abrir um segundo caminho de soma. **Nos outros três eixos o rótulo é a chave da agregação e portanto único; neste não** — o apelido é texto digitado, e a máquina que perdeu o `team.json` volta com outro `deviceId` e o mesmo apelido. Quem repete apelido ganha o começo do `deviceId` como sufixo (o `hostName` também repete no caso real), e a linha do `LazyColumn` é chaveada pela **posição**, não pelo rótulo: chave repetida ali não desenha item errado, derruba a janela. **Grade de atividade e ferramentas ficam vazias**: o servidor agrega por sessão e modelo, nunca por hora nem por ferramenta, e a pane já pula seção vazia. O teste que importa é o do total batendo com `snapshot.totalCostMicros` — divergência ali significa dois caminhos de precificação.
 - **Leitura:** `TeamUsageViewModel`, laço ao vivo de 5s, só com a janela aberta. Mesmas restrições anti-flicker do `CliSessionsViewModel`.
@@ -241,10 +259,32 @@ assíncrona e o `ScreenshotGenerator` renderiza offscreen com relógio manual �
 fallback é falha silenciosa.
 
 **Primitivas** (`presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt`):
-todas stateless. Superfície de dados, cabeçalho de seção com marcador de 2dp, linha de dados com
-divisória própria, barra de estado, abas sublinhadas, controle segmentado, chip de alternância,
-botão, botão de ícone, campo, interruptor, tooltip, aviso, vazio, carregando, erro, indicador de
-estado e barra de progresso. Antes de desenhar um retângulo novo, procure aqui.
+todas stateless. Corpo de janela com barra de estado, barra de controles, superfície de dados,
+cabeçalho de seção com marcador de 2dp, linha de dados com divisória própria, bloco de métrica,
+faixa de legendas de coluna com valor de célula, abas sublinhadas, controle segmentado, chip de
+alternância, botão, botão de ícone, campo, interruptor, tooltip, aviso, vazio, carregando, erro,
+indicador de estado e barra de progresso.
+Antes de desenhar um retângulo novo, procure aqui.
+
+- **Primitiva construída e não adotada não conserta nada.** A refatoração de agosto fechou com
+  `AppWindowScaffold` e `AppToolbar` em **zero** telas e `AppStatusIndicator` em uma — a fundação
+  existia e cada tela continuava montando o próprio retângulo. A passada de conformidade de
+  2026-08-23 fez a adoção; ao criar primitiva nova, o commit que a cria e o que a consome andam
+  juntos.
+- **Bloco de métrica** (`AppMetricBlock`): rótulo em cima, valor embaixo, borda em volta, largura
+  fixa e igual entre os blocos da mesma fileira. A ordem não é estética — numa fileira de quatro, o
+  olho varre os rótulos para achar o que procura, não os números. Qualificação longa fica **fora**
+  do bloco: dentro dele, um rodapé de quatro medidas mede três vezes a largura do bloco vizinho e a
+  fileira perde o alinhamento que a grade existe para dar.
+- **Número é `label*`, não `body*`.** A divisão entre as duas famílias é por papel: `body*` é sans e
+  existe para texto corrido, e número em fonte proporcional não alinha coluna — que é a razão de a
+  mono estar na escala. Vale para célula de tabela, valor de métrica e rótulo de controle.
+- **Controle deslizante** usa os slots `track`/`thumb` do `Slider` do Material com o desenho do
+  sistema (trilha de 4dp, polegar de 12dp). Não é um controle próprio: a semântica de progresso, que
+  é o que `SetProgress` dos testes exercita, tem de continuar vindo do `Slider`.
+- **`AppSwitch` ligado é verde**, não azul: ligado é um estado, o mesmo "ok" do indicador e da barra
+  saudável. O azul deste sistema é informação — linha de gráfico e realce de seleção —, e com ele
+  ali um interruptor ligado lia como item selecionado.
 
 - **Aba × segmentado × chip**: aba troca **o que** a tela mostra, segmentado troca **como** (janela,
   ordem, tamanho de página), chip de alternância liga ou desliga **uma** restrição. Desenhá-los igual
@@ -267,6 +307,13 @@ estado e barra de progresso. Antes de desenhar um retângulo novo, procure aqui.
    por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
 5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
    `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
+6. `Modifier.border` arredonda o traço **para cima** (`ceil(width.toPx())`, `Border.kt`) e o pinta
+   **depois** do conteúdo. Numa caixa de 4dp o anel de 1dp vira 2px a partir de densidade 1,05 e come
+   a caixa inteira: a barra de cota ficava cinza com a cota em 37% nas escalas de 105% e 110%
+   (issue #83). Borda que precisa ocupar layout é **fundo mais padding** — o `roundToPx` do padding
+   acompanha a altura, e é o `box-sizing: border-box` que o protótipo já especificava. O defeito é de
+   **pintura**: `boundsInRoot` devolvia a altura cheia nas duas escalas, então só bitmap
+   (`captureToImage`) o pega.
 
 **Escala da interface** (`AppTheme(uiScalePercent = …)` + `UiScalePreferences.kt` + slider na aba
 Geral): a escala troca a **densidade** da composição, nunca a escala tipográfica. Subir só a
@@ -332,6 +379,13 @@ linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
   `TooltipBox` aninhados disputam o mesmo hover —, e por isso a frase de `riskDotTooltipSubtitle`
   não chegava à tela em tamanho nenhum de janela. A métrica `Projeção de uso` continua ao lado: ela
   diz qual é o estado, o rodapé diz o que ele significa.
+- **O estado da fonte tem ponto e palavra no cabeçalho** (`API_USAGE_CARD_STATUS_TAG` +
+  `worstQuotaRisk`): o `RiskSemaphoreDot` de cada cota é só ponto, e sozinho ele deixava a cor
+  informando o estado — que é exatamente o que este sistema visual não faz. O badge resume o **pior**
+  risco entre as cotas pela ordem do enum, não pelo percentual: 40% às onze da manhã pode ser pior
+  que 80% dez minutos antes do reinício. Cota vencida não entra, e sem projeção conhecida não há
+  badge — "Normal" ali seria uma garantia que ninguém deu. Os rótulos saem de `riskLevelLabel`, que
+  já existia.
 
 **Aviso de fonte é hint, não banner** (`CardNoticeHint` em `ApiUsageCard.kt`): os
 `ApiUsageNotice` saem como uma exclamação âmbar (`Icons.Rounded.ErrorOutline`) no cabeçalho, ao

@@ -4,13 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -27,6 +26,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
@@ -107,10 +107,17 @@ fun DebouncedSecretField(
             PasswordVisualTransformation()
         },
         trailingIcon = {
-            IconButton(onClick = { revealed = !revealed }) {
+            // Quadrado de 26dp: o círculo de 40dp do Material era mais alto que
+            // o campo de 28 ao lado do qual ele fica.
+            AppIconButton(
+                contentDescription = if (revealed) hideLabel else revealLabel,
+                onClick = { revealed = !revealed }
+            ) {
                 Icon(
                     imageVector = if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                    contentDescription = if (revealed) hideLabel else revealLabel
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

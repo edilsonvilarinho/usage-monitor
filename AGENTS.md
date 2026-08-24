@@ -169,8 +169,15 @@ O essencial para nao quebrar nada:
 - Tipografia IBM Plex: mono em rotulo/numero/titulo, sans em texto corrido. Os TTFs vivem em
   `desktopMain/resources/fonts/` e sao carregados por `appFontFamilies` (expect/actual).
 - Primitivas em `presentation/ui/components/App{Structure,Controls,States}.kt`. Componente novo de
-  UI deve sair delas.
+  UI deve sair delas — e primitiva construida e nao adotada nao conserta nada: a refatoracao de
+  agosto fechou com `AppWindowScaffold` e `AppToolbar` em zero telas, e cada tela continuava
+  montando o proprio retangulo. O commit que cria e o que consome andam juntos.
 - Cor nunca informa sozinha: `AppStatusIndicator` traz ponto e palavra, e o tom sai de `AppTone`.
+- Acento e identidade de **fonte**, nao de valor. Numero fica na cor do texto e em `label*` (mono):
+  `body*` e sans e existe para texto corrido, e fonte proporcional nao alinha coluna.
+- Nada de Material cru na camada de UI: `TextButton`, `IconButton`, `OutlinedTextField`, `Checkbox`,
+  `Card` e `HorizontalDivider` trazem altura, raio e cor proprios. `Slider` e a excecao, e so pelos
+  slots `track`/`thumb` — a semantica de progresso tem de continuar vindo dele.
 - `weight` nao funciona dentro de `FlowRow`; acao com icone precisa de `contentDescription` na
   semantica; placeholder de campo precisa de `clearAndSetSemantics`.
 - Tela mais alta exige subir a altura da **cena** do teste de componente, nao a do `Box` interno.

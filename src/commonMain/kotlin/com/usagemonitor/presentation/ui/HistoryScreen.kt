@@ -2,7 +2,6 @@ package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -10,31 +9,21 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,14 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.AppLanguage
@@ -64,10 +51,8 @@ import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageAccountContext
-import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.requiresUsageAccount
 import com.usagemonitor.presentation.ui.components.AppButton
@@ -77,9 +62,9 @@ import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.theme.AppMotion
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
@@ -121,18 +106,40 @@ fun HistoryScreen(
         HistoryUiState.Loading -> focusedSource
     }
 
-    Surface(
+    // Sem `Success` não há coleta a datar, e uma barra de 30dp vazia é cromo que
+    // não informa nada. O tipo da variável é anotado porque é ele que faz a
+    // lambda de dentro do `let` ser reconhecida como `@Composable`.
+    val statusBarContent: (@Composable RowScope.() -> Unit)? =
+        (state as? HistoryUiState.Success)?.let { success ->
+            {
+                Text(
+                    text = lastUpdatedLabel(success.report.lastUpdatedAt, language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+    // Corpo de janela do sistema: fundo, grade de espaçamento e a barra de estado
+    // como última linha, fora da área rolável. O padding entra na coluna interna,
+    // não no scaffold, porque é ela que rola — com o padding no scaffold, a
+    // margem de baixo cortaria o conteúdo em vez de acompanhá-lo.
+    AppWindowScaffold(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        contentPadding = 0.dp,
+        spacing = 0.dp,
+        statusBar = statusBarContent
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 20.dp, vertical = 24.dp)
-                    .padding(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(AppSpacing.lg)
+                    .padding(end = AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
                 HistoryHeader(
                     language = language,
@@ -230,12 +237,6 @@ fun HistoryScreen(
                                         )
                                     } else if (current.report.source == ApiSource.CODEX) {
                                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                            Text(
-                                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-
                                             current.report.series.forEachIndexed { index, series ->
                                                 key(
                                                     series.quotaLabel +
@@ -264,12 +265,6 @@ fun HistoryScreen(
                                         }
 
                                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                            Text(
-                                                text = lastUpdatedLabel(current.report.lastUpdatedAt, language),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-
                                             cardModels.forEachIndexed { index, model ->
                                                 key(
                                                     model.baseLabel +
@@ -312,6 +307,15 @@ fun HistoryScreen(
         }
     }
 }
+
+/**
+ * O rótulo da última coleta, agora no rodapé.
+ *
+ * Ele era um `Text` solto acima da primeira série, repetido em dois dos quatro
+ * ramos por fonte — o do Codex e o genérico —, e ausente nos outros dois. Como
+ * barra de estado ele vale para as quatro, sai da área rolável e para de
+ * competir com o gráfico pelo topo da janela.
+ */
 
 @Composable
 private fun HistoryHeader(
@@ -574,46 +578,32 @@ private fun DeepSeekHistoryCard(
         visible = true
     }
 
-    Card(
+    // Mesma anatomia de `HistorySeriesCard`: painel neutro, cabeçalho com o
+    // marcador de 2dp e nenhuma sombra. A faixa de 3dp que atravessava a altura
+    // toda, a superfície com alpha e a elevação de 6 eram os três restos do card
+    // anterior que sobreviveram à passada da Fase E — esta tela só é composta com
+    // a DeepSeek selecionada, e nenhuma captura passava por aqui.
+    AppDataSurfaceFlush(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 alpha = cardAlpha
                 translationY = cardOffsetY
             },
-        shape = AppShapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(3.dp)
-                    .background(accentColor.copy(alpha = 0.85f))
+        header = {
+            AppSectionHeader(
+                title = title,
+                subtitle = subtitle,
+                markerColor = accentColor
             )
+        }
+    ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                    .fillMaxWidth()
+                    .padding(AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = accentColor,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
                 HistoryMetricTable(
                     entries = buildList {
                         add(
@@ -651,7 +641,8 @@ private fun DeepSeekHistoryCard(
                     language = language,
                     chartSelectionKey = chartSelectionKey,
                     tooltipTitle = title,
-                    tooltipSubtitle = subtitle
+                    tooltipSubtitle = subtitle,
+                    accentColor = accentColor
                 )
 
                 deepSeekForecastText(series.forecast, language)?.let { message ->
@@ -662,7 +653,6 @@ private fun DeepSeekHistoryCard(
                     )
                 }
             }
-        }
     }
 }
 
@@ -691,49 +681,30 @@ private fun OpenCodeHistoryCard(
         visible = true
     }
 
-    Card(
+    AppDataSurfaceFlush(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 alpha = cardAlpha
                 translationY = cardOffsetY
             },
-        shape = AppShapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(3.dp)
-                    .background(accentColor.copy(alpha = 0.85f))
+        header = {
+            AppSectionHeader(
+                title = modelReport.modelName,
+                subtitle = openCodeHistorySubtitle(
+                    periodType = modelReport.chartSeries.periodType,
+                    language = language
+                ),
+                markerColor = accentColor
             )
+        }
+    ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .fillMaxWidth()
+                    .padding(AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = modelReport.modelName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = accentColor,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = openCodeHistorySubtitle(
-                            periodType = modelReport.chartSeries.periodType,
-                            language = language
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
                 UsageHistoryLineChart(
                     points = modelReport.chartSeries.points,
                     unit = modelReport.chartSeries.unit,
@@ -743,7 +714,8 @@ private fun OpenCodeHistoryCard(
                     tooltipSubtitle = openCodeHistorySubtitle(
                         periodType = modelReport.chartSeries.periodType,
                         language = language
-                    )
+                    ),
+                    accentColor = accentColor
                 )
 
                 HistoryMetricTable(
@@ -774,7 +746,6 @@ private fun OpenCodeHistoryCard(
                     )
                 )
             }
-        }
     }
 }
 

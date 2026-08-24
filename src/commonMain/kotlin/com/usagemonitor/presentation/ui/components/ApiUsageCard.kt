@@ -4,11 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -48,9 +45,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
@@ -67,12 +62,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -82,13 +74,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
-import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
@@ -97,7 +85,6 @@ import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountContext
-import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
@@ -108,6 +95,7 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 
@@ -124,6 +112,9 @@ private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 const val API_USAGE_CARD_TAG_PREFIX = "apiUsageCard:"
 const val API_USAGE_CARD_HEADER_TAG = "apiUsageCardHeader"
 const val API_USAGE_CARD_ACTIONS_TAG = "apiUsageCardActions"
+
+/** Badge de estado do cabeçalho: ponto e palavra do pior risco entre as cotas. */
+const val API_USAGE_CARD_STATUS_TAG = "apiUsageCardStatus"
 const val QUOTA_BLOCK_TAG_PREFIX = "quotaBlock:"
 
 /** O rótulo da cota é único dentro de um card: é a chave da série. */
@@ -293,17 +284,25 @@ fun ApiUsageCard(
             )
 
             Column(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = density.contentHorizontalPadding,
-                        vertical = density.contentVerticalPadding
-                    )
-            ) {
+                // O cabeçalho carrega o próprio padding e o conteúdo abaixo dele
+                // encosta na borda: é o `.pbody.flush` do protótipo, onde a
+                // divisória de cada cota atravessa o card de ponta a ponta. Com o
+                // padding num bloco só em volta de tudo, a divisória parava a 12dp
+                // de cada lado e a lista deixava de ler como tabela.
+                //
+                // `spacedBy` e não `SpaceBetween`: a coluna do título já leva
+                // `weight(1f)` e empurra o resto para a direita sozinha, e o
+                // arranjo por espaço não deixava vão entre o badge de estado e o
+                // primeiro botão — a palavra encostava no ícone.
                 Row(
-                    modifier = Modifier.fillMaxWidth().testTag(API_USAGE_CARD_HEADER_TAG),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = density.contentHorizontalPadding,
+                            vertical = density.contentVerticalPadding
+                        )
+                        .testTag(API_USAGE_CARD_HEADER_TAG),
+                    horizontalArrangement = Arrangement.spacedBy(density.headerSpacing),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -315,19 +314,33 @@ fun ApiUsageCard(
                         // fundo inteiro do card, e com quatro cards abertos o
                         // dashboard virava quatro retângulos coloridos disputando
                         // a atenção que os números deviam ter.
-                        AppSourceMarker(color = accentColorFor(source = source, accents = AppAccents.current))
-                        HoverTooltipBox(
-                            title = apiName,
-                            metrics = emptyList(),
-                            modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            Text(
-                                text = apiName,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        AppSourceMarker(
+                            color = accentColorFor(source = source, accents = AppAccents.current),
+                            height = if (accountContext == null) 18.dp else 28.dp
+                        )
+                        // Título e conta na mesma coluna, como o `.ptitle`/`.psub`
+                        // do protótipo. A conta era uma linha de largura cheia
+                        // abaixo do cabeçalho inteiro, alinhada à borda do card e
+                        // não ao título de que ela é o subtítulo.
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
+                            HoverTooltipBox(
+                                title = apiName,
+                                metrics = emptyList()
+                            ) {
+                                Text(
+                                    text = apiName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (accountContext != null) {
+                                AccountIdentityLabel(
+                                    account = accountContext,
+                                    language = language
+                                )
+                            }
                         }
                         source.statusBadgeLabel(language)?.let { badgeLabel ->
                             Text(
@@ -357,6 +370,25 @@ fun ApiUsageCard(
                                 iconSize = density.actionIconSize
                             )
                         }
+                    }
+
+                    // Estado da fonte com **ponto e palavra**, ao lado das ações,
+                    // como no protótipo. O `RiskSemaphoreDot` de cada cota é só
+                    // ponto: sozinho, ele deixa a cor informando o estado, que é
+                    // exatamente o que este sistema visual não faz. Aqui a
+                    // palavra aparece uma vez, para o card inteiro, e continua
+                    // sendo lida com o card minimizado — o cabeçalho é composto
+                    // nos dois estados.
+                    worstQuotaRisk(
+                        quotas = orderedQuotas,
+                        riskByQuotaKey = riskByQuotaKey,
+                        now = now
+                    )?.let { (_, worstRisk) ->
+                        AppStatusIndicator(
+                            label = riskLevelLabel(worstRisk.level, language),
+                            tone = toneFor(worstRisk.level),
+                            modifier = Modifier.testTag(API_USAGE_CARD_STATUS_TAG)
+                        )
                     }
 
                     Row(
@@ -410,16 +442,7 @@ fun ApiUsageCard(
                     }
                 }
 
-                if (accountContext != null) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    AccountIdentityLabel(
-                        account = accountContext,
-                        language = language,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
+                AppDivider()
 
                 AnimatedContent(
                     targetState = isMinimized,
@@ -438,12 +461,21 @@ fun ApiUsageCard(
                     },
                     label = "cardLayoutMode"
                 ) { minimized ->
+                    // Só a cota expandida é linha de tabela e traz a própria
+                    // divisória de ponta a ponta. Badge e resumo do OpenCode são
+                    // blocos, e bloco encostado na borda não tem onde respirar:
+                    // esses dois recebem o padding do card.
+                    val blockPadding = Modifier.padding(
+                        horizontal = density.contentHorizontalPadding,
+                        vertical = density.contentVerticalPadding
+                    )
                     if (source.isObservedActivitySource()) {
                         OpenCodeUsageSummary(
                             source = source,
                             quotas = orderedQuotas,
                             language = language,
-                            compact = minimized
+                            compact = minimized,
+                            modifier = blockPadding
                         )
                     } else if (minimized) {
                         CompactQuotaSummary(
@@ -455,7 +487,8 @@ fun ApiUsageCard(
                             density = density,
                             stacked = stackCompactQuotas,
                             showTooltip = showQuotaTooltip,
-                            now = now
+                            now = now,
+                            modifier = blockPadding
                         )
                     } else {
                         ExpandedQuotaSummary(
@@ -469,8 +502,6 @@ fun ApiUsageCard(
                         )
                     }
                 }
-
-            }
 
             // As quatro ações de navegação desceram do cabeçalho para uma barra
             // própria. No topo elas dividiam espaço com atualizar e minimizar, que
@@ -714,14 +745,19 @@ private fun OpenCodeUsageSummary(
     val modelSummaries = remember(quotas) { buildOpenCodeModelSummaries(quotas) }
 
     if (modelSummaries.isEmpty()) {
+        // Superfície neutra com borda, como todo bloco de dado do sistema. O
+        // fundo pintado com a cor da fonte era o resto do card colorido que a
+        // refatoração tirou do resto do dashboard: aqui ele sobreviveu porque
+        // OpenCode e Kilo não entram nas capturas.
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .clip(AppShapes.extraLarge)
-                .background(accentColorFor(source).copy(alpha = 0.1f))
-                .padding(horizontal = 16.dp, vertical = 18.dp),
+                .clip(AppShapes.small)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
         ) {
             Text(
                 text = if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected",
@@ -803,13 +839,17 @@ private fun OpenCodeModelRowContent(
     compact: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // A identidade da fonte fica no marcador de 2dp do cabeçalho do card, como em
+    // todos os outros. Aqui ela pintava o bloco inteiro, e num card com três
+    // modelos eram três retângulos coloridos dentro de um card já identificado.
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(AppShapes.extraLarge)
-            .background(accentColorFor(source).copy(alpha = 0.12f))
-            .padding(horizontal = 14.dp, vertical = if (compact) 10.dp else 12.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 12.dp)
+            .clip(AppShapes.small)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+            .padding(horizontal = AppSpacing.md, vertical = if (compact) AppSpacing.sm else AppSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else AppSpacing.md)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -841,8 +881,8 @@ private fun OpenCodeModelRowContent(
                 Text(
                     text = localizedRequestCount(summary.requestsFiveHours, language),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = openCodePrimaryWindowLabel(language),
@@ -896,7 +936,6 @@ private fun OpenCodeInlineComparisonChart(
             label = "5h",
             value = summary.requestsFiveHours,
             fraction = summary.requestsFiveHours / maxValue,
-            accentColor = accentColorFor(source),
             language = language
         )
         OpenCodeInlineBar(
@@ -904,7 +943,6 @@ private fun OpenCodeInlineComparisonChart(
             label = "7d",
             value = summary.requestsSevenDays,
             fraction = summary.requestsSevenDays / maxValue,
-            accentColor = accentColorFor(source),
             language = language
         )
     }
@@ -916,7 +954,6 @@ private fun OpenCodeInlineBar(
     label: String,
     value: Long,
     fraction: Float,
-    accentColor: Color,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
@@ -948,25 +985,11 @@ private fun OpenCodeInlineBar(
                     value = value.toString()
                 )
             ),
-            modifier = Modifier
-                .weight(1f)
-                .height(8.dp)
+            modifier = Modifier.weight(1f)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(AppShapes.small)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                        .height(8.dp)
-                        .clip(AppShapes.small)
-                        .background(accentColor.copy(alpha = 0.82f))
-                )
-            }
+            // A barra do sistema: 4dp, com borda e trilha neutra. Esta era a
+            // única do app com 8dp e superfície com alpha própria.
+            AppProgressTrack(fraction = fraction, tone = AppTone.INFO)
         }
 
         Text(
@@ -1270,19 +1293,27 @@ private fun ExpandedQuotaSummary(
     now: Instant,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(density.expandedQuotaSpacing)
-    ) {
-        quotas.forEach { quota ->
-            QuotaRow(
-                quota = quota,
-                showUsageDetails = showUsageDetails,
-                language = language,
-                risk = riskByQuotaKey[quota.seriesKey],
-                showTooltip = showTooltip,
-                now = now
-            )
+    // Linha de dados, com divisória própria e sem vão entre elas: é a mesma
+    // decisão da lista do time. O vão fazia três cotas lerem como três blocos
+    // empilhados, e sem a divisória o rótulo de uma encostava no reinício da
+    // anterior sem nada dizendo onde uma termina.
+    Column(modifier = modifier.fillMaxWidth()) {
+        quotas.forEachIndexed { index, quota ->
+            AppDataRow(
+                showDivider = index != quotas.lastIndex,
+                horizontalPadding = density.contentHorizontalPadding,
+                verticalPadding = density.contentVerticalPadding
+            ) {
+                QuotaRow(
+                    quota = quota,
+                    showUsageDetails = showUsageDetails,
+                    language = language,
+                    risk = riskByQuotaKey[quota.seriesKey],
+                    showTooltip = showTooltip,
+                    now = now,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }

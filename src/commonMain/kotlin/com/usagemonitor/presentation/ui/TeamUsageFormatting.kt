@@ -101,13 +101,9 @@ internal object TeamUsageLabels {
         }
     }
 
-    fun trendTitle(dayCount: Int, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
-            "Tendência dos últimos $dayCount dias"
-        } else {
-            "Trend over the last $dayCount days"
-        }
-    }
+    // `trendTitle` saiu: era o título de um painel de explicação acima do
+    // gráfico, e o painel deixou de existir. A aba já se chama "Tendência" e o
+    // `trendHint` já diz quantos dias a série cobre.
 
     /**
      * A tendência não segue o filtro de janela da lista, e a tela precisa
@@ -157,6 +153,23 @@ internal object TeamUsageLabels {
      */
     fun accountBand(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Conta" else "Account"
+    }
+
+    /**
+     * A mesma palavra com a contagem de integrantes emendada.
+     *
+     * A contagem morava numa coluna própria da faixa, que a lista de integrantes
+     * não tem. Com a faixa reservando as mesmas colunas da linha, um número sob a
+     * legenda "Tempo ativo" diria uma coisa e valeria outra — então ele voltou
+     * para onde a faixa se identifica.
+     */
+    fun accountBandWithMembers(memberCount: Int, language: AppLanguage): String {
+        return "${accountBand(language)} · ${memberCount(memberCount, language)}"
+    }
+
+    /** Legenda da coluna de identidade, a mesma da tela de presença. */
+    fun columnMember(language: AppLanguage): String {
+        return TeamPresenceLabels.columnMember(language)
     }
 
     /** Conta que ainda não tem chave emitida — só o uuid a identifica. */
@@ -426,10 +439,13 @@ internal object TeamUsageLabels {
         if (instantLabel == null) {
             return if (language == AppLanguage.PT) "nunca reportou" else "never reported"
         }
+        // "envio", e não "último envio": a frase mora na terceira linha da coluna
+        // de identidade, e as duas palavras a faziam truncar justamente no
+        // carimbo, que é a parte que informa.
         return if (language == AppLanguage.PT) {
-            "último envio $instantLabel"
+            "envio $instantLabel"
         } else {
-            "last report $instantLabel"
+            "report $instantLabel"
         }
     }
 }

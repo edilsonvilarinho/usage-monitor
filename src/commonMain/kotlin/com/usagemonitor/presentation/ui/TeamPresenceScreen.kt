@@ -27,12 +27,9 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,7 +47,13 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
+import com.usagemonitor.presentation.ui.components.AppCellValue
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
+import com.usagemonitor.presentation.ui.components.AppTextField
+import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppToggleChip
@@ -59,7 +62,6 @@ import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
@@ -80,11 +82,14 @@ internal const val PRESENCE_REMOVE_CONFIRM_TAG = "teamPresenceRemoveConfirm"
 internal const val PRESENCE_DELETE_ACCOUNT_CONFIRM_TAG = "teamPresenceDeleteAccountConfirm"
 internal const val PRESENCE_ACTION_ERROR_TAG = "teamPresenceActionError"
 internal const val PRESENCE_COLUMN_HEADER_TAG = "teamPresenceColumnHeader"
+internal const val PRESENCE_FILTER_TAG = "teamPresenceFilter"
+internal const val PRESENCE_LAST_SEEN_TAG_PREFIX = "teamPresenceLastSeen:"
+internal const val PRESENCE_LAST_TURN_TAG_PREFIX = "teamPresenceLastTurn:"
 
 // Larguras das colunas num lugar só, pelo mesmo motivo da tela de consumo: a
 // faixa do cabeçalho, a da conta e a linha do integrante têm de cair no mesmo x.
 //
-// O somatório não é livre. Quando ele passa da largura útil da janela o `FlowRow`
+// O somatório não é livre. Quando ele passa da largura útil da janela a linha
 // quebra e as colunas deixam de alinhar entre as linhas — que é exatamente o que
 // as larguras fixas existem para impedir. A conta:
 //
@@ -92,39 +97,65 @@ internal const val PRESENCE_COLUMN_HEADER_TAG = "teamPresenceColumnHeader"
 //         ≤ largura_janela − 72dp
 //
 // onde os 72dp são 32 de padding da Column + 12 do `SCROLLBAR_GUTTER` + 28 do
-// `contentPadding` da linha. Com as cinco colunas e a ação o pior caso dá 932dp, e
-// é dele que sai `TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP`. O tamanho default da janela
-// (960dp) sempre coube; o que faltava era impedir o arrasto da borda para baixo do
-// orçamento — foi assim que a faixa da conta apareceu em produção com o botão de
-// apagar numa linha própria.
+// `contentPadding` da linha. O que faltava era impedir o arrasto da borda para
+// baixo do orçamento — foi assim que a faixa da conta apareceu em produção com o
+// botão de apagar numa linha própria.
 //
-// A ação fica **fora** do `FlowRow`, como coluna fixa à direita: dentro dele ela é
-// o último item e portanto o primeiro a quebrar, e o que sobra na tela é um ícone
+// A ação fica **fora** do `Row`, como coluna fixa à direita: dentro dele ela é o
+// último item e portanto o primeiro a quebrar, e o que sobra na tela é um ícone
 // vermelho solto, sem coluna, sem legenda e sem dizer a que linha pertence.
-// As colunas Estado e Trabalhando carregam um carimbo do tipo
-// "último sinal 12/08 10:58 BRT": abaixo de ~150dp de texto ele quebra em duas
-// linhas e a lista fica com alturas irregulares. Estado ainda desconta o ponto
-// de status e o espaçamento (14dp), daí ser a mais larga das duas.
-private val PRESENCE_COLUMN_IDENTITY = 190.dp
-private val PRESENCE_COLUMN_MACHINE = 125.dp
-private val PRESENCE_COLUMN_STATE = 170.dp
-private val PRESENCE_COLUMN_WORKING = 155.dp
-private val PRESENCE_COLUMN_STATUS = 104.dp
+//
+// A ordem é a do protótipo: o estado primeiro, porque é a pergunta que a tela
+// responde. E os dois carimbos ganharam colunas próprias — moravam dentro das
+// células de Estado e de Trabalhando, dois dados por célula, que é exatamente o
+// que uma faixa de legendas existe para desfazer.
+//
+// São **sete** colunas onde antes eram cinco, e é por isso que o piso da janela
+// subiu de 940 para 1030dp: cada carimbo é "12/08 10:58 BRT" por extenso, e
+// truncá-lo em "12/08 10:58 B…" apaga justamente o fuso que a frase existe para
+// dizer. O somatório abaixo é 802dp.
+private val PRESENCE_COLUMN_STATE = 132.dp
+private val PRESENCE_COLUMN_IDENTITY = 150.dp
+private val PRESENCE_COLUMN_MACHINE = 104.dp
+private val PRESENCE_COLUMN_ACTIVE_SESSIONS = 96.dp
+private val PRESENCE_COLUMN_LAST_SEEN = 116.dp
+private val PRESENCE_COLUMN_LAST_TURN = 116.dp
+private val PRESENCE_COLUMN_STATUS = 88.dp
 
 private val PRESENCE_COLUMN_SPACING = 16.dp
 private val PRESENCE_ROW_CONTENT_PADDING = 14.dp
 private val PRESENCE_ACCOUNT_VERTICAL_PADDING = 10.dp
 
-/**
- * Marcador de 2dp do `AppDataRow` mais o vão que o separa da primeira célula.
- *
- * A faixa de legendas não é uma linha de dados e não tem marcador; sem repetir a
- * soma aqui, ela prometia um alinhamento 14dp à esquerda do que as linhas entregam.
- */
-private val PRESENCE_MARKER_GUTTER = 14.dp
+/** Largura fixa: num `FlowRow` um campo elástico empurraria os indicadores. */
+private val PRESENCE_FILTER_FIELD_WIDTH = 200.dp
 
 /** Mesma pegada do `AppIconButton` (26dp), para o cabeçalho reservar a casa certa. */
 private val PRESENCE_ACTION_SLOT = 26.dp
+
+/**
+ * As três palavras que os dois booleanos produzem.
+ *
+ * Continuam **duas camadas** e não uma escala: *conectado* é heartbeat dentro de
+ * 90s e *trabalhando agora* é turno dentro de 5min. O que muda é o desenho — as
+ * três combinações que existem (trabalhar implica estar online) cabem numa coluna
+ * só, e colapsá-las em duas é que esconderia o caso que a tela existe para
+ * mostrar: quem está com o app aberto e parado.
+ */
+private fun presenceStateLabel(entry: TeamMemberPresence, language: AppLanguage): String {
+    return when {
+        entry.isWorkingNow -> TeamPresenceLabels.workingNow(language)
+        entry.isOnline -> TeamPresenceLabels.online(language)
+        else -> TeamPresenceLabels.offline(language)
+    }
+}
+
+private fun presenceStateTone(entry: TeamMemberPresence): AppTone {
+    return when {
+        entry.isWorkingNow -> AppTone.OK
+        entry.isOnline -> AppTone.INFO
+        else -> AppTone.NEUTRAL
+    }
+}
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -148,6 +179,7 @@ fun TeamPresenceScreen(
         actionError = actionError,
         onToggleAccount = { groupKey -> viewModel.toggleAccount(groupKey) },
         onSetOnlyOnline = { value -> viewModel.setOnlyOnline(value) },
+        onQueryChange = { value -> viewModel.setQuery(value) },
         onRemoveMember = { memberKey -> viewModel.removeMember(memberKey) },
         onDeleteAccount = { accountKey -> viewModel.deleteAccount(accountKey) },
         onDismissActionError = { viewModel.clearActionError() },
@@ -165,6 +197,7 @@ internal fun TeamPresenceContent(
     actionError: String? = null,
     onToggleAccount: (String) -> Unit = {},
     onSetOnlyOnline: (Boolean) -> Unit = {},
+    onQueryChange: (String) -> Unit = {},
     onRemoveMember: (String) -> Unit = {},
     onDeleteAccount: (String) -> Unit = {},
     onDismissActionError: () -> Unit = {}
@@ -190,6 +223,7 @@ internal fun TeamPresenceContent(
                 actionError = actionError,
                 onToggleAccount = onToggleAccount,
                 onSetOnlyOnline = onSetOnlyOnline,
+                onQueryChange = onQueryChange,
                 onRequestRemoveMember = { entry -> pendingMember = entry },
                 onRequestDeleteAccount = { group -> pendingAccount = group },
                 onDismissActionError = onDismissActionError
@@ -250,9 +284,12 @@ private fun ConfirmationDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm, modifier = Modifier.testTag(confirmTag)) {
-                Text(text = confirmLabel, color = MaterialTheme.colorScheme.error)
-            }
+            AppButton(
+                label = confirmLabel,
+                onClick = onConfirm,
+                tone = AppButtonTone.DANGER,
+                modifier = Modifier.testTag(confirmTag)
+            )
         },
         dismissButton = {
             AppButton(
@@ -273,6 +310,7 @@ private fun TeamPresenceList(
     actionError: String?,
     onToggleAccount: (String) -> Unit,
     onSetOnlyOnline: (Boolean) -> Unit,
+    onQueryChange: (String) -> Unit,
     onRequestRemoveMember: (TeamMemberPresence) -> Unit,
     onRequestDeleteAccount: (TeamPresenceAccountGroup) -> Unit,
     onDismissActionError: () -> Unit
@@ -281,7 +319,12 @@ private fun TeamPresenceList(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        TeamPresenceHeader(state = state, language = language, onSetOnlyOnline = onSetOnlyOnline)
+        TeamPresenceHeader(
+            state = state,
+            language = language,
+            onSetOnlyOnline = onSetOnlyOnline,
+            onQueryChange = onQueryChange
+        )
 
         if (actionError != null) {
             Row(
@@ -321,7 +364,16 @@ private fun TeamPresenceList(
         }
 
         if (state.isFilteredEmpty) {
-            CenteredMessage(TeamPresenceLabels.emptyFiltered(language))
+            // Dois filtros, duas mensagens: "desligue o filtro para ver o time
+            // inteiro" não ajuda quem digitou um nome que não existe.
+            val query = state.query.trim()
+            CenteredMessage(
+                if (query.isEmpty()) {
+                    TeamPresenceLabels.emptyFiltered(language)
+                } else {
+                    TeamPresenceLabels.emptyQuery(query, language)
+                }
+            )
             return@Column
         }
 
@@ -410,26 +462,27 @@ private fun TeamPresenceList(
 private fun TeamPresenceHeader(
     state: TeamPresenceUiState.Success,
     language: AppLanguage,
-    onSetOnlyOnline: (Boolean) -> Unit
+    onSetOnlyOnline: (Boolean) -> Unit,
+    onQueryChange: (String) -> Unit
 ) {
-    val accents = AppAccents.current
-
+    // Superfície de dados como as outras: `AppElevation.dialog` num painel dentro
+    // da janela punha 8dp de sombra sob um bloco que não flutua sobre nada.
     DepthSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.large,
-        elevation = AppElevation.dialog,
-        contentPadding = 16.dp
+        contentPadding = AppSpacing.md
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // O e-mail é dado, e dado fica na cor do texto — a mesma decisão do
+            // cabeçalho do modal de consumo.
             if (state.accountLabel != null) {
                 Text(
                     text = state.accountLabel,
                     style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -437,7 +490,7 @@ private fun TeamPresenceHeader(
                 Text(
                     text = TeamUsageLabels.allAccounts(state.presenceGroups.size, language),
                     style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -458,20 +511,23 @@ private fun TeamPresenceHeader(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SummaryNumber(
-                value = state.workingCount.toString(),
-                caption = TeamPresenceLabels.workingSummary(state.workingCount, language),
-                valueColor = accents.cacheRead
+            // Indicador de estado, não bloco de métrica: aqui o texto já traz o
+            // número ("2 conectados"), e o protótipo desenha esta tela com ponto
+            // e palavra. Eram três números soltos e coloridos — verde, azul e
+            // branco — sem nada dizendo o que a cor significava. Os tons são os
+            // mesmos das linhas abaixo, ou a mesma ideia teria duas cores na
+            // mesma tela.
+            AppStatusIndicator(
+                label = TeamPresenceLabels.workingSummary(state.workingCount, language),
+                tone = AppTone.OK
             )
-            SummaryNumber(
-                value = state.onlineCount.toString(),
-                caption = TeamPresenceLabels.onlineSummary(state.onlineCount, language),
-                valueColor = accents.input
+            AppStatusIndicator(
+                label = TeamPresenceLabels.onlineSummary(state.onlineCount, language),
+                tone = AppTone.INFO
             )
-            SummaryNumber(
-                value = state.totalCount.toString(),
-                caption = TeamPresenceLabels.knownSummary(state.totalCount, language),
-                valueColor = MaterialTheme.colorScheme.onSurface
+            AppStatusIndicator(
+                label = TeamPresenceLabels.knownSummary(state.totalCount, language),
+                tone = AppTone.NEUTRAL
             )
 
             // Filtro binário: um segmentado de dois estados diria "ou isto, ou
@@ -482,6 +538,16 @@ private fun TeamPresenceHeader(
                 selected = state.onlyOnline,
                 onClick = { onSetOnlyOnline(!state.onlyOnline) },
                 modifier = Modifier.testTag(PRESENCE_ONLY_ONLINE_TAG)
+            )
+
+            // Campo de texto ao lado do chip, como no protótipo: o chip liga uma
+            // restrição, o campo estreita por nome. Num time de vinte máquinas o
+            // chip sozinho não acha ninguém.
+            AppTextField(
+                value = state.query,
+                onValueChange = onQueryChange,
+                placeholder = TeamPresenceLabels.filterPlaceholder(language),
+                modifier = Modifier.width(PRESENCE_FILTER_FIELD_WIDTH).testTag(PRESENCE_FILTER_TAG)
             )
         }
     }
@@ -506,33 +572,39 @@ private fun TeamPresenceColumnHeader(
     hasHealthColumn: Boolean,
     hasActionColumn: Boolean
 ) {
-    Row(
+    AppColumnHeaderRow(
         modifier = Modifier
-            .fillMaxWidth()
             .padding(end = SCROLLBAR_GUTTER)
-            .padding(horizontal = PRESENCE_ROW_CONTENT_PADDING)
-            .padding(start = PRESENCE_MARKER_GUTTER)
             .testTag(PRESENCE_COLUMN_HEADER_TAG),
-        horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING)
+        horizontalPadding = PRESENCE_ROW_CONTENT_PADDING,
+        spacing = PRESENCE_COLUMN_SPACING
     ) {
-        ColumnHeaderLabel(
-            label = TeamPresenceLabels.columnMember(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY)
-        )
-        ColumnHeaderLabel(
-            label = CliSessionsLabels.machine(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_MACHINE)
-        )
-        ColumnHeaderLabel(
+        AppColumnHeaderLabel(
             label = TeamPresenceLabels.columnState(language),
             modifier = Modifier.width(PRESENCE_COLUMN_STATE)
         )
-        ColumnHeaderLabel(
-            label = TeamPresenceLabels.columnWorking(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_WORKING)
+        AppColumnHeaderLabel(
+            label = TeamPresenceLabels.columnMember(language),
+            modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.machine(language),
+            modifier = Modifier.width(PRESENCE_COLUMN_MACHINE)
+        )
+        AppColumnHeaderLabel(
+            label = TeamPresenceLabels.columnActiveSessions(language),
+            modifier = Modifier.width(PRESENCE_COLUMN_ACTIVE_SESSIONS)
+        )
+        AppColumnHeaderLabel(
+            label = TeamPresenceLabels.columnLastSeen(language),
+            modifier = Modifier.width(PRESENCE_COLUMN_LAST_SEEN)
+        )
+        AppColumnHeaderLabel(
+            label = TeamPresenceLabels.columnLastTurn(language),
+            modifier = Modifier.width(PRESENCE_COLUMN_LAST_TURN)
         )
         if (hasHealthColumn) {
-            ColumnHeaderLabel(
+            AppColumnHeaderLabel(
                 label = TeamUsageLabels.columnStatus(language),
                 modifier = Modifier.width(PRESENCE_COLUMN_STATUS)
             )
@@ -546,39 +618,6 @@ private fun TeamPresenceColumnHeader(
     }
 }
 
-@Composable
-private fun SummaryNumber(
-    value: String,
-    caption: String,
-    valueColor: androidx.compose.ui.graphics.Color
-) {
-    Column {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = valueColor
-        )
-        Text(
-            text = caption,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/**
- * Faixa que separa uma conta da seguinte na visão global.
- *
- * Mostra o rótulo **e** o `accountUuid` pela mesma razão da tela de consumo: o
- * rótulo é texto que o administrador digitou e o servidor não o verifica, então
- * ele orienta mas não prova.
- *
- * A anatomia é a mesma da faixa de conta do modal de consumo: superfície
- * `surfaceVariant`, marcador de 2dp, a palavra "Conta" e divisória embaixo. Sem
- * ela, conta e integrante eram dois retângulos transparentes de mesmo peso
- * separados por um vão, e nada dizia qual dos dois níveis se estava lendo.
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TeamPresenceAccountHeader(
@@ -613,11 +652,16 @@ private fun TeamPresenceAccountHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AppSourceMarker(color = accents.cacheRead)
-            FlowRow(
+            Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // A primeira coluna da linha é o estado, e a faixa não tem estado
+                // agregado: o vão mantém a identidade da conta no mesmo x do
+                // apelido do integrante.
+                Spacer(modifier = Modifier.width(PRESENCE_COLUMN_STATE))
+
                 // Ícone dentro da coluna de identidade, como na linha do integrante: é o
                 // que mantém as colunas seguintes no mesmo x nas duas.
                 Row(
@@ -632,9 +676,9 @@ private fun TeamPresenceAccountHeader(
                         } else {
                             TeamUsageLabels.expandAccount(language)
                         },
-                        tint = accents.cacheRead
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         // A palavra vem antes do e-mail: sem ela a faixa entregava um
                         // endereço e um uuid sem dizer que aquilo é a conta, e ao lado de
                         // uma linha de integrante — que também tem nome e identificador —
@@ -648,7 +692,7 @@ private fun TeamPresenceAccountHeader(
                         Text(
                             text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
                             style = MaterialTheme.typography.titleSmall,
-                            color = accents.cacheRead,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -667,19 +711,28 @@ private fun TeamPresenceAccountHeader(
                 // mantém as colunas seguintes no mesmo x da linha do integrante.
                 Spacer(modifier = Modifier.width(PRESENCE_COLUMN_MACHINE))
 
-                MetricValue(
-                    value = TeamPresenceLabels.groupSummary(group.onlineCount, group.totalCount, language),
-                    modifier = Modifier.width(PRESENCE_COLUMN_STATE)
-                )
-
-                MetricValue(
-                    value = group.workingCount.toString(),
-                    valueColor = accents.cacheRead,
-                    modifier = Modifier.width(PRESENCE_COLUMN_WORKING)
+                // Uma célula só, atravessando as três colunas que a conta não
+                // tem — sessões ativas, último sinal e último turno. O texto se
+                // descreve ("2 de 2 conectados · 1 trabalhando"), então ele não
+                // depende da legenda de coluna nenhuma; o que não pode acontecer
+                // é um número cru sob a legenda errada.
+                AppCellValue(
+                    value = TeamPresenceLabels.accountBandSummary(
+                        online = group.onlineCount,
+                        total = group.totalCount,
+                        working = group.workingCount,
+                        language = language
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(
+                        PRESENCE_COLUMN_ACTIVE_SESSIONS +
+                            PRESENCE_COLUMN_SPACING + PRESENCE_COLUMN_LAST_SEEN +
+                            PRESENCE_COLUMN_SPACING + PRESENCE_COLUMN_LAST_TURN
+                    )
                 )
             }
 
-            // Fora do `FlowRow` de propósito: dentro dele a ação é o último item e
+            // Fora do `Row` de propósito: dentro dele a ação é o último item e
             // portanto o primeiro a quebrar, e numa janela estreita o botão de
             // apagar aparecia sozinho numa linha abaixo do e-mail.
             if (deletable) {
@@ -743,18 +796,28 @@ private fun TeamPresenceRow(
         verticalPadding = PRESENCE_ROW_CONTENT_PADDING
     ) {
         AppSourceMarker(color = accent)
-        FlowRow(
+        // `Row` e não `FlowRow`: quebrar é o que a faixa de legendas não admite.
+        // Quem garante que ela não quebre é o orçamento de `PRESENCE_COLUMN_*`
+        // mais o piso da janela.
+        Row(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // O botão de remover tem 48dp de alvo e é o item mais alto da linha.
-            // Sem centrar, as células de texto ficam grudadas no topo com um vão
-            // morto embaixo. O `FlowRow` desta versão do Compose não tem
-            // alinhamento de item, então cada célula carrega o seu.
-            val cellAlignment = Modifier.align(Alignment.CenterVertically)
+            // Um estado e três palavras, não dois booleanos soltos: trabalhar
+            // implica estar online, então as três combinações que existem cabem
+            // numa coluna só — e ela continua sendo ponto **e** palavra, porque
+            // cor sozinha não informa.
+            AppStatusIndicator(
+                label = presenceStateLabel(entry, language),
+                tone = presenceStateTone(entry),
+                modifier = Modifier
+                    .width(PRESENCE_COLUMN_STATE)
+                    .semantics(mergeDescendants = true) { }
+                    .testTag("$PRESENCE_STATE_TAG_PREFIX${entry.memberKey}")
+            )
 
-            Column(modifier = cellAlignment.width(PRESENCE_COLUMN_IDENTITY)) {
+            Column(modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY)) {
                 Text(
                     text = entry.alias,
                     style = MaterialTheme.typography.titleSmall,
@@ -774,83 +837,45 @@ private fun TeamPresenceRow(
                 }
             }
 
-            MetricValue(
+            AppCellValue(
                 value = entry.machineLabel,
-                modifier = cellAlignment.width(PRESENCE_COLUMN_MACHINE)
+                modifier = Modifier.width(PRESENCE_COLUMN_MACHINE)
             )
 
-            // Semântica mesclada: "Conectado" e o horário do último sinal são uma
-            // unidade de leitura, e separá-los faria o leitor de tela anunciar
-            // dois fragmentos soltos.
-            Row(
-                modifier = cellAlignment
-                    .width(PRESENCE_COLUMN_STATE)
-                    .semantics(mergeDescendants = true) { }
-                    .testTag("$PRESENCE_STATE_TAG_PREFIX${entry.memberKey}"),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Alinhado ao topo, e não centrado: a célula tem duas linhas, e
-                // centrar deixaria o ponto flutuando entre elas em vez de ao lado
-                // do estado que ele codifica. Os 5dp o descem à altura da x-height
-                // da primeira linha.
-                Box(
-                    modifier = Modifier
-                        .padding(top = 5.dp)
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (entry.isOnline) accents.input else MaterialTheme.colorScheme.outline)
-                )
-                Column {
-                    Text(
-                        text = if (entry.isOnline) {
-                            TeamPresenceLabels.online(language)
-                        } else {
-                            TeamPresenceLabels.offline(language)
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (entry.isOnline) accents.input else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    // Hora absoluta, e não tempo decorrido: o decorrido mudaria a
-                    // cada tique e recomporia a lista inteira de 5 em 5 segundos.
-                    Text(
-                        text = TeamPresenceLabels.lastSignal(
-                            instantLabel = entry.lastSeenAt?.let { instant -> formatInstant(instant) },
-                            language = language
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Column(
-                modifier = cellAlignment
-                    .width(PRESENCE_COLUMN_WORKING)
-                    .semantics(mergeDescendants = true) { }
+            // Só o número: a legenda da coluna já diz o que ele conta. Quem não
+            // está trabalhando tem zero, e zero aqui é medida — o "Parado" que
+            // existia é o que a coluna Estado passou a dizer.
+            AppCellValue(
+                value = entry.activeSessionCount.toString(),
+                color = if (entry.isWorkingNow) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier
+                    .width(PRESENCE_COLUMN_ACTIVE_SESSIONS)
                     .testTag("$PRESENCE_WORKING_TAG_PREFIX${entry.memberKey}")
-            ) {
-                Text(
-                    text = if (entry.isWorkingNow) {
-                        TeamPresenceLabels.activeSessions(entry.activeSessionCount, language)
-                    } else {
-                        TeamPresenceLabels.idle(language)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (entry.isWorkingNow) {
-                        accents.cacheRead
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-                Text(
-                    text = TeamPresenceLabels.lastTurn(
-                        instantLabel = entry.lastActivityAt?.let { instant -> formatInstant(instant) },
-                        language = language
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            )
+
+            // Hora absoluta, e não tempo decorrido: o decorrido mudaria a cada
+            // tique e recomporia a lista inteira de 5 em 5 segundos.
+            AppCellValue(
+                value = entry.lastSeenAt?.let { instant -> formatInstant(instant) }
+                    ?: TeamPresenceLabels.neverSeen(language),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .width(PRESENCE_COLUMN_LAST_SEEN)
+                    .testTag("$PRESENCE_LAST_SEEN_TAG_PREFIX${entry.memberKey}")
+            )
+
+            AppCellValue(
+                value = entry.lastActivityAt?.let { instant -> formatInstant(instant) }
+                    ?: TeamPresenceLabels.neverSeen(language),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .width(PRESENCE_COLUMN_LAST_TURN)
+                    .testTag("$PRESENCE_LAST_TURN_TAG_PREFIX${entry.memberKey}")
+            )
 
             // Quem não tem sessão não tem veredito, mas a coluna continua ocupada:
             // sem o vão, a linha sem status encolhe e o botão de ação sobe uma
@@ -860,7 +885,7 @@ private fun TeamPresenceRow(
                 TeamHealthCell(
                     health = worstHealth,
                     language = language,
-                    modifier = cellAlignment.width(PRESENCE_COLUMN_STATUS),
+                    modifier = Modifier.width(PRESENCE_COLUMN_STATUS),
                     showLabel = false
                 )
             } else if (hasHealthColumn) {

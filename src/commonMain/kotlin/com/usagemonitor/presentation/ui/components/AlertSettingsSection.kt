@@ -7,17 +7,15 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.UsageAlertSettings
@@ -58,16 +56,17 @@ fun AlertSettingsSection(
     // e seria apagado no primeiro clique em qualquer outro chip.
     val offered = (OFFERED_PERCENTS + selected).distinct().sorted()
 
-    Column(
+    // Painel com cabeçalho, como as outras seções das Configurações. O título
+    // era um `Text` solto no topo de uma coluna, e as três opções abaixo dele
+    // eram linhas sem divisória sobre o mesmo fundo.
+    AppDataSurfaceFlush(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        header = { AppSectionHeader(title = if (isPt) "Alertas" else "Alerts") }
     ) {
-        Text(
-            text = if (isPt) "Alertas" else "Alerts",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(AppSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+      ) {
         AlertToggleRow(
             label = if (isPt) "Avisar quando a quota cruzar um limiar" else "Warn when a quota crosses a threshold",
             checked = settings.quotaAlertsEnabled,
@@ -183,6 +182,7 @@ fun AlertSettingsSection(
                 tone = AppButtonTone.GHOST
             )
         }
+      }
     }
 }
 
@@ -193,15 +193,14 @@ private fun AlertToggleRow(
     testTag: String,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    // Rótulo em mono e linha de dados, como as opções da aba Geral: o texto
+    // estava em `bodySmall`, que é sans, e lia como frase e não como rótulo.
+    AppDataRow(showDivider = false, horizontalPadding = 0.dp) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f).padding(end = 8.dp)
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
         )
         AppSwitch(
             checked = checked,

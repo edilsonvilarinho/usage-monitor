@@ -92,6 +92,14 @@ O cabecalho conta quantas sessoes estao saturadas ou em atencao.
 
 ![Sessoes CLI](img/cli-sessions.png)
 
+### Resumo por eixo
+
+O consumo da mesma janela recortado por projeto, modelo, branch e ferramenta, com
+o ritmo de queima e a grade de atividade por hora. As tres listas descrevem os
+mesmos turnos: somar baldes de listas diferentes contaria o mesmo gasto tres vezes.
+
+![Resumo por eixo](img/cli-breakdown.png)
+
 ### Detalhe da sessao
 
 Recomendacao de `/compact`, crescimento do contexto turno a turno e, no bloco
@@ -105,6 +113,14 @@ Consumo agregado da conta por integrante: apelido, maquina, tokens, custo e
 fatia do time. Cada integrante expande para as sessoes dele.
 
 ![Sessoes do time](img/team-usage.png)
+
+### Tendencia do time
+
+Quanto cada integrante gastou por dia, uma barra por dia e uma cor por pessoa.
+Todas na mesma escala: normalizar cada um pelo proprio pico faria quem gasta
+centavos parecer igual a quem gasta dezenas de dolares.
+
+![Tendencia do time](img/team-trend.png)
 
 ### Configuracoes
 

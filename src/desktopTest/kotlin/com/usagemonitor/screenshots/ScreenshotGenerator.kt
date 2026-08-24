@@ -36,6 +36,7 @@ import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
@@ -43,6 +44,7 @@ import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
+import com.usagemonitor.presentation.viewmodel.TeamUsageView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -97,8 +99,10 @@ fun main(args: Array<String>) {
     generator.settings()
     generator.settingsTeam()
     generator.cliSessions()
+    generator.cliBreakdown()
     generator.cliSessionDetail()
     generator.teamUsage()
+    generator.teamTrend()
     generator.presence(isDark = true)
     generator.presence(isDark = false)
     generator.presenceAccounts()
@@ -231,16 +235,15 @@ private class ScreenshotGenerator(private val outputDir: File) {
      * time fora do quadro.
      */
     fun settingsTeam() = capture("settings-team", widthDp = 620, heightDp = 610) {
+        // Sem envoltório: a seção ja monta o próprio painel com borda, e o
+        // `Surface` com alpha que existia aqui era um quinto degrau de
+        // superfície — inventado pela captura, ausente do app.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(AppSpacing.lg)
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                shape = MaterialTheme.shapes.medium
-            ) {
+            run {
                 TeamIntegrationSection(
                     settings = ScreenshotFixtures.teamSettings,
                     language = AppLanguage.PT,
@@ -252,7 +255,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
                     onAliasChange = {},
                     onProfileParticipationChange = { _, _ -> },
                     onTestConnection = {},
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier
                 )
             }
         }
@@ -262,6 +265,25 @@ private class ScreenshotGenerator(private val outputDir: File) {
         CliSessionsContent(
             state = CliSessionsUiState.Success(
                 sessions = ScreenshotFixtures.cliSessions,
+                range = CliSessionRange.LAST_5H,
+                rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
+                rangeAnchored = true,
+                profileLabel = "Padrão",
+                lastChangedAt = ScreenshotFixtures.NOW
+            ),
+            language = AppLanguage.PT,
+            onSelectRange = {},
+            onOpenSession = {},
+            onCloseDetail = {}
+        )
+    }
+
+    fun cliBreakdown() = capture("cli-breakdown", widthDp = 960, heightDp = 760) {
+        CliSessionsContent(
+            state = CliSessionsUiState.Success(
+                sessions = ScreenshotFixtures.cliSessions,
+                view = com.usagemonitor.presentation.viewmodel.CliSessionsView.BREAKDOWN,
+                breakdown = ScreenshotFixtures.cliBreakdown,
                 range = CliSessionRange.LAST_5H,
                 rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
                 rangeAnchored = true,
@@ -300,6 +322,24 @@ private class ScreenshotGenerator(private val outputDir: File) {
         )
     }
 
+    fun teamTrend() = capture("team-trend", widthDp = 960, heightDp = 560) {
+        TeamUsageContent(
+            state = TeamUsageUiState.Success(
+                members = ScreenshotFixtures.teamMembers,
+                trend = ScreenshotFixtures.teamTrend,
+                view = TeamUsageView.TREND,
+                range = CliSessionRange.LAST_5H,
+                rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
+                rangeAnchored = true,
+                accountLabel = "dev@example.com — Example Org",
+                lastChangedAt = ScreenshotFixtures.NOW
+            ),
+            language = AppLanguage.PT,
+            onSelectRange = {},
+            onToggleMember = {}
+        )
+    }
+
     fun teamUsage() = capture("team-usage", widthDp = 1_060, heightDp = 600) {
         TeamUsageContent(
             state = TeamUsageUiState.Success(
@@ -320,14 +360,14 @@ private class ScreenshotGenerator(private val outputDir: File) {
     /**
      * Presença de uma conta, nos dois temas.
      *
-     * A largura é a mesma da janela real (960dp) — capturar mais largo esconderia
+     * A largura é a mesma do piso da janela real (1030dp) — capturar mais largo esconderia
      * justamente a quebra de coluna que se quer conferir. O `canManage` aqui é
      * inerte: `TeamPresenceContent` só libera os botões destrutivos na visão
      * global, que é o que [presenceAccounts] captura.
      */
     fun presence(isDark: Boolean) {
         val name = if (isDark) "presence" else "presence-light"
-        capture(name, widthDp = 960, heightDp = 460, isDark = isDark) {
+        capture(name, widthDp = 1_030, heightDp = 460, isDark = isDark) {
             TeamPresenceContent(
                 state = TeamPresenceUiState.Success(
                     entries = ScreenshotFixtures.teamPresence,
@@ -347,10 +387,10 @@ private class ScreenshotGenerator(private val outputDir: File) {
      * É a captura que prova a faixa de conta — superfície, marcador, a palavra
      * "Conta" e divisória — e a coluna de ação à direita, que é onde o botão de
      * apagar conta aparecia solto numa linha própria. Largura mínima da janela
-     * (940dp): capturar mais largo esconderia o pior caso do orçamento de colunas.
+     * (1030dp): capturar mais largo esconderia o pior caso do orçamento de colunas.
      */
     fun presenceAccounts() {
-        capture("presence-accounts", widthDp = 940, heightDp = 460, isDark = true) {
+        capture("presence-accounts", widthDp = 1_030, heightDp = 460, isDark = true) {
             TeamPresenceContent(
                 state = TeamPresenceUiState.Success(
                     entries = ScreenshotFixtures.teamPresenceAccounts,

@@ -13,6 +13,9 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,6 +40,7 @@ import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.TEAM_ACCOUNT_GROUP_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_LIST_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.TEAM_SLIDING_WINDOW_NOTICE_TAG
+import com.usagemonitor.presentation.ui.TEAM_TOTAL_MEMBERS_BLOCK_TAG
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_REMOVE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_ROW_TAG_PREFIX
@@ -82,7 +86,8 @@ class TeamUsageScreenTest {
             )
         )
 
-        onNodeWithText("1 integrante").assertIsDisplayed()
+        onNode(hasTestTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG) and hasAnyDescendant(hasText("1")))
+            .assertIsDisplayed()
         onNodeWithText("$1.23").assertIsDisplayed()
         onNodeWithText("custo estimado · últimas 5h").assertIsDisplayed()
     }
@@ -229,7 +234,8 @@ class TeamUsageScreenTest {
         onNodeWithText("joao").assertIsDisplayed()
         onNodeWithText("sem uso no período").assertIsDisplayed()
         // Quem não usou não conta como integrante ativo do período.
-        onNodeWithText("1 integrante").assertIsDisplayed()
+        onNode(hasTestTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG) and hasAnyDescendant(hasText("1")))
+            .assertIsDisplayed()
     }
 
     @Test
@@ -1114,8 +1120,12 @@ class TeamUsageScreenTest {
             // continua existindo para ela não voltar a crescer sem motivo.
             onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
                 .assertHeightIsEqualTo(62.dp)
+            // 63 e não 88 (issue #81): com a legenda numa faixa única, cada célula
+            // deixou de carregar o próprio rótulo e virou uma linha de texto só.
+            // A coluna de identidade continua com três, porque ali são identidade
+            // e os dois carimbos que a qualificam.
             onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
-                .assertHeightIsEqualTo(88.dp)
+                .assertHeightIsEqualTo(63.dp)
         }
 
     @Test
@@ -1170,7 +1180,7 @@ class TeamUsageScreenTest {
 
         onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
             .assertIsDisplayed()
-            .assertTextContains("Conta")
+            .assertTextContains("Conta", substring = true)
     }
 
     /**
@@ -1192,20 +1202,25 @@ class TeamUsageScreenTest {
             // Números da conta A: 2 das 3 máquinas, 3 das 4 sessões e o custo
             // somado delas. A asserção é sobre a faixa, não sobre a tela: é ela
             // que prova que o número está na conta certa.
+            //
+            // A contagem de integrantes vem emendada na palavra "Conta" desde que
+            // a faixa passou a reservar as mesmas colunas da linha, e as sessões
+            // viraram célula de uma coluna que a legenda nomeia.
             onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
                 .assertIsDisplayed()
-                .assertTextContains("2")
-                .assertTextContains("3 sessões")
+                .assertTextContains("Conta · 2 integrantes")
+                .assertTextContains("3")
                 .assertTextContains("$4.0000")
 
             // Conta B tem uma máquina só; o total dela não some no da conta A.
             onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-b")
                 .assertIsDisplayed()
-                .assertTextContains("1")
+                .assertTextContains("Conta · 1 integrante")
                 .assertTextContains("$0.1000")
 
             // O cabeçalho continua somando tudo: nenhuma faixa o substitui.
-            onNodeWithText("3 integrantes").assertIsDisplayed()
+            onNode(hasTestTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG) and hasAnyDescendant(hasText("3")))
+                .assertIsDisplayed()
             onNodeWithText("4 sessões").assertIsDisplayed()
         }
 

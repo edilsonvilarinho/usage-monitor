@@ -1424,6 +1424,13 @@ fun main() = application {
             LaunchedEffect(cliSessionsOpenGeneration) {
                 activateWindow(window)
             }
+            ApplyWindowMinimumSize(
+                window = window,
+                widthDp = CLI_SESSIONS_MIN_WINDOW_WIDTH_DP,
+                heightDp = CLI_SESSIONS_MIN_WINDOW_HEIGHT_DP,
+                uiScalePercent = uiScalePercent,
+                workArea = screenWorkArea
+            )
             AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = cliSessionsTitle,
@@ -1463,6 +1470,13 @@ fun main() = application {
             LaunchedEffect(teamUsageOpenGeneration) {
                 activateWindow(window)
             }
+            ApplyWindowMinimumSize(
+                window = window,
+                widthDp = TEAM_USAGE_MIN_WINDOW_WIDTH_DP,
+                heightDp = TEAM_USAGE_MIN_WINDOW_HEIGHT_DP,
+                uiScalePercent = uiScalePercent,
+                workArea = screenWorkArea
+            )
             AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = teamTitle,
@@ -1502,35 +1516,13 @@ fun main() = application {
             LaunchedEffect(teamPresenceOpenGeneration) {
                 activateWindow(window)
             }
-            // Largura mínima igual ao orçamento de colunas da lista de presença.
-            // Abaixo dela o `FlowRow` das linhas quebra e as colunas param de
-            // alinhar; o tamanho persistido não protege nada, porque quem arrasta a
-            // borda é o usuário.
-            //
-            // A unidade da janela AWT é a mesma `Dp` do `WindowState` — o Compose
-            // Desktop converte 1:1 (`setSizeImpl` usa `size.width.value`), e a
-            // densidade do sistema fica só no desenho. O que entra aqui é a escala
-            // da interface, pelo mesmo motivo de `scaledWindowSize`: ela multiplica
-            // a densidade do conteúdo, então a 150% a mesma janela mostra menos
-            // colunas e o piso precisa subir junto.
-            //
-            // O piso também é preso à área útil: a 150% ele daria 1410dp de largura,
-            // mais que um monitor de 1366, e um piso maior que a tela não é piso —
-            // é janela que nem arrastando a borda cabe.
-            val presenceMinimumScale = uiScaleFactor(uiScalePercent)
-            LaunchedEffect(presenceMinimumScale, screenWorkArea) {
-                val minimum = fitWindowSize(
-                    DpSize(
-                        width = TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP.dp * presenceMinimumScale,
-                        height = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP.dp * presenceMinimumScale
-                    ),
-                    screenWorkArea
-                )
-                window.minimumSize = java.awt.Dimension(
-                    minimum.width.value.roundToInt(),
-                    minimum.height.value.roundToInt()
-                )
-            }
+            ApplyWindowMinimumSize(
+                window = window,
+                widthDp = TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP,
+                heightDp = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP,
+                uiScalePercent = uiScalePercent,
+                workArea = screenWorkArea
+            )
             AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = presenceTitle,
@@ -1891,6 +1883,48 @@ fun main() = application {
                 }
             }
         }
+    }
+}
+
+/**
+ * Piso de arrasto da janela AWT, em `Dp` de interface.
+ *
+ * As três janelas de lista — Sessões CLI, Sessões do time e Presença — têm faixa
+ * de legendas de coluna sobre linhas de largura fixa. Abaixo do orçamento de
+ * colunas a linha quebra e as colunas param de alinhar; o tamanho persistido não
+ * protege nada, porque quem arrasta a borda é o usuário.
+ *
+ * A unidade da janela AWT é a mesma `Dp` do `WindowState` — o Compose Desktop
+ * converte 1:1 (`setSizeImpl` usa `size.width.value`), e a densidade do sistema
+ * fica só no desenho. O que entra aqui é a **escala da interface**, pelo mesmo
+ * motivo de `scaledWindowSize`: ela multiplica a densidade do conteúdo, então a
+ * 150% a mesma janela mostra menos colunas e o piso precisa subir junto.
+ *
+ * O piso também é preso à área útil: a 150% ele daria 1410dp de largura, mais que
+ * um monitor de 1366, e um piso maior que a tela não é piso — é janela que nem
+ * arrastando a borda cabe.
+ *
+ * Fora de `main()` de propósito: aquele composable já está no limite do backend
+ * JVM, e três cópias deste efeito seriam três lugares para o orçamento divergir.
+ */
+@Composable
+private fun ApplyWindowMinimumSize(
+    window: java.awt.Window,
+    widthDp: Int,
+    heightDp: Int,
+    uiScalePercent: Int,
+    workArea: ScreenWorkArea
+) {
+    val scale = uiScaleFactor(uiScalePercent)
+    LaunchedEffect(window, scale, workArea, widthDp, heightDp) {
+        val minimum = fitWindowSize(
+            DpSize(width = widthDp.dp * scale, height = heightDp.dp * scale),
+            workArea
+        )
+        window.minimumSize = java.awt.Dimension(
+            minimum.width.value.roundToInt(),
+            minimum.height.value.roundToInt()
+        )
     }
 }
 

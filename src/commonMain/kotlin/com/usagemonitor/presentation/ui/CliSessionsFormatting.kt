@@ -256,6 +256,17 @@ internal object CliSessionsLabels {
      * cada turno relê o contexto inteiro. Sem o qualificador o número é lido como
      * volume de conteúdo produzido, que ele não é.
      */
+    /**
+     * Rótulo do bloco de total de sessões.
+     *
+     * Plural e sem número, ao contrário de [sessionCount]: aquele é a célula da
+     * lista do time, onde valor e palavra andam juntos ("2 sessões"). Aqui o
+     * número é o valor do bloco e a palavra é o rótulo dele.
+     */
+    fun columnSessions(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Sessões" else "Sessions"
+    }
+
     fun columnTokens(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Tokens (com cache)" else "Tokens (with cache)"
     }
@@ -275,6 +286,17 @@ internal object CliSessionsLabels {
     }
 
     fun columnCache(language: AppLanguage): String = "Cache"
+
+    /**
+     * Nome da coluna da fatia.
+     *
+     * Não é o `TeamUsageLabels.columnShare`, que é "do time": aquele é o rótulo
+     * de uma célula que já traz o número junto ("15% do time"), e como legenda de
+     * coluna ele diria a preposição sem o substantivo.
+     */
+    fun columnShare(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Participação" else "Share"
+    }
 
     fun columnCost(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Custo" else "Cost"

@@ -19,6 +19,20 @@ private const val CLI_SESSIONS_WINDOW_PLACEMENT_KEY = "cliSessionsWindowPlacemen
 private const val DEFAULT_CLI_SESSIONS_WINDOW_WIDTH_DP = 960
 private const val DEFAULT_CLI_SESSIONS_WINDOW_HEIGHT_DP = 780
 
+/**
+ * Piso da janela, aplicado em `Main.kt` via `minimumSize` da janela AWT.
+ *
+ * A lista de sessões passou a ter uma **faixa de legendas de coluna**, e uma faixa
+ * dessas só cumpre a promessa se a linha não quebrar: as seis colunas fixas mais o
+ * padding, a barra de rolagem e a coluna de ação cabem em 960dp e não em menos. O
+ * tamanho default já era esse; o que faltava era impedir o arrasto da borda para
+ * baixo do orçamento, que é a mesma porta que a tela de presença fechou.
+ *
+ * A conta está em `CliSessionsScreen.SESSION_COLUMN_*`.
+ */
+internal const val CLI_SESSIONS_MIN_WINDOW_WIDTH_DP = 960
+internal const val CLI_SESSIONS_MIN_WINDOW_HEIGHT_DP = 460
+
 internal data class PersistedCliSessionsWindowState(
     val widthDp: Int? = null,
     val heightDp: Int? = null,

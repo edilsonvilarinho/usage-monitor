@@ -28,13 +28,10 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,20 +53,26 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
+import com.usagemonitor.presentation.ui.components.AppCellValue
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppIconButton
+import com.usagemonitor.presentation.ui.components.AppMetricBlock
+import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
+import com.usagemonitor.presentation.ui.components.AppToolbar
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
@@ -90,6 +93,7 @@ internal const val TEAM_SESSION_REMOVE_CONFIRM_TAG = "teamSessionRemoveConfirm"
 internal const val TEAM_ADMIN_OVERVIEW_TAG = "teamAdminOverviewBadge"
 internal const val TEAM_ACCOUNT_GROUP_TAG_PREFIX = "teamAccountGroup:"
 internal const val TEAM_SLIDING_WINDOW_NOTICE_TAG = "teamSlidingWindowNotice"
+internal const val TEAM_COLUMN_HEADER_TAG = "teamUsageColumnHeader"
 const val TEAM_TAB_MEMBERS_TAG = "teamUsageTabMembers"
 const val TEAM_TAB_BREAKDOWN_TAG = "teamUsageTabBreakdown"
 const val TEAM_TAB_TREND_TAG = "teamUsageTabTrend"
@@ -97,19 +101,47 @@ internal const val TEAM_TREND_PANE_TAG = "teamUsageTrendPane"
 internal const val TEAM_TREND_SCROLLBAR_TAG = "teamUsageTrendScrollbar"
 const val TEAM_EXPORT_PDF_TAG = "teamUsageExportPdf"
 
+/**
+ * Bloco de total de integrantes do cabeçalho.
+ *
+ * O número deixou de vir emendado à palavra ("3 integrantes") e virou valor de
+ * um bloco com rótulo próprio, então não há mais um texto único que prove a
+ * contagem: a âncora é o bloco.
+ */
+const val TEAM_TOTAL_MEMBERS_BLOCK_TAG = "teamUsageTotalMembers"
+
 /** Compartilhada com o modal da máquina: as duas telas dão o mesmo aviso. */
 const val REFRESHING_NOTICE_TAG = "usageRefreshingNotice"
 
-// Larguras das colunas da lista, num lugar só: a faixa da conta e a linha do
-// integrante têm de cair no mesmo x, e dois conjuntos de literais seriam dois
-// números que precisam concordar em arquivos diferentes.
-private val TEAM_COLUMN_IDENTITY = 210.dp
-private val TEAM_COLUMN_MACHINE = 140.dp
-private val TEAM_COLUMN_TOKENS = 140.dp
+// Larguras das colunas da lista, num lugar só: a faixa de legendas, a faixa da
+// conta e a linha do integrante têm de cair no mesmo x, e três conjuntos de
+// literais seriam três números que precisam concordar.
+//
+// O somatório não é livre e é ele que sustenta a faixa de cabeçalho. Com a janela
+// no piso de 960dp sobram 836dp para a linha, descontados os 32 do corpo da
+// janela, os 12 da barra de rolagem, os 28 do padding da linha, os 14 do marcador
+// e os 26 do botão de remover. Com o vão de 16dp entre sete colunas, sobram
+// **740dp** para as larguras somadas — e é essa a conta abaixo. Passar disso faz
+// a linha quebrar, e faixa de legendas sobre linha quebrada promete um
+// alinhamento que o conteúdo não cumpre.
+//
+// A máquina saiu da coluna própria e desceu para a segunda linha da coluna de
+// identidade: ela qualifica o integrante — como "esta máquina" na tela de
+// presença — e é isso que libera a largura que a contagem de sessões passou a
+// ocupar como coluna, no lugar de ser o rótulo dinâmico da célula de tokens.
+private val TEAM_COLUMN_IDENTITY = 180.dp
+private val TEAM_COLUMN_SESSIONS = 60.dp
+private val TEAM_COLUMN_TOKENS = 136.dp
 private val TEAM_COLUMN_COST = 96.dp
-private val TEAM_COLUMN_ACTIVE_TIME = 84.dp
+private val TEAM_COLUMN_ACTIVE_TIME = 76.dp
 private val TEAM_COLUMN_SHARE = 96.dp
-private val TEAM_COLUMN_STATUS = 112.dp
+private val TEAM_COLUMN_STATUS = 96.dp
+
+/** Vão entre colunas, igual ao da tela de presença. */
+private val TEAM_COLUMN_SPACING = 16.dp
+
+/** Mesma pegada do `AppIconButton`, para o cabeçalho reservar a casa certa. */
+private val TEAM_ACTION_SLOT = 26.dp
 
 // A linha do integrante mora dentro de um `DepthSurface`, e a faixa da conta
 // não. O padding horizontal compartilhado mantém as colunas no mesmo x; os
@@ -286,15 +318,12 @@ private fun RemoveMemberConfirmation(
         title = { Text(TeamUsageLabels.removeMemberTitle(language)) },
         text = { Text(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
         confirmButton = {
-            TextButton(
+            AppButton(
+                label = TeamUsageLabels.confirmRemoval(language),
                 onClick = onConfirm,
+                tone = AppButtonTone.DANGER,
                 modifier = Modifier.testTag(TEAM_REMOVE_CONFIRM_TAG)
-            ) {
-                Text(
-                    text = TeamUsageLabels.confirmRemoval(language),
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
+            )
         },
         dismissButton = {
             AppButton(
@@ -326,15 +355,12 @@ private fun RemoveSessionConfirmation(
             )
         },
         confirmButton = {
-            TextButton(
+            AppButton(
+                label = TeamUsageLabels.confirmSessionRemoval(language),
                 onClick = onConfirm,
+                tone = AppButtonTone.DANGER,
                 modifier = Modifier.testTag(TEAM_SESSION_REMOVE_CONFIRM_TAG)
-            ) {
-                Text(
-                    text = TeamUsageLabels.confirmSessionRemoval(language),
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
+            )
         },
         dismissButton = {
             AppButton(
@@ -365,9 +391,36 @@ private fun TeamUsageList(
 ) {
     val view = state.effectiveView
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    // Aviso de recarga a esquerda e carimbo da ultima alteracao a direita, fora
+    // da area que rola. Os dois eram linhas no topo: o aviso aparece e some a
+    // cada troca de janela e deslocava a lista inteira, e o carimbo muda a cada
+    // tique do laco de 5s ao lado do rotulo da conta.
+    AppWindowScaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = AppSpacing.lg,
+        spacing = AppSpacing.md,
+        statusBar = {
+            if (state.isRefreshing) {
+                Text(
+                    text = BreakdownLabels.refreshing(language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(REFRESHING_NOTICE_TAG)
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = TeamUsageLabels.lastChange(
+                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
+                    language = language
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     ) {
         TeamUsageHeader(
             state = state,
@@ -390,17 +443,6 @@ private fun TeamUsageList(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().testTag(TEAM_SLIDING_WINDOW_NOTICE_TAG)
-            )
-        }
-
-        // Acima do despacho de aba: vale para as três, porque a troca de janela
-        // deixa desatualizado tudo o que elas mostram.
-        if (state.isRefreshing) {
-            Text(
-                text = BreakdownLabels.refreshing(language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().testTag(REFRESHING_NOTICE_TAG)
             )
         }
 
@@ -451,7 +493,7 @@ private fun TeamUsageList(
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 TeamTrendPane(trend = state.trend, language = language)
             }
-            return@Column
+            return@AppWindowScaffold
         }
 
         if (view == TeamUsageView.BREAKDOWN) {
@@ -465,15 +507,28 @@ private fun TeamUsageList(
                     hint = TeamUsageLabels.breakdownHint(language)
                 )
             }
-            return@Column
+            return@AppWindowScaffold
         }
 
         if (state.isEmpty) {
             CenteredMessage(
                 TeamUsageLabels.emptyInRange(state.range, state.rangeAnchored, language)
             )
-            return@Column
+            return@AppWindowScaffold
         }
+
+        // Decidido uma vez para a lista inteira, e não por linha: as colunas só
+        // alinham se todas as linhas reservarem as mesmas casas. Uma coluna que
+        // aparece em algumas linhas e some em outras desloca tudo o que vem depois.
+        val hasStatusColumn = state.memberGroups.any { group ->
+            group.worstHealth != null || group.members.any { member -> member.worstHealth != null }
+        }
+
+        TeamColumnHeader(
+            language = language,
+            hasStatusColumn = hasStatusColumn,
+            hasActionColumn = state.isAdminOverview
+        )
 
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             val listState = rememberLazyListState()
@@ -496,6 +551,8 @@ private fun TeamUsageList(
                                 share = state.tokenShareOf(group),
                                 expanded = state.isAccountExpanded(group),
                                 language = language,
+                                hasStatusColumn = hasStatusColumn,
+                                hasActionColumn = state.isAdminOverview,
                                 onToggle = { onToggleAccount(group.groupKey) }
                             )
                         }
@@ -513,12 +570,32 @@ private fun TeamUsageList(
                                 expanded = member.memberKey in state.expandedMemberKeys,
                                 language = language,
                                 removable = state.isAdminOverview,
+                                hasStatusColumn = hasStatusColumn,
+                                hasActionColumn = state.isAdminOverview,
                                 onToggle = { onToggleMember(member.memberKey) },
                                 onRemove = { onRequestRemoveMember(member) }
                             )
                         }
 
                         if (member.memberKey in state.expandedMemberKeys) {
+                            // A faixa de legendas do bloco aninhado: são as colunas
+                            // da lista de sessões, não as da lista de integrantes, e
+                            // sem ela o bloco entrega sete números sem dizer o que
+                            // cada um é.
+                            item(key = "${member.memberKey}:sessionHeader") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .padding(start = TEAM_SESSION_INDENT, top = AppSpacing.sm)
+                                ) {
+                                    CliSessionColumnHeader(
+                                        language = language,
+                                        hasActionColumn = state.isAdminOverview
+                                    )
+                                }
+                            }
+
                             // As sessões entram como itens irmãos, e não dentro da
                             // linha: aninhar uma lista rolável em outra quebra a
                             // rolagem e desliga o reaproveitamento de itens.
@@ -562,7 +639,8 @@ private fun TeamUsageList(
                                             "$TEAM_SESSION_REMOVE_TAG_PREFIX${member.memberKey}:${session.sessionId}"
                                         } else {
                                             null
-                                        }
+                                        },
+                                        hasActionColumn = state.isAdminOverview
                                     )
                                 }
                             }
@@ -614,31 +692,26 @@ private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
                 .padding(end = SCROLLBAR_GUTTER),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            DepthSurface(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = 16.dp
-            ) {
-                Text(
-                    text = TeamUsageLabels.trendTitle(trend.days.size, language),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = OUTPUT_COLOR
-                )
-                // O que a tendência é, antes de como lê-la: sem esta frase o
-                // painel entrega barras sem dizer que grandeza elas medem.
-                Text(
-                    text = TeamUsageLabels.trendHint(trend.days.size, language),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = TeamUsageLabels.trendNotice(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            // O gráfico primeiro e a explicação depois, como no protótipo: um
+            // painel de três linhas acima dele empurrava as barras para baixo da
+            // dobra numa janela baixa, e a frase que diz o que ele mede já vive
+            // na linha de cabeçalho do próprio gráfico.
+            TeamTrendChart(trend = trend, language = language)
 
-            TeamTrendChart(trend = trend, accent = OUTPUT_COLOR, language = language)
+            Text(
+                text = TeamUsageLabels.trendHint(trend.days.size, language),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // O fuso e a independência do filtro de janela: sem esta frase, um
+            // gráfico de dias ao lado de números de 5h é lido como o mesmo
+            // recorte.
+            Text(
+                text = TeamUsageLabels.trendNotice(language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         VerticalScrollbar(
@@ -665,13 +738,14 @@ private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
  * É por ela que a conta abre e fecha. A visão global nasce recolhida, então esta
  * faixa é a lista inteira até alguém pedir o detalhe de uma conta.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TeamAccountGroupHeader(
     group: TeamAccountGroup,
     share: Double,
     expanded: Boolean,
     language: AppLanguage,
+    hasStatusColumn: Boolean,
+    hasActionColumn: Boolean,
     onToggle: () -> Unit
 ) {
     val accents = AppAccents.current
@@ -703,10 +777,10 @@ private fun TeamAccountGroupHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AppSourceMarker(color = accents.cacheRead)
-            FlowRow(
+            Row(
                 modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(TEAM_COLUMN_SPACING),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Ícone dentro da coluna de identidade, como na linha do integrante: é o
                 // que mantém as colunas seguintes no mesmo x nas duas.
@@ -722,23 +796,33 @@ private fun TeamAccountGroupHeader(
                         } else {
                             TeamUsageLabels.expandAccount(language)
                         },
-                        tint = accents.cacheRead
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         // A palavra vem antes do e-mail: sem ela a faixa entregava um
                         // endereço e um uuid sem dizer que aquilo é a conta, e ao lado de
                         // uma linha de integrante — que também tem nome e identificador —
                         // as duas liam igual.
+                        //
+                        // A contagem de integrantes vem emendada nela: a coluna
+                        // que ela ocupava virou "Sessões", e um número sob a
+                        // legenda "Tempo ativo" diria uma coisa e valeria outra.
                         Text(
-                            text = TeamUsageLabels.accountBand(language),
+                            text = TeamUsageLabels.accountBandWithMembers(
+                                memberCount = group.activeMemberCount,
+                                language = language
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
                         )
+                        // O e-mail é o dado, e dado fica na cor do texto. Quem
+                        // identifica a faixa como conta é o marcador de 2dp à
+                        // esquerda e a palavra logo acima.
                         Text(
                             text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
                             style = MaterialTheme.typography.titleSmall,
-                            color = accents.cacheRead,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -753,36 +837,37 @@ private fun TeamAccountGroupHeader(
                     }
                 }
 
-                // Só o número: o rótulo da coluna já diz o que ele conta, e repetir
-                // "integrantes" no valor deixaria a célula diferente de todas as outras.
-                MetricText(
-                    label = TeamUsageLabels.columnMembers(language),
-                    value = group.activeMemberCount.toString(),
-                    modifier = Modifier.width(TEAM_COLUMN_MACHINE)
+                AppCellValue(
+                    value = group.sessionCount.toString(),
+                    modifier = Modifier.width(TEAM_COLUMN_SESSIONS)
                 )
 
-                MetricText(
-                    label = TeamUsageLabels.sessionCount(group.sessionCount, language),
+                AppCellValue(
                     value = formatQuantity(group.totalTokens),
                     modifier = Modifier.width(TEAM_COLUMN_TOKENS)
                 )
 
-                MetricText(
-                    label = TeamUsageLabels.columnCost(language),
+                AppCellValue(
+                    // Custo na cor do texto, como na lista da máquina: azul só no custo
+                    // sugeria uma categoria que as outras colunas não têm.
                     value = if (group.isCostComplete) {
                         formatMicrosUsd(group.totalCostMicros)
                     } else {
                         "${formatMicrosUsd(group.totalCostMicros)}+"
                     },
-                    // Custo na cor do texto, como na lista da máquina: azul só no custo
-                    // sugeria uma categoria que as outras colunas não têm.
                     modifier = Modifier.width(TEAM_COLUMN_COST)
                 )
 
+                // A conta não agrega tempo de trabalho: somar o tempo ativo de
+                // duas máquinas que trabalharam ao mesmo tempo daria uma hora que
+                // ninguém passou. A coluna fica vazia — e continua reservada, ou
+                // as colunas seguintes sairiam de x.
+                Spacer(modifier = Modifier.width(TEAM_COLUMN_ACTIVE_TIME))
+
                 Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
-                    MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
+                    AppCellValue(value = formatPercent(share))
                     Spacer(modifier = Modifier.height(4.dp))
-                    MeterBar(fraction = share, color = accents.cacheRead, height = 4.dp)
+                    AppProgressTrack(fraction = share.toFloat(), tone = AppTone.INFO)
                 }
 
                 val worstHealth = group.worstHealth
@@ -790,9 +875,16 @@ private fun TeamAccountGroupHeader(
                     TeamHealthCell(
                         health = worstHealth,
                         language = language,
+                        showLabel = false,
                         modifier = Modifier.width(TEAM_COLUMN_STATUS)
                     )
+                } else if (hasStatusColumn) {
+                    Spacer(modifier = Modifier.width(TEAM_COLUMN_STATUS))
                 }
+            }
+
+            if (hasActionColumn) {
+                Spacer(modifier = Modifier.size(TEAM_ACTION_SLOT))
             }
         }
         AppDivider()
@@ -849,130 +941,19 @@ private fun TeamUsageHeader(
     onSelectView: (TeamUsageView) -> Unit,
     onExportReport: () -> Unit
 ) {
-    val accents = AppAccents.current
-
-    DepthSurface(
+    // Sem painel em volta: o corpo da janela já é a superfície, e um retângulo com
+    // borda envolvendo barra de controles, métricas e abas transformava o
+    // cabeçalho inteiro num bloco só — que é o que o protótipo desenha solto.
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = 16.dp
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (state.accountLabel != null) {
-                Text(
-                    text = state.accountLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            if (state.isAdminOverview) {
-                Text(
-                    text = TeamUsageLabels.allAccounts(state.memberGroups.size, language),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = accents.cacheRead,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.testTag(TEAM_ADMIN_OVERVIEW_TAG)
-                )
-            }
-            LiveBadge(language = language)
-            Text(
-                text = TeamUsageLabels.lastChange(
-                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
-                    language = language
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Column {
-                Text(
-                    text = TeamUsageLabels.memberCount(state.activeMemberCount, language),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = TeamUsageLabels.sessionCount(state.sessionCount, language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                // O veredito por sessão vive dois níveis abaixo, dentro de um
-                // integrante recolhido. Aqui ele aparece sem nenhum clique.
-                HealthTallyText(tally = state.healthTally, language = language)
-            }
-
-            Column {
-                Text(
-                    text = formatQuantity(state.totalTokens),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accents.cacheRead
-                )
-                Text(
-                    text = TeamUsageLabels.columnTokens(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Column {
-                Text(
-                    text = if (state.isTotalCostComplete) {
-                        formatMicrosUsdShort(state.totalCostMicros)
-                    } else {
-                        "${formatMicrosUsdShort(state.totalCostMicros)}+"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accents.input
-                )
-                Text(
-                    text = TeamUsageLabels.estimatedTotalInRange(
-                        range = state.range,
-                        endsAt = state.rangeEndsAt,
-                        isAnchored = state.rangeAnchored,
-                        language = language
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            AppSegmentedControl(
-                options = CliSessionRange.entries.map { entry ->
-                    AppSegment(label = TeamUsageLabels.rangeLabel(entry, language))
-                },
-                selectedIndex = CliSessionRange.entries.indexOf(state.range),
-                onSelect = { index -> onSelectRange(CliSessionRange.entries[index]) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Abas depois dos chips de janela, como no modal da máquina: a janela vale
-        // para as leituras de dentro, então trocá-la é a escolha de fora.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // Abas **antes** das métricas, como no protótipo: a aba escolhe o que a
+        // janela mostra, e os totais são conteúdo dela.
+        //
+        // `Row` e não `FlowRow`: as abas levam `weight` para empurrar o resto para
+        // a direita, e peso dentro de um `FlowRow` fica sem referência de largura.
+        AppToolbar(spacing = AppSpacing.sm) {
             val view = state.effectiveView
             // Na visão global a série nunca é carregada — uma linha por conta não
             // caberia num gráfico só — e uma aba que nunca mostra nada é pior que
@@ -999,6 +980,30 @@ private fun TeamUsageHeader(
                 modifier = Modifier.weight(1f)
             )
 
+            if (state.isAdminOverview) {
+                Text(
+                    text = TeamUsageLabels.allAccounts(state.memberGroups.size, language),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(TEAM_ADMIN_OVERVIEW_TAG)
+                )
+            }
+            // O carimbo da última alteração desceu para a barra de estado; aqui
+            // fica só o selo de leitura ao vivo, que é estado do laço e não dado.
+            LiveBadge(language = language)
+
+            // A janela vale para as três abas, então trocá-la é a escolha de fora
+            // e a aba é a de dentro — as duas na mesma faixa.
+            AppSegmentedControl(
+                options = CliSessionRange.entries.map { entry ->
+                    AppSegment(label = TeamUsageLabels.rangeLabel(entry, language))
+                },
+                selectedIndex = CliSessionRange.entries.indexOf(state.range),
+                onSelect = { index -> onSelectRange(CliSessionRange.entries[index]) }
+            )
+
             // O relatorio nao segue a aba: ele e o recorte inteiro da janela, com
             // integrantes, resumo e sessoes juntos.
             AppButton(
@@ -1008,9 +1013,79 @@ private fun TeamUsageHeader(
             )
         }
 
+        // O rótulo da conta é dado e não controle: fica na linha de texto abaixo
+        // da barra, junto das outras qualificações da janela.
+        if (state.accountLabel != null) {
+            Text(
+                text = state.accountLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Blocos de métrica de largura igual, como no modal da máquina: eram
+        // três pares valor/rótulo flutuando sobre o mesmo painel.
+        //
+        // Os totais são o mesmo tipo de coisa e ficam na mesma cor. O acento é
+        // identidade de fonte, não de valor: tokens em verde ao lado de custo em
+        // azul sugere duas categorias onde há duas medidas da mesma janela.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+        ) {
+            AppMetricBlock(
+                label = TeamUsageLabels.columnMembers(language),
+                value = state.activeMemberCount.toString(),
+                // O veredito por sessão vive dois níveis abaixo, dentro de um
+                // integrante recolhido. Aqui ele aparece sem nenhum clique.
+                footer = CliSessionsLabels.healthTally(state.healthTally, language),
+                footerColor = healthTallyColor(state.healthTally),
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH).testTag(TEAM_TOTAL_MEMBERS_BLOCK_TAG)
+            )
+
+            AppMetricBlock(
+                label = TeamUsageLabels.columnTokens(language),
+                value = formatQuantity(state.totalTokens),
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+            )
+
+            AppMetricBlock(
+                label = TeamUsageLabels.columnCost(language),
+                value = if (state.isTotalCostComplete) {
+                    formatMicrosUsdShort(state.totalCostMicros)
+                } else {
+                    "${formatMicrosUsdShort(state.totalCostMicros)}+"
+                },
+                modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+            )
+        }
+
+        // Fora dos blocos, pela mesma razão do modal da máquina: a janela do
+        // custo é uma frase, e dentro do bloco ela media três vezes a largura
+        // dele.
+        Text(
+            text = TeamUsageLabels.sessionCount(state.sessionCount, language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
+            text = TeamUsageLabels.estimatedTotalInRange(
+                range = state.range,
+                endsAt = state.rangeEndsAt,
+                isAnchored = state.rangeAnchored,
+                language = language
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
         val exportOutcome = state.exportOutcome
         if (exportOutcome != null) {
-            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = exportOutcomeMessage(exportOutcome, language),
                 style = MaterialTheme.typography.labelSmall,
@@ -1024,7 +1099,65 @@ private fun TeamUsageHeader(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Faixa de legendas das colunas, uma vez para a lista inteira.
+ *
+ * Cada célula reimprimia "Máquina", "Custo", "Tempo ativo" e "do time" ao lado do
+ * próprio valor: numa lista de time isso dobra o texto da tela e o ruído cresce
+ * com o número de pessoas. A legenda pertence à coluna.
+ *
+ * Fora da `LazyColumn` de propósito, como na tela de presença: na visão global a
+ * lista já tem as faixas de conta rolando dentro dela, e dois níveis de cabeçalho
+ * grudado empilhariam.
+ */
+@Composable
+private fun TeamColumnHeader(
+    language: AppLanguage,
+    hasStatusColumn: Boolean,
+    hasActionColumn: Boolean
+) {
+    AppColumnHeaderRow(
+        modifier = Modifier.padding(end = SCROLLBAR_GUTTER).testTag(TEAM_COLUMN_HEADER_TAG),
+        horizontalPadding = TEAM_ROW_HORIZONTAL_PADDING,
+        spacing = TEAM_COLUMN_SPACING
+    ) {
+        AppColumnHeaderLabel(
+            label = TeamUsageLabels.columnMember(language),
+            modifier = Modifier.width(TEAM_COLUMN_IDENTITY)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.columnSessions(language),
+            modifier = Modifier.width(TEAM_COLUMN_SESSIONS)
+        )
+        AppColumnHeaderLabel(
+            label = TeamUsageLabels.columnTokens(language),
+            modifier = Modifier.width(TEAM_COLUMN_TOKENS)
+        )
+        AppColumnHeaderLabel(
+            label = TeamUsageLabels.columnCost(language),
+            modifier = Modifier.width(TEAM_COLUMN_COST)
+        )
+        AppColumnHeaderLabel(
+            label = TeamUsageLabels.columnActiveTime(language),
+            modifier = Modifier.width(TEAM_COLUMN_ACTIVE_TIME)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.columnShare(language),
+            modifier = Modifier.width(TEAM_COLUMN_SHARE)
+        )
+        if (hasStatusColumn) {
+            AppColumnHeaderLabel(
+                label = TeamUsageLabels.columnStatus(language),
+                modifier = Modifier.width(TEAM_COLUMN_STATUS)
+            )
+        }
+        if (hasActionColumn) {
+            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(TEAM_ACTION_SLOT))
+        }
+    }
+}
+
 @Composable
 private fun TeamMemberRow(
     member: TeamMemberUsage,
@@ -1032,6 +1165,10 @@ private fun TeamMemberRow(
     expanded: Boolean,
     language: AppLanguage,
     removable: Boolean,
+    /** A lista tem coluna de status; esta linha reserva a casa mesmo sem veredito. */
+    hasStatusColumn: Boolean,
+    /** A lista tem coluna de ação; esta linha reserva a casa mesmo sem botão. */
+    hasActionColumn: Boolean,
     onToggle: () -> Unit,
     onRemove: () -> Unit
 ) {
@@ -1044,6 +1181,10 @@ private fun TeamMemberRow(
     // Linha de tabela, não card: eram até vinte cards empilhados numa janela de
     // time grande. O marcador de 2dp mantém a leitura de "esta pessoa produziu"
     // que o acento do card dava, sem pintar a linha inteira.
+    //
+    // `Row` e não `FlowRow`: quebrar é o que a faixa de legendas não admite. É o
+    // orçamento de `TEAM_COLUMN_*` mais o piso da janela que garantem que ela não
+    // quebre.
     AppDataRow(
         modifier = Modifier.testTag("$TEAM_MEMBER_ROW_TAG_PREFIX${member.deviceId}"),
         onClick = if (member.hasActivity) onToggle else null,
@@ -1051,10 +1192,10 @@ private fun TeamMemberRow(
         verticalPadding = TEAM_MEMBER_VERTICAL_PADDING
     ) {
         AppSourceMarker(color = accent)
-        FlowRow(
+        Row(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(TEAM_MEMBER_WRAPPED_ROW_GAP)
+            horizontalArrangement = Arrangement.spacedBy(TEAM_COLUMN_SPACING),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 modifier = Modifier.width(TEAM_COLUMN_IDENTITY),
@@ -1072,11 +1213,21 @@ private fun TeamMemberRow(
                         tint = accent
                     )
                 }
-                Column {
+                // Apelido, máquina e último envio: identidade e os dois carimbos
+                // que a qualificam. A máquina deixou de ser coluna própria — ela
+                // não é uma medida ao lado de custo e tokens, é quem é a pessoa.
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = member.alias,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = member.machineLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1093,22 +1244,18 @@ private fun TeamMemberRow(
                 }
             }
 
-            // Larguras fixas, como na lista de sessões: sem elas cada linha
-            // dimensiona pelo próprio número e as colunas param de alinhar.
-            MetricText(
-                label = TeamUsageLabels.columnMachine(language),
-                value = member.machineLabel,
-                modifier = Modifier.width(TEAM_COLUMN_MACHINE)
+            AppCellValue(
+                value = member.sessionCount.toString(),
+                modifier = Modifier.width(TEAM_COLUMN_SESSIONS)
             )
 
-            MetricText(
-                label = TeamUsageLabels.sessionCount(member.sessionCount, language),
+            AppCellValue(
                 value = if (member.hasActivity) {
                     formatQuantity(member.totalTokens)
                 } else {
                     TeamUsageLabels.noActivityInRange(language)
                 },
-                valueColor = if (member.hasActivity) {
+                color = if (member.hasActivity) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -1116,8 +1263,7 @@ private fun TeamMemberRow(
                 modifier = Modifier.width(TEAM_COLUMN_TOKENS)
             )
 
-            MetricText(
-                label = TeamUsageLabels.columnCost(language),
+            AppCellValue(
                 value = if (member.isCostComplete) {
                     formatMicrosUsd(member.totalCostMicros)
                 } else {
@@ -1128,8 +1274,7 @@ private fun TeamMemberRow(
 
             // Servidor anterior à 0.7.0 não mede tempo e a coluna sai como "—".
             // Zero mediria e diria "não trabalhou", que é outra afirmação.
-            MetricText(
-                label = TeamUsageLabels.columnActiveTime(language),
+            AppCellValue(
                 value = member.totalActiveMillis
                     ?.takeIf { millis -> millis > 0L }
                     ?.let { millis -> formatActiveTime(millis) }
@@ -1138,9 +1283,9 @@ private fun TeamMemberRow(
             )
 
             Column(modifier = Modifier.width(TEAM_COLUMN_SHARE)) {
-                MetricText(TeamUsageLabels.columnShare(language), formatPercent(share))
+                AppCellValue(value = formatPercent(share))
                 Spacer(modifier = Modifier.height(4.dp))
-                MeterBar(fraction = share, color = accent, height = 4.dp)
+                AppProgressTrack(fraction = share.toFloat(), tone = AppTone.INFO)
             }
 
             // Pior status entre as sessões deste integrante. Sem ele, a única
@@ -1151,27 +1296,34 @@ private fun TeamMemberRow(
                 TeamHealthCell(
                     health = worstHealth,
                     language = language,
+                    showLabel = false,
                     modifier = Modifier
                         .width(TEAM_COLUMN_STATUS)
                         .testTag("$TEAM_MEMBER_HEALTH_TAG_PREFIX${member.deviceId}")
                 )
+            } else if (hasStatusColumn) {
+                Spacer(modifier = Modifier.width(TEAM_COLUMN_STATUS))
             }
+        }
 
-            if (removable) {
-                AppIconButton(
-                    contentDescription = TeamUsageLabels.removeMember(language),
-                    onClick = onRemove,
-                    tone = AppButtonTone.DANGER,
-                    modifier = Modifier.testTag("$TEAM_MEMBER_REMOVE_TAG_PREFIX${member.deviceId}")
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
+        // Fora do fluxo de colunas, como na tela de presença: lá dentro a ação é o
+        // último item e o primeiro a quebrar numa janela estreita.
+        if (removable) {
+            AppIconButton(
+                contentDescription = TeamUsageLabels.removeMember(language),
+                onClick = onRemove,
+                tone = AppButtonTone.DANGER,
+                modifier = Modifier.testTag("$TEAM_MEMBER_REMOVE_TAG_PREFIX${member.deviceId}")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
+        } else if (hasActionColumn) {
+            Spacer(modifier = Modifier.size(TEAM_ACTION_SLOT))
         }
     }
 }

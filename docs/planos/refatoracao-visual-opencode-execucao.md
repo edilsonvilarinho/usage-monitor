@@ -206,6 +206,153 @@ Uma decisão de ordenação entrou junto, e ela não é visual: as contas da vis
 em ordem alfabética pelo e-mail, com o consumo ordenando dentro de cada uma. Ordenar as contas por
 consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s.
 
+### Passada de conformidade — 2026-08-23
+
+Levantamento a pedido do usuário: **a fundação (Fase C) foi construída e a adoção nas telas ficou
+parcial.** `AppWindowScaffold` e `AppToolbar` tinham **zero** usos em tela nenhuma;
+`AppStatusIndicator` tinha um. E havia regras do próprio sistema violadas em produção — acento como
+cor de valor no modal do time, elevação 6/10dp em três lugares, dois gradientes, superfície com
+alpha, número em IBM Plex Sans nas duas listas tabulares, e as cinco abas das Configurações sem
+painel, sem divisória e com rótulo em sans.
+
+Escopo executado: regras **e** anatomia. Onze commits, `allTests` verde em cada fase.
+
+| O que mudou | Por quê |
+|---|---|
+| Elevação, gradiente e superfície com alpha voltam aos tokens | Os cards de histórico da DeepSeek e do OpenCode nunca passaram pela Fase E — aquela tela só é composta com essas fontes selecionadas, e nenhuma captura passava por ali. As duas tooltips de gráfico flutuavam mais alto que a tooltip padrão do app |
+| O acento sai da cor de valor no modal do time | `CliSessionsHeader` já tinha a decisão oposta, com o comentário explicando. As duas telas dizem a mesma coisa e liam diferente |
+| Valor numérico passa a `label*` (mono) nas duas listas | `body*` é sans e existe para texto corrido; número em fonte proporcional não alinha coluna, que é a razão de a mono estar na escala |
+| Badge de estado com **ponto e palavra** no cabeçalho do card | O único indicador de risco do dashboard era o `RiskSemaphoreDot`, um ponto colorido sem palavra nenhuma — cor informando sozinha |
+| O card ganha a anatomia de painel: cabeçalho com divisória, cotas como linhas de dados | O padding num bloco só em volta de tudo fazia a divisória parar a 12dp de cada lado, e a lista de cotas deixava de ler como tabela |
+| `AppWindowScaffold` e a barra de estado entram no Histórico, nas Sessões CLI e no modal do time | O aviso de recarga aparece e some a cada troca de janela; no topo, ele deslocava para baixo tudo o que estava sendo lido |
+| Totais viram blocos de métrica, e `MetricCard` sobe para `AppMetricBlock` | Primitiva consumida por três telas morava num arquivo de tela — o padrão que a Fase C existiu para acabar |
+| As cinco abas das Configurações viram painéis com cabeçalho e linhas de dados | Sete controles empilhados sem divisória e todo rótulo em sans: achar uma opção era ler a lista inteira |
+| Os dois controles deslizantes recebem trilha e polegar do sistema | Trilha de 16dp, indicadores de parada e polegar em cápsula — três coisas que este sistema não tem em lugar nenhum. A semântica de progresso continua vindo do `Slider` |
+| `AppSwitch` ligado passa de `primary` para o verde de estado | O azul deste sistema é informação — linha de gráfico e realce de seleção —, e com ele ali um interruptor ligado lia como item selecionado |
+| Sai o Material residual: `TextButton`, `IconButton`, `OutlinedTextField`, `Checkbox`, `HorizontalDivider`, `Card` e 85 imports mortos | Cada um trazia altura, raio e cor próprios ao lado de controles que já são retângulo de raio 6 |
+
+**Duas mudanças de texto de interface**, as únicas: o seletor de tema deixou de ser `🌙 Escuro` /
+`☀️ Claro` — único emoji da interface — e virou segmentado `Escuro` / `Claro`; e o bloco de total de
+sessões ganhou o rótulo `Sessões` / `Sessions`, porque o número deixou de vir emendado à palavra.
+Os asserts que observavam os textos antigos mudaram nos mesmos commits.
+
+**O protótipo cedeu em três pontos**, por decisão explícita do usuário, e o HTML foi atualizado:
+rodapé do card em botões de **ícone** (a `contentDescription` carrega a explicação do pisca, e botão
+de texto não teria onde levá-la); card minimizado com **badges por cota** (o resumo `68% · 41%` apaga
+o rótulo e a tooltip de cada cota); lista de sessões com **rótulo por célula** (as células somam
+quase 1.000dp e cabeçalho fixo sobre linha que quebra desalinha).
+
+**Um item do protótipo não foi implementado:** a contagem `4 fontes` na barra de estado do
+dashboard. Ela afirma um estado agregado que o app não calcula, e com uma fonte em erro o verde
+mentiria — escolher o tom seria inventar semântica que o protótipo não define. Falha de fonte já tem
+o banner por alvo. Registrado no próprio HTML.
+
+
+### Passada de conformidade — 2026-08-24 (issue #81)
+
+Levantamento do usuário, de novo por captura: cinco comparações lado a lado — protótipo à esquerda,
+app à direita — das seções **8 · Resumo por eixo**, **9 · Uso do time**, **9b · Tendência do time**,
+**10 · Presença** e **10b · Presença — todas as contas**. A passada de 23/08 corrigiu as regras e a
+anatomia do dashboard, do histórico e das Configurações; estas cinco telas ficaram com a anatomia
+antiga.
+
+O eixo da passada é um só: **a legenda pertence à coluna, não à célula.** Quatro listas repetiam o
+rótulo dentro de cada célula — "Máquina", "Custo", "Tempo ativo", "do time" — e numa lista de time
+isso dobra o texto da tela, com o ruído crescendo com o número de linhas.
+
+| O que mudou | Por quê |
+|---|---|
+| `AppColumnHeaderRow`, `AppColumnHeaderLabel` e `AppCellValue` entram em `AppStructure` | `ColumnHeaderLabel` e `MetricValue` moravam em `CliSessionsScreen.kt`, arquivo de tela, consumidos por três telas — o mesmo defeito que fez `MetricCard` virar `AppMetricBlock` |
+| Resumo por eixo: totais viram três blocos de métrica e as linhas viram tabela | Eram dois painéis com título em azul e em verde, e um card por balde com barra de largura total — quatro elementos para dizer o que uma linha de tabela diz com colunas alinhadas |
+| Resumo por eixo: o paginador sobe para a faixa de controles | No rodapé ele é a primeira coisa a sair da tela numa janela baixa, que é justamente quando a lista é longa. Filtro, ordem e página escolhem parâmetros do mesmo conteúdo e ficam juntos |
+| Lista de sessões e lista do time ganham faixa de legendas | A legenda pertence à coluna. Ver a reversão abaixo |
+| Cabeçalho das duas janelas sai do `DepthSurface`, e as abas vêm antes das métricas | O corpo da janela já é a superfície; o retângulo com borda transformava barra de controles, métricas e abas num bloco só. A aba escolhe o que a janela mostra, e os totais são conteúdo dela |
+| Tendência: faixa por integrante vira barras agrupadas com legenda e grade | Da faixa dava para ver que houve um pico, não em que dia nem de quem |
+| Presença: sete colunas na ordem do protótipo, com o Estado primeiro | Estado e Trabalhando carregavam **dois dados por célula** — a palavra e um carimbo —, e célula com dois dados não tem uma legenda |
+| Presença ganha o campo "Filtrar integrante" | O chip liga uma restrição; num time de vinte máquinas ele sozinho não acha ninguém. O texto mora no `Success` ao lado de `onlyOnline`, um dono só para "o que a lista mostra" |
+| Sessões CLI e Uso do time ganham piso de janela; o da Presença sobe de 940 para 1030 | Faixa de legendas sobre linha que quebra promete um alinhamento que o conteúdo não cumpre, e quem arrasta a borda é o usuário |
+
+**A concessão do rótulo por célula foi revertida**, e ela era a primeira dos três pontos em que "o
+protótipo cedeu" na passada anterior. O motivo original era largura: as células da linha de sessão
+somavam quase 1.000dp contra uma janela de 960. O que a desfez foi o **veredito de saturação sair do
+fluxo de colunas** — ele media 210dp e desceu para uma segunda linha da própria linha, junto da razão
+que o gerou, que é como a §6 do protótipo já desenhava a linha. Com ele fora as seis colunas somam
+766dp com o vão, e o piso de janela garante que continuem cabendo. As outras duas concessões — botões
+de ícone no rodapé do card e badges por cota no card minimizado — seguem valendo.
+
+**Uma exceção consciente entra no lugar**: na tendência do time **a cor identifica o integrante**,
+contra a regra de que acento é identidade de fonte e não de valor. Num gráfico agrupado a cor é o
+único jeito de dizer de quem é a barra; é o que o protótipo desenha e foi decisão explícita do
+usuário. A paleta reusa os acentos de fonte já medidos por `AppAccentsContrastTest` e **cicla** — do
+sétimo integrante em diante duas séries repetem o tom, e quem as separa é a legenda.
+
+**Larguras de coluna são orçamento, não gosto.** Cada lista carrega a conta no comentário das
+constantes: soma das colunas + vão × (n − 1) + marcador + barra de rolagem + coluna de ação ≤ largura
+da janela − cromo. Sessões CLI e Uso do time cabem em 960dp; a Presença precisa de 1030 porque é a
+única que imprime dois carimbos `12/08 10:58 BRT` por linha, e truncá-los apagaria justamente o fuso
+que a frase existe para dizer.
+
+**Três textos de interface mudaram**, e nenhum é cosmético: `lastSeen` perdeu a palavra "último"
+(a frase mora na terceira linha da coluna de identidade e as duas palavras a faziam truncar no
+carimbo); `TeamPresenceLabels.columnWorking` virou `workingNow`, que é o valor da coluna Estado e não
+o nome de uma coluna; e `CliSessionsLabels.columnShare` nasceu como "Participação", porque
+`TeamUsageLabels.columnShare` é "do time" — rótulo de uma célula que já traz o número junto, e como
+legenda de coluna ele diria a preposição sem o substantivo. `trendTitle` saiu: era o título de um
+painel de explicação que deixou de existir.
+
+**O protótipo mudou junto** nas seis seções: §6 (a nota da concessão reescrita e a lista com faixa de
+legendas), §8 (paginador no topo, "Por página", ordem e rótulo das abas alinhados ao código, grade
+7 × 24 no lugar da fileira de 24 horas), §9 (colunas do integrante, faixa da conta reservando as
+mesmas colunas, bloco de sessões com o cabeçalho da §6), §9b (piso e teto de largura de barra, e a
+nota da cor por integrante), §10 (colunas de Último turno e Status, chip e campo de filtro juntos) e
+§10b (faixa de legendas e os agregados da conta numa célula que atravessa as colunas vazias).
+
+
+### Passada de conformidade — 2026-08-24 (issue #83)
+
+Uma primitiva, um defeito: a **barra de cota desaparecia** nas escalas de 105% e 110% do slider de
+interface. O levantamento veio por captura do dashboard, e a medição de pixel fechou o diagnóstico
+antes de qualquer alteração — a 80% o trilho tem 3px com 1px de verde nos primeiros 37% da largura;
+a 110% as quatro linhas do trilho são `0xFF3D3838`, que é `outlineVariant`. Não é a barra desenhada
+errada: é a barra desenhada e apagada.
+
+A causa está em `Modifier.border`, não no app. `Border.kt` do Compose 1.7.1 faz
+`strokeWidthPx = ceil(width.toPx())` e desenha em `onDrawWithContent { drawContent(); … }`, ou seja,
+**por cima dos filhos**. Com `TRACK_HEIGHT` de 4dp e borda de 1dp:
+
+| Escala | Trilho | Traço | Interior |
+|---|---|---|---|
+| 80–85% | 3px | 1px | 1px |
+| 90–100% | 4px | 1px | 2px |
+| **105–110%** | **4px** | **2px** | **0px — barra cega** |
+| 115–135% | 5px | 2px | 1px |
+| 140–150% | 6px | 2px | 2px |
+
+O padrão de fábrica é 115%, então a barra vinha de fábrica como um fio de 1px e sumia em duas
+posições do slider.
+
+`AppProgressTrack` passou a montar a borda como **fundo mais padding** em vez de `Modifier.border`.
+O padding usa `roundToPx`, que acompanha a altura do trilho, e é exatamente o
+`box-sizing: border-box` que a §2 do protótipo já especificava — ali a borda reserva layout e o
+preenchimento nunca fica por baixo do anel. **A renderização a 100% é a mesma de antes** (2px de cor
+entre dois anéis de 1px), então nenhuma captura do README precisa ser regerada: os geradores rodam
+na escala neutra, e foi por isso que o defeito nunca apareceu numa delas.
+
+O protótipo **não mudou**. Ele estava certo; quem divergiu foi o Compose.
+
+O teste de regressão é em **bitmap**, não em layout: o `Box` de preenchimento sempre foi medido com
+a altura cheia, e `boundsInRoot` devolvia 4px nas duas escalas cegas — um teste de layout passaria
+com a barra apagada. `AppStatesTest` percorre a grade inteira do slider (80…150 de 5 em 5),
+renderiza a barra com fração 0 e com fração 1, e compara os dois bitmaps. Contra o código anterior a
+diferença a 105% é de **12 pixels** — só o antialiasing das pontas arredondadas — contra um piso de
+meia linha da largura do trilho. A grade inteira é percorrida de propósito: o defeito morava em duas
+posições específicas, e uma escala amostrada passaria.
+
+Ficaram de fora, verificados: **toda** borda de 1dp do app engrossa para 2px na mesma faixa, mas em
+botão, campo e superfície de dados isso é uma borda mais grossa e não conteúdo apagado — o interior
+deles tem dezenas de dp; e o ponto vazado de `AppStatusIndicator`, de 6dp, continua vazado com 3px
+de interior. Nenhum outro elemento com `.size`/`.height` de um dígito em dp usa `border`.
+
 ---
 
 ## Protocolo de retomada de sessão

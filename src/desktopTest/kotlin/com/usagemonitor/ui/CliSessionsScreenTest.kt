@@ -10,6 +10,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -30,6 +33,7 @@ import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
+import com.usagemonitor.presentation.ui.TOTAL_SESSIONS_BLOCK_TAG
 import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.EXPORT_CSV_TAG
 import com.usagemonitor.presentation.ui.EXPORT_JSON_TAG
@@ -85,7 +89,13 @@ class CliSessionsScreenTest {
             }
         }
 
-        onNodeWithText("1 sessão").assertIsDisplayed()
+        // O bloco carrega rótulo e número separados; nem um nem outro serve
+        // sozinho como âncora — "1" aparece em mais de um canto da tela e
+        // "Sessões" também é o rótulo da aba —, então a âncora é o bloco.
+        onNode(hasTestTag(TOTAL_SESSIONS_BLOCK_TAG) and hasAnyDescendant(hasText("1")))
+            .assertIsDisplayed()
+        onNode(hasTestTag(TOTAL_SESSIONS_BLOCK_TAG) and hasAnyDescendant(hasText("Sessões")))
+            .assertIsDisplayed()
         onNodeWithText("session-").assertIsDisplayed()
         onNodeWithText("\$1.23").assertIsDisplayed()
         onNodeWithText("custo estimado · últimas 5h").assertIsDisplayed()

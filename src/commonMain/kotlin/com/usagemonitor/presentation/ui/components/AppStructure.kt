@@ -59,6 +59,17 @@ val AppBorderWidth: Dp = 1.dp
 /** Largura do marcador semântico que identifica fonte ou severidade. */
 private val MARKER_WIDTH = 2.dp
 
+/**
+ * Do começo da linha até a primeira célula: o marcador mais o vão que o segue.
+ *
+ * [AppDataRow] separa os filhos por [AppSpacing.md], e o primeiro deles é o
+ * [AppSourceMarker] de 2dp. Uma faixa de legendas não é linha de dados e não tem
+ * marcador; sem repetir esta soma ela prometeria um alinhamento deslocado do que
+ * as linhas entregam. Existe aqui, e não como literal em cada tela, porque são
+ * duas listas que precisam concordar com a mesma linha de dados.
+ */
+val AppMarkerGutter: Dp = MARKER_WIDTH + AppSpacing.md
+
 /** Altura da barra de controles e da barra de estado. */
 private val TOOLBAR_HEIGHT = 34.dp
 private val STATUS_BAR_HEIGHT = 30.dp
@@ -326,6 +337,155 @@ fun AppDataRow(
         )
         if (showDivider) {
             AppDivider()
+        }
+    }
+}
+
+/**
+ * Faixa de legendas de coluna, uma vez para a lista inteira.
+ *
+ * É o `thead` do protótipo. A alternativa — cada célula reimprimindo o próprio
+ * rótulo — dobra o texto da tela e o ruído cresce com o número de linhas: a
+ * legenda pertence à coluna, não à célula.
+ *
+ * Ela só cumpre a promessa se a linha **não quebrar**: as células precisam ser
+ * `Row` de largura fixa, e a soma das larguras tem de caber na largura mínima da
+ * janela. Onde isso não for verdade, a faixa mente sobre o alinhamento.
+ *
+ * Fora da `LazyColumn`, nunca `stickyHeader`: na visão global de time já há
+ * faixas de conta rolando dentro da lista, e dois níveis de cabeçalho grudado
+ * empilhariam.
+ */
+@Composable
+fun AppColumnHeaderRow(
+    modifier: Modifier = Modifier,
+    horizontalPadding: Dp = AppSpacing.md,
+    /** Vão até a primeira coluna; o default acompanha o marcador da linha de dados. */
+    startGutter: Dp = AppMarkerGutter,
+    /** O default é o vão entre células do [AppDataRow]; passar outro obriga a linha a passar o mesmo. */
+    spacing: Dp = AppSpacing.md,
+    content: @Composable RowScope.() -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding)
+            .padding(start = startGutter),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.Bottom,
+        content = content
+    )
+}
+
+/**
+ * Uma legenda de coluna.
+ *
+ * Morava em `CliSessionsScreen.kt` — arquivo de tela — e já era consumida por
+ * três telas, o mesmo defeito que fez `MetricCard` virar [AppMetricBlock].
+ */
+@Composable
+fun AppColumnHeaderLabel(
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+/**
+ * Valor de célula, sem rótulo: quem nomeia a coluna é [AppColumnHeaderLabel].
+ *
+ * `label*` — mono — e não `body*`: a escala divide as duas famílias por papel, e
+ * número em fonte proporcional não alinha coluna, que é a razão de a mono estar
+ * aqui.
+ */
+@Composable
+fun AppCellValue(
+    value: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    maxLines: Int = 1
+) {
+    Text(
+        text = value,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
+/**
+ * Bloco de métrica: rótulo em cima, valor abaixo, dentro de uma borda.
+ *
+ * É o `.metric` do protótipo, e a ordem importa: o rótulo diz o que o número
+ * significa e vem primeiro, porque numa fileira de quatro blocos o olho varre os
+ * rótulos para achar o que procura, não os valores.
+ *
+ * O valor fica **na cor do texto**. O acento é identidade de fonte e vive no
+ * marcador de seção e na linha do gráfico; repetido em cada número, a fileira
+ * inteira vira paleta e nada se destaca. [footerColor] é a exceção — ali a cor
+ * qualifica o rodapé, que é comentário sobre o valor, não o valor.
+ *
+ * [labelTrailing] existe para o `?` do glossário: ele pertence ao rótulo, e um
+ * slot é o que evita a primitiva importar o vocabulário da tela de sessões.
+ */
+@Composable
+fun AppMetricBlock(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    footer: String? = null,
+    footerColor: Color? = null,
+    labelTrailing: @Composable (() -> Unit)? = null
+) {
+    Column(
+        modifier = modifier
+            .clip(AppShapes.small)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+            .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // O rótulo cede a largura ao que vier depois: truncado ele ainda
+                // se lê, mas um ícone empurrado para fora do bloco some.
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (labelTrailing != null) {
+                labelTrailing()
+            }
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (footer != null) {
+            Text(
+                text = footer,
+                style = MaterialTheme.typography.labelSmall,
+                color = footerColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
