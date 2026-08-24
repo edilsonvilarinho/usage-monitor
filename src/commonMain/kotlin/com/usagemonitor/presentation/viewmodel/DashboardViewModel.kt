@@ -867,19 +867,31 @@ class DashboardViewModel(
     }
 
     /**
-     * Reage ao interruptor das Configurações.
+     * Reage ao interruptor das Configurações, **nos dois sentidos**.
      *
      * Desligar no meio do download cancela o job **e descarta o que já estava
      * pronto**: um artefato preparado seria aplicado no encerramento, que é
      * exatamente o que o usuário acabou de recusar.
+     *
+     * Ligar reavalia a versão que a tela já está anunciando. Sem isso o
+     * interruptor parece inerte: quem o liga com a faixa de "nova versão" na tela
+     * fica olhando para ela sem nada acontecer até o poll seguinte, que pode
+     * estar a 10 minutos de distância. Medido na atividade A20, com o usuário
+     * ligando o interruptor e relatando que o download não começou.
+     *
+     * `onUpdateAnnounced` é o mesmo caminho do poll, e não um segundo: ele já
+     * carrega as guardas de download em voo, de artefato pronto e de backoff.
      */
     private fun startAutoUpdateSwitchWatcher() {
         viewModelScope.launch {
             autoUpdateEnabled.collect { enabled ->
+                val current = _appUpdateState.value
                 if (enabled) {
+                    if (current != null) {
+                        onUpdateAnnounced(current.update)
+                    }
                     return@collect
                 }
-                val current = _appUpdateState.value
                 forgetPendingUpdate()
                 if (current != null) {
                     _appUpdateState.value = AppUpdateUiState.Available(current.update)

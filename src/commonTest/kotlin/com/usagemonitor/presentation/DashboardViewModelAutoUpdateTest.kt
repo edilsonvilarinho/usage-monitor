@@ -327,6 +327,35 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
         }
     }
 
+    /**
+     * O sentido inverso, e ele faltava: quem liga o interruptor com a faixa de
+     * "nova versão" já na tela ficava olhando para ela sem nada acontecer até o
+     * poll seguinte — até 10 minutos depois, sem nenhum sinal de que ligar o
+     * interruptor tinha surtido efeito. Foi assim que apareceu na A20, com o
+     * usuário relatando que o download não começava.
+     */
+    @Test
+    fun `turning the switch on starts the download for the version already announced`() = runTest {
+        val installer = FakeInstaller()
+        val enabled = MutableStateFlow(false)
+        val viewModel = autoUpdateViewModel(installer = installer, enabledFlow = enabled)
+
+        try {
+            runCurrent()
+            // Desligado, a faixa é a de sempre: baixar manualmente.
+            assertIs<AppUpdateUiState.Available>(viewModel.appUpdateState.value)
+
+            enabled.value = true
+            runCurrent()
+
+            assertIs<AppUpdateUiState.Ready>(viewModel.appUpdateState.value)
+            viewModel.scheduleUpdateOnExit()
+            assertEquals(1, installer.scheduleCalls)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
     // --- encerramento --------------------------------------------------------
 
     @Test

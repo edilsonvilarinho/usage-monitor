@@ -421,6 +421,37 @@ explicitamente **fora do `allTests`**, usarem nomes isolados nas quatro superfí
 (diretório, chave de desinstalação, atalhos e chave `Run`) e limparem tudo em bloco `finally`. A
 restrição continua valendo para a suíte unitária, que é para onde foi escrita.
 
+### Dois defeitos que só o smoke test empacotado encontrou (A20)
+
+Nenhum dos dois aparecia em teste, e os dois falhavam em **100%** das tentativas, em silêncio.
+
+1. **O instalador nunca era lançado.** `launchDetachedProcess` passava
+   `ProcessBuilder.Redirect.DISCARD` para `redirectInput`, e `DISCARD` é um redirect de **escrita**:
+   a chamada lançava `IllegalArgumentException("Redirect invalid for reading: WRITE")` **antes** de
+   `start()`. O app fechava, nada acontecia, o app não voltava e o disco não registrava nada.
+   Escapou porque `processLauncher` é injetável para o teste de `schedule` afirmar o comando exato
+   sem criar processo — e **toda** a suíte usava a versão falsa, de modo que a única implementação
+   que roda em produção nunca era executada. *A costura que torna uma função testável não testa a
+   função que ela substitui.* Fechado por `LaunchDetachedProcessTest`, que chama o lançador real.
+2. **Ligar o interruptor não fazia nada.** O observador do interruptor tratava só o desligar
+   (`if (enabled) return@collect`). Quem o ligava com a faixa de "nova versão" na tela ficava
+   olhando para ela até o poll seguinte, a até 10 minutos de distância, sem nenhum sinal. Foi o
+   usuário quem relatou, olhando a tela. Agora ligar reavalia pelo mesmo `onUpdateAnnounced` do
+   poll, que já carrega as guardas de download em voo, artefato pronto e backoff.
+
+O que tornou o primeiro diagnosticável foi ter parado de descartar o `Result` de `schedule()`: a
+falha virou recibo com o motivo, e o motivo nomeou a causa na primeira reprodução.
+
+### Achados menores da A20
+
+- **O artefato de 122 MB não é podado depois de aplicado** — segue em `~/.usage-monitor/updates/`.
+  A contra-auditoria já suspeitava; agora está medido. Não corrigido aqui.
+- **`CloseMainWindow()` não fecha este app**: o launcher do jpackage não expõe janela principal ao
+  Windows. Fechar por script não exercita o caminho real de encerramento, e as duas primeiras
+  reproduções por script foram inválidas por isso.
+- **O roteiro da A20 estava errado**: pedia um `Setup.exe` local servido por HTTP, que
+  `TRUSTED_DOWNLOAD_HOSTS` recusa.
+
 ### O que ficou por verificar
 
 - **Estado visível do interruptor na tela.** O app sobe, mas confirmar que a linha aparece desabilitada
@@ -468,4 +499,4 @@ hash, e preencher o hash depois quebraria a regra de escrever a linha no mesmo c
 | — | 2026-08-22 | `docs(plan): record the model and effort level used` | Cabeçalho de procedência | concluída | Modelo, nível de esforço, ferramenta, branch e autor dos commits no topo do documento. O rastro de auditoria de um trabalho feito por agente precisa dizer sob quais condições as conclusões foram tiradas — sem isso, "medido" e "verificado" não têm dono |
 | — | 2026-08-22 | `docs(plan): consolidate the deviations found while executing` | Seção **Desvios do plano e achados da execução** | concluída | Fecha o PR 1 e o PR 2 com a leitura consolidada do que a execução descobriu e o plano não previa: 3 medições no NSIS — duas delas contradizendo premissas herdadas da auditoria anterior —, 2 defeitos que só apareceram ao executar, 4 ajustes na estrutura das atividades, 4 armadilhas de ambiente, 1 restrição relativizada e 4 itens por verificar. O plano previa 2 `!ifndef` no `.nsi`; foram necessários **4** — isolamento de cenário era requisito, não detalhe |
 | A19 | 2026-08-24 | `feat(update): turn the automatic update on for the next release` | Ligação da funcionalidade | concluída | `AUTO_UPDATE_SHIPPED` para `true` e `MIN_UPDATABLE_TARGET_VERSION` de `999.0.0` para **`38.0.0`**, a primeira release que sai com o `/UPDATE` no `.nsi`. **Pré-requisito que não estava nesta lista:** a #78 tinha de fechar antes — enquanto o portão de origem dava `NSIS_PER_USER` para uma instalação MSI, ligar isto rodaria o `Setup.exe /S /UPDATE` sobre uma árvore do Windows Installer, que é o cenário que o KDoc do enum descreve como razão de ele existir. Dois testes trocaram de lado: o de `WindowsAppUpdateInstallerTest` que afirmava o sentinela `999.0.0` agora afirma que **nenhuma release anterior ao `/UPDATE` é alvo aceito** (`23.0.0` e `37.0.0` recusadas, `38.0.0` aceita), e `AutoUpdateWiringTest` ganhou um caso novo com a constante `LAST_VERSION_WITHOUT_UPDATE_MODE`: só a direção **para baixo** é destrutiva, então o portão afirma o piso e não a igualdade com a tag — amarrar à tag exigiria que o teste soubesse um número decidido depois. README com a seção de atualização automática: o que é, os dois casos em que o interruptor vem desabilitado com motivo, os ~120 MB, o executável sem assinatura e o piso de 38.0.0. `gradlew.bat desktopTest --rerun`: **114 classes / 1223 testes / 0 falhas** |
-| A20 | 2026-08-24 | `fix(update): record why the update package was never handed over` | Smoke test empacotado | **em andamento** | Feed local servindo o release real de teste `smoke-a20-38` (asset em `github.com`, porque `TRUSTED_DOWNLOAD_HOSTS` só aceita aquele host — o roteiro original pedia um `Setup.exe` local, que a allowlist recusa). **Passo 1 verde:** download em menos de 10 s, 122.309.429 bytes exatos e SHA-256 batendo com o `digest` da API. **Passos 2 e 3 reprovaram, três vezes — duas por script e uma pelo clique do usuário em "Reiniciar e atualizar agora":** o app fecha, **nenhum instalador é lançado**, não há recibo, não há `INSTDIR.new`/`.old`, a versão segue 37.0.0 e o artefato fica parado em `~/.usage-monitor/updates/`. O instalador **não** é o culpado: lançado à mão com `/S /UPDATE /PID=…` ele devolve exit 0 em 3,3 s, troca para 39.0.0 e escreve recibo `status=success`. O arquivo baixado não tem Mark-of-the-Web, então não é SmartScreen. Duas das três guardas de `scheduleUpdateOnExit` estão descartadas por medição: o download é gated por `canDownloadAutomatically()`, que checa o interruptor, logo ele estava ligado e o instalador não era nulo. **Defeito de projeto corrigido neste commit:** `scheduleUpdateOnExit` descartava o `Result` de `schedule()` — falha ali é invisível por construção, porque quem escreve o recibo é o instalador, que justamente não roda. Agora a falha vira recibo com o motivo. **Armadilha de ambiente:** `CloseMainWindow()` não fecha este app — o launcher do jpackage não expõe janela principal —, então fechar por script não exercita o caminho real; o gatilho confiável é o clique. Causa raiz ainda **não determinada**, aguardando o recibo da próxima reprodução |
+| A20 | 2026-08-24 | `fix(update): actually launch the installer and react to the switch` | Smoke test empacotado | concluída | Feed local servindo o prerelease real `smoke-a20-38` — o roteiro pedia um `Setup.exe` local, e `TRUSTED_DOWNLOAD_HOSTS` só aceita `github.com`, então o asset é publicado de verdade. **Passo 1 verde:** download em <10 s, 122.309.429 bytes exatos, SHA-256 igual ao `digest` da API. **Passo 2 verde depois de duas correções:** 37.0.0 → **39.0.0**, app relançado sozinho, recibo `status=success previousVersion=37.0.0`, **um** jar na pasta (sem órfão), sem `INSTDIR.new`/`.old`, `Uninstall.exe`, atalho e chave `Run` no lugar, e dados intactos (`team.json` com o mesmo SHA-256, 39 preferências). **Passo 3 verde:** o botão "Reiniciar e atualizar agora" foi exercitado pelo usuário e é o caminho que fechou o ciclo. **Passo 5 verde:** interruptor desligado, zero downloads em 120 s, faixa no caminho manual. **Passo 4 não exercitado ponta a ponta**: o lado do instalador já é o cenário S3 (exit 3, recibo `locked`, instalação intacta) e o lado da faixa é `AppUpdateBannerTest`; falta só a integração dos dois. **Dois defeitos encontrados, ambos invisíveis e ambos de 100% de incidência** — ver *Desvios*. `gradlew.bat desktopTest --rerun`: **115 classes / 1226 testes / 0 falhas** |

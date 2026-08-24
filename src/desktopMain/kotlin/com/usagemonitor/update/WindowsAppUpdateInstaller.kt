@@ -192,9 +192,21 @@ private fun defaultUpdatesDirectory(): File {
  * Processo solto: nem herda os fluxos do app nem é esperado por ele. O app está
  * saindo, e o instalador precisa sobreviver a essa saída.
  */
-private fun launchDetachedProcess(command: List<String>, directory: File?) {
+/**
+ * Lança o instalador desacoplado deste processo, que está saindo.
+ *
+ * `Redirect.DISCARD` é um redirect de **escrita**, e `redirectInput` exige um de
+ * leitura: passar `DISCARD` ali lança `IllegalArgumentException("Redirect invalid
+ * for reading: WRITE")` **antes** de `start()` — o processo nunca chega a ser
+ * criado. Era o defeito medido na A20: a atualização automática falhava em 100%
+ * das tentativas, para todo usuário, e em silêncio.
+ *
+ * A entrada vai para o dispositivo nulo do Windows. Este arquivo já é
+ * Windows-only, e `Redirect.INHERIT` herdaria de um processo GUI sem console.
+ */
+internal fun launchDetachedProcess(command: List<String>, directory: File?) {
     val builder = ProcessBuilder(command)
-        .redirectInput(ProcessBuilder.Redirect.DISCARD)
+        .redirectInput(ProcessBuilder.Redirect.from(File("NUL")))
         .redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .redirectError(ProcessBuilder.Redirect.DISCARD)
     if (directory != null) {
