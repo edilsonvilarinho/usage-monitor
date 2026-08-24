@@ -94,7 +94,7 @@ aqui** — ver risco **R5**.
 |---|---|---|---|
 | **A00** | Linha de base da suíte na branch base, sem edição nenhuma | total anotado nos Pontos de situação | — (sem commit) |
 | **A01** | Este plano em `docs/planos/instalador-unico-windows-execucao.md` | o documento | `docs(plan): add the single windows installer plan` |
-| **A02** | Limpar a máquina de desenvolvimento e rodar as **quatro medições** do MSI | seção *Medições* preenchida + Pontos de situação | `docs(installer): record the measured msi removal semantics` |
+| **A02** | Limpar a máquina de desenvolvimento e **medir** a remoção do MSI | seção *Medições* preenchida + Pontos de situação | `docs(installer): record the measured msi removal semantics` |
 | **A03** | Parar de publicar o MSI | `build.gradle.kts`, workflow, skills, `CLAUDE.md`, `README.md`; apagar `patch-msi-launch.ps1` | `build(packaging): ship a single Windows installer` |
 | **A04** | Portão de origem passa a exigir o `Uninstall.exe` | `WindowsInstallOrigin.kt` + teste | `fix(update): require the NSIS uninstaller to authorize automatic updates` |
 | **A05** | Remoção do MSI por baixo no `.onInit` + quinto `!ifndef` | `src/installer/UsageMonitor.nsi` | `feat(installer): remove a previous MSI install before installing` |
@@ -149,6 +149,48 @@ resultado medido, e o comando que rodou.
 
 `docs/planos/atualizacao-automatica-windows-execucao.md` **não é tocado** — é registro histórico da
 #75.
+
+---
+
+## Medições (A02) — o que foi medido, 2026-08-24
+
+Sujeito: `Usage.Monitor-37.0.0.msi` do release `v37.0.0` (121.155.584 bytes), instalado e removido
+nesta máquina. ProductCode `{845948FC-4664-31DD-92E1-4261C88FE6BF}`.
+
+### Resultados
+
+| # | Pergunta | Resultado medido |
+|---|---|---|
+| **M1** | O Restart Manager fecha o app sob `msiexec /x /qn`? | **Não.** Com o app rodando: exit **3010**, 6,2 s, os **dois** processos continuaram vivos e **69 arquivos ficaram** na pasta. Com o app fechado, duas passadas: exit **0**, 2,4 s e 2,1 s, **pasta removida por completo**. A diferença é o desenho da A05 |
+| **M1b** | `taskkill` gracioso (sem `/F`) fecha o app? | **Não.** Sinal enviado aos dois processos, `taskkill` devolveu 0, e **1 dos 2 sobreviveu mais de 20 s**. `taskkill /F /IM "Usage Monitor.exe"` encerrou em **0,1 s** |
+| **M2** | `ExecWait` pendura com o mutex `_MSIExecute` tomado? | **Não trava.** Com uma instalação MSI em curso, a segunda operação **esperou 1,98 s e completou** (exit 1605). A espera é limitada pela duração da operação concorrente — que não é limitada em geral, mas não é espera infinita |
+| **M3** | O que sobra na pasta depois do `/x`? | **Nada**, quando o app está fechado (duas passadas). **69 arquivos**, quando o `/x` devolve 3010 |
+| **M4** | `~/.usage-monitor/` e as preferências sobrevivem? | **Sim, provado.** Sentinelas de arquivo e de registro intactas após o `/x`; `usage-history.db` em 10.702.848 bytes antes e depois; `team.json` com o mesmo SHA-256 (`C9894D19…6DB6CF`); 13 arquivos e 38 valores de preferência antes e depois |
+| **M5** | Estado do registro depois de um 3010 | A entrada de ARP do MSI **some** e o vínculo em `HKCU\Software\Microsoft\Installer\UpgradeCodes\…` é **apagado** — com os 69 arquivos ainda no disco. Sonda não prevista, e é a que mais muda o plano |
+
+### O que isso muda na A05
+
+1. **`taskkill /F /IM "Usage Monitor.exe"` antes do `msiexec`.** O Restart Manager não fecha o app e o
+   fechamento gracioso também não; só o forçado fecha, e em 0,1 s. Há precedente no próprio arquivo:
+   a seção de desinstalação já faz isso. **Não replicar** o `taskkill /F /IM java.exe` que está ao
+   lado dele — aquele mata toda JVM da máquina, incluindo daemons do Gradle e IDEs de quem instala.
+2. **`3010` deixa de ser código aceitável.** O plano original o aceitava junto de `0` e `1605`; medido,
+   ele significa "removi o registro e deixei os arquivos", que é exatamente o estado que o `File /r`
+   não pode encontrar. Aceitos: `0` e `1605`.
+3. **Detecção por UpgradeCode sozinha não basta** (M5). Depois de um 3010 o produto está
+   desregistrado e `MsiEnumRelatedProductsW` devolve 259, com 69 arquivos ainda na pasta — o
+   instalador concluiria "não há MSI" e gravaria por cima do lixo. A A05 ganha uma **segunda guarda**:
+   se `$INSTDIR` existe e **não** contém `Uninstall.exe`, aquela árvore não foi escrita pelo NSIS e é
+   apagada antes do `File /r`. É o mesmo sinal que a A04 usa para o portão de origem, e cobre também
+   a cópia manual de pasta.
+
+### Armadilha de ambiente encontrada
+
+A primeira passada de M1 foi **inválida** e não por causa do MSI: o app subia e morria em ~5 s, com
+exit 0 e sem log. Causa medida — **um daemon do Gradle retinha `~/.usage-monitor/app.lock`**, e o
+`SingleInstanceGuard` derruba a instância nova em silêncio. `gradlew.bat --stop` liberou o lock e o
+app passou a ficar de pé. Consequência prática, registrada como **R11**: rodar a suíte deixa o app
+instalado impossível de abrir até o daemon morrer.
 
 ---
 
@@ -240,15 +282,38 @@ System::Call 'msi::MsiEnumRelatedProductsW(w "${MSI_UPGRADE_CODE}", i 0, i $R2, 
 
 Índice em laço — pode haver mais de um produto relacionado.
 
+### Fechar o app primeiro — decidido por M1/M1b, não presumido
+
+```nsis
+ExecWait '"$SYSDIR\taskkill.exe" /F /IM "Usage Monitor.exe"' $3
+```
+
+O Restart Manager **não** fecha o app sob `/qn` (M1: exit 3010, app vivo, 69 arquivos no lugar) e o
+`taskkill` gracioso também não (M1b: 1 de 2 processos sobrevive a 20 s). Só o forçado fecha, em 0,1 s.
+A seção de desinstalação deste mesmo arquivo já usa esse comando — o precedente existe. **Não
+replicar** o `taskkill /F /IM java.exe` que está ao lado dele: aquele mata toda JVM da máquina.
+Código de retorno não é falha: `128` significa apenas que não havia processo.
+
 ### Remoção
 
 ```nsis
 ExecWait '"$SYSDIR\msiexec.exe" /x $1 /qn REBOOT=ReallySuppress' $2
 ```
 
-`/qn` é silêncio total, e o MSI é per-user, então não há UAC (ver risco **R7**). Aceitar `0`, `3010`
-e `1605` (produto ausente); qualquer outro código é falha. Se **M3** mostrar resíduo, entra
-`RMDir /r "$INSTDIR"` entre a remoção e o `File /r`.
+`/qn` é silêncio total, e o MSI é per-user, então não há UAC (ver risco **R7**). Aceitos **`0`** e
+**`1605`** (produto ausente). **`3010` é falha**, ao contrário do que a issue propunha: medido, ele
+significa "registro removido, arquivos mantidos" — exatamente o estado que o `File /r` não pode
+encontrar.
+
+### Segunda guarda: árvore estranha sem registro (M5)
+
+Detectar pelo UpgradeCode não basta. Depois de um 3010 o produto fica desregistrado e o vínculo de
+UpgradeCode é apagado, com os arquivos ainda no disco: `MsiEnumRelatedProductsW` devolve 259 e o
+instalador concluiria que não há nada a remover.
+
+Por isso, **independentemente de ter achado MSI**: se `$INSTDIR` existe e **não** contém
+`Uninstall.exe`, aquela árvore não foi escrita pelo NSIS e é apagada antes do `File /r`. É o mesmo
+sinal que a A04 usa no portão de origem, e cobre de quebra a cópia manual de pasta.
 
 ### Política de falha
 
@@ -261,7 +326,7 @@ Padrão de parada, já medido e documentado no cabeçalho do próprio `.nsi` (li
 `reason=msi-removal-failed` → `SetErrorLevel 4` → `Quit`. **Nunca** `MessageBox` bloqueante sob `/S`:
 é a armadilha medida na A02 da #75.
 
-**App rodando** entra aqui, com o desenho definido por **M1** e não antes dela.
+O desenho do "app rodando" saiu de M1/M1b e está acima, não é mais uma pendência.
 
 ---
 
@@ -363,7 +428,7 @@ hash. `git log --grep` recupera o commit pelo assunto.
 |---|---|---|---|---|---|
 | A00 | 2026-08-24 | — | Linha de base da suíte na branch base (`3792192`) | concluída | `gradlew.bat desktopTest --rerun`: BUILD SUCCESSFUL em 2m46s. Agregado dos XML de `build/test-results/desktopTest`: **114 classes / 1221 testes / 0 falhas / 0 erros / 0 pulados** — o mesmo total registrado na A14 da #75, o que confirma que a branch está no estado esperado |
 | A01 | 2026-08-24 | `docs(plan): add the single windows installer plan` | Este plano em `docs/planos/` | concluída | Este arquivo. Nove atividades atômicas, tabela de Pontos de situação e tabela de Problemas em aberto com 10 riscos já identificados. **Divergência deliberada da issue #78**, que pedia "sem tabela de pontos de situação em `docs/planos/`": o registro por atividade foi exigido explicitamente pelo autor do repositório, para viabilizar auditoria completa ao final |
-| A02 | — | — | Limpeza da máquina + quatro medições do MSI | pendente | — |
+| A02 | 2026-08-24 | `docs(installer): record the measured msi removal semantics` | Limpeza da máquina + medições do MSI | concluída | Seção *Medições (A02)*. **Três premissas do plano caíram.** (1) O Restart Manager **não** fecha o app sob `/qn`: com o app rodando, `msiexec /x` devolveu **3010** em 6,2 s, os dois processos sobreviveram e **69 arquivos ficaram** na pasta; com o app fechado, duas passadas deram exit 0 em 2,4 s e 2,1 s com a pasta **removida por completo**. (2) `taskkill` gracioso **não** fecha — 1 de 2 processos sobreviveu a 20 s; `taskkill /F` encerrou em 0,1 s. (3) Sonda não prevista (**M5**): depois de um 3010 a entrada de ARP **some** e o vínculo de UpgradeCode é **apagado** com os arquivos no disco, então detecção por UpgradeCode sozinha não vê o lixo — daí a segunda guarda por ausência de `Uninstall.exe`. `ExecWait` **não** trava com o mutex tomado: a segunda operação esperou 1,98 s e completou (1605). Dados preservados e **provados**: `usage-history.db` em 10.702.848 bytes antes e depois, `team.json` com o mesmo SHA-256, 13 arquivos e 38 valores de preferência antes e depois. Primeira passada de M1 foi **inválida** por um daemon do Gradle reter `~/.usage-monitor/app.lock` (R11). Máquina deixada limpa: nenhuma entrada em ARP, nenhuma pasta de instalação |
 | A03 | — | — | Parar de publicar o MSI | pendente | — |
 | A04 | — | — | Portão de origem exige o `Uninstall.exe` | pendente | — |
 | A05 | — | — | Remoção do MSI por baixo no `.onInit` | pendente | — |
@@ -382,15 +447,17 @@ a auditoria final da A08.
 | # | Risco / problema | Evidência hoje | Fecha em | Estado |
 |---|---|---|---|---|
 | **R1** | WiX não está instalado nesta máquina (`$env:WIX` vazio, nenhum `candle.exe`) — S7/S8 não rodam localmente | verificado por `Test-Path` em 2026-08-24 | A07 (SKIP local + `choco install wixtoolset` no CI) | aberto |
-| **R2** | `msiexec /x /qn` pode devolver `3010` e deixar os arquivos para o reboot, com o `File /r` gravando por cima deles | não medido | M1 | aberto |
-| **R3** | `ExecWait` não tem timeout; com o mutex `_MSIExecute` tomado o instalador fica pendurado | não medido | M2 | aberto |
-| **R4** | App em execução durante a remoção e durante o `File /r`; a seção de instalação não tem `taskkill`, e `taskkill /F` durante escrita do SQLite é pior que não atualizar | comentário da #75 + leitura do `.nsi` | M1 → A05 | aberto |
+| **R2** | `msiexec /x /qn` pode devolver `3010` e deixar os arquivos para o reboot, com o `File /r` gravando por cima deles | **medido em 2026-08-24: acontece.** Exit 3010, 69 arquivos mantidos | A05 (`3010` vira falha; app fechado antes) | medido |
+| **R3** | `ExecWait` não tem timeout; com o mutex `_MSIExecute` tomado o instalador fica pendurado | **medido: não trava.** Segunda operação esperou 1,98 s e completou (1605). A espera é a duração da operação concorrente, que não é limitada em geral | — | aceito |
+| **R4** | App em execução durante a remoção e durante o `File /r`; a seção de instalação não tem `taskkill`, e `taskkill /F` durante escrita do SQLite é pior que não atualizar | **medido:** Restart Manager não fecha; `taskkill` gracioso não fecha (1 de 2 sobrevive a 20 s); `taskkill /F` fecha em 0,1 s | A05 (`taskkill /F` só do executável do app, nunca de `java.exe`) | medido |
 | **R5** | A branch base está ~10 commits atrás do `main`, com conflito garantido em arquivos visuais | `git log main..origin/feat/auto-update-windows-75` | fora deste escopo — é da #75 | aceito |
 | **R6** | O pipeline de release só é provado na primeira tag publicada após a mudança | por construção | — | aceito |
 | **R7** | Se algum usuário instalou o MSI elevado (per-machine em vez de per-user), o `/x` exigiria UAC e o `/qn` falharia | não medido; o `build.gradle.kts` sempre usou `perUserInstall = true`, mas isso não prova o que há na máquina alheia | A02 (registrar) / A05 (código de erro vira falha visível) | aberto |
 | **R8** | Sintaxe do `System::Call` para `MsiEnumRelatedProductsW` (buffer de saída em `w .r1`) só é validada ao compilar e executar | plugin `System.dll` presente; chamada não exercitada | A05 | aberto |
-| **R9** | Quantos arquivos o `msiexec /x` remove depois de o NSIS ter sobrescrito os mesmos caminhos — a "bomba-relógio" do §2.1 da issue | não medido | M3 | aberto |
+| **R9** | Quantos arquivos o `msiexec /x` remove depois de o NSIS ter sobrescrito os mesmos caminhos — a "bomba-relógio" do §2.1 da issue | **parcialmente medido:** com o app fechado a remoção é total (zero resíduo), então o `File /r` posterior escreve numa pasta limpa. A ordem "remover, depois instalar" desarma a bomba por construção | A05 (ordem) + segunda guarda | medido |
 | **R10** | A A03 sozinha numa release é uma regressão; depende de disciplina de tag, não de código | — | A08 (conferir que A03–A07 estão na mesma tag) | aberto |
+| **R11** | Um daemon do Gradle retém `~/.usage-monitor/app.lock`; com ele preso o app instalado sobe e morre em ~5 s, com exit 0 e sem log — o `SingleInstanceGuard` derruba a instância nova em silêncio | **medido em 2026-08-24**: `gradlew.bat --stop` libera o lock e o app passa a ficar de pé. Invalidou a primeira passada de M1 | fora deste escopo — defeito próprio, merece issue | aberto |
+| **R12** | Depois de um `3010` o produto MSI fica **desregistrado** e o vínculo de UpgradeCode é apagado, com os arquivos ainda no disco: detecção por `MsiEnumRelatedProductsW` devolve 259 e não vê o resíduo | **medido (M5)** | A05 (segunda guarda: `$INSTDIR` sem `Uninstall.exe` é apagado antes do `File /r`) | medido |
 
 ---
 
