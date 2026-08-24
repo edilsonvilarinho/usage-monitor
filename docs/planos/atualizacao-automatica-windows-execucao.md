@@ -452,6 +452,23 @@ falha virou recibo com o motivo, e o motivo nomeou a causa na primeira reproduç
 - **O roteiro da A20 estava errado**: pedia um `Setup.exe` local servido por HTTP, que
   `TRUSTED_DOWNLOAD_HOSTS` recusa.
 
+### A18 corrigida depois de ver o job vermelho
+
+O job `installer-scenarios` nunca chegou a rodar os cenários. O passo de filtro por path faz um diff
+de **três pontos**, que exige base comum, e o `actions/checkout` padrão é raso: com um
+`fetch --depth=1` da base, as duas histórias não se tocam e o git responde
+`fatal: origin/<base>...HEAD: no merge base`. O passo falha, o job falha, e os cenários são pulados.
+
+Foi assim no CI do PR #85, e o defeito já estava catalogado como **P1-09** na contra-auditoria — a
+correção é que faltava. Duas mudanças: `fetch-depth: 0` no checkout, e o filtro passou a checar
+`$LASTEXITCODE` do `git diff`. A segunda importa porque `$ErrorActionPreference = 'Stop'` **não**
+aborta o pwsh em falha de comando nativo: sem ela, um git que falhasse deixaria a lista de arquivos
+vazia e o filtro concluiria "nada mudou", pulando os cenários **em silêncio** — que é pior que o job
+vermelho. Na dúvida, roda.
+
+**Consequência registrada:** até aqui os cenários do instalador só foram exercitados localmente. A
+primeira execução real deles no CI é a próxima PR que tocar `src/installer/` ou o pacote `update/`.
+
 ### O que ficou por verificar
 
 - **Estado visível do interruptor na tela.** O app sobe, mas confirmar que a linha aparece desabilitada
