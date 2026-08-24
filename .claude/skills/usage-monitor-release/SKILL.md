@@ -28,14 +28,14 @@ Release this repository in a way that stays aligned with the current build, inst
    - macOS `.dmg` files come from the `build-macos` job (`macos-latest` for arm64, `macos-15-intel` for x64). They are unsigned: no Apple Developer ID, no notarization. `packageDmg` cannot run on Windows or Linux, so there is no local validation path for it.
 7. Run the local verification that must pass before the tag exists:
    - `gradlew.bat allTests` — mandatory. The tag is what triggers the release; a broken suite discovered after the push means a burned tag on the remote.
-   - Do not package locally as a release gate. `build-windows` already runs `packageMsi patchMsiLaunch packageInstaller` plus the `-VerifyOnly` MSI gate, and `build-linux`/`build-macos` cover the other two OSes. Local packaging duplicates CI and proves only one platform.
+   - Do not package locally as a release gate. `build-windows` already runs `packageInstaller`, and `build-linux`/`build-macos` cover the other two OSes. Local packaging duplicates CI and proves only one platform.
    - `gradlew.bat packageInstaller` only when the task is debugging the installer itself (see the `usage-monitor-nsis-installer` skill).
 8. Publish. Invoking this skill **is** the request to publish — never stop to ask for confirmation:
    - commit the version bump with the temporary agent git identity
    - create the annotated tag `vX.Y.Z`
    - push `main` and the tag
 9. Watch the GitHub Actions workflow `Release Desktop Packages` and report the outcome. The `verify` job runs `allTests` in parallel with the build jobs and `publish-release` requires it, so a red `verify` produces workflow artifacts but no GitHub Release. The published release must carry every artifact family:
-   - Windows: `Usage Monitor-X.Y.Z.msi` and `UsageMonitor-Setup-X.Y.Z.exe`
+   - Windows: `UsageMonitor-Setup-X.Y.Z.exe`, the only Windows artifact. The `.msi` was dropped after v37 — both installers wrote to the same `%LOCALAPPDATA%\Usage Monitor` and an MSI install could never update itself.
    - Linux: `.deb`, `.rpm`, and `usage-monitor_X.Y.Z_linux_x64.tar.gz`
    - macOS: `usage-monitor_X.Y.Z_macos_arm64.dmg` and `usage-monitor_X.Y.Z_macos_x64.dmg`
    A release missing either DMG is incomplete and must be reported as such.

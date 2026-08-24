@@ -104,7 +104,6 @@ compose.desktop {
         nativeDistributions {
             targetFormats(
                 TargetFormat.Exe,
-                TargetFormat.Msi,
                 TargetFormat.Deb,
                 TargetFormat.Rpm,
                 TargetFormat.Dmg
@@ -124,6 +123,12 @@ compose.desktop {
                 shortcut = true
                 perUserInstall = true
                 dirChooser = true
+                // Nao geramos mais MSI, entao este UpgradeCode nao produz nada aqui.
+                // Ele fica porque e o UpgradeCode das instalacoes MSI que ja existem
+                // por ai -- ate a v37 o release publicava as duas coisas -- e e por
+                // ele que o UsageMonitor.nsi as encontra e remove antes de instalar
+                // (!ifndef MSI_UPGRADE_CODE). Apagar daqui deixaria o GUID orfao no
+                // .nsi, sem nada que diga de onde ele veio.
                 upgradeUuid = "D26C4B79-9F2B-4CE5-B94E-E2E6A2A9E4A4"
             }
             linux {
@@ -229,23 +234,6 @@ tasks.register<Exec>("buildNsisInstaller") {
         logger.warn("NSIS not found. Skipping installer generation.")
         logger.warn("Install NSIS from https://nsis.sourceforge.io/ to enable installer build.")
     }
-}
-
-// O MSI do jpackage nao lanca a aplicacao no fim da instalacao. O script abaixo
-// acrescenta o checkbox "iniciar agora" ao ExitDialog do MSI ja gerado.
-tasks.register<Exec>("patchMsiLaunch") {
-    dependsOn("packageMsi")
-
-    onlyIf { org.gradle.internal.os.OperatingSystem.current().isWindows }
-
-    commandLine(
-        "powershell",
-        "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-File", file("patch-msi-launch.ps1").absolutePath,
-        "-MsiDirectory", file("build/compose/binaries/main/msi").absolutePath,
-        "-MsiFileName", "Usage Monitor-$appVersion.msi"
-    )
 }
 
 tasks.register("packageInstaller") {

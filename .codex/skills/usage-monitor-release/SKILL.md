@@ -33,7 +33,7 @@ Release this repository in a way that stays aligned with the current build, inst
    - create the annotated tag `vX.Y.Z`
    - push `main` and the tag
 9. Watch the GitHub Actions workflow `Release Desktop Packages` and report the outcome. The published release must carry every artifact family:
-   - Windows: `Usage Monitor-X.Y.Z.msi` and `UsageMonitor-Setup-X.Y.Z.exe`
+   - Windows: `UsageMonitor-Setup-X.Y.Z.exe`, the only Windows artifact. The `.msi` was dropped after v37 — both installers wrote to the same `%LOCALAPPDATA%\Usage Monitor` and an MSI install could never update itself.
    - Linux: `.deb`, `.rpm`, and `usage-monitor_X.Y.Z_linux_x64.tar.gz`
    - macOS: `usage-monitor_X.Y.Z_macos_arm64.dmg` and `usage-monitor_X.Y.Z_macos_x64.dmg`
    A release missing either DMG is incomplete and must be reported as such.
