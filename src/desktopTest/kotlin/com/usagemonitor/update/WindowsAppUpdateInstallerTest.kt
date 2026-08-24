@@ -21,6 +21,7 @@ import java.security.MessageDigest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -91,10 +92,17 @@ class WindowsAppUpdateInstallerTest {
     }
 
     @Test
-    fun `the production constant is unreachable while the installer has no update mode`() {
-        // Guarda de release: baixar a constante para um valor real antes de o
-        // .nsi entender /UPDATE reabriria o caminho destrutivo.
-        assertEquals("999.0.0", MIN_UPDATABLE_TARGET_VERSION)
+    fun `the production constant refuses every release without update mode`() {
+        // Guarda de release, agora do outro lado: o sentinela caiu na A19, quando
+        // o .nsi passou a entender /UPDATE. O que a guarda afirma hoje e que
+        // nenhuma release publicada ANTES disso e aceita como alvo -- mandar
+        // `/S /UPDATE` para aquele instalador o deixa pendurado no MessageBox do
+        // `.onInit`, medido na A02.
+        val installer = installer(minVersion = MIN_UPDATABLE_TARGET_VERSION)
+
+        assertFalse(installer.isTargetUpdatable(LAST_VERSION_WITHOUT_UPDATE_MODE))
+        assertFalse(installer.isTargetUpdatable("23.0.0"))
+        assertTrue(installer.isTargetUpdatable(MIN_UPDATABLE_TARGET_VERSION))
     }
 
     // --- selecao de artefato ------------------------------------------------

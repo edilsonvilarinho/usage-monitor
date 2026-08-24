@@ -29,10 +29,23 @@ import java.io.File
  * Quem decide não é a versão instalada, é a **versão baixada** — por isso a
  * comparação é contra `update.version`, não contra a versão em execução.
  *
- * O valor abaixo é inalcançável de propósito enquanto o `/UPDATE` não existir no
- * `.nsi` (atividade A16). A atividade A19 o troca pelo número real.
+ * `38.0.0` é a primeira release publicada com o `/UPDATE` no `.nsi`; a v37 e as
+ * anteriores têm o instalador que trava. **Este número está amarrado à tag que
+ * sair desta branch**: se a release for publicada com outro número, ele muda
+ * junto. Errar para cima é inócuo — a app só enxerga versões mais novas que a
+ * dela —, mas errar para baixo reabre o caminho travado, e é isso que o teste de
+ * `AutoUpdateWiringTest` impede.
  */
-internal const val MIN_UPDATABLE_TARGET_VERSION = "999.0.0"
+internal const val MIN_UPDATABLE_TARGET_VERSION = "38.0.0"
+
+/**
+ * Última release cujo `Setup.exe` **não** entende `/UPDATE`.
+ *
+ * Não é usada em tempo de execução: existe para o portão de release afirmar, em
+ * teste, que [MIN_UPDATABLE_TARGET_VERSION] está acima dela. É a única direção
+ * de erro que é destrutiva.
+ */
+internal const val LAST_VERSION_WITHOUT_UPDATE_MODE = "37.0.0"
 
 class WindowsAppUpdateInstaller(
     httpClient: HttpClient,

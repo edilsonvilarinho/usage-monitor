@@ -1,5 +1,6 @@
 package com.usagemonitor.update
 
+import com.usagemonitor.data.repository.isVersionNewer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -45,5 +46,23 @@ class AutoUpdateWiringTest {
         if (!AUTO_UPDATE_SHIPPED) {
             assertEquals("999.0.0", MIN_UPDATABLE_TARGET_VERSION)
         }
+    }
+
+    @Test
+    fun `the minimum target version is above the last release without update mode`() {
+        // Das duas direções de erro só uma é destrutiva. Mínimo alto demais é
+        // inócuo: a app só enxerga versões mais novas que a dela, e uma versão
+        // que nunca existiu nunca é oferecida. Mínimo baixo demais manda
+        // `/S /UPDATE` para um Setup.exe que não conhece a opção, e aquele fica
+        // pendurado no MessageBox do `.onInit` para sempre — medido na A02.
+        //
+        // Por isso o teste afirma só o piso, e não a igualdade com a tag: amarrar
+        // à tag exigiria que este arquivo soubesse o número da release, que é
+        // decidido depois.
+        assertTrue(
+            isVersionNewer(MIN_UPDATABLE_TARGET_VERSION, LAST_VERSION_WITHOUT_UPDATE_MODE),
+            "MIN_UPDATABLE_TARGET_VERSION ($MIN_UPDATABLE_TARGET_VERSION) precisa ser maior que " +
+                "$LAST_VERSION_WITHOUT_UPDATE_MODE, a última release cujo instalador não entende /UPDATE."
+        )
     }
 }

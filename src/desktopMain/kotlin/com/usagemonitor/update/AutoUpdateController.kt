@@ -22,8 +22,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *
  * A atividade A19 vira este valor **junto** com [MIN_UPDATABLE_TARGET_VERSION],
  * e há um teste que reprova a combinação inconsistente.
+ *
+ * Ligado na A19, depois de o `.nsi` entender `/UPDATE` (A16), dos seis cenários
+ * do instalador passarem (A17) e de a #78 fechar o falso positivo do portão de
+ * origem — sem aquele, uma instalação MSI passava como `NSIS_PER_USER` e a
+ * atualização automática rodaria sobre uma árvore do Windows Installer.
  */
-internal const val AUTO_UPDATE_SHIPPED = false
+internal const val AUTO_UPDATE_SHIPPED = true
 
 /**
  * Tudo que a janela principal precisa saber sobre atualização automática.

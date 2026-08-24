@@ -290,7 +290,31 @@ Recurso **opcional**, desligado por default. Serve o caso em que a mesma conta A
 - Quando existe versao mais nova, a UI mostra um banner com a versao disponivel.
 - O banner oferece acao para abrir a pagina da release publicada no GitHub.
 - A verificacao roda na inicializacao, a cada 10 minutos e tambem no refresh manual.
-- A app nao faz mais download, instalacao automatica nem restart por update em Windows ou Linux.
+
+#### Atualizacao automatica (Windows, opcional)
+
+Desmarcada por padrao, em Configuracoes -> Geral. Ligada, a app baixa o
+`UsageMonitor-Setup-<versao>.exe` em segundo plano, confere o SHA-256 publicado pela API do GitHub e
+mostra "pronta para instalar". A troca acontece quando a app fecha, ou na hora pelo botao
+"Reiniciar e atualizar agora". O resultado da ultima tentativa fica em
+`~/.usage-monitor/update-receipt.properties`.
+
+O interruptor aparece **desabilitado, com o motivo**, quando a atualizacao nao se aplica:
+
+| Caso | Por que |
+|---|---|
+| Linux e macOS | O `.deb`/`.rpm` exige elevacao e o DMG sem Developer ID nao remonta o bundle de forma confiavel. |
+| Instalacao que nao veio do `UsageMonitor-Setup` | MSI, copia manual da pasta ou `gradlew run`. Aplicar o instalador NSIS por cima criaria uma instalacao paralela. A deteccao exige o `Uninstall.exe` no diretorio registrado. |
+
+Duas coisas que valem saber antes de ligar:
+
+- **O download tem ~120 MB por versao.** Nao ha atualizacao delta, e nenhum artefato publicado e
+  menor. E o motivo de o interruptor vir desmarcado.
+- **O `Setup.exe` nao e assinado.** SmartScreen ou antivirus podem barra-lo. Falha ali cai no banner
+  de baixar manualmente, que e o comportamento de sempre.
+
+Releases anteriores a 38.0.0 nao sao alvo valido: o instalador delas nao entende o modo silencioso de
+atualizacao, e receber esse parametro o deixaria pendurado num dialogo invisivel.
 
 ### Preferencias persistidas
 
