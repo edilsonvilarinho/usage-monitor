@@ -307,6 +307,52 @@ mesmas colunas, bloco de sessões com o cabeçalho da §6), §9b (piso e teto de
 nota da cor por integrante), §10 (colunas de Último turno e Status, chip e campo de filtro juntos) e
 §10b (faixa de legendas e os agregados da conta numa célula que atravessa as colunas vazias).
 
+
+### Passada de conformidade — 2026-08-24 (issue #83)
+
+Uma primitiva, um defeito: a **barra de cota desaparecia** nas escalas de 105% e 110% do slider de
+interface. O levantamento veio por captura do dashboard, e a medição de pixel fechou o diagnóstico
+antes de qualquer alteração — a 80% o trilho tem 3px com 1px de verde nos primeiros 37% da largura;
+a 110% as quatro linhas do trilho são `0xFF3D3838`, que é `outlineVariant`. Não é a barra desenhada
+errada: é a barra desenhada e apagada.
+
+A causa está em `Modifier.border`, não no app. `Border.kt` do Compose 1.7.1 faz
+`strokeWidthPx = ceil(width.toPx())` e desenha em `onDrawWithContent { drawContent(); … }`, ou seja,
+**por cima dos filhos**. Com `TRACK_HEIGHT` de 4dp e borda de 1dp:
+
+| Escala | Trilho | Traço | Interior |
+|---|---|---|---|
+| 80–85% | 3px | 1px | 1px |
+| 90–100% | 4px | 1px | 2px |
+| **105–110%** | **4px** | **2px** | **0px — barra cega** |
+| 115–135% | 5px | 2px | 1px |
+| 140–150% | 6px | 2px | 2px |
+
+O padrão de fábrica é 115%, então a barra vinha de fábrica como um fio de 1px e sumia em duas
+posições do slider.
+
+`AppProgressTrack` passou a montar a borda como **fundo mais padding** em vez de `Modifier.border`.
+O padding usa `roundToPx`, que acompanha a altura do trilho, e é exatamente o
+`box-sizing: border-box` que a §2 do protótipo já especificava — ali a borda reserva layout e o
+preenchimento nunca fica por baixo do anel. **A renderização a 100% é a mesma de antes** (2px de cor
+entre dois anéis de 1px), então nenhuma captura do README precisa ser regerada: os geradores rodam
+na escala neutra, e foi por isso que o defeito nunca apareceu numa delas.
+
+O protótipo **não mudou**. Ele estava certo; quem divergiu foi o Compose.
+
+O teste de regressão é em **bitmap**, não em layout: o `Box` de preenchimento sempre foi medido com
+a altura cheia, e `boundsInRoot` devolvia 4px nas duas escalas cegas — um teste de layout passaria
+com a barra apagada. `AppStatesTest` percorre a grade inteira do slider (80…150 de 5 em 5),
+renderiza a barra com fração 0 e com fração 1, e compara os dois bitmaps. Contra o código anterior a
+diferença a 105% é de **12 pixels** — só o antialiasing das pontas arredondadas — contra um piso de
+meia linha da largura do trilho. A grade inteira é percorrida de propósito: o defeito morava em duas
+posições específicas, e uma escala amostrada passaria.
+
+Ficaram de fora, verificados: **toda** borda de 1dp do app engrossa para 2px na mesma faixa, mas em
+botão, campo e superfície de dados isso é uma borda mais grossa e não conteúdo apagado — o interior
+deles tem dezenas de dp; e o ponto vazado de `AppStatusIndicator`, de 6dp, continua vazado com 3px
+de interior. Nenhum outro elemento com `.size`/`.height` de um dígito em dp usa `border`.
+
 ---
 
 ## Protocolo de retomada de sessão

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -108,6 +109,15 @@ fun AppStatusIndicator(
  * [fraction] é recortada em 0..1 aqui e não na chamada: cota estourada devolve
  * mais de 100%, e uma barra desenhada além da própria largura sangra sobre a
  * linha vizinha.
+ *
+ * **A borda de 1dp é fundo mais padding, nunca `Modifier.border`.** O `border`
+ * do Compose arredonda o traço para cima (`ceil(width.toPx())`) e o pinta
+ * **depois** do conteúdo: num trilho de 4dp o anel vira 2px a partir de
+ * densidade 1,05 e cobre os 4px inteiros, apagando o preenchimento — a barra
+ * ficava cinza com a cota em 37% nas escalas de 105% e 110% (issue #83). Fundo
+ * mais padding usa `roundToPx`, que acompanha a altura do trilho, e é também o
+ * `box-sizing: border-box` que o protótipo especifica, em que a cor nunca fica
+ * por baixo do anel.
  */
 @Composable
 fun AppProgressTrack(
@@ -120,14 +130,21 @@ fun AppProgressTrack(
         modifier = modifier
             .fillMaxWidth()
             .height(TRACK_HEIGHT)
+            // O clip é o `overflow: hidden` do protótipo: ele recorta os dois
+            // filhos e dispensa clip interno.
             .clip(AppShapes.extraSmall)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.extraSmall)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+            .padding(AppBorderWidth)
     ) {
         Box(
             modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
                 .fillMaxWidth(safe)
-                .height(TRACK_HEIGHT)
                 .background(tone.color())
         )
     }

@@ -299,6 +299,13 @@ Antes de desenhar um retângulo novo, procure aqui.
    por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
 5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
    `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
+6. `Modifier.border` arredonda o traço **para cima** (`ceil(width.toPx())`, `Border.kt`) e o pinta
+   **depois** do conteúdo. Numa caixa de 4dp o anel de 1dp vira 2px a partir de densidade 1,05 e come
+   a caixa inteira: a barra de cota ficava cinza com a cota em 37% nas escalas de 105% e 110%
+   (issue #83). Borda que precisa ocupar layout é **fundo mais padding** — o `roundToPx` do padding
+   acompanha a altura, e é o `box-sizing: border-box` que o protótipo já especificava. O defeito é de
+   **pintura**: `boundsInRoot` devolvia a altura cheia nas duas escalas, então só bitmap
+   (`captureToImage`) o pega.
 
 **Escala da interface** (`AppTheme(uiScalePercent = …)` + `UiScalePreferences.kt` + slider na aba
 Geral): a escala troca a **densidade** da composição, nunca a escala tipográfica. Subir só a
