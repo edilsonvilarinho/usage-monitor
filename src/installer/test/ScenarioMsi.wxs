@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSI minimo para o cenario S7: um produto per-user, um arquivo, um UpgradeCode.
+
+  Existe porque o S7 precisa de uma instalacao MSI de verdade para o instalador
+  encontrar e remover, e usar o MSI de producao ali desinstalaria o Usage Monitor
+  real da maquina de quem roda a suite. O UpgradeCode abaixo e proprio do cenario
+  e e o MESMO valor que o roteiro passa ao makensis em /DMSI_UPGRADE_CODE.
+
+  perUser porque e o que o produto real usava (perUserInstall = true), e e o que
+  permite instalar e remover sem UAC durante o teste.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="UM Scenario MSI"
+           Language="1033"
+           Version="1.0.0"
+           Manufacturer="Usage Monitor Scenarios"
+           UpgradeCode="A7F2C6E1-4B3D-4E85-9C1A-6D2F8B0E3A57">
+
+    <Package InstallerVersion="200"
+             Compressed="yes"
+             InstallScope="perUser"
+             Description="Usage Monitor scenario fixture" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!--
+      O Id do Directory e maiusculo de proposito: assim ele e uma propriedade
+      publica e o roteiro escolhe o destino na linha de comando
+      (INSTALLFOLDER=...), sem recompilar o MSI para cada diretorio descartavel.
+    -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="INSTALLFOLDER" Name="UM Scenario MSI" />
+      </Directory>
+    </Directory>
+
+    <ComponentGroup Id="Payload" Directory="INSTALLFOLDER">
+      <Component Id="MsiMarker" Guid="C1F0B4A2-9D77-4C36-8E51-2A6B9F3D4E80">
+        <File Id="MsiMarkerFile" Name="msi-marker.txt" Source="$(var.PayloadFile)" KeyPath="yes" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main" Level="1">
+      <ComponentGroupRef Id="Payload" />
+    </Feature>
+  </Product>
+</Wix>

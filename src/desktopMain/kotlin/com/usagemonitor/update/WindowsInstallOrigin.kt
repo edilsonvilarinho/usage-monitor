@@ -42,30 +42,61 @@ object WindowsInstallOriginResolver {
      * detecção independente de qual delas o runtime preenche.
      */
     fun current(): WindowsInstallOrigin {
+        val installLocation = AutoStartManager.readWindowsInstallLocationOrNull()
         return resolve(
             isWindows = System.getProperty("os.name").orEmpty().lowercase().contains("win"),
-            installLocation = AutoStartManager.readWindowsInstallLocationOrNull(),
+            installLocation = installLocation,
             executableCandidates = listOfNotNull(
                 System.getProperty("jpackage.app-path"),
                 ProcessHandle.current().info().command().orElse(null)
-            )
+            ),
+            hasNsisUninstaller = hasNsisUninstallerIn(installLocation)
         )
     }
 
     /**
+     * Checagem de **sistema de arquivos**, e não de registro: não abre `reg.exe`
+     * nem varre o banco do Windows Installer, que é lento e frágil. O
+     * `Uninstall.exe` é escrito pelo `WriteUninstaller` do NSIS e não existe num
+     * app-image do jpackage — desinstalação de MSI é por `msiexec`.
+     */
+    private fun hasNsisUninstallerIn(installLocation: String?): Boolean {
+        val directory = installLocation?.trim()?.trim('"')?.takeIf { it.isNotBlank() } ?: return false
+        return File(directory, UNINSTALLER_FILE_NAME).isFile
+    }
+
+    private const val UNINSTALLER_FILE_NAME = "Uninstall.exe"
+
+    /**
      * Função pura, para o teste não depender do registro nem do processo real.
      *
-     * A instalação é considerada gerenciada quando o `InstallLocation` da chave
-     * HKCU que o NSIS escreve é **o diretório onde o executável em execução
-     * está**. A chave sozinha não basta: ela sobrevive a uma instalação removida
-     * à mão e passaria a autorizar a atualização de uma cópia qualquer da pasta.
+     * São **três** condições, e nenhuma delas basta sozinha:
+     *
+     * 1. o `InstallLocation` da chave HKCU que o NSIS escreve existe;
+     * 2. ele é **o diretório onde o executável em execução está** — a chave
+     *    sobrevive a uma instalação removida à mão e passaria a autorizar a
+     *    atualização de uma cópia qualquer da pasta;
+     * 3. esse diretório contém o `Uninstall.exe` do NSIS.
+     *
+     * A terceira condição existe porque até a v37 o release publicava também um
+     * MSI, e os **dois instaladores gravavam no mesmo diretório**. Numa máquina
+     * que veio do NSIS e migrou para o MSI, as duas primeiras condições batem —
+     * por acidente — e o resolvedor devolvia `NSIS_PER_USER` para uma instalação
+     * que é MSI, que é exatamente o caso que ele existe para recusar. O
+     * `Uninstall.exe` é o que distingue: o NSIS sempre o escreve, o app-image do
+     * jpackage nunca o tem.
      */
     internal fun resolve(
         isWindows: Boolean,
         installLocation: String?,
-        executableCandidates: List<String>
+        executableCandidates: List<String>,
+        hasNsisUninstaller: Boolean
     ): WindowsInstallOrigin {
         if (!isWindows) {
+            return WindowsInstallOrigin.UNMANAGED
+        }
+
+        if (!hasNsisUninstaller) {
             return WindowsInstallOrigin.UNMANAGED
         }
 

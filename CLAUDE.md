@@ -147,7 +147,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
 
 ### Empacotamento
 
-`TargetFormat.Exe`/`Msi` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
+`TargetFormat.Exe` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). **O `Msi` saiu**: os dois instaladores de Windows gravavam no mesmo `%LOCALAPPDATA%\Usage Monitor`, e o do MSI nunca poderia se atualizar sozinho — `selectArtifact` só aceita `WINDOWS_NSIS`. O `upgradeUuid` continua no `build.gradle.kts` porque é o UpgradeCode das instalações MSI que já existem, e é por ele que o `UsageMonitor.nsi` as encontra e remove antes de instalar. O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
 
 Auto-start (`AutoStartManager`): registro `Run` no Windows, `.desktop` no Linux, LaunchAgent (`~/Library/LaunchAgents/com.usagemonitor.app.plist` + `launchctl`) no macOS. O enum `Platform` é exaustivo em três `when` do arquivo — valor novo quebra a compilação nos três.
 

@@ -215,31 +215,16 @@ jobs:
         shell: pwsh
         run: choco install nsis -y
 
-      - name: Extract version
-        id: version
-        shell: pwsh
-        run: |
-          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
-            $tag = '${{ inputs.tag }}'
-          } else {
-            $tag = $env:GITHUB_REF -replace '^refs/tags/', ''
-          }
-          $version = $tag -replace '^v', ''
-          "VERSION=$version" >> $env:GITHUB_OUTPUT
-
+      # O passo "Extract version" saiu junto do MSI: o unico leitor dele neste job
+      # era o gate do patch-msi-launch. O nome do Setup.exe vem da versao do
+      # Gradle, e o Copy-Item usa curinga.
       - name: Build Windows release artifacts
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat packageMsi patchMsiLaunch packageInstaller
-
-          $version = "${{ steps.version.outputs.VERSION }}"
-
-          # Gate: um MSI sem o launch no ExitDialog nao pode chegar ao release.
-          .\patch-msi-launch.ps1 -MsiDirectory build\compose\binaries\main\msi -MsiFileName "Usage Monitor-$version.msi" -VerifyOnly
+          .\gradlew.bat packageInstaller
 
           New-Item -ItemType Directory -Force -Path dist-build | Out-Null
-          Get-ChildItem -Recurse -File build\compose\binaries -Filter *.msi | Copy-Item -Destination dist-build -Force
           Get-ChildItem -File build\installer -Filter "UsageMonitor-Setup-*.exe" | Copy-Item -Destination dist-build -Force
           Get-ChildItem dist-build | Format-Table Name,Length
 
