@@ -19,7 +19,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = installLocation,
-            executableCandidates = listOf(installedExecutable)
+            executableCandidates = listOf(installedExecutable),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.NSIS_PER_USER, origin)
@@ -32,12 +33,14 @@ class WindowsInstallOriginTest {
         val fromJpackageOnly = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = installLocation,
-            executableCandidates = listOf(installedExecutable, """C:\java\bin\java.exe""")
+            executableCandidates = listOf(installedExecutable, """C:\java\bin\java.exe"""),
+            hasNsisUninstaller = true
         )
         val fromProcessOnly = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = installLocation,
-            executableCandidates = listOf("""C:\java\bin\java.exe""", installedExecutable)
+            executableCandidates = listOf("""C:\java\bin\java.exe""", installedExecutable),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.NSIS_PER_USER, fromJpackageOnly)
@@ -49,7 +52,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = """c:\users\someone\appdata\local\USAGE MONITOR\""",
-            executableCandidates = listOf(installedExecutable)
+            executableCandidates = listOf(installedExecutable),
+            hasNsisUninstaller = true
         )
 
         // O sistema de arquivos do Windows não distingue maiúsculas, e o registro
@@ -62,7 +66,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = "\"$installLocation\"",
-            executableCandidates = listOf(installedExecutable)
+            executableCandidates = listOf(installedExecutable),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.NSIS_PER_USER, origin)
@@ -75,7 +80,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = installLocation,
-            executableCandidates = listOf("""D:\portable\Usage Monitor\Usage Monitor.exe""")
+            executableCandidates = listOf("""D:\portable\Usage Monitor\Usage Monitor.exe"""),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
@@ -86,7 +92,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = null,
-            executableCandidates = listOf(installedExecutable)
+            executableCandidates = listOf(installedExecutable),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
@@ -97,7 +104,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = "   ",
-            executableCandidates = listOf(installedExecutable)
+            executableCandidates = listOf(installedExecutable),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
@@ -108,7 +116,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = installLocation,
-            executableCandidates = emptyList()
+            executableCandidates = emptyList(),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
@@ -121,7 +130,26 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = true,
             installLocation = installLocation,
-            executableCandidates = listOf("""C:\Users\someone\AppData\Local\Usage Monitor\runtime\bin\java.exe""")
+            executableCandidates = listOf("""C:\Users\someone\AppData\Local\Usage Monitor\runtime\bin\java.exe"""),
+            hasNsisUninstaller = true
+        )
+
+        assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
+    }
+
+    @Test
+    fun `the registered location without the NSIS uninstaller is unmanaged`() {
+        // Este e o estado real medido em 2026-08-24 numa maquina que veio do NSIS
+        // e migrou para o MSI: a chave HKCU do NSIS continua la em 23.0.0, o
+        // produto ativo e o MSI em 37.0.0, e os dois usam o MESMO diretorio. As
+        // duas primeiras condicoes batem por acidente, e sem esta terceira o
+        // resolvedor autorizava a atualizacao automatica de uma arvore gerenciada
+        // pelo Windows Installer.
+        val origin = WindowsInstallOriginResolver.resolve(
+            isWindows = true,
+            installLocation = installLocation,
+            executableCandidates = listOf(installedExecutable),
+            hasNsisUninstaller = false
         )
 
         assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
@@ -132,7 +160,8 @@ class WindowsInstallOriginTest {
         val origin = WindowsInstallOriginResolver.resolve(
             isWindows = false,
             installLocation = installLocation,
-            executableCandidates = listOf(installedExecutable)
+            executableCandidates = listOf(installedExecutable),
+            hasNsisUninstaller = true
         )
 
         assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
