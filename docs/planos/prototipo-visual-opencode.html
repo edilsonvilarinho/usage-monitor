@@ -388,6 +388,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <div class="grp">Telas</div>
   <a href="#dashboard">Dashboard</a>
   <a href="#dash-estados">Dashboard · estados</a>
+  <a href="#atualizacao">Faixa de atualização</a>
   <a href="#historico">Histórico</a>
   <a href="#sessoes">Sessões CLI</a>
   <a href="#detalhe">Detalhe de sessão</a>
@@ -822,6 +823,28 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     </div>
   </div>
 </div>
+
+<!-- ══════════════════════ FAIXA DE ATUALIZAÇÃO ═══════════════════════ -->
+<h2 id="atualizacao">4c · Faixa de atualização — os quatro estados</h2>
+<p class="lede">A faixa de uma linha da issue #67 ganhou os estados da atualização automática (issue #75). Ela continua sendo <b>uma linha de 28dp no topo do dashboard</b>, com o marcador de 2dp à esquerda, o título cedendo espaço numa janela estreita e o rótulo da ação como única pista de que a linha é clicável. Sem botão, sem parágrafo de descrição.</p>
+
+<div class="panel"><div class="pbody">
+  <div class="cap">Disponível — atualização automática desligada, que é o padrão</div>
+  <div class="banner info"><span class="bar"></span><span class="bt" style="flex:1">Nova versão 38.0.0 disponível</span><span class="bt" style="color:var(--info)">Baixar atualização →</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Baixando — em segundo plano, com o interruptor ligado</div>
+  <div class="banner info"><span class="bar"></span><span class="bt" style="flex:1">Baixando a versão 38.0.0 — 42%</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Pronta — será aplicada ao fechar o app</div>
+  <div class="banner"><span class="bar" style="background:var(--ok)"></span><span class="bt" style="flex:1">Versão 38.0.0 pronta — será aplicada ao fechar</span><span class="bt" style="color:var(--ok)">Reiniciar e atualizar agora →</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Falhou — a versão instalada continua intacta</div>
+  <div class="banner warn"><span class="bar"></span><span class="bt" style="flex:1">Falha ao baixar a versão 38.0.0</span><span class="bt" style="color:var(--warn)">Baixar manualmente →</span></div>
+</div></div>
+
+<p class="note"><b>Três decisões que a imagem não mostra.</b> O progresso é <b>texto</b>, nunca indicador animado: animação infinita trava o <code>waitForIdle</code> dos testes de componente, e é a mesma regra que já vale para o resto do app. <b>Baixando não tem rótulo de ação e a faixa deixa de ser clicável</b> — faixa clicável sem rótulo seria um alvo de clique invisível. E <b>falha devolve o caminho manual</b>, que é o comportamento que o app sempre teve: a atualização automática que não deu certo não pode deixar o usuário sem saída.</p>
+
+<p class="note">Sem tamanho declarado no asset não há porcentagem, e a faixa diz só <span class="v sm">Baixando a versão 38.0.0…</span> — inventar um percentual seria pior que omiti-lo.</p>
 
 <!-- ═══════════════════════════════ HISTÓRICO ═════════════════════════ -->
 <h2 id="historico">5 · Histórico</h2>
@@ -1342,6 +1365,11 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="panel"><div class="phead"><span class="ptitle">Sistema</span></div><div class="pbody flush">
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Iniciar com o sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sempre visível</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Mantém a janela acima das demais.</span></div><span class="sw"></span></div>
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
+      </div></div>
+
+      <div class="panel"><div class="phead"><span class="ptitle">Atualização automática — indisponível, com o motivo</span></div><div class="pbody flush">
+        <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Disponível apenas na instalação feita pelo instalador .exe. Esta cópia veio do MSI ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação.</span></div><span class="sw"></span></div>
       </div></div>
       <div class="panel"><div class="phead"><span class="ptitle">Orçamento mensal</span></div><div class="pbody">
         <div class="hstack"><input class="field" type="text" value="150.00" style="max-width:120px"><span class="k">USD · teto contra o custo estimado do índice CLI no mês corrente</span></div>
@@ -1352,6 +1380,10 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     </div>
   </div>
 </div>
+
+<p class="note"><b>Por que o interruptor de atualização diz o tamanho e o momento.</b> Os dois surpreendem: são ~120 MB por versão, sem atualização delta, e a troca dos arquivos acontece <b>sem nenhuma confirmação</b> no instante em que o usuário fecha a janela. Ele vem <b>desmarcado</b>, e o texto de apoio existe porque um interruptor que não avisa disso liga uma coisa que ninguém escolheu.</p>
+
+<p class="note"><b>Desabilitado, ele carrega o motivo</b> — plataforma, origem da instalação ou build sem o mecanismo. Um controle cinza sem explicação é pior que controle nenhum: o usuário não descobre se é limitação ou defeito. E sem suporte o interruptor <b>mostra desligado</b>, e não o valor guardado: ligado-mas-inerte seria promessa falsa. A linha do recibo só aparece depois da primeira atualização silenciosa, e diz explicitamente quando ela falhou — atualização automática que falha é invisível por natureza.</p>
 
 <h2 id="cfg-alertas">12b · Configurações — Alertas</h2>
 <div class="win mid" style="max-width:none">
@@ -1498,6 +1530,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Fonte embutida no PDFBox recalcula largura de todas as colunas</span><span class="k">commit K1</span></div>
   <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhum texto de interface muda — ~390 asserts observam essas strings</span><span class="k">todas as fases</span></div>
   <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhuma ação, filtro, gráfico, exportação ou mensagem é removida</span><span class="k">todas as fases</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Com <code>USAGE_MONITOR_UPDATE_FEED_URL</code> definida, o feed de releases é outro — e o SHA-256 que barra artefato adulterado vem de lá. A aba Geral mostra um aviso em tom âmbar enquanto ela estiver ativa</span><span class="k">issue #75</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>Setup.exe</code> não é assinado: SmartScreen ou antivírus podem barrar a atualização silenciosa, que então cai na faixa "Baixar manualmente"</span><span class="k">issue #75</span></div>
 </div></div>
 <p class="note">Aprovado o protótipo, a execução começa pela Fase C (fundação): fontes, paleta, escala tipográfica, tokens de forma e as dezessete primitivas — oito commits antes de qualquer tela mudar de aparência.</p>
 

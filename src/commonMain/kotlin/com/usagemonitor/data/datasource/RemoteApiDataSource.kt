@@ -190,9 +190,20 @@ open class RemoteApiDataSource(
         return response.body()
     }
 
-    open suspend fun fetchLatestGitHubRelease(owner: String, repository: String): GitHubReleaseDto {
+    /**
+     * [feedUrlOverride] troca a URL da API por outra, para o smoke test de
+     * atualização não exigir publicar uma release de verdade a cada tentativa.
+     * Ver `USAGE_MONITOR_UPDATE_FEED_URL` em `AppUpdateRepositoryImpl`.
+     */
+    open suspend fun fetchLatestGitHubRelease(
+        owner: String,
+        repository: String,
+        feedUrlOverride: String? = null
+    ): GitHubReleaseDto {
+        val url = feedUrlOverride?.takeIf { it.isNotBlank() }
+            ?: "https://api.github.com/repos/$owner/$repository/releases/latest"
         val response = requireSuccess(
-            response = httpClient.get("https://api.github.com/repos/$owner/$repository/releases/latest") {
+            response = httpClient.get(url) {
                 header("Accept", "application/vnd.github+json")
                 header("User-Agent", USAGE_MONITOR_USER_AGENT)
                 header("X-GitHub-Api-Version", GITHUB_API_VERSION)

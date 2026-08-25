@@ -97,3 +97,78 @@ jobs:
           name: test-reports
           path: build/reports/tests/**
           if-no-files-found: ignore
+
+  # Job separado do `tests` de proposito: o roteiro instala e desinstala de
+  # verdade, mexe no registro do runner e leva alguns minutos. Amarra-lo ao job
+  # rapido faria toda mudanca de Kotlin esperar por ele.
+  #
+  # O `allTests` NAO cobre nada disto: o modo /UPDATE e script NSIS, e a unica
+  # forma de exercita-lo e compilar o instalador e roda-lo. Foi exatamente assim
+  # que os dois defeitos da atividade A16 apareceram -- nenhum deles seria pego
+  # lendo o codigo.
+  installer-scenarios:
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        # fetch-depth: 0 porque o filtro abaixo usa diff de tres pontos, que
+        # precisa de base comum. Com o checkout raso padrao e um fetch --depth=1
+        # da base, as duas historias nao se tocam e o git responde
+        # `fatal: ...: no merge base` -- o passo falha, o job falha, e os cenarios
+        # NUNCA rodam. Aconteceu de verdade: o CI do PR #85 ficou vermelho por
+        # isto, e o defeito ja estava catalogado como P1-09 na contra-auditoria.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect installer changes
+        id: filter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ github.event_name }}' -ne 'pull_request') {
+            "relevant=true" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          git fetch --no-tags origin '${{ github.event.pull_request.base.ref }}'
+          $changed = git diff --name-only "origin/${{ github.event.pull_request.base.ref }}...HEAD"
+          # Falha do git nao pode virar "nada mudou": com ErrorActionPreference
+          # Stop o pwsh NAO aborta em comando nativo, entao o filtro seguiria com
+          # a lista vazia e pularia os cenarios em silencio. Na duvida, roda.
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "git diff falhou ($LASTEXITCODE); rodando os cenarios por precaucao."
+            "relevant=true" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          $relevant = $false
+          foreach ($file in $changed) {
+            if ($file -like 'src/installer/*' -or $file -like 'src/desktopMain/kotlin/com/usagemonitor/update/*') {
+              Write-Host "Installer-related change: $file"
+              $relevant = $true
+              break
+            }
+          }
+          "relevant=$($relevant.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Install NSIS
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: choco install nsis -y
+
+      # So o cenario S7 usa: ele compila um MSI minimo para o instalador
+      # encontrar e remover. Sem WiX o roteiro pula esse cenario com aviso em vez
+      # de falhar, entao este passo e o que faz o S7 rodar de verdade aqui.
+      - name: Install WiX
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: choco install wixtoolset -y
+
+      - name: Run installer update scenarios
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\src\installer\test\Invoke-UpdateScenarios.ps1

@@ -262,6 +262,14 @@ object AutoStartManager {
         target += normalizedPath
     }
 
+    /**
+     * Exposta para o resolvedor de origem da instalação
+     * ([com.usagemonitor.update.WindowsInstallOriginResolver]) reusar esta
+     * leitura em vez de abrir um segundo caminho para a mesma chave HKCU — duas
+     * leituras do mesmo valor divergiriam no dia em que uma delas mudasse.
+     */
+    internal fun readWindowsInstallLocationOrNull(): String? = readWindowsInstallLocation()
+
     private fun readWindowsInstallLocation(): String? {
         if (currentPlatform() != Platform.WINDOWS) {
             return null

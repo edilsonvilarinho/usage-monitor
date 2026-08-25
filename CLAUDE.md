@@ -152,7 +152,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
 
 ### Empacotamento
 
-`TargetFormat.Exe`/`Msi` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
+`TargetFormat.Exe` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). **O `Msi` saiu**: os dois instaladores de Windows gravavam no mesmo `%LOCALAPPDATA%\Usage Monitor`, e o do MSI nunca poderia se atualizar sozinho — `selectArtifact` só aceita `WINDOWS_NSIS`. O `upgradeUuid` continua no `build.gradle.kts` porque é o UpgradeCode das instalações MSI que já existem, e é por ele que o `UsageMonitor.nsi` as encontra e remove antes de instalar. O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
 
 Auto-start (`AutoStartManager`): registro `Run` no Windows, `.desktop` no Linux, LaunchAgent (`~/Library/LaunchAgents/com.usagemonitor.app.plist` + `launchctl`) no macOS. O enum `Platform` é exaustivo em três `when` do arquivo — valor novo quebra a compilação nos três.
 
@@ -236,6 +236,14 @@ Refatoração de agosto de 2026, inspirada na linguagem do OpenCode. O plano de 
 histórico das decisões está em [`docs/planos/refatoracao-visual-opencode-execucao.md`](docs/planos/refatoracao-visual-opencode-execucao.md);
 a especificação de aparência é o protótipo aprovado, [`docs/planos/prototipo-visual-opencode.html`](docs/planos/prototipo-visual-opencode.html).
 Divergência entre o Compose e o protótipo é defeito do Compose.
+
+**Toda alteração de tela é registrada no protótipo, no mesmo commit da mudança.** A regra de
+precedência do parágrafo acima só se sustenta enquanto o protótipo descrever o app inteiro; um
+protótipo desatualizado a transforma em ponteiro para um documento que não descreve mais o produto.
+Tela nova ou estado que ainda não existe ganha seção `<h2 id="…">N · …</h2>` própria mais o link em
+`nav.index`; controle, coluna ou texto novo dentro de tela já desenhada vira linha no mockup dela;
+risco conhecido e decisão pendente vão para `§15 #checklist`. Vale para qualquer superfície visível —
+janela, diálogo, faixa, bandeja e relatório PDF.
 
 **Tokens** (`presentation/ui/theme/AppTheme.kt`): quatro superfícies neutras dentro de ~14% de
 luminância (`AppSurfaces`), raios 4/6/8/10 com **teto de 10** (`AppShapes`), elevação 0/2/8 —
@@ -410,6 +418,13 @@ Helvetica em vez de falhar.
 - **Nomes em inglês**, comentários em português.
 - Evitar scope functions aninhadas (`let`, `apply`, `run`). Preferir fluxo explícito.
 - Commits: Conventional Commits em inglês + `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`.
+- **Uma atividade, um commit.** Cada unidade de trabalho fecha sozinha: código, teste e documentação
+  da mesma decisão entram juntos. Commit que só compila com o próximo não é atômico, e commit que
+  junta duas decisões impede reverter uma sem perder a outra.
+- **Trabalho com plano em `docs/planos/` mantém ali a tabela de pontos de situação**, uma linha por
+  atividade, escrita **no mesmo commit** da atividade que ela descreve — em commit separado a linha
+  pode existir sem a mudança e vice-versa, e o registro deixa de servir para auditoria. Cada entrada
+  carrega o comando que rodou e o resultado, nunca a intenção.
 
 ## Endpoints externos
 

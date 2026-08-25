@@ -306,7 +306,31 @@ Recurso **opcional**, desligado por default. Serve o caso em que a mesma conta A
 - Quando existe versao mais nova, a UI mostra um banner com a versao disponivel.
 - O banner oferece acao para abrir a pagina da release publicada no GitHub.
 - A verificacao roda na inicializacao, a cada 10 minutos e tambem no refresh manual.
-- A app nao faz mais download, instalacao automatica nem restart por update em Windows ou Linux.
+
+#### Atualizacao automatica (Windows, opcional)
+
+Desmarcada por padrao, em Configuracoes -> Geral. Ligada, a app baixa o
+`UsageMonitor-Setup-<versao>.exe` em segundo plano, confere o SHA-256 publicado pela API do GitHub e
+mostra "pronta para instalar". A troca acontece quando a app fecha, ou na hora pelo botao
+"Reiniciar e atualizar agora". O resultado da ultima tentativa fica em
+`~/.usage-monitor/update-receipt.properties`.
+
+O interruptor aparece **desabilitado, com o motivo**, quando a atualizacao nao se aplica:
+
+| Caso | Por que |
+|---|---|
+| Linux e macOS | O `.deb`/`.rpm` exige elevacao e o DMG sem Developer ID nao remonta o bundle de forma confiavel. |
+| Instalacao que nao veio do `UsageMonitor-Setup` | MSI, copia manual da pasta ou `gradlew run`. Aplicar o instalador NSIS por cima criaria uma instalacao paralela. A deteccao exige o `Uninstall.exe` no diretorio registrado. |
+
+Duas coisas que valem saber antes de ligar:
+
+- **O download tem ~120 MB por versao.** Nao ha atualizacao delta, e nenhum artefato publicado e
+  menor. E o motivo de o interruptor vir desmarcado.
+- **O `Setup.exe` nao e assinado.** SmartScreen ou antivirus podem barra-lo. Falha ali cai no banner
+  de baixar manualmente, que e o comportamento de sempre.
+
+Releases anteriores a 38.0.0 nao sao alvo valido: o instalador delas nao entende o modo silencioso de
+atualizacao, e receber esse parametro o deixaria pendurado num dialogo invisivel.
 
 ### Preferencias persistidas
 
@@ -395,13 +419,38 @@ Dependencias principais do bootstrap:
 
 - `desktopJar` gera o JAR executavel.
 - `createDistributable` gera a distribuicao desktop em `build/compose/binaries/main/app/Usage Monitor`.
-- O projeto configura `TargetFormat.Exe`, `TargetFormat.Msi`, `TargetFormat.Deb`, `TargetFormat.Rpm` e `TargetFormat.Dmg`.
+- O projeto configura `TargetFormat.Exe`, `TargetFormat.Deb`, `TargetFormat.Rpm` e `TargetFormat.Dmg`.
 - `packageInstaller` empacota o instalador NSIS quando o NSIS estiver instalado.
 - `build-with-icon.ps1` e um fluxo auxiliar Windows para gerar distributable, aplicar icone com `rcedit` e chamar o NSIS manualmente.
 - `packageDmg` so roda em macOS: o jpackage nao faz cross-compile.
 - A versao da app vem de `build.gradle.kts` e e propagada para `CURRENT_APP_VERSION`.
 - Tags `v*` disparam `.github/workflows/release-linux.yml`, que publica artefatos Linux, Windows e macOS no GitHub Release. O job `verify` roda `allTests` em paralelo com os builds e `publish-release` depende dele: suite vermelha nao publica release.
 - `.github/workflows/ci.yml` roda `allTests` em push para `main` e em pull request; `.github/workflows/ci-server.yml` roda `typecheck` e `vitest` do `server/` quando `server/**` muda.
+
+### Instalacao no Windows
+
+O unico instalador de Windows e o `UsageMonitor-Setup-X.Y.Z.exe`. Ate a v37 o release publicava
+tambem um `Usage Monitor-X.Y.Z.msi`, e os dois gravavam no **mesmo** `%LOCALAPPDATA%\Usage Monitor`.
+O `.msi` saiu de circulacao por dois motivos: quem instalava por ele ficava permanentemente fora da
+atualizacao automatica, e ele estava em `perUserInstall`, que e justamente o modo que nao serve para
+deploy por maquina via Intune ou GPO.
+
+**Quem esta numa instalacao MSI nao precisa fazer nada.** Basta baixar o `UsageMonitor-Setup` e
+executar: o instalador encontra o produto MSI anterior pelo UpgradeCode, o remove em silencio e so
+entao grava a versao nova. Os dados ficam em `~/.usage-monitor/` e nas preferencias do registro, fora
+do diretorio de instalacao, e sobrevivem a migracao.
+
+Se a remocao automatica falhar, o instalador diz que falhou e para, em vez de produzir uma instalacao
+dupla. Nesse caso a limpeza manual e:
+
+1. Feche o Usage Monitor.
+2. Desinstale o MSI em "Aplicativos e recursos" — a entrada cujo desinstalador e `MsiExec.exe` — ou
+   por `msiexec /x {ProductCode}`.
+3. Apague a chave orfa do instalador anterior, se existir:
+   `reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Usage Monitor" /f`
+4. Confira que `%LOCALAPPDATA%\Usage Monitor` sumiu; se sobrou, apague.
+5. Instale o `UsageMonitor-Setup-X.Y.Z.exe`.
+6. Reconfira "Iniciar com o Windows" nas Configuracoes.
 
 ### Instalacao no macOS
 

@@ -203,6 +203,7 @@ fun DashboardScreen(
                             state = updateState,
                             language = language,
                             onOpenRelease = { viewModel.openUpdateReleasePage() },
+                            onRestartAndUpdate = { viewModel.restartAndUpdateNow() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs)

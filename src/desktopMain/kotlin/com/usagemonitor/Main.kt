@@ -144,6 +144,9 @@ import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
+import com.usagemonitor.update.isEnabled
+import com.usagemonitor.update.rememberAutoUpdateController
+import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -429,6 +432,9 @@ fun main() = application {
         AppUpdateRepositoryImpl(remoteApiDataSource)
     }
     val appUpdateReleaseOpener = remember { DesktopAppUpdateReleaseOpener() }
+    // Uma chamada, e todo o estado da atualização automática mora fora daqui:
+    // `main()` está no limite do backend JVM.
+    val autoUpdate = rememberAutoUpdateController(settings = settings, httpClient = httpClient)
 
     val recordUsageSnapshot = remember(usageHistoryRepository) {
         RecordUsageSnapshotUseCase(usageHistoryRepository)
@@ -462,6 +468,10 @@ fun main() = application {
             saveDashboardCache = saveDashboardCache,
             checkForAppUpdate = CheckForAppUpdateUseCase(appUpdateRepository),
             appUpdateReleaseOpener = appUpdateReleaseOpener,
+            appUpdateInstaller = autoUpdate.installer,
+            autoUpdateEnabled = autoUpdate.enabled,
+            onRestartAndUpdateRequested = { autoUpdate.requestRestart() },
+            onUpdateScheduleFailure = ::writeUpdateScheduleFailureReceipt,
             currentAppVersion = CURRENT_APP_VERSION,
             isAppVisible = isAppVisible,
             anthropicProfiles = enabledAnthropicProfiles,
@@ -624,6 +634,11 @@ fun main() = application {
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
+                // Por último, e não primeiro: o instalador espera este processo
+                // sair de qualquer forma, mas entregar o pacote antes de o SQLite
+                // fechar seria abrir uma janela para a troca de arquivos correr
+                // contra a escrita do banco.
+                viewModel.scheduleUpdateOnExit()
             }
         }
 
@@ -649,6 +664,11 @@ fun main() = application {
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
+                // Por último, e não primeiro: o instalador espera este processo
+                // sair de qualquer forma, mas entregar o pacote antes de o SQLite
+                // fechar seria abrir uma janela para a troca de arquivos correr
+                // contra a escrita do banco.
+                viewModel.scheduleUpdateOnExit()
             }
         }
     }
@@ -1092,10 +1112,19 @@ fun main() = application {
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
+                // Por último, e não primeiro: o instalador espera este processo
+                // sair de qualquer forma, mas entregar o pacote antes de o SQLite
+                // fechar seria abrir uma janela para a troca de arquivos correr
+                // contra a escrita do banco.
+                viewModel.scheduleUpdateOnExit()
             }
             exitProcess(0)
         }
     }
+    // "Reiniciar e atualizar agora" reusa a mesma saída ordenada do resto do app:
+    // um segundo caminho de encerramento seria um segundo lugar para esquecer de
+    // fechar o banco.
+    autoUpdate.bindRestart(shutdownApplication)
 
     val restoreMainWindow = {
         mainWindowState.isMinimized = false
@@ -1628,6 +1657,11 @@ fun main() = application {
                             setCardsOnlyMode(enabled)
                             showSettingsToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
                         },
+                        autoUpdateEnabled = autoUpdate.isEnabled(),
+                        autoUpdateSupport = autoUpdate.support,
+                        lastUpdateReceipt = autoUpdate.lastReceipt,
+                        autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
+                        onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },
                         onWindowOpacityChange = { percent ->
                             // Aviso não sai daqui: quem persiste é o coletor com
                             // debounce lá em cima, e arrastar o slider dispararia

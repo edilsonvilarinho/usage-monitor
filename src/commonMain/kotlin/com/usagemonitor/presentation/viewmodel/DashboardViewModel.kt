@@ -7,6 +7,10 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.domain.repository.AppUpdateInstaller
+import com.usagemonitor.domain.repository.AppUpdatePreparation
+import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.repository.KiloRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
@@ -73,6 +77,30 @@ class DashboardViewModel(
     ),
     private val checkForAppUpdate: CheckForAppUpdateUseCase? = null,
     private val appUpdateReleaseOpener: AppUpdateReleaseOpener = UnsupportedAppUpdateReleaseOpener,
+    /**
+     * Nulo é "esta build não traz o mecanismo", e nada é baixado nem executado.
+     * É o estado do PR 1 do plano de auto-update.
+     */
+    private val appUpdateInstaller: AppUpdateInstaller? = null,
+    private val autoUpdateEnabled: StateFlow<Boolean> = MutableStateFlow(false),
+    /**
+     * Encerramento ordenado pedido pela faixa ("Reiniciar e atualizar agora").
+     * O view model não sabe fechar a aplicação; quem sabe é o `Main.kt`.
+     */
+    private val onRestartAndUpdateRequested: () -> Unit = {},
+    /**
+     * Registra que a entrega do pacote ao sistema falhou, com o motivo.
+     *
+     * Existe porque essa falha é **invisível por construção**: ela acontece com o
+     * app já saindo, e quem escreve o recibo é o instalador — que, justamente,
+     * não chegou a rodar. Sem isto o usuário fecha o app esperando a atualização,
+     * o app não volta, e não há nada no disco dizendo por quê. Foi o que a
+     * atividade A20 mediu.
+     *
+     * Recebe `(versão, motivo)`. A escrita fica no desktop; o view model não
+     * conhece arquivo.
+     */
+    private val onUpdateScheduleFailure: (String, String) -> Unit = { _, _ -> },
     private val currentAppVersion: String = "0.0.0",
     private val clock: Clock = Clock.System,
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
@@ -123,6 +151,41 @@ class DashboardViewModel(
     private var initFetchJob: Job? = null
     private var pendingFetchRequest: PendingFetchRequest? = null
 
+    /**
+     * Artefato já baixado e conferido, esperando o encerramento.
+     *
+     * `@Volatile` porque quem escreve é uma corrotina e quem lê é a thread do
+     * shutdown hook — mesmo motivo do `scheduledRefreshAt` acima.
+     */
+    @Volatile private var preparedUpdate: AppUpdatePreparation? = null
+
+    /**
+     * Versão **em voo**, e não só a preparada.
+     *
+     * É esta variável que impede o poll de 10 min de cancelar e reiniciar um
+     * download em andamento: durante o download `preparedUpdate` é nulo, e
+     * comparar só por ele fazia o ciclo recomeçar do zero a cada passada — um
+     * download de 120 MB que levasse mais de 10 min nunca terminaria.
+     */
+    @Volatile private var downloadingVersion: String? = null
+    private var updateDownloadJob: Job? = null
+
+    /**
+     * Espera antes de tentar de novo a mesma versão.
+     *
+     * Sem ela, uma falha recorrente rebaixaria 120 MB a cada 10 min — ~17 GB por
+     * dia, indefinidamente. Zerada quando a versão anunciada muda: release nova
+     * é uma tentativa nova.
+     */
+    private var updateBackoff: UpdateBackoff? = null
+
+    private data class UpdateBackoff(
+        val version: String,
+        val attempts: Int,
+        val retryAfter: Instant,
+        val reason: AppUpdateFailureReason
+    )
+
     init {
         val isPersistedRefreshStillPending = persistedNextRefreshAt != null && persistedNextRefreshAt > clock.now()
         // Reidrata a UI com o último snapshot salvo em vez de deixar a tela
@@ -143,6 +206,7 @@ class DashboardViewModel(
         if (config.autoStartUpdateChecks) {
             startUpdateCheckLoop()
         }
+        startAutoUpdateSwitchWatcher()
         if (config.autoStartCountdown) {
             startCountdown()
         }
@@ -486,7 +550,9 @@ class DashboardViewModel(
     }
 
     fun openUpdateReleasePage() {
-        val update = (_appUpdateState.value as? AppUpdateUiState.Available)?.update ?: return
+        // Qualquer estado com versão anunciada abre a página: a faixa oferece o
+        // caminho manual também depois de a atualização automática falhar.
+        val update = _appUpdateState.value?.update ?: return
         appUpdateReleaseOpener.open(update.releasePageUrl)
             .onFailure { error ->
                 _toastMessage.value = DashboardToast.ReleasePageError(
@@ -668,16 +734,201 @@ class DashboardViewModel(
             updateUseCase(currentAppVersion)
                 .onSuccess { update ->
                     if (update == null) {
+                        forgetPendingUpdate()
                         _appUpdateState.value = null
                         return@onSuccess
                     }
 
-                    _appUpdateState.value = AppUpdateUiState.Available(update)
+                    onUpdateAnnounced(update)
                 }
                 .onFailure {
                     // Falha silenciosa: UI mantém estado anterior; próxima janela de poll tenta de novo.
                 }
         }
+    }
+
+    /**
+     * Decide o que fazer com a versão anunciada. Chamada a cada passada do laço
+     * de verificação, então a ordem das guardas é o que impede trabalho repetido.
+     */
+    private fun onUpdateAnnounced(update: AppUpdateInfo) {
+        // Release diferente da que estava em curso: o que foi baixado ou falhou
+        // antes não descreve mais nada.
+        if (trackedVersion() != null && trackedVersion() != update.version) {
+            forgetPendingUpdate()
+        }
+
+        val prepared = preparedUpdate
+        if (prepared != null && prepared.version == update.version) {
+            _appUpdateState.value = AppUpdateUiState.Ready(update)
+            return
+        }
+
+        // Download em voo da mesma versão: não recomeçar. Esta é a guarda que
+        // faltava e que fazia o poll de 10 min reiniciar o download do zero.
+        if (downloadingVersion == update.version && updateDownloadJob?.isActive == true) {
+            return
+        }
+
+        if (!canDownloadAutomatically()) {
+            _appUpdateState.value = AppUpdateUiState.Available(update)
+            return
+        }
+
+        val backoff = updateBackoff
+        if (backoff != null && backoff.version == update.version) {
+            if (clock.now() < backoff.retryAfter) {
+                // Continua mostrando a falha: a versão instalada está intacta e o
+                // caminho manual segue oferecido na faixa.
+                _appUpdateState.value = AppUpdateUiState.Failed(update, backoff.reason)
+                return
+            }
+            if (backoff.attempts >= config.updateRetryBackoff.size) {
+                _appUpdateState.value = AppUpdateUiState.Failed(update, backoff.reason)
+                return
+            }
+        }
+
+        startUpdateDownload(update)
+    }
+
+    private fun canDownloadAutomatically(): Boolean {
+        val installer = appUpdateInstaller ?: return false
+        if (!autoUpdateEnabled.value) {
+            return false
+        }
+        return installer.support() == AppUpdateSupport.SUPPORTED
+    }
+
+    private fun trackedVersion(): String? {
+        return downloadingVersion ?: preparedUpdate?.version ?: updateBackoff?.version
+    }
+
+    private fun startUpdateDownload(update: AppUpdateInfo) {
+        val installer = appUpdateInstaller ?: return
+
+        downloadingVersion = update.version
+        _appUpdateState.value = AppUpdateUiState.Downloading(update, percent = null)
+
+        updateDownloadJob = viewModelScope.launch {
+            // O percentual só é publicado quando o número inteiro muda: são ~1900
+            // blocos de 64 KB em 120 MB, e emitir a cada bloco faria a tela
+            // recompor duas mil vezes para mostrar a mesma dezena.
+            var lastPublishedPercent = -1
+            val result = installer.prepare(update) { downloadedBytes, totalBytes ->
+                val percent = percentOf(downloadedBytes, totalBytes)
+                if (percent != null && percent != lastPublishedPercent) {
+                    lastPublishedPercent = percent
+                    _appUpdateState.value = AppUpdateUiState.Downloading(update, percent)
+                }
+            }
+
+            downloadingVersion = null
+            result
+                .onSuccess { preparation ->
+                    preparedUpdate = preparation
+                    updateBackoff = null
+                    _appUpdateState.value = AppUpdateUiState.Ready(update)
+                }
+                .onFailure {
+                    registerUpdateFailure(update, AppUpdateFailureReason.DOWNLOAD)
+                }
+        }
+    }
+
+    private fun percentOf(downloadedBytes: Long, totalBytes: Long?): Int? {
+        if (totalBytes == null || totalBytes <= 0L) {
+            return null
+        }
+        return ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
+    }
+
+    private fun registerUpdateFailure(update: AppUpdateInfo, reason: AppUpdateFailureReason) {
+        val previousAttempts = updateBackoff?.takeIf { it.version == update.version }?.attempts ?: 0
+        val attempts = previousAttempts + 1
+        val waitFor = config.updateRetryBackoff.getOrNull(attempts - 1)
+            ?: config.updateRetryBackoff.last()
+
+        updateBackoff = UpdateBackoff(
+            version = update.version,
+            attempts = attempts,
+            retryAfter = clock.now() + waitFor,
+            reason = reason
+        )
+        _appUpdateState.value = AppUpdateUiState.Failed(update, reason)
+    }
+
+    private fun forgetPendingUpdate() {
+        updateDownloadJob?.cancel()
+        updateDownloadJob = null
+        downloadingVersion = null
+        preparedUpdate = null
+        updateBackoff = null
+    }
+
+    /**
+     * Reage ao interruptor das Configurações, **nos dois sentidos**.
+     *
+     * Desligar no meio do download cancela o job **e descarta o que já estava
+     * pronto**: um artefato preparado seria aplicado no encerramento, que é
+     * exatamente o que o usuário acabou de recusar.
+     *
+     * Ligar reavalia a versão que a tela já está anunciando. Sem isso o
+     * interruptor parece inerte: quem o liga com a faixa de "nova versão" na tela
+     * fica olhando para ela sem nada acontecer até o poll seguinte, que pode
+     * estar a 10 minutos de distância. Medido na atividade A20, com o usuário
+     * ligando o interruptor e relatando que o download não começou.
+     *
+     * `onUpdateAnnounced` é o mesmo caminho do poll, e não um segundo: ele já
+     * carrega as guardas de download em voo, de artefato pronto e de backoff.
+     */
+    private fun startAutoUpdateSwitchWatcher() {
+        viewModelScope.launch {
+            autoUpdateEnabled.collect { enabled ->
+                val current = _appUpdateState.value
+                if (enabled) {
+                    if (current != null) {
+                        onUpdateAnnounced(current.update)
+                    }
+                    return@collect
+                }
+                forgetPendingUpdate()
+                if (current != null) {
+                    _appUpdateState.value = AppUpdateUiState.Available(current.update)
+                }
+            }
+        }
+    }
+
+    /**
+     * Entrega o pacote ao sistema. Chamada no encerramento, depois de o resto do
+     * app ter fechado — o instalador espera este processo sair de qualquer forma,
+     * mas a ordem correta não custa nada.
+     */
+    fun scheduleUpdateOnExit() {
+        val installer = appUpdateInstaller ?: return
+        if (!autoUpdateEnabled.value) {
+            return
+        }
+        val preparation = preparedUpdate ?: return
+        // O Result não pode ser descartado aqui. Este é o último ponto do
+        // processo em que ainda se sabe alguma coisa: se a entrega falhar, o
+        // instalador não roda, não escreve recibo, e o usuário vê o app fechar e
+        // não voltar — sem uma linha no disco explicando.
+        installer.schedule(preparation).onFailure { error ->
+            val reason = error.message?.takeIf { it.isNotBlank() }
+                ?: error::class.simpleName
+                ?: "unknown"
+            onUpdateScheduleFailure(preparation.version, reason)
+        }
+    }
+
+    /** Ação da faixa no estado pronto. Sem artefato preparado não faz nada. */
+    fun restartAndUpdateNow() {
+        if (appUpdateInstaller == null || preparedUpdate == null) {
+            return
+        }
+        onRestartAndUpdateRequested()
     }
 
     private fun scheduleNextRefresh(baseTime: Instant = clock.now()) {
