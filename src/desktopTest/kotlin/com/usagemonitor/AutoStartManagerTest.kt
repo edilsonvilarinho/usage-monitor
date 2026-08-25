@@ -4,6 +4,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AutoStartManagerTest {
@@ -166,6 +167,139 @@ class AutoStartManagerTest {
     @Test
     fun `a similar looking argument does not count as the origin argument`() {
         assertTrue(AutoStartManager.autoStartCommandNeedsMigration(""""app.exe" --autostart-delayed"""))
+    }
+
+    // --- Linux: launcher estavel ---------------------------------------------
+
+    private val linuxRoot = "/home/edils/.local/share/usage-monitor"
+    private val stableLauncher = "/home/edils/.local/bin/usage-monitor"
+    private val versionedExecutable = "$linuxRoot/versions/39.0.0/Usage Monitor/bin/Usage Monitor"
+
+    /**
+     * O launcher estavel le `current` e sobrevive a troca de versao. Um caminho
+     * dentro de `versions/<versao>` deixa de existir na segunda atualizacao, e a
+     * falha e silenciosa: nada no app le a entrada depois de escreve-la.
+     */
+    @Test
+    fun `the linux entry points at the stable launcher when it exists`() {
+        assertEquals(
+            stableLauncher,
+            AutoStartManager.linuxAutoStartExecutablePath(
+                stableLauncherPath = stableLauncher,
+                isExecutable = { path -> path == stableLauncher },
+                fallback = { versionedExecutable }
+            )
+        )
+    }
+
+    /**
+     * Numa instalacao `.deb` o launcher estavel simplesmente nao esta la, e o
+     * fallback e o que sempre foi. E por isso que o teste e a presenca do
+     * arquivo, e nao o resolvedor de origem.
+     */
+    @Test
+    fun `without the stable launcher the linux entry falls back`() {
+        assertEquals(
+            "/opt/usage-monitor/bin/usage-monitor",
+            AutoStartManager.linuxAutoStartExecutablePath(
+                stableLauncherPath = stableLauncher,
+                isExecutable = { false },
+                fallback = { "/opt/usage-monitor/bin/usage-monitor" }
+            )
+        )
+        assertNull(
+            AutoStartManager.linuxAutoStartExecutablePath(
+                stableLauncherPath = null,
+                isExecutable = { true },
+                fallback = { null }
+            )
+        )
+    }
+
+    @Test
+    fun `an entry inside the versioned tree is migrated`() {
+        assertTrue(
+            AutoStartManager.linuxAutoStartNeedsLauncherMigration(
+                currentCommand = AutoStartManager.buildLinuxDesktopEntry(
+                    versionedExecutable,
+                    "$linuxRoot/versions/39.0.0/Usage Monitor/bin"
+                ),
+                stableLauncherPath = stableLauncher,
+                versionsPrefix = "$linuxRoot/versions/"
+            )
+        )
+    }
+
+    @Test
+    fun `an entry already at the stable launcher is left alone`() {
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsLauncherMigration(
+                currentCommand = AutoStartManager.buildLinuxDesktopEntry(
+                    stableLauncher,
+                    "/home/edils/.local/bin"
+                ),
+                stableLauncherPath = stableLauncher,
+                versionsPrefix = "$linuxRoot/versions/"
+            )
+        )
+    }
+
+    /**
+     * Uma instalacao `.deb` aponta para `/opt` e nao para a arvore versionada:
+     * reescreve-la seria mexer numa instalacao que este mecanismo nao governa.
+     */
+    @Test
+    fun `an entry outside the versioned tree is not migrated`() {
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsLauncherMigration(
+                currentCommand = AutoStartManager.buildLinuxDesktopEntry(
+                    "/opt/usage-monitor/bin/usage-monitor",
+                    "/opt/usage-monitor/bin"
+                ),
+                stableLauncherPath = stableLauncher,
+                versionsPrefix = "$linuxRoot/versions/"
+            )
+        )
+    }
+
+    /** Entrada ausente nao migra: ligaria a inicializacao de quem a desligou. */
+    @Test
+    fun `a missing linux entry is never migrated`() {
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsLauncherMigration(
+                currentCommand = null,
+                stableLauncherPath = stableLauncher,
+                versionsPrefix = "$linuxRoot/versions/"
+            )
+        )
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsLauncherMigration(
+                currentCommand = "   ",
+                stableLauncherPath = stableLauncher,
+                versionsPrefix = "$linuxRoot/versions/"
+            )
+        )
+    }
+
+    /** Sem launcher estavel ou sem raiz nao ha para onde migrar. */
+    @Test
+    fun `nothing is migrated without a destination`() {
+        val entry = AutoStartManager.buildLinuxDesktopEntry(versionedExecutable, "/x")
+
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsLauncherMigration(
+                currentCommand = entry,
+                stableLauncherPath = null,
+                versionsPrefix = "$linuxRoot/versions/"
+            )
+        )
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsLauncherMigration(
+                currentCommand = entry,
+                stableLauncherPath = stableLauncher,
+                versionsPrefix = null
+            )
+        )
     }
 
     private fun createTempDir(): File {

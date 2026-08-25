@@ -1,5 +1,8 @@
 package com.usagemonitor
 
+import com.usagemonitor.update.normalizePosixPath
+import com.usagemonitor.update.resolveLinuxInstallRoot
+import com.usagemonitor.update.resolveLinuxStableLauncherPath
 import java.io.File
 
 object AutoStartManager {
@@ -57,11 +60,33 @@ object AutoStartManager {
         }
 
         val currentCommand = readAutoStartCommand()
-        if (!autoStartCommandNeedsMigration(currentCommand)) {
+        val needsMigration = autoStartCommandNeedsMigration(currentCommand) ||
+            (currentPlatform() == Platform.LINUX && linuxEntryPointsIntoVersionedTree(currentCommand))
+        if (!needsMigration) {
             return true
         }
 
         return setAutoStart(enabled = true)
+    }
+
+    /**
+     * Se a entrada Linux aponta para dentro de `versions/<versao>` em vez de para
+     * o launcher estavel.
+     *
+     * Uma entrada assim funciona **ate a primeira atualizacao**: a arvore que ela
+     * nomeia e podada dois ciclos depois, e o autostart passa a apontar para um
+     * caminho que nao existe -- sem erro na tela, porque nada no app le a entrada
+     * depois de escreve-la.
+     *
+     * Entrada **ausente nao migra**, pelo mesmo motivo do argumento `--autostart`:
+     * ligaria a inicializacao de quem a desligou.
+     */
+    private fun linuxEntryPointsIntoVersionedTree(currentCommand: String?): Boolean {
+        return linuxAutoStartNeedsLauncherMigration(
+            currentCommand = currentCommand,
+            stableLauncherPath = resolveLinuxStableLauncherPath(),
+            versionsPrefix = resolveLinuxInstallRoot()?.let { root -> "$root/versions/" }
+        )
     }
 
     private fun readAutoStartCommand(): String? {
@@ -166,7 +191,10 @@ object AutoStartManager {
             return !autostartFile.exists() || autostartFile.delete()
         }
 
-        val executablePath = resolveExecutablePath() ?: return false
+        val executablePath = linuxAutoStartExecutablePath(
+            stableLauncherPath = resolveLinuxStableLauncherPath(),
+            fallback = ::resolveExecutablePath
+        ) ?: return false
         val parentDir = File(executablePath).parentFile?.absolutePath ?: return false
         val desktopEntry = buildLinuxDesktopEntry(executablePath, parentDir)
 
@@ -203,6 +231,53 @@ object AutoStartManager {
 
         runCommand(listOf("launchctl", "load", "-w", launchAgentFile.absolutePath))
         return true
+    }
+
+    /**
+     * Para onde a entrada de inicializacao do Linux deve apontar.
+     *
+     * O launcher estavel vem primeiro **quando ele existe e e executavel**: ele
+     * le `current` e sobrevive a troca de versao, enquanto um caminho dentro de
+     * `versions/<versao>` deixa de existir na segunda atualizacao. A presenca do
+     * arquivo e o teste certo, e nao o resolvedor de origem: numa instalacao
+     * `.deb` o launcher simplesmente nao esta la, e o fallback e o que sempre foi.
+     *
+     * Funcao pura com os dois lados injetados porque a suite roda no Windows, e
+     * ali nao existe nem `~/.local/bin` nem bit de execucao.
+     */
+    internal fun linuxAutoStartExecutablePath(
+        stableLauncherPath: String?,
+        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } },
+        fallback: () -> String?
+    ): String? {
+        val launcher = stableLauncherPath?.trim()?.takeIf { it.isNotBlank() }
+        if (launcher != null && isExecutable(launcher)) {
+            return launcher
+        }
+        return fallback()
+    }
+
+    /**
+     * Se a entrada existente aponta para dentro da arvore versionada.
+     *
+     * Tres respostas negativas, e todas com motivo: entrada **ausente** nao migra
+     * (ligaria a inicializacao de quem a desligou); sem launcher estavel nao ha
+     * para onde migrar; e uma entrada que **ja** nomeia o launcher estavel esta
+     * atualizada -- reescreve-la seria trabalho sem mudanca.
+     */
+    internal fun linuxAutoStartNeedsLauncherMigration(
+        currentCommand: String?,
+        stableLauncherPath: String?,
+        versionsPrefix: String?
+    ): Boolean {
+        val command = currentCommand?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        val launcher = stableLauncherPath?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        val prefix = versionsPrefix?.trim()?.takeIf { it.isNotBlank() } ?: return false
+
+        if (command.contains(launcher)) {
+            return false
+        }
+        return command.contains(normalizePosixPath(prefix) + "/")
     }
 
     internal fun buildLinuxDesktopEntry(executablePath: String, parentDir: String): String {
