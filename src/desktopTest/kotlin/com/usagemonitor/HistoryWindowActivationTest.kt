@@ -19,14 +19,51 @@ class HistoryWindowActivationTest {
         assertFalse(window.setBoundsCalled)
     }
 
-    private class FakeWindowActivationTarget : WindowActivationTarget {
+    // `toFront()` sozinho so pisca o botao na barra quando o processo nao detem o
+    // primeiro plano -- que e o caso de quem clica no atalho com o app ja rodando.
+    @Test
+    fun `activation flips always on top to defeat the foreground lock`() {
+        val window = FakeWindowActivationTarget()
+
+        activateWindow(window)
+
+        assertTrue(window.wasAlwaysOnTopWhenBroughtToFront)
+    }
+
+    @Test
+    fun `always on top goes back to false after the activation`() {
+        val window = FakeWindowActivationTarget()
+
+        activateWindow(window)
+
+        assertFalse(window.isAlwaysOnTop)
+    }
+
+    // A janela principal tem `alwaysOnTop` como preferencia do usuario: apagar a
+    // escolha dele ao ativar a janela seria trocar um defeito por outro.
+    @Test
+    fun `a window the user pinned on top stays pinned`() {
+        val window = FakeWindowActivationTarget(alwaysOnTop = true)
+
+        activateWindow(window)
+
+        assertTrue(window.isAlwaysOnTop)
+        assertTrue(window.broughtToFront)
+    }
+
+    private class FakeWindowActivationTarget(
+        alwaysOnTop: Boolean = false
+    ) : WindowActivationTarget {
         override var isVisible: Boolean = false
+        override var isAlwaysOnTop: Boolean = alwaysOnTop
         var broughtToFront = false
         var focusRequested = false
         var setBoundsCalled = false
+        var wasAlwaysOnTopWhenBroughtToFront = false
 
         override fun toFront() {
             broughtToFront = true
+            wasAlwaysOnTopWhenBroughtToFront = isAlwaysOnTop
         }
 
         override fun requestFocus() {
