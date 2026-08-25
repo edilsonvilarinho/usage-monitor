@@ -105,6 +105,41 @@ O que esses números decidem:
 | A7 | Auditoria do que não é testado | Seção neste documento + issues |
 | A8 | Registrar as decisões no `CLAUDE.md` | `CLAUDE.md` |
 
+## Auditoria do que não é testado (A7)
+
+Feita sobre o relatório da A5 — 1005 classes com contador de linha, **82,7%** de linhas cobertas —,
+não sobre a heurística de "arquivo sem teste homônimo", que apontava 127 de 235 arquivos e não
+distinguia caso de uso exercitado pelo teste do ViewModel de código que nunca roda.
+
+### Lacuna real
+
+| Classe | Linhas descobertas | Cobertura | Por quê é lacuna |
+|---|---:|---:|---|
+| `data.datasource.RemoteTeamDataSource` | 158 | **1,9%** | 480 linhas, 20 métodos `open suspend fun`. Os testes **herdam** dela (`FakeRemoteTeamDataSource : RemoteTeamDataSource(HttpClient())`) e sobrescrevem tudo — a costura testada fica um nível acima do código que carrega o risco. Nada do que o `CLAUDE.md` descreve como sutil executa: o 404 lembrado por URL de `presence`/`trend`, o `x-admin-token` recusado no ingest, o `allowClaim`. O repositório já tem a ferramenta: `ktor-client-mock` está em `commonTest` e **onze** arquivos usam `MockEngine` |
+| `usecase.GetTeamUsageTrendUseCase` | 15 | **0%** | Aplica `ModelPricingTable` sobre as linhas cruas do servidor e monta o eixo de dias — as duas decisões que o `CLAUDE.md` registra como cliente-side |
+| `TeamUsageWindowPreferencesKt` | 54 | **0%** | Mesmo padrão de oito arquivos de preferência que **têm** teste (`MainWindowPreferencesTest`, `HistoryWindowPreferencesTest`, …) |
+| `CliSessionsWindowPreferencesKt` | 54 | **0%** | idem |
+| `BudgetPreferencesKt` | 17 | **0%** | idem |
+| `update.UpdateReceiptReaderKt` | 28 | **0%** | Leitura de arquivo, do mesmo tipo já coberto por `UpdateArtifactDownloaderTest` |
+| `datasource.LocalDashboardCacheDataSource` | 23 | **0%** | Único `Local*DataSource` sem teste; todos os outros têm |
+| `presentation.ui.UsageAlertMessagesKt` | 23 | **0%** | Formatação de texto, do mesmo tipo de `SessionPulseFormattingTest` |
+
+### Não testável pela suíte atual — e por isso não vira issue
+
+| Classe | Linhas descobertas | Motivo |
+|---|---:|---|
+| `presentation.ui.DesktopWindowFrameKt` (+3 lambdas) | 121 + 107 | Carrega `WindowDraggableArea`, que exige janela AWT real; `runDesktopComposeUiTest` compõe fora de janela |
+| `components.ShimmerBoxKt` | 24 | Animação infinita — o próprio `CLAUDE.md` proíbe uma em teste, porque trava o `waitForIdle` |
+| `ReleaseNotesWindowKt`, `update.AutoUpdateControllerKt` | 16 + 13 | Ciclo de vida de janela e de processo |
+| `usage_monitor.generated.resources.*` | 15 | Código gerado |
+| `components.ActivityHeatmapGridKt` | 59 | Desenho puro em `Canvas`; a lógica da grade vive no domain e **está** coberta |
+| `AutoStartManager` | 132 | 41,3%: o que falta são os ramos de macOS e Linux, que não executam no runner Windows |
+
+### Coberto indiretamente — não é lacuna
+
+`data.dto` fica em 75,7% porque DTO não tem lógica: o que o exercita são os testes de mapper. O mesmo
+vale para as interfaces de repositório e para os `*Labels`, atingidos pelos testes de componente.
+
 ---
 
 ## Pontos de situação
@@ -121,6 +156,7 @@ commit não pode conter o próprio hash.
 | A4 | 2026-08-25 | `ci: publish what each test suite actually ran` | Detalhe do que rodou, em todo run | concluída | `tools/ci/test-summary.mjs` novo, sem dependência externa, lendo JUnit XML — o mesmo parser para os dois jobs, porque duas implementações divergiriam justamente na contagem. O `vitest` passa a escrever o mesmo formato (`npm run test:ci`). Os dois workflows publicam o resumo com `if: always()`, e o ramo que pula a suíte publica **NAO EXECUTADA** com o motivo e a contagem de arquivos avaliados — o filtro perdeu o `break` para poder contar. `--require` derruba o job quando a suíte devia rodar e não produziu XML: é o que faz "passou sem executar" ficar vermelho. O checkout deixou de ser condicional (~5 s) porque o script precisa existir no ramo que ele anuncia. Verificado localmente com `GITHUB_STEP_SUMMARY` apontando para um arquivo: saíram os três blocos — `1293 | 0 | 0 | 0 | 122`, `167 | 0 | 0 | 0 | 13` e o bloco de suíte não executada. `yaml.safe_load` nos dois workflows lista os oito/nove passos na ordem certa |
 | A5 | 2026-08-25 | `ci: report coverage on main instead of paying for it silently` | Cobertura publicada, sem trava | concluída | Bloco `kover { }` novo: a instrumentação vira **opt-in** por `-Pcoverage` (`disabledForAll.set(!providers.gradleProperty("coverage").isPresent)`), `MainKt` sai do relatório por filtro e `html`/`xml` saem do `check`. **O gatilho foi provado, não deduzido:** `gradlew.bat desktopTest` sem a propriedade **reexecutou** a tarefa (`> Task :desktopTest`, 47 s) contra 53 s instrumentado — o agente muda a entrada da tarefa. `gradlew.bat koverXmlReport koverHtmlReport -Pcoverage`: BUILD SUCCESSFUL in 9s com `:desktopTest` UP-TO-DATE, que é o desenho — a mesma passada serve suíte e relatório. **Linha de base: 82,7% de linhas, 52,3% de ramos, 80,4% de métodos, 81,1% de classes (15 985 de 19 323 linhas).** `grep -c 'name="com/usagemonitor/MainKt' report.xml` devolveu **0**, confirmando o filtro. `tools/ci/coverage-summary.mjs` novo lê os contadores do **fechamento** do documento — ler os do topo devolvia o primeiro pacote e imprimia `--` no lugar do total, defeito pego na primeira execução |
 | A6 | 2026-08-25 | `ci: stop a chocolatey outage from failing the installer job` | Tirar o chocolatey do caminho crítico | concluída | Os dois passos passam a **detectar antes de instalar** — `makensis.exe` nos dois caminhos do `Resolve-MakeNsis` e `candle.exe` pelo `%WIX%in` ou pelo PATH, a mesma detecção do `Resolve-WixBin` — e só chamam o chocolatey quando falta, com três tentativas e espera crescente. O WiX **não lança** ao fim: sem ele o roteiro pula o S7 com aviso, e derrubar o job custaria os outros seis cenários. Sintaxe dos dois blocos validada com `[System.Management.Automation.Language.Parser]::ParseInput`: ambos sem erro (os três blocos que o parser reprova contêm `${{ }}` do GitHub ou são `bash`, e já eram assim). Motivo registrado no comentário: o 504 do run `32793042676` |
+| A7 | 2026-08-25 | `docs(plan): audit what the suite does not cover` | Auditoria do que não é testado | concluída | Seção *Auditoria do que não é testado* acima, feita sobre o relatório da A5 (1005 classes, 82,7% de linhas). **O achado que muda a resposta da issue:** `RemoteTeamDataSource` está em **1,9%** não por falta de teste, mas porque os testes **herdam da classe real** (`FakeRemoteTeamDataSource : RemoteTeamDataSource(HttpClient())`) e sobrescrevem os 20 métodos — a costura testada fica um nível acima do código que carrega o risco, e os 480 linhas de HTTP nunca executam. Duas issues abertas: [#94](https://github.com/edilsonvilarinho/usage-monitor/issues/94) e [#95](https://github.com/edilsonvilarinho/usage-monitor/issues/95). O resto foi classificado como não testável (`DesktopWindowFrame` precisa de janela AWT, `ShimmerBox` é animação infinita) ou coberto indiretamente (DTO pelos mappers), e **não** virou issue |
 
 ---
 
