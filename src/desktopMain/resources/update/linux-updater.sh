@@ -45,9 +45,15 @@ versions_dir=$root/versions
 staging_dir=$root/updates/$version.staging
 target_dir=$versions_dir/$version
 
-PID_TIMEOUT_SECONDS=60
-ACK_TIMEOUT_SECONDS=60
-POLL_INTERVAL=1
+# Os tres tetos sao ajustaveis por ambiente, e os defaults ficam aqui.
+#
+# Nao e configuracao: o app nunca define estas variaveis. Existem porque o
+# harness precisa exercitar os dois timeouts, e um teste que leva 60 s para
+# provar que um timeout dispara e um teste que ninguem roda -- entao ninguem
+# descobre quando o ramo de rollback quebra.
+PID_TIMEOUT_SECONDS=${USAGE_MONITOR_UPDATER_PID_TIMEOUT:-60}
+ACK_TIMEOUT_SECONDS=${USAGE_MONITOR_UPDATER_ACK_TIMEOUT:-60}
+POLL_INTERVAL=${USAGE_MONITOR_UPDATER_POLL_INTERVAL:-1}
 
 log() {
     printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"

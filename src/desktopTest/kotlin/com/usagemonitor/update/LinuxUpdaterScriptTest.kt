@@ -30,6 +30,26 @@ class LinuxUpdaterScriptTest {
     }
 
     /**
+     * **CRLF no recurso é uma falha total e silenciosa.** O kernel lê a linha do
+     * shebang inteira, então `#!/bin/sh\r` procura um interpretador chamado
+     * `/bin/sh<CR>`, que não existe: `bad interpreter: /bin/sh^M`. Nenhum
+     * `sh -n` local pega isso, porque no Windows o `sh` do Git Bash aceita.
+     *
+     * Não é hipótese: o desenvolvimento acontece com `core.autocrlf=true`, e um
+     * `git checkout` deste arquivo já o devolveu com CRLF. O `.gitattributes`
+     * prende o formato; este teste é o que denuncia quando ele deixar de fazê-lo.
+     */
+    @Test
+    fun `the packaged script has no carriage returns`() {
+        val body = materialize().readText()
+
+        assertFalse(
+            body.contains('\r'),
+            "o recurso foi empacotado com CRLF: em Linux isso vira 'bad interpreter: /bin/sh^M'"
+        )
+    }
+
+    /**
      * Um script executado no encerramento do app, gravável pelo grupo, é um
      * caminho de execução de código aberto a quem estiver na mesma máquina.
      */
