@@ -1719,6 +1719,7 @@ fun main(args: Array<String>) = application {
                         },
                         autoUpdateEnabled = autoUpdate.isEnabled(),
                         autoUpdateSupport = autoUpdate.support,
+                        autoUpdatePlatform = autoUpdate.platform,
                         lastUpdateReceipt = autoUpdate.lastReceipt,
                         autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
                         onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },

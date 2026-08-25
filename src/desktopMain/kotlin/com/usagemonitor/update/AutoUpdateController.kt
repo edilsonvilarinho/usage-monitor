@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.CURRENT_APP_VERSION
 import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
+import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.shouldDiscardUpdateArtifacts
 import com.usagemonitor.domain.repository.AppUpdateInstaller
@@ -45,6 +46,14 @@ internal const val AUTO_UPDATE_SHIPPED = true
  */
 internal class AutoUpdateController(
     val installer: AppUpdateInstaller?,
+    /**
+     * Plataforma em execução, ou `null` quando o app não a reconhece.
+     *
+     * Vai para a tela porque dois dos motivos de indisponibilidade nomeiam o
+     * instalador da plataforma: `.exe` no Windows, `.sh` em user-space no Linux.
+     * Sem ela o texto continuaria dizendo "MSI" numa máquina Linux.
+     */
+    val platform: AppUpdatePlatform?,
     val enabled: MutableStateFlow<Boolean>,
     val lastReceipt: AppUpdateReceipt?,
     /** Valor de USAGE_MONITOR_UPDATE_FEED_URL, quando definida. */
@@ -100,6 +109,7 @@ internal fun rememberAutoUpdateController(
         }
         AutoUpdateController(
             installer = installer,
+            platform = currentUpdatePlatform(),
             enabled = MutableStateFlow(readPersistedAutoUpdateEnabled(settings)),
             // Lido uma vez, na abertura: o recibo é escrito pelo instalador
             // enquanto o app está fechado, e reler a cada recomposição seria
@@ -127,4 +137,28 @@ internal fun rememberAutoUpdateController(
     }
 
     return controller
+}
+
+/**
+ * Plataforma em execução, no vocabulário dos artefatos de release.
+ *
+ * `null` para o que não se reconhece — e não um chute em Windows. O valor
+ * escolhe qual instalador o texto da tela vai nomear, e nomear o errado é pior
+ * que não nomear nenhum.
+ */
+internal fun currentUpdatePlatform(
+    osName: String = System.getProperty("os.name").orEmpty()
+): AppUpdatePlatform? {
+    val name = osName.lowercase()
+    // macOS vem ANTES de Windows: "darwin" contém "win", e com a ordem trocada
+    // um sistema Darwin seria classificado como Windows. Medido — o teste
+    // `mac names are recognized in both spellings` reprova a ordem invertida.
+    // O `os.name` de um JDK em macOS é "Mac OS X" e nunca "Darwin", então o
+    // defeito seria latente e invisível até deixar de ser.
+    return when {
+        name.contains("mac") || name.contains("darwin") -> AppUpdatePlatform.MACOS
+        name.contains("win") -> AppUpdatePlatform.WINDOWS
+        name.contains("linux") -> AppUpdatePlatform.LINUX
+        else -> null
+    }
 }

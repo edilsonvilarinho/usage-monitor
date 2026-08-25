@@ -61,17 +61,32 @@ enum class AppUpdateSupport {
     SUPPORTED,
 
     /**
-     * Linux e macOS. Só o Windows tem instalação per-user sem UAC neste projeto;
-     * `.deb`/`.rpm` pedem gerenciador de pacotes e o `.dmg` não é assinado.
+     * macOS, e qualquer sistema que o app não reconheça. O `.dmg` não é assinado
+     * e remontar o bundle sob quarentena do Gatekeeper não fecha de forma
+     * confiável.
      */
     UNSUPPORTED_PLATFORM,
 
     /**
-     * Windows instalado pelo MSI ou fora do instalador. Atualizar um MSI com o
-     * instalador NSIS criaria cópia paralela e deixaria um registro Windows
-     * Installer capaz de remover arquivos da versão nova.
+     * A instalação existe na plataforma certa, mas não foi criada pelo caminho
+     * que a atualização automática sabe substituir: Windows vindo do MSI ou de
+     * fora do instalador, Linux vindo de `.deb`/`.rpm` ou de uma cópia manual da
+     * pasta. Atualizar por cima criaria uma segunda instalação, ou mexeria em
+     * arquivos que pertencem ao gerenciador de pacotes.
      */
     UNSUPPORTED_INSTALL_ORIGIN,
+
+    /**
+     * A plataforma e a origem servem, mas não há artefato publicado para a
+     * arquitetura desta máquina — hoje, Linux ARM64.
+     *
+     * **É um valor novo num enum existente**, contra a regra do `CLAUDE.md`, e a
+     * exceção é deliberada: há **um** `when` exaustivo sobre este enum
+     * (`autoUpdateHint`), e o erro de compilação é o portão que garante que o
+     * texto novo existe. Sem o valor, ARM64 cairia em [UNSUPPORTED_PLATFORM] e a
+     * tela diria a razão errada.
+     */
+    UNSUPPORTED_ARCHITECTURE,
 
     /**
      * Esta build não traz o mecanismo. Estado do PR 1, em que o interruptor
