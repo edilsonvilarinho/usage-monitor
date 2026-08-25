@@ -78,7 +78,27 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      # O cache do Gradle NAO fica no `setup-java`. O post-step dele arquiva o
+      # `~/.gradle` com o daemon ainda vivo, e no Windows o tar falha nos `.lock`
+      # (`Device or resource busy`, e no run 32780176169 um
+      # `tar.exe failed with exit code 2`). O efeito era total e silencioso: todo
+      # run desde 23/08 comecava com `gradle cache is not found`, e
+      # `gh cache list` nao tinha UMA entrada Windows -- so as quatro do macOS,
+      # gravadas pelo release. Os ~57 s que o job gastava antes da primeira tarefa
+      # eram download; a mesma fase custa 0,44 s na maquina de desenvolvimento.
+      #
+      # Esta action para o daemon antes de arquivar e exclui os locks. E da
+      # Gradle Inc., e o job `build-windows` do release ja usa a antecessora dela
+      # (`gradle/gradle-build-action`), entao nao e precedente novo no repositorio.
+      - name: Setup Gradle
+        if: steps.filter.outputs.relevant == 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # So a `main` escreve. Cache gravado num run de PR fica com o escopo
+          # daquele PR e nenhum outro run consegue le-lo: seria pagar a gravacao
+          # sem nunca cobrar o proveito.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # MINIMAX_API_KEY fica deliberadamente indefinida: os testes injetam o
       # leitor da env var e `MiniMaxRepositoryImplTest` afirma a mensagem de
@@ -88,7 +108,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat allTests
+          .\gradlew.bat allTests --build-cache
 
       - name: Upload test reports
         if: failure() && steps.filter.outputs.relevant == 'true'
