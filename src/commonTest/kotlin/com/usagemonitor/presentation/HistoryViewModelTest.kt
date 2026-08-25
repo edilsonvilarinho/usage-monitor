@@ -10,9 +10,9 @@ import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,13 +23,26 @@ class HistoryViewModelTest {
 
     private val now = Instant.parse("2026-04-28T18:00:00Z")
 
+    // O view model roda em `Dispatchers.Default`, e o `delay` dentro de `runTest`
+    // avanca tempo VIRTUAL: ele volta na hora e nao espera o trabalho de fundo.
+    // As duas esperas abaixo giravam 200 vezes em tempo zero e devolviam o
+    // primeiro estado que encontrassem. Foi assim que
+    // `emits Empty state when enabledApis is empty` observou `Loading` num runner
+    // carregado (run 32855876748) depois de anos passando aqui. A pausa e a mesma
+    // de `pauseForBackgroundWork` em `DashboardViewModelTestSupport`, que ja
+    // tratava exatamente este caso.
+    private suspend fun pauseForBackgroundWork() {
+        yield()
+        Thread.sleep(20)
+    }
+
     private suspend fun awaitNonLoading(viewModel: HistoryViewModel): HistoryUiState {
         repeat(200) {
             val state = viewModel.uiState.value
             if (state !is HistoryUiState.Loading) {
                 return state
             }
-            delay(20)
+            pauseForBackgroundWork()
         }
         return viewModel.uiState.value
     }
@@ -39,7 +52,7 @@ class HistoryViewModelTest {
             if (repo.invocations >= expected) {
                 return
             }
-            delay(20)
+            pauseForBackgroundWork()
         }
     }
 
@@ -102,8 +115,9 @@ class HistoryViewModelTest {
         val callsBefore = repo.invocations
 
         viewModel.selectSource(ApiSource.ANTHROPIC)
-        // Pequena espera: se houvesse refresh, invocations subiria.
-        delay(100)
+        // Espera REAL: se houvesse refresh, invocations subiria. Com `delay` a
+        // assercao passava sem esperar nada, porque o tempo era virtual.
+        repeat(5) { pauseForBackgroundWork() }
 
         assertEquals(callsBefore, repo.invocations)
         viewModel.onDestroy()

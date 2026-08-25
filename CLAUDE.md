@@ -461,6 +461,11 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   escreve no mesmo formato (`npm run test:ci`). Duas implementações divergiriam justamente na
   contagem, que é o número que o resumo existe para dar. Sem dependência externa: no job do desktop
   não há `npm ci`.
+- **`delay` dentro de `runTest` avança tempo VIRTUAL e não espera trabalho de fundo.** Os view models rodam em `Dispatchers.Default`; uma espera escrita com `delay` volta na hora, e um laço de 200 tentativas gira em tempo zero e devolve o primeiro estado que encontrar. Era assim que
+  `HistoryViewModelTest > emits Empty state when enabledApis is empty` observava `Loading` num runner
+  carregado depois de anos passando (run `32855876748`), e era assim que um `delay(100)` escrito para
+  provar que *nada* aconteceu passava sem esperar nada. Espera de estado de view model usa
+  `yield()` + `Thread.sleep`, como `pauseForBackgroundWork` em `DashboardViewModelTestSupport`.
 - **Cobertura é relatório, não trava.** O Kover estava aplicado desde sempre instrumentando toda
   passada — 6 a 7 s medidos — sem que nenhuma tarefa de relatório rodasse em lugar nenhum. Agora a
   instrumentação é **opt-in** por `-Pcoverage`, que só o push na `main` usa, e a mesma passada serve
