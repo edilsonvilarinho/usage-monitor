@@ -167,6 +167,24 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     dependsOn(generateAppVersionSource)
 }
 
+// A suite roda em uma JVM so por default, e ela e a maior fatia do build:
+// 1m22s de `:desktopTest` contra 2m28s de tudo. Cada fork e um processo
+// proprio, entao nao ha estado compartilhado a proteger -- os testes que tocam
+// disco criam diretorio temporario proprio e os de Preferences usam no com nome
+// aleatorio.
+//
+// Medido na maquina de desenvolvimento (16 processadores): 1m24s serial, 1m12s
+// com 2 forks, 52s com 4, com resultado identico nos tres casos. O piso e a
+// classe mais lenta, porque o Gradle distribui por classe -- `ComponentTest`
+// sozinha leva 41s dos 52s, e alem de 4 forks nao ha o que ganhar enquanto ela
+// existir. Dai o teto, que tambem segura o heap: sao `maxParallelForks` x
+// `maxHeapSize` alem dos 3g do daemon.
+tasks.withType<Test>().configureEach {
+    val requestedForks = providers.gradleProperty("testForks").orNull?.toIntOrNull()
+    maxParallelForks = requestedForks ?: Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
+    maxHeapSize = "1g"
+}
+
 // Capturas do README: renderizadas offscreen a partir dos composables reais com
 // dados sinteticos. O gerador vive em desktopTest para nao entrar no JAR
 // distribuido e ainda enxergar os composables `internal`.
