@@ -23,6 +23,15 @@ gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*"
 # Apenas testes de componente UI (desktopTest)
 gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"
 
+# Forks paralelos da suite: o default e `availableProcessors()` com teto de 4.
+# Use a propriedade so para medir ou para contornar maquina apertada.
+gradlew.bat allTests -PtestForks=1
+
+# Cobertura: a instrumentacao do Kover e opt-in, senao custa 6-7s por passada
+# para produzir um numero que ninguem le. So o push na `main` liga isto no CI.
+gradlew.bat allTests -Pcoverage
+gradlew.bat koverHtmlReport -Pcoverage
+
 # Limpar build cache
 gradlew.bat clean
 ```
@@ -419,6 +428,50 @@ código — `monogram.svg` ao lado é referência e não é lido. O `.icns` só 
 saneamento WinAnsi de `UsageReportDocument.sanitized` **permanece** — a fonte tem os acentos, mas
 trocar o contrato de caracteres é outra migração. Sem o recurso no classpath, o relatório cai para
 Helvetica em vez de falhar.
+
+## CI e testes
+
+Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e `ci-server.yml`
+(suíte do servidor no Ubuntu). O plano com as medições está em
+[`docs/planos/ci-testes-detalhe-e-velocidade-execucao.md`](docs/planos/ci-testes-detalhe-e-velocidade-execucao.md).
+
+- **O cache do Gradle é da `gradle/actions/setup-gradle`, não do `cache: 'gradle'` do `setup-java`.**
+  O post-step daquele arquiva o `~/.gradle` com o daemon vivo e no Windows o `tar` morre nos `.lock`
+  (`Device or resource busy` → `exit code 2`). O efeito era total e silencioso: todo run começava com
+  `gradle cache is not found` e o repositório não tinha **uma** entrada Windows em `gh cache list`. Os
+  ~57 s gastos antes da primeira tarefa eram **download** — a mesma fase custa 0,44 s numa máquina com
+  o `~/.gradle` quente. **Só a `main` escreve o cache** (`cache-read-only` fora dela): cache gravado
+  num run de PR fica com o escopo daquele PR e nenhum outro run consegue lê-lo.
+- **A suíte roda em forks paralelos**, com teto de 4. O piso é a classe mais lenta, porque o Gradle
+  distribui por classe: `ComponentTest` sozinha leva 41 s dos 52 s. Cada fork é um processo próprio e
+  não há estado compartilhado a proteger — os testes que tocam disco criam diretório temporário e os
+  de `Preferences` usam nó com nome aleatório. **Ao escrever teste que grava em caminho fixo, lembre
+  que ele passa a competir com outro fork.**
+- **O filtro por path continua, e um job que pulou a suíte tem de dizer que pulou.** Rodar 5 min de
+  Windows por um typo no README é a lentidão que a issue #93 reclama; mas um `Successful in 5s` que
+  não executou teste nenhum é indistinguível de um que executou, e foi ele que abriu a issue. Os dois
+  jobs publicam no `$GITHUB_STEP_SUMMARY` — contagem e classes mais lentas quando rodam, **NAO
+  EXECUTADA** com motivo e contagem de arquivos quando não. O `--require` do
+  `tools/ci/test-summary.mjs` derruba o job quando a suíte devia rodar e não produziu XML: é o que faz
+  "passou sem executar" ficar vermelho.
+- **Um parser de JUnit XML para os dois jobs** (`tools/ci/test-summary.mjs`), e por isso o `vitest`
+  escreve no mesmo formato (`npm run test:ci`). Duas implementações divergiriam justamente na
+  contagem, que é o número que o resumo existe para dar. Sem dependência externa: no job do desktop
+  não há `npm ci`.
+- **Cobertura é relatório, não trava.** O Kover estava aplicado desde sempre instrumentando toda
+  passada — 6 a 7 s medidos — sem que nenhuma tarefa de relatório rodasse em lugar nenhum. Agora a
+  instrumentação é **opt-in** por `-Pcoverage`, que só o push na `main` usa, e a mesma passada serve
+  suíte e relatório. Sem `koverVerify` e sem piso: limiar calibrado antes de a linha de base existir é
+  limiar calibrado no escuro. Linha de base de 2026-08-25: **82,7% de linhas**, 52,3% de ramos.
+  `MainKt` fica fora do relatório por filtro — é o grafo de DI mais a janela, e contá-lo afunda o
+  número sem apontar lacuna que se possa fechar.
+- **Cobertura alta não é a mesma coisa que costura certa.** `RemoteTeamDataSource` está em 1,9%
+  porque os testes **herdam da classe real** e sobrescrevem os 20 métodos: o nome aparece em três
+  arquivos de teste e nenhuma linha de HTTP executa (issue #94). Ao ver uma classe `open` com todo
+  método `open`, pergunte o que sobra dela quando o teste a substitui.
+- **`choco install` detecta antes de instalar e tem retry.** Um 504 da `community.chocolatey.org`
+  derrubou a `main` em 25/08 sem nenhum defeito de código. O WiX não lança ao fim: sem ele o roteiro
+  pula o cenário S7 com aviso, e derrubar o job custaria os outros seis.
 
 ## Convenções de código
 
