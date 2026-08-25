@@ -184,6 +184,74 @@ jobs:
           find build/compose/binaries -type f \( -name "*.deb" -o -name "*.rpm" \) -exec cp {} dist-build/ \;
           ls -la dist-build
 
+      # O tarball deixou de ser so um anexo de conveniencia: e o pacote que a
+      # atualizacao automatica do Linux extrai e promove. Um `.tar.gz` com duas
+      # raizes, com um link, ou sem o bit de execucao no launcher chega ao
+      # usuario e so falha DEPOIS do swap, quando o app ja nao esta de pe para
+      # relatar. As mesmas guardas do `TarballExtractor`, do lado de ca.
+      - name: Validate the Linux tarball
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          TARBALL="usage-monitor_${VERSION}_linux_x64.tar.gz"
+          TAR_PATH="dist-build/$TARBALL"
+
+          tar -tvzf "$TAR_PATH" > listing.txt
+
+          roots="$(awk '{ print $NF }' listing.txt | cut -d/ -f1 | sort -u)"
+          if [ "$roots" != "Usage Monitor" ]; then
+            echo "Expected a single 'Usage Monitor' root, found:" >&2
+            echo "$roots" >&2
+            exit 1
+          fi
+
+          # Coluna de modo do `tar -tv`: `-` para arquivo comum, `d` para
+          # diretorio. Qualquer outra letra e link, device, fifo ou socket.
+          bad_types="$(awk '{ print substr($1, 1, 1) }' listing.txt | sort -u | grep -v '^[-d]$' || true)"
+          if [ -n "$bad_types" ]; then
+            echo "The tarball contains entry types that are not files or directories: $bad_types" >&2
+            exit 1
+          fi
+
+          launcher_mode="$(awk '$0 ~ /Usage Monitor\/bin\/Usage Monitor$/ { print $1 }' listing.txt)"
+          if [ "$launcher_mode" != "-rwxr-xr-x" ]; then
+            echo "Expected 'Usage Monitor/bin/Usage Monitor' with mode 0755, found '$launcher_mode'." >&2
+            exit 1
+          fi
+
+          echo "Tarball: $(wc -l < listing.txt) entries, single root, no links, launcher 0755."
+          rm -f listing.txt
+
+      # O SHA-256 daqui serve SO ao instalador inicial: ele nao fala com a API do
+      # GitHub. Quem se atualiza sozinho usa o campo `digest` da release, que
+      # cobre o mesmo arquivo sem ninguem ter de recalcular nada.
+      - name: Generate the user-space installer
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          TARBALL="usage-monitor_${VERSION}_linux_x64.tar.gz"
+          SHA256="$(sha256sum "dist-build/$TARBALL" | cut -d' ' -f1)"
+          INSTALLER="dist-build/install-usage-monitor_${VERSION}_linux_x64.sh"
+
+          sed \
+            -e "s|@VERSION@|${VERSION}|g" \
+            -e "s|@TARBALL@|${TARBALL}|g" \
+            -e "s|@SHA256@|${SHA256}|g" \
+            src/installer/linux/install-usage-monitor.sh.template > "$INSTALLER"
+
+          # Placeholder sobrado significa template e workflow fora de sincronia,
+          # e o instalador sairia baixando a URL literal `@TARBALL@`.
+          if grep -qE '@[A-Z0-9_]+@' "$INSTALLER"; then
+            echo "The installer still has unreplaced placeholders:" >&2
+            grep -nE '@[A-Z0-9_]+@' "$INSTALLER" >&2
+            exit 1
+          fi
+
+          sh -n "$INSTALLER"
+          chmod 0755 "$INSTALLER"
+          echo "Installer: $INSTALLER (tarball sha256 $SHA256)"
+          ls -la dist-build
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:

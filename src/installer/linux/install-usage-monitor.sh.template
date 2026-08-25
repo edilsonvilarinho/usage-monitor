@@ -1,0 +1,170 @@
+#!/bin/sh
+# Instalador user-space do Usage Monitor. POSIX sh, sem sudo.
+#
+# Este arquivo e um TEMPLATE: o workflow de release substitui @VERSION@,
+# @TARBALL@ e @SHA256@ e publica o resultado como asset. Ele nao fala com a API
+# do GitHub -- por isso o SHA-256 vem embutido aqui, e nao do campo `digest` que
+# o app usa quando se atualiza sozinho.
+#
+# O que ele cria, tudo dentro do $HOME:
+#
+#   <XDG_DATA_HOME>/usage-monitor/.usage-monitor-managed   marcador
+#   <XDG_DATA_HOME>/usage-monitor/versions/<versao>/       a arvore
+#   <XDG_DATA_HOME>/usage-monitor/current                  ponteiro de versao
+#   ~/.local/bin/usage-monitor                             launcher estavel
+#   ~/.local/share/applications/usage-monitor.desktop      entrada de menu
+#
+# Nada em /opt, /usr ou /usr/local. Uma instalacao existente de .deb/.rpm faz o
+# script PARAR: aqueles arquivos pertencem ao gerenciador de pacotes, e escrever
+# por cima deles produz uma arvore que o proximo `apt upgrade` desfaz.
+
+set -eu
+
+VERSION='@VERSION@'
+TARBALL='@TARBALL@'
+SHA256='@SHA256@'
+RELEASE_URL="https://github.com/edilsonvilarinho/usage-monitor/releases/download/v$VERSION/$TARBALL"
+
+APP_DIR_NAME='Usage Monitor'
+APP_LAUNCHER_RELATIVE='bin/Usage Monitor'
+
+die() {
+    printf 'usage-monitor: %s\n' "$1" >&2
+    exit 1
+}
+
+info() {
+    printf 'usage-monitor: %s\n' "$1"
+}
+
+# --- 1. instalacao por gerenciador de pacotes bloqueia ---------------------
+
+if command -v dpkg >/dev/null 2>&1 && dpkg -s usage-monitor >/dev/null 2>&1; then
+    die "ja existe uma instalacao .deb. Remova-a com 'sudo apt remove usage-monitor' antes de instalar em user-space."
+fi
+
+if command -v rpm >/dev/null 2>&1 && rpm -q usage-monitor >/dev/null 2>&1; then
+    die "ja existe uma instalacao .rpm. Remova-a com 'sudo dnf remove usage-monitor' antes de instalar em user-space."
+fi
+
+for legacy in "/opt/$APP_DIR_NAME" /opt/usage-monitor; do
+    if [ -d "$legacy" ]; then
+        die "encontrei $legacy. Remova a instalacao do gerenciador de pacotes antes de instalar em user-space; este instalador nao toca em /opt."
+    fi
+done
+
+# --- 2. raiz XDG. Variavel RELATIVA e invalida e ignorada, conforme a spec. --
+
+data_home=${XDG_DATA_HOME:-}
+case "$data_home" in
+    /*) ;;
+    *) data_home="$HOME/.local/share" ;;
+esac
+
+root="$data_home/usage-monitor"
+versions_dir="$root/versions"
+target_dir="$versions_dir/$VERSION"
+marker="$root/.usage-monitor-managed"
+current_file="$root/current"
+launcher="$HOME/.local/bin/usage-monitor"
+desktop_file="$HOME/.local/share/applications/usage-monitor.desktop"
+
+# --- 3. baixa e confere ---------------------------------------------------
+
+workdir=$(mktemp -d)
+trap 'rm -rf "$workdir"' EXIT
+
+archive="$workdir/$TARBALL"
+
+if [ -f "./$TARBALL" ]; then
+    info "usando o arquivo local ./$TARBALL"
+    cp "./$TARBALL" "$archive"
+elif command -v curl >/dev/null 2>&1; then
+    info "baixando $RELEASE_URL"
+    curl -fsSL --proto '=https' --tlsv1.2 -o "$archive" "$RELEASE_URL"
+elif command -v wget >/dev/null 2>&1; then
+    info "baixando $RELEASE_URL"
+    wget -q --https-only -O "$archive" "$RELEASE_URL"
+else
+    die "nem curl nem wget disponiveis."
+fi
+
+# O hash e conferido SEMPRE, inclusive para o arquivo local: e ele que separa o
+# tarball publicado de qualquer outro com o mesmo nome.
+if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "$archive" | cut -d' ' -f1)
+elif command -v shasum >/dev/null 2>&1; then
+    actual=$(shasum -a 256 "$archive" | cut -d' ' -f1)
+else
+    die "nem sha256sum nem shasum disponiveis; nao da para conferir a integridade."
+fi
+
+if [ "$actual" != "$SHA256" ]; then
+    die "SHA-256 nao confere. Esperado $SHA256, obtido $actual."
+fi
+
+info "SHA-256 conferido."
+
+# --- 4. extrai para o destino versionado ----------------------------------
+
+mkdir -p "$versions_dir"
+
+staging="$workdir/staging"
+mkdir -p "$staging"
+tar -xzf "$archive" -C "$staging"
+
+if [ ! -x "$staging/$APP_DIR_NAME/$APP_LAUNCHER_RELATIVE" ]; then
+    die "o arquivo nao traz '$APP_DIR_NAME/$APP_LAUNCHER_RELATIVE'."
+fi
+
+if [ -e "$target_dir" ]; then
+    info "substituindo a versao $VERSION ja instalada."
+    rm -rf "$target_dir"
+fi
+
+mkdir -p "$target_dir"
+mv "$staging/$APP_DIR_NAME" "$target_dir/$APP_DIR_NAME"
+
+# --- 5. marcador, ponteiro, launcher e menu -------------------------------
+
+: > "$marker"
+printf '%s\n' "$VERSION" > "$current_file.next"
+mv "$current_file.next" "$current_file"
+
+mkdir -p "$(dirname "$launcher")"
+cat > "$launcher" <<LAUNCHER
+#!/bin/sh
+# Gerado pelo Usage Monitor. Lê a versão ativa e executa a árvore dela.
+set -eu
+root='$root'
+version=\$(cat "\$root/current")
+exec "\$root/versions/\$version/$APP_DIR_NAME/$APP_LAUNCHER_RELATIVE" "\$@"
+LAUNCHER
+chmod 0755 "$launcher"
+
+mkdir -p "$(dirname "$desktop_file")"
+{
+    printf '[Desktop Entry]\n'
+    printf 'Type=Application\n'
+    printf 'Version=1.0\n'
+    printf 'Name=%s\n' "$APP_DIR_NAME"
+    printf 'Exec="%s"\n' "$launcher"
+    printf 'Terminal=false\n'
+    printf 'Categories=Utility;Monitor;\n'
+    # O icone so entra quando o arquivo existe: linha `Icon=` apontando para um
+    # caminho inexistente da o mesmo icone generico de nao ter linha nenhuma, com
+    # a diferenca de afirmar uma coisa falsa.
+    if [ -f "$target_dir/$APP_DIR_NAME/lib/$APP_DIR_NAME.png" ]; then
+        printf 'Icon=%s\n' "$target_dir/$APP_DIR_NAME/lib/$APP_DIR_NAME.png"
+    fi
+} > "$desktop_file"
+
+info "instalado em $target_dir"
+info "launcher: $launcher"
+
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) info "AVISO: $HOME/.local/bin nao esta no PATH. Acrescente-o ou use o caminho completo." ;;
+esac
+
+info "pronto. Rode 'usage-monitor' ou abra pelo menu de aplicativos."

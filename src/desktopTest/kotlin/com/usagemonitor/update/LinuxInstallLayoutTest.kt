@@ -204,6 +204,57 @@ class LinuxInstallLayoutTest {
     }
 
     /**
+     * O layout tem **dois donos**: o instalador inicial cria a árvore, e este
+     * código a lê e a reescreve depois. Divergência entre eles não dá erro
+     * nenhum — dá um app que não encontra a própria instalação, e só na primeira
+     * atualização.
+     *
+     * O teste amarra os **valores**, não o texto: os dois lados montam as mesmas
+     * linhas com sintaxes diferentes, e exigir bytes iguais reprovaria por
+     * diferença de aspas sem nenhum defeito atrás.
+     */
+    @Test
+    fun `the installer template names the same layout the constants do`() {
+        val template = File("src/installer/linux/install-usage-monitor.sh.template")
+        assertTrue(
+            template.isFile,
+            "template não encontrado em ${template.absolutePath}: se ele mudou de lugar, " +
+                "este portão parou de existir junto"
+        )
+
+        val body = template.readText()
+        listOf(
+            "APP_DIR_NAME='$LINUX_APP_DIRECTORY_NAME'",
+            "APP_LAUNCHER_RELATIVE='$LINUX_APP_LAUNCHER_RELATIVE_PATH'",
+            "root=\"\$data_home/$LINUX_INSTALL_DIRECTORY_NAME\"",
+            "versions_dir=\"\$root/$LINUX_VERSIONS_DIRECTORY_NAME\"",
+            "marker=\"\$root/$LINUX_MANAGED_MARKER_NAME\"",
+            "current_file=\"\$root/$LINUX_CURRENT_FILE_NAME\"",
+            "launcher=\"\$HOME/$LINUX_STABLE_LAUNCHER_RELATIVE_PATH\""
+        ).forEach { line ->
+            assertTrue(body.contains(line), "o template não define '$line'")
+        }
+    }
+
+    /**
+     * O launcher que o app gera e o que o instalador escreve executam o mesmo
+     * caminho. Aqui o texto **é** comparável: os dois derivam das mesmas
+     * constantes conferidas acima.
+     */
+    @Test
+    fun `the generated launcher execs the versioned tree`() {
+        val script = buildLinuxStableLauncherScript("/home/edils/.local/share/usage-monitor")
+
+        assertTrue(
+            script.contains(
+                "exec \"\$root/$LINUX_VERSIONS_DIRECTORY_NAME/\$version/" +
+                    "$LINUX_APP_DIRECTORY_NAME/$LINUX_APP_LAUNCHER_RELATIVE_PATH\" \"\$@\""
+            ),
+            script
+        )
+    }
+
+    /**
      * O caminho do `$HOME` é texto do usuário. Um apóstrofo num nome de conta
      * basta para transformar interpolação ingênua em execução de comando.
      */
