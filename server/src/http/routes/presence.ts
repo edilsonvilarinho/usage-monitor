@@ -49,7 +49,12 @@ export function createPresenceRouter(deps: PresenceRouterDeps): Router {
         }
 
         const now = deps.now();
-        deps.repository.touchMember(parsed.data.accountKey, parsed.data.member, now);
+        deps.repository.touchMember(
+          parsed.data.accountKey,
+          parsed.data.member,
+          now,
+          parsed.data.accountEmail,
+        );
 
         const granted = readTeamAccess(res);
         if (granted?.keyId != null) {

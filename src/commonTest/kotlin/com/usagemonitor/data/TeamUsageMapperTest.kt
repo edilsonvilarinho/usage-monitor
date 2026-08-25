@@ -405,6 +405,7 @@ class TeamUsageMapperTest {
     fun `converte o lote de envio preservando tokens e timestamps`() {
         val payload = TeamIngestPayload(
             accountKey = "account-uuid",
+            accountEmail = "pessoa@empresa.com",
             member = TeamMemberIdentity(
                 deviceId = "device-1",
                 alias = "edilson",
@@ -444,6 +445,7 @@ class TeamUsageMapperTest {
         val dto = payload.toDto()
 
         assertEquals("account-uuid", dto.accountKey)
+        assertEquals("pessoa@empresa.com", dto.accountEmail)
         assertEquals("DESKTOP-A1", dto.member.hostName)
 
         val session = dto.sessions.single()

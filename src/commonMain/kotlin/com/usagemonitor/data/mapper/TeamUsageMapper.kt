@@ -51,6 +51,7 @@ fun TeamPresenceResponseDto.toDomain(): TeamPresenceReceipt {
 fun TeamIngestPayload.toDto(): TeamIngestRequestDto {
     return TeamIngestRequestDto(
         accountKey = accountKey,
+        accountEmail = accountEmail,
         member = member.toDto(),
         sessions = sessions.map { session ->
             TeamSessionUploadDto(

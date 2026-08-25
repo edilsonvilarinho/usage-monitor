@@ -532,7 +532,18 @@ class TeamUsageViewModel(
         return accounts
             .flatMap { account ->
                 account.snapshot.members.map { member ->
-                    member.copy(accountKey = account.accountKey, accountLabel = account.label)
+                    val fallbackEmail = account.label?.trim()?.lowercase()?.takeIf { label ->
+                        val at = label.indexOf('@')
+                        at > 0 && at == label.lastIndexOf('@') &&
+                            label.substring(at + 1).contains('.') && label.none(Char::isWhitespace)
+                    }
+                    member.copy(
+                        accountKey = account.accountKey,
+                        accountLabel = account.label,
+                        accountEmail = account.accountEmail ?: fallbackEmail,
+                        accountEmailSource = account.emailSource
+                            ?: fallbackEmail?.let { com.usagemonitor.domain.entity.TeamAccountEmailSource.LABEL }
+                    )
                 }
             }
             .sortedWith(
@@ -540,8 +551,8 @@ class TeamUsageViewModel(
                 // por um degrau próprio do comparador e não por uma sentinela de
                 // texto: ela não tem e-mail para comparar, e abrir a lista com um
                 // uuid cru seria pior que fechá-la com ele.
-                compareBy<TeamMemberUsage> { member -> if (member.accountLabel == null) 1 else 0 }
-                    .thenBy { member -> member.accountLabel?.lowercase().orEmpty() }
+                compareBy<TeamMemberUsage> { member -> if (member.accountEmail == null) 1 else 0 }
+                    .thenBy { member -> member.accountEmail?.lowercase().orEmpty() }
                     // Duas contas sem rótulo empatam acima; o uuid as separa e
                     // mantém a ordem total.
                     .thenBy { member -> member.accountKey.orEmpty() }

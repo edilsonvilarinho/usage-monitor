@@ -2144,6 +2144,7 @@ private fun buildTeamSyncTargets(registry: AnthropicProfileRegistry): List<TeamS
         TeamSyncTarget(
             profileId = record.id,
             accountKey = accountContext.key.providerAccountId,
+            accountEmail = accountContext.email,
             organizationUuid = accountContext.key.workspaceId,
             organizationName = accountContext.workspaceName
         )

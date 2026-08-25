@@ -54,6 +54,7 @@ import com.usagemonitor.presentation.ui.components.AppSourceMarker
 import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppToggleChip
@@ -64,6 +65,7 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
+import com.usagemonitor.presentation.viewmodel.TeamPresenceEmailGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 
@@ -380,7 +382,7 @@ private fun TeamPresenceList(
         // Decidido uma vez para a lista inteira, e não por linha: as colunas só
         // alinham se todas as linhas reservarem as mesmas casas. Uma coluna que
         // aparece em algumas linhas e some em outras desloca tudo o que vem depois.
-        val hasHealthColumn = state.presenceGroups.any { group ->
+        val hasHealthColumn = state.emailGroups.any { group ->
             group.entries.any { entry -> entry.worstHealth != null }
         }
 
@@ -401,34 +403,42 @@ private fun TeamPresenceList(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
             ) {
-                for (group in state.presenceGroups) {
-                    // Esta máquina participa da conta: apagá-la levaria junto o
-                    // histórico local, e a conta voltaria no envio seguinte.
-                    val isLocalAccount = localDeviceId != null &&
-                        group.entries.any { entry -> entry.deviceId == localDeviceId }
-
+                for (emailGroup in state.emailGroups) {
                     // Faixa só na visão global: no modal de uma conta só ela já é
                     // a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
-                        item(key = "account:${group.accountKey}") {
-                            TeamPresenceAccountHeader(
-                                group = group,
-                                expanded = state.isAccountExpanded(group),
+                        item(key = "email:${emailGroup.groupKey}") {
+                            TeamPresenceEmailHeader(
+                                group = emailGroup,
+                                expanded = state.isEmailExpanded(emailGroup),
                                 language = language,
-                                deletable = canManage && !isLocalAccount,
                                 hasActionColumn = canManage,
-                                onToggle = { onToggleAccount(group.groupKey) },
-                                onDelete = { onRequestDeleteAccount(group) }
+                                onToggle = { onToggleAccount(emailGroup.groupKey) }
                             )
                         }
                     }
 
-                    if (!state.isAccountExpanded(group)) {
+                    if (!state.isEmailExpanded(emailGroup)) {
                         continue
                     }
 
-                    items(count = group.entries.size, key = { index -> group.entries[index].memberKey }) { index ->
-                        val entry = group.entries[index]
+                    for (account in emailGroup.accounts) {
+                        val isLocalAccount = localDeviceId != null &&
+                            account.entries.any { entry -> entry.deviceId == localDeviceId }
+                        if (state.isAdminOverview) {
+                            item(key = "uuid:${account.accountKey}") {
+                                TeamPresenceAccountSubgroupHeader(
+                                    group = account,
+                                    language = language,
+                                    deletable = canManage && !isLocalAccount,
+                                    hasActionColumn = canManage,
+                                    onDelete = { onRequestDeleteAccount(account) }
+                                )
+                            }
+                        }
+
+                    items(count = account.entries.size, key = { index -> account.entries[index].memberKey }) { index ->
+                        val entry = account.entries[index]
                         val isLocalMachine = localDeviceId != null && entry.deviceId == localDeviceId
                         TeamPresenceRow(
                             entry = entry,
@@ -442,6 +452,7 @@ private fun TeamPresenceList(
                             hasActionColumn = canManage,
                             onRemove = { onRequestRemoveMember(entry) }
                         )
+                    }
                     }
                 }
             }
@@ -488,7 +499,11 @@ private fun TeamPresenceHeader(
             }
             if (state.isAdminOverview) {
                 Text(
-                    text = TeamUsageLabels.allAccounts(state.presenceGroups.size, language),
+                    text = TeamUsageLabels.allEmailGroups(
+                        emailCount = state.emailGroups.size,
+                        accountCount = state.presenceGroups.size,
+                        language = language
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
@@ -620,15 +635,13 @@ private fun TeamPresenceColumnHeader(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TeamPresenceAccountHeader(
-    group: TeamPresenceAccountGroup,
+private fun TeamPresenceEmailHeader(
+    group: TeamPresenceEmailGroup,
     expanded: Boolean,
     language: AppLanguage,
-    deletable: Boolean,
     /** A lista tem coluna de ação; a faixa reserva a casa mesmo sem botão. */
     hasActionColumn: Boolean,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit
+    onToggle: () -> Unit
 ) {
     val accents = AppAccents.current
 
@@ -645,7 +658,9 @@ private fun TeamPresenceAccountHeader(
                     horizontal = PRESENCE_ROW_CONTENT_PADDING,
                     vertical = PRESENCE_ACCOUNT_VERTICAL_PADDING
                 )
-                .testTag("$PRESENCE_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
+                .testTag(
+                    "$PRESENCE_ACCOUNT_GROUP_TAG_PREFIX${group.accounts.singleOrNull()?.accountKey ?: group.groupKey}"
+                ),
             // Marcador e vão iguais aos do `AppDataRow` da linha do integrante: é o
             // que mantém os agregados da conta no mesmo x das colunas dela.
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
@@ -683,14 +698,24 @@ private fun TeamPresenceAccountHeader(
                         // endereço e um uuid sem dizer que aquilo é a conta, e ao lado de
                         // uma linha de integrante — que também tem nome e identificador —
                         // as duas liam igual.
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = TeamUsageLabels.accountBand(language),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                            if (group.hasProvisionalAccounts) {
+                                Text(
+                                    text = TeamUsageLabels.provisionalLabel(language),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AppTone.WARNING.color(),
+                                    maxLines = 1
+                                )
+                            }
+                        }
                         Text(
-                            text = TeamUsageLabels.accountBand(language),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
+                            text = group.accountEmail ?: TeamUsageLabels.unlabeledAccount(language),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
@@ -698,7 +723,13 @@ private fun TeamPresenceAccountHeader(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = group.accountKey.orEmpty(),
+                            text = group.accounts.singleOrNull()?.accountKey.orEmpty().takeIf { it.isNotEmpty() }
+                                ?.let { accountKey -> accountKey }
+                                ?: TeamUsageLabels.technicalAccounts(
+                                    count = group.accounts.size,
+                                    provisional = group.hasProvisionalAccounts,
+                                    language = language
+                                ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -735,26 +766,72 @@ private fun TeamPresenceAccountHeader(
             // Fora do `Row` de propósito: dentro dele a ação é o último item e
             // portanto o primeiro a quebrar, e numa janela estreita o botão de
             // apagar aparecia sozinho numa linha abaixo do e-mail.
-            if (deletable) {
-                AppIconButton(
-                    contentDescription = TeamPresenceLabels.deleteAccount(language),
-                    onClick = onDelete,
-                    tone = AppButtonTone.DANGER,
-                    modifier = Modifier.testTag("$PRESENCE_ACCOUNT_DELETE_TAG_PREFIX${group.groupKey}")
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.DeleteForever,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            } else if (hasActionColumn) {
+            if (hasActionColumn) {
                 Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
             }
         }
         AppDivider()
     }
+}
+
+@Composable
+private fun TeamPresenceAccountSubgroupHeader(
+    group: TeamPresenceAccountGroup,
+    language: AppLanguage,
+    deletable: Boolean,
+    hasActionColumn: Boolean,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(
+                start = PRESENCE_ROW_CONTENT_PADDING + AppSpacing.xl,
+                end = PRESENCE_ROW_CONTENT_PADDING,
+                top = AppSpacing.sm,
+                bottom = AppSpacing.sm
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "${TeamUsageLabels.accountBand(language)} · ${group.accountKey.orEmpty()}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = TeamPresenceLabels.accountBandSummary(
+                    online = group.onlineCount,
+                    total = group.totalCount,
+                    working = group.workingCount,
+                    language = language
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (deletable) {
+            AppIconButton(
+                contentDescription = TeamPresenceLabels.deleteAccount(language),
+                onClick = onDelete,
+                tone = AppButtonTone.DANGER,
+                modifier = Modifier.testTag("$PRESENCE_ACCOUNT_DELETE_TAG_PREFIX${group.groupKey}")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteForever,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        } else if (hasActionColumn) {
+            Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
+        }
+    }
+    AppDivider()
 }
 
 /**

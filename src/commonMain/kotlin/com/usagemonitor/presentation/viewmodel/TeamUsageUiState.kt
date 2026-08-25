@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamAccountEmailSource
 import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.entity.worstHealth
@@ -203,6 +204,10 @@ sealed interface TeamUsageUiState {
             return shareOf(group.totalTokens)
         }
 
+        fun tokenShareOf(group: TeamEmailGroup): Double {
+            return shareOf(group.totalTokens)
+        }
+
         /**
          * Se os integrantes desta conta aparecem na lista.
          *
@@ -210,6 +215,13 @@ sealed interface TeamUsageUiState {
          * uma possibilidade — sempre visível.
          */
         fun isAccountExpanded(group: TeamAccountGroup): Boolean {
+            if (!isAdminOverview) {
+                return true
+            }
+            return group.groupKey in expandedAccountKeys
+        }
+
+        fun isEmailExpanded(group: TeamEmailGroup): Boolean {
             if (!isAdminOverview) {
                 return true
             }
@@ -241,12 +253,44 @@ sealed interface TeamUsageUiState {
                     grouped.getOrPut(member.accountKey) { mutableListOf() }.add(member)
                 }
                 return grouped.map { (accountKey, groupMembers) ->
+                    val explicitEmail = groupMembers.firstNotNullOfOrNull { it.accountEmail }
+                    val fallbackEmail = groupMembers.firstNotNullOfOrNull { member ->
+                        member.accountLabel?.normalizedEmailOrNull()
+                    }
                     TeamAccountGroup(
                         accountKey = accountKey,
                         accountLabel = groupMembers.firstNotNullOfOrNull { it.accountLabel },
+                        accountEmail = explicitEmail ?: fallbackEmail,
+                        emailSource = groupMembers.firstNotNullOfOrNull { it.accountEmailSource }
+                            ?: fallbackEmail?.let { TeamAccountEmailSource.LABEL },
                         members = groupMembers
                     )
                 }
+            }
+
+
+        /** Hierarquia visual: e-mail efetivo -> UUID técnico -> integrantes. */
+        val emailGroups: List<TeamEmailGroup>
+            get() {
+                val grouped = LinkedHashMap<String, MutableList<TeamAccountGroup>>()
+                for (account in memberGroups) {
+                    val key = account.accountEmail?.lowercase()
+                        ?: "uuid:${account.accountKey.orEmpty()}"
+                    grouped.getOrPut(key) { mutableListOf() }.add(account)
+                }
+                return grouped.entries
+                    .sortedWith(
+                        compareBy<Map.Entry<String, MutableList<TeamAccountGroup>>> { entry ->
+                            entry.key.startsWith("uuid:")
+                        }.thenBy { entry -> entry.key }
+                    )
+                    .map { (key, accounts) ->
+                        TeamEmailGroup(
+                            groupKey = accounts.singleOrNull()?.groupKey ?: key,
+                            accountEmail = accounts.firstNotNullOfOrNull { it.accountEmail },
+                            accounts = accounts.sortedBy { account -> account.accountKey.orEmpty() }
+                        )
+                    }
             }
     }
 }
@@ -261,6 +305,8 @@ sealed interface TeamUsageUiState {
 data class TeamAccountGroup(
     val accountKey: String?,
     val accountLabel: String?,
+    val accountEmail: String? = null,
+    val emailSource: TeamAccountEmailSource? = null,
     val members: List<TeamMemberUsage>
 ) {
     /**
@@ -298,6 +344,48 @@ data class TeamAccountGroup(
      */
     val worstHealth: CliSessionHealth?
         get() = members.flatMap { member -> member.sessions }.worstHealth()
+}
+
+private fun String.normalizedEmailOrNull(): String? {
+    val normalized = trim().lowercase()
+    val at = normalized.indexOf('@')
+    return normalized.takeIf {
+        at > 0 && at == normalized.lastIndexOf('@') &&
+            normalized.substring(at + 1).contains('.') && normalized.none(Char::isWhitespace)
+    }
+}
+
+data class TeamEmailGroup(
+    val groupKey: String,
+    val accountEmail: String?,
+    val accounts: List<TeamAccountGroup>
+) {
+    val members: List<TeamMemberUsage>
+        get() = accounts.flatMap { account -> account.members }
+
+    val accountCount: Int
+        get() = accounts.size
+
+    val activeMemberCount: Int
+        get() = accounts.sumOf { account -> account.activeMemberCount }
+
+    val sessionCount: Int
+        get() = accounts.sumOf { account -> account.sessionCount }
+
+    val totalTokens: Long
+        get() = accounts.sumOf { account -> account.totalTokens }
+
+    val totalCostMicros: Long
+        get() = accounts.sumOf { account -> account.totalCostMicros }
+
+    val isCostComplete: Boolean
+        get() = accounts.all { account -> account.isCostComplete }
+
+    val worstHealth: CliSessionHealth?
+        get() = members.flatMap { member -> member.sessions }.worstHealth()
+
+    val hasProvisionalAccounts: Boolean
+        get() = accounts.any { account -> account.emailSource == TeamAccountEmailSource.LABEL }
 }
 
 /**

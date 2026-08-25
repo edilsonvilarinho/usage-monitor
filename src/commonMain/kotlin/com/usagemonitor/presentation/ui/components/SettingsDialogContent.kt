@@ -73,6 +73,7 @@ const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
 const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
+const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
 const val AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG = "autoUpdateFeedOverride"
 
@@ -845,50 +846,53 @@ fun AutoUpdateToggle(
     val isSupported = support == AppUpdateSupport.SUPPORTED
     val label = if (isPt) "Atualização automática" else "Automatic updates"
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    AppDataRow(modifier = modifier, showDivider = true) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .testTag(AUTO_UPDATE_TEXT_BLOCK_TEST_TAG)
+        ) {
             Text(
                 text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = autoUpdateHint(support = support, isPt = isPt),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 4.dp)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            AppSwitch(
-                // Sem suporte o interruptor mostra desligado, e não o que está
-                // guardado: ligado-mas-inerte seria uma promessa falsa.
-                checked = enabled && isSupported,
-                onCheckedChange = { onToggle(it) },
-                enabled = isSupported,
-                modifier = Modifier.testTag(AUTO_UPDATE_SWITCH_TEST_TAG)
-            )
+            if (lastReceipt != null) {
+                Text(
+                    text = lastUpdateReceiptLine(receipt = lastReceipt, isPt = isPt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(AUTO_UPDATE_RECEIPT_TEST_TAG)
+                )
+            }
+            if (!feedUrlOverride.isNullOrBlank()) {
+                // Tom de aviso porque é isso que ele é: com o feed trocado, o
+                // SHA-256 que barra artefato adulterado passa a vir de outro lugar.
+                Text(
+                    text = if (isPt) {
+                        "Aviso: o feed de releases está sobrescrito por $UPDATE_FEED_URL_ENV_VAR ($feedUrlOverride). Só para teste."
+                    } else {
+                        "Warning: the release feed is overridden by $UPDATE_FEED_URL_ENV_VAR ($feedUrlOverride). Testing only."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppTone.WARNING.color(),
+                    modifier = Modifier.testTag(AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG)
+                )
+            }
         }
-        Text(
-            text = autoUpdateHint(support = support, isPt = isPt),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        AppSwitch(
+            // Sem suporte o interruptor mostra desligado, e não o que está
+            // guardado: ligado-mas-inerte seria uma promessa falsa.
+            checked = enabled && isSupported,
+            onCheckedChange = { onToggle(it) },
+            enabled = isSupported,
+            modifier = Modifier.testTag(AUTO_UPDATE_SWITCH_TEST_TAG)
         )
-        if (lastReceipt != null) {
-            Text(
-                text = lastUpdateReceiptLine(receipt = lastReceipt, isPt = isPt),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag(AUTO_UPDATE_RECEIPT_TEST_TAG)
-            )
-        }
-        if (!feedUrlOverride.isNullOrBlank()) {
-            // Tom de aviso porque é isso que ele é: com o feed trocado, o
-            // SHA-256 que barra artefato adulterado passa a vir de outro lugar.
-            Text(
-                text = if (isPt) {
-                    "Aviso: o feed de releases está sobrescrito por $UPDATE_FEED_URL_ENV_VAR ($feedUrlOverride). Só para teste."
-                } else {
-                    "Warning: the release feed is overridden by $UPDATE_FEED_URL_ENV_VAR ($feedUrlOverride). Testing only."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = AppTone.WARNING.color(),
-                modifier = Modifier.testTag(AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG)
-            )
-        }
     }
 }
 

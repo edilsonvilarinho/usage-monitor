@@ -493,6 +493,48 @@ class TeamPresenceViewModelTest {
     }
 
     @Test
+    fun `mesmo e-mail agrupa dois UUIDs e exclusao continua escopada ao selecionado`() = runTest {
+        val adminRepository = FakePresenceAdminRepository(
+            accounts = listOf(
+                TeamAccountUsage(
+                    accountKey = ACCOUNT_KEY,
+                    label = "Pessoa",
+                    accountEmail = "pessoa@empresa.com",
+                    snapshot = TeamUsageSnapshot(
+                        members = listOf(member(deviceId = "device-1", alias = "visivel"))
+                    )
+                ),
+                TeamAccountUsage(
+                    accountKey = OTHER_ACCOUNT_KEY,
+                    label = "Pessoa",
+                    accountEmail = "pessoa@empresa.com",
+                    snapshot = TeamUsageSnapshot(
+                        members = listOf(member(deviceId = "device-1", alias = "oculto"))
+                    )
+                )
+            )
+        )
+
+        withViewModel(adminRepository = adminRepository, canManage = true) { viewModel ->
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            val state = assertIs<TeamPresenceUiState.Success>(viewModel.uiState.value)
+            val emailGroup = state.emailGroups.single()
+            assertEquals(2, emailGroup.accounts.size)
+            assertEquals(2, emailGroup.entries.map { entry -> entry.memberKey }.distinct().size)
+            assertEquals(
+                emailGroup.groupKey,
+                state.copy(query = "visivel").emailGroups.single().groupKey
+            )
+
+            viewModel.deleteAccount(OTHER_ACCOUNT_KEY)
+            runCurrent()
+            assertEquals(listOf(OTHER_ACCOUNT_KEY), adminRepository.deletedAccounts)
+        }
+    }
+
+    @Test
     fun `remover integrante usa a conta dele e recarrega a lista`() = runTest {
         val repository = FakePresenceRepository()
         val adminRepository = FakePresenceAdminRepository(

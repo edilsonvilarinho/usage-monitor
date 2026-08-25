@@ -42,6 +42,15 @@ interface TeamUsageRepository {
         member: TeamMemberIdentity
     ): Result<TeamPresenceReceipt>
 
+    /** Compatibilidade para implementações antigas do contrato em testes e clientes internos. */
+    suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        return touchPresence(accountKey = accountKey, member = member)
+    }
+
     /**
      * Lê o consumo do time de uma conta.
      *

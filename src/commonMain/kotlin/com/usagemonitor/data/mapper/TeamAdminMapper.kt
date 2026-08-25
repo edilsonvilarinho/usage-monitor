@@ -7,6 +7,7 @@ import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamVerificationDto
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
+import com.usagemonitor.domain.entity.TeamAccountEmailSource
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
 import kotlinx.datetime.Instant
@@ -56,6 +57,12 @@ fun TeamOverviewDto.toDomain(): List<TeamAccountUsage> {
         TeamAccountUsage(
             accountKey = account.accountKey,
             label = account.label,
+            accountEmail = account.accountEmail,
+            emailSource = when (account.emailSource) {
+                "reported" -> TeamAccountEmailSource.REPORTED
+                "label" -> TeamAccountEmailSource.LABEL
+                else -> null
+            },
             snapshot = TeamSnapshotDto(
                 members = account.members,
                 rows = account.rows,

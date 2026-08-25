@@ -9,6 +9,15 @@ const tokenCount = z.number().int().nonnegative().default(0);
 
 const nullableText = z.string().max(TEXT_MAX).nullable().default(null);
 
+const optionalAccountEmail = z
+  .string()
+  .trim()
+  .max(TEXT_MAX)
+  .email()
+  .transform((value) => value.toLowerCase())
+  .nullish()
+  .default(null);
+
 export const memberSchema = z.object({
   deviceId: z.string().min(1).max(TEXT_MAX),
   alias: z.string().trim().min(1).max(60),
@@ -48,6 +57,7 @@ export const turnSchema = z.object({
 export function createIngestSchema(maxTurnsPerRequest: number) {
   return z.object({
     accountKey: z.string().min(1).max(TEXT_MAX),
+    accountEmail: optionalAccountEmail,
     member: memberSchema,
     sessions: z.array(sessionSchema).max(maxTurnsPerRequest).default([]),
     turns: z.array(turnSchema).max(maxTurnsPerRequest).default([]),
@@ -69,6 +79,7 @@ export type IngestRequestBody = z.infer<ReturnType<typeof createIngestSchema>>;
  */
 export const presenceBodySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
+  accountEmail: optionalAccountEmail,
   member: memberSchema,
 });
 

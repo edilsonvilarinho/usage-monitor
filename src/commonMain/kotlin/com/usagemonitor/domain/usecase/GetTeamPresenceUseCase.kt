@@ -54,7 +54,12 @@ class GetAdminTeamPresenceUseCase(
         return repository.fetchOverview(cutoff).map { accounts ->
             val members = accounts.flatMap { account ->
                 account.snapshot.members.map { member ->
-                    member.copy(accountKey = account.accountKey, accountLabel = account.label)
+                    member.copy(
+                        accountKey = account.accountKey,
+                        accountLabel = account.label,
+                        accountEmail = account.accountEmail,
+                        accountEmailSource = account.emailSource
+                    )
                 }
             }
             members.toPresenceResult(referenceNow, serverClockOffset.offsetMillis)

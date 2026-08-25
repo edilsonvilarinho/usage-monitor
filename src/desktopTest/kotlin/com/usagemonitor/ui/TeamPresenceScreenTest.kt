@@ -462,7 +462,8 @@ class TeamPresenceScreenTest {
                 entries = listOf(
                     entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
                 ),
-                isAdminOverview = true
+                isAdminOverview = true,
+                expandedAccountKeys = setOf("acc-a")
             ),
             localDeviceId = "device-outro",
             canManage = true,
@@ -577,7 +578,8 @@ class TeamPresenceScreenTest {
                 entries = listOf(
                     entry(deviceId = "device-1", accountKey = "acc-a", accountLabel = "time-a")
                 ),
-                isAdminOverview = true
+                isAdminOverview = true,
+                expandedAccountKeys = setOf("acc-a")
             ),
             localDeviceId = "device-outro",
             canManage = true,

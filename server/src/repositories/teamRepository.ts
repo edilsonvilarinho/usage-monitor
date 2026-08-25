@@ -1,4 +1,5 @@
 import type { Db } from '../db/openDatabase.js';
+import { normalizeAccountEmail } from '../domain/accountEmail.js';
 
 export interface IngestMember {
   deviceId: string;
@@ -33,6 +34,7 @@ export interface IngestTurn {
 
 export interface IngestPayload {
   accountKey: string;
+  accountEmail?: string | null;
   member: IngestMember;
   sessions: IngestSession[];
   turns: IngestTurn[];
@@ -119,6 +121,10 @@ export interface TeamAccountSnapshot extends TeamSnapshot {
   accountKey: string;
   /** Rotulo da chave dona da conta, ou `null` para conta sem chave emitida. */
   label: string | null;
+  /** E-mail efetivo usado somente para agrupamento visual. */
+  accountEmail: string | null;
+  /** Origem do e-mail efetivo; `label` e sempre um fallback provisório. */
+  emailSource: 'reported' | 'label' | null;
 }
 
 /** Identificacao da sessao pedida, com a maquina que a reportou. */
@@ -486,6 +492,19 @@ const DELETE_MEMBER_SQL = `
 DELETE FROM team_members WHERE account_key = @accountKey AND device_id = @deviceId
 `;
 
+const UPSERT_ACCOUNT_EMAIL_SQL = `
+INSERT INTO team_accounts (account_key, account_email, email_updated_at)
+VALUES (@accountKey, @accountEmail, @emailUpdatedAt)
+ON CONFLICT(account_key) DO UPDATE SET
+  account_email = excluded.account_email,
+  email_updated_at = MAX(excluded.email_updated_at, team_accounts.email_updated_at)
+`;
+
+const SELECT_ACCOUNT_EMAILS_SQL = `
+SELECT account_key AS accountKey, account_email AS accountEmail
+FROM team_accounts
+`;
+
 /**
  * Apaga somente os turnos da sessao que ainda pertence ao device informado.
  *
@@ -530,6 +549,10 @@ const DELETE_ACCOUNT_MEMBERS_SQL = `
 DELETE FROM team_members WHERE account_key = @accountKey
 `;
 
+const DELETE_ACCOUNT_METADATA_SQL = `
+DELETE FROM team_accounts WHERE account_key = @accountKey
+`;
+
 export class TeamRepository {
   private readonly db: Db;
 
@@ -544,20 +567,30 @@ export class TeamRepository {
    * uma segunda regra de upsert que divirja dela — o `COALESCE` do host_name e
    * o `MAX` do `last_seen_at` valem aqui pelos mesmos motivos.
    *
-   * Sem transacao, ao contrario de [ingest]: e um statement so, e no SQLite um
-   * statement ja e atomico. Passar por [ingest] com arrays vazios prepararia
-   * `UPSERT_SESSION` e `INSERT_TURN` para nada e devolveria um recibo que mente.
+   * O e-mail reportado e o membro sao gravados na mesma transacao. Passar por
+   * [ingest] com arrays vazios prepararia `UPSERT_SESSION` e `INSERT_TURN` para
+   * nada e devolveria um recibo que mente.
    */
-  touchMember(accountKey: string, member: IngestMember, now: number): void {
-    this.db.prepare(UPSERT_MEMBER_SQL).run({
-      accountKey,
-      deviceId: member.deviceId,
-      alias: member.alias,
-      hostName: member.hostName,
-      organizationUuid: member.organizationUuid,
-      organizationName: member.organizationName,
-      lastSeenAt: now,
+  touchMember(
+    accountKey: string,
+    member: IngestMember,
+    now: number,
+    accountEmail: string | null = null,
+  ): void {
+    const run = this.db.transaction(() => {
+      this.upsertAccountEmail(accountKey, accountEmail, now);
+      this.db.prepare(UPSERT_MEMBER_SQL).run({
+        accountKey,
+        deviceId: member.deviceId,
+        alias: member.alias,
+        hostName: member.hostName,
+        organizationUuid: member.organizationUuid,
+        organizationName: member.organizationName,
+        lastSeenAt: now,
+      });
     });
+
+    run();
   }
 
   /** Grava membro, sessoes e turnos numa transacao unica. Idempotente. */
@@ -567,6 +600,7 @@ export class TeamRepository {
     const insertTurn = this.db.prepare(INSERT_TURN_SQL);
 
     const run = this.db.transaction((): IngestReceipt => {
+      this.upsertAccountEmail(payload.accountKey, payload.accountEmail ?? null, now);
       upsertMember.run({
         accountKey: payload.accountKey,
         deviceId: payload.member.deviceId,
@@ -680,6 +714,7 @@ export class TeamRepository {
       const deletedTurns = this.db.prepare(DELETE_ACCOUNT_TURNS_SQL).run(params).changes;
       const deletedSessions = this.db.prepare(DELETE_ACCOUNT_SESSIONS_SQL).run(params).changes;
       const deletedMembers = this.db.prepare(DELETE_ACCOUNT_MEMBERS_SQL).run(params).changes;
+      this.db.prepare(DELETE_ACCOUNT_METADATA_SQL).run(params);
       return { deletedTurns, deletedSessions, deletedMembers };
     });
 
@@ -743,6 +778,14 @@ export class TeamRepository {
       since,
       gapCutoffMs,
     }) as Array<TeamSessionActivityRow & { accountKey: string }>;
+    const reportedEmails = new Map(
+      (
+        this.db.prepare(SELECT_ACCOUNT_EMAILS_SQL).all() as Array<{
+          accountKey: string;
+          accountEmail: string;
+        }>
+      ).map((row) => [row.accountKey, row.accountEmail]),
+    );
 
     const byAccount = new Map<string, TeamAccountSnapshot>();
 
@@ -751,9 +794,14 @@ export class TeamRepository {
       if (existing !== undefined) {
         return existing;
       }
+      const label = labels.get(accountKey) ?? null;
+      const reportedEmail = reportedEmails.get(accountKey) ?? null;
+      const provisionalEmail = normalizeAccountEmail(label);
       const created: TeamAccountSnapshot = {
         accountKey,
-        label: labels.get(accountKey) ?? null,
+        label,
+        accountEmail: reportedEmail ?? provisionalEmail,
+        emailSource: reportedEmail !== null ? 'reported' : provisionalEmail !== null ? 'label' : null,
         members: [],
         rows: [],
         activity: [],
@@ -778,6 +826,19 @@ export class TeamRepository {
     }
 
     return [...byAccount.values()];
+  }
+
+  private upsertAccountEmail(accountKey: string, accountEmail: string | null, now: number): void {
+    const normalized = normalizeAccountEmail(accountEmail);
+    if (normalized === null) {
+      return;
+    }
+
+    this.db.prepare(UPSERT_ACCOUNT_EMAIL_SQL).run({
+      accountKey,
+      accountEmail: normalized,
+      emailUpdatedAt: now,
+    });
   }
 
   /**

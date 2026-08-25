@@ -15,6 +15,12 @@
  * cruzem, mas qualquer portador da chave unica de ambiente le qualquer conta.
  */
 export const SCHEMA = `
+CREATE TABLE IF NOT EXISTS team_accounts (
+  account_key        TEXT    PRIMARY KEY,
+  account_email      TEXT    NOT NULL,
+  email_updated_at   INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS team_members (
   account_key       TEXT    NOT NULL,
   device_id         TEXT    NOT NULL,

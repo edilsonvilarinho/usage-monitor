@@ -24,6 +24,7 @@ import kotlin.test.assertTrue
 
 private const val PROFILE_ID = "default"
 private const val ACCOUNT_KEY = "account-uuid-aaa"
+private const val ACCOUNT_EMAIL = "helio.sales@empresa.com"
 
 /** Captura os lotes enviados e permite forçar falha, sem tocar a rede. */
 private class RecordingTeamRepository(
@@ -37,6 +38,7 @@ private class RecordingTeamRepository(
 
     /** Batidas de presença, na ordem em que chegaram. */
     val presenceTouches = mutableListOf<Pair<String, TeamMemberIdentity>>()
+    val presenceEmails = mutableListOf<String?>()
 
     /** Lotes de verdade, sem os envios que só carregam a identidade. */
     val turnBatches: List<TeamIngestPayload>
@@ -87,6 +89,15 @@ private class RecordingTeamRepository(
         return Result.success(TeamPresenceReceipt())
     }
 
+    override suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        presenceEmails += accountEmail
+        return touchPresence(accountKey = accountKey, member = member)
+    }
+
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
 
     override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
@@ -125,6 +136,7 @@ class TeamSyncServiceTest {
 
             val payload = repository.turnBatches.single()
             assertEquals(ACCOUNT_KEY, payload.accountKey)
+            assertEquals(ACCOUNT_EMAIL, payload.accountEmail)
             assertEquals("edilson", payload.member.alias)
             assertEquals(2, payload.turns.size)
             // As sessões dos turnos têm de viajar no mesmo lote: o servidor
@@ -473,6 +485,7 @@ class TeamSyncServiceTest {
             assertEquals("device-1", member.deviceId)
             assertEquals("edilson", member.alias)
             assertEquals("DESKTOP-TEST", member.hostName)
+            assertEquals(listOf<String?>(ACCOUNT_EMAIL), repository.presenceEmails)
             assertTrue(repository.turnBatches.isEmpty())
         }
     }
@@ -592,7 +605,11 @@ class TeamSyncServiceTest {
         batchSize: Int = 2_000,
         ensureIndexFresh: (suspend () -> Unit)? = null,
         targets: List<TeamSyncTarget> = listOf(
-            TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY)
+            TeamSyncTarget(
+                profileId = PROFILE_ID,
+                accountKey = ACCOUNT_KEY,
+                accountEmail = ACCOUNT_EMAIL
+            )
         ),
         settingsProvider: () -> TeamIntegrationSettings = { settings },
         /** `null` reproduz uma instalação anterior à presença. */

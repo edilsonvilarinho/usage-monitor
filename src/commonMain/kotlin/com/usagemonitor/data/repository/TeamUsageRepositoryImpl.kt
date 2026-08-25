@@ -88,6 +88,14 @@ class TeamUsageRepositoryImpl(
         accountKey: String,
         member: TeamMemberIdentity
     ): Result<TeamPresenceReceipt> {
+        return touchPresence(accountKey = accountKey, accountEmail = null, member = member)
+    }
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
         val settings = settingsProvider()
         if (!settings.isActive) {
             return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
@@ -102,6 +110,7 @@ class TeamUsageRepositoryImpl(
                     apiKey = settings.apiKey,
                     request = TeamPresenceRequestDto(
                         accountKey = accountKey,
+                        accountEmail = accountEmail,
                         member = member.toDto()
                     )
                 ).toDomain()
@@ -125,6 +134,7 @@ class TeamUsageRepositoryImpl(
         return push(
             TeamIngestPayload(
                 accountKey = accountKey,
+                accountEmail = accountEmail,
                 member = member,
                 sessions = emptyList(),
                 turns = emptyList()

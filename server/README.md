@@ -10,7 +10,9 @@ Self-hosted: a empresa que usa a integração opera este servidor. Não há serv
 
 Apenas metadados de uso — **nenhum conteúdo de prompt ou resposta**:
 
-`sessionId`, `messageId`, `ts`, `model`, contagens de token, `cwd`, `gitBranch`, `hostName`, `alias`, `accountUuid`.
+`sessionId`, `messageId`, `ts`, `model`, contagens de token, `cwd`, `gitBranch`, `hostName`, `alias`, `accountUuid` e o e-mail da conta.
+
+Desde a versão **0.9.0**, o e-mail real da conta trafega como metadado opcional. Ele é normalizado (`trim` + minúsculas) e serve apenas para agrupamento visual; autorização, ingestão, detalhe e exclusão continuam escopados pelo `accountUuid`.
 
 O `cwd` e o `gitBranch` revelam nomes de projeto e de branch. É o que permite o detalhamento por sessão dentro do modal.
 
@@ -118,6 +120,7 @@ Idempotente. A chave primária `(account_key, session_id, message_id)` com `INSE
 ```jsonc
 {
   "accountKey": "<accountUuid da conta Anthropic>",
+  "accountEmail": "pessoa@empresa.com",
   "member": {
     "deviceId": "<uuid estável por instalação>",
     "alias": "edilson",
@@ -170,6 +173,7 @@ Disponível a partir da versão **0.4.0**. Diz "o Usage Monitor está aberto nes
 ```jsonc
 {
   "accountKey": "<accountUuid da conta Anthropic>",
+  "accountEmail": "pessoa@empresa.com",
   "member": {
     "deviceId": "<uuid estável por instalação>",
     "alias": "edilson",
@@ -188,7 +192,7 @@ O app bate a cada **30 segundos**, por conta participante, enquanto estiver aber
 
 Três propriedades desenhadas de propósito:
 
-- **Grava só `team_members`.** Nunca sessão nem turno. É o mesmo upsert do ingest (`MAX` no `last_seen_at`, `COALESCE` no `host_name` e na organização), num statement só, sem transação.
+- **Grava `team_members` e, quando informado, `team_accounts`.** Nunca sessão nem turno. O e-mail é metadado por conta; o integrante mantém o mesmo upsert do ingest (`MAX` no `last_seen_at`, `COALESCE` no `host_name` e na organização).
 - **O `lastSeenAt` é o relógio do servidor**, e vem na resposta justamente para o cliente medir o próprio desvio. Sem isso o app compararia um carimbo do servidor com o relógio local, e um desvio de minutos deixaria o time inteiro "online" para sempre. O corpo **não** aceita timestamp: aceitar o do cliente permitiria a uma máquina se declarar eternamente presente.
 - **Idempotente e barata.** A mesma linha é reescrita a cada batida; ~200 bytes por requisição.
 
@@ -382,7 +386,7 @@ Disponíveis a partir da versão **0.3.0**, e **só quando `TEAM_ADMIN_TOKEN` es
 | Rota | Efeito |
 |---|---|
 | `GET /api/admin/v1/ping` | `{"status":"ok"}`. É o que o botão **Validar** do app chama. |
-| `GET /api/admin/v1/overview?since=&gapCutoffMs=` | Todas as contas: `{ accounts: [{ accountKey, label, members[], rows[], activity[] }] }`. Mesmo formato de `/v1/team`, uma entrada por conta. `activity` a partir da 0.7.0. |
+| `GET /api/admin/v1/overview?since=&gapCutoffMs=` | Todas as contas: `{ accounts: [{ accountKey, label, accountEmail, emailSource, members[], rows[], activity[] }] }`. `emailSource` é `reported`, `label` ou `null`; e-mail reportado sempre prevalece. Mesmo formato de `/v1/team`, uma entrada por conta. `activity` a partir da 0.7.0 e metadados de e-mail a partir da 0.9.0. |
 | `POST /api/admin/v1/keys` | `{ label, maxAccounts? }` → `201` com a chave crua. |
 | `GET /api/admin/v1/keys` | Lista **com a chave crua**, mais `keyPrefix`, `maxAccounts`, `accounts[]` e as datas. |
 | `PATCH /api/admin/v1/keys/:id` | `{ label?, maxAccounts? }`. Teto abaixo do já reivindicado → `400`. |
@@ -392,7 +396,7 @@ Disponíveis a partir da versão **0.3.0**, e **só quando `TEAM_ADMIN_TOKEN` es
 | `DELETE /api/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId` | **0.8.0+.** Apaga somente a sessão e seus turnos. Irreversível; novos turnos podem recriá-la. |
 | `DELETE /api/admin/v1/accounts/:accountKey` | **0.5.0+.** Apaga a conta inteira: integrantes, sessões, turnos e o vínculo. Irreversível. |
 
-Conta que entrou pela chave legada aparece no `overview` com `label: null` — existe nos dados e não tem chave dona.
+Conta que entrou pela chave legada aparece no `overview` com `label: null` — existe nos dados e não tem chave dona. Enquanto uma conta histórica ainda não reportou o e-mail, um `label` com formato válido de e-mail aparece como fallback provisório (`emailSource: "label"`); texto livre inválido não vira e-mail.
 
 **Desvincular não faz a conta sumir.** O `overview` é derivado de `team_members` e `team_turns`, nunca de `team_key_accounts`: uma conta desvinculada continua na lista, agora sem rótulo. Quem a tira de lá é `DELETE /api/admin/v1/accounts/:accountKey` — é o conserto da conta que a empresa deixou de usar, e o único caminho que não exige uma chamada por máquina.
 
@@ -473,9 +477,9 @@ O `HEALTHCHECK` está no Dockerfile e no compose. O processo roda como `node` (u
 7. **Deploy.** Confira `GET https://<dominio>/api/health`.
 8. **Auto Deploy:** ative o webhook na branch `main` se quiser redeploy a cada push.
 
-**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**; apagar uma conta inteira depende da **0.5.0**; e excluir uma sessão depende da rota administrativa da **0.8.0**. Contra servidor anterior, a exclusão de sessão responde `404` e o app exige atualização, pois não existe fallback seguro. Nas leituras compatíveis, o painel continua caindo no agregado ou no heartbeat via ingest conforme o recurso ausente. Um redeploy resolve.
+**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**; apagar uma conta inteira depende da **0.5.0**; excluir uma sessão depende da rota administrativa da **0.8.0**; e o agrupamento pelo e-mail real depende da **0.9.0**. Contra servidor anterior, a exclusão de sessão responde `404` e o app exige atualização, pois não existe fallback seguro. Nas leituras compatíveis, o painel continua caindo no agregado ou no heartbeat via ingest conforme o recurso ausente. Um redeploy resolve.
 
-Não há migração de banco a rodar: as tabelas novas da 0.3.0 (`team_keys`, `team_key_accounts`, `server_meta`) são criadas no boot e as antigas não mudam. As versões 0.4.0, 0.5.0 e 0.8.0 não acrescentam tabela nem coluna; presença e exclusões usam o esquema existente. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
+Não há migração manual de banco a rodar: as tabelas novas são criadas no boot. A 0.3.0 criou `team_keys`, `team_key_accounts` e `server_meta`; a 0.9.0 cria `team_accounts` sem alterar nem fundir os dados existentes. As versões 0.4.0, 0.5.0 e 0.8.0 não acrescentaram tabela nem coluna. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
 
 Rodando em **Docker Swarm**, mantenha **1 réplica**: o SQLite é um arquivo local e duas réplicas em nós diferentes veriam bancos distintos. Se o cluster tiver mais de um nó, fixe uma constraint de nó para o volume seguir o serviço.
 

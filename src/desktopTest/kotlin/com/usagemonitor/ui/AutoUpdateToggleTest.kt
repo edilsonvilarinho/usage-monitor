@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -21,13 +22,45 @@ import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_RECEIPT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_TEXT_BLOCK_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AutoUpdateToggle
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class AutoUpdateToggleTest {
+
+    @Test
+    fun `switch ocupa o slot direito e todos os textos ficam no bloco esquerdo`() = runDesktopComposeUiTest {
+        showToggle(
+            enabled = true,
+            support = AppUpdateSupport.SUPPORTED,
+            receipt = AppUpdateReceipt(
+                version = "39.0.0",
+                previousVersion = "38.0.0",
+                status = AppUpdateReceiptStatus.SUCCESS,
+                reason = null
+            ),
+            feedOverride = "http://localhost:8099/release.json"
+        )
+
+        val textBlock = onNodeWithTag(AUTO_UPDATE_TEXT_BLOCK_TEST_TAG).getUnclippedBoundsInRoot()
+        val switch = onNodeWithTag(AUTO_UPDATE_SWITCH_TEST_TAG).getUnclippedBoundsInRoot()
+        assertTrue(switch.left > textBlock.left)
+        assertTrue(switch.left >= textBlock.right)
+
+        val titleLeft = onNodeWithText("Atualização automática").getUnclippedBoundsInRoot().left
+        val hintLeft = onNodeWithText(
+            "Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app."
+        ).getUnclippedBoundsInRoot().left
+        val receiptLeft = onNodeWithTag(AUTO_UPDATE_RECEIPT_TEST_TAG).getUnclippedBoundsInRoot().left
+        val warningLeft = onNodeWithTag(AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG).getUnclippedBoundsInRoot().left
+        assertEquals(titleLeft, hintLeft)
+        assertEquals(titleLeft, receiptLeft)
+        assertEquals(titleLeft, warningLeft)
+    }
 
     @Test
     fun `supported install says the size and the moment`() = runDesktopComposeUiTest {

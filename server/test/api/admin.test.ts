@@ -8,6 +8,8 @@ import {
   createHarness,
   createKeyViaAdmin,
   makePayload,
+  makeSession,
+  makeTurn,
   type Harness,
 } from '../support/harness.js';
 
@@ -239,6 +241,8 @@ describe('visao global do admin', () => {
     const contas = response.body.accounts as Array<{
       accountKey: string;
       label: string | null;
+      accountEmail: string | null;
+      emailSource: 'reported' | 'label' | null;
       members: unknown[];
       rows: unknown[];
     }>;
@@ -246,6 +250,8 @@ describe('visao global do admin', () => {
     expect(contas).toHaveLength(2);
     const contaA = contas.find((conta) => conta.accountKey === ACCOUNT_A);
     expect(contaA?.label).toBe('fulano@empresa.com');
+    expect(contaA?.accountEmail).toBe('fulano@empresa.com');
+    expect(contaA?.emailSource).toBe('label');
     expect(contaA?.members).toHaveLength(1);
     expect(contaA?.rows).toHaveLength(1);
   });
@@ -411,6 +417,60 @@ describe('remocao de conta inteira', () => {
     } finally {
       semAdmin.cleanup();
     }
+  });
+
+  it('mantem UUIDs separados e devolve o mesmo agrupador de e-mail', async () => {
+    const created = await createKeyViaAdmin(harness, 'rotulo administrativo', 2);
+    await request(harness.app)
+      .post('/api/v1/ingest')
+      .set('x-team-key', created.key)
+      .send(makePayload({ accountKey: ACCOUNT_A, accountEmail: 'pessoa@empresa.com' }));
+    await request(harness.app)
+      .post('/api/v1/ingest')
+      .set('x-team-key', created.key)
+      .send(
+        makePayload({
+          accountKey: ACCOUNT_B,
+          accountEmail: 'PESSOA@EMPRESA.COM',
+          sessions: [makeSession({ sessionId: 'session-b' })],
+          turns: [makeTurn({ sessionId: 'session-b', messageId: 'msg-b' })],
+        }),
+      );
+
+    const response = await request(harness.app)
+      .get('/api/admin/v1/overview')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.body.accounts).toHaveLength(2);
+    expect(response.body.accounts.map((account: { accountKey: string }) => account.accountKey).sort())
+      .toEqual([ACCOUNT_A, ACCOUNT_B].sort());
+    expect(response.body.accounts.map((account: { accountEmail: string }) => account.accountEmail))
+      .toEqual(['pessoa@empresa.com', 'pessoa@empresa.com']);
+    expect(response.body.accounts.every((account: { emailSource: string }) => account.emailSource === 'reported'))
+      .toBe(true);
+  });
+
+  it('e-mail reportado prevalece sobre label e label invalido nao vira fallback', async () => {
+    const reported = await createKeyViaAdmin(harness, 'fallback@empresa.com');
+    const invalid = await createKeyViaAdmin(harness, 'Pessoa sem e-mail');
+    await request(harness.app)
+      .post('/api/v1/ingest')
+      .set('x-team-key', reported.key)
+      .send(makePayload({ accountKey: ACCOUNT_A, accountEmail: 'real@empresa.com' }));
+    await ingestWith(harness, invalid.key, ACCOUNT_B, 'session-b', 'msg-b');
+
+    const response = await request(harness.app)
+      .get('/api/admin/v1/overview')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+    const byKey = new Map(
+      response.body.accounts.map((account: { accountKey: string }) => [account.accountKey, account]),
+    ) as Map<string, { accountEmail: string | null; emailSource: string | null }>;
+
+    expect(byKey.get(ACCOUNT_A)).toMatchObject({
+      accountEmail: 'real@empresa.com',
+      emailSource: 'reported',
+    });
+    expect(byKey.get(ACCOUNT_B)).toMatchObject({ accountEmail: null, emailSource: null });
   });
 });
 

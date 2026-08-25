@@ -37,6 +37,31 @@ describe('POST /api/v1/ingest', () => {
     expect(turnCount.total).toBe(1);
   });
 
+  it('aceita cliente antigo sem accountEmail', async () => {
+    const response = await post(makePayload());
+
+    expect(response.status).toBe(200);
+    const metadata = harness.db.prepare('SELECT * FROM team_accounts').all();
+    expect(metadata).toEqual([]);
+  });
+
+  it('normaliza e persiste o e-mail reportado', async () => {
+    const response = await post(makePayload({ accountEmail: '  Helio.Sales@Empresa.COM  ' }));
+
+    expect(response.status).toBe(200);
+    const metadata = harness.db
+      .prepare('SELECT account_email AS accountEmail FROM team_accounts WHERE account_key = ?')
+      .get(ACCOUNT_A) as { accountEmail: string };
+    expect(metadata.accountEmail).toBe('helio.sales@empresa.com');
+  });
+
+  it('recusa accountEmail invalido', async () => {
+    const response = await post({ ...makePayload(), accountEmail: 'nao-e-email' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('validation_error');
+  });
+
   it('e idempotente: reenviar o mesmo lote nao duplica turnos', async () => {
     await post(makePayload());
     const second = await post(makePayload());

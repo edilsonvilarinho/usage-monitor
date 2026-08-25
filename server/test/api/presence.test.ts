@@ -72,6 +72,20 @@ describe('POST /api/v1/presence', () => {
     expect(readMember()?.lastSeenAt).toBe(1_700_000_000_000);
   });
 
+  it('persiste e normaliza accountEmail no heartbeat', async () => {
+    const response = await post({
+      accountKey: ACCOUNT_A,
+      accountEmail: '  Helio.Sales@Empresa.COM ',
+      member: makeMember(),
+    });
+
+    expect(response.status).toBe(200);
+    const metadata = harness.db
+      .prepare('SELECT account_email AS accountEmail FROM team_accounts WHERE account_key = ?')
+      .get(ACCOUNT_A) as { accountEmail: string };
+    expect(metadata.accountEmail).toBe('helio.sales@empresa.com');
+  });
+
   it('devolve o relogio do servidor no corpo', async () => {
     harness.setNow(1_700_000_500_000);
 

@@ -68,6 +68,7 @@ import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppToolbar
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
@@ -76,6 +77,7 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.TeamAccountGroup
+import com.usagemonitor.presentation.viewmodel.TeamEmailGroup
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageView
@@ -520,7 +522,7 @@ private fun TeamUsageList(
         // Decidido uma vez para a lista inteira, e não por linha: as colunas só
         // alinham se todas as linhas reservarem as mesmas casas. Uma coluna que
         // aparece em algumas linhas e some em outras desloca tudo o que vem depois.
-        val hasStatusColumn = state.memberGroups.any { group ->
+        val hasStatusColumn = state.emailGroups.any { group ->
             group.worstHealth != null || group.members.any { member -> member.worstHealth != null }
         }
 
@@ -541,28 +543,35 @@ private fun TeamUsageList(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
             ) {
-                for (group in state.memberGroups) {
+                for (emailGroup in state.emailGroups) {
                     // Cabeçalho só na visão global: no modal de uma conta só, a
                     // conta já é a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
-                        item(key = "account:${group.accountKey}") {
+                        item(key = "email:${emailGroup.groupKey}") {
                             TeamAccountGroupHeader(
-                                group = group,
-                                share = state.tokenShareOf(group),
-                                expanded = state.isAccountExpanded(group),
+                                group = emailGroup,
+                                share = state.tokenShareOf(emailGroup),
+                                expanded = state.isEmailExpanded(emailGroup),
                                 language = language,
                                 hasStatusColumn = hasStatusColumn,
                                 hasActionColumn = state.isAdminOverview,
-                                onToggle = { onToggleAccount(group.groupKey) }
+                                onToggle = { onToggleAccount(emailGroup.groupKey) }
                             )
                         }
                     }
 
-                    if (!state.isAccountExpanded(group)) {
+                    if (!state.isEmailExpanded(emailGroup)) {
                         continue
                     }
 
-                    for (member in group.members) {
+                    for (account in emailGroup.accounts) {
+                        if (emailGroup.accounts.size > 1) {
+                            item(key = "uuid:${account.accountKey}") {
+                                TeamAccountUuidHeader(account = account, language = language)
+                            }
+                        }
+
+                    for (member in account.members) {
                         item(key = member.memberKey) {
                             TeamMemberRow(
                                 member = member,
@@ -645,6 +654,7 @@ private fun TeamUsageList(
                                 }
                             }
                         }
+                    }
                     }
                 }
             }
@@ -740,7 +750,7 @@ private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
  */
 @Composable
 private fun TeamAccountGroupHeader(
-    group: TeamAccountGroup,
+    group: TeamEmailGroup,
     share: Double,
     expanded: Boolean,
     language: AppLanguage,
@@ -768,7 +778,9 @@ private fun TeamAccountGroupHeader(
                     horizontal = TEAM_ROW_HORIZONTAL_PADDING,
                     vertical = TEAM_ACCOUNT_VERTICAL_PADDING
                 )
-                .testTag("$TEAM_ACCOUNT_GROUP_TAG_PREFIX${group.accountKey.orEmpty()}"),
+                .testTag(
+                    "$TEAM_ACCOUNT_GROUP_TAG_PREFIX${group.accounts.singleOrNull()?.accountKey ?: group.groupKey}"
+                ),
             // Marcador e vão iguais aos do `AppDataRow` da linha do integrante: é o que
             // mantém os totais da conta no mesmo x das colunas dela. Sem ele a faixa
             // começava 14dp à esquerda da linha e as duas colunas de custo não
@@ -807,20 +819,30 @@ private fun TeamAccountGroupHeader(
                         // A contagem de integrantes vem emendada nela: a coluna
                         // que ela ocupava virou "Sessões", e um número sob a
                         // legenda "Tempo ativo" diria uma coisa e valeria outra.
-                        Text(
-                            text = TeamUsageLabels.accountBandWithMembers(
-                                memberCount = group.activeMemberCount,
-                                language = language
-                            ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = TeamUsageLabels.accountBandWithMembers(
+                                    memberCount = group.activeMemberCount,
+                                    language = language
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                            if (group.hasProvisionalAccounts) {
+                                Text(
+                                    text = TeamUsageLabels.provisionalLabel(language),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AppTone.WARNING.color(),
+                                    maxLines = 1
+                                )
+                            }
+                        }
                         // O e-mail é o dado, e dado fica na cor do texto. Quem
                         // identifica a faixa como conta é o marcador de 2dp à
                         // esquerda e a palavra logo acima.
                         Text(
-                            text = group.accountLabel ?: TeamUsageLabels.unlabeledAccount(language),
+                            text = group.accountEmail ?: TeamUsageLabels.unlabeledAccount(language),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
@@ -828,7 +850,13 @@ private fun TeamAccountGroupHeader(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = group.accountKey.orEmpty(),
+                            text = group.accounts.singleOrNull()?.accountKey.orEmpty().takeIf { it.isNotEmpty() }
+                                ?.let { accountKey -> accountKey }
+                                ?: TeamUsageLabels.technicalAccounts(
+                                    count = group.accountCount,
+                                    provisional = group.hasProvisionalAccounts,
+                                    language = language
+                                ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -889,6 +917,31 @@ private fun TeamAccountGroupHeader(
         }
         AppDivider()
     }
+}
+
+@Composable
+private fun TeamAccountUuidHeader(account: TeamAccountGroup, language: AppLanguage) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(
+                start = TEAM_ROW_HORIZONTAL_PADDING + AppSpacing.xl,
+                end = TEAM_ROW_HORIZONTAL_PADDING,
+                top = AppSpacing.sm,
+                bottom = AppSpacing.sm
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "${TeamUsageLabels.accountBand(language)} · ${account.accountKey.orEmpty()}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+    AppDivider()
 }
 
 /**
@@ -982,7 +1035,11 @@ private fun TeamUsageHeader(
 
             if (state.isAdminOverview) {
                 Text(
-                    text = TeamUsageLabels.allAccounts(state.memberGroups.size, language),
+                    text = TeamUsageLabels.allEmailGroups(
+                        emailCount = state.emailGroups.size,
+                        accountCount = state.memberGroups.size,
+                        language = language
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,

@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamAccountEmailSource
 import com.usagemonitor.presentation.ui.report.UsageReportSection
 import com.usagemonitor.presentation.ui.report.reportForCliSessions
 import com.usagemonitor.presentation.ui.report.reportForTeam
@@ -276,6 +277,42 @@ class UsageReportBuildersTest {
             listOf("maior", "empate-a", "empate-b", "zero", "ausente"),
             tables.last().rows.map { row -> row.first() }
         )
+    }
+
+    @Test
+    fun `relatorio global resume por e-mail e ordena por e-mail e UUID`() {
+        val members = listOf(
+            teamMember("zeca", session("z", "p", activeMillis = 9_000L)).copy(
+                accountKey = "uuid-b",
+                accountEmail = "b@empresa.com",
+                accountEmailSource = TeamAccountEmailSource.REPORTED
+            ),
+            teamMember("ana", session("a", "p", activeMillis = 1_000L)).copy(
+                accountKey = "uuid-a2",
+                accountEmail = "a@empresa.com",
+                accountEmailSource = TeamAccountEmailSource.LABEL
+            ),
+            teamMember("bia", session("b", "p", activeMillis = 2_000L)).copy(
+                accountKey = "uuid-a1",
+                accountEmail = "a@empresa.com",
+                accountEmailSource = TeamAccountEmailSource.REPORTED
+            )
+        )
+
+        val document = reportForTeam(
+            state = TeamUsageUiState.Success(members = members, isAdminOverview = true),
+            language = AppLanguage.PT,
+            now = NOW
+        )
+        val tables = document.sections.filterIsInstance<UsageReportSection.Table>()
+        val summary = tables.first { table -> table.heading == "Resumo por e-mail" }
+        val memberTable = tables.first { table -> table.heading == "Integrante" }
+        val sessionsTable = tables.last { table -> table.heading == "Sessões" }
+
+        assertEquals(listOf("a@empresa.com", "b@empresa.com"), summary.rows.map { row -> row[0] })
+        assertEquals(listOf("uuid-a1", "uuid-a2", "uuid-b"), memberTable.rows.map { row -> row[1] })
+        assertEquals(listOf("uuid-a1", "uuid-a2", "uuid-b"), sessionsTable.rows.map { row -> row[1] })
+        assertTrue(document.footnotes.any { note -> note.contains("rótulo administrativo") })
     }
 }
 

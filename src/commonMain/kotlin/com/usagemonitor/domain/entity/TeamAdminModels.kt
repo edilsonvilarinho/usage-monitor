@@ -70,5 +70,7 @@ data class TeamAccountUsage(
     val accountKey: String,
     /** Rótulo da chave dona; `null` para conta sem chave emitida. */
     val label: String?,
+    val accountEmail: String? = null,
+    val emailSource: TeamAccountEmailSource? = null,
     val snapshot: TeamUsageSnapshot
 )

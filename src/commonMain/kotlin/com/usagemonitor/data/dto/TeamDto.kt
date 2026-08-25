@@ -47,6 +47,7 @@ data class TeamTurnUploadDto(
 @Serializable
 data class TeamIngestRequestDto(
     val accountKey: String,
+    val accountEmail: String? = null,
     val member: TeamMemberDto,
     val sessions: List<TeamSessionUploadDto> = emptyList(),
     val turns: List<TeamTurnUploadDto> = emptyList()
@@ -66,6 +67,7 @@ data class TeamIngestResponseDto(
 @Serializable
 data class TeamPresenceRequestDto(
     val accountKey: String,
+    val accountEmail: String? = null,
     val member: TeamMemberDto
 )
 
@@ -260,6 +262,8 @@ data class TeamAccountDeletionDto(
 data class TeamAccountSnapshotDto(
     val accountKey: String,
     val label: String? = null,
+    val accountEmail: String? = null,
+    val emailSource: String? = null,
     val members: List<TeamMemberRowDto> = emptyList(),
     val rows: List<TeamUsageRowDto> = emptyList(),
     val activity: List<TeamSessionActivityDto> = emptyList()

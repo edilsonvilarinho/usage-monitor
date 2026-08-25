@@ -144,6 +144,30 @@ internal object TeamUsageLabels {
         }
     }
 
+    fun allEmailGroups(emailCount: Int, accountCount: Int, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
+            "$emailCount grupos por e-mail · $accountCount UUIDs"
+        } else {
+            "$emailCount email groups · $accountCount UUIDs"
+        }
+    }
+
+    fun technicalAccounts(count: Int, provisional: Boolean, language: AppLanguage): String {
+        val accounts = if (language == AppLanguage.PT) {
+            if (count == 1) "1 UUID" else "$count UUIDs"
+        } else {
+            if (count == 1) "1 UUID" else "$count UUIDs"
+        }
+        if (!provisional) {
+            return accounts
+        }
+        return "$accounts · ${provisionalLabel(language)}"
+    }
+
+    fun provisionalLabel(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "rótulo provisório" else "provisional label"
+    }
+
     /**
      * Rótulo da faixa que abre uma conta na lista global.
      *

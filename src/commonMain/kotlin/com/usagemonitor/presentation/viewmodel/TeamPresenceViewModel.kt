@@ -297,6 +297,10 @@ class TeamPresenceViewModel(
 
                     val entries = result.entries
                     val contentChanged = current == null || current.entries != entries
+                    val availableGroupKeys = TeamPresenceUiState.Success(
+                        entries = entries,
+                        isAdminOverview = scopeOverview
+                    ).emailGroups.mapTo(mutableSetOf()) { group -> group.groupKey }
 
                     _uiState.value = TeamPresenceUiState.Success(
                         entries = entries,
@@ -310,7 +314,7 @@ class TeamPresenceViewModel(
                         // conjunto, senão reapareceria aberta se voltasse depois.
                         expandedAccountKeys = current?.expandedAccountKeys
                             ?.filterTo(mutableSetOf()) { key ->
-                                entries.any { entry -> entry.accountKey.orEmpty() == key }
+                                key in availableGroupKeys
                             }
                             ?: emptySet(),
                         // Carimbo só anda quando o conteúdo muda. Marcá-lo a cada

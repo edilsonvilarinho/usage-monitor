@@ -24,6 +24,7 @@ data class TeamMemberIdentity(
  */
 data class TeamIngestPayload(
     val accountKey: String,
+    val accountEmail: String? = null,
     val member: TeamMemberIdentity,
     val sessions: List<CliSessionSummary>,
     val turns: List<CliSessionTurn>
@@ -75,6 +76,10 @@ data class TeamMemberUsage(
     val accountKey: String? = null,
     /** Rótulo da conta; `null` quando ela não tem chave emitida. */
     val accountLabel: String? = null,
+    /** E-mail efetivo usado apenas para agrupamento visual. */
+    val accountEmail: String? = null,
+    /** Origem do e-mail; [TeamAccountEmailSource.LABEL] é fallback provisório. */
+    val accountEmailSource: TeamAccountEmailSource? = null,
     /**
      * As linhas cruas `(sessão, projeto, branch, modelo)` que geraram [sessions].
      *
@@ -151,6 +156,11 @@ data class TeamMemberUsage(
      */
     val memberKey: String
         get() = if (accountKey == null) deviceId else "$accountKey/$deviceId"
+}
+
+enum class TeamAccountEmailSource {
+    REPORTED,
+    LABEL
 }
 
 /** Resposta do servidor já dobrada em sessões e agrupada por integrante. */

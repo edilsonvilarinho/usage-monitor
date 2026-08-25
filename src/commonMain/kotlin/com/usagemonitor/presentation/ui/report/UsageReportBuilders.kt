@@ -6,6 +6,7 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBucket
+import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.BreakdownAxis
 import com.usagemonitor.presentation.ui.BreakdownLabels
 import com.usagemonitor.presentation.ui.CliSessionsLabels
@@ -161,25 +162,69 @@ fun reportForTeam(
         }
     )
 
+    if (state.isAdminOverview) {
+        sections += UsageReportSection.Table(
+            heading = ReportLabels.accountsByEmail(language),
+            columns = listOf(
+                UsageReportColumn(ReportLabels.email(language), weight = 2.1f),
+                UsageReportColumn(ReportLabels.uuids(language), weight = 2f),
+                UsageReportColumn(ReportLabels.members(language), weight = 0.8f, alignEnd = true),
+                UsageReportColumn(ReportLabels.sessions(language), weight = 0.8f, alignEnd = true),
+                UsageReportColumn(CliSessionsLabels.columnTokens(language), weight = 1.1f, alignEnd = true),
+                UsageReportColumn(CliSessionsLabels.columnCost(language), weight = 1f, alignEnd = true)
+            ),
+            rows = state.emailGroups.map { group ->
+                listOf(
+                    group.accountEmail ?: ReportLabels.noEmail(language),
+                    group.accounts.joinToString(", ") { account -> account.accountKey.orEmpty() },
+                    group.members.size.toString(),
+                    group.sessionCount.toString(),
+                    formatQuantity(group.totalTokens),
+                    costCell(group.totalCostMicros, group.isCostComplete)
+                )
+            }
+        )
+    }
+
+    val orderedMembers = if (state.isAdminOverview) {
+        state.members.sortedWith(
+            compareBy<TeamMemberUsage> { member -> member.accountEmail == null }
+                .thenBy { member -> member.accountEmail.orEmpty() }
+                .thenBy { member -> member.accountKey.orEmpty() }
+                .thenByDescending { member -> member.totalActiveMillis ?: -1L }
+                .thenBy { member -> member.alias.lowercase() }
+        )
+    } else {
+        state.members.sortedByActiveTimeDescending { member -> member.totalActiveMillis }
+    }
+
     sections += UsageReportSection.Table(
         heading = BreakdownLabels.axisTab(BreakdownAxis.MEMBER, language),
-        columns = listOf(
-            UsageReportColumn(ReportLabels.member(language), weight = 2.2f),
-            UsageReportColumn(ReportLabels.machine(language), weight = 1.6f),
-            UsageReportColumn(ReportLabels.sessions(language), weight = 0.8f, alignEnd = true),
-            UsageReportColumn(CliSessionsLabels.columnTokens(language), weight = 1.2f, alignEnd = true),
-            UsageReportColumn(CliSessionsLabels.columnCost(language), weight = 1.1f, alignEnd = true),
-            UsageReportColumn(CliSessionsLabels.activeTime(language), weight = 0.9f, alignEnd = true)
-        ),
-        rows = state.members.sortedByActiveTimeDescending { member -> member.totalActiveMillis }.map { member ->
-            listOf(
-                member.alias,
-                member.machineLabel,
-                member.sessionCount.toString(),
-                formatQuantity(member.totalTokens),
-                costCell(member.totalCostMicros, member.isCostComplete),
-                activeCell(member.totalActiveMillis)
-            )
+        columns = buildList {
+            if (state.isAdminOverview) {
+                add(UsageReportColumn(ReportLabels.email(language), weight = 1.8f))
+                add(UsageReportColumn(ReportLabels.uuid(language), weight = 1.5f))
+            }
+            add(UsageReportColumn(ReportLabels.member(language), weight = 2.2f))
+            add(UsageReportColumn(ReportLabels.machine(language), weight = 1.6f))
+            add(UsageReportColumn(ReportLabels.sessions(language), weight = 0.8f, alignEnd = true))
+            add(UsageReportColumn(CliSessionsLabels.columnTokens(language), weight = 1.2f, alignEnd = true))
+            add(UsageReportColumn(CliSessionsLabels.columnCost(language), weight = 1.1f, alignEnd = true))
+            add(UsageReportColumn(CliSessionsLabels.activeTime(language), weight = 0.9f, alignEnd = true))
+        },
+        rows = orderedMembers.map { member ->
+            buildList {
+                if (state.isAdminOverview) {
+                    add(member.accountEmail ?: ReportLabels.noEmail(language))
+                    add(member.accountKey.orEmpty())
+                }
+                add(member.alias)
+                add(member.machineLabel)
+                add(member.sessionCount.toString())
+                add(formatQuantity(member.totalTokens))
+                add(costCell(member.totalCostMicros, member.isCostComplete))
+                add(activeCell(member.totalActiveMillis))
+            }
         }
     )
 
@@ -195,30 +240,40 @@ fun reportForTeam(
     // por integrante que a tela usa para responder isso.
     sections += UsageReportSection.Table(
         heading = ReportLabels.sessionsHeading(language),
-        columns = listOf(
-            UsageReportColumn(ReportLabels.member(language), weight = 1.6f),
-            UsageReportColumn(ReportLabels.session(language), weight = 1.2f),
-            UsageReportColumn(ReportLabels.project(language), weight = 1.6f),
-            UsageReportColumn(ReportLabels.model(language), weight = 1.8f),
-            UsageReportColumn(ReportLabels.turns(language), weight = 0.7f, alignEnd = true),
-            UsageReportColumn(CliSessionsLabels.columnTokens(language), weight = 1.1f, alignEnd = true),
-            UsageReportColumn(CliSessionsLabels.columnCost(language), weight = 1f, alignEnd = true),
-            UsageReportColumn(CliSessionsLabels.activeTime(language), weight = 0.8f, alignEnd = true)
-        ),
-        rows = state.members
-            .flatMap { member -> member.sessions.map { session -> member.alias to session } }
-            .sortedByActiveTimeDescending { (_, session) -> session.activeMillis }
-            .map { (memberAlias, session) ->
-                listOf(
-                    memberAlias,
-                    shortSessionId(session.sessionId),
-                    session.projectName ?: "-",
-                    session.primaryModel ?: "-",
-                    session.turnCount.toString(),
-                    formatQuantity(session.totalTokens),
-                    costCell(session.costMicros, session.isCostComplete),
-                    activeCell(session.activeMillis)
-                )
+        columns = buildList {
+            if (state.isAdminOverview) {
+                add(UsageReportColumn(ReportLabels.email(language), weight = 1.8f))
+                add(UsageReportColumn(ReportLabels.uuid(language), weight = 1.5f))
+            }
+            add(UsageReportColumn(ReportLabels.member(language), weight = 1.6f))
+            add(UsageReportColumn(ReportLabels.session(language), weight = 1.2f))
+            add(UsageReportColumn(ReportLabels.project(language), weight = 1.6f))
+            add(UsageReportColumn(ReportLabels.model(language), weight = 1.8f))
+            add(UsageReportColumn(ReportLabels.turns(language), weight = 0.7f, alignEnd = true))
+            add(UsageReportColumn(CliSessionsLabels.columnTokens(language), weight = 1.1f, alignEnd = true))
+            add(UsageReportColumn(CliSessionsLabels.columnCost(language), weight = 1f, alignEnd = true))
+            add(UsageReportColumn(CliSessionsLabels.activeTime(language), weight = 0.8f, alignEnd = true))
+        },
+        rows = orderedMembers
+            .flatMap { member ->
+                member.sessions.sortedByDescending { session -> session.activeMillis ?: -1L }
+                    .map { session -> member to session }
+            }
+            .map { (member, session) ->
+                buildList {
+                    if (state.isAdminOverview) {
+                        add(member.accountEmail ?: ReportLabels.noEmail(language))
+                        add(member.accountKey.orEmpty())
+                    }
+                    add(member.alias)
+                    add(shortSessionId(session.sessionId))
+                    add(session.projectName ?: "-")
+                    add(session.primaryModel ?: "-")
+                    add(session.turnCount.toString())
+                    add(formatQuantity(session.totalTokens))
+                    add(costCell(session.costMicros, session.isCostComplete))
+                    add(activeCell(session.activeMillis))
+                }
             }
     )
 
@@ -234,6 +289,9 @@ fun reportForTeam(
     // este aviso o recorte de 5h seria lido como a janela de alguém.
     if (state.isAdminOverview && state.range != CliSessionRange.ALL) {
         footnotes += ReportLabels.slidingWindowNote(language)
+    }
+    if (state.isAdminOverview && state.emailGroups.any { group -> group.hasProvisionalAccounts }) {
+        footnotes += ReportLabels.provisionalEmailNote(language)
     }
 
     return UsageReportDocument(
@@ -480,6 +538,22 @@ internal object ReportLabels {
     fun burnRate(language: AppLanguage) = pick(language, "Ritmo de queima", "Burn rate")
 
     fun allAccounts(language: AppLanguage) = pick(language, "Todas as contas", "All accounts")
+
+    fun accountsByEmail(language: AppLanguage) = pick(language, "Resumo por e-mail", "Summary by email")
+
+    fun email(language: AppLanguage) = pick(language, "E-mail", "Email")
+
+    fun uuid(language: AppLanguage) = "UUID"
+
+    fun uuids(language: AppLanguage) = "UUIDs"
+
+    fun noEmail(language: AppLanguage) = pick(language, "Sem e-mail", "No email")
+
+    fun provisionalEmailNote(language: AppLanguage) = pick(
+        language,
+        "Alguns agrupamentos usam provisoriamente um rótulo administrativo com formato de e-mail.",
+        "Some groups provisionally use an administrative label formatted as an email address."
+    )
 
     fun generatedAt(language: AppLanguage) = pick(language, "gerado em", "generated at")
 

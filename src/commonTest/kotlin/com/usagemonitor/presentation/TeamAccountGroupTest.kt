@@ -3,6 +3,7 @@ package com.usagemonitor.presentation
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamAccountEmailSource
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
@@ -47,6 +48,8 @@ private fun groupMember(
     deviceId: String,
     accountKey: String?,
     accountLabel: String? = null,
+    accountEmail: String? = null,
+    emailSource: TeamAccountEmailSource? = null,
     sessions: List<CliSessionSummary> = emptyList()
 ): TeamMemberUsage {
     return TeamMemberUsage(
@@ -54,7 +57,9 @@ private fun groupMember(
         alias = deviceId,
         sessions = sessions,
         accountKey = accountKey,
-        accountLabel = accountLabel
+        accountLabel = accountLabel,
+        accountEmail = accountEmail,
+        accountEmailSource = emailSource
     )
 }
 
@@ -66,6 +71,36 @@ private fun groupMember(
  * linhas debaixo dela.
  */
 class TeamAccountGroupTest {
+
+    @Test
+    fun `dois UUIDs do mesmo e-mail formam um grupo sem fundir identidades`() {
+        val state = TeamUsageUiState.Success(
+            members = listOf(
+                groupMember(
+                    deviceId = "device-1",
+                    accountKey = "account-a",
+                    accountEmail = "pessoa@empresa.com",
+                    emailSource = TeamAccountEmailSource.REPORTED,
+                    sessions = listOf(groupSession("s1", tokens = 300L))
+                ),
+                groupMember(
+                    deviceId = "device-1",
+                    accountKey = "account-b",
+                    accountEmail = "pessoa@empresa.com",
+                    emailSource = TeamAccountEmailSource.LABEL,
+                    sessions = listOf(groupSession("s2", tokens = 700L))
+                )
+            ),
+            isAdminOverview = true
+        )
+
+        val group = state.emailGroups.single()
+        assertEquals(2, group.accounts.size)
+        assertEquals(1_000L, group.totalTokens)
+        assertEquals(setOf("account-a", "account-b"), group.accounts.map { it.accountKey }.toSet())
+        assertEquals(2, group.members.map { it.memberKey }.distinct().size)
+        assertTrue(group.hasProvisionalAccounts)
+    }
 
     @Test
     fun `grupo soma sessoes tokens e custo dos integrantes`() {

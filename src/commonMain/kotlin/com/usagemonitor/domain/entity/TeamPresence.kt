@@ -78,6 +78,12 @@ data class TeamMemberPresence(
     val accountLabel: String?
         get() = member.accountLabel
 
+    val accountEmail: String?
+        get() = member.accountEmail
+
+    val accountEmailSource: TeamAccountEmailSource?
+        get() = member.accountEmailSource
+
     /** Última batida de presença conhecida; `null` para quem nunca reportou. */
     val lastSeenAt: Instant?
         get() = member.lastSeenAt
@@ -150,14 +156,28 @@ fun Iterable<TeamMemberUsage>.toTeamPresence(referenceNow: Instant): List<TeamMe
     }
 
     return entries.sortedWith(
-        compareBy<TeamMemberPresence> { entry -> if (entry.accountLabel == null) 1 else 0 }
-            .thenBy { entry -> entry.accountLabel?.lowercase().orEmpty() }
+        compareBy<TeamMemberPresence> { entry -> if (entry.effectiveAccountEmail() == null) 1 else 0 }
+            .thenBy { entry -> entry.effectiveAccountEmail().orEmpty() }
             .thenBy { entry -> entry.accountKey.orEmpty() }
             .thenByDescending { entry -> entry.isWorkingNow }
             .thenByDescending { entry -> entry.isOnline }
             .thenBy { entry -> entry.alias.lowercase() }
             .thenBy { entry -> entry.deviceId }
     )
+}
+
+private fun TeamMemberPresence.effectiveAccountEmail(): String? {
+    val reported = accountEmail?.trim()?.lowercase()
+    if (!reported.isNullOrEmpty()) {
+        return reported
+    }
+
+    val fallback = accountLabel?.trim()?.lowercase() ?: return null
+    val at = fallback.indexOf('@')
+    return fallback.takeIf {
+        at > 0 && at == fallback.lastIndexOf('@') &&
+            fallback.substring(at + 1).contains('.') && fallback.none(Char::isWhitespace)
+    }
 }
 
 /**

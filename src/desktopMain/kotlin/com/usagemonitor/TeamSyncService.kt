@@ -27,6 +27,7 @@ internal data class TeamSyncTarget(
     val profileId: String,
     /** `accountUuid` da conta — é o que agrupa as máquinas no servidor. */
     val accountKey: String,
+    val accountEmail: String? = null,
     val organizationUuid: String? = null,
     val organizationName: String? = null
 )
@@ -48,11 +49,12 @@ internal data class TeamSyncReport(
  */
 internal data class ConfirmedIdentity(
     val alias: String,
-    val apiKey: String
+    val apiKey: String,
+    val accountEmail: String?
 )
 
-private fun TeamIntegrationSettings.confirmedIdentity(): ConfirmedIdentity {
-    return ConfirmedIdentity(alias = alias, apiKey = apiKey)
+private fun TeamIntegrationSettings.confirmedIdentity(target: TeamSyncTarget): ConfirmedIdentity {
+    return ConfirmedIdentity(alias = alias, apiKey = apiKey, accountEmail = target.accountEmail)
 }
 
 /**
@@ -312,6 +314,7 @@ internal class TeamSyncService(
 
             val payload = TeamIngestPayload(
                 accountKey = target.accountKey,
+                accountEmail = target.accountEmail,
                 member = TeamMemberIdentity(
                     deviceId = settings.deviceId,
                     alias = settings.alias,
@@ -336,7 +339,7 @@ internal class TeamSyncService(
             // O lote carrega a mesma identidade e vai com a mesma chave, então
             // confirma tanto quanto o envio dedicado — e evita repeti-lo na
             // próxima passada quando o envio de identidade falhou mas este passou.
-            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity()
+            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity(target)
 
             runCatching { syncStateDataSource.markPushed(batch.turns, clock.now()) }
                 .onFailure { error -> return TeamSyncReport(pushedTurns, batches, failures + error) }
@@ -377,6 +380,7 @@ internal class TeamSyncService(
 
         return useCase(
             accountKey = target.accountKey,
+            accountEmail = target.accountEmail,
             member = TeamMemberIdentity(
                 deviceId = settings.deviceId,
                 alias = settings.alias,
@@ -407,12 +411,13 @@ internal class TeamSyncService(
         settings: TeamIntegrationSettings,
         target: TeamSyncTarget
     ): Throwable? {
-        if (confirmedIdentityByAccount[target.accountKey] == settings.confirmedIdentity()) {
+        if (confirmedIdentityByAccount[target.accountKey] == settings.confirmedIdentity(target)) {
             return null
         }
 
         val payload = TeamIngestPayload(
             accountKey = target.accountKey,
+            accountEmail = target.accountEmail,
             member = TeamMemberIdentity(
                 deviceId = settings.deviceId,
                 alias = settings.alias,
@@ -427,7 +432,7 @@ internal class TeamSyncService(
 
         val failure = pushTeamUsage(payload, force = true).exceptionOrNull()
         if (failure == null) {
-            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity()
+            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity(target)
         }
         return failure
     }

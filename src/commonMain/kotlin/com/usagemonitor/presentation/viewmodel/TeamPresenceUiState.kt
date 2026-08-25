@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.TeamMemberPresence
+import com.usagemonitor.domain.entity.TeamAccountEmailSource
 import kotlinx.datetime.Instant
 
 sealed interface TeamPresenceUiState {
@@ -119,12 +120,55 @@ sealed interface TeamPresenceUiState {
                     grouped.getOrPut(entry.accountKey) { mutableListOf() }.add(entry)
                 }
                 return grouped.map { (accountKey, groupEntries) ->
+                    val explicitEmail = groupEntries.firstNotNullOfOrNull { it.member.accountEmail }
+                    val fallbackEmail = groupEntries.firstNotNullOfOrNull { entry ->
+                        entry.accountLabel?.presenceEmailOrNull()
+                    }
                     TeamPresenceAccountGroup(
                         accountKey = accountKey,
                         accountLabel = groupEntries.firstNotNullOfOrNull { it.accountLabel },
+                        accountEmail = explicitEmail ?: fallbackEmail,
+                        emailSource = groupEntries.firstNotNullOfOrNull { it.member.accountEmailSource }
+                            ?: fallbackEmail?.let { TeamAccountEmailSource.LABEL },
                         entries = groupEntries
                     )
                 }
+            }
+
+        val emailGroups: List<TeamPresenceEmailGroup>
+            get() {
+                val grouped = LinkedHashMap<String, MutableList<TeamPresenceAccountGroup>>()
+                for (account in presenceGroups) {
+                    val key = account.accountEmail?.lowercase()
+                        ?: "uuid:${account.accountKey.orEmpty()}"
+                    grouped.getOrPut(key) { mutableListOf() }.add(account)
+                }
+                return grouped.entries
+                    .sortedWith(
+                        compareBy<Map.Entry<String, MutableList<TeamPresenceAccountGroup>>> { entry ->
+                            entry.key.startsWith("uuid:")
+                        }.thenBy { entry -> entry.key }
+                    )
+                    .map { (key, accounts) ->
+                        val knownAccountCount = entries.asSequence()
+                            .filter { entry ->
+                                val email = entry.member.accountEmail
+                                    ?: entry.accountLabel?.presenceEmailOrNull()
+                                email?.lowercase() == key
+                            }
+                            .map { entry -> entry.accountKey }
+                            .distinct()
+                            .count()
+                        TeamPresenceEmailGroup(
+                            groupKey = if (knownAccountCount > 1) {
+                                key
+                            } else {
+                                accounts.singleOrNull()?.groupKey ?: key
+                            },
+                            accountEmail = accounts.firstNotNullOfOrNull { it.accountEmail },
+                            accounts = accounts.sortedBy { account -> account.accountKey.orEmpty() }
+                        )
+                    }
             }
 
         /**
@@ -134,6 +178,12 @@ sealed interface TeamPresenceUiState {
          * possibilidade — sempre visível.
          */
         fun isAccountExpanded(group: TeamPresenceAccountGroup): Boolean {
+            if (!isAdminOverview) {
+                return true
+            }
+            return group.groupKey in expandedAccountKeys
+        }
+        fun isEmailExpanded(group: TeamPresenceEmailGroup): Boolean {
             if (!isAdminOverview) {
                 return true
             }
@@ -151,6 +201,8 @@ sealed interface TeamPresenceUiState {
 data class TeamPresenceAccountGroup(
     val accountKey: String?,
     val accountLabel: String?,
+    val accountEmail: String? = null,
+    val emailSource: TeamAccountEmailSource? = null,
     val entries: List<TeamMemberPresence>
 ) {
     /**
@@ -169,4 +221,34 @@ data class TeamPresenceAccountGroup(
 
     val totalCount: Int
         get() = entries.size
+}
+
+private fun String.presenceEmailOrNull(): String? {
+    val normalized = trim().lowercase()
+    val at = normalized.indexOf('@')
+    return normalized.takeIf {
+        at > 0 && at == normalized.lastIndexOf('@') &&
+            normalized.substring(at + 1).contains('.') && normalized.none(Char::isWhitespace)
+    }
+}
+
+data class TeamPresenceEmailGroup(
+    val groupKey: String,
+    val accountEmail: String?,
+    val accounts: List<TeamPresenceAccountGroup>
+) {
+    val entries: List<TeamMemberPresence>
+        get() = accounts.flatMap { account -> account.entries }
+
+    val onlineCount: Int
+        get() = accounts.sumOf { account -> account.onlineCount }
+
+    val workingCount: Int
+        get() = accounts.sumOf { account -> account.workingCount }
+
+    val totalCount: Int
+        get() = accounts.sumOf { account -> account.totalCount }
+
+    val hasProvisionalAccounts: Boolean
+        get() = accounts.any { account -> account.emailSource == TeamAccountEmailSource.LABEL }
 }

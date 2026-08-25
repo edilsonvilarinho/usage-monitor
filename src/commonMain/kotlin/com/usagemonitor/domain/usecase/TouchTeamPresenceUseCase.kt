@@ -20,4 +20,16 @@ class TouchTeamPresenceUseCase(
     ): Result<TeamPresenceReceipt> {
         return repository.touchPresence(accountKey = accountKey, member = member)
     }
+
+    suspend operator fun invoke(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> {
+        return repository.touchPresence(
+            accountKey = accountKey,
+            accountEmail = accountEmail,
+            member = member
+        )
+    }
 }
