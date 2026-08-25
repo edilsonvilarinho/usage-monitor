@@ -162,9 +162,10 @@ LangString MUI_TEXT_FINISH_RUN ${LANG_ENGLISH} "&Launch Usage Monitor now"
 ;    fechado, duas passadas: exit 0 e pasta removida por completo. Por isso o
 ;    taskkill vem antes, e por isso 3010 NAO e sucesso aqui.
 ; 2. `taskkill` sem /F nao fecha: 1 dos 2 processos sobreviveu a 20 s. Com /F
-;    encerra em 0,1 s. NAO replicar o `taskkill /F /IM java.exe` que a Section
-;    "Uninstall" usa: aquele mata toda JVM da maquina, inclusive daemons de build
-;    e IDEs de quem instala.
+;    encerra em 0,1 s. O nome da imagem sai sempre de PRODUCT_NAME: comando com
+;    alcance fora do $INSTDIR nao pode agir fora do produto (#78). Nunca filtrar
+;    por `java.exe` -- e o que a Section "Uninstall" fazia ate a #88, e aquilo
+;    matava toda JVM da maquina sem tocar em processo nenhum do app.
 ; 3. Depois de um 3010 a entrada de ARP some e o vinculo de UpgradeCode e
 ;    apagado, com os arquivos ainda no disco: MsiEnumRelatedProducts devolve 259
 ;    e nao ve o residuo. Por isso a deteccao por UpgradeCode nao basta e existe a
@@ -596,13 +597,23 @@ SectionEnd
 ; -----------------------------------------------
 Section "Uninstall"
     SetShellVarContext current
-    ; Kill application processes BEFORE removing files
+    ; Encerra o produto ANTES de remover os arquivos, senao o RMDir /r deixa
+    ; resto para tras. Duas restricoes no comando, medidas na #88:
+    ;
+    ; - O nome da imagem sai de PRODUCT_NAME, e nao de um literal, pelo mesmo
+    ;   motivo do taskkill de RemoveForeignInstall (#78): o desinstalador roda
+    ;   dentro do roteiro de cenarios, via o ExecWait '$0 _?=' do .onInit, e com
+    ;   o nome fixo uma rodada da suite mata o app instalado real de quem a
+    ;   executa. Em producao o valor e identico.
+    ; - /T cobre os descendentes do proprio app. E a rede de seguranca restrita
+    ;   ao produto que substitui o `taskkill /F /IM java.exe` daqui: aquele
+    ;   matava TODA JVM da maquina -- daemons do Gradle, IDEs, servidores locais
+    ;   -- e nao matava processo nenhum do produto, porque o app instalado e um
+    ;   app-image do jpackage cujo runtime/bin nao tem java.exe. Era heranca de
+    ;   quando a distribuicao era um JAR.
     DetailPrint "Stopping application processes..."
-    ExecWait 'taskkill /F /IM "Usage Monitor.exe"' $0
-    DetailPrint "Usage Monitor killed (exit code: $0)"
-    Sleep 500
-    ExecWait 'taskkill /F /IM java.exe' $0
-    DetailPrint "Java processes killed (exit code: $0)"
+    ExecWait '"$SYSDIR\taskkill.exe" /F /T /IM "${PRODUCT_NAME}.exe"' $0
+    DetailPrint "${PRODUCT_NAME} killed (exit code: $0)"
     Sleep 1000
 
     ; Remove registry keys
