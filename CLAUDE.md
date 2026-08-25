@@ -23,9 +23,9 @@ gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*"
 # Apenas testes de componente UI (desktopTest)
 gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"
 
-# Forks paralelos da suite: o default e `availableProcessors()` com teto de 4.
-# Use a propriedade so para medir ou para contornar maquina apertada.
-gradlew.bat allTests -PtestForks=1
+# Forks paralelos: o default e 1. So ligue numa maquina com `~/.skiko` ja
+# populado -- num cache frio os forks se atropelam extraindo a nativa do Skiko.
+gradlew.bat allTests -PtestForks=4
 
 # Cobertura: a instrumentacao do Kover e opt-in, senao custa 6-7s por passada
 # para produzir um numero que ninguem le. So o push na `main` liga isto no CI.
@@ -442,11 +442,14 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   ~57 s gastos antes da primeira tarefa eram **download** — a mesma fase custa 0,44 s numa máquina com
   o `~/.gradle` quente. **Só a `main` escreve o cache** (`cache-read-only` fora dela): cache gravado
   num run de PR fica com o escopo daquele PR e nenhum outro run consegue lê-lo.
-- **A suíte roda em forks paralelos**, com teto de 4. O piso é a classe mais lenta, porque o Gradle
-  distribui por classe: `ComponentTest` sozinha leva 41 s dos 52 s. Cada fork é um processo próprio e
-  não há estado compartilhado a proteger — os testes que tocam disco criam diretório temporário e os
-  de `Preferences` usam nó com nome aleatório. **Ao escrever teste que grava em caminho fixo, lembre
-  que ele passa a competir com outro fork.**
+- **A suíte roda em um fork só, e forks paralelos são opt-in por `-PtestForks=N`.** O ganho é real —
+  1m24s serial, 52 s com 4 forks, resultado idêntico —, mas o **Skiko** impede ligá-lo por default:
+  `Library.unpackIfNeeded` extrai `skiko-windows-x64.dll` para `~/.skiko/<hash>/` com um `Files.move`,
+  e no Windows esse move falha com `AccessDeniedException` quando outro processo já abriu o destino.
+  Numa máquina de desenvolvimento o cache está quente desde sempre e não há extração nem corrida; num
+  runner limpo, todo fork tenta extrair ao mesmo tempo. Passou local, passou no primeiro run do CI e
+  derrubou o segundo com 41 testes de UI em `ExceptionInInitializerError`. **Divergência entre verde
+  local e vermelho no CI em teste de UI: olhe o `~/.skiko` antes de olhar o teste.**
 - **O filtro por path continua, e um job que pulou a suíte tem de dizer que pulou.** Rodar 5 min de
   Windows por um typo no README é a lentidão que a issue #93 reclama; mas um `Successful in 5s` que
   não executou teste nenhum é indistinguível de um que executou, e foi ele que abriu a issue. Os dois

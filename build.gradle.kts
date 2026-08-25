@@ -167,21 +167,23 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     dependsOn(generateAppVersionSource)
 }
 
-// A suite roda em uma JVM so por default, e ela e a maior fatia do build:
-// 1m22s de `:desktopTest` contra 2m28s de tudo. Cada fork e um processo
-// proprio, entao nao ha estado compartilhado a proteger -- os testes que tocam
-// disco criam diretorio temporario proprio e os de Preferences usam no com nome
-// aleatorio.
+// Forks paralelos so por opt-in (`-PtestForks=N`), e o default e UM.
 //
-// Medido na maquina de desenvolvimento (16 processadores): 1m24s serial, 1m12s
-// com 2 forks, 52s com 4, com resultado identico nos tres casos. O piso e a
-// classe mais lenta, porque o Gradle distribui por classe -- `ComponentTest`
-// sozinha leva 41s dos 52s, e alem de 4 forks nao ha o que ganhar enquanto ela
-// existir. Dai o teto, que tambem segura o heap: sao `maxParallelForks` x
-// `maxHeapSize` alem dos 3g do daemon.
+// O ganho e real e foi medido numa maquina de 16 processadores: 1m24s serial,
+// 1m12s com 2 forks e 52s com 4, com resultado identico nos tres casos. O que
+// impede de ligar por default e o Skiko: `Library.unpackIfNeeded` extrai
+// `skiko-windows-x64.dll` para `~/.skiko/<hash>/` com um `Files.move`, e no
+// Windows esse move falha com `AccessDeniedException` quando outro processo ja
+// abriu o destino. Com o cache quente -- o caso de toda maquina de
+// desenvolvimento -- nao ha extracao e nao ha corrida; num runner limpo, todo
+// fork tenta extrair ao mesmo tempo.
+//
+// Foi exatamente o que aconteceu: passou local, passou no primeiro run do CI e
+// derrubou o segundo com `ExceptionInInitializerError` em `AppThemeScaleTest` e
+// em 40 testes de `ComponentTest`. Ligar isto no CI depende de pre-extrair a
+// biblioteca nativa antes da suite; ate la, o default seguro e serial.
 tasks.withType<Test>().configureEach {
-    val requestedForks = providers.gradleProperty("testForks").orNull?.toIntOrNull()
-    maxParallelForks = requestedForks ?: Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
+    maxParallelForks = providers.gradleProperty("testForks").orNull?.toIntOrNull() ?: 1
     maxHeapSize = "1g"
 }
 
