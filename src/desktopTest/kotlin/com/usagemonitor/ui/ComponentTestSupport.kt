@@ -3,6 +3,7 @@ package com.usagemonitor.ui
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.AppUpdateRepository
@@ -137,6 +138,13 @@ internal fun dashboardViewModelWithAvailableUpdate(enabledApis: MutableStateFlow
                 )
             )
         }
+
+        // Fora do que estes testes exercitam: a janela de novidades tem caminho
+        // e cobertura próprios.
+        override suspend fun getReleaseNotes(
+            version: String,
+            previousVersion: String?
+        ): Result<ReleaseNotes?> = Result.success(null)
     }
 
     return DashboardViewModel(
@@ -186,6 +194,13 @@ internal fun dashboardViewModelWithAvailableUpdateAction(
                 )
             )
         }
+
+        // Fora do que estes testes exercitam: a janela de novidades tem caminho
+        // e cobertura próprios.
+        override suspend fun getReleaseNotes(
+            version: String,
+            previousVersion: String?
+        ): Result<ReleaseNotes?> = Result.success(null)
     }
 
     val releaseOpener = object : AppUpdateReleaseOpener {
