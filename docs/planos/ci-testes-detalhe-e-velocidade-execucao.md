@@ -140,6 +140,37 @@ distinguia caso de uso exercitado pelo teste do ViewModel de código que nunca r
 `data.dto` fica em 75,7% porque DTO não tem lógica: o que o exercita são os testes de mapper. O mesmo
 vale para as interfaces de repositório e para os `*Labels`, atingidos pelos testes de componente.
 
+## Resultado medido no CI
+
+Três runs do PR, na ordem em que aconteceram.
+
+| Run | Estado do PR | `tests` | `Run tests` | `:desktopTest` | Cache |
+|---|---|---:|---:|---:|---|
+| [`32853549920`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32853549920) | A1–A8, 4 forks | 4 min 41 s | 4 min 14 s | **~42 s** | `Gradle User Home cache not found` |
+| [`32854143312`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32854143312) | A9, 4 forks | **falhou** | falhou | — | idem |
+| [`32855222794`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32855222794) | A10, serial | 5 min 11 s | 4 min 38 s | ~74 s | idem |
+
+Linha de base antes de tudo: 4 min 36 s, 4 min 39 s e 4 min 50 s.
+
+**O ganho de tempo ainda não apareceu, e há um motivo verificável para isso.** `cache-read-only` deixa
+o PR apenas como leitor, e ainda não existe **nenhuma** entrada Windows para ler — a primeira só é
+gravada no primeiro push para a `main`. Os ~57 s de download continuam sendo pagos em todo run deste
+PR, por desenho. A verificação do cache é a única do plano que só pode ser feita depois do merge:
+
+```bash
+gh cache list            # tem de passar a listar uma chave Windows
+gh run list --workflow=CI --limit 5
+```
+
+**O que já está verificado no runner:**
+
+- os dois jobs de teste publicam o resumo em run verde (`Publish test summary`: success nos runs
+  acima), e o `installer-scenarios` publica **NAO EXECUTADA** quando o filtro o pula — antes ele
+  ficava verde em 12 s sem dizer nada;
+- `--require` está no caminho: o passo roda com `if: always()` e falharia se a suíte não tivesse
+  produzido XML;
+- os forks paralelos foram medidos e **reprovados** no runner, com causa raiz identificada (A10).
+
 ---
 
 ## Pontos de situação
