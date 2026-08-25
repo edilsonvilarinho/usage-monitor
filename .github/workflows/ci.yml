@@ -54,22 +54,28 @@ jobs:
             --jq '.[].filename')"
 
           relevant=false
+          changed=0
           while IFS= read -r file; do
             [ -z "$file" ] && continue
+            changed=$((changed + 1))
             # Mesmo recorte do `paths-ignore` do gatilho de push.
             case "$file" in
               server/*|docs/*|*.md) continue ;;
             esac
             echo "Desktop change: $file"
             relevant=true
-            break
           done <<< "$files"
 
-          echo "relevant=$relevant"
+          # Sem `break` no laco: a contagem completa entra no resumo do job, e e
+          # ela que diz quantos arquivos foram avaliados quando a suite nao roda.
+          echo "relevant=$relevant changed=$changed"
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
+      # Checkout sem condicao: `tools/ci/test-summary.mjs` precisa existir no disco
+      # tambem no ramo em que a suite nao roda, que e justamente o que ele tem de
+      # anunciar. Sao ~5 s.
       - name: Checkout
-        if: steps.filter.outputs.relevant == 'true'
         uses: actions/checkout@v4
 
       - name: Setup JDK
@@ -78,7 +84,27 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      # O cache do Gradle NAO fica no `setup-java`. O post-step dele arquiva o
+      # `~/.gradle` com o daemon ainda vivo, e no Windows o tar falha nos `.lock`
+      # (`Device or resource busy`, e no run 32780176169 um
+      # `tar.exe failed with exit code 2`). O efeito era total e silencioso: todo
+      # run desde 23/08 comecava com `gradle cache is not found`, e
+      # `gh cache list` nao tinha UMA entrada Windows -- so as quatro do macOS,
+      # gravadas pelo release. Os ~57 s que o job gastava antes da primeira tarefa
+      # eram download; a mesma fase custa 0,44 s na maquina de desenvolvimento.
+      #
+      # Esta action para o daemon antes de arquivar e exclui os locks. E da
+      # Gradle Inc., e o job `build-windows` do release ja usa a antecessora dela
+      # (`gradle/gradle-build-action`), entao nao e precedente novo no repositorio.
+      - name: Setup Gradle
+        if: steps.filter.outputs.relevant == 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # So a `main` escreve. Cache gravado num run de PR fica com o escopo
+          # daquele PR e nenhum outro run consegue le-lo: seria pagar a gravacao
+          # sem nunca cobrar o proveito.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # MINIMAX_API_KEY fica deliberadamente indefinida: os testes injetam o
       # leitor da env var e `MiniMaxRepositoryImplTest` afirma a mensagem de
@@ -86,17 +112,72 @@ jobs:
       - name: Run tests
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
+        env:
+          # A instrumentacao do Kover custa 6 a 7 s por passada (medido: 47 s
+          # limpo contra 53 s instrumentado) e so serve se alguem for ler o
+          # relatorio. Ela entra na `main`, onde o relatorio sai logo abaixo, e
+          # fica fora do PR. A mesma passada serve as duas coisas: gerar o
+          # relatorio num segundo `allTests` seria rodar a suite duas vezes.
+          WITH_COVERAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat allTests
+          $arguments = @('allTests', '--build-cache')
+          if ($env:WITH_COVERAGE -eq 'true') { $arguments += '-Pcoverage' }
+          .\gradlew.bat @arguments
 
+      # O resumo sai em TODO run, verde inclusive. Um check que so diz
+      # "Successful in 5m" nao permite saber se a suite rodou -- foi um verde de
+      # 5 s, com zero teste executado, que abriu a issue #93. O `--require`
+      # derruba o job quando a suite devia rodar e nao produziu XML nenhum: e o
+      # unico jeito de "passou sem executar" ficar vermelho.
+      - name: Publish test summary
+        if: always() && steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: node tools/ci/test-summary.mjs --title "Desktop (allTests)" --glob "build/test-results/**/*.xml" --require
+
+      - name: Report skipped suite
+        if: steps.filter.outputs.relevant != 'true'
+        shell: pwsh
+        run: |
+          node tools/ci/test-summary.mjs `
+            --title "Desktop (allTests)" `
+            --skipped "nenhum arquivo fora de server/, docs/ e *.md" `
+            --evaluated "${{ steps.filter.outputs.changed }}"
+
+      # Relatorio de cobertura so no push para `main`. Sem `koverVerify` e sem
+      # piso: o limiar so faz sentido depois de a linha de base existir, e uma
+      # trava ligada no mesmo commit que produz o primeiro numero e uma trava
+      # calibrada no escuro. `:desktopTest` ja rodou instrumentado acima, entao
+      # aqui ele sai UP-TO-DATE e o passo so agrega.
+      - name: Coverage report
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat koverXmlReport koverHtmlReport --build-cache -Pcoverage
+          node tools/ci/coverage-summary.mjs build/reports/kover/report.xml
+
+      - name: Upload coverage report
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.relevant == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kover-report
+          path: build/reports/kover/html/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Sobe sempre, nao so no `failure()`: sem o XML guardado nao ha como
+      # comparar duracao entre runs nem investigar intermitencia depois do fato.
       - name: Upload test reports
-        if: failure() && steps.filter.outputs.relevant == 'true'
+        if: always() && steps.filter.outputs.relevant == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: build/reports/tests/**
+          path: |
+            build/reports/tests/**
+            build/test-results/**
           if-no-files-found: ignore
+          retention-days: 7
 
   # Job separado do `tests` de proposito: o roteiro instala e desinstala de
   # verdade, mexe no registro do runner e leva alguns minutos. Amarra-lo ao job
@@ -153,22 +234,106 @@ jobs:
           }
           "relevant=$($relevant.ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
+      # Retry porque `community.chocolatey.org` derrubou a `main` em 25/08 00:17
+      # (run 32793042676) com um 504 Gateway Timeout -- nenhum defeito de codigo,
+      # so uma chamada de rede unica no caminho critico. A deteccao de presenca e
+      # a mesma do `Resolve-MakeNsis` do roteiro: ja instalado, o passo nao chama
+      # o chocolatey nenhuma vez.
       - name: Install NSIS
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
-        run: choco install nsis -y
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $candidates = @(
+            'C:\Program Files (x86)\NSIS\makensis.exe',
+            'C:\Program Files\NSIS\makensis.exe'
+          )
+          foreach ($attempt in 1..3) {
+            if ($candidates | Where-Object { Test-Path $_ }) {
+              Write-Host 'makensis presente; nada a instalar.'
+              exit 0
+            }
+            Write-Host "Instalando NSIS (tentativa $attempt de 3)..."
+            choco install nsis -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds (10 * $attempt)
+          }
+          if (-not ($candidates | Where-Object { Test-Path $_ })) {
+            throw 'NSIS nao ficou disponivel depois de tres tentativas.'
+          }
 
       # So o cenario S7 usa: ele compila um MSI minimo para o instalador
       # encontrar e remover. Sem WiX o roteiro pula esse cenario com aviso em vez
       # de falhar, entao este passo e o que faz o S7 rodar de verdade aqui.
+      #
+      # A imagem do runner ja traz o WiX -- o passo levou 2 s no run 32841192171,
+      # que e o tempo de o chocolatey descobrir que nao ha o que fazer. A
+      # deteccao e a mesma do `Resolve-WixBin` do roteiro.
       - name: Install WiX
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
-        run: choco install wixtoolset -y
+        run: |
+          $ErrorActionPreference = 'Continue'
+          function Test-Wix {
+            if ($env:WIX -and (Test-Path (Join-Path $env:WIX 'bin\candle.exe'))) { return $true }
+            return [bool](Get-Command candle.exe -ErrorAction SilentlyContinue)
+          }
+          foreach ($attempt in 1..3) {
+            if (Test-Wix) {
+              Write-Host 'candle.exe presente; nada a instalar.'
+              exit 0
+            }
+            Write-Host "Instalando WiX (tentativa $attempt de 3)..."
+            choco install wixtoolset -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds (10 * $attempt)
+          }
+          # Sem WiX o roteiro pula o S7 com aviso, entao aqui nao se lanca: o job
+          # perderia um cenario, nao os outros seis.
+          if (-not (Test-Wix)) { Write-Host '::warning::WiX indisponivel; o cenario S7 sera pulado.' }
 
+      # O roteiro termina com "Verificacoes: N   Falhas: M". Essa linha e o unico
+      # numero que este job produz, e sem ela o check verde nao diz se rodaram
+      # nove cenarios ou nenhum -- o mesmo defeito que a issue #93 aponta nos
+      # jobs de teste. O try/catch existe porque uma assercao do roteiro *lanca*:
+      # sem ele o passo morreria antes de escrever o resumo. E o codigo de saida
+      # precisa ser reemitido a mao, ja que o epilogo do pwsh so olha o ultimo
+      # comando -- que aqui passou a ser o Add-Content.
       - name: Run installer update scenarios
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\src\installer\test\Invoke-UpdateScenarios.ps1
+          $exitCode = 0
+          $output = @()
+          # `*>&1` e nao `2>&1`: o roteiro fala por `Write-Host`, que escreve no
+          # stream de informacao (6) e nao no de erro. Com `2>&1` o `Tee-Object`
+          # nao recebia linha nenhuma e a contagem nunca era encontrada -- medido.
+          try {
+            .\src\installer\test\Invoke-UpdateScenarios.ps1 *>&1 | Tee-Object -Variable output
+            $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+          } catch {
+            Write-Host $_
+            $exitCode = 1
+          }
+          $tally = $output | ForEach-Object { $_.ToString() } | Select-String -Pattern '^Verificacoes:' | Select-Object -Last 1
+          $verdict = if ($exitCode -eq 0) { 'passou' } else { 'FALHOU' }
+          $line = if ($tally) { $tally.Line.Trim() } else { 'contagem nao encontrada na saida do roteiro' }
+          @(
+            "## Cenarios do instalador -- $verdict",
+            '',
+            "``$line``",
+            ''
+          ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          exit $exitCode
+
+      # Mesmo tratamento dos jobs de teste: um check verde que nao rodou cenario
+      # nenhum tem de dizer isso. O checkout deste job ja e incondicional, entao
+      # o script esta no disco.
+      - name: Report skipped scenarios
+        if: steps.filter.outputs.relevant != 'true'
+        shell: pwsh
+        run: |
+          node tools/ci/test-summary.mjs `
+            --title "Cenarios do instalador" `
+            --skipped "nenhuma mudanca em src/installer/ nem em src/desktopMain/kotlin/com/usagemonitor/update/"

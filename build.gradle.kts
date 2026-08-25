@@ -167,6 +167,57 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     dependsOn(generateAppVersionSource)
 }
 
+// Forks paralelos so por opt-in (`-PtestForks=N`), e o default e UM.
+//
+// O ganho e real e foi medido numa maquina de 16 processadores: 1m24s serial,
+// 1m12s com 2 forks e 52s com 4, com resultado identico nos tres casos. O que
+// impede de ligar por default e o Skiko: `Library.unpackIfNeeded` extrai
+// `skiko-windows-x64.dll` para `~/.skiko/<hash>/` com um `Files.move`, e no
+// Windows esse move falha com `AccessDeniedException` quando outro processo ja
+// abriu o destino. Com o cache quente -- o caso de toda maquina de
+// desenvolvimento -- nao ha extracao e nao ha corrida; num runner limpo, todo
+// fork tenta extrair ao mesmo tempo.
+//
+// Foi exatamente o que aconteceu: passou local, passou no primeiro run do CI e
+// derrubou o segundo com `ExceptionInInitializerError` em `AppThemeScaleTest` e
+// em 40 testes de `ComponentTest`. Ligar isto no CI depende de pre-extrair a
+// biblioteca nativa antes da suite; ate la, o default seguro e serial.
+tasks.withType<Test>().configureEach {
+    maxParallelForks = providers.gradleProperty("testForks").orNull?.toIntOrNull() ?: 1
+    maxHeapSize = "1g"
+}
+
+// O plugin do Kover estava aplicado desde sempre e NENHUMA tarefa de relatorio
+// era executada em lugar nenhum: o agente instrumentava toda passada de
+// `:desktopTest` -- 6 a 7 s medidos -- para produzir um numero que ninguem lia.
+// Agora a instrumentacao e opt-in por `-Pcoverage`, que e o que o passo da
+// `main` usa no CI. Sem a propriedade, a suite roda limpa.
+kover {
+    currentProject {
+        instrumentation {
+            disabledForAll.set(!providers.gradleProperty("coverage").isPresent)
+        }
+    }
+
+    reports {
+        filters {
+            excludes {
+                // `Main.kt` e o grafo de DI mais a janela: nao existe teste de
+                // unidade que o exercite, e conta-lo como descoberto afunda o
+                // numero sem apontar lacuna nenhuma que se possa fechar.
+                classes("com.usagemonitor.MainKt", "com.usagemonitor.MainKt$*")
+            }
+        }
+
+        total {
+            // Nada pendurado no `check`: o relatorio e um passo proprio do CI, e
+            // amarra-lo ao `check` faria toda build local pagar por ele.
+            html { onCheck.set(false) }
+            xml { onCheck.set(false) }
+        }
+    }
+}
+
 // Capturas do README: renderizadas offscreen a partir dos composables reais com
 // dados sinteticos. O gerador vive em desktopTest para nao entrar no JAR
 // distribuido e ainda enxergar os composables `internal`.
