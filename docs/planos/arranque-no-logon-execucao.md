@@ -65,7 +65,7 @@ chave `Run` pelo Agendador de Tarefas passa a ser tomada com número medido.
 | A03 | `activateWindow` vence o *foreground lock* do Windows | `HistoryWindowActivation.kt` |
 | A04 | Origem do arranque marcada com `--autostart` | `AutoStartManager.kt`, `UsageMonitor.nsi`, `Main.kt` |
 | A05 | Medir o Agendador de Tarefas antes de migrar (experimento, sem código) | — |
-| A06 | Migração para o Agendador de Tarefas — **condicional à A05** | `AutoStartManager.kt`, `UsageMonitor.nsi` |
+| A06 | ~~Migração para o Agendador de Tarefas~~ — **descartada pela A05** | — |
 
 ### Decisões travadas
 
@@ -86,7 +86,11 @@ chave `Run` pelo Agendador de Tarefas passa a ser tomada com número medido.
   ao corpo sem reindentar as mil linhas abaixo, e mantém a regra de não criar composable nova ali.
 - **A A06 é condicional e o critério é anterior à medida:** ganho abaixo de ~15 s → não migra. O
   ganho não pagaria a superfície nova (tarefa a criar, remover no desinstalador, migrar instalações
-  existentes, e ambientes corporativos que bloqueiam criação de tarefas).
+  existentes, e ambientes corporativos que bloqueiam criação de tarefas). **A A05 a descartou antes
+  disso:** o Agendador recusa a criação sem elevação, então a latência do logon fica como está.
+- **A latência de ~40 s não é do app.** Ela é a fila que o Explorer serializa no logon. O único
+  ajuste que a encurta é `HKCU\...\Explorer\Serialize\StartupDelayInMSec`, que vale para **todos**
+  os programas de inicialização da conta — configuração de quem usa a máquina, não do app.
 
 ## Pontos de situação
 
@@ -102,6 +106,8 @@ commit não pode conter o próprio hash.
 | A03 | 2026-08-25 | `fix(startup): defeat the windows foreground lock when activating a window` | `activateWindow` vence o *foreground lock* | concluída | `WindowActivationTarget` ganhou `isAlwaysOnTop` e `activateWindow` liga o sinalizador só quando ele estava desligado, restaurando-o depois. Vale para as **seis** janelas que já usavam a função. **Falsificação:** com o flip removido, `gradlew.bat desktopTest --tests "com.usagemonitor.HistoryWindowActivationTest"` deu `tests="4" failures="1"` e a falha foi exatamente `activation flips always on top to defeat the foreground lock` — o teste discrimina. Restaurado: `tests="4" skipped="0" failures="0" errors="0"` |
 | A04 | 2026-08-25 | `feat(startup): tell an autostart launch apart from a manual one` | Origem do arranque marcada | concluída | `AutoStartManager` grava `--autostart` nas três plataformas (chave `Run`, `Exec=` do `.desktop`, segundo `<string>` do plist) e a Section `SEC_AUTO_START` do `.nsi` faz o mesmo; **o nome do valor não muda**, é por ele que `isWindowsAutoStartEnabled` decide. `ensureAutoStartCommandCurrent()` migra por baixo no arranque quem já tinha a entrada sem o argumento — entrada **ausente não migra**, senão ligaria a inicialização de quem a desligou. `gradlew.bat desktopTest --tests "com.usagemonitor.AutoStartManagerTest"`: `tests="13" skipped="0" failures="0" errors="0"` (6 antigos + 7 novos). `makensis` com os cinco `/D` sobrescritos: **exit 0**, só os dois warnings pré-existentes de `MUI_TEXT_FINISH_RUN`. Fecha **R4** |
 | A03b | 2026-08-25 | `fix(startup): cycle the always on top flag and record the served request` | Ciclo do sinalizador + prova de atendimento | concluída | **Atividade não prevista, descoberta ao verificar de verdade.** A sonda (`focus-probe.ps1`, no scratchpad) roda a build nova com `user.home` redirecionado e mede a **ordem Z** — não `GetForegroundWindow`, que o Windows nega por desenho a processo sem primeiro plano. Primeira passada: pedido escrito, instância B com exit 0, mas **nada se movia**, e não havia como separar "o pedido nunca foi lido" de "foi lido e a janela não subiu". Daí o outcome `focus-request-served`. Com ele: `second-instance-exit` às 12:17:07.346 e `focus-request-served` às 12:17:07.364 — **18 ms**, o pedido é lido. E o defeito apareceu: com `alwaysOnTop` **já ligado**, atribuir `true` de novo não reordena nada, então o ciclo passou a ser `false → true → valor anterior`. Medida final, com a preferência `always/On/Top` desligada durante a sonda e restaurada ao fim: app na posição **13** com a cobertura na **3** antes; app na **3** e cobertura na **4** depois. `gradlew.bat desktopTest --tests "…HistoryWindowActivationTest" --tests "…StartupDiagnosticsTest"`: BUILD SUCCESSFUL |
+| A05 | 2026-08-25 | `docs(plan): rule out the task scheduler for the logon launch` | Medir o Agendador de Tarefas | concluída | **Resultado negativo, e ele dispensa o reboot.** `schtasks /Create /SC ONLOGON` a partir de um processo **não elevado** (`runas /trustlevel:0x20000`) devolve `ERRO: Acesso negado.` e a tarefa não é criada. A variante `/RU <domínio>\<usuário>` — a própria conta — dá o **mesmo** `Acesso negado`. Da sessão elevada as duas funcionam (`create exit=0`, `query exit=0`, `delete exit=0`), o que confirma que o obstáculo é o privilégio e não a sintaxe. Como o instalador roda com `RequestExecutionLevel user` e o app roda não elevado, nem a instalação nem o interruptor das Configurações conseguiriam criar ou remover a tarefa. Tarefa criada à mão pela sessão elevada e removida em seguida; nenhuma sobrou |
+| A06 | 2026-08-25 | — | Migração para o Agendador de Tarefas | **descartada** | A A05 mostrou que o mecanismo é inviável sem elevação, então o critério de ganho (~15 s) nem chega a ser aplicado. Migrar exigiria pedir UAC na instalação e no interruptor, contra o desenho per-user do instalador, para economizar ~40 s de fila do Explorer no logon |
 
 ---
 
@@ -114,5 +120,5 @@ commit não pode conter o próprio hash.
 | R7 | A sonda da A03b **encerrou a instância instalada do app** que estava aberta na máquina, apesar de filtrar os processos pelo caminho do build. O app foi reaberto e a preferência `always/On/Top` conferida de volta em `true`; a causa não foi isolada, então a sonda não deve ser reexecutada sem revisar o filtro do `Stop-Process` | aberto |
 | R3 | O argumento `--autostart` da A04 só chega às instalações já feitas pela migração no arranque; se ela falhar, o campo `origin` fica errado e nada mais quebra | aberto |
 | R4 | Entre a A01 e a A04 o campo `origin` registra `manual` **também** para arranque por autostart, porque a chave `Run` ainda não carrega o argumento. As duas atividades saem no mesmo lote, sem release entre elas | fechado na A04 |
-| R5 | A A05 pode descobrir que `schtasks /SC ONLOGON` sem `/RU` exige elevação, ou que o NSIS com `RequestExecutionLevel user` não consegue criar a tarefa. É o motivo de a A05 vir antes e de a A06 ser condicional | aberto |
+| R5 | A A05 pode descobrir que `schtasks /SC ONLOGON` sem `/RU` exige elevação, ou que o NSIS com `RequestExecutionLevel user` não consegue criar a tarefa. É o motivo de a A05 vir antes e de a A06 ser condicional | **confirmado** na A05 — `Acesso negado` sem elevação, com e sem `/RU`. A A06 foi descartada |
 | R6 | O `bootDeltaMs` do rascunho **não existe**: a JVM não expõe o instante de boot do SO de forma portátil, e um processo externo só para medi-lo custaria mais do que informa. O arquivo grava `processStartedAt` e `ts`; o delta contra o boot se calcula com `LastBootUpTime` na análise | fechado — decidido na A01 |
