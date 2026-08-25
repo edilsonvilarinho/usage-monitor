@@ -234,18 +234,63 @@ jobs:
           }
           "relevant=$($relevant.ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
+      # Retry porque `community.chocolatey.org` derrubou a `main` em 25/08 00:17
+      # (run 32793042676) com um 504 Gateway Timeout -- nenhum defeito de codigo,
+      # so uma chamada de rede unica no caminho critico. A deteccao de presenca e
+      # a mesma do `Resolve-MakeNsis` do roteiro: ja instalado, o passo nao chama
+      # o chocolatey nenhuma vez.
       - name: Install NSIS
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
-        run: choco install nsis -y
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $candidates = @(
+            'C:\Program Files (x86)\NSIS\makensis.exe',
+            'C:\Program Files\NSIS\makensis.exe'
+          )
+          foreach ($attempt in 1..3) {
+            if ($candidates | Where-Object { Test-Path $_ }) {
+              Write-Host 'makensis presente; nada a instalar.'
+              exit 0
+            }
+            Write-Host "Instalando NSIS (tentativa $attempt de 3)..."
+            choco install nsis -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds (10 * $attempt)
+          }
+          if (-not ($candidates | Where-Object { Test-Path $_ })) {
+            throw 'NSIS nao ficou disponivel depois de tres tentativas.'
+          }
 
       # So o cenario S7 usa: ele compila um MSI minimo para o instalador
       # encontrar e remover. Sem WiX o roteiro pula esse cenario com aviso em vez
       # de falhar, entao este passo e o que faz o S7 rodar de verdade aqui.
+      #
+      # A imagem do runner ja traz o WiX -- o passo levou 2 s no run 32841192171,
+      # que e o tempo de o chocolatey descobrir que nao ha o que fazer. A
+      # deteccao e a mesma do `Resolve-WixBin` do roteiro.
       - name: Install WiX
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
-        run: choco install wixtoolset -y
+        run: |
+          $ErrorActionPreference = 'Continue'
+          function Test-Wix {
+            if ($env:WIX -and (Test-Path (Join-Path $env:WIX 'bin\candle.exe'))) { return $true }
+            return [bool](Get-Command candle.exe -ErrorAction SilentlyContinue)
+          }
+          foreach ($attempt in 1..3) {
+            if (Test-Wix) {
+              Write-Host 'candle.exe presente; nada a instalar.'
+              exit 0
+            }
+            Write-Host "Instalando WiX (tentativa $attempt de 3)..."
+            choco install wixtoolset -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds (10 * $attempt)
+          }
+          # Sem WiX o roteiro pula o S7 com aviso, entao aqui nao se lanca: o job
+          # perderia um cenario, nao os outros seis.
+          if (-not (Test-Wix)) { Write-Host '::warning::WiX indisponivel; o cenario S7 sera pulado.' }
 
       - name: Run installer update scenarios
         if: steps.filter.outputs.relevant == 'true'
