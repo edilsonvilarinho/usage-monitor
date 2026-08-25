@@ -1000,6 +1000,66 @@ class TeamUsageViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `conta expandida sobrevive a refresh manual`() = runTest {
+        val repository = FakeTeamRepository()
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                overviewAccount(ACCOUNT_KEY, "fulano@empresa.com", "device-1", tokens = 10),
+                overviewAccount(OTHER_ACCOUNT_KEY, null, "device-2", tokens = 30)
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        viewModel.toggleAccount(ACCOUNT_KEY)
+        viewModel.refresh()
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(setOf(ACCOUNT_KEY), state.expandedAccountKeys)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `grupo por email expandido sobrevive a refresh`() = runTest {
+        val repository = FakeTeamRepository()
+        val sharedEmail = "time@empresa.com"
+        val admin = FakeAdminOverviewRepository(
+            accounts = listOf(
+                overviewAccount(
+                    accountKey = ACCOUNT_KEY,
+                    label = "conta-a",
+                    deviceId = "device-1",
+                    tokens = 10,
+                    accountEmail = sharedEmail
+                ),
+                overviewAccount(
+                    accountKey = OTHER_ACCOUNT_KEY,
+                    label = "conta-b",
+                    deviceId = "device-2",
+                    tokens = 30,
+                    accountEmail = sharedEmail
+                )
+            )
+        )
+        val viewModel = buildViewModel(repository, adminRepository = admin)
+        viewModel.openForAllAccounts()
+        runCurrent()
+
+        val initial = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        val emailGroup = initial.emailGroups.single()
+        viewModel.toggleAccount(emailGroup.groupKey)
+        viewModel.refresh()
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertEquals(setOf(sharedEmail), state.expandedAccountKeys)
+        assertTrue(state.isEmailExpanded(state.emailGroups.single()))
+        viewModel.onDestroy()
+    }
+
     /** O modal de uma conta não tem faixa para clicar: recolher não existe lá. */
     @Test
     fun `modal de uma conta mostra os integrantes sem depender do conjunto expandido`() = runTest {
@@ -1268,11 +1328,13 @@ private fun overviewAccount(
     accountKey: String,
     label: String?,
     deviceId: String,
-    tokens: Long = 0L
+    tokens: Long = 0L,
+    accountEmail: String? = null
 ): TeamAccountUsage {
     return TeamAccountUsage(
         accountKey = accountKey,
         label = label,
+        accountEmail = accountEmail,
         snapshot = TeamUsageSnapshot(
             members = listOf(member(deviceId, sessions = listOf(session("s1", tokens = tokens))))
         )

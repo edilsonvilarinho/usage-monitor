@@ -586,15 +586,17 @@ class TeamUsageViewModel(
 
     private suspend fun loadTeam() {
         loadMutex.withLock {
-            val current = _uiState.value as? TeamUsageUiState.Success
             val overview = adminOverview
 
             (fetchScope() ?: return@withLock).fold(
                 onSuccess = { result ->
                     val members = result.members
+                    // Ler o estado somente depois da consulta evita que o
+                    // resultado de um refresh sobrescreva uma expansão feita
+                    // enquanto a consulta estava em voo.
+                    val current = _uiState.value as? TeamUsageUiState.Success
                     val contentChanged = current == null || current.members != members
-
-                    _uiState.value = TeamUsageUiState.Success(
+                    val nextState = TeamUsageUiState.Success(
                         members = members,
                         range = range,
                         rangeStartsAt = result.window.cutoffMillis?.let(Instant::fromEpochMilliseconds),
@@ -613,11 +615,7 @@ class TeamUsageViewModel(
                         // Mesmo tratamento das linhas abertas. Conta que sumiu da
                         // resposta sai do conjunto, senão ela reapareceria aberta
                         // se voltasse horas depois.
-                        expandedAccountKeys = current?.expandedAccountKeys
-                            ?.filterTo(mutableSetOf()) { key ->
-                                members.any { member -> member.accountKey.orEmpty() == key }
-                            }
-                            ?: emptySet(),
+                        expandedAccountKeys = current?.expandedAccountKeys ?: emptySet(),
                         // Carimbo só anda quando o conteúdo muda. Marcá-lo a cada
                         // tique quebraria a igualdade do estado e recomporia a tela.
                         lastChangedAt = if (contentChanged) clock.now() else current?.lastChangedAt,
@@ -634,12 +632,23 @@ class TeamUsageViewModel(
                         exportOutcome = current?.exportOutcome,
                         breakdown = result.breakdown
                     )
+                    // A chave da faixa é o UUID quando há um único UUID no
+                    // grupo e o e-mail quando o mesmo e-mail reúne múltiplos
+                    // UUIDs. Validar somente contra `member.accountKey` fazia
+                    // o refresh fechar justamente esses grupos por e-mail.
+                    val validGroupKeys = nextState.emailGroups
+                        .mapTo(hashSetOf()) { group -> group.groupKey }
+                    _uiState.value = nextState.copy(
+                        expandedAccountKeys = nextState.expandedAccountKeys
+                            .filterTo(linkedSetOf()) { key -> key in validGroupKeys }
+                    )
                 },
                 onFailure = { error ->
                     // Falha intermitente com dados na tela não apaga o que o
                     // usuário está lendo: o erro vira aviso e a lista fica. Mas o
                     // "Atualizando…" tem de sair, senão a tela avisaria para sempre
                     // que está esperando uma resposta que já falhou.
+                    val current = _uiState.value as? TeamUsageUiState.Success
                     if (current != null) {
                         if (current.isRefreshing) {
                             _uiState.value = current.copy(isRefreshing = false)
