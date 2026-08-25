@@ -292,9 +292,48 @@ jobs:
           # perderia um cenario, nao os outros seis.
           if (-not (Test-Wix)) { Write-Host '::warning::WiX indisponivel; o cenario S7 sera pulado.' }
 
+      # O roteiro termina com "Verificacoes: N   Falhas: M". Essa linha e o unico
+      # numero que este job produz, e sem ela o check verde nao diz se rodaram
+      # nove cenarios ou nenhum -- o mesmo defeito que a issue #93 aponta nos
+      # jobs de teste. O try/catch existe porque uma assercao do roteiro *lanca*:
+      # sem ele o passo morreria antes de escrever o resumo. E o codigo de saida
+      # precisa ser reemitido a mao, ja que o epilogo do pwsh so olha o ultimo
+      # comando -- que aqui passou a ser o Add-Content.
       - name: Run installer update scenarios
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\src\installer\test\Invoke-UpdateScenarios.ps1
+          $exitCode = 0
+          $output = @()
+          # `*>&1` e nao `2>&1`: o roteiro fala por `Write-Host`, que escreve no
+          # stream de informacao (6) e nao no de erro. Com `2>&1` o `Tee-Object`
+          # nao recebia linha nenhuma e a contagem nunca era encontrada -- medido.
+          try {
+            .\src\installer\test\Invoke-UpdateScenarios.ps1 *>&1 | Tee-Object -Variable output
+            $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+          } catch {
+            Write-Host $_
+            $exitCode = 1
+          }
+          $tally = $output | ForEach-Object { $_.ToString() } | Select-String -Pattern '^Verificacoes:' | Select-Object -Last 1
+          $verdict = if ($exitCode -eq 0) { 'passou' } else { 'FALHOU' }
+          $line = if ($tally) { $tally.Line.Trim() } else { 'contagem nao encontrada na saida do roteiro' }
+          @(
+            "## Cenarios do instalador -- $verdict",
+            '',
+            "``$line``",
+            ''
+          ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          exit $exitCode
+
+      # Mesmo tratamento dos jobs de teste: um check verde que nao rodou cenario
+      # nenhum tem de dizer isso. O checkout deste job ja e incondicional, entao
+      # o script esta no disco.
+      - name: Report skipped scenarios
+        if: steps.filter.outputs.relevant != 'true'
+        shell: pwsh
+        run: |
+          node tools/ci/test-summary.mjs `
+            --title "Cenarios do instalador" `
+            --skipped "nenhuma mudanca em src/installer/ nem em src/desktopMain/kotlin/com/usagemonitor/update/"
