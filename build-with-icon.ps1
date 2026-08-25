@@ -101,12 +101,9 @@ try {
     Write-Host "No Usage Monitor processes running"
 }
 
-# Kill Java processes (build residue)
-try {
-    Get-Process java -ErrorAction Stop | Stop-Process -Force -ErrorAction Stop
-    Write-Host "Java processes killed"
-} catch {
-    Write-Host "No Java processes running"
-}
+# Nao existe passo de "matar Java" aqui, de proposito (#88): um
+# `Get-Process java | Stop-Process -Force` derruba o daemon do Gradle e a IDE de
+# quem esta buildando, e nao encerra nada do produto -- o app-image do jpackage
+# roda como "Usage Monitor.exe" e o runtime/bin dele nao tem java.exe.
 
 Write-Host "=== Cleanup complete ==="

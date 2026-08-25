@@ -19,8 +19,9 @@
     MSI_UPGRADE_CODE proprio, a primeira instalacao do roteiro DESINSTALARIA o
     Usage Monitor real, caso a maquina ainda esteja no MSI.
 
-    S7 precisa de WiX (candle/light) para compilar o fixture MSI. Sem WiX ele e
-    pulado com aviso; os demais nao dependem disso.
+    S7 precisa de WiX (candle/light) para compilar o fixture MSI. S9 precisa de
+    um java.exe resolvivel, para servir de sentinela. Sem eles os dois sao
+    pulados com aviso; os demais nao dependem disso.
 
     Fora do allTests de proposito: e lento e mexe no registro da maquina.
 #>
@@ -205,6 +206,42 @@ function Remove-ScenarioArtifacts {
     Remove-Item -Path $UninstallKey -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+function Resolve-JavaExe {
+    if ($env:JAVA_HOME) {
+        $candidate = Join-Path $env:JAVA_HOME 'bin\java.exe'
+        if (Test-Path $candidate) { return $candidate }
+    }
+    $command = Get-Command java.exe -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+    return $null
+}
+
+# Sentinela do S9. Uma JVM viva durante a rodada inteira, que nenhum cenario
+# deveria encostar: e o teste da #88. Ate ela, a Section "Uninstall" rodava
+# `taskkill /F /IM java.exe`, e o desinstalador e acionado de lado pelo
+# ExecWait '$0 _?=' do .onInit em S5, S6 e S8 -- ou seja, cada rodada da suite
+# derrubava o daemon do Gradle e a IDE de quem a executava.
+#
+# Precisa ser um processo cujo NOME DE IMAGEM seja java.exe, porque e por nome
+# que o taskkill filtra. O single-file source launcher (Java 11+) da isso sem
+# passo de compilacao.
+function Start-JvmSentinel {
+    param([string] $Root)
+    $java = Resolve-JavaExe
+    if (-not $java) { return $null }
+
+    New-Item -ItemType Directory -Force -Path $Root | Out-Null
+    $source = Join-Path $Root 'Sentinel.java'
+    Set-Content -Path $source -Encoding ASCII -Value @'
+public class Sentinel {
+    public static void main(String[] args) throws Exception {
+        Thread.sleep(900000L);
+    }
+}
+'@
+    return Start-Process -FilePath $java -ArgumentList $source -PassThru -WindowStyle Hidden
+}
+
 # ---------------------------------------------------------------- preparacao
 
 $script:MakeNsis = Resolve-MakeNsis
@@ -225,6 +262,13 @@ $setupV1 = Join-Path $outputDir 'Setup-1.0.0.exe'
 $setupV2 = Join-Path $outputDir 'Setup-2.0.0.exe'
 Build-Installer -Version '1.0.0' -PayloadDirectory $payloadV1 -OutputFile $setupV1
 Build-Installer -Version '2.0.0' -PayloadDirectory $payloadV2 -OutputFile $setupV2
+
+$script:Sentinel = Start-JvmSentinel -Root (Join-Path $WorkDirectory 'sentinel')
+if ($script:Sentinel) {
+    Write-Host "sentinela: java.exe pid $($script:Sentinel.Id)"
+} else {
+    Write-Host "sentinela: java.exe nao encontrado -- S9 sera pulado" -ForegroundColor Yellow
+}
 
 try {
 
@@ -368,8 +412,24 @@ Assert-Equal 'jar orfao removido' $false (Test-Path (Join-Path $target 'app\jar-
 Assert-Equal 'desinstalador escrito' $true (Test-Path (Join-Path $target 'Uninstall.exe'))
 Assert-Equal 'registro atualizado para a versao nova' '1.0.0' (Get-RegistryValue $UninstallKey 'DisplayVersion')
 
+# ------------------------------------------------------------------ S9
+
+Write-Host "`n== S9: a rodada nao mata JVM alheia =="
+if ($script:Sentinel) {
+    # S5, S6 e S8 acionaram o desinstalador pelo caminho de reinstalacao. Se a
+    # Section "Uninstall" voltar a filtrar por nome de imagem global, esta
+    # assercao reprova -- foi assim que ela foi falsificada na #88.
+    $script:Sentinel.Refresh()
+    Assert-Equal 'JVM alheia sobreviveu aos cenarios' $false $script:Sentinel.HasExited
+} else {
+    Write-Host "   PULADO -- sem java.exe para servir de sentinela" -ForegroundColor Yellow
+}
+
 } finally {
     Write-Host "`n== limpeza =="
+    if ($script:Sentinel -and -not $script:Sentinel.HasExited) {
+        Stop-Process -Id $script:Sentinel.Id -Force -ErrorAction SilentlyContinue
+    }
     Uninstall-ScenarioMsi -MsiFile (Join-Path $outputDir 'ScenarioMsi.msi')
     Remove-ScenarioArtifacts -TargetDirectory $target
 }
