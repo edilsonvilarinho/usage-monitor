@@ -34,12 +34,20 @@ internal enum class StartupOrigin {
 
 internal enum class StartupOutcome {
     STARTED,
-    SECOND_INSTANCE_EXIT;
+    SECOND_INSTANCE_EXIT,
+
+    /**
+     * A instancia viva atendeu o pedido de foco deixado por outra. Sem esta linha
+     * nao ha como separar "o pedido nunca foi lido" de "foi lido e a janela nao
+     * veio para a frente" -- que sao defeitos em lugares diferentes.
+     */
+    FOCUS_REQUEST_SERVED;
 
     val wireValue: String
         get() = when (this) {
             STARTED -> "started"
             SECOND_INSTANCE_EXIT -> "second-instance-exit"
+            FOCUS_REQUEST_SERVED -> "focus-request-served"
         }
 }
 

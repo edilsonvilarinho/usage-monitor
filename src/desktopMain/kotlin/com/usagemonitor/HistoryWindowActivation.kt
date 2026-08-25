@@ -55,14 +55,17 @@ internal fun activateWindow(window: WindowActivationTarget) {
     window.isVisible = true
 
     val wasAlwaysOnTop = window.isAlwaysOnTop
-    if (!wasAlwaysOnTop) {
-        window.isAlwaysOnTop = true
-    }
+
+    // Alternar, e nao "ligar se estiver desligado": com o sinalizador JA ligado,
+    // atribuir `true` de novo nao produz reordenacao nenhuma, e a janela continua
+    // atras da que detem o primeiro plano. E o caso da janela principal de quem
+    // usa "manter sempre visivel" -- justamente a configuracao em que o defeito
+    // passaria despercebido em teste.
+    window.isAlwaysOnTop = false
+    window.isAlwaysOnTop = true
 
     window.toFront()
     window.requestFocus()
 
-    if (!wasAlwaysOnTop) {
-        window.isAlwaysOnTop = false
-    }
+    window.isAlwaysOnTop = wasAlwaysOnTop
 }

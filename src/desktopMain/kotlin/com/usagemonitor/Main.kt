@@ -1165,6 +1165,9 @@ fun main(args: Array<String>) = application {
             val focusRequested = withContext(Dispatchers.IO) { focusRequests.consume() }
             if (focusRequested) {
                 restoreMainWindow()
+                withContext(Dispatchers.IO) {
+                    startupDiagnostics.record(startupOrigin, StartupOutcome.FOCUS_REQUEST_SERVED)
+                }
             }
         }
     }

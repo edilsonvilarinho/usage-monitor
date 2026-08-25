@@ -51,11 +51,37 @@ class HistoryWindowActivationTest {
         assertTrue(window.broughtToFront)
     }
 
+    // Medido: com o sinalizador ja ligado, atribuir `true` de novo nao reordena
+    // nada e a janela fica atras da que detem o primeiro plano. Por isso o ciclo
+    // completo, tambem quando ela ja estava presa no topo.
+    @Test
+    fun `the always on top flag is cycled even when it was already on`() {
+        val window = FakeWindowActivationTarget(alwaysOnTop = true)
+
+        activateWindow(window)
+
+        assertEquals(listOf(false, true, true), window.alwaysOnTopWrites)
+    }
+
+    @Test
+    fun `the always on top flag is cycled when it was off`() {
+        val window = FakeWindowActivationTarget(alwaysOnTop = false)
+
+        activateWindow(window)
+
+        assertEquals(listOf(false, true, false), window.alwaysOnTopWrites)
+    }
+
     private class FakeWindowActivationTarget(
         alwaysOnTop: Boolean = false
     ) : WindowActivationTarget {
         override var isVisible: Boolean = false
+        val alwaysOnTopWrites = mutableListOf<Boolean>()
         override var isAlwaysOnTop: Boolean = alwaysOnTop
+            set(value) {
+                alwaysOnTopWrites += value
+                field = value
+            }
         var broughtToFront = false
         var focusRequested = false
         var setBoundsCalled = false
