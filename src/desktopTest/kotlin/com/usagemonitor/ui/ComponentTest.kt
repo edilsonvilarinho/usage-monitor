@@ -58,7 +58,9 @@ import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_TAG
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_HINT_TAG
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
+import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
@@ -395,6 +397,96 @@ class ComponentTest {
         ).assertIsDisplayed()
         onAllNodesWithText("Quota 7d indisponível na fonte semanal do Codex").assertCountEquals(0)
         onAllNodesWithText("Codex 7d").assertCountEquals(0)
+    }
+
+    @Test
+    fun `ApiUsageCard renders stable Codex quotas with progress tracks when expanded`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex 5h",
+                            used = 23L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = "Codex 7d",
+                            used = 11L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-04-28T10:00:00Z")
+                )
+            }
+        }
+
+        onNodeWithText("Codex").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Semanal").assertIsDisplayed()
+        onNodeWithText("23%").assertIsDisplayed()
+        onNodeWithText("11%").assertIsDisplayed()
+        onNodeWithText("Reinício: Ter 17h00 BRT").assertIsDisplayed()
+        onNodeWithText("Reinício: Dom 03/05 9h00 BRT").assertIsDisplayed()
+        onNodeWithTag(quotaProgressTrackTag("Codex 5h"), useUnmergedTree = true).assertExists()
+        onNodeWithTag(quotaProgressTrackTag("Codex 7d"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun `ApiUsageCard keeps Codex compact badges without progress tracks when minimized`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex 5h",
+                            used = 23L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = "Codex 7d",
+                            used = 11L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    isMinimized = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-04-28T10:00:00Z")
+                )
+            }
+        }
+
+        onNodeWithText("Codex 5h").assertIsDisplayed()
+        onNodeWithText("Codex 7d").assertIsDisplayed()
+        onNodeWithText("23%").assertIsDisplayed()
+        onNodeWithText("11%").assertIsDisplayed()
+        onNodeWithTag(quotaProgressTrackTag("Codex 5h"), useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag(quotaProgressTrackTag("Codex 7d"), useUnmergedTree = true).assertDoesNotExist()
     }
 
     /**
@@ -1196,6 +1288,54 @@ class ComponentTest {
 
         onNodeWithTag(API_USAGE_CARD_STATUS_TAG).assertIsDisplayed()
         onNodeWithText("Crítico").assertIsDisplayed()
+    }
+
+    @Test
+    fun `card status hint explains the quota that caused the severity`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 5h",
+            used = 95L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.PERCENTAGE
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(quota),
+                    riskByQuotaKey = mapOf(
+                        QuotaSeriesKey(quota.label, quota.periodType) to QuotaRiskSummary(
+                            level = UsageRiskLevel.WILL_EXCEED,
+                            estimatedExhaustionAt = Instant.parse("2026-04-28T18:00:00Z")
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    now = Instant.parse("2026-04-28T15:00:00Z"),
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithTag(API_USAGE_CARD_STATUS_HINT_TAG, useUnmergedTree = true)
+            .performMouseInput { moveTo(center) }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithText("Projeção de uso").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        onNodeWithText("Cota").assertIsDisplayed()
+        onNodeWithText("Claude 5h").assertIsDisplayed()
+        onNodeWithText("No ritmo atual, a cota deve esgotar antes do reset", substring = true)
+            .assertIsDisplayed()
+        onNodeWithContentDescription(
+            "Status Crítico. Cota Claude 5h.",
+            substring = true
+        ).assertIsDisplayed()
     }
 
     @Test

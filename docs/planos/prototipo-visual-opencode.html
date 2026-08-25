@@ -605,7 +605,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
             <span class="psub">dev@example.com — Example Org</span>
           </div>
           <span class="sp"></span>
-          <span class="st warn" title="Risco de estouro Sessão 5h: Atenção">Atenção</span>
+          <span class="st warn" title="Projeção de uso · Cota Sessão 5h · Status Atenção · No ritmo atual, a cota deve esgotar antes do reset. Previsão: Qua 13/08 13h00 BRT.">Atenção</span>
           <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
           <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
         </div>
@@ -649,7 +649,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
             <span class="psub">qa@example.com — Example Org (Sandbox)</span>
           </div>
           <span class="sp"></span>
-          <span class="st ok">Normal</span>
+          <span class="st ok" title="Projeção de uso · Cota Sessão 5h · Status Normal · No ritmo atual, a cota deve resetar antes de esgotar.">Normal</span>
           <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
           <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
         </div>
@@ -677,17 +677,21 @@ table.dt td.num, table.dt th.num { text-align: right; }
           <span class="srcmark" style="background:var(--codex)"></span>
           <span class="ptitle">Codex</span>
           <span class="sp"></span>
+          <span class="st crit" title="Projeção de uso · Cota Codex 5h · Status Crítico · No ritmo atual, a cota deve esgotar antes do reset. Previsão: Qua 13/08 18h51 BRT.">Crítico</span>
           <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
           <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
         </div>
         <div class="pbody flush">
           <div class="row"><div class="stack" style="gap:3px;flex:1">
-            <div class="hstack"><span class="k">Codex atual</span><span class="sp"></span><span class="v">23%</span></div>
-            <div class="track ok"><i style="width:23%"></i></div>
-            <span class="k dim">Reinício: Qua 14h00 BRT</span>
+            <div class="hstack"><span class="k">Codex 5h</span><span class="sp"></span><span class="v">75%</span></div>
+            <div class="track crit"><i style="width:75%"></i></div>
+            <span class="k dim">Reinício: Qua 20h51 BRT</span>
           </div></div>
-          <div class="row"><span class="st warn">Janela reportada pelo Codex (fonte instável)</span></div>
-          <div class="row"><span class="st off">Quota semanal indisponível</span></div>
+          <div class="row"><div class="stack" style="gap:3px;flex:1">
+            <div class="hstack"><span class="k">Codex 7d</span><span class="sp"></span><span class="v">12%</span></div>
+            <div class="track ok"><i style="width:12%"></i></div>
+            <span class="k dim">Reinício: Ter 01/09 15h51 BRT</span>
+          </div></div>
         </div>
         <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
       </div>
@@ -721,7 +725,10 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <button class="btn ghost" type="button">Configurações</button>
   </div>
 </div>
-<p class="note"><b>As ações de navegação do card são botões de ícone, não de texto.</b> A
+<p class="note"><b>O status do cabeçalho também é um hint.</b> Passe o cursor sobre <code>Normal</code>, <code>Atenção</code>
+ou <code>Crítico</code> para ver a cota que determinou o pior estado e a projeção que explica o rótulo. O texto do hint
+repete a regra usada no card: a cota deve resetar antes de esgotar em <code>Normal</code>; deve esgotar antes do reset em
+<code>Atenção</code> e <code>Crítico</code>, com a previsão da coleta. <b>As ações de navegação do card são botões de ícone, não de texto.</b> A
 <code>contentDescription</code> de cada uma carrega a explicação do pisca do semáforo ("1 sessão ativa agora pede
 atenção: …"), que é a razão de o semáforo existir e o que os testes de componente observam — botão de texto não teria
 onde levá-la. O rodapé da janela vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e
@@ -795,7 +802,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="win narrow" style="max-width:none">
       <div class="body tight">
         <div class="banner warn"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Codex</span><span class="bd">Sessão expirada. Faça login pelo CLI e atualize.</span></div><span class="sp"></span><button class="btn ghost" type="button">Recarregar Codex</button></div>
-        <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · Padrão</span><span class="sp"></span><span class="st ok">Normal</span></div>
+        <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · Padrão</span><span class="sp"></span><span class="st ok" title="Projeção de uso · Cota Sessão 5h · Status Normal · No ritmo atual, a cota deve resetar antes de esgotar.">Normal</span></div>
         <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">68%</span></div><div class="track warn"><i style="width:68%"></i></div></div></div></div></div>
       </div>
     </div>

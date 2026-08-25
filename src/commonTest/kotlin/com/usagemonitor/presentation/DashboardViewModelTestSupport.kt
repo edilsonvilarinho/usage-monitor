@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -83,6 +84,39 @@ abstract class DashboardViewModelTestSupport {
                 rawTotal = 4500L
             )
         )
+    )
+
+    protected val sampleCodexStats = ApiUsageStats(
+        source = ApiSource.CODEX,
+        apiName = "Codex",
+        accountContext = UsageAccountContext(
+            key = UsageAccountKey(
+                source = ApiSource.CODEX,
+                providerAccountId = "codex-user-a",
+                workspaceId = "codex-workspace-a"
+            ),
+            email = "codex@example.com",
+            workspaceName = "Codex Workspace"
+        ),
+        quotas = listOf(
+            QuotaInfo(
+                label = "Codex 5h",
+                used = 23L,
+                total = 100L,
+                periodEndAt = Instant.parse("2025-01-01T17:00:00Z"),
+                periodType = PeriodType.INTERVAL,
+                unit = UsageUnit.PERCENTAGE
+            ),
+            QuotaInfo(
+                label = "Codex 7d",
+                used = 11L,
+                total = 100L,
+                periodEndAt = Instant.parse("2025-01-08T12:00:00Z"),
+                periodType = PeriodType.WEEKLY,
+                unit = UsageUnit.PERCENTAGE
+            )
+        ),
+        notices = emptySet()
     )
 
     protected fun defaultEnabledApis(): MutableStateFlow<Set<ApiSource>> {

@@ -865,6 +865,120 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     }
 
     @Test
+    fun `restores Codex five hour and weekly quotas from cache before network`() = runTest {
+        var codexCalls = 0
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                codexCalls += 1
+                return Result.failure(Exception("Não deveria consultar a rede"))
+            }
+        }
+        val fixedClock = object : Clock {
+            override fun now(): Instant = fixedInstant
+        }
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(failingAnthropicRepository()),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(failingMiniMaxRepository()),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(failingDeepSeekRepository()),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX)),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getCachedDashboardStats = cachedStatsUseCase(listOf(sampleCodexStats)),
+            clock = fixedClock,
+            config = manualRefreshConfig(),
+            persistedNextRefreshAt = fixedInstant + with(kotlin.time.Duration.Companion) { 5.minutes }
+        )
+
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        val state = viewModel.uiState.value as UiState.Success
+        val codex = state.data.single()
+        assertEquals(ApiSource.CODEX, codex.source)
+        assertEquals(listOf("Codex 5h", "Codex 7d"), codex.quotas.map { it.label })
+        assertEquals(listOf(23L, 11L), codex.quotas.map { it.used })
+        assertEquals("codex-user-a", codex.accountContext?.key?.providerAccountId)
+        assertEquals(0, codexCalls)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `new Codex response replaces the cached five hour and weekly quotas`() = runTest {
+        val freshCodexStats = sampleCodexStats.copy(
+            quotas = listOf(
+                sampleCodexStats.quotas[0].copy(used = 44L),
+                sampleCodexStats.quotas[1].copy(used = 55L)
+            )
+        )
+        var codexCalls = 0
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                codexCalls += 1
+                return Result.success(freshCodexStats)
+            }
+        }
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(failingAnthropicRepository()),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(failingMiniMaxRepository()),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(failingDeepSeekRepository()),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX)),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getCachedDashboardStats = cachedStatsUseCase(listOf(sampleCodexStats)),
+            clock = Clock.System,
+            config = manualRefreshConfig()
+        )
+
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        viewModel.refresh()
+        awaitCondition {
+            codexCalls == 1 &&
+                (viewModel.uiState.value as? UiState.Success)
+                    ?.data
+                    ?.singleOrNull()
+                    ?.quotas
+                    ?.map { it.used } == listOf(44L, 55L)
+        }
+
+        val state = viewModel.uiState.value as UiState.Success
+        val codex = state.data.single()
+        assertEquals(listOf(PeriodType.INTERVAL, PeriodType.WEEKLY), codex.quotas.map { it.periodType })
+        assertEquals("codex-user-a", codex.accountContext?.key?.providerAccountId)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `failed Codex target refresh preserves the cached quotas`() = runTest {
+        var codexCalls = 0
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                codexCalls += 1
+                return Result.failure(Exception("Sessão do Codex indisponível"))
+            }
+        }
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(failingAnthropicRepository()),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(failingMiniMaxRepository()),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(failingDeepSeekRepository()),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX)),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getCachedDashboardStats = cachedStatsUseCase(listOf(sampleCodexStats)),
+            clock = Clock.System,
+            config = manualRefreshConfig(),
+            persistedNextRefreshAt = fixedInstant + with(kotlin.time.Duration.Companion) { 5.minutes }
+        )
+
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        viewModel.refresh(UsageTargetKey.forSource(ApiSource.CODEX))
+        awaitCondition { codexCalls == 1 && viewModel.uiState.value is UiState.Success }
+
+        val state = viewModel.uiState.value as UiState.Success
+        val codex = state.data.single()
+        assertEquals(listOf(23L, 11L), codex.quotas.map { it.used })
+        assertEquals(listOf("Codex 5h", "Codex 7d"), codex.quotas.map { it.label })
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `cache restore brings the usage projection back with it`() = runTest {
         val expectedRisk = QuotaRiskSummary(
             level = UsageRiskLevel.WILL_EXCEED,
@@ -997,6 +1111,27 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     }
 
     private val anthropicTarget = UsageTargetKey.forSource(ApiSource.ANTHROPIC)
+
+    private fun failingAnthropicRepository(): AnthropicRepository {
+        return object : AnthropicRepository {
+            override suspend fun getUsage() =
+                Result.failure<ApiUsageStats>(Exception("Anthropic não deveria ser consultado"))
+        }
+    }
+
+    private fun failingMiniMaxRepository(): MiniMaxRepository {
+        return object : MiniMaxRepository {
+            override suspend fun getUsage() =
+                Result.failure<ApiUsageStats>(Exception("MiniMax não deveria ser consultado"))
+        }
+    }
+
+    private fun failingDeepSeekRepository(): DeepSeekRepository {
+        return object : DeepSeekRepository {
+            override suspend fun getUsage() =
+                Result.failure<ApiUsageStats>(Exception("DeepSeek não deveria ser consultado"))
+        }
+    }
 
     private fun riskReport(risk: QuotaRiskSummary): ApiUsageHistoryReport {
         return ApiUsageHistoryReport(

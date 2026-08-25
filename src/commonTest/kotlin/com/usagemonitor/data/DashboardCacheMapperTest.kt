@@ -90,6 +90,90 @@ class DashboardCacheMapperTest {
     }
 
     @Test
+    fun `round trip preserves stable Codex windows and account context`() {
+        val original = ApiUsageStats(
+            source = ApiSource.CODEX,
+            targetKey = UsageTargetKey.forSource(ApiSource.CODEX),
+            apiName = "Codex",
+            accountContext = UsageAccountContext(
+                key = UsageAccountKey(
+                    source = ApiSource.CODEX,
+                    providerAccountId = "codex-user-a",
+                    workspaceId = "codex-workspace-a"
+                ),
+                email = "codex@example.com",
+                workspaceName = "Codex Workspace"
+            ),
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Codex 5h",
+                    used = 23L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE
+                ),
+                QuotaInfo(
+                    label = "Codex 7d",
+                    used = 11L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            )
+        )
+
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(original.toCacheDto())
+        ).toDomain()
+
+        assertEquals(listOf("Codex 5h", "Codex 7d"), restored.first().quotas.map { it.label })
+        assertEquals(listOf(23L, 11L), restored.first().quotas.map { it.used })
+        assertEquals(listOf(PeriodType.INTERVAL, PeriodType.WEEKLY), restored.first().quotas.map { it.periodType })
+        assertEquals(original.accountContext, restored.first().accountContext)
+        assertEquals(original, restored.first())
+    }
+
+    @Test
+    fun `round trip preserves Codex reported fallback and notices`() {
+        val original = ApiUsageStats(
+            source = ApiSource.CODEX,
+            apiName = "Codex",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Codex atual",
+                    used = 42L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.REPORTED,
+                    unit = UsageUnit.PERCENTAGE
+                ),
+                QuotaInfo(
+                    label = "Codex 7d",
+                    used = 17L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            ),
+            notices = setOf(
+                ApiUsageNotice.SOURCE_UNSTABLE,
+                ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE
+            )
+        )
+
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(original.toCacheDto())
+        ).toDomain()
+
+        assertEquals(original, restored.first())
+    }
+
+    @Test
     fun `round trip preserves the quota currency code`() {
         val original = ApiUsageStats(
             source = ApiSource.ANTHROPIC,

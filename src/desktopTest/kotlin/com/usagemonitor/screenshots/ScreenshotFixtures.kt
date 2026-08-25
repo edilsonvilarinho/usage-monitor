@@ -3,7 +3,6 @@ package com.usagemonitor.screenshots
 import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
-import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
@@ -154,14 +153,21 @@ internal object ScreenshotFixtures {
             source = ApiSource.CODEX,
             apiName = "Codex",
             accountContext = codexAccount,
-            notices = setOf(ApiUsageNotice.SOURCE_UNSTABLE, ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE),
             quotas = listOf(
                 QuotaInfo(
-                    label = "Codex atual",
+                    label = "Codex 5h",
                     used = 23L,
                     total = 100L,
                     periodEndAt = NOW.plusHours(3),
                     periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE
+                ),
+                QuotaInfo(
+                    label = "Codex 7d",
+                    used = 11L,
+                    total = 100L,
+                    periodEndAt = NOW.plusHours(103),
+                    periodType = PeriodType.WEEKLY,
                     unit = UsageUnit.PERCENTAGE
                 )
             )

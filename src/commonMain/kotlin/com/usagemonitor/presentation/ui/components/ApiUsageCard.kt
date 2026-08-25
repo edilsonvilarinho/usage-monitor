@@ -115,10 +115,15 @@ const val API_USAGE_CARD_ACTIONS_TAG = "apiUsageCardActions"
 
 /** Badge de estado do cabeçalho: ponto e palavra do pior risco entre as cotas. */
 const val API_USAGE_CARD_STATUS_TAG = "apiUsageCardStatus"
+const val API_USAGE_CARD_STATUS_HINT_TAG = "apiUsageCardStatusHint"
 const val QUOTA_BLOCK_TAG_PREFIX = "quotaBlock:"
+const val QUOTA_PROGRESS_TRACK_TAG_PREFIX = "quotaProgress:"
 
 /** O rótulo da cota é único dentro de um card: é a chave da série. */
 fun quotaBlockTag(label: String): String = "$QUOTA_BLOCK_TAG_PREFIX$label"
+
+/** Âncora de teste da barra da cota expandida; não altera a semântica visual. */
+fun quotaProgressTrackTag(label: String): String = "$QUOTA_PROGRESS_TRACK_TAG_PREFIX$label"
 
 fun apiUsageCardTag(apiName: String): String = "$API_USAGE_CARD_TAG_PREFIX$apiName"
 
@@ -383,12 +388,37 @@ fun ApiUsageCard(
                         quotas = orderedQuotas,
                         riskByQuotaKey = riskByQuotaKey,
                         now = now
-                    )?.let { (_, worstRisk) ->
-                        AppStatusIndicator(
-                            label = riskLevelLabel(worstRisk.level, language),
-                            tone = toneFor(worstRisk.level),
-                            modifier = Modifier.testTag(API_USAGE_CARD_STATUS_TAG)
-                        )
+                    )?.let { (worstQuota, worstRisk) ->
+                        val statusLabel = riskLevelLabel(worstRisk.level, language)
+                        Box(modifier = Modifier.testTag(API_USAGE_CARD_STATUS_TAG)) {
+                            HoverTooltipBox(
+                                title = riskDotTooltipTitle(language),
+                                metrics = listOf(
+                                    TooltipMetric(
+                                        label = if (language == AppLanguage.PT) "Cota" else "Quota",
+                                        value = worstQuota.label
+                                    ),
+                                    TooltipMetric(
+                                        label = if (language == AppLanguage.PT) "Status" else "Status",
+                                        value = statusLabel
+                                    )
+                                ),
+                                footnote = riskDotTooltipSubtitle(worstRisk, language),
+                                modifier = Modifier.testTag(API_USAGE_CARD_STATUS_HINT_TAG)
+                            ) {
+                                AppStatusIndicator(
+                                    label = statusLabel,
+                                    tone = toneFor(worstRisk.level),
+                                    modifier = Modifier.semantics {
+                                        contentDescription = riskStatusContentDescription(
+                                            quotaLabel = worstQuota.label,
+                                            risk = worstRisk,
+                                            language = language
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
 
                     Row(
@@ -1423,7 +1453,9 @@ private fun QuotaRowContent(
             AppProgressTrack(
                 fraction = quota.percentageUsed,
                 tone = quotaTone(quota = quota, risk = risk),
-                modifier = Modifier.alpha(staleAlpha)
+                modifier = Modifier
+                    .testTag(quotaProgressTrackTag(quota.label))
+                    .alpha(staleAlpha)
             )
         }
 

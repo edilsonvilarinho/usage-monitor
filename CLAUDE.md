@@ -401,7 +401,9 @@ linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
   risco entre as cotas pela ordem do enum, não pelo percentual: 40% às onze da manhã pode ser pior
   que 80% dez minutos antes do reinício. Cota vencida não entra, e sem projeção conhecida não há
   badge — "Normal" ali seria uma garantia que ninguém deu. Os rótulos saem de `riskLevelLabel`, que
-  já existia.
+  já existia. O badge inteiro também abre um `HoverTooltipBox` persistente: ele informa a cota que
+  determinou o pior estado e reutiliza a explicação da projeção, inclusive para `Normal` — a cota
+  deve resetar antes de esgotar — e para `Atenção`/`Crítico` — a cota deve esgotar antes do reset.
 
 **Aviso de fonte é hint, não banner** (`CardNoticeHint` em `ApiUsageCard.kt`): os
 `ApiUsageNotice` saem como uma exclamação âmbar (`Icons.Rounded.ErrorOutline`) no cabeçalho, ao

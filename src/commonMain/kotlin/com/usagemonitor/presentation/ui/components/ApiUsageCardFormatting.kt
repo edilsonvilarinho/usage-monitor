@@ -368,6 +368,20 @@ internal fun riskDotTooltipSubtitle(risk: QuotaRiskSummary, language: AppLanguag
     }
 }
 
+internal fun riskStatusContentDescription(
+    quotaLabel: String,
+    risk: QuotaRiskSummary,
+    language: AppLanguage
+): String {
+    val levelLabel = riskLevelLabel(risk.level, language)
+    val explanation = riskDotTooltipSubtitle(risk, language)
+    return if (language == AppLanguage.PT) {
+        "Status $levelLabel. Cota $quotaLabel. $explanation"
+    } else {
+        "Status $levelLabel. Quota $quotaLabel. $explanation"
+    }
+}
+
 internal fun buildQuotaTooltipMetrics(
     quota: QuotaInfo,
     language: AppLanguage,
