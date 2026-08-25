@@ -76,6 +76,7 @@ import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
+import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
@@ -115,6 +116,7 @@ import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.ReleaseNotesWindow
 import com.usagemonitor.presentation.ui.TeamKeysAdminScreen
 import com.usagemonitor.presentation.ui.TeamPresenceScreen
 import com.usagemonitor.presentation.ui.TeamUsageScreen
@@ -146,6 +148,7 @@ import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import com.usagemonitor.update.isEnabled
 import com.usagemonitor.update.rememberAutoUpdateController
+import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -435,6 +438,12 @@ fun main() = application {
     // Uma chamada, e todo o estado da atualização automática mora fora daqui:
     // `main()` está no limite do backend JVM.
     val autoUpdate = rememberAutoUpdateController(settings = settings, httpClient = httpClient)
+    // Idem: decide, busca e lembra as novidades da versão recém-instalada.
+    val releaseNotes = rememberReleaseNotesController(
+        settings = settings,
+        getReleaseNotes = GetReleaseNotesUseCase(appUpdateRepository),
+        receipt = autoUpdate.lastReceipt
+    )
 
     val recordUsageSnapshot = remember(usageHistoryRepository) {
         RecordUsageSnapshotUseCase(usageHistoryRepository)
@@ -1540,6 +1549,17 @@ fun main() = application {
             }
         }
     }
+
+    // Sem notas ela não compõe nada; a decisão inteira mora no controlador.
+    ReleaseNotesWindow(
+        controller = releaseNotes,
+        language = language,
+        isDark = isDark,
+        uiScalePercent = uiScalePercent,
+        iconImage = iconImage,
+        screenWorkArea = screenWorkArea,
+        onOpenReleasePage = { url -> appUpdateReleaseOpener.open(url) }
+    )
 
     if (isTeamKeysOpen) {
         val keysTitle = if (language == AppLanguage.PT) {

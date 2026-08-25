@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
@@ -151,6 +152,13 @@ abstract class DashboardViewModelTestSupport {
             override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
                 return block()
             }
+
+            // Fora do que estes testes exercitam: a janela de novidades tem
+            // caminho e cobertura próprios.
+            override suspend fun getReleaseNotes(
+                version: String,
+                previousVersion: String?
+            ): Result<ReleaseNotes?> = Result.success(null)
         }
         return CheckForAppUpdateUseCase(repository)
     }

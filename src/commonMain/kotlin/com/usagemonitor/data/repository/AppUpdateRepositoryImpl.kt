@@ -7,7 +7,10 @@ import com.usagemonitor.domain.entity.AppUpdateArtifact
 import com.usagemonitor.domain.entity.AppUpdateArtifactKind
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.AppUpdatePlatform
+import com.usagemonitor.domain.entity.ReleaseNotes
+import com.usagemonitor.domain.entity.parseReleaseNoteItems
 import com.usagemonitor.domain.repository.AppUpdateRepository
+import kotlinx.datetime.Instant
 
 private const val RELEASE_REPOSITORY_OWNER = "edilsonvilarinho"
 private const val RELEASE_REPOSITORY_NAME = "usage-monitor"
@@ -48,6 +51,35 @@ class AppUpdateRepositoryImpl(
                 version = latestVersion,
                 releasePageUrl = latestRelease.htmlUrl,
                 artifacts = mapArtifacts(latestRelease.assets)
+            )
+        }
+    }
+
+    override suspend fun getReleaseNotes(
+        version: String,
+        previousVersion: String?
+    ): Result<ReleaseNotes?> {
+        return Result.runCatching {
+            val release = remoteApiDataSource.fetchGitHubReleaseByTag(
+                owner = RELEASE_REPOSITORY_OWNER,
+                repository = RELEASE_REPOSITORY_NAME,
+                // As tags do projeto levam o "v" que `getLatestAvailableUpdate`
+                // remove ao ler; aqui o caminho é o inverso.
+                tag = "v$version",
+                feedUrlOverride = envVarReader()
+            )
+
+            val items = parseReleaseNoteItems(release.body)
+            if (items.isEmpty()) {
+                return@runCatching null
+            }
+
+            ReleaseNotes(
+                version = version,
+                previousVersion = previousVersion,
+                publishedAt = release.publishedAt?.let { stamp -> runCatching { Instant.parse(stamp) }.getOrNull() },
+                releasePageUrl = release.htmlUrl,
+                items = items
             )
         }
     }

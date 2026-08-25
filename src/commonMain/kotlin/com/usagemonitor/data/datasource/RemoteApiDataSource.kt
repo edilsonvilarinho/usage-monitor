@@ -195,6 +195,38 @@ open class RemoteApiDataSource(
      * atualização não exigir publicar uma release de verdade a cada tentativa.
      * Ver `USAGE_MONITOR_UPDATE_FEED_URL` em `AppUpdateRepositoryImpl`.
      */
+    /**
+     * A release de uma tag específica.
+     *
+     * Existe separada de [fetchLatestGitHubRelease] porque as novidades são as
+     * da versão **em execução**, não as da última publicada: quem atualizou
+     * 37 → 39 enquanto a 40 já saiu leria as notas erradas.
+     *
+     * Com [feedUrlOverride] definido a URL é usada tal como veio — o servidor de
+     * teste do smoke test serve uma release só, e montar um caminho de tag em
+     * cima dele daria 404.
+     */
+    open suspend fun fetchGitHubReleaseByTag(
+        owner: String,
+        repository: String,
+        tag: String,
+        feedUrlOverride: String? = null
+    ): GitHubReleaseDto {
+        val url = feedUrlOverride?.takeIf { it.isNotBlank() }
+            ?: "https://api.github.com/repos/$owner/$repository/releases/tags/$tag"
+        val response = requireSuccess(
+            response = httpClient.get(url) {
+                header("Accept", "application/vnd.github+json")
+                header("User-Agent", USAGE_MONITOR_USER_AGENT)
+                header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "GitHub release"
+        )
+
+        return response.body()
+    }
+
     open suspend fun fetchLatestGitHubRelease(
         owner: String,
         repository: String,

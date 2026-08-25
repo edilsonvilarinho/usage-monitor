@@ -9,6 +9,17 @@ data class GitHubReleaseDto(
     val tagName: String,
     @SerialName("html_url")
     val htmlUrl: String,
+    /**
+     * Corpo markdown da release, que alimenta a janela de novidades.
+     *
+     * Já vinha na resposta e era descartado pelo `ignoreUnknownKeys`. Anulável
+     * porque release publicada sem descrição existe — e ali a janela
+     * simplesmente não abre, em vez de abrir vazia.
+     */
+    val body: String? = null,
+    /** ISO 8601. Nulo é "não informado": a linha de data some, a janela fica. */
+    @SerialName("published_at")
+    val publishedAt: String? = null,
     val assets: List<GitHubReleaseAssetDto> = emptyList()
 )
 
