@@ -149,8 +149,14 @@ Três runs do PR, na ordem em que aconteceram.
 | [`32853549920`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32853549920) | A1–A8, 4 forks | 4 min 41 s | 4 min 14 s | **~42 s** | `Gradle User Home cache not found` |
 | [`32854143312`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32854143312) | A9, 4 forks | **falhou** | falhou | — | idem |
 | [`32855222794`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32855222794) | A10, serial | 5 min 11 s | 4 min 38 s | ~74 s | idem |
+| [`32855876748`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32855876748) | A10, serial | **falhou** | falhou | — | idem |
+| [`32857183350`](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/32857183350) | A11, serial | 4 min 34 s | — | — | idem |
 
 Linha de base antes de tudo: 4 min 36 s, 4 min 39 s e 4 min 50 s.
+
+As duas falhas foram achados, não regressões do plano: `32854143312` é a corrida do Skiko (A10) e
+`32855876748` é a espera não determinística de `HistoryViewModelTest` (A11), que já estava lá antes
+deste trabalho e passava por sorte de escalonamento.
 
 **O ganho de tempo ainda não apareceu, e há um motivo verificável para isso.** `cache-read-only` deixa
 o PR apenas como leitor, e ainda não existe **nenhuma** entrada Windows para ler — a primeira só é
