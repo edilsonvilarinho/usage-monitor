@@ -579,7 +579,12 @@ Section "Start with Windows" SEC_AUTO_START
         Return
     ${EndIf}
     DetailPrint "Configuring auto-start..."
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}" '"$INSTDIR\Usage Monitor.exe"'
+    ; O argumento identifica a origem do arranque no registro de diagnostico do
+    ; app: o processo lancado por esta chave e o lancado pelo atalho tem o mesmo
+    ; pai (o Explorer) e sem ele sao indistinguiveis. O NOME do valor continua
+    ; sendo AUTO_START_VALUE_NAME -- e por ele que o app decide se a inicializacao
+    ; esta ligada.
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}" '"$INSTDIR\Usage Monitor.exe" --autostart'
 SectionEnd
 
 ; -----------------------------------------------

@@ -866,6 +866,12 @@ fun main(args: Array<String>) = application {
                 settings.putBoolean(AUTO_START_KEY, resolvedAutoStartEnabled)
             }
             autoStartEnabled = resolvedAutoStartEnabled
+            // Migracao por baixo: instalacao anterior a esta versao tem a entrada
+            // de inicializacao sem o argumento de origem, e sem ele todo arranque
+            // por autostart seria registrado como manual.
+            withContext(Dispatchers.IO) {
+                AutoStartManager.ensureAutoStartCommandCurrent()
+            }
         }
     }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }

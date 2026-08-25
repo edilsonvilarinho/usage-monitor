@@ -39,6 +39,82 @@ object AutoStartManager {
         return setAutoStart(enabled)
     }
 
+    /**
+     * Reescreve a entrada de inicializacao quando ela nao carrega
+     * [StartupOrigin.AUTO_START_ARGUMENT].
+     *
+     * Sem isto, quem ja tinha o app configurado ficaria para tras: o argumento so
+     * chegaria ao alternar o interruptor ou ao reinstalar, e ate la todo arranque
+     * por autostart seria registrado como manual. A migracao acontece por baixo,
+     * sem acao de quem usa.
+     *
+     * Devolve `true` quando a entrada esta atualizada ao fim -- inclusive quando
+     * ja estava.
+     */
+    fun ensureAutoStartCommandCurrent(): Boolean {
+        if (!isAutoStartEnabled()) {
+            return false
+        }
+
+        val currentCommand = readAutoStartCommand()
+        if (!autoStartCommandNeedsMigration(currentCommand)) {
+            return true
+        }
+
+        return setAutoStart(enabled = true)
+    }
+
+    private fun readAutoStartCommand(): String? {
+        return when (currentPlatform()) {
+            Platform.WINDOWS -> readWindowsAutoStartCommand()
+            Platform.LINUX -> readFileOrNull(linuxAutostartFile())
+            Platform.MACOS -> readFileOrNull(macAutostartFile())
+            Platform.OTHER -> null
+        }
+    }
+
+    private fun readFileOrNull(file: File): String? {
+        return runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull()
+    }
+
+    private fun readWindowsAutoStartCommand(): String? {
+        val result = runCommand(
+            listOf("reg", "query", WINDOWS_RUN_KEY, "/v", WINDOWS_VALUE_NAME)
+        )
+        if (result.exitCode != 0) {
+            return null
+        }
+
+        return result.output.lineSequence()
+            .map(String::trim)
+            .firstNotNullOfOrNull { line ->
+                Regex("""^$WINDOWS_VALUE_NAME\s+REG_\w+\s+(.+)$""")
+                    .find(line)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+            }
+    }
+
+    internal fun windowsAutoStartCommand(executablePath: String): String {
+        return "\"$executablePath\" ${StartupOrigin.AUTO_START_ARGUMENT}"
+    }
+
+    /**
+     * Entrada ausente nao migra: nao ha o que reescrever.
+     *
+     * A procura e por fronteira e nao por token separado por espaco, porque o
+     * texto examinado tem tres formas diferentes -- valor da chave `Run`,
+     * `Exec=` do `.desktop` e `<string>` do plist -- e so a fronteira funciona nas
+     * tres sem recortar cada uma. Ela tambem evita casar com `--autostart-algo`.
+     */
+    internal fun autoStartCommandNeedsMigration(currentCommand: String?): Boolean {
+        val command = currentCommand?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        val argument = Regex("""(?<![\w-])""" + Regex.escape(StartupOrigin.AUTO_START_ARGUMENT) + """(?![\w-])""")
+        return !argument.containsMatchIn(command)
+    }
+
     private fun currentPlatform(): Platform {
         val osName = System.getProperty("os.name").lowercase()
         return when {
@@ -59,7 +135,7 @@ object AutoStartManager {
     private fun setWindowsAutoStart(enabled: Boolean): Boolean {
         if (enabled) {
             val executablePath = resolveExecutablePath() ?: return false
-            val command = "\"$executablePath\""
+            val command = windowsAutoStartCommand(executablePath)
             val result = runCommand(
                 listOf(
                     "reg",
@@ -92,16 +168,7 @@ object AutoStartManager {
 
         val executablePath = resolveExecutablePath() ?: return false
         val parentDir = File(executablePath).parentFile?.absolutePath ?: return false
-        val desktopEntry = buildString {
-            appendLine("[Desktop Entry]")
-            appendLine("Type=Application")
-            appendLine("Version=1.0")
-            appendLine("Name=$APP_DISPLAY_NAME")
-            appendLine("Exec=${quoteDesktopValue(executablePath)}")
-            appendLine("Path=${quoteDesktopValue(parentDir)}")
-            appendLine("Terminal=false")
-            appendLine("X-GNOME-Autostart-enabled=true")
-        }
+        val desktopEntry = buildLinuxDesktopEntry(executablePath, parentDir)
 
         return runCatching {
             autostartFile.parentFile.mkdirs()
@@ -138,6 +205,19 @@ object AutoStartManager {
         return true
     }
 
+    internal fun buildLinuxDesktopEntry(executablePath: String, parentDir: String): String {
+        return buildString {
+            appendLine("[Desktop Entry]")
+            appendLine("Type=Application")
+            appendLine("Version=1.0")
+            appendLine("Name=$APP_DISPLAY_NAME")
+            appendLine("Exec=${quoteDesktopValue(executablePath)} ${StartupOrigin.AUTO_START_ARGUMENT}")
+            appendLine("Path=${quoteDesktopValue(parentDir)}")
+            appendLine("Terminal=false")
+            appendLine("X-GNOME-Autostart-enabled=true")
+        }
+    }
+
     internal fun buildLaunchAgentPlist(executablePath: String): String {
         return buildString {
             appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
@@ -152,6 +232,7 @@ object AutoStartManager {
             appendLine("    <key>ProgramArguments</key>")
             appendLine("    <array>")
             appendLine("        <string>${escapeXml(executablePath)}</string>")
+            appendLine("        <string>${StartupOrigin.AUTO_START_ARGUMENT}</string>")
             appendLine("    </array>")
             appendLine("    <key>RunAtLoad</key>")
             appendLine("    <true/>")
