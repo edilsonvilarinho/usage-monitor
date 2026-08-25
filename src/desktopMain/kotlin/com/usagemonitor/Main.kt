@@ -155,10 +155,12 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
@@ -243,8 +245,14 @@ fun main(args: Array<String>) = application {
     val startupDiagnostics = remember { StartupDiagnostics() }
     val startupOrigin = remember { StartupOrigin.from(args) }
 
+    val focusRequests = remember { FocusRequestChannel() }
+
     val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
     if (singleInstanceGuard == null) {
+        // Sair calado aqui e o que faz clicar no atalho com o app ja rodando nao
+        // produzir nada -- indistinguivel de "o app nao abre". O pedido de foco
+        // fica no disco e a instancia viva o atende.
+        focusRequests.request()
         startupDiagnostics.record(startupOrigin, StartupOutcome.SECOND_INSTANCE_EXIT)
         exitApplication()
         return@application
@@ -1140,6 +1148,19 @@ fun main(args: Array<String>) = application {
         mainWindowState.isMinimized = false
         mainWindowRef?.let { window -> activateWindow(window) }
         Unit
+    }
+
+    // O mesmo caminho do item "Abrir" da bandeja, e nao um segundo: um segundo
+    // seria um segundo lugar para esquecer de desminimizar. A leitura vai para a
+    // IO porque este efeito roda na thread da interface.
+    LaunchedEffect(focusRequests) {
+        while (isActive) {
+            delay(FocusRequestChannel.POLL_INTERVAL_MILLIS)
+            val focusRequested = withContext(Dispatchers.IO) { focusRequests.consume() }
+            if (focusRequested) {
+                restoreMainWindow()
+            }
+        }
     }
 
     if (isTraySupported) {
