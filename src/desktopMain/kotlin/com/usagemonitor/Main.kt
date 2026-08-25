@@ -158,10 +158,12 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
@@ -238,12 +240,28 @@ private fun loadWindowIcon() = runCatching {
 }.getOrNull()
 
 @OptIn(kotlinx.coroutines.FlowPreview::class)
-fun main() = application {
+fun main(args: Array<String>) = application {
+
+    // Forma de expressao de proposito: ela expoe `args` ao corpo sem reindentar
+    // as mil linhas que vem abaixo, e mantem a regra de nao criar composable nova
+    // aqui dentro.
+    val startupDiagnostics = remember { StartupDiagnostics() }
+    val startupOrigin = remember { StartupOrigin.from(args) }
+
+    val focusRequests = remember { FocusRequestChannel() }
 
     val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
     if (singleInstanceGuard == null) {
+        // Sair calado aqui e o que faz clicar no atalho com o app ja rodando nao
+        // produzir nada -- indistinguivel de "o app nao abre". O pedido de foco
+        // fica no disco e a instancia viva o atende.
+        focusRequests.request()
+        startupDiagnostics.record(startupOrigin, StartupOutcome.SECOND_INSTANCE_EXIT)
         exitApplication()
         return@application
+    }
+    LaunchedEffect(startupDiagnostics, startupOrigin) {
+        startupDiagnostics.record(startupOrigin, StartupOutcome.STARTED)
     }
 
     val httpClient = remember {
@@ -857,6 +875,12 @@ fun main() = application {
                 settings.putBoolean(AUTO_START_KEY, resolvedAutoStartEnabled)
             }
             autoStartEnabled = resolvedAutoStartEnabled
+            // Migracao por baixo: instalacao anterior a esta versao tem a entrada
+            // de inicializacao sem o argumento de origem, e sem ele todo arranque
+            // por autostart seria registrado como manual.
+            withContext(Dispatchers.IO) {
+                AutoStartManager.ensureAutoStartCommandCurrent()
+            }
         }
     }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
@@ -1139,6 +1163,22 @@ fun main() = application {
         mainWindowState.isMinimized = false
         mainWindowRef?.let { window -> activateWindow(window) }
         Unit
+    }
+
+    // O mesmo caminho do item "Abrir" da bandeja, e nao um segundo: um segundo
+    // seria um segundo lugar para esquecer de desminimizar. A leitura vai para a
+    // IO porque este efeito roda na thread da interface.
+    LaunchedEffect(focusRequests) {
+        while (isActive) {
+            delay(FocusRequestChannel.POLL_INTERVAL_MILLIS)
+            val focusRequested = withContext(Dispatchers.IO) { focusRequests.consume() }
+            if (focusRequested) {
+                restoreMainWindow()
+                withContext(Dispatchers.IO) {
+                    startupDiagnostics.record(startupOrigin, StartupOutcome.FOCUS_REQUEST_SERVED)
+                }
+            }
+        }
     }
 
     if (isTraySupported) {
