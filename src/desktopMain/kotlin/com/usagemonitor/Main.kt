@@ -235,12 +235,22 @@ private fun loadWindowIcon() = runCatching {
 }.getOrNull()
 
 @OptIn(kotlinx.coroutines.FlowPreview::class)
-fun main() = application {
+fun main(args: Array<String>) = application {
+
+    // Forma de expressao de proposito: ela expoe `args` ao corpo sem reindentar
+    // as mil linhas que vem abaixo, e mantem a regra de nao criar composable nova
+    // aqui dentro.
+    val startupDiagnostics = remember { StartupDiagnostics() }
+    val startupOrigin = remember { StartupOrigin.from(args) }
 
     val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
     if (singleInstanceGuard == null) {
+        startupDiagnostics.record(startupOrigin, StartupOutcome.SECOND_INSTANCE_EXIT)
         exitApplication()
         return@application
+    }
+    LaunchedEffect(startupDiagnostics, startupOrigin) {
+        startupDiagnostics.record(startupOrigin, StartupOutcome.STARTED)
     }
 
     val httpClient = remember {
