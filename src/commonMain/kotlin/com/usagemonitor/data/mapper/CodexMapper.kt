@@ -1,6 +1,7 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.dto.CodexUsageResponse
+import com.usagemonitor.data.dto.CodexUsageWindowDto
 import com.usagemonitor.data.dto.CodexWeeklyUsageResponse
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
@@ -14,13 +15,35 @@ object CodexMapper {
 
     private const val PERCENT_SCALE = 100L
 
-    fun toFiveHourQuota(response: CodexUsageResponse): QuotaInfo {
+    fun toIntervalQuota(response: CodexUsageResponse): QuotaInfo {
+        return QuotaInfo(
+            label = "Codex 5h",
+            used = response.rateLimit.primaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
+            total = PERCENT_SCALE,
+            periodEndAt = Instant.fromEpochSeconds(response.rateLimit.primaryWindow.resetAt),
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.PERCENTAGE
+        )
+    }
+
+    fun toReportedQuota(response: CodexUsageResponse): QuotaInfo {
         return QuotaInfo(
             label = "Codex atual",
             used = response.rateLimit.primaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
             total = PERCENT_SCALE,
             periodEndAt = Instant.fromEpochSeconds(response.rateLimit.primaryWindow.resetAt),
             periodType = PeriodType.REPORTED,
+            unit = UsageUnit.PERCENTAGE
+        )
+    }
+
+    fun toWeeklyQuota(window: CodexUsageWindowDto): QuotaInfo {
+        return QuotaInfo(
+            label = "Codex 7d",
+            used = window.usedPercent.coerceIn(0L, PERCENT_SCALE),
+            total = PERCENT_SCALE,
+            periodEndAt = Instant.fromEpochSeconds(window.resetAt),
+            periodType = PeriodType.WEEKLY,
             unit = UsageUnit.PERCENTAGE
         )
     }
@@ -36,12 +59,23 @@ object CodexMapper {
         )
     }
 
-    fun mergeUsage(
-        fiveHourQuota: QuotaInfo,
+    fun mergeStableUsage(
+        intervalQuota: QuotaInfo,
+        weeklyQuota: QuotaInfo
+    ): ApiUsageStats {
+        return ApiUsageStats(
+            source = ApiSource.CODEX,
+            apiName = "Codex",
+            quotas = listOf(intervalQuota, weeklyQuota)
+        )
+    }
+
+    fun mergeReportedUsage(
+        reportedQuota: QuotaInfo,
         weeklyQuota: QuotaInfo?
     ): ApiUsageStats {
         val quotas = buildList {
-            add(fiveHourQuota)
+            add(reportedQuota)
             if (weeklyQuota != null) {
                 add(weeklyQuota)
             }

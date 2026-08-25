@@ -20,16 +20,23 @@ class CodexRepositoryImpl(
     private suspend fun fetchStableUsage(): ApiUsageStats {
         for (attempt in 0..1) {
             val session = authDataSource.loadSession()
-            val fiveHourResponse = apiDataSource.fetchCodexFiveHourUsage(session)
-            val fiveHourQuota = CodexMapper.toFiveHourQuota(fiveHourResponse)
-            val weeklyQuota = runCatching {
-                apiDataSource.fetchCodexWeeklyUsage(session)
-            }.getOrNull()?.let(CodexMapper::toWeeklyQuota)
+            val usageResponse = apiDataSource.fetchCodexFiveHourUsage(session)
+            val embeddedWeeklyWindow = usageResponse.rateLimit.secondaryWindow
+            val stats = if (embeddedWeeklyWindow != null) {
+                CodexMapper.mergeStableUsage(
+                    intervalQuota = CodexMapper.toIntervalQuota(usageResponse),
+                    weeklyQuota = CodexMapper.toWeeklyQuota(embeddedWeeklyWindow)
+                )
+            } else {
+                val weeklyQuota = runCatching {
+                    apiDataSource.fetchCodexWeeklyUsage(session)
+                }.getOrNull()?.let(CodexMapper::toWeeklyQuota)
 
-            val stats = CodexMapper.mergeUsage(
-                fiveHourQuota = fiveHourQuota,
-                weeklyQuota = weeklyQuota
-            ).copy(accountContext = session.accountContext)
+                CodexMapper.mergeReportedUsage(
+                    reportedQuota = CodexMapper.toReportedQuota(usageResponse),
+                    weeklyQuota = weeklyQuota
+                )
+            }.copy(accountContext = session.accountContext)
 
             if (authDataSource.isSessionCurrent(session)) {
                 return stats

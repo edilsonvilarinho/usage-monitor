@@ -269,7 +269,7 @@ class UsageHistoryRepositoryImplTest {
     }
 
     @Test
-    fun `reported Codex series comes before legacy series and suppresses inference`() = kotlinx.coroutines.test.runTest {
+    fun `reported Codex series stays separate and keeps forecast inference disabled`() = kotlinx.coroutines.test.runTest {
         val records = listOf(
             record(
                 label = "Codex 5h",
@@ -303,10 +303,11 @@ class UsageHistoryRepositoryImplTest {
 
         val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
 
-        assertEquals(listOf("Codex atual", "Codex 5h"), report.series.map { it.quotaLabel })
-        assertEquals(PeriodType.REPORTED, report.series.first().periodType)
-        assertEquals(0.0, report.series.first().averageDisplayConsumptionPerHour)
-        assertIs<UsageForecast.InsufficientData>(report.series.first().forecast)
+        assertEquals(listOf("Codex 5h", "Codex atual"), report.series.map { it.quotaLabel })
+        val reportedSeries = report.series.first { it.quotaLabel == "Codex atual" }
+        assertEquals(PeriodType.REPORTED, reportedSeries.periodType)
+        assertEquals(0.0, reportedSeries.averageDisplayConsumptionPerHour)
+        assertIs<UsageForecast.InsufficientData>(reportedSeries.forecast)
     }
 
     @Test

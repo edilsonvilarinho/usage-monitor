@@ -379,7 +379,6 @@ class ComponentTest {
         }
 
         onNodeWithText("Codex").assertIsDisplayed()
-        onNodeWithText("Instável").assertIsDisplayed()
         onNodeWithText("42%").assertIsDisplayed()
         onNodeWithText("Uso atual").assertIsDisplayed()
         onNodeWithText("Reinício reportado: Ter 28/04 17h00 BRT").assertIsDisplayed()
@@ -1459,7 +1458,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `ApiCheckboxRow shows instability badge and reason for Codex`() = runDesktopComposeUiTest {
+    fun `ApiCheckboxRow keeps Codex row plain by default`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 ApiCheckboxRow(
@@ -1471,10 +1470,10 @@ class ComponentTest {
         }
 
         onNodeWithText("Codex").assertIsDisplayed()
-        onNodeWithText("Instável").assertIsDisplayed()
-        onNodeWithText(
+        onAllNodesWithText("Instável").assertCountEquals(0)
+        onAllNodesWithText(
             "Monitoramento em transição: o contrato de uso mudou e os limites podem oscilar até a fonte estabilizar."
-        ).assertIsDisplayed()
+        ).assertCountEquals(0)
     }
 
     @Test
@@ -2771,7 +2770,7 @@ class ComponentTest {
 
         onNodeWithText("Histórico do Codex").assertIsDisplayed()
         onNodeWithText("Codex atual").assertIsDisplayed()
-        onNodeWithText("Janela reportada pelo Codex (fonte instável).").assertIsDisplayed()
+        onNodeWithText("Janela reportada").assertIsDisplayed()
         onAllNodesWithText("API").assertCountEquals(0)
         onNodeWithText("Intervalo").assertIsDisplayed()
         onNodeWithText("Total").assertIsDisplayed()
@@ -2885,8 +2884,8 @@ class ComponentTest {
         }
 
         onNodeWithText("Codex atual").assertIsDisplayed()
-        onNodeWithText("Codex 5h (legado)").assertIsDisplayed()
-        onNodeWithText("Quota intervalar legada").assertIsDisplayed()
+        onNodeWithText("Codex 5h").assertIsDisplayed()
+        onNodeWithText("Quota intervalar").assertIsDisplayed()
         viewModel.onDestroy()
     }
 

@@ -6,9 +6,11 @@ import kotlinx.serialization.Serializable
 /**
  * Resposta legada do endpoint privado GET /backend-api/codex/usage.
  *
- * Hoje ele é tratado apenas como fonte confiável da janela curta (5h).
- * `secondary_window` pode até aparecer, mas não é mais usado como fonte oficial
- * da quota semanal.
+ * Quando `secondary_window` está presente, a app volta a tratar este payload
+ * como fonte oficial das janelas 5h + 7d.
+ *
+ * Se `secondary_window` vier ausente, o monitor cai no modo degradado:
+ * publica a janela primária como `REPORTED` e tenta uma fonte semanal separada.
  */
 @Serializable
 data class CodexUsageResponse(

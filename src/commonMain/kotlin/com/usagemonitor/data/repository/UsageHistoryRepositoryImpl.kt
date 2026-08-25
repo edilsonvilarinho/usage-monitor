@@ -297,14 +297,6 @@ class UsageHistoryRepositoryImpl(
     )
 
     private fun historySeriesRank(source: ApiSource, series: UsageHistorySeries): Int {
-        if (source == ApiSource.CODEX) {
-            return when (series.periodType) {
-                PeriodType.REPORTED -> 0
-                PeriodType.INTERVAL -> 1
-                PeriodType.WEEKLY -> 2
-            }
-        }
-
         return when (series.periodType) {
             PeriodType.INTERVAL -> 0
             PeriodType.WEEKLY -> 1

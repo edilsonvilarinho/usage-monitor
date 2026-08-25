@@ -21,11 +21,15 @@ import kotlin.test.assertTrue
 class CodexRepositoryImplTest {
 
     @Test
-    fun `merges five hour and weekly quotas when both sources succeed`() = runTest {
+    fun `uses five hour and weekly windows from the same payload when secondary window is present`() = runTest {
         val repository = repositoryWith(
             dataSource = object : FakeCodexDataSource() {
                 override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
-                    return sampleWeeklyResponse
+                    throw IllegalStateException("weekly source should not be called")
+                }
+
+                override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
+                    return sampleStableResponse
                 }
             }
         )
@@ -34,12 +38,12 @@ class CodexRepositoryImplTest {
 
         assertEquals(2, result.quotas.size)
         assertEquals("codex@example.com", result.accountContext?.email)
-        assertEquals(listOf("Codex atual", "Codex 7d"), result.quotas.map { it.label })
-        assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
+        assertEquals(listOf("Codex 5h", "Codex 7d"), result.quotas.map { it.label })
+        assertEquals(emptySet(), result.notices)
     }
 
     @Test
-    fun `keeps five hour quota and emits notice when weekly source is unavailable`() = runTest {
+    fun `keeps reported quota and emits notice when weekly source is unavailable`() = runTest {
         val repository = repositoryWith(
             dataSource = object : FakeCodexDataSource() {
                 override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
@@ -59,6 +63,22 @@ class CodexRepositoryImplTest {
             ),
             result.notices
         )
+    }
+
+    @Test
+    fun `keeps reported quota and merges separate weekly source when primary payload lacks secondary window`() = runTest {
+        val repository = repositoryWith(
+            dataSource = object : FakeCodexDataSource() {
+                override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
+                    return sampleWeeklyResponse
+                }
+            }
+        )
+
+        val result = repository.getUsage().getOrThrow()
+
+        assertEquals(listOf("Codex atual", "Codex 7d"), result.quotas.map { it.label })
+        assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
     }
 
     @Test
@@ -165,6 +185,26 @@ class CodexRepositoryImplTest {
     }
 
     private companion object {
+        val sampleStableResponse = CodexUsageResponse(
+            planType = "plus",
+            rateLimit = CodexRateLimitDto(
+                allowed = true,
+                limitReached = false,
+                primaryWindow = CodexUsageWindowDto(
+                    usedPercent = 8L,
+                    limitWindowSeconds = 18_000L,
+                    resetAfterSeconds = 17_288L,
+                    resetAt = 1_777_398_377L
+                ),
+                secondaryWindow = CodexUsageWindowDto(
+                    usedPercent = 11L,
+                    limitWindowSeconds = 604_800L,
+                    resetAfterSeconds = 604_088L,
+                    resetAt = 1_777_985_177L
+                )
+            )
+        )
+
         val sampleFiveHourResponse = CodexUsageResponse(
             planType = "plus",
             rateLimit = CodexRateLimitDto(

@@ -16,19 +16,9 @@ fun ApiSource.isObservedActivitySource(): Boolean {
 }
 
 fun ApiSource.statusBadgeLabel(language: AppLanguage = AppLanguage.PT): String? {
-    return when (this) {
-        ApiSource.CODEX -> if (language == AppLanguage.PT) "Instável" else "Unstable"
-        else -> null
-    }
+    return null
 }
 
 fun ApiSource.statusSupportingText(language: AppLanguage = AppLanguage.PT): String? {
-    return when (this) {
-        ApiSource.CODEX -> if (language == AppLanguage.PT) {
-            "Monitoramento em transição: o contrato de uso mudou e os limites podem oscilar até a fonte estabilizar."
-        } else {
-            "Usage monitoring is in transition: the usage contract changed and limits may fluctuate until the source stabilizes."
-        }
-        else -> null
-    }
+    return null
 }
