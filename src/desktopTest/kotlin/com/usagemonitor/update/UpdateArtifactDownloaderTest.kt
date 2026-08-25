@@ -260,6 +260,30 @@ class UpdateArtifactDownloaderTest {
         assertEquals(listOf(ASSET_NAME, "$ASSET_NAME.part"), remaining)
     }
 
+    @Test
+    fun `pruning without a name to keep empties the directory`() {
+        updatesDirectory.mkdirs()
+        File(updatesDirectory, ASSET_NAME).writeBytes(payload)
+        File(updatesDirectory, "$ASSET_NAME.part").writeBytes(ByteArray(10))
+        File(updatesDirectory, "UsageMonitor-Setup-36.0.0.exe").writeBytes(ByteArray(10))
+
+        // É a poda de abertura: o recibo já disse que este artefato foi
+        // aplicado, então não há nome a preservar.
+        pruneUpdateArtifacts(updatesDirectory, keepAssetName = null)
+
+        assertEquals(emptyList(), updatesDirectory.listFiles().orEmpty().map { it.name })
+    }
+
+    @Test
+    fun `pruning an absent directory is not an error`() {
+        val absent = File(updatesDirectory, "nao-existe")
+
+        // A poda roda em toda abertura, inclusive na de quem nunca baixou nada.
+        pruneUpdateArtifacts(absent, keepAssetName = null)
+
+        assertEquals(false, absent.exists())
+    }
+
     // --- infraestrutura -----------------------------------------------------
 
     private fun MockRequestHandleScope.respondFull(): HttpResponseData {
