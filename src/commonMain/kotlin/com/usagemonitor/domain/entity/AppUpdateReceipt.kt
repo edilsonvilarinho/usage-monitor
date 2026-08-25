@@ -25,3 +25,27 @@ data class AppUpdateReceipt(
 )
 
 enum class AppUpdateReceiptStatus { SUCCESS, FAILED }
+
+/**
+ * O artefato baixado ainda serve para alguma coisa?
+ *
+ * O `Setup.exe` são ~120 MB e fica em `~/.usage-monitor/updates/` depois de
+ * aplicado, porque a única poda que existe roda em `prepare()` — ou seja, só
+ * quando uma versão **nova** é anunciada. Sem versão nova nunca há poda, e o
+ * arquivo mora ali para sempre.
+ *
+ * As duas condições importam, e nenhuma delas basta sozinha:
+ *
+ * - **Falha mantém o artefato de propósito.** O download é retomável e um
+ *   arquivo íntegro no disco não toca a rede; apagá-lo obrigaria a rebaixar
+ *   120 MB na tentativa seguinte.
+ * - **Versão diferente da que está rodando é prova de que a troca não
+ *   aconteceu.** Recibo de sucesso da 39 com o app em 37 descreve outra coisa
+ *   que não este binário, e o artefato ainda pode ser o caminho até ela.
+ */
+fun shouldDiscardUpdateArtifacts(receipt: AppUpdateReceipt?, currentVersion: String): Boolean {
+    if (receipt == null || receipt.status != AppUpdateReceiptStatus.SUCCESS) {
+        return false
+    }
+    return receipt.version == currentVersion
+}

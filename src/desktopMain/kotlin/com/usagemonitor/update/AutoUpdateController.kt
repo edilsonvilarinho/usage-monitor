@@ -1,17 +1,22 @@
 package com.usagemonitor.update
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.CURRENT_APP_VERSION
 import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.entity.AppUpdateReceipt
+import com.usagemonitor.domain.entity.shouldDiscardUpdateArtifacts
 import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.persistAutoUpdateEnabled
 import com.usagemonitor.readPersistedAutoUpdateEnabled
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 
 /**
  * Se **esta build** traz o mecanismo de atualização automática.
@@ -87,7 +92,7 @@ internal fun rememberAutoUpdateController(
     settings: PreferencesSettings,
     httpClient: HttpClient
 ): AutoUpdateController {
-    return remember(settings, httpClient) {
+    val controller = remember(settings, httpClient) {
         val installer = if (AUTO_UPDATE_SHIPPED) {
             WindowsAppUpdateInstaller(httpClient = httpClient)
         } else {
@@ -104,4 +109,22 @@ internal fun rememberAutoUpdateController(
             persist = { value -> persistAutoUpdateEnabled(settings, value) }
         )
     }
+
+    // Poda do artefato já aplicado. Mora aqui, e não no `main()`, porque aquele
+    // composable está no limite do backend JVM e não pode receber estado novo;
+    // e num LaunchedEffect, e não no corpo do `remember` acima, porque apagar
+    // arquivo é escrita e escrita não vai na thread de composição.
+    //
+    // Independe do interruptor: o artefato já foi aplicado, e desligar a
+    // atualização automática depois disso não o torna útil de novo. Idempotente,
+    // então não há marcador a guardar — na abertura seguinte não sobra nada.
+    LaunchedEffect(controller) {
+        if (shouldDiscardUpdateArtifacts(controller.lastReceipt, CURRENT_APP_VERSION)) {
+            withContext(Dispatchers.IO) {
+                pruneUpdateArtifacts(defaultUpdatesDirectory(), keepAssetName = null)
+            }
+        }
+    }
+
+    return controller
 }

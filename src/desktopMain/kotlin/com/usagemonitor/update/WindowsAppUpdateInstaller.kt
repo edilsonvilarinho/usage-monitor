@@ -183,7 +183,8 @@ class WindowsAppUpdateInstaller(
     }
 }
 
-private fun defaultUpdatesDirectory(): File {
+/** `internal` porque a poda de abertura precisa do mesmo caminho, e dois resolvedores divergiriam. */
+internal fun defaultUpdatesDirectory(): File {
     val home = System.getProperty("user.home") ?: error("user.home is unavailable")
     return File(home, ".usage-monitor/updates")
 }

@@ -79,12 +79,7 @@ class UpdateArtifactDownloader(
      *
      * Sem isso o diretório cresce ~120 MB por versão baixada, indefinidamente.
      */
-    fun prune(keepAssetName: String) {
-        val keep = setOf(keepAssetName, "$keepAssetName.part")
-        updatesDirectory.listFiles()
-            ?.filter { it.isFile && it.name !in keep }
-            ?.forEach { it.delete() }
-    }
+    fun prune(keepAssetName: String) = pruneUpdateArtifacts(updatesDirectory, keepAssetName)
 
     private suspend fun writeBody(
         artifact: AppUpdateArtifact,
@@ -222,4 +217,23 @@ class UpdateArtifactDownloader(
          */
         val TRUSTED_DOWNLOAD_HOSTS = setOf("github.com", "www.github.com")
     }
+}
+
+/**
+ * Apaga artefatos de `updates/`, preservando [keepAssetName] e o `.part` dele.
+ *
+ * `null` apaga tudo, e é o caso da poda de abertura: o artefato que o recibo diz
+ * ter sido aplicado já cumpriu o papel, e são ~120 MB por versão. A poda do
+ * [UpdateArtifactDownloader.prune] preserva um nome porque roda **antes** de
+ * aplicar — ali, apagar a versão anterior por uma tentativa que a rede derrubou
+ * deixaria o usuário sem as duas.
+ *
+ * Função top-level e não só método da classe porque quem poda na abertura não
+ * tem, nem precisa de, um `HttpClient`.
+ */
+internal fun pruneUpdateArtifacts(directory: File, keepAssetName: String?) {
+    val keep = if (keepAssetName == null) emptySet() else setOf(keepAssetName, "$keepAssetName.part")
+    directory.listFiles()
+        ?.filter { it.isFile && it.name !in keep }
+        ?.forEach { it.delete() }
 }
