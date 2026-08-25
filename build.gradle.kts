@@ -185,6 +185,37 @@ tasks.withType<Test>().configureEach {
     maxHeapSize = "1g"
 }
 
+// O plugin do Kover estava aplicado desde sempre e NENHUMA tarefa de relatorio
+// era executada em lugar nenhum: o agente instrumentava toda passada de
+// `:desktopTest` -- 6 a 7 s medidos -- para produzir um numero que ninguem lia.
+// Agora a instrumentacao e opt-in por `-Pcoverage`, que e o que o passo da
+// `main` usa no CI. Sem a propriedade, a suite roda limpa.
+kover {
+    currentProject {
+        instrumentation {
+            disabledForAll.set(!providers.gradleProperty("coverage").isPresent)
+        }
+    }
+
+    reports {
+        filters {
+            excludes {
+                // `Main.kt` e o grafo de DI mais a janela: nao existe teste de
+                // unidade que o exercite, e conta-lo como descoberto afunda o
+                // numero sem apontar lacuna nenhuma que se possa fechar.
+                classes("com.usagemonitor.MainKt", "com.usagemonitor.MainKt$*")
+            }
+        }
+
+        total {
+            // Nada pendurado no `check`: o relatorio e um passo proprio do CI, e
+            // amarra-lo ao `check` faria toda build local pagar por ele.
+            html { onCheck.set(false) }
+            xml { onCheck.set(false) }
+        }
+    }
+}
+
 // Capturas do README: renderizadas offscreen a partir dos composables reais com
 // dados sinteticos. O gerador vive em desktopTest para nao entrar no JAR
 // distribuido e ainda enxergar os composables `internal`.

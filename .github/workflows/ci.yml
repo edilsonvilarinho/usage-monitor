@@ -112,9 +112,18 @@ jobs:
       - name: Run tests
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
+        env:
+          # A instrumentacao do Kover custa 6 a 7 s por passada (medido: 47 s
+          # limpo contra 53 s instrumentado) e so serve se alguem for ler o
+          # relatorio. Ela entra na `main`, onde o relatorio sai logo abaixo, e
+          # fica fora do PR. A mesma passada serve as duas coisas: gerar o
+          # relatorio num segundo `allTests` seria rodar a suite duas vezes.
+          WITH_COVERAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat allTests --build-cache
+          $arguments = @('allTests', '--build-cache')
+          if ($env:WITH_COVERAGE -eq 'true') { $arguments += '-Pcoverage' }
+          .\gradlew.bat @arguments
 
       # O resumo sai em TODO run, verde inclusive. Um check que so diz
       # "Successful in 5m" nao permite saber se a suite rodou -- foi um verde de
@@ -134,6 +143,28 @@ jobs:
             --title "Desktop (allTests)" `
             --skipped "nenhum arquivo fora de server/, docs/ e *.md" `
             --evaluated "${{ steps.filter.outputs.changed }}"
+
+      # Relatorio de cobertura so no push para `main`. Sem `koverVerify` e sem
+      # piso: o limiar so faz sentido depois de a linha de base existir, e uma
+      # trava ligada no mesmo commit que produz o primeiro numero e uma trava
+      # calibrada no escuro. `:desktopTest` ja rodou instrumentado acima, entao
+      # aqui ele sai UP-TO-DATE e o passo so agrega.
+      - name: Coverage report
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat koverXmlReport koverHtmlReport --build-cache -Pcoverage
+          node tools/ci/coverage-summary.mjs build/reports/kover/report.xml
+
+      - name: Upload coverage report
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.relevant == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kover-report
+          path: build/reports/kover/html/**
+          if-no-files-found: ignore
+          retention-days: 14
 
       # Sobe sempre, nao so no `failure()`: sem o XML guardado nao ha como
       # comparar duracao entre runs nem investigar intermitencia depois do fato.
