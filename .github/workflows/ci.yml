@@ -54,22 +54,28 @@ jobs:
             --jq '.[].filename')"
 
           relevant=false
+          changed=0
           while IFS= read -r file; do
             [ -z "$file" ] && continue
+            changed=$((changed + 1))
             # Mesmo recorte do `paths-ignore` do gatilho de push.
             case "$file" in
               server/*|docs/*|*.md) continue ;;
             esac
             echo "Desktop change: $file"
             relevant=true
-            break
           done <<< "$files"
 
-          echo "relevant=$relevant"
+          # Sem `break` no laco: a contagem completa entra no resumo do job, e e
+          # ela que diz quantos arquivos foram avaliados quando a suite nao roda.
+          echo "relevant=$relevant changed=$changed"
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
+      # Checkout sem condicao: `tools/ci/test-summary.mjs` precisa existir no disco
+      # tambem no ramo em que a suite nao roda, que e justamente o que ele tem de
+      # anunciar. Sao ~5 s.
       - name: Checkout
-        if: steps.filter.outputs.relevant == 'true'
         uses: actions/checkout@v4
 
       - name: Setup JDK
@@ -110,13 +116,37 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\gradlew.bat allTests --build-cache
 
+      # O resumo sai em TODO run, verde inclusive. Um check que so diz
+      # "Successful in 5m" nao permite saber se a suite rodou -- foi um verde de
+      # 5 s, com zero teste executado, que abriu a issue #93. O `--require`
+      # derruba o job quando a suite devia rodar e nao produziu XML nenhum: e o
+      # unico jeito de "passou sem executar" ficar vermelho.
+      - name: Publish test summary
+        if: always() && steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: node tools/ci/test-summary.mjs --title "Desktop (allTests)" --glob "build/test-results/**/*.xml" --require
+
+      - name: Report skipped suite
+        if: steps.filter.outputs.relevant != 'true'
+        shell: pwsh
+        run: |
+          node tools/ci/test-summary.mjs `
+            --title "Desktop (allTests)" `
+            --skipped "nenhum arquivo fora de server/, docs/ e *.md" `
+            --evaluated "${{ steps.filter.outputs.changed }}"
+
+      # Sobe sempre, nao so no `failure()`: sem o XML guardado nao ha como
+      # comparar duracao entre runs nem investigar intermitencia depois do fato.
       - name: Upload test reports
-        if: failure() && steps.filter.outputs.relevant == 'true'
+        if: always() && steps.filter.outputs.relevant == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: build/reports/tests/**
+          path: |
+            build/reports/tests/**
+            build/test-results/**
           if-no-files-found: ignore
+          retention-days: 7
 
   # Job separado do `tests` de proposito: o roteiro instala e desinstala de
   # verdade, mexe no registro do runner e leva alguns minutos. Amarra-lo ao job

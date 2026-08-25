@@ -56,8 +56,10 @@ jobs:
             --jq '.[].filename')"
 
           relevant=false
+          changed=0
           while IFS= read -r file; do
             [ -z "$file" ] && continue
+            changed=$((changed + 1))
             # Mesmo recorte do `paths` do gatilho de push.
             case "$file" in
               server/*|.github/workflows/ci-server.yml) ;;
@@ -65,14 +67,18 @@ jobs:
             esac
             echo "Server change: $file"
             relevant=true
-            break
           done <<< "$files"
 
-          echo "relevant=$relevant"
+          # Sem `break` no laco: a contagem completa entra no resumo do job, e e
+          # ela que diz quantos arquivos foram avaliados quando a suite nao roda.
+          echo "relevant=$relevant changed=$changed"
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
+      # Checkout sem condicao: `tools/ci/test-summary.mjs` precisa existir no disco
+      # tambem no ramo em que a suite nao roda, que e justamente o que ele tem de
+      # anunciar.
       - name: Checkout
-        if: steps.filter.outputs.relevant == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node
@@ -92,6 +98,32 @@ jobs:
         if: steps.filter.outputs.relevant == 'true'
         run: npm run typecheck
 
+      # `test:ci` e o `vitest run` com o reporter JUnit ligado. O resumo do job sai
+      # do mesmo XML que o job do desktop usa, com o mesmo parser -- duas
+      # implementacoes divergiriam justamente na contagem.
       - name: Run tests
         if: steps.filter.outputs.relevant == 'true'
-        run: npm test
+        run: npm run test:ci
+
+      # Sai em TODO run, verde inclusive: foi um "Successful in 5s" deste job,
+      # com zero teste executado, que abriu a issue #93. O `--require` derruba o
+      # job quando a suite devia rodar e nao produziu XML nenhum.
+      - name: Publish test summary
+        if: always() && steps.filter.outputs.relevant == 'true'
+        working-directory: .
+        run: node tools/ci/test-summary.mjs --title "Servidor de time" --glob "server/test-results/*.xml" --require
+
+      - name: Report skipped suite
+        if: steps.filter.outputs.relevant != 'true'
+        working-directory: .
+        run: |
+          node tools/ci/test-summary.mjs             --title "Servidor de time"             --skipped "nenhuma mudanca em server/ nem no proprio workflow"             --evaluated "${{ steps.filter.outputs.changed }}"
+
+      - name: Upload test reports
+        if: always() && steps.filter.outputs.relevant == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-server
+          path: server/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
