@@ -663,7 +663,12 @@ internal fun CliSessionRow(
     session: CliSessionSummary,
     language: AppLanguage,
     onOpen: () -> Unit,
-    /** `false` no modal do time: o transcript daquela sessão não está nesta máquina. */
+    /**
+     * `false` quando o transcript não está nesta máquina — a sessão de um colega
+     * na lista do time. Ali a linha **não** oferece o botão de copiar: o
+     * `--resume` cairia num seletor vazio, e a issue #102 pede que a sessão de
+     * outro integrante não seja copiável.
+     */
     isLocalSession: Boolean = true,
     /** Ação destrutiva opcional; ausente nas listas locais e para não administradores. */
     onRemove: (() -> Unit)? = null,
@@ -706,11 +711,12 @@ internal fun CliSessionRow(
                         )
                     }
                     // O clique do botão é consumido por ele: copiar não abre o detalhe.
-                    CopySessionCommandButton(
-                        sessionId = session.sessionId,
-                        language = language,
-                        isLocalSession = isLocalSession
-                    )
+                    if (isLocalSession) {
+                        CopySessionCommandButton(
+                            sessionId = session.sessionId,
+                            language = language
+                        )
+                    }
                 }
 
                 Column(modifier = Modifier.width(SESSION_COLUMN_PROJECT)) {

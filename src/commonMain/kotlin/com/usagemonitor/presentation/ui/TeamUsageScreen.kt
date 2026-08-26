@@ -70,7 +70,6 @@ import com.usagemonitor.presentation.ui.components.AppToolbar
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
-import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
@@ -1424,12 +1423,9 @@ private fun TeamSessionDetailPane(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            CopySessionCommandButton(
-                sessionId = detail.sessionId,
-                language = language,
-                isLocalSession = false,
-                showLabel = true
-            )
+            // Sem botão de cópia: o painel abre a sessão de outro integrante, e a
+            // issue #102 pede que ela não seja copiável. A sessão desta máquina
+            // volta a oferecê-lo quando o painel souber comparar o device.
         }
 
         when (detail) {

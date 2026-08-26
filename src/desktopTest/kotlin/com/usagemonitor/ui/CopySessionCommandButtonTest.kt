@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -40,26 +42,6 @@ class CopySessionCommandButtonTest {
         onNodeWithContentDescription("Copiar comando de retomada").performClick()
 
         assertEquals(listOf("claude --resume $SESSION_ID"), copied)
-    }
-
-    /** Sessão de outra máquina: o `--resume` não teria transcript para abrir aqui. */
-    @Test
-    fun `a team session copies only the identifier`() = runDesktopComposeUiTest {
-        val copied = mutableListOf<String>()
-        setContent {
-            AppTheme(isDark = true) {
-                CopySessionCommandButton(
-                    sessionId = SESSION_ID,
-                    language = AppLanguage.PT,
-                    isLocalSession = false,
-                    onCopy = { text -> copied += text }
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Copiar id da sessão").performClick()
-
-        assertEquals(listOf(SESSION_ID), copied)
     }
 
     @Test
@@ -101,8 +83,15 @@ class CopySessionCommandButtonTest {
         onNodeWithContentDescription("Copiar comando de retomada").assertIsDisplayed()
     }
 
+    /**
+     * Sessão de outra máquina não é copiável (issue #102).
+     *
+     * O botão não troca de rótulo: ele **não existe**. Copiar só o identificador
+     * era o comportamento anterior, e o que a issue pede é que a sessão de um
+     * colega não ofereça nada para copiar.
+     */
     @Test
-    fun `the team session row offers the identifier instead of the command`() = runDesktopComposeUiTest {
+    fun `the team session row offers no copy button`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(200.dp)) {
@@ -116,7 +105,8 @@ class CopySessionCommandButtonTest {
             }
         }
 
-        onNodeWithContentDescription("Copiar id da sessão").assertIsDisplayed()
+        onAllNodesWithContentDescription("Copiar comando de retomada").assertCountEquals(0)
+        onAllNodesWithContentDescription("Copiar id da sessão").assertCountEquals(0)
     }
 
     private fun summary(): CliSessionSummary {

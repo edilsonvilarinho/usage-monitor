@@ -171,17 +171,6 @@ internal object CliSessionsLabels {
         }
     }
 
-    /**
-     * Rótulo da sessão de outra máquina.
-     *
-     * Ali o transcript não existe localmente e o `--resume` não teria o que
-     * retomar, então o botão copia só o identificador — e o texto não promete
-     * uma retomada que não acontece.
-     */
-    fun copySessionId(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Copiar id da sessão" else "Copy session id"
-    }
-
     fun copied(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Copiado" else "Copied"
     }

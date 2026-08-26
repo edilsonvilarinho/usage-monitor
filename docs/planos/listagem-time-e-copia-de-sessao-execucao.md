@@ -120,6 +120,7 @@ hash, e preencher o hash depois quebraria a regra de escrever a linha no mesmo c
 
 | # | Data | Commit | Atividade | Estado | Evidência |
 |---|---|---|---|---|---|
+| A01 | 2026-08-26 | `refactor(session): drop the second copy mode` | O botão de copiar deixa de ter dois modos | concluída | `CopySessionCommandButton` perdeu `isLocalSession`: o payload é sempre `resumeSessionCommand` e o rótulo sempre `copyResumeCommand`. `CliSessionsLabels.copySessionId` saiu como código morto, junto com o assert dele em `ResumeSessionCommandTest`. `CliSessionRow` **manteve** o parâmetro com semântica nova — `false` não renderiza o botão —, e é isso que preserva o call site do modal do time sem inventar um segundo nome para a mesma pergunta. O painel de detalhe do time (`TeamSessionDetailPane`) perdeu o botão nesta atividade e o recupera na A02, condicionado ao device; o import de `CopySessionCommandButton` saiu de `TeamUsageScreen` junto, senão o commit deixaria import morto. Teste 2 e 5 de `CopySessionCommandButtonTest` reescritos: em vez de afirmar o rótulo alternativo, afirmam **ausência** dos dois rótulos com `onAllNodesWithContentDescription(...).assertCountEquals(0)`. Protótipo §6 ganhou a nota da regra. `gradlew.bat desktopTest --tests "…CopySessionCommandButtonTest" --tests "…ResumeSessionCommandTest"`: BUILD SUCCESSFUL em 1m43s |
 
 ### Achados
 

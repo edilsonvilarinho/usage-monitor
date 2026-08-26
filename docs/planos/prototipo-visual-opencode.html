@@ -1014,6 +1014,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note">O botão de retomada copia <code>claude --resume &lt;uuid completo&gt;</code>: o id truncado em 8 que aparece na coluna <b>não retoma nada</b> — com prefixo o CLI cai no seletor interativo.</p>
+<p class="note"><b>O botão só existe na linha de uma sessão desta máquina.</b> Ele teve um segundo modo, que copiava apenas o identificador na lista do time, e esse modo saiu: sessão de outro integrante não oferece botão nenhum (issue #102). Rótulo diferente para a mesma ação continuava entregando o dado que a issue pede para não entregar, e um <code>--resume</code> com transcript de outra máquina cairia num seletor vazio. A linha continua clicável e o detalhe segue abrindo — é ele que permite diagnosticar a sessão saturada de um colega, que é para o que a lista do time existe.</p>
 
 <!-- ═══════════════════════════════ DETALHE ═══════════════════════════ -->
 <h2 id="detalhe">7 · Detalhe de sessão</h2>

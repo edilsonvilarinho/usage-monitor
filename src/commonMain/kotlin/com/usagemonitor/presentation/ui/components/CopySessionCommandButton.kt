@@ -27,23 +27,22 @@ import com.usagemonitor.presentation.ui.resumeSessionCommand
 private const val COPY_FEEDBACK_MILLIS = 2_000L
 
 /**
- * Copia o que permite voltar à sessão.
+ * Copia o comando que traz a sessão de volta.
  *
  * A tela mostra o id truncado em oito caracteres, que não retoma nada: o
  * `claude --resume` só volta direto para a conversa com o id inteiro. O botão
  * existe para entregar esse valor completo sem obrigar ninguém a caçá-lo em
  * `~/.claude/projects`.
  *
- * [isLocalSession] falso é a sessão de um colega, vinda do servidor de time: o
- * transcript não está nesta máquina, então ali se copia apenas o identificador —
- * um comando de retomada que cairia num seletor vazio seria pior que botão
- * nenhum.
+ * Ele tinha um segundo modo, que copiava só o identificador para a sessão vinda
+ * do servidor de time. Esse modo saiu: sessão que não é desta máquina não
+ * oferece mais botão nenhum (issue #102), e o ramo ficou sem consumidor. Quem
+ * decide se o botão existe é o chamador — aqui não há mais o que escolher.
  */
 @Composable
 internal fun CopySessionCommandButton(
     sessionId: String,
     language: AppLanguage,
-    isLocalSession: Boolean = true,
     /** `false` deixa só o ícone; o texto fica na tooltip, para a lista densa. */
     showLabel: Boolean = false,
     modifier: Modifier = Modifier,
@@ -61,15 +60,13 @@ internal fun CopySessionCommandButton(
         copied = false
     }
 
-    val idleLabel = if (isLocalSession) {
-        CliSessionsLabels.copyResumeCommand(language)
+    val label = if (copied) {
+        CliSessionsLabels.copied(language)
     } else {
-        CliSessionsLabels.copySessionId(language)
+        CliSessionsLabels.copyResumeCommand(language)
     }
-    val label = if (copied) CliSessionsLabels.copied(language) else idleLabel
-    val payload = if (isLocalSession) resumeSessionCommand(sessionId) else sessionId
     val onClick = {
-        onCopy(payload)
+        onCopy(resumeSessionCommand(sessionId))
         copied = true
     }
 
