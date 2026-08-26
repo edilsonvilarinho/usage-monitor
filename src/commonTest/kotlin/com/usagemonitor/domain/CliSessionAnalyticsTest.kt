@@ -223,8 +223,8 @@ class CliSessionAnalyticsTest {
             turn(seq = 2, model = SONNET, outputTokens = 1_000_000L)
         )
 
-        // 25,00 + 15,00 USD — a fórmula Sonnet fixa do legado daria 30,00.
-        assertEquals(40_000_000L, computeAnalytics(detail).costBreakdown.totalMicros)
+        // 25,00 + 10,00 USD — a fórmula Sonnet fixa do legado daria 30,00.
+        assertEquals(35_000_000L, computeAnalytics(detail).costBreakdown.totalMicros)
     }
 
     @Test

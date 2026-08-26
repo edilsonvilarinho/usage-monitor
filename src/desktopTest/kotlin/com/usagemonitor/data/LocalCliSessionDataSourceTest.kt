@@ -185,8 +185,8 @@ class LocalCliSessionDataSourceTest {
             dataSource.syncIndex()
 
             val session = dataSource.readSessions().single()
-            // 25,00 + 15,00 + 25,00 USD. A fórmula Sonnet fixa do legado daria 45,00.
-            assertEquals(65_000_000L, session.costMicros)
+            // 25,00 + 10,00 + 25,00 USD. A fórmula Sonnet fixa do legado daria 45,00.
+            assertEquals(60_000_000L, session.costMicros)
             assertEquals("claude-opus-5", session.primaryModel)
         }
     }

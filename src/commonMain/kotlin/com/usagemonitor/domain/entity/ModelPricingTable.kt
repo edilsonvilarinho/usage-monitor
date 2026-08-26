@@ -11,6 +11,12 @@ package com.usagemonitor.domain.entity
 object ModelPricingTable {
 
     private val OPUS = ModelPricing.ofUsdPerMillion(input = 5.00, output = 25.00)
+
+    // Sonnet 5 tem tarifa própria: 2/10 por milhão. Os 3/15 são do 4.6 e do 4.5 — uma
+    // constante só para os três superestimava toda sessão em Sonnet 5 por um fator
+    // exato de 3/2, porque os cinco componentes derivam do input e a razão
+    // output/input é 5x nos dois preços.
+    private val SONNET_5 = ModelPricing.ofUsdPerMillion(input = 2.00, output = 10.00)
     private val SONNET = ModelPricing.ofUsdPerMillion(input = 3.00, output = 15.00)
     private val HAIKU = ModelPricing.ofUsdPerMillion(input = 1.00, output = 5.00)
     private val FABLE = ModelPricing.ofUsdPerMillion(input = 10.00, output = 50.00)
@@ -31,7 +37,7 @@ object ModelPricingTable {
         "claude-opus-4-7" to OPUS,
         "claude-opus-4-6" to OPUS,
         "claude-opus-4-5" to OPUS,
-        "claude-sonnet-5" to SONNET,
+        "claude-sonnet-5" to SONNET_5,
         "claude-sonnet-4-6" to SONNET,
         "claude-sonnet-4-5" to SONNET,
         "claude-haiku-4-5" to HAIKU,
