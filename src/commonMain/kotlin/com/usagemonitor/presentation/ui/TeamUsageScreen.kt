@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
@@ -71,7 +72,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
-import com.usagemonitor.presentation.ui.components.DepthSurface
+import com.usagemonitor.presentation.ui.components.appNestedGroupGuide
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -145,20 +146,38 @@ private val TEAM_COLUMN_SPACING = 16.dp
 /** Mesma pegada do `AppIconButton`, para o cabeçalho reservar a casa certa. */
 private val TEAM_ACTION_SLOT = 26.dp
 
-// A linha do integrante mora dentro de um `DepthSurface`, e a faixa da conta
-// não. O padding horizontal compartilhado mantém as colunas no mesmo x; os
-// paddings verticais são diferentes de propósito para destacar a hierarquia.
+/** Pegada do `Icon` do Material, para a linha sem ícone reservar a mesma casa. */
+private val TEAM_EXPAND_ICON_SIZE = 24.dp
+
+// O padding horizontal é compartilhado entre a faixa da conta e a linha do
+// integrante: é ele que mantém as colunas das duas no mesmo x, que é a
+// comparação que a faixa existe para permitir.
+//
+// O padding vertical **não** é compartilhado, e a diferença deixou de ser
+// simbólica: a faixa da conta media 62dp e a linha do integrante 63dp, ou seja,
+// a capa era mais baixa que o item que ela cobre (issue #104).
 private val TEAM_ROW_HORIZONTAL_PADDING = 14.dp
-private val TEAM_ACCOUNT_VERTICAL_PADDING = 10.dp
+private val TEAM_ACCOUNT_VERTICAL_PADDING = AppSpacing.md
 private val TEAM_MEMBER_VERTICAL_PADDING = 10.dp
 private val TEAM_MEMBER_WRAPPED_ROW_GAP = 4.dp
 
-// Recuo do bloco de sessões de um integrante.
+// Degrau de aninhamento da lista, aplicado **dentro da coluna de identidade** e
+// não no início da linha.
+//
+// Recuar a linha inteira moveria as colunas numéricas do integrante para fora do
+// x das da faixa da conta, e é justamente a comparação entre os dois números que
+// a faixa existe para dar. Recuar só o texto entrega o degrau visual e deixa a
+// faixa de legendas — uma só, acima da lista inteira — continuar descrevendo
+// todas as linhas. A coluna de identidade cede a mesma largura que o degrau
+// ocupa, então nada além do texto se move.
+private val TEAM_NEST_INDENT = AppSpacing.md
+
+// Recuo do bloco de sessões de um integrante, somado ao degrau do integrante.
 //
 // O recuo sozinho não estava sendo lido: numa lista onde conta, integrante e
 // sessão flutuam sobre o mesmo fundo, 24dp à esquerda passam por alinhamento
 // diferente, não por nível abaixo. Quem dá o nível é a superfície, como no
-// protótipo: lá o bloco aninhado tem recuo **e** fundo próprio.
+// protótipo, mais a guia vertical que liga o bloco à linha de quem o abriu.
 private val TEAM_SESSION_INDENT = AppSpacing.xl
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
@@ -166,6 +185,14 @@ private val TEAM_SESSION_INDENT = AppSpacing.xl
 fun TeamUsageScreen(
     viewModel: TeamUsageViewModel,
     language: AppLanguage,
+    /**
+     * Máquina desta instalação, para separar a sessão própria da de um colega.
+     *
+     * Nulo quando a integração não está configurada ou a instalação é só de
+     * administração — e ali nenhuma sessão da lista é desta máquina, que é o
+     * resultado seguro.
+     */
+    localDeviceId: String? = null,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -175,6 +202,7 @@ fun TeamUsageScreen(
     TeamUsageContent(
         state = state,
         language = language,
+        localDeviceId = localDeviceId,
         removalError = removalError,
         sessionRemovalError = sessionRemovalError,
         onSelectRange = { range -> viewModel.setRange(range) },
@@ -203,6 +231,8 @@ internal fun TeamUsageContent(
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Ver `TeamUsageScreen`; default nulo para não arrastar quem não o exercita. */
+    localDeviceId: String? = null,
     // Com default para não arrastar as chamadas que só exercitam o modal de uma
     // conta, onde não existe faixa a recolher.
     onToggleAccount: (String) -> Unit = {},
@@ -242,6 +272,7 @@ internal fun TeamUsageContent(
                     TeamUsageList(
                         state = state,
                         language = language,
+                        localDeviceId = localDeviceId,
                         removalError = removalError,
                         sessionRemovalError = sessionRemovalError,
                         onSelectRange = onSelectRange,
@@ -261,6 +292,7 @@ internal fun TeamUsageContent(
                     TeamSessionDetailPane(
                         detail = detail,
                         language = language,
+                        isLocalSession = localDeviceId != null && detail.deviceId == localDeviceId,
                         advancedExpanded = state.advancedExpanded,
                         glossaryExpanded = state.glossaryExpanded,
                         onCloseDetail = onCloseDetail,
@@ -378,6 +410,7 @@ private fun RemoveSessionConfirmation(
 private fun TeamUsageList(
     state: TeamUsageUiState.Success,
     language: AppLanguage,
+    localDeviceId: String?,
     removalError: String?,
     sessionRemovalError: String?,
     onSelectRange: (CliSessionRange) -> Unit,
@@ -565,9 +598,26 @@ private fun TeamUsageList(
                     }
 
                     for (account in emailGroup.accounts) {
-                        if (emailGroup.accounts.size > 1) {
+                        // Um degrau por nível que existe acima do integrante: a
+                        // faixa da conta só é desenhada na visão global, e a
+                        // sub-faixa de uuid só quando o mesmo e-mail tem mais de
+                        // uma conta. No modal de uma conta os dois somem e o
+                        // recuo é zero, que é a geometria de sempre.
+                        val hasUuidHeader = emailGroup.accounts.size > 1
+                        val memberIndent = when {
+                            !state.isAdminOverview -> 0.dp
+                            hasUuidHeader -> TEAM_NEST_INDENT * 2
+                            else -> TEAM_NEST_INDENT
+                        }
+                        val sessionIndent = memberIndent + TEAM_SESSION_INDENT
+
+                        if (hasUuidHeader) {
                             item(key = "uuid:${account.accountKey}") {
-                                TeamAccountUuidHeader(account = account, language = language)
+                                TeamAccountUuidHeader(
+                                    account = account,
+                                    language = language,
+                                    indent = TEAM_NEST_INDENT
+                                )
                             }
                         }
 
@@ -578,6 +628,7 @@ private fun TeamUsageList(
                                 share = state.tokenShareOf(member),
                                 expanded = member.memberKey in state.expandedMemberKeys,
                                 language = language,
+                                indent = memberIndent,
                                 removable = state.isAdminOverview,
                                 hasStatusColumn = hasStatusColumn,
                                 hasActionColumn = state.isAdminOverview,
@@ -596,7 +647,11 @@ private fun TeamUsageList(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(MaterialTheme.colorScheme.surface)
-                                        .padding(start = TEAM_SESSION_INDENT, top = AppSpacing.sm)
+                                        .appNestedGroupGuide(
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            indent = sessionIndent
+                                        )
+                                        .padding(start = sessionIndent, top = AppSpacing.sm)
                                 ) {
                                     CliSessionColumnHeader(
                                         language = language,
@@ -621,11 +676,19 @@ private fun TeamUsageList(
                                 // `surfaceVariant` porque `surfaceVariant` é o realce
                                 // de hover do `AppDataRow`: com ele aqui, passar o
                                 // mouse numa sessão deixaria de dar retorno nenhum.
+                                //
+                                // A guia atravessa o cabeçalho e todas as sessões:
+                                // é ela que diz que estes itens irmãos pertencem à
+                                // linha do integrante logo acima.
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(MaterialTheme.colorScheme.surface)
-                                        .padding(start = TEAM_SESSION_INDENT)
+                                        .appNestedGroupGuide(
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            indent = sessionIndent
+                                        )
+                                        .padding(start = sessionIndent)
                                         .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
                                 ) {
                                     val session = member.sessions[index]
@@ -638,7 +701,12 @@ private fun TeamUsageList(
                                         onOpen = {
                                             onOpenSession(member.memberKey, session.sessionId)
                                         },
-                                        isLocalSession = false,
+                                        // Só a máquina desta instalação tem o
+                                        // transcript no disco, e é só nela que o
+                                        // botão de copiar aparece: a sessão de um
+                                        // colega não é copiável (issue #102).
+                                        isLocalSession = localDeviceId != null &&
+                                            member.deviceId == localDeviceId,
                                         onRemove = if (state.isAdminOverview) {
                                             { onRequestRemoveSession(member, session) }
                                         } else {
@@ -841,6 +909,12 @@ private fun TeamAccountGroupHeader(
                         // O e-mail é o dado, e dado fica na cor do texto. Quem
                         // identifica a faixa como conta é o marcador de 2dp à
                         // esquerda e a palavra logo acima.
+                        // Continua em `titleSmall`, e o degrau tipográfico foi
+                        // medido e recusado: com `titleMedium` (16sp) o e-mail
+                        // não cabe nos 148dp úteis da coluna e a captura saiu com
+                        // "ana@example…" — truncar a identidade da conta é pior
+                        // que a capa ser um degrau menos pesada. A altura da
+                        // faixa vem do padding vertical, que não custa largura.
                         Text(
                             text = group.accountEmail ?: TeamUsageLabels.unlabeledAccount(language),
                             style = MaterialTheme.typography.titleSmall,
@@ -920,13 +994,18 @@ private fun TeamAccountGroupHeader(
 }
 
 @Composable
-private fun TeamAccountUuidHeader(account: TeamAccountGroup, language: AppLanguage) {
+private fun TeamAccountUuidHeader(
+    account: TeamAccountGroup,
+    language: AppLanguage,
+    /** Um degrau abaixo da faixa do e-mail e um acima do integrante que ela cobre. */
+    indent: Dp
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .padding(
-                start = TEAM_ROW_HORIZONTAL_PADDING + AppSpacing.xl,
+                start = TEAM_ROW_HORIZONTAL_PADDING + indent,
                 end = TEAM_ROW_HORIZONTAL_PADDING,
                 top = AppSpacing.sm,
                 bottom = AppSpacing.sm
@@ -1221,6 +1300,14 @@ private fun TeamMemberRow(
     share: Double,
     expanded: Boolean,
     language: AppLanguage,
+    /**
+     * Degrau de aninhamento, aplicado **dentro** da coluna de identidade.
+     *
+     * Ele desloca só o texto: a coluna cede a mesma largura e as colunas
+     * numéricas continuam no x das da faixa da conta, que é a comparação que a
+     * faixa existe para permitir.
+     */
+    indent: Dp,
     removable: Boolean,
     /** A lista tem coluna de status; esta linha reserva a casa mesmo sem veredito. */
     hasStatusColumn: Boolean,
@@ -1231,9 +1318,14 @@ private fun TeamMemberRow(
 ) {
     val accents = AppAccents.current
 
+    // Acento da **fonte**, e não o verde da faixa da conta: com os dois no mesmo
+    // tom, capa e item traziam o mesmo marcador de 2dp no mesmo x e o marcador
+    // deixava de dizer em que nível a linha está (issue #104). É também o que o
+    // protótipo já desenhava.
+    //
     // Integrante sem uso no período fica neutro: destacá-lo com a mesma cor de
     // quem consumiu daria a impressão de atividade que não houve.
-    val accent = if (member.hasActivity) accents.cacheRead else MaterialTheme.colorScheme.outline
+    val accent = if (member.hasActivity) accents.anthropic else MaterialTheme.colorScheme.outline
 
     // Linha de tabela, não card: eram até vinte cards empilhados numa janela de
     // time grande. O marcador de 2dp mantém a leitura de "esta pessoa produziu"
@@ -1259,6 +1351,12 @@ private fun TeamMemberRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // O degrau vive aqui, dentro da coluna: `TEAM_COLUMN_IDENTITY` é
+                // fixa, então o que ele consome sai do texto e nenhuma coluna à
+                // direita se move.
+                if (indent > 0.dp) {
+                    Spacer(modifier = Modifier.width(indent))
+                }
                 if (member.hasActivity) {
                     Icon(
                         imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
@@ -1269,10 +1367,27 @@ private fun TeamMemberRow(
                         },
                         tint = accent
                     )
+                } else {
+                    // A casa do ícone fica reservada. Sem ela o integrante sem
+                    // atividade começava 24dp à esquerda dos outros, e numa lista
+                    // com um único integrante parado a coluna inteira lia como
+                    // desalinhada — medido na captura do README.
+                    Spacer(modifier = Modifier.width(TEAM_EXPAND_ICON_SIZE))
                 }
                 // Apelido, máquina e último envio: identidade e os dois carimbos
                 // que a qualificam. A máquina deixou de ser coluna própria — ela
                 // não é uma medida ao lado de custo e tokens, é quem é a pessoa.
+                //
+                // **Sem a palavra do nível**, e a tentativa está registrada
+                // porque ela parecia a resposta óbvia para a issue #104. Ela
+                // duplicaria a legenda desta coluna, que já diz "Integrante" uma
+                // vez para a lista inteira — o rótulo por célula que a issue #81
+                // desfez. E emendada na máquina para não custar uma quarta linha,
+                // ela estourava os 148dp úteis da coluna: a captura do README
+                // saiu com "Integrante · DESKTOP-…", truncando justamente o dado
+                // que identifica a máquina. Quem separa capa de item aqui são o
+                // recuo, o marcador, o peso do e-mail da faixa e a palavra que a
+                // **faixa** carrega.
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = member.alias,
@@ -1400,6 +1515,8 @@ private fun TeamMemberRow(
 private fun TeamSessionDetailPane(
     detail: TeamSessionDetailUiState,
     language: AppLanguage,
+    /** Sessão desta máquina; só ela oferece o botão de copiar (issue #102). */
+    isLocalSession: Boolean,
     advancedExpanded: Boolean,
     glossaryExpanded: Boolean,
     onCloseDetail: () -> Unit,
@@ -1424,12 +1541,16 @@ private fun TeamSessionDetailPane(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            CopySessionCommandButton(
-                sessionId = detail.sessionId,
-                language = language,
-                isLocalSession = false,
-                showLabel = true
-            )
+            // O painel também abre a sessão de um colega, e ali não há o que
+            // copiar: o transcript não está nesta máquina e a issue #102 pede
+            // que a sessão de outro integrante não seja copiável.
+            if (isLocalSession) {
+                CopySessionCommandButton(
+                    sessionId = detail.sessionId,
+                    language = language,
+                    showLabel = true
+                )
+            }
         }
 
         when (detail) {

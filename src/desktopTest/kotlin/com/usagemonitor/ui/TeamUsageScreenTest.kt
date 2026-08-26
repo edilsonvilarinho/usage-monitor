@@ -7,16 +7,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -67,6 +69,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private val NOW = Instant.parse("2026-08-11T12:00:00Z")
 
@@ -126,6 +129,28 @@ class TeamUsageScreenTest {
         onNodeWithText("DESKTOP-A1").assertIsDisplayed()
         onNodeWithText("maria").assertIsDisplayed()
         onNodeWithText("NOTE-B2").assertIsDisplayed()
+    }
+
+    /**
+     * Issue #104: a palavra do nível é da faixa, e a linha não a repete.
+     *
+     * Ela chegou a ser emendada na máquina na linha do integrante, e as duas
+     * coisas deram errado ao mesmo tempo: duplicava a legenda da coluna, que já
+     * diz "Integrante" uma vez para a lista inteira, e estourava a largura útil
+     * da coluna, truncando a máquina em "DESKTOP-…".
+     */
+    @Test
+    fun `a palavra do nivel aparece uma vez fora da faixa de legendas`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1", tokens = 500L))),
+                    member("device-2", "maria", "NOTE-B2", listOf(session("s2", tokens = 400L)))
+                )
+            )
+        )
+
+        onAllNodesWithText("Integrante", useUnmergedTree = true).assertCountEquals(1)
     }
 
     @Test
@@ -204,6 +229,61 @@ class TeamUsageScreenTest {
 
         // O id curto de oito caracteres é a mesma célula da lista de sessões local.
         onNodeWithText("abcdef01").assertIsDisplayed()
+    }
+
+    /**
+     * Issue #102: a sessão desta máquina, mesmo listada no modal do time, tem o
+     * transcript no disco — e é a única que oferece o comando de retomada.
+     */
+    @Test
+    fun `sessao desta maquina oferece o comando de retomada`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123", tokens = 500L)))
+                ),
+                expandedMemberKeys = setOf("device-1")
+            ),
+            localDeviceId = "device-1"
+        )
+
+        onNodeWithContentDescription("Copiar comando de retomada").assertIsDisplayed()
+    }
+
+    /** Issue #102: a sessão de um colega não oferece nada para copiar. */
+    @Test
+    fun `sessao de outro integrante nao oferece botao de copia`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123", tokens = 500L)))
+                ),
+                expandedMemberKeys = setOf("device-1")
+            ),
+            localDeviceId = "device-outro"
+        )
+
+        // A sessão continua na lista e continua clicável: o que sai é só o botão.
+        onNodeWithText("abcdef01").assertIsDisplayed()
+        onAllNodesWithContentDescription("Copiar comando de retomada").assertCountEquals(0)
+    }
+
+    /**
+     * Sem integração configurada não há device local, e nenhuma sessão da lista
+     * é desta máquina — o resultado seguro é não oferecer botão nenhum.
+     */
+    @Test
+    fun `sem device local nenhuma sessao oferece botao de copia`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123", tokens = 500L)))
+                ),
+                expandedMemberKeys = setOf("device-1")
+            )
+        )
+
+        onAllNodesWithContentDescription("Copiar comando de retomada").assertCountEquals(0)
     }
 
     @Test
@@ -981,7 +1061,8 @@ class TeamUsageScreenTest {
         onSelectView: (TeamUsageView) -> Unit = {},
         onExportReport: () -> Unit = {},
         onRemoveMember: (String) -> Unit = {},
-        onRemoveSession: (String, String) -> Unit = { _, _ -> }
+        onRemoveSession: (String, String) -> Unit = { _, _ -> },
+        localDeviceId: String? = null
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -989,6 +1070,7 @@ class TeamUsageScreenTest {
                     TeamUsageContent(
                         state = state,
                         language = AppLanguage.PT,
+                        localDeviceId = localDeviceId,
                         onSelectRange = {},
                         onToggleMember = {},
                         onToggleAccount = onToggleAccount,
@@ -1089,13 +1171,18 @@ class TeamUsageScreenTest {
     }
 
     /**
-     * A linha do integrante encolheu de 109dp para 88dp na refatoração visual:
-     * ela deixou de ser um card com padding próprio e virou linha de tabela. O
-     * assert continua existindo pelo mesmo motivo de antes — a linha não pode
-     * voltar a crescer —, com o número novo.
+     * A capa tem de ser mais alta que o item que ela cobre (issue #104).
+     *
+     * O assert fixava 62dp e 63dp, e esses dois números diziam exatamente o
+     * defeito sem que ninguém o lesse: a faixa da conta era **um dp mais baixa**
+     * que a linha do integrante. Dois números mágicos não dizem qual dos dois é a
+     * capa; a relação, sim — e é ela que não pode voltar a se inverter.
+     *
+     * O teto continua existindo pelo motivo de sempre: a linha não pode voltar a
+     * ser o card de 109dp que a refatoração visual desfez.
      */
     @Test
-    fun `faixa da conta cresce e linha do integrante fica compacta em 960dp`() =
+    fun `faixa da conta e mais alta que a linha do integrante em 960dp`() =
         runDesktopComposeUiTest {
             renderSuccess(
                 TeamUsageUiState.Success(
@@ -1115,17 +1202,26 @@ class TeamUsageScreenTest {
                 width = 960.dp
             )
 
-            // 62 e não 57: a faixa ganhou a palavra "Conta" acima do e-mail
-            // (issue #69). Cinco dp é o preço de dizer o que a linha é; o assert
-            // continua existindo para ela não voltar a crescer sem motivo.
-            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
-                .assertHeightIsEqualTo(62.dp)
-            // 63 e não 88 (issue #81): com a legenda numa faixa única, cada célula
-            // deixou de carregar o próprio rótulo e virou uma linha de texto só.
-            // A coluna de identidade continua com três, porque ali são identidade
-            // e os dois carimbos que a qualificam.
-            onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
-                .assertHeightIsEqualTo(63.dp)
+            // `bottom - top` e não `.height`: o `height` importado aqui é o
+            // modificador de layout, e o do `DpRect` fica escondido por ele.
+            val accountBounds = onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
+                .getUnclippedBoundsInRoot()
+            val memberBounds = onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
+                .getUnclippedBoundsInRoot()
+            val accountHeight = accountBounds.bottom - accountBounds.top
+            val memberHeight = memberBounds.bottom - memberBounds.top
+
+            assertTrue(
+                accountHeight > memberHeight,
+                "faixa da conta ($accountHeight) deveria ser mais alta que a linha do integrante ($memberHeight)"
+            )
+            // Teto da linha: ela não pode voltar a ser o card de 109dp. As três
+            // linhas da coluna de identidade são identidade, o nível e os
+            // carimbos que a qualificam — nada além disso cabe ali.
+            assertTrue(
+                memberHeight <= 72.dp,
+                "linha do integrante cresceu para $memberHeight"
+            )
         }
 
     @Test

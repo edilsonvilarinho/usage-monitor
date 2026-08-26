@@ -1,12 +1,16 @@
 package com.usagemonitor.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -17,6 +21,7 @@ import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
+import com.usagemonitor.presentation.ui.components.appNestedGroupGuide
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -108,5 +113,43 @@ class AppStructureTest {
 
         onNodeWithText("Conteúdo").assertIsDisplayed()
         onNodeWithText("v35.0.0").assertIsDisplayed()
+    }
+
+    /**
+     * A guia é traço de fundo e não pode consumir layout.
+     *
+     * É a diferença entre ela e `Modifier.border`, que arredonda a espessura
+     * para cima e come a caixa em escalas fracionárias (issue #83). Se ela
+     * deslocasse o conteúdo, o recuo do bloco aninhado passaria a depender de a
+     * guia existir — e o item sem guia sairia de alinhamento com o irmão.
+     */
+    @Test
+    fun `a guia de bloco aninhado nao desloca o conteudo`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(600.dp).height(200.dp)) {
+                    Column {
+                        Box(
+                            modifier = Modifier
+                                .appNestedGroupGuide(
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    indent = 24.dp
+                                )
+                                .padding(start = 24.dp)
+                        ) {
+                            Text("com guia")
+                        }
+                        Box(modifier = Modifier.padding(start = 24.dp)) {
+                            Text("sem guia")
+                        }
+                    }
+                }
+            }
+        }
+
+        val withGuide = onNodeWithText("com guia").getUnclippedBoundsInRoot().left
+        val withoutGuide = onNodeWithText("sem guia").getUnclippedBoundsInRoot().left
+
+        assertEquals(withoutGuide, withGuide)
     }
 }

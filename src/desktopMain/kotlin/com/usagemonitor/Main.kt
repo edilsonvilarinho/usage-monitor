@@ -1556,7 +1556,10 @@ fun main(args: Array<String>) = application {
                 ) {
                     TeamUsageScreen(
                         viewModel = teamUsageViewModel,
-                        language = language
+                        language = language,
+                        // Mesma origem que a tela de presença usa logo abaixo: é
+                        // ela que separa a sessão desta máquina da de um colega.
+                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
                     )
                 }
             }

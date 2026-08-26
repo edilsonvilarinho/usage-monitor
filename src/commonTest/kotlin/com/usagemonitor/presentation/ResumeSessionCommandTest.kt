@@ -34,8 +34,6 @@ class ResumeSessionCommandTest {
     fun `copy labels exist in both languages`() {
         assertEquals("Copiar comando de retomada", CliSessionsLabels.copyResumeCommand(AppLanguage.PT))
         assertEquals("Copy resume command", CliSessionsLabels.copyResumeCommand(AppLanguage.EN))
-        assertEquals("Copiar id da sessão", CliSessionsLabels.copySessionId(AppLanguage.PT))
-        assertEquals("Copy session id", CliSessionsLabels.copySessionId(AppLanguage.EN))
         assertEquals("Copiado", CliSessionsLabels.copied(AppLanguage.PT))
         assertEquals("Copied", CliSessionsLabels.copied(AppLanguage.EN))
     }

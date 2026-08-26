@@ -287,6 +287,39 @@ fun AppSourceMarker(
 }
 
 /**
+ * Guia vertical que liga um bloco aninhado à linha que o abriu.
+ *
+ * Uma lista que abre sub-itens numa `LazyColumn` não pode aninhar uma lista
+ * dentro da outra — aninhar quebra a rolagem e desliga o reaproveitamento —,
+ * então os filhos entram como itens **irmãos** do pai. O preço é que nada na
+ * árvore diz que aqueles itens pertencem à linha de cima: eles são retângulos
+ * soltos com um recuo, e recuo sozinho lê como alinhamento diferente, não como
+ * nível abaixo (issue #104).
+ *
+ * O traço é desenhado por item e fica contínuo porque a lista não tem vão entre
+ * eles. É `drawBehind` e não `Modifier.border`: aquele arredonda a espessura
+ * para cima e pinta **depois** do conteúdo, que foi o defeito da issue #83.
+ * Aqui o traço não ocupa layout nenhum — quem reserva o espaço é o `padding` do
+ * próprio item, que é onde [indent] também é aplicado.
+ *
+ * @param indent distância da borda esquerda do item até o traço. É o mesmo
+ *   recuo que o conteúdo recebe, e o traço mora na metade dele.
+ */
+fun Modifier.appNestedGroupGuide(color: Color, indent: Dp): Modifier {
+    return drawBehind {
+        val strokeWidth = MARKER_WIDTH.toPx()
+        // Na metade do recuo: encostado no conteúdo ele viraria borda da célula,
+        // e encostado na borda do item ele viraria borda da lista.
+        val left = indent.toPx() / 2f - strokeWidth / 2f
+        drawRect(
+            color = color,
+            topLeft = Offset(left, 0f),
+            size = Size(strokeWidth, size.height)
+        )
+    }
+}
+
+/**
  * Linha de dados: altura mínima de 32dp, divisória embaixo e realce no hover.
  *
  * A divisória é do próprio item e não um separador entre itens porque a lista é
