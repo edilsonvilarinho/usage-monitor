@@ -1169,7 +1169,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="row" style="background:var(--raised)">
         <span class="srcmark" style="background:var(--cread)"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
-        <div class="stack" style="gap:0;width:142px"><span class="k">Conta · 3 integrantes</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <div class="stack" style="gap:0;width:142px"><span class="k">Conta · 3 integrantes</span><span class="v" style="font-weight:500">ana@example.com</span><span class="k">account-primary</span></div>
         <span class="v sm" style="width:60px">4</span>
         <span class="v sm" style="width:136px">8,97 M</span>
         <span class="v sm" style="width:96px">US$ 14,2092</span>
@@ -1178,8 +1178,9 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       </div>
       <div class="row">
         <span class="srcmark" style="background:var(--anthropic)"></span>
+        <span style="width:12px"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
-        <div class="stack" style="gap:0;width:142px"><span class="v sm">dev-01</span><span class="k">DESKTOP-A1</span><span class="k">envio 12/08 10:58 BRT</span></div>
+        <div class="stack" style="gap:0;width:130px"><span class="k">Integrante · DESKTOP-A1</span><span class="v sm">dev-01</span><span class="k">envio 12/08 10:58 BRT</span></div>
         <span class="v sm" style="width:60px">2</span>
         <span class="v sm" style="width:136px">6,32 M</span>
         <span class="v sm" style="width:96px">US$ 9,0892</span>
@@ -1210,8 +1211,9 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       </div>
       <div class="row">
         <span class="srcmark" style="background:var(--anthropic)"></span>
+        <span style="width:12px"></span>
         <button class="btn ghost icon" type="button" aria-label="Expandir integrante">▸</button>
-        <div class="stack" style="gap:0;width:142px"><span class="v sm">dev-02</span><span class="k">NOTE-B2</span><span class="k">envio 12/08 10:49 BRT</span></div>
+        <div class="stack" style="gap:0;width:130px"><span class="k">Integrante · NOTE-B2</span><span class="v sm">dev-02</span><span class="k">envio 12/08 10:49 BRT</span></div>
         <span class="v sm" style="width:60px">1</span>
         <span class="v sm" style="width:136px">2,65 M</span>
         <span class="v sm" style="width:96px">US$ 5,1200</span>
@@ -1221,8 +1223,9 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       </div>
       <div class="row">
         <span class="srcmark" style="background:var(--border)"></span>
+        <span style="width:12px"></span>
         <span style="width:26px"></span>
-        <div class="stack" style="gap:0;width:142px"><span class="v sm">dev-03</span><span class="k">NOTE-C3</span><span class="k">envio 12/08 02:00 BRT</span></div>
+        <div class="stack" style="gap:0;width:130px"><span class="k">Integrante · NOTE-C3</span><span class="v sm">dev-03</span><span class="k">envio 12/08 02:00 BRT</span></div>
         <span class="v sm" style="width:60px">0</span>
         <span class="v sm dim" style="width:136px">sem uso no período</span>
         <span class="v sm" style="width:96px">US$ 0,0000</span>
@@ -1235,6 +1238,9 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note"><b>Um degrau de superfície por nível, e <code>--raised</code> fica reservado ao hover.</b> A faixa da conta é o único nível que o usa como fundo fixo; o bloco de sessões fica <b>um degrau de distância do fundo da lista</b>, na direção que houver — aqui a lista mora num <code>.panel</code> em <code>--surface</code> e o bloco desce para <code>--bg</code>; no Compose a lista mora sobre <code>--bg</code> e o bloco sobe para <code>--surface</code>. O bloco aninhado era <code>--raised</code> nesta página e isso estava tecnicamente errado: <code>--raised</code> é o realce de <code>.row:hover</code>, e com ele no bloco passar o mouse numa sessão deixava de dar retorno nenhum. A faixa só aparece na visão de todas as contas — no modal de uma conta ela seria repetição do título da janela.</p>
+<p class="note"><b>O que separa a capa do item são quatro coisas, e nenhuma delas é a superfície sozinha</b> (issue #104). A faixa da conta e a linha do integrante tinham o mesmo <code>x</code>, o mesmo marcador verde, o mesmo corpo de texto e — medido — a capa era <b>um dp mais baixa</b> que o item que ela cobre. Os quatro degraus, na ordem em que o olho os usa: (1) a <b>palavra do nível</b>, "Conta · N integrantes" contra "Integrante · MÁQUINA"; (2) o <b>recuo</b> de 12px por nível; (3) o <b>marcador</b>, verde de agregação na conta e acento da <b>fonte</b> no integrante; (4) o <b>peso</b>, com o e-mail da conta um degrau tipográfico acima do apelido. Entre as quatro superfícies vizinhas há ~3% de luminância, e <code>--raised</code> ainda é o hover da linha: superfície sozinha nunca ia bastar.</p>
+<p class="note"><b>O recuo mora dentro da coluna de identidade, não no início da linha.</b> A faixa da conta é totalizadora, e o número dela só serve para comparar se cair no mesmo <code>x</code> do número do integrante; recuar a linha inteira tiraria as colunas de lugar. E a faixa de legendas é <b>uma só</b>, acima da lista inteira — se as linhas recuassem, ela deixaria de descrever a maioria delas, que é exatamente o que a issue #81 proibiu. A coluna de identidade cede a mesma largura que o degrau ocupa: o apelido trunca um pouco antes e nada mais se move. Na visão global o degrau é de 12px; quando o mesmo e-mail tem mais de uma conta, a sub-faixa de uuid ocupa o primeiro degrau e o integrante vai para o segundo. No modal de uma conta não há capa nenhuma e o recuo é zero.</p>
+<p class="note"><b>A máquina vem emendada na palavra do nível, e não em linha própria.</b> Ela já era a segunda linha da coluna de identidade; emendá-la mantém as três linhas que existiam e o rótulo sai de graça. Uma quarta linha por integrante seria clareza paga em rolagem, e uma lista de vinte máquinas é o caso que a tela precisa aguentar.</p>
 <p class="note"><b>O botão de copiar existe só na sessão desta máquina.</b> O integrante desenhado acima é a instalação local — <code>deviceId</code> igual ao do <code>team.json</code> —, e por isso a linha de sessão dele traz o botão: o transcript está no disco e o <code>claude --resume</code> abre a conversa. Nas sessões dos outros integrantes ele <b>não é desenhado</b> (issue #102): a linha continua clicável e o detalhe segue abrindo, porque é ele que permite diagnosticar a sessão saturada de um colega. Sem <code>deviceId</code> local — integração desligada, instalação só de administração — nenhuma linha tem botão, que é o resultado seguro.</p>
 <p class="note"><b>A ordem das contas é alfabética pelo e-mail</b>, e o consumo ordena de novo dentro de cada uma. Ordenar as contas por consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s. Conta sem chave emitida vai para o fim: sem e-mail não há o que comparar, e abrir a lista com um uuid cru seria pior que fechá-la com ele.</p>
 

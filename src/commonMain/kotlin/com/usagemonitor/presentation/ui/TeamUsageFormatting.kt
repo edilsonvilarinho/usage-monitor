@@ -191,6 +191,25 @@ internal object TeamUsageLabels {
         return "${accountBand(language)} · ${memberCount(memberCount, language)}"
     }
 
+    /**
+     * A palavra do nível da linha do integrante, com a máquina emendada.
+     *
+     * A faixa da conta se anuncia desde a passada da issue #69; a linha logo
+     * abaixo dela, não — era um nome com dois carimbos, do mesmo tamanho e no
+     * mesmo x, e sem nada dizendo que aquilo é um degrau abaixo (issue #104).
+     *
+     * A máquina vem emendada em vez de ocupar a linha que ocupava: sem isso o
+     * rótulo custaria uma quarta linha em cada integrante, e uma lista de vinte
+     * máquinas pagaria a clareza em rolagem.
+     */
+    fun memberBandWithMachine(machineLabel: String, language: AppLanguage): String {
+        val band = if (language == AppLanguage.PT) "Integrante" else "Member"
+        if (machineLabel.isBlank()) {
+            return band
+        }
+        return "$band · $machineLabel"
+    }
+
     /** Legenda da coluna de identidade, a mesma da tela de presença. */
     fun columnMember(language: AppLanguage): String {
         return TeamPresenceLabels.columnMember(language)

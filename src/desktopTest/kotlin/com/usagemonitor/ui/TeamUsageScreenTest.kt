@@ -7,7 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -69,6 +69,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private val NOW = Instant.parse("2026-08-11T12:00:00Z")
 
@@ -125,9 +126,25 @@ class TeamUsageScreenTest {
         )
 
         onNodeWithText("edilson").assertIsDisplayed()
-        onNodeWithText("DESKTOP-A1").assertIsDisplayed()
         onNodeWithText("maria").assertIsDisplayed()
-        onNodeWithText("NOTE-B2").assertIsDisplayed()
+        // Por trecho: a máquina vem emendada na palavra do nível ("Integrante ·
+        // DESKTOP-A1"), que é o que separa esta linha da faixa da conta.
+        onNodeWithText("DESKTOP-A1", substring = true).assertIsDisplayed()
+        onNodeWithText("NOTE-B2", substring = true).assertIsDisplayed()
+    }
+
+    /** Issue #104: a linha se anuncia como integrante, igual à faixa como conta. */
+    @Test
+    fun `linha do integrante se anuncia como integrante`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1", tokens = 500L)))
+                )
+            )
+        )
+
+        onNodeWithText("Integrante · DESKTOP-A1").assertIsDisplayed()
     }
 
     @Test
@@ -1148,13 +1165,18 @@ class TeamUsageScreenTest {
     }
 
     /**
-     * A linha do integrante encolheu de 109dp para 88dp na refatoração visual:
-     * ela deixou de ser um card com padding próprio e virou linha de tabela. O
-     * assert continua existindo pelo mesmo motivo de antes — a linha não pode
-     * voltar a crescer —, com o número novo.
+     * A capa tem de ser mais alta que o item que ela cobre (issue #104).
+     *
+     * O assert fixava 62dp e 63dp, e esses dois números diziam exatamente o
+     * defeito sem que ninguém o lesse: a faixa da conta era **um dp mais baixa**
+     * que a linha do integrante. Dois números mágicos não dizem qual dos dois é a
+     * capa; a relação, sim — e é ela que não pode voltar a se inverter.
+     *
+     * O teto continua existindo pelo motivo de sempre: a linha não pode voltar a
+     * ser o card de 109dp que a refatoração visual desfez.
      */
     @Test
-    fun `faixa da conta cresce e linha do integrante fica compacta em 960dp`() =
+    fun `faixa da conta e mais alta que a linha do integrante em 960dp`() =
         runDesktopComposeUiTest {
             renderSuccess(
                 TeamUsageUiState.Success(
@@ -1174,17 +1196,26 @@ class TeamUsageScreenTest {
                 width = 960.dp
             )
 
-            // 62 e não 57: a faixa ganhou a palavra "Conta" acima do e-mail
-            // (issue #69). Cinco dp é o preço de dizer o que a linha é; o assert
-            // continua existindo para ela não voltar a crescer sem motivo.
-            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
-                .assertHeightIsEqualTo(62.dp)
-            // 63 e não 88 (issue #81): com a legenda numa faixa única, cada célula
-            // deixou de carregar o próprio rótulo e virou uma linha de texto só.
-            // A coluna de identidade continua com três, porque ali são identidade
-            // e os dois carimbos que a qualificam.
-            onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
-                .assertHeightIsEqualTo(63.dp)
+            // `bottom - top` e não `.height`: o `height` importado aqui é o
+            // modificador de layout, e o do `DpRect` fica escondido por ele.
+            val accountBounds = onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
+                .getUnclippedBoundsInRoot()
+            val memberBounds = onNodeWithTag("${TEAM_MEMBER_ROW_TAG_PREFIX}device-1")
+                .getUnclippedBoundsInRoot()
+            val accountHeight = accountBounds.bottom - accountBounds.top
+            val memberHeight = memberBounds.bottom - memberBounds.top
+
+            assertTrue(
+                accountHeight > memberHeight,
+                "faixa da conta ($accountHeight) deveria ser mais alta que a linha do integrante ($memberHeight)"
+            )
+            // Teto da linha: ela não pode voltar a ser o card de 109dp. As três
+            // linhas da coluna de identidade são identidade, o nível e os
+            // carimbos que a qualificam — nada além disso cabe ali.
+            assertTrue(
+                memberHeight <= 72.dp,
+                "linha do integrante cresceu para $memberHeight"
+            )
         }
 
     @Test
