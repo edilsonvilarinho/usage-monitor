@@ -307,7 +307,7 @@ Recurso **opcional**, desligado por default. Serve o caso em que a mesma conta A
 - O banner oferece acao para abrir a pagina da release publicada no GitHub.
 - A verificacao roda na inicializacao, a cada 10 minutos e tambem no refresh manual.
 
-#### Atualizacao automatica (Windows, opcional)
+#### Atualizacao automatica (opcional)
 
 Desmarcada por padrao, em Configuracoes -> Geral. Ligada, a app baixa o
 `UsageMonitor-Setup-<versao>.exe` em segundo plano, confere o SHA-256 publicado pela API do GitHub e
@@ -319,8 +319,10 @@ O interruptor aparece **desabilitado, com o motivo**, quando a atualizacao nao s
 
 | Caso | Por que |
 |---|---|
-| Linux e macOS | O `.deb`/`.rpm` exige elevacao e o DMG sem Developer ID nao remonta o bundle de forma confiavel. |
-| Instalacao que nao veio do `UsageMonitor-Setup` | MSI, copia manual da pasta ou `gradlew run`. Aplicar o instalador NSIS por cima criaria uma instalacao paralela. A deteccao exige o `Uninstall.exe` no diretorio registrado. |
+| macOS | O DMG nao tem Developer ID, e remontar o bundle sob quarentena do Gatekeeper nao fecha de forma confiavel. |
+| Windows fora do `UsageMonitor-Setup` | MSI, copia manual da pasta ou `gradlew run`. Aplicar o instalador NSIS por cima criaria uma instalacao paralela. A deteccao exige o `Uninstall.exe` no diretorio registrado. |
+| Linux fora da instalacao user-space | `.deb`, `.rpm`, copia manual da pasta ou `gradlew run`. Aqueles arquivos pertencem ao gerenciador de pacotes, e escrever por cima deles produz uma arvore que o proximo `apt upgrade` desfaz. |
+| Linux ARM64 | Nao ha `.tar.gz` ARM64 publicado. E outra coisa que "plataforma sem suporte": a plataforma serve, o pacote e que nao existe. |
 
 Duas coisas que valem saber antes de ligar:
 
@@ -331,6 +333,35 @@ Duas coisas que valem saber antes de ligar:
 
 Releases anteriores a 38.0.0 nao sao alvo valido: o instalador delas nao entende o modo silencioso de
 atualizacao, e receber esse parametro o deixaria pendurado num dialogo invisivel.
+
+##### No Linux
+
+Vale so para a instalacao **user-space**, feita pelo `install-usage-monitor_<versao>_linux_x64.sh`
+publicado junto da release. Ela vive inteira dentro do `$HOME` e nao usa `sudo`:
+
+```
+<XDG_DATA_HOME>/usage-monitor/.usage-monitor-managed   marcador que autoriza a escrita
+<XDG_DATA_HOME>/usage-monitor/versions/<versao>/       uma arvore por versao retida
+<XDG_DATA_HOME>/usage-monitor/current                  arquivo de texto com a versao ativa
+~/.local/bin/usage-monitor                             launcher estavel, le `current` e faz exec
+~/.local/share/applications/usage-monitor.desktop      entrada de menu
+```
+
+Ligada, a app baixa o `.tar.gz`, confere o SHA-256 da API do GitHub e extrai para
+`updates/<versao>.staging`. Ao fechar, um script promove o staging para `versions/<versao>` por
+`rename`, troca `current`, relanca a app e **espera a confirmacao dela**. Sem confirmacao em 60 s,
+ele restaura `current`, relanca a versao anterior e grava o motivo no recibo. Duas versoes ficam em
+disco: a atual e uma anterior, para o rollback do ciclo seguinte.
+
+- **~125 MB por versao**, e ~600 MB em disco com as duas retidas.
+- **Uma instalacao `.deb`/`.rpm` existente exige migracao manual.** O instalador user-space detecta e
+  **para**, sem tocar em `/opt`, `/usr` ou arquivos do gerenciador de pacotes.
+- **O tarball nao e assinado.** A integridade vem do `digest` que a API do GitHub publica, por TLS —
+  o mesmo portao do Windows.
+- O log de cada troca fica em `~/.usage-monitor/diagnostics/linux-update.log`.
+
+Fora do escopo: musl/Alpine, ARM64, Flatpak e AppImage. Nesses casos o interruptor aparece
+desabilitado com o motivo, e o caminho continua sendo baixar a release e instalar a mao.
 
 ### Preferencias persistidas
 
@@ -451,6 +482,23 @@ dupla. Nesse caso a limpeza manual e:
 4. Confira que `%LOCALAPPDATA%\Usage Monitor` sumiu; se sobrou, apague.
 5. Instale o `UsageMonitor-Setup-X.Y.Z.exe`.
 6. Reconfira "Iniciar com o Windows" nas Configuracoes.
+
+### Instalacao no Linux
+
+Tres formatos, e so um deles se atualiza sozinho:
+
+| Formato | Instalacao | Atualizacao automatica |
+|---|---|---|
+| `install-usage-monitor_X.Y.Z_linux_x64.sh` | `sh ./install-usage-monitor_X.Y.Z_linux_x64.sh`, sem `sudo` | **Sim** |
+| `usage-monitor_X.Y.Z_amd64.deb` | `sudo apt install ./usage-monitor_X.Y.Z_amd64.deb` | Nao — interruptor desabilitado com o motivo |
+| `usage-monitor-X.Y.Z.x86_64.rpm` | `sudo dnf install ./usage-monitor-X.Y.Z.x86_64.rpm` | Nao — idem |
+
+O instalador user-space baixa o `.tar.gz` da release (ou usa o arquivo local, se ele estiver ao lado),
+**confere o SHA-256 sempre** e monta a arvore dentro do `$HOME`. Ele recusa a instalacao quando
+encontra um pacote `.deb`/`.rpm` ja instalado, ou um `/opt/usage-monitor`: remova aquele antes.
+
+Se `~/.local/bin` nao estiver no `PATH`, o instalador avisa; o executavel continua acessivel pelo
+caminho completo e pela entrada de menu.
 
 ### Instalacao no macOS
 

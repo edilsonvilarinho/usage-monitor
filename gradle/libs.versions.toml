@@ -8,6 +8,7 @@ kotlinx-coroutines = "1.9.0"
 multiplatform-settings = "1.2.0"
 sqlite-jdbc = "3.46.1.3"
 pdfbox = "3.0.7"
+commons-compress = "1.27.1"
 kover = "0.9.8"
 
 [libraries]
@@ -32,6 +33,10 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 # Preferências persistidas (tema, idioma)
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+
+# Leitura do .tar.gz da atualizacao Linux. O JDK nao traz leitor de tar, e
+# depender do comando `tar` deixaria o update na mao do que estiver no PATH.
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 
 # Geração do relatório PDF. JVM-only, então só entra no desktopMain.
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }

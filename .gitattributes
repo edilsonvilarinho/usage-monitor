@@ -1,0 +1,10 @@
+# Scripts POSIX sao executados por `/bin/sh` numa maquina Linux, e o kernel le a
+# linha do shebang ate o fim dela. Com CRLF, o interpretador procurado passa a ser
+# `/bin/sh\r`, que nao existe: `bad interpreter: /bin/sh^M`.
+#
+# Nao e hipotese. O desenvolvimento acontece no Windows com `core.autocrlf=true`,
+# e um `git checkout` do `linux-updater.sh` ja o devolveu com CRLF -- o defeito
+# foi medido, e a versao no disco quebraria em qualquer Linux. `eol=lf` prende o
+# arquivo no formato certo dos dois lados: no repositorio e no worktree.
+*.sh          text eol=lf
+*.sh.template text eol=lf

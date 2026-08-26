@@ -147,7 +147,9 @@ import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import com.usagemonitor.update.isEnabled
+import com.usagemonitor.update.UpdateAckChannel
 import com.usagemonitor.update.rememberAutoUpdateController
+import com.usagemonitor.update.updateAckTokenFrom
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import io.ktor.client.HttpClient
@@ -249,6 +251,12 @@ fun main(args: Array<String>) = application {
     val startupOrigin = remember { StartupOrigin.from(args) }
 
     val focusRequests = remember { FocusRequestChannel() }
+
+    // Token do health check da atualizacao Linux, quando este processo foi
+    // lancado pelo `linux-updater.sh`. Parseado FORA de `StartupOrigin`: aquele
+    // enum responde "autostart ou manual", e o health check nao e uma terceira
+    // origem -- a versao promovida pode subir das duas formas.
+    val updateAckToken = remember { updateAckTokenFrom(args) }
 
     val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
     if (singleInstanceGuard == null) {
@@ -1269,6 +1277,19 @@ fun main(args: Array<String>) = application {
         LaunchedEffect(window) {
             mainWindowRef = window
         }
+        // O ACK sai daqui e nao do topo do `main()`: ele afirma que esta versao
+        // subiu inteira, e o unico ponto em que isso e verdade e depois de o
+        // `SingleInstanceGuard` ter deixado passar, dos recursos criticos terem
+        // sido construidos e da janela ter composto. Confirmar antes disso faria
+        // o script guardar como boa uma versao que ainda pode nao abrir -- e o
+        // rollback existe justamente para esse caso.
+        if (updateAckToken != null) {
+            LaunchedEffect(updateAckToken) {
+                withContext(Dispatchers.IO) {
+                    UpdateAckChannel().acknowledge(updateAckToken)
+                }
+            }
+        }
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
@@ -1719,6 +1740,7 @@ fun main(args: Array<String>) = application {
                         },
                         autoUpdateEnabled = autoUpdate.isEnabled(),
                         autoUpdateSupport = autoUpdate.support,
+                        autoUpdatePlatform = autoUpdate.platform,
                         lastUpdateReceipt = autoUpdate.lastReceipt,
                         autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
                         onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },

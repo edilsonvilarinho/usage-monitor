@@ -337,3 +337,156 @@ jobs:
           node tools/ci/test-summary.mjs `
             --title "Cenarios do instalador" `
             --skipped "nenhuma mudanca em src/installer/ nem em src/desktopMain/kotlin/com/usagemonitor/update/"
+
+  # Cenarios do `linux-updater.sh`. Job separado do `installer-scenarios`, que e
+  # Windows: o roteiro daqui promove diretorios, espera PID e exercita rollback
+  # em POSIX sh, e nao ha runner que faca as duas coisas.
+  #
+  # Tres containers porque a promessa do script e `/bin/sh`, e `/bin/sh` e `dash`
+  # no Ubuntu e `bash` no Arch e no Fedora. Um bashismo que passe no Fedora
+  # quebra o update de quem usa Debian, e e essa a diferenca que a matriz existe
+  # para pegar. Os tres sao container -- inclusive o Ubuntu, que rodaria direto no
+  # runner: uniformizar tira do caminho a diferenca entre `sh` do runner e `sh`
+  # da imagem, que e justamente o que se quer medir.
+  linux-updater-scenarios:
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu
+            image: 'ubuntu:24.04'
+            install: 'apt-get update && apt-get install -y --no-install-recommends git ca-certificates tar'
+          - name: arch
+            image: 'archlinux:latest'
+            install: 'pacman -Sy --noconfirm git tar'
+          - name: fedora
+            image: 'fedora:latest'
+            install: 'dnf -y install git tar'
+
+    steps:
+      # Antes do checkout, e nao depois: `actions/checkout` precisa do `git` para
+      # trazer historia. Sem ele a action cai no download por API, o `git diff` do
+      # filtro falha, e o job passa a rodar os cenarios "por precaucao" sempre --
+      # verde, mas sem o filtro que ele deveria ter.
+      - name: Install container dependencies
+        run: ${{ matrix.install }}
+
+      - name: Checkout
+        # fetch-depth: 0 pelo mesmo motivo do job do instalador do Windows: o
+        # filtro usa diff de tres pontos, que precisa de base comum, e com o
+        # checkout raso o git responde `no merge base` -- o passo falha, o job
+        # falha, e os cenarios NUNCA rodam.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect linux updater changes
+        id: filter
+        shell: bash
+        run: |
+          set -uo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+
+          if ! git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"; then
+            echo "git fetch falhou; rodando os cenarios por precaucao."
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! changed="$(git diff --name-only "origin/${{ github.event.pull_request.base.ref }}...HEAD")"; then
+            echo "git diff falhou; rodando os cenarios por precaucao."
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          relevant=false
+          for file in $changed; do
+            case "$file" in
+              src/desktopMain/resources/update/*|src/installer/linux/*|src/desktopMain/kotlin/com/usagemonitor/update/*)
+                echo "Linux updater change: $file"
+                relevant=true
+                break
+                ;;
+            esac
+          done
+
+          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+
+      # Um check verde que nao rodou cenario nenhum e indistinguivel de um que
+      # rodou. O roteiro termina com "N verificacoes, M falhas", e essa linha vai
+      # para o resumo -- o mesmo tratamento dos jobs de teste.
+      - name: Run linux updater scenarios
+        if: steps.filter.outputs.relevant == 'true'
+        shell: bash
+        run: |
+          set -uo pipefail
+          sh -n src/desktopMain/resources/update/linux-updater.sh
+          sh -n src/installer/linux/test/run-updater-scenarios.sh
+
+          sh src/installer/linux/test/run-updater-scenarios.sh 2>&1 | tee scenarios.log
+          status=${PIPESTATUS[0]}
+
+          tally="$(grep -E '^[0-9]+ verificacoes' scenarios.log | tail -n 1)"
+          if [ -z "$tally" ]; then
+            tally='contagem nao encontrada na saida do roteiro'
+            status=1
+          fi
+          verdict='passou'
+          if [ "$status" -ne 0 ]; then
+            verdict='FALHOU'
+          fi
+
+          {
+            echo "## Cenarios do updater Linux (${{ matrix.name }}) -- $verdict"
+            echo
+            echo "\`$tally\`"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          rm -f scenarios.log
+          exit "$status"
+
+      # O instalador user-space nao tem cenario proprio: ele so faz sentido com o
+      # tarball da release, que nao existe aqui. O que da para afirmar sem ele e
+      # que o template continua sendo `sh` valido depois da substituicao -- que e
+      # exatamente o passo que o release faz antes de publicar.
+      - name: Check the user-space installer template
+        if: steps.filter.outputs.relevant == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed \
+            -e 's|@VERSION@|39.0.0|g' \
+            -e 's|@TARBALL@|usage-monitor_39.0.0_linux_x64.tar.gz|g' \
+            -e 's|@SHA256@|0000000000000000000000000000000000000000000000000000000000000000|g' \
+            src/installer/linux/install-usage-monitor.sh.template > installer.sh
+          if grep -qE '@[A-Z0-9_]+@' installer.sh; then
+            echo "O template tem placeholder que a substituicao do release nao cobre:" >&2
+            grep -nE '@[A-Z0-9_]+@' installer.sh >&2
+            exit 1
+          fi
+          sh -n installer.sh
+          rm -f installer.sh
+          echo "Template do instalador: sintaxe valida, sem placeholder sobrado."
+
+      - name: Report skipped scenarios
+        if: steps.filter.outputs.relevant != 'true'
+        shell: bash
+        run: |
+          {
+            echo "## Cenarios do updater Linux (${{ matrix.name }}) -- NAO EXECUTADA"
+            echo
+            echo "nenhuma mudanca em src/desktopMain/resources/update/, src/installer/linux/ nem em src/desktopMain/kotlin/com/usagemonitor/update/"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"

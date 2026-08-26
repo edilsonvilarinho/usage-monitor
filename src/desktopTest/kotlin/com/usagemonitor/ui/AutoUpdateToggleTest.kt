@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
 import com.usagemonitor.domain.repository.AppUpdateSupport
@@ -90,19 +91,43 @@ class AutoUpdateToggleTest {
     }
 
     @Test
-    fun `unsupported platform disables the switch and explains why`() = runDesktopComposeUiTest {
-        showToggle(enabled = false, support = AppUpdateSupport.UNSUPPORTED_PLATFORM)
+    fun `unsupported platform names macOS instead of blaming linux`() = runDesktopComposeUiTest {
+        showToggle(
+            enabled = false,
+            support = AppUpdateSupport.UNSUPPORTED_PLATFORM,
+            platform = AppUpdatePlatform.MACOS
+        )
 
         onNodeWithTag(AUTO_UPDATE_SWITCH_TEST_TAG).assertIsNotEnabled()
         onNodeWithText(
-            "Disponível apenas no Windows: no Linux a instalação passa pelo gerenciador de pacotes " +
-                "e no macOS o pacote não é assinado."
+            "Não disponível no macOS: o pacote não é assinado e o Gatekeeper exige liberação manual."
+        ).assertIsDisplayed()
+    }
+
+    /**
+     * Plataforma que o app não reconhece não pode nomear instalador nenhum: o
+     * texto genérico é o que sobra de verdadeiro.
+     */
+    @Test
+    fun `unknown platform falls back to the generic reason`() = runDesktopComposeUiTest {
+        showToggle(
+            enabled = false,
+            support = AppUpdateSupport.UNSUPPORTED_PLATFORM,
+            platform = null
+        )
+
+        onNodeWithText(
+            "Não disponível nesta plataforma. A atualização automática cobre Windows e Linux em user-space."
         ).assertIsDisplayed()
     }
 
     @Test
     fun `unsupported install origin explains the second install risk`() = runDesktopComposeUiTest {
-        showToggle(enabled = false, support = AppUpdateSupport.UNSUPPORTED_INSTALL_ORIGIN)
+        showToggle(
+            enabled = false,
+            support = AppUpdateSupport.UNSUPPORTED_INSTALL_ORIGIN,
+            platform = AppUpdatePlatform.WINDOWS
+        )
 
         onNodeWithTag(AUTO_UPDATE_SWITCH_TEST_TAG).assertIsNotEnabled()
         onNodeWithText(
@@ -110,6 +135,48 @@ class AutoUpdateToggleTest {
                 "ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação."
         ).assertIsDisplayed()
     }
+
+    /**
+     * O mesmo valor de suporte, outra plataforma, outro texto. É por isto que
+     * `autoUpdateHint` passou a receber a plataforma: no Linux o instalador é o
+     * `.sh` e o risco é mexer em arquivo do gerenciador de pacotes, não criar
+     * uma segunda instalação.
+     */
+    @Test
+    fun `unsupported install origin on linux names the sh installer`() = runDesktopComposeUiTest {
+        showToggle(
+            enabled = false,
+            support = AppUpdateSupport.UNSUPPORTED_INSTALL_ORIGIN,
+            platform = AppUpdatePlatform.LINUX
+        )
+
+        onNodeWithTag(AUTO_UPDATE_SWITCH_TEST_TAG).assertIsNotEnabled()
+        onNodeWithText(
+            "Disponível apenas na instalação em user-space feita pelo instalador .sh. Esta cópia " +
+                "veio de um pacote .deb/.rpm ou de fora dele, e atualizá-la por aqui mexeria em " +
+                "arquivos do gerenciador de pacotes."
+        ).assertIsDisplayed()
+    }
+
+    /**
+     * ARM64 não é "plataforma sem suporte": a plataforma tem suporte e o pacote
+     * é que não existe. Sem valor próprio no enum, a tela diria a razão errada.
+     */
+    @Test
+    fun `unsupported architecture says the package is missing, not the platform`() =
+        runDesktopComposeUiTest {
+            showToggle(
+                enabled = false,
+                support = AppUpdateSupport.UNSUPPORTED_ARCHITECTURE,
+                platform = AppUpdatePlatform.LINUX
+            )
+
+            onNodeWithTag(AUTO_UPDATE_SWITCH_TEST_TAG).assertIsNotEnabled()
+            onNodeWithText(
+                "Não há pacote publicado para a arquitetura desta máquina. A atualização " +
+                    "automática cobre apenas x86_64."
+            ).assertIsDisplayed()
+        }
 
     @Test
     fun `build without the mechanism says so instead of promising`() = runDesktopComposeUiTest {
@@ -217,6 +284,7 @@ class AutoUpdateToggleTest {
                     AutoUpdateToggle(
                         enabled = true,
                         support = AppUpdateSupport.SUPPORTED,
+                        platform = AppUpdatePlatform.WINDOWS,
                         language = AppLanguage.EN,
                         lastReceipt = AppUpdateReceipt(
                             version = "38.0.0",
@@ -239,6 +307,7 @@ class AutoUpdateToggleTest {
     private fun androidx.compose.ui.test.ComposeUiTest.showToggle(
         enabled: Boolean,
         support: AppUpdateSupport,
+        platform: AppUpdatePlatform? = AppUpdatePlatform.WINDOWS,
         receipt: AppUpdateReceipt? = null,
         feedOverride: String? = null,
         onToggle: (Boolean) -> Unit = {}
@@ -249,6 +318,7 @@ class AutoUpdateToggleTest {
                     AutoUpdateToggle(
                         enabled = enabled,
                         support = support,
+                        platform = platform,
                         language = AppLanguage.PT,
                         lastReceipt = receipt,
                         feedUrlOverride = feedOverride,

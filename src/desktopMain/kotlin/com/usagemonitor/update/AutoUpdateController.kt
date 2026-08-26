@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.CURRENT_APP_VERSION
 import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
+import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.shouldDiscardUpdateArtifacts
 import com.usagemonitor.domain.repository.AppUpdateInstaller
@@ -36,6 +37,21 @@ import kotlinx.coroutines.withContext
 internal const val AUTO_UPDATE_SHIPPED = true
 
 /**
+ * Se **esta build** traz a atualização automática do Linux.
+ *
+ * Sai em `false`, e o motivo é o mesmo que manteve o caminho do Windows inerte
+ * até o `.nsi` entender `/UPDATE`: com ele falso, `installer` é nulo no Linux e
+ * **não existe caminho de código** que extraia tarball ou troque diretório de
+ * instalação. Um mecanismo que ainda não foi exercitado numa máquina real não
+ * pode virar acidente.
+ *
+ * A atividade A14 vira este valor **junto** com
+ * [MIN_LINUX_UPDATABLE_TARGET_VERSION], depois do aceite em máquina Linux, e
+ * `AutoUpdateWiringTest` reprova a combinação inconsistente nos dois sentidos.
+ */
+internal const val LINUX_AUTO_UPDATE_SHIPPED = false
+
+/**
  * Tudo que a janela principal precisa saber sobre atualização automática.
  *
  * Existe como classe própria, e não como mais um punhado de `remember` dentro do
@@ -45,6 +61,14 @@ internal const val AUTO_UPDATE_SHIPPED = true
  */
 internal class AutoUpdateController(
     val installer: AppUpdateInstaller?,
+    /**
+     * Plataforma em execução, ou `null` quando o app não a reconhece.
+     *
+     * Vai para a tela porque dois dos motivos de indisponibilidade nomeiam o
+     * instalador da plataforma: `.exe` no Windows, `.sh` em user-space no Linux.
+     * Sem ela o texto continuaria dizendo "MSI" numa máquina Linux.
+     */
+    val platform: AppUpdatePlatform?,
     val enabled: MutableStateFlow<Boolean>,
     val lastReceipt: AppUpdateReceipt?,
     /** Valor de USAGE_MONITOR_UPDATE_FEED_URL, quando definida. */
@@ -52,8 +76,20 @@ internal class AutoUpdateController(
     private val persist: (Boolean) -> Unit
 ) {
 
+    /**
+     * Sem instalador, o motivo ainda depende da plataforma.
+     *
+     * `UNAVAILABLE` no Windows e no Linux é literal — a build não traz o
+     * mecanismo, ou não o traz ainda. No macOS seria **falso**: ali não é a
+     * build que falta, é o pacote que não é assinado, e o Gatekeeper exige
+     * liberação manual. Colapsar os dois faria a tela prometer que uma versão
+     * futura resolveria o que não é problema de versão.
+     */
     val support: AppUpdateSupport
-        get() = installer?.support() ?: AppUpdateSupport.UNAVAILABLE
+        get() = installer?.support() ?: when (platform) {
+            AppUpdatePlatform.MACOS, null -> AppUpdateSupport.UNSUPPORTED_PLATFORM
+            AppUpdatePlatform.WINDOWS, AppUpdatePlatform.LINUX -> AppUpdateSupport.UNAVAILABLE
+        }
 
     fun setEnabled(value: Boolean) {
         enabled.value = value
@@ -93,13 +129,24 @@ internal fun rememberAutoUpdateController(
     httpClient: HttpClient
 ): AutoUpdateController {
     val controller = remember(settings, httpClient) {
-        val installer = if (AUTO_UPDATE_SHIPPED) {
-            WindowsAppUpdateInstaller(httpClient = httpClient)
-        } else {
-            null
+        val platform = currentUpdatePlatform()
+        // Um instalador por plataforma, e nenhum onde o mecanismo não foi
+        // exercitado. O instalador do Windows respondia `UNSUPPORTED_PLATFORM`
+        // fora do Windows e por isso podia ser construído em qualquer lugar;
+        // manter isso com dois instaladores significaria construir o errado e
+        // depender de ele se recusar.
+        val installer = when (platform) {
+            AppUpdatePlatform.WINDOWS ->
+                if (AUTO_UPDATE_SHIPPED) WindowsAppUpdateInstaller(httpClient = httpClient) else null
+
+            AppUpdatePlatform.LINUX ->
+                if (LINUX_AUTO_UPDATE_SHIPPED) LinuxAppUpdateInstaller(httpClient = httpClient) else null
+
+            AppUpdatePlatform.MACOS, null -> null
         }
         AutoUpdateController(
             installer = installer,
+            platform = platform,
             enabled = MutableStateFlow(readPersistedAutoUpdateEnabled(settings)),
             // Lido uma vez, na abertura: o recibo é escrito pelo instalador
             // enquanto o app está fechado, e reler a cada recomposição seria
@@ -127,4 +174,28 @@ internal fun rememberAutoUpdateController(
     }
 
     return controller
+}
+
+/**
+ * Plataforma em execução, no vocabulário dos artefatos de release.
+ *
+ * `null` para o que não se reconhece — e não um chute em Windows. O valor
+ * escolhe qual instalador o texto da tela vai nomear, e nomear o errado é pior
+ * que não nomear nenhum.
+ */
+internal fun currentUpdatePlatform(
+    osName: String = System.getProperty("os.name").orEmpty()
+): AppUpdatePlatform? {
+    val name = osName.lowercase()
+    // macOS vem ANTES de Windows: "darwin" contém "win", e com a ordem trocada
+    // um sistema Darwin seria classificado como Windows. Medido — o teste
+    // `mac names are recognized in both spellings` reprova a ordem invertida.
+    // O `os.name` de um JDK em macOS é "Mac OS X" e nunca "Darwin", então o
+    // defeito seria latente e invisível até deixar de ser.
+    return when {
+        name.contains("mac") || name.contains("darwin") -> AppUpdatePlatform.MACOS
+        name.contains("win") -> AppUpdatePlatform.WINDOWS
+        name.contains("linux") -> AppUpdatePlatform.LINUX
+        else -> null
+    }
 }

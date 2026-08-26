@@ -202,16 +202,45 @@ internal fun defaultUpdatesDirectory(): File {
  * criado. Era o defeito medido na A20: a atualização automática falhava em 100%
  * das tentativas, para todo usuário, e em silêncio.
  *
- * A entrada vai para o dispositivo nulo do Windows. Este arquivo já é
- * Windows-only, e `Redirect.INHERIT` herdaria de um processo GUI sem console.
+ * A entrada vai para o **dispositivo nulo do sistema**, resolvido por SO.
+ * `Redirect.INHERIT` herdaria de um processo GUI sem console, e `NUL` fixo — que
+ * era o que estava aqui — não existe no Linux: o `ProcessBuilder` lançaria
+ * `IOException` ao abrir o arquivo, e o updater nunca seria criado.
+ *
+ * A saída pode ir para um arquivo: é assim que o `linux-updater.sh` escreve o
+ * log dele, sem que o script precise conhecer o caminho. `null` mantém o
+ * descarte, que é o que o instalador do Windows quer.
  */
-internal fun launchDetachedProcess(command: List<String>, directory: File?) {
+internal fun launchDetachedProcess(
+    command: List<String>,
+    directory: File?,
+    outputFile: File? = null
+) {
+    val output = if (outputFile == null) {
+        ProcessBuilder.Redirect.DISCARD
+    } else {
+        outputFile.parentFile?.mkdirs()
+        ProcessBuilder.Redirect.appendTo(outputFile)
+    }
+
     val builder = ProcessBuilder(command)
-        .redirectInput(ProcessBuilder.Redirect.from(File("NUL")))
-        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-        .redirectError(ProcessBuilder.Redirect.DISCARD)
+        .redirectInput(ProcessBuilder.Redirect.from(nullInputDevice()))
+        .redirectOutput(output)
+        .redirectError(output)
     if (directory != null) {
         builder.directory(directory)
     }
     builder.start()
+}
+
+/**
+ * `NUL` no Windows, `/dev/null` no resto.
+ *
+ * Não é detalhe portátil: o `Redirect.from` **abre o arquivo**, e um `NUL` num
+ * Linux seria um caminho relativo inexistente.
+ */
+internal fun nullInputDevice(
+    osName: String = System.getProperty("os.name").orEmpty()
+): File {
+    return if (osName.lowercase().contains("win")) File("NUL") else File("/dev/null")
 }

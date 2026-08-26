@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
 import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
@@ -137,6 +138,12 @@ fun SettingsDialogContent(
      * interruptor aparece desabilitado com o motivo em vez de prometer algo.
      */
     autoUpdateSupport: AppUpdateSupport = AppUpdateSupport.UNAVAILABLE,
+    /**
+     * Plataforma em execução. `null` é "não reconhecida", e não um default de
+     * conveniência: dois dos motivos de indisponibilidade nomeiam o instalador,
+     * e quem não sabe onde está não pode nomeá-lo.
+     */
+    autoUpdatePlatform: AppUpdatePlatform? = null,
     lastUpdateReceipt: AppUpdateReceipt? = null,
     autoUpdateFeedOverride: String? = null,
     onAutoUpdateChange: (Boolean) -> Unit = {},
@@ -240,6 +247,7 @@ fun SettingsDialogContent(
                         uiScalePercent = uiScalePercent,
                         autoUpdateEnabled = autoUpdateEnabled,
                         autoUpdateSupport = autoUpdateSupport,
+                        autoUpdatePlatform = autoUpdatePlatform,
                         lastUpdateReceipt = lastUpdateReceipt,
                         autoUpdateFeedOverride = autoUpdateFeedOverride,
                         onThemeToggle = onThemeToggle,
@@ -365,6 +373,7 @@ private fun GeneralSettingsTab(
     uiScalePercent: Int,
     autoUpdateEnabled: Boolean,
     autoUpdateSupport: AppUpdateSupport,
+    autoUpdatePlatform: AppUpdatePlatform?,
     lastUpdateReceipt: AppUpdateReceipt?,
     autoUpdateFeedOverride: String?,
     onThemeToggle: () -> Unit,
@@ -424,6 +433,7 @@ private fun GeneralSettingsTab(
         AutoUpdateToggle(
             enabled = autoUpdateEnabled,
             support = autoUpdateSupport,
+            platform = autoUpdatePlatform,
             language = currentLanguage,
             lastReceipt = lastUpdateReceipt,
             feedUrlOverride = autoUpdateFeedOverride,
@@ -831,6 +841,8 @@ fun CardsOnlyModeToggle(
 fun AutoUpdateToggle(
     enabled: Boolean,
     support: AppUpdateSupport,
+    /** Ver [autoUpdateHint]: `null` é plataforma não reconhecida. */
+    platform: AppUpdatePlatform? = null,
     language: AppLanguage = AppLanguage.PT,
     lastReceipt: AppUpdateReceipt? = null,
     /**
@@ -858,7 +870,7 @@ fun AutoUpdateToggle(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = autoUpdateHint(support = support, isPt = isPt),
+                text = autoUpdateHint(support = support, isPt = isPt, platform = platform),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -896,7 +908,25 @@ fun AutoUpdateToggle(
     }
 }
 
-internal fun autoUpdateHint(support: AppUpdateSupport, isPt: Boolean): String {
+/**
+ * O motivo que acompanha o interruptor, por plataforma.
+ *
+ * A [platform] entrou porque dois dos motivos **mudam de conteúdo** conforme o
+ * sistema: `UNSUPPORTED_PLATFORM` significava "não é Windows" e passou a
+ * significar "é macOS ou algo que não reconhecemos", e
+ * `UNSUPPORTED_INSTALL_ORIGIN` fala de MSI no Windows e de `.deb`/`.rpm` no
+ * Linux. Sem ela, o texto continuaria afirmando no Linux coisas que deixaram de
+ * ser verdade.
+ *
+ * `null` é plataforma **não reconhecida** — e não um default de conveniência:
+ * quem não sabe onde está não pode nomear o instalador certo, e o texto genérico
+ * é o que sobra de honesto.
+ */
+internal fun autoUpdateHint(
+    support: AppUpdateSupport,
+    isPt: Boolean,
+    platform: AppUpdatePlatform? = null
+): String {
     return when (support) {
         AppUpdateSupport.SUPPORTED -> if (isPt) {
             "Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app."
@@ -904,16 +934,46 @@ internal fun autoUpdateHint(support: AppUpdateSupport, isPt: Boolean): String {
             "Downloads the new version in the background (~120 MB) and applies it on exit."
         }
 
-        AppUpdateSupport.UNSUPPORTED_PLATFORM -> if (isPt) {
-            "Disponível apenas no Windows: no Linux a instalação passa pelo gerenciador de pacotes e no macOS o pacote não é assinado."
-        } else {
-            "Windows only: on Linux the install goes through the package manager, and on macOS the package is unsigned."
+        AppUpdateSupport.UNSUPPORTED_PLATFORM -> when (platform) {
+            AppUpdatePlatform.MACOS -> if (isPt) {
+                "Não disponível no macOS: o pacote não é assinado e o Gatekeeper exige liberação manual."
+            } else {
+                "Not available on macOS: the package is unsigned and Gatekeeper requires manual approval."
+            }
+
+            else -> if (isPt) {
+                "Não disponível nesta plataforma. A atualização automática cobre Windows e Linux em user-space."
+            } else {
+                "Not available on this platform. Automatic updates cover Windows and user-space Linux."
+            }
         }
 
-        AppUpdateSupport.UNSUPPORTED_INSTALL_ORIGIN -> if (isPt) {
-            "Disponível apenas na instalação feita pelo instalador .exe. Esta cópia veio do MSI ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação."
+        AppUpdateSupport.UNSUPPORTED_INSTALL_ORIGIN -> when (platform) {
+            AppUpdatePlatform.LINUX -> if (isPt) {
+                "Disponível apenas na instalação em user-space feita pelo instalador .sh. Esta cópia veio de um pacote .deb/.rpm ou de fora dele, e atualizá-la por aqui mexeria em arquivos do gerenciador de pacotes."
+            } else {
+                "Only available for the user-space install made by the .sh installer. This copy came from a .deb/.rpm package or from outside it, and updating it here would touch files owned by the package manager."
+            }
+
+            AppUpdatePlatform.WINDOWS -> if (isPt) {
+                "Disponível apenas na instalação feita pelo instalador .exe. Esta cópia veio do MSI ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação."
+            } else {
+                "Only available for installs made by the .exe installer. This copy came from the MSI or from outside it, and updating it here would create a second install."
+            }
+
+            else -> if (isPt) {
+                "Disponível apenas nas instalações feitas pelo instalador oficial do aplicativo."
+            } else {
+                "Only available for installs made by the app's official installer."
+            }
+        }
+
+        // O texto não nomeia a arquitetura desta máquina: quem a lê é
+        // `os.arch`, e o valor bruto ("aarch64") não diz nada a quem instalou.
+        AppUpdateSupport.UNSUPPORTED_ARCHITECTURE -> if (isPt) {
+            "Não há pacote publicado para a arquitetura desta máquina. A atualização automática cobre apenas x86_64."
         } else {
-            "Only available for installs made by the .exe installer. This copy came from the MSI or from outside it, and updating it here would create a second install."
+            "No package is published for this machine's architecture. Automatic updates cover x86_64 only."
         }
 
         AppUpdateSupport.UNAVAILABLE -> if (isPt) {

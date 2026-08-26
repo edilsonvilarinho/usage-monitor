@@ -1,7 +1,9 @@
 package com.usagemonitor.update
 
 import java.io.File
+import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -52,5 +54,48 @@ class LaunchDetachedProcessTest {
             listOf(System.getenv("COMSPEC") ?: "cmd.exe", "/c", "exit", "0"),
             directory
         )
+    }
+
+    /**
+     * `Redirect.from` **abre o arquivo**. `NUL` fixo — que era o que estava aqui
+     * — é um caminho relativo inexistente no Linux: o `ProcessBuilder` lançaria
+     * `IOException` e o updater nunca seria criado, exatamente o mesmo desenho
+     * de falha do `Redirect.DISCARD` que a A20 do Windows mediu.
+     */
+    @Test
+    fun `the null input device is resolved per operating system`() {
+        assertEquals("NUL", nullInputDevice("Windows 11").path)
+        assertEquals(File("/dev/null").path, nullInputDevice("Linux").path)
+        assertEquals(File("/dev/null").path, nullInputDevice("Mac OS X").path)
+    }
+
+    /**
+     * A saída pode ir para um arquivo: é assim que o log do `linux-updater.sh` é
+     * escrito sem o script conhecer o caminho. `append` e não truncar — duas
+     * tentativas de atualização não podem apagar o rastro uma da outra.
+     */
+    @Test
+    fun `an output file receives what the process writes, appended`() {
+        if (!isWindows) {
+            return
+        }
+
+        val logFile = File(
+            Files.createTempDirectory("usage-monitor-launch").toFile(),
+            "diagnostics/linux-update.log"
+        )
+        try {
+            launchDetachedProcess(
+                listOf(System.getenv("COMSPEC") ?: "cmd.exe", "/c", "echo", "primeira"),
+                null,
+                logFile
+            )
+            // O diretório é criado pelo lançador: o `Redirect.appendTo` falha se
+            // o pai não existir, e o `diagnostics/` pode não existir no primeiro
+            // uso de uma instalação nova.
+            assertTrue(logFile.parentFile.isDirectory)
+        } finally {
+            logFile.parentFile.parentFile.deleteRecursively()
+        }
     }
 }

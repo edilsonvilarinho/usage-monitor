@@ -71,6 +71,11 @@ kotlin {
                 // PDFBox: relatorio PDF das telas de sessoes. E JVM-only, entao o
                 // modelo do documento fica em commonMain e so a renderizacao aqui.
                 implementation(libs.pdfbox)
+
+                // Commons Compress: leitura do .tar.gz da atualizacao Linux. O JDK
+                // traz zip e gzip, mas nao traz leitor de tar; e depender do binario
+                // `tar` deixaria o update na mao do que estiver no PATH da maquina.
+                implementation(libs.commons.compress)
             }
         }
 
