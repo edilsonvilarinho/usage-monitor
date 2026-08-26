@@ -13,10 +13,12 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -204,6 +206,61 @@ class TeamUsageScreenTest {
 
         // O id curto de oito caracteres é a mesma célula da lista de sessões local.
         onNodeWithText("abcdef01").assertIsDisplayed()
+    }
+
+    /**
+     * Issue #102: a sessão desta máquina, mesmo listada no modal do time, tem o
+     * transcript no disco — e é a única que oferece o comando de retomada.
+     */
+    @Test
+    fun `sessao desta maquina oferece o comando de retomada`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123", tokens = 500L)))
+                ),
+                expandedMemberKeys = setOf("device-1")
+            ),
+            localDeviceId = "device-1"
+        )
+
+        onNodeWithContentDescription("Copiar comando de retomada").assertIsDisplayed()
+    }
+
+    /** Issue #102: a sessão de um colega não oferece nada para copiar. */
+    @Test
+    fun `sessao de outro integrante nao oferece botao de copia`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123", tokens = 500L)))
+                ),
+                expandedMemberKeys = setOf("device-1")
+            ),
+            localDeviceId = "device-outro"
+        )
+
+        // A sessão continua na lista e continua clicável: o que sai é só o botão.
+        onNodeWithText("abcdef01").assertIsDisplayed()
+        onAllNodesWithContentDescription("Copiar comando de retomada").assertCountEquals(0)
+    }
+
+    /**
+     * Sem integração configurada não há device local, e nenhuma sessão da lista
+     * é desta máquina — o resultado seguro é não oferecer botão nenhum.
+     */
+    @Test
+    fun `sem device local nenhuma sessao oferece botao de copia`() = runDesktopComposeUiTest {
+        renderSuccess(
+            TeamUsageUiState.Success(
+                members = listOf(
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("abcdef0123", tokens = 500L)))
+                ),
+                expandedMemberKeys = setOf("device-1")
+            )
+        )
+
+        onAllNodesWithContentDescription("Copiar comando de retomada").assertCountEquals(0)
     }
 
     @Test
@@ -981,7 +1038,8 @@ class TeamUsageScreenTest {
         onSelectView: (TeamUsageView) -> Unit = {},
         onExportReport: () -> Unit = {},
         onRemoveMember: (String) -> Unit = {},
-        onRemoveSession: (String, String) -> Unit = { _, _ -> }
+        onRemoveSession: (String, String) -> Unit = { _, _ -> },
+        localDeviceId: String? = null
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -989,6 +1047,7 @@ class TeamUsageScreenTest {
                     TeamUsageContent(
                         state = state,
                         language = AppLanguage.PT,
+                        localDeviceId = localDeviceId,
                         onSelectRange = {},
                         onToggleMember = {},
                         onToggleAccount = onToggleAccount,

@@ -352,6 +352,10 @@ private class ScreenshotGenerator(private val outputDir: File) {
                 lastChangedAt = ScreenshotFixtures.NOW
             ),
             language = AppLanguage.PT,
+            // O integrante expandido é justamente esta máquina, então a captura
+            // mostra o botão de copiar na linha da sessão própria — que é o
+            // único lugar em que ele existe.
+            localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID,
             onSelectRange = {},
             onToggleMember = {}
         )

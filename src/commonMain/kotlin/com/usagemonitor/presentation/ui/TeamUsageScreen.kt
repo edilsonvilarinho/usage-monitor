@@ -70,6 +70,7 @@ import com.usagemonitor.presentation.ui.components.AppToolbar
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
+import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
@@ -165,6 +166,14 @@ private val TEAM_SESSION_INDENT = AppSpacing.xl
 fun TeamUsageScreen(
     viewModel: TeamUsageViewModel,
     language: AppLanguage,
+    /**
+     * Máquina desta instalação, para separar a sessão própria da de um colega.
+     *
+     * Nulo quando a integração não está configurada ou a instalação é só de
+     * administração — e ali nenhuma sessão da lista é desta máquina, que é o
+     * resultado seguro.
+     */
+    localDeviceId: String? = null,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -174,6 +183,7 @@ fun TeamUsageScreen(
     TeamUsageContent(
         state = state,
         language = language,
+        localDeviceId = localDeviceId,
         removalError = removalError,
         sessionRemovalError = sessionRemovalError,
         onSelectRange = { range -> viewModel.setRange(range) },
@@ -202,6 +212,8 @@ internal fun TeamUsageContent(
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Ver `TeamUsageScreen`; default nulo para não arrastar quem não o exercita. */
+    localDeviceId: String? = null,
     // Com default para não arrastar as chamadas que só exercitam o modal de uma
     // conta, onde não existe faixa a recolher.
     onToggleAccount: (String) -> Unit = {},
@@ -241,6 +253,7 @@ internal fun TeamUsageContent(
                     TeamUsageList(
                         state = state,
                         language = language,
+                        localDeviceId = localDeviceId,
                         removalError = removalError,
                         sessionRemovalError = sessionRemovalError,
                         onSelectRange = onSelectRange,
@@ -260,6 +273,7 @@ internal fun TeamUsageContent(
                     TeamSessionDetailPane(
                         detail = detail,
                         language = language,
+                        isLocalSession = localDeviceId != null && detail.deviceId == localDeviceId,
                         advancedExpanded = state.advancedExpanded,
                         glossaryExpanded = state.glossaryExpanded,
                         onCloseDetail = onCloseDetail,
@@ -377,6 +391,7 @@ private fun RemoveSessionConfirmation(
 private fun TeamUsageList(
     state: TeamUsageUiState.Success,
     language: AppLanguage,
+    localDeviceId: String?,
     removalError: String?,
     sessionRemovalError: String?,
     onSelectRange: (CliSessionRange) -> Unit,
@@ -637,7 +652,12 @@ private fun TeamUsageList(
                                         onOpen = {
                                             onOpenSession(member.memberKey, session.sessionId)
                                         },
-                                        isLocalSession = false,
+                                        // Só a máquina desta instalação tem o
+                                        // transcript no disco, e é só nela que o
+                                        // botão de copiar aparece: a sessão de um
+                                        // colega não é copiável (issue #102).
+                                        isLocalSession = localDeviceId != null &&
+                                            member.deviceId == localDeviceId,
                                         onRemove = if (state.isAdminOverview) {
                                             { onRequestRemoveSession(member, session) }
                                         } else {
@@ -1399,6 +1419,8 @@ private fun TeamMemberRow(
 private fun TeamSessionDetailPane(
     detail: TeamSessionDetailUiState,
     language: AppLanguage,
+    /** Sessão desta máquina; só ela oferece o botão de copiar (issue #102). */
+    isLocalSession: Boolean,
     advancedExpanded: Boolean,
     glossaryExpanded: Boolean,
     onCloseDetail: () -> Unit,
@@ -1423,9 +1445,16 @@ private fun TeamSessionDetailPane(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            // Sem botão de cópia: o painel abre a sessão de outro integrante, e a
-            // issue #102 pede que ela não seja copiável. A sessão desta máquina
-            // volta a oferecê-lo quando o painel souber comparar o device.
+            // O painel também abre a sessão de um colega, e ali não há o que
+            // copiar: o transcript não está nesta máquina e a issue #102 pede
+            // que a sessão de outro integrante não seja copiável.
+            if (isLocalSession) {
+                CopySessionCommandButton(
+                    sessionId = detail.sessionId,
+                    language = language,
+                    showLabel = true
+                )
+            }
         }
 
         when (detail) {

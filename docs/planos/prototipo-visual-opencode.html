@@ -1197,6 +1197,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
           <div class="stack" style="gap:var(--s1)">
             <div class="hstack" style="gap:var(--s3)">
               <div class="stack" style="gap:0;width:170px"><span class="v sm">7c4a1f92</span><span class="k">12/08 10:58 BRT</span></div>
+              <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
               <div class="stack" style="gap:0;width:130px"><span class="v sm">api-gateway</span><span class="k">48 turnos</span></div>
               <span class="v sm" style="width:136px">4,40 M</span>
               <div class="stack" style="gap:0;width:90px"><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
@@ -1234,6 +1235,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note"><b>Um degrau de superfície por nível, e <code>--raised</code> fica reservado ao hover.</b> A faixa da conta é o único nível que o usa como fundo fixo; o bloco de sessões fica <b>um degrau de distância do fundo da lista</b>, na direção que houver — aqui a lista mora num <code>.panel</code> em <code>--surface</code> e o bloco desce para <code>--bg</code>; no Compose a lista mora sobre <code>--bg</code> e o bloco sobe para <code>--surface</code>. O bloco aninhado era <code>--raised</code> nesta página e isso estava tecnicamente errado: <code>--raised</code> é o realce de <code>.row:hover</code>, e com ele no bloco passar o mouse numa sessão deixava de dar retorno nenhum. A faixa só aparece na visão de todas as contas — no modal de uma conta ela seria repetição do título da janela.</p>
+<p class="note"><b>O botão de copiar existe só na sessão desta máquina.</b> O integrante desenhado acima é a instalação local — <code>deviceId</code> igual ao do <code>team.json</code> —, e por isso a linha de sessão dele traz o botão: o transcript está no disco e o <code>claude --resume</code> abre a conversa. Nas sessões dos outros integrantes ele <b>não é desenhado</b> (issue #102): a linha continua clicável e o detalhe segue abrindo, porque é ele que permite diagnosticar a sessão saturada de um colega. Sem <code>deviceId</code> local — integração desligada, instalação só de administração — nenhuma linha tem botão, que é o resultado seguro.</p>
 <p class="note"><b>A ordem das contas é alfabética pelo e-mail</b>, e o consumo ordena de novo dentro de cada uma. Ordenar as contas por consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s. Conta sem chave emitida vai para o fim: sem e-mail não há o que comparar, e abrir a lista com um uuid cru seria pior que fechá-la com ele.</p>
 
 <h2 id="tendencia">9b · Tendência do time</h2>
