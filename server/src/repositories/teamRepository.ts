@@ -127,6 +127,51 @@ export interface TeamAccountSnapshot extends TeamSnapshot {
   emailSource: 'reported' | 'label' | null;
 }
 
+/**
+ * Uma pagina de relatorio, com o cursor da proxima.
+ *
+ * `nextCursor` nulo significa fim do conjunto — nao "sem resultado". A ultima
+ * pagina cheia vem sem cursor porque a consulta pede um item a mais do que o
+ * limite: sem isso, a ultima pagina exata devolveria um cursor que abriria uma
+ * pagina vazia.
+ */
+export interface ReportPage<T> {
+  rows: T[];
+  nextCursor: ReportCursor | null;
+}
+
+/**
+ * Posicao no conjunto ordenado, que e a **propria chave de agrupamento**.
+ *
+ * Nao e `MAX(t.ts) DESC` como no overview: recencia nao da ordem total sem
+ * desempate, e quem pagina um periodo fechado quer completude, nao o mais
+ * recente primeiro. O `model` fica vazio quando e nulo — NULL nao compara em
+ * row-value.
+ */
+export interface ReportCursor {
+  accountKey: string;
+  deviceId: string;
+  sessionId: string;
+  model: string;
+}
+
+export interface ReportUsageRow extends TeamUsageRow {
+  accountKey: string;
+}
+
+export interface ReportActivityRow extends TeamSessionActivityRow {
+  accountKey: string;
+}
+
+/** Conta e integrantes, sem consumo: o "quem e quem" do relatorio. */
+export interface ReportAccountMembers {
+  accountKey: string;
+  label: string | null;
+  accountEmail: string | null;
+  emailSource: 'reported' | 'label' | null;
+  members: TeamMemberRow[];
+}
+
 /** Identificacao da sessao pedida, com a maquina que a reportou. */
 export interface TeamSessionRow {
   deviceId: string;
@@ -291,6 +336,7 @@ JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
 WHERE t.account_key = @accountKey
   AND t.ts >= @since
+  AND (@until IS NULL OR t.ts < @until)
 GROUP BY s.device_id, dayBucket, t.model
 ORDER BY dayBucket ASC, deviceId ASC
 `;
@@ -316,6 +362,7 @@ JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
 WHERE t.account_key = @accountKey
   AND (@since IS NULL OR t.ts >= @since)
+  AND (@until IS NULL OR t.ts < @until)
 GROUP BY s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
 `;
@@ -331,6 +378,12 @@ ORDER BY MAX(t.ts) DESC
  *
  * `is_sidechain = 0` porque o subagente roda em paralelo com a conversa
  * principal: somar os intervalos dele contaria o mesmo tempo duas vezes.
+ *
+ * O recorte entra **dentro** da subconsulta, antes do `LAG`. O intervalo que
+ * cruza a fronteira nao e contado em nenhuma das duas janelas: conta-lo nas duas
+ * duplicaria o mesmo tempo, e atribui-lo a uma delas exigiria ler um turno que
+ * esta fora dela. E o que `since` sempre fez na borda esquerda — `until` so
+ * passa a fazer o mesmo na direita.
  *
  * A ordem e `(ts, message_id)` e nao `seq`: o servidor nao guarda a sequencia
  * do transcript, e esse par ja e a ordem canonica que `/v1/session` devolve.
@@ -349,6 +402,7 @@ FROM (
   WHERE t.account_key = @accountKey
     AND t.is_sidechain = 0
     AND (@since IS NULL OR t.ts >= @since)
+    AND (@until IS NULL OR t.ts < @until)
 )
 WHERE gap > 0 AND gap < @gapCutoffMs
 GROUP BY deviceId, sessionId
@@ -368,6 +422,7 @@ FROM (
     ON s.account_key = t.account_key AND s.session_id = t.session_id
   WHERE t.is_sidechain = 0
     AND (@since IS NULL OR t.ts >= @since)
+    AND (@until IS NULL OR t.ts < @until)
 )
 WHERE gap > 0 AND gap < @gapCutoffMs
 GROUP BY accountKey, deviceId, sessionId
@@ -410,8 +465,86 @@ FROM team_turns t
 JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
 WHERE (@since IS NULL OR t.ts >= @since)
+  AND (@until IS NULL OR t.ts < @until)
 GROUP BY t.account_key, s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
+`;
+
+/**
+ * Linhas planas para o relatorio, ordenadas pela chave de agrupamento.
+ *
+ * Irma de [SELECT_ALL_USAGE_SQL], com duas diferencas: a ordem e
+ * `(conta, maquina, sessao, modelo)` em vez de recencia, e o predicado do cursor
+ * cabe no `WHERE` — as quatro colunas sao do `GROUP BY`, entao o filtro age
+ * antes de agrupar e nao vira `HAVING` sobre agregado.
+ *
+ * `IFNULL(t.model, '')` porque `model` e anulavel e NULL nao compara em
+ * row-value: sem isso a pagina pararia na primeira linha sem modelo.
+ *
+ * O `LIMIT` pede um item a mais do que o cliente pediu; quem descarta o extra e
+ * quem monta o cursor.
+ */
+const SELECT_REPORT_USAGE_SQL = `
+SELECT t.account_key AS accountKey,
+       s.device_id AS deviceId,
+       t.session_id AS sessionId,
+       s.cwd AS cwd,
+       s.git_branch AS gitBranch,
+       s.live_context_tokens AS liveContextTokens,
+       s.live_context_model AS liveContextModel,
+       t.model AS model,
+       COUNT(*) AS turnCount,
+       MIN(t.ts) AS firstTs,
+       MAX(t.ts) AS lastTs,
+       SUM(t.input_tokens) AS inputTokens,
+       SUM(t.output_tokens) AS outputTokens,
+       SUM(t.cache_read_tokens) AS cacheReadTokens,
+       SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+FROM team_turns t
+JOIN team_sessions s
+  ON s.account_key = t.account_key AND s.session_id = t.session_id
+WHERE (@since IS NULL OR t.ts >= @since)
+  AND (@until IS NULL OR t.ts < @until)
+  AND (@cursorAccountKey IS NULL
+       OR (t.account_key, s.device_id, t.session_id, IFNULL(t.model, '')) >
+          (@cursorAccountKey, @cursorDeviceId, @cursorSessionId, @cursorModel))
+GROUP BY t.account_key, s.device_id, t.session_id, t.model
+ORDER BY t.account_key ASC, s.device_id ASC, t.session_id ASC, IFNULL(t.model, '') ASC
+LIMIT @limit
+`;
+
+/**
+ * Tempo de trabalho por sessao, paginado.
+ *
+ * Mesma definicao de [SELECT_ALL_SESSION_ACTIVITY_SQL]. O cursor filtra
+ * `(conta, maquina, sessao)` **inteiras**, nunca turnos dentro de uma sessao:
+ * cortar turnos ali mudaria o `LAG` e a soma da sessao dependeria da pagina em
+ * que ela caiu.
+ */
+const SELECT_REPORT_ACTIVITY_SQL = `
+SELECT accountKey, deviceId, sessionId, SUM(gap) AS activeMillis
+FROM (
+  SELECT t.account_key AS accountKey,
+         s.device_id AS deviceId,
+         t.session_id AS sessionId,
+         t.ts - LAG(t.ts) OVER (
+           PARTITION BY t.account_key, t.session_id ORDER BY t.ts, t.message_id
+         ) AS gap
+  FROM team_turns t
+  JOIN team_sessions s
+    ON s.account_key = t.account_key AND s.session_id = t.session_id
+  WHERE t.is_sidechain = 0
+    AND (@since IS NULL OR t.ts >= @since)
+    AND (@until IS NULL OR t.ts < @until)
+    AND (@cursorAccountKey IS NULL
+         OR (t.account_key, s.device_id, t.session_id) >
+            (@cursorAccountKey, @cursorDeviceId, @cursorSessionId))
+)
+WHERE gap > 0 AND gap < @gapCutoffMs
+GROUP BY accountKey, deviceId, sessionId
+ORDER BY accountKey ASC, deviceId ASC, sessionId ASC
+LIMIT @limit
 `;
 
 /**
@@ -721,13 +854,26 @@ export class TeamRepository {
     return run();
   }
 
-  /** Snapshot de uma conta. `since` nulo devolve tudo o que sobreviveu a retencao. */
-  readTeam(accountKey: string, since: number | null, gapCutoffMs: number): TeamSnapshot {
+  /**
+   * Snapshot de uma conta no recorte `[since, until)`.
+   *
+   * Os dois sao opcionais: nulos devolvem tudo o que sobreviveu a retencao. O
+   * intervalo e semiaberto porque duas janelas adjacentes nao podem contar duas
+   * vezes o turno que cai exatamente na fronteira.
+   */
+  readTeam(
+    accountKey: string,
+    since: number | null,
+    until: number | null,
+    gapCutoffMs: number,
+  ): TeamSnapshot {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
-    const rows = this.db.prepare(SELECT_USAGE_SQL).all({ accountKey, since }) as TeamUsageRow[];
+    const rows = this.db
+      .prepare(SELECT_USAGE_SQL)
+      .all({ accountKey, since, until }) as TeamUsageRow[];
     const activity = this.db
       .prepare(SELECT_SESSION_ACTIVITY_SQL)
-      .all({ accountKey, since, gapCutoffMs }) as TeamSessionActivityRow[];
+      .all({ accountKey, since, until, gapCutoffMs }) as TeamSessionActivityRow[];
     return { members, rows, activity };
   }
 
@@ -738,9 +884,9 @@ export class TeamRepository {
    * chamada — e para uma maquina que existe mas nao consumiu no periodo
    * aparecer com serie vazia, em vez de sumir.
    */
-  readTrend(accountKey: string, since: number): TeamTrend {
+  readTrend(accountKey: string, since: number, until: number | null): TeamTrend {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
-    const raw = this.db.prepare(SELECT_TREND_SQL).all({ accountKey, since }) as Array<
+    const raw = this.db.prepare(SELECT_TREND_SQL).all({ accountKey, since, until }) as Array<
       Omit<TeamTrendRow, 'dayStartMillis'> & { dayBucket: number }
     >;
 
@@ -765,17 +911,19 @@ export class TeamRepository {
    */
   readOverview(
     since: number | null,
+    until: number | null,
     labels: Map<string, string>,
     gapCutoffMs: number,
   ): TeamAccountSnapshot[] {
     const memberRows = this.db.prepare(SELECT_ALL_MEMBERS_SQL).all() as Array<
       TeamMemberRow & { accountKey: string }
     >;
-    const usageRows = this.db.prepare(SELECT_ALL_USAGE_SQL).all({ since }) as Array<
+    const usageRows = this.db.prepare(SELECT_ALL_USAGE_SQL).all({ since, until }) as Array<
       TeamUsageRow & { accountKey: string }
     >;
     const activityRows = this.db.prepare(SELECT_ALL_SESSION_ACTIVITY_SQL).all({
       since,
+      until,
       gapCutoffMs,
     }) as Array<TeamSessionActivityRow & { accountKey: string }>;
     const reportedEmails = new Map(
@@ -828,6 +976,121 @@ export class TeamRepository {
     return [...byAccount.values()];
   }
 
+  /**
+   * Linhas planas de consumo para o consumidor externo, uma pagina por vez.
+   *
+   * Rota nova e plana em vez de paginar `/admin/v1/overview`: aquele monta a tela
+   * do app, cujo `flattenAccounts`/`toUsageBreakdown` assume resposta completa —
+   * uma pagina parcial subestimaria os totais sem erro nenhum.
+   */
+  readReportUsage(options: {
+    since: number | null;
+    until: number | null;
+    limit: number;
+    cursor: ReportCursor | null;
+  }): ReportPage<ReportUsageRow> {
+    const rows = this.db.prepare(SELECT_REPORT_USAGE_SQL).all({
+      since: options.since,
+      until: options.until,
+      limit: options.limit + 1,
+      ...cursorParams(options.cursor),
+    }) as ReportUsageRow[];
+
+    return toPage(rows, options.limit, (row) => ({
+      accountKey: row.accountKey,
+      deviceId: row.deviceId,
+      sessionId: row.sessionId,
+      model: row.model ?? '',
+    }));
+  }
+
+  /**
+   * Tempo de trabalho por sessao, uma pagina por vez.
+   *
+   * Sessao sem intervalo medido nao aparece — e a mesma promessa de
+   * [readTeam]: `null` seria "nao medido" e zero seria "medido e sem intervalo",
+   * e uma linha inventada com zero afirmaria a segunda coisa.
+   */
+  readReportActivity(options: {
+    since: number | null;
+    until: number | null;
+    gapCutoffMs: number;
+    limit: number;
+    cursor: ReportCursor | null;
+  }): ReportPage<ReportActivityRow> {
+    const rows = this.db.prepare(SELECT_REPORT_ACTIVITY_SQL).all({
+      since: options.since,
+      until: options.until,
+      gapCutoffMs: options.gapCutoffMs,
+      limit: options.limit + 1,
+      ...cursorParams(options.cursor),
+    }) as ReportActivityRow[];
+
+    return toPage(rows, options.limit, (row) => ({
+      accountKey: row.accountKey,
+      deviceId: row.deviceId,
+      sessionId: row.sessionId,
+      // A ordem desta consulta nao tem modelo; o campo viaja vazio para o cursor
+      // ter uma forma so.
+      model: '',
+    }));
+  }
+
+  /**
+   * Contas e integrantes, sem consumo e sem paginacao.
+   *
+   * O tamanho da resposta e o tamanho do time, nao o do historico: paginar aqui
+   * seria cursor para uma lista que cabe numa tela.
+   */
+  readReportMembers(labels: Map<string, string>): ReportAccountMembers[] {
+    const memberRows = this.db.prepare(SELECT_ALL_MEMBERS_SQL).all() as Array<
+      TeamMemberRow & { accountKey: string }
+    >;
+    const reportedEmails = new Map(
+      (
+        this.db.prepare(SELECT_ACCOUNT_EMAILS_SQL).all() as Array<{
+          accountKey: string;
+          accountEmail: string;
+        }>
+      ).map((row) => [row.accountKey, row.accountEmail]),
+    );
+
+    const byAccount = new Map<string, ReportAccountMembers>();
+    const ensure = (accountKey: string): ReportAccountMembers => {
+      const existing = byAccount.get(accountKey);
+      if (existing !== undefined) {
+        return existing;
+      }
+      const label = labels.get(accountKey) ?? null;
+      const reportedEmail = reportedEmails.get(accountKey) ?? null;
+      const provisionalEmail = normalizeAccountEmail(label);
+      const created: ReportAccountMembers = {
+        accountKey,
+        label,
+        accountEmail: reportedEmail ?? provisionalEmail,
+        emailSource: reportedEmail !== null ? 'reported' : provisionalEmail !== null ? 'label' : null,
+        members: [],
+      };
+      byAccount.set(accountKey, created);
+      return created;
+    };
+
+    // Conta que so aparece em `team_key_accounts` — chave emitida, maquina ainda
+    // nao enviou nada — entra na lista sem integrante, em vez de sumir.
+    for (const accountKey of labels.keys()) {
+      ensure(accountKey);
+    }
+
+    for (const row of memberRows) {
+      const { accountKey, ...member } = row;
+      ensure(accountKey).members.push(member);
+    }
+
+    return [...byAccount.values()].sort((left, right) =>
+      left.accountKey.localeCompare(right.accountKey),
+    );
+  }
+
   private upsertAccountEmail(accountKey: string, accountEmail: string | null, now: number): void {
     const normalized = normalizeAccountEmail(accountEmail);
     if (normalized === null) {
@@ -871,4 +1134,48 @@ export class TeamRepository {
 
     return { session, turns };
   }
+}
+
+/**
+ * Parametros do cursor, com `null` significando "primeira pagina".
+ *
+ * Os quatro viajam sempre juntos: o SQL testa apenas `@cursorAccountKey IS NULL`
+ * e usaria os outros tres em row-value, que nao tolera mistura de nulos.
+ */
+function cursorParams(cursor: ReportCursor | null): {
+  cursorAccountKey: string | null;
+  cursorDeviceId: string | null;
+  cursorSessionId: string | null;
+  cursorModel: string | null;
+} {
+  if (cursor === null) {
+    return {
+      cursorAccountKey: null,
+      cursorDeviceId: null,
+      cursorSessionId: null,
+      cursorModel: null,
+    };
+  }
+  return {
+    cursorAccountKey: cursor.accountKey,
+    cursorDeviceId: cursor.deviceId,
+    cursorSessionId: cursor.sessionId,
+    cursorModel: cursor.model,
+  };
+}
+
+/**
+ * Corta o item extra e monta o cursor a partir da ultima linha **mantida**.
+ *
+ * A consulta pede `limit + 1`: e a presenca desse extra, e nao a pagina estar
+ * cheia, que prova haver proxima pagina. Sem ele, a ultima pagina exata
+ * devolveria um cursor que abriria uma pagina vazia.
+ */
+function toPage<T>(rows: T[], limit: number, toCursor: (row: T) => ReportCursor): ReportPage<T> {
+  if (rows.length <= limit) {
+    return { rows, nextCursor: null };
+  }
+  const page = rows.slice(0, limit);
+  const last = page[page.length - 1];
+  return { rows: page, nextCursor: last === undefined ? null : toCursor(last) };
 }

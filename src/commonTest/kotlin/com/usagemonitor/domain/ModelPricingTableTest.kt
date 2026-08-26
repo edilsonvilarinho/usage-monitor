@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.ModelPricing
 import com.usagemonitor.domain.entity.ModelPricingTable
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -67,6 +68,27 @@ class ModelPricingTableTest {
         assertEquals(300_000L, pricing.cacheReadMicrosPerMillion)
         assertEquals(3_750_000L, pricing.cacheWrite5mMicrosPerMillion)
         assertEquals(6_000_000L, pricing.cacheWrite1hMicrosPerMillion)
+    }
+
+    @Test
+    fun `derives the five prices for sonnet 5`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-sonnet-5"))
+
+        assertEquals(2_000_000L, pricing.inputMicrosPerMillion)
+        assertEquals(10_000_000L, pricing.outputMicrosPerMillion)
+        assertEquals(200_000L, pricing.cacheReadMicrosPerMillion)
+        assertEquals(2_500_000L, pricing.cacheWrite5mMicrosPerMillion)
+        assertEquals(4_000_000L, pricing.cacheWrite1hMicrosPerMillion)
+    }
+
+    // A tarifa do Sonnet 5 já foi a do 4.6 por engano, e nenhum teste reprovava:
+    // os dois casam pelo mesmo prefixo até a fronteira e a diferença só aparece no preço.
+    @Test
+    fun `sonnet 5 does not share pricing with sonnet 4-6`() {
+        assertNotEquals(
+            ModelPricingTable.forModel("claude-sonnet-4-6"),
+            ModelPricingTable.forModel("claude-sonnet-5")
+        )
     }
 
     @Test

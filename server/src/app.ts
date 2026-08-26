@@ -9,6 +9,7 @@ import { createAdminRouter } from './http/routes/admin.js';
 import { createHealthRouter } from './http/routes/health.js';
 import { createIngestRouter } from './http/routes/ingest.js';
 import { createPresenceRouter } from './http/routes/presence.js';
+import { createReportRouter } from './http/routes/report.js';
 import { createTeamRouter } from './http/routes/team.js';
 import { createVerifyRouter } from './http/routes/verify.js';
 
@@ -64,6 +65,10 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
   // administracao, a presenca vale para qualquer deploy.
   app.use('/api', createPresenceRouter({ config, repository, keyRepository, now }));
   app.use('/api', createTeamRouter({ config, repository, keyRepository, now }));
+  // Incondicional: sem `TEAM_REPORT_TOKEN` as rotas respondem 401 em vez de nao
+  // existir. Rota ausente faria "credencial errada" e "variavel nao definida"
+  // chegarem ao consumidor como o mesmo 404.
+  app.use('/api', createReportRouter({ config, repository, keyRepository }));
   app.use('/api', createVerifyRouter({ config, keyRepository, now }));
 
   // Sem token de administracao as rotas nem existem: caem na coringa 404 abaixo,
@@ -71,7 +76,13 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
   if (config.adminToken !== null) {
     app.use(
       '/api',
-      createAdminRouter({ adminToken: config.adminToken, repository, keyRepository, now }),
+      createAdminRouter({
+        adminToken: config.adminToken,
+        reportToken: config.reportToken,
+        repository,
+        keyRepository,
+        now,
+      }),
     );
   }
 

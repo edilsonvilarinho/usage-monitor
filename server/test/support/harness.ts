@@ -18,6 +18,7 @@ import type {
 export const TEST_TEAM_KEY = 'test-team-key-0123456789abcdefgh';
 export const TEST_ADMIN_TOKEN = 'test-admin-token-0123456789abcdef';
 export const TEST_KEY_SECRET = 'test-key-secret-0123456789abcdefg';
+export const TEST_REPORT_TOKEN = 'test-report-token-0123456789abcd';
 
 export const ACCOUNT_A = 'account-uuid-aaa';
 export const ACCOUNT_B = 'account-uuid-bbb';
@@ -42,6 +43,7 @@ export function createHarness(configOverrides: Partial<Config> = {}): Harness {
     teamApiKey: TEST_TEAM_KEY,
     adminToken: TEST_ADMIN_TOKEN,
     keySecret: TEST_KEY_SECRET,
+    reportToken: TEST_REPORT_TOKEN,
     legacyKeyMode: 'open',
     retentionDays: 45,
     maxTurnsPerRequest: 5000,

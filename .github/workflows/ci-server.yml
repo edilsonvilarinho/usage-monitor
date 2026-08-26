@@ -81,6 +81,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Par do step de mesmo nome em `ci.yml`: os filtros de path dos dois
+      # workflows sao disjuntos, entao a guarda precisa de um step em cada um.
+      # Aqui ela cobre a edicao que mexe so em `server/src/domain/modelPricing.ts`.
+      # `working-directory: .` porque o default do job e `server`, e o script le os
+      # dois arquivos a partir da raiz do repositorio.
+      - name: Check pricing table parity
+        if: steps.filter.outputs.relevant == 'true'
+        working-directory: .
+        run: node tools/ci/check-pricing-parity.mjs
+
       - name: Setup Node
         if: steps.filter.outputs.relevant == 'true'
         uses: actions/setup-node@v4

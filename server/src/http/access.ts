@@ -5,6 +5,7 @@ import { hashKey, type TeamKeyRepository } from '../repositories/teamKeyReposito
 import { isValidTeamKey, TEAM_KEY_HEADER } from './auth.js';
 
 export const ADMIN_TOKEN_HEADER = 'x-admin-token';
+export const REPORT_TOKEN_HEADER = 'x-report-key';
 
 export interface AccessDeps {
   config: Config;
@@ -14,9 +15,9 @@ export interface AccessDeps {
 
 /** Como a requisicao foi autorizada. O ingest usa isto para marcar o uso. */
 export interface TeamAccess {
-  /** `null` para a chave legada de ambiente e para o token de admin. */
+  /** `null` para a chave legada de ambiente, para o token de admin e para o de relatorio. */
   keyId: string | null;
-  kind: 'admin' | 'legacy' | 'team-key';
+  kind: 'admin' | 'legacy' | 'report' | 'team-key';
 }
 
 /** Extrai a conta alvo da requisicao. Query nas leituras, corpo no ingest. */
@@ -73,6 +74,48 @@ export function requireTeamAccess(
   };
 }
 
+/**
+ * Envolve um handler exigindo credencial de **leitura global**: `x-admin-token`
+ * ou `x-report-key`, sem escopo de conta.
+ *
+ * Separado de [requireTeamAccess] porque aqui nao ha conta a autorizar — a rota
+ * ou devolve dado de todo mundo, ou nao devolve nada. Chave de time nao serve:
+ * ela e por conta, e uma leitura global feita com ela devolveria as outras.
+ */
+export function requireGlobalRead(
+  tokens: Pick<Config, 'adminToken' | 'reportToken'>,
+  handler: RequestHandler,
+): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const access = authorizeGlobalRead(tokens, req);
+    if (access === null) {
+      next(new UnauthorizedError('Credencial de leitura global ausente ou invalida.'));
+      return;
+    }
+    res.locals[ACCESS_LOCALS_KEY] = access;
+    handler(req, res, next);
+  };
+}
+
+function authorizeGlobalRead(
+  tokens: Pick<Config, 'adminToken' | 'reportToken'>,
+  req: Request,
+): TeamAccess | null {
+  if (
+    tokens.adminToken !== null &&
+    isValidTeamKey(req.header(ADMIN_TOKEN_HEADER) ?? undefined, tokens.adminToken)
+  ) {
+    return { keyId: null, kind: 'admin' };
+  }
+  if (
+    tokens.reportToken !== null &&
+    isValidTeamKey(req.header(REPORT_TOKEN_HEADER) ?? undefined, tokens.reportToken)
+  ) {
+    return { keyId: null, kind: 'report' };
+  }
+  return null;
+}
+
 /** Envolve um handler exigindo o token de admin. */
 export function requireAdminToken(expectedToken: string, handler: RequestHandler): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -95,6 +138,17 @@ function authorize(
     const received = req.header(ADMIN_TOKEN_HEADER);
     if (received !== undefined && isValidTeamKey(received, adminToken)) {
       return { keyId: null, kind: 'admin' };
+    }
+  }
+
+  // O token de relatorio entra no mesmo ponto do de admin — dentro do
+  // `!allowClaim`, que e o que ja o recusa no ingest e na presenca. Ele le
+  // qualquer conta e nao reivindica nenhuma: reivindicar e escrita.
+  const reportToken = deps.config.reportToken;
+  if (!allowClaim && reportToken !== null) {
+    const received = req.header(REPORT_TOKEN_HEADER);
+    if (received !== undefined && isValidTeamKey(received, reportToken)) {
+      return { keyId: null, kind: 'report' };
     }
   }
 

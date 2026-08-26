@@ -78,6 +78,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Guarda de paridade entre a tabela de precos do domain Kotlin e a que o
+      # servidor publica. Ela roda AQUI e no `ci-server.yml` porque os filtros de
+      # path dos dois sao disjuntos -- este ignora `server/**` e aquele so dispara
+      # com `server/**` --, entao um step so deixaria metade das edicoes passar
+      # batida. Neste job ela cobre a edicao que mexe so no Kotlin.
+      #
+      # Antes do JDK de proposito: sao milissegundos de node contra minutos de
+      # Gradle, e divergencia de preco nao precisa esperar a suite. `node` ja vem
+      # no runner, e o script nao tem dependencia -- nao existe `npm ci` aqui.
+      - name: Check pricing table parity
+        if: steps.filter.outputs.relevant == 'true'
+        shell: pwsh
+        run: node tools/ci/check-pricing-parity.mjs
+
       - name: Setup JDK
         if: steps.filter.outputs.relevant == 'true'
         uses: actions/setup-java@v4

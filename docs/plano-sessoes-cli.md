@@ -206,7 +206,7 @@ Os quatro preços derivam da tarifa de input do modelo: cache read `0,1×`, cach
 |---|---|---|---|---|---|
 | `claude-opus-5` | 5,00 | 25,00 | 0,50 | 6,25 | 10,00 |
 | `claude-opus-4-8` / `4-7` / `4-6` / `4-5` | 5,00 | 25,00 | 0,50 | 6,25 | 10,00 |
-| `claude-sonnet-5` | 3,00 | 15,00 | 0,30 | 3,75 | 6,00 |
+| `claude-sonnet-5` | 2,00 | 10,00 | 0,20 | 2,50 | 4,00 |
 | `claude-sonnet-4-6` / `4-5` | 3,00 | 15,00 | 0,30 | 3,75 | 6,00 |
 | `claude-haiku-4-5` | 1,00 | 5,00 | 0,10 | 1,25 | 2,00 |
 | `claude-fable-5` / `claude-mythos-5` | 10,00 | 50,00 | 1,00 | 12,50 | 20,00 |

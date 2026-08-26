@@ -3,7 +3,7 @@ import { NotFoundError, ValidationError } from '../../domain/errors.js';
 import { logger } from '../../logger.js';
 import type { TeamKeyRepository, TeamKeyRecord } from '../../repositories/teamKeyRepository.js';
 import type { TeamRepository } from '../../repositories/teamRepository.js';
-import { requireAdminToken } from '../access.js';
+import { requireAdminToken, requireGlobalRead } from '../access.js';
 import {
   DEFAULT_GAP_CUTOFF_MS,
   createKeyBodySchema,
@@ -16,6 +16,8 @@ import { wrap } from '../errorHandler.js';
 
 export interface AdminRouterDeps {
   adminToken: string;
+  /** Credencial de leitura global. So a visao agregada a aceita; nenhum `DELETE` a ve. */
+  reportToken: string | null;
   repository: TeamRepository;
   keyRepository: TeamKeyRepository;
   now: () => number;
@@ -37,6 +39,12 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
   const router = Router();
   const protect = (handler: Parameters<typeof requireAdminToken>[1]) =>
     requireAdminToken(deps.adminToken, handler);
+
+  // Leitura que nao expoe segredo nem apaga nada aceita tambem `x-report-key`.
+  // `protect` continua sendo o portao de tudo o mais — inclusive da listagem de
+  // chaves, que devolve material de credencial, e de todos os `DELETE`.
+  const readOnly = (handler: Parameters<typeof requireAdminToken>[1]) =>
+    requireGlobalRead({ adminToken: deps.adminToken, reportToken: deps.reportToken }, handler);
 
   /** Existe para o botao "Validar" do app dizer sim ou nao sem efeito colateral. */
   router.get(
@@ -128,7 +136,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
    */
   router.get(
     '/admin/v1/overview',
-    protect(
+    readOnly(
       wrap((req, res) => {
         const parsed = overviewQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -140,6 +148,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
 
         const accounts = deps.repository.readOverview(
           parsed.data.since ?? null,
+          parsed.data.until ?? null,
           deps.keyRepository.accountLabels(),
           parsed.data.gapCutoffMs ?? DEFAULT_GAP_CUTOFF_MS,
         );

@@ -21,6 +21,17 @@ export interface Config {
   adminToken: string | null;
   /** Segredo de derivacao da cifra das chaves. Exigido junto do [adminToken]. */
   keySecret: string | null;
+  /**
+   * Credencial de **leitura global**, para o consumidor externo de relatorio.
+   *
+   * Le qualquer conta sem escopo e sem chave de time, e nao alcanca rota
+   * destrutiva nenhuma: `requireAdminToken` continua sendo o unico portao dos
+   * `DELETE`, e o ingest e a presenca a recusam junto com o token de admin.
+   *
+   * Rotacao e redeploy — e o preco aceito de manter a credencial em variavel de
+   * ambiente em vez de linha no banco com escopo e UI propria.
+   */
+  reportToken: string | null;
   legacyKeyMode: LegacyKeyMode;
   retentionDays: number;
   maxTurnsPerRequest: number;
@@ -48,6 +59,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Config 
     teamApiKey: readOptionalSecret(env.TEAM_API_KEY),
     adminToken: readOptionalSecret(env.TEAM_ADMIN_TOKEN),
     keySecret: readOptionalSecret(env.TEAM_KEY_SECRET),
+    reportToken: readOptionalSecret(env.TEAM_REPORT_TOKEN),
     legacyKeyMode: parseLegacyKeyMode(env.TEAM_LEGACY_KEY_MODE),
     retentionDays: parseIntegerOrDefault(env.TEAM_RETENTION_DAYS, DEFAULT_RETENTION_DAYS),
     maxTurnsPerRequest: parseIntegerOrDefault(
@@ -70,6 +82,9 @@ export function validateConfig(config: Config): Config {
   requireStrongSecret(config.teamApiKey, 'TEAM_API_KEY');
   requireStrongSecret(config.adminToken, 'TEAM_ADMIN_TOKEN');
   requireStrongSecret(config.keySecret, 'TEAM_KEY_SECRET');
+  // Fora da checagem de "pelo menos um segredo" acima, de proposito: um servidor
+  // que so publica relatorio e nao aceita cliente nenhum nao tem o que relatar.
+  requireStrongSecret(config.reportToken, 'TEAM_REPORT_TOKEN');
 
   // A chave emitida e guardada cifrada para o admin poder rele-la depois. Sem o
   // segredo de derivacao nao ha como criar chave nenhuma, entao as rotas

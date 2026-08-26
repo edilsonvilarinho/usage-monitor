@@ -103,9 +103,32 @@ export const DEFAULT_GAP_CUTOFF_MS = 5 * 60 * 1_000;
 /** Um dia como teto: acima disso o "intervalo" ja nao descreve trabalho seguido. */
 const GAP_CUTOFF_MAX_MS = 24 * 60 * 60 * 1_000;
 
-export const teamQuerySchema = z.object({
+/**
+ * Recorte semiaberto: `since <= ts < until`.
+ *
+ * `since` sempre foi inclusivo, entao `until` tem de ser exclusivo — com os dois
+ * inclusivos, duas janelas adjacentes contariam duas vezes o turno que cai
+ * exatamente na fronteira, e um relatorio mensal somaria mais que o ano.
+ *
+ * O `path` vai explicito no refino porque sem ele a issue nasce sem caminho e a
+ * mensagem de erro das rotas sai como "parametros ausentes".
+ */
+const withUntilAfterSince = <T extends z.ZodRawShape>(shape: T) =>
+  z
+    .object(shape)
+    .refine(
+      (value) =>
+        (value as { since?: number; until?: number }).until === undefined ||
+        (value as { since?: number; until?: number }).since === undefined ||
+        (value as { since: number; until: number }).until >
+          (value as { since: number; until: number }).since,
+      { message: 'until precisa ser maior que since', path: ['until'] },
+    );
+
+export const teamQuerySchema = withUntilAfterSince({
   accountKey: z.string().min(1).max(TEXT_MAX),
   since: z.coerce.number().int().nonnegative().optional(),
+  until: z.coerce.number().int().nonnegative().optional(),
   gapCutoffMs: z.coerce.number().int().positive().max(GAP_CUTOFF_MAX_MS).optional(),
 });
 
@@ -128,9 +151,35 @@ export const claimBodySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
 });
 
-/** Recorte opcional da visao global. Mesma semantica do `since` de `/v1/team`. */
-export const overviewQuerySchema = z.object({
+/** Recorte opcional da visao global. Mesma semantica de `/v1/team`. */
+export const overviewQuerySchema = withUntilAfterSince({
   since: z.coerce.number().int().nonnegative().optional(),
+  until: z.coerce.number().int().nonnegative().optional(),
+  gapCutoffMs: z.coerce.number().int().positive().max(GAP_CUTOFF_MAX_MS).optional(),
+});
+
+/**
+ * Teto de linhas por pagina de relatorio.
+ *
+ * O default cobre a leitura tipica em uma requisicao; o teto existe porque a
+ * resposta cresce com sessoes x modelos, e um `limit` sem limite viraria a
+ * varredura da tabela inteira a pedido de qualquer portador do token.
+ */
+export const DEFAULT_REPORT_LIMIT = 500;
+const REPORT_LIMIT_MAX = 5000;
+
+const reportWindow = {
+  since: z.coerce.number().int().nonnegative().optional(),
+  until: z.coerce.number().int().nonnegative().optional(),
+  limit: z.coerce.number().int().positive().max(REPORT_LIMIT_MAX).optional(),
+  // Opaco para quem chama: e o `base64url` que a resposta anterior devolveu.
+  cursor: z.string().min(1).max(TEXT_MAX).optional(),
+};
+
+export const reportUsageQuerySchema = withUntilAfterSince(reportWindow);
+
+export const reportActivityQuerySchema = withUntilAfterSince({
+  ...reportWindow,
   gapCutoffMs: z.coerce.number().int().positive().max(GAP_CUTOFF_MAX_MS).optional(),
 });
 
@@ -176,9 +225,14 @@ export const updateKeyBodySchema = z
  * `days=100000` viraria uma varredura da tabela inteira a pedido de qualquer
  * portador de chave.
  */
-export const trendQuerySchema = z.object({
+export const trendQuerySchema = withUntilAfterSince({
   accountKey: z.string().min(1).max(TEXT_MAX),
   days: z.coerce.number().int().positive().max(365).optional(),
+  // `days` continua aceito e continua sendo o que o desktop manda hoje
+  // (`RemoteTeamDataSource.kt`). `since` explicito vence: quem pede periodo
+  // fechado quer as bordas que pediu, nao uma contagem a partir de agora.
+  since: z.coerce.number().int().nonnegative().optional(),
+  until: z.coerce.number().int().nonnegative().optional(),
 });
 
 export const sessionQuerySchema = z.object({

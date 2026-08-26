@@ -45,6 +45,38 @@ describe('loadConfigFromEnv', () => {
     ).toThrow(/TEAM_KEY_SECRET/);
   });
 
+  it('le TEAM_REPORT_TOKEN quando presente', () => {
+    const config = loadConfigFromEnv({
+      TEAM_API_KEY: VALID_KEY,
+      TEAM_REPORT_TOKEN: VALID_KEY,
+    } as NodeJS.ProcessEnv);
+
+    expect(config.reportToken).toBe(VALID_KEY);
+  });
+
+  it('nasce sem token de relatorio', () => {
+    const config = loadConfigFromEnv({ TEAM_API_KEY: VALID_KEY } as NodeJS.ProcessEnv);
+
+    expect(config.reportToken).toBeNull();
+  });
+
+  // Um servidor que so publica relatorio e nao aceita cliente nenhum nao tem o
+  // que relatar: o token de relatorio NAO conta como o segredo que falta.
+  it('nao aceita TEAM_REPORT_TOKEN como unico segredo', () => {
+    expect(() =>
+      loadConfigFromEnv({ TEAM_REPORT_TOKEN: VALID_KEY } as NodeJS.ProcessEnv),
+    ).toThrow(/TEAM_ADMIN_TOKEN/);
+  });
+
+  it('falha com TEAM_REPORT_TOKEN curto', () => {
+    expect(() =>
+      loadConfigFromEnv({
+        TEAM_API_KEY: VALID_KEY,
+        TEAM_REPORT_TOKEN: 'curto',
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/TEAM_REPORT_TOKEN/);
+  });
+
   it('falha com TEAM_LEGACY_KEY_MODE invalido', () => {
     expect(() =>
       loadConfigFromEnv({
