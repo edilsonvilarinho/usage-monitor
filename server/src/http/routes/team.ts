@@ -50,9 +50,11 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
         }
 
         // O escopo e sempre a conta pedida: uma resposta nunca mistura contas.
+        // A janela e semiaberta: `since <= ts < until`.
         const snapshot = deps.repository.readTeam(
           parsed.data.accountKey,
           parsed.data.since ?? null,
+          parsed.data.until ?? null,
           parsed.data.gapCutoffMs ?? DEFAULT_GAP_CUTOFF_MS,
         );
 
@@ -85,10 +87,12 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
           );
         }
 
+        // `since` explicito vence; sem ele, a contagem de dias a partir de agora,
+        // que e o que o desktop manda hoje e nao pode quebrar.
         const days = parsed.data.days ?? DEFAULT_TREND_DAYS;
-        const since = deps.now() - days * MILLIS_PER_DAY;
+        const since = parsed.data.since ?? deps.now() - days * MILLIS_PER_DAY;
 
-        res.json(deps.repository.readTrend(parsed.data.accountKey, since));
+        res.json(deps.repository.readTrend(parsed.data.accountKey, since, parsed.data.until ?? null));
       }),
     ),
   );

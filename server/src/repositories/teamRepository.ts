@@ -291,6 +291,7 @@ JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
 WHERE t.account_key = @accountKey
   AND t.ts >= @since
+  AND (@until IS NULL OR t.ts < @until)
 GROUP BY s.device_id, dayBucket, t.model
 ORDER BY dayBucket ASC, deviceId ASC
 `;
@@ -316,6 +317,7 @@ JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
 WHERE t.account_key = @accountKey
   AND (@since IS NULL OR t.ts >= @since)
+  AND (@until IS NULL OR t.ts < @until)
 GROUP BY s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
 `;
@@ -331,6 +333,12 @@ ORDER BY MAX(t.ts) DESC
  *
  * `is_sidechain = 0` porque o subagente roda em paralelo com a conversa
  * principal: somar os intervalos dele contaria o mesmo tempo duas vezes.
+ *
+ * O recorte entra **dentro** da subconsulta, antes do `LAG`. O intervalo que
+ * cruza a fronteira nao e contado em nenhuma das duas janelas: conta-lo nas duas
+ * duplicaria o mesmo tempo, e atribui-lo a uma delas exigiria ler um turno que
+ * esta fora dela. E o que `since` sempre fez na borda esquerda — `until` so
+ * passa a fazer o mesmo na direita.
  *
  * A ordem e `(ts, message_id)` e nao `seq`: o servidor nao guarda a sequencia
  * do transcript, e esse par ja e a ordem canonica que `/v1/session` devolve.
@@ -349,6 +357,7 @@ FROM (
   WHERE t.account_key = @accountKey
     AND t.is_sidechain = 0
     AND (@since IS NULL OR t.ts >= @since)
+    AND (@until IS NULL OR t.ts < @until)
 )
 WHERE gap > 0 AND gap < @gapCutoffMs
 GROUP BY deviceId, sessionId
@@ -368,6 +377,7 @@ FROM (
     ON s.account_key = t.account_key AND s.session_id = t.session_id
   WHERE t.is_sidechain = 0
     AND (@since IS NULL OR t.ts >= @since)
+    AND (@until IS NULL OR t.ts < @until)
 )
 WHERE gap > 0 AND gap < @gapCutoffMs
 GROUP BY accountKey, deviceId, sessionId
@@ -410,6 +420,7 @@ FROM team_turns t
 JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
 WHERE (@since IS NULL OR t.ts >= @since)
+  AND (@until IS NULL OR t.ts < @until)
 GROUP BY t.account_key, s.device_id, t.session_id, t.model
 ORDER BY MAX(t.ts) DESC
 `;
@@ -721,13 +732,26 @@ export class TeamRepository {
     return run();
   }
 
-  /** Snapshot de uma conta. `since` nulo devolve tudo o que sobreviveu a retencao. */
-  readTeam(accountKey: string, since: number | null, gapCutoffMs: number): TeamSnapshot {
+  /**
+   * Snapshot de uma conta no recorte `[since, until)`.
+   *
+   * Os dois sao opcionais: nulos devolvem tudo o que sobreviveu a retencao. O
+   * intervalo e semiaberto porque duas janelas adjacentes nao podem contar duas
+   * vezes o turno que cai exatamente na fronteira.
+   */
+  readTeam(
+    accountKey: string,
+    since: number | null,
+    until: number | null,
+    gapCutoffMs: number,
+  ): TeamSnapshot {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
-    const rows = this.db.prepare(SELECT_USAGE_SQL).all({ accountKey, since }) as TeamUsageRow[];
+    const rows = this.db
+      .prepare(SELECT_USAGE_SQL)
+      .all({ accountKey, since, until }) as TeamUsageRow[];
     const activity = this.db
       .prepare(SELECT_SESSION_ACTIVITY_SQL)
-      .all({ accountKey, since, gapCutoffMs }) as TeamSessionActivityRow[];
+      .all({ accountKey, since, until, gapCutoffMs }) as TeamSessionActivityRow[];
     return { members, rows, activity };
   }
 
@@ -738,9 +762,9 @@ export class TeamRepository {
    * chamada — e para uma maquina que existe mas nao consumiu no periodo
    * aparecer com serie vazia, em vez de sumir.
    */
-  readTrend(accountKey: string, since: number): TeamTrend {
+  readTrend(accountKey: string, since: number, until: number | null): TeamTrend {
     const members = this.db.prepare(SELECT_MEMBERS_SQL).all({ accountKey }) as TeamMemberRow[];
-    const raw = this.db.prepare(SELECT_TREND_SQL).all({ accountKey, since }) as Array<
+    const raw = this.db.prepare(SELECT_TREND_SQL).all({ accountKey, since, until }) as Array<
       Omit<TeamTrendRow, 'dayStartMillis'> & { dayBucket: number }
     >;
 
@@ -765,17 +789,19 @@ export class TeamRepository {
    */
   readOverview(
     since: number | null,
+    until: number | null,
     labels: Map<string, string>,
     gapCutoffMs: number,
   ): TeamAccountSnapshot[] {
     const memberRows = this.db.prepare(SELECT_ALL_MEMBERS_SQL).all() as Array<
       TeamMemberRow & { accountKey: string }
     >;
-    const usageRows = this.db.prepare(SELECT_ALL_USAGE_SQL).all({ since }) as Array<
+    const usageRows = this.db.prepare(SELECT_ALL_USAGE_SQL).all({ since, until }) as Array<
       TeamUsageRow & { accountKey: string }
     >;
     const activityRows = this.db.prepare(SELECT_ALL_SESSION_ACTIVITY_SQL).all({
       since,
+      until,
       gapCutoffMs,
     }) as Array<TeamSessionActivityRow & { accountKey: string }>;
     const reportedEmails = new Map(

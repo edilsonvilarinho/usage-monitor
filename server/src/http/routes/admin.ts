@@ -148,6 +148,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
 
         const accounts = deps.repository.readOverview(
           parsed.data.since ?? null,
+          parsed.data.until ?? null,
           deps.keyRepository.accountLabels(),
           parsed.data.gapCutoffMs ?? DEFAULT_GAP_CUTOFF_MS,
         );
