@@ -165,6 +165,31 @@ fechada.
 
 ## Pontos de situação
 
+**Plano concluído em 2026-08-25**, em seis commits na branch `fix/sonnet-5-pricing-105` — `c4bf174`,
+`f168292`, `219c201`, `539f561`, `4ae4d82`, `3aab723` —, sem push e sem PR.
+
+Estado medido no fim: `gradlew.bat allTests` **1420 testes / 0 falhas**; `npm test` no servidor
+**216 testes / 17 arquivos / 0 falhas** (174 antes desta linha de trabalho); `npm run typecheck` sem
+erro; `npm ci --dry-run` limpo depois do bump; `node tools/ci/check-pricing-parity.mjs` verde, e
+reprovando nas quatro mutações medidas.
+
+### Pendências
+
+Nenhuma é de desenvolvimento. O código do plano está fechado e verificado; o que falta depende de
+decisão ou de máquina que não é esta.
+
+| # | Pendência | Natureza | Nota |
+|---|---|---|---|
+| P1 | Push da branch e PR | decisão | Os seis commits estão só no repositório local. O nome `fix/sonnet-5-pricing-105` é herança da A01 e não descreve o resto — renomear antes do push é o momento barato. |
+| P2 | Redeploy com `TEAM_REPORT_TOKEN` definido | operação | A variável é opcional: sem ela as rotas existem e respondem 401. **Sem migração de banco** — a 0.10.0 não acrescenta tabela nem coluna. |
+| P3 | Verificação ponta a ponta com `curl` | operação | As três chamadas da seção de verificação. A terceira é a que importa: `DELETE` com `x-report-key` respondendo **401**. Coberta por teste automatizado, não contra o servidor real. |
+| P4 | Capturas do README com o custo antigo do Sonnet 5 | fora de escopo | `ScreenshotFixtures.kt:62` usa `claude-sonnet-5`; `generateScreenshots` é manual, não roda no CI, e regerar imagem não era atividade deste plano. |
+| P5 | Índice em `team_turns(ts)` | não fazer agora | Risco 2: só entra com medida que o justifique. |
+
+**O que explicitamente não ficou pendente:** cliente desktop não muda (`until` é opcional, as rotas
+são aditivas, o token é novo); não há migração de banco; o protótipo visual não é atualizado porque
+nenhuma superfície visível mudou; e `unpricedTurnCount` continua derivável, sem campo novo.
+
 A coluna `Commit` guarda o **assunto** do commit, não o hash: um commit não pode conter o próprio
 hash, e preencher o hash depois quebraria a regra de escrever a linha no mesmo commit da atividade.
 
