@@ -11,6 +11,9 @@ import com.usagemonitor.presentation.ui.components.formatCurrencyAmount
 import com.usagemonitor.presentation.ui.components.orderQuotasForCard
 import com.usagemonitor.presentation.ui.components.quotaDetailText
 import com.usagemonitor.presentation.ui.components.resetLabel
+import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
+import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -111,5 +114,56 @@ class ApiUsageCardFormattingTest {
         assertEquals("$3.85", formatCents(385L))
         assertEquals("-R$1.50", formatCurrencyAmount(-150L, "BRL"))
         assertEquals("JPY 5.00", formatCents(500L, "JPY"))
+    }
+
+    // ------------------------------------------------------------------
+    // Projeção de saldo sem reset (issue #109)
+    // ------------------------------------------------------------------
+
+    /**
+     * A contradição que a issue mostra em captura: o card imprime "Saldo não
+     * expira" e a tooltip logo abaixo prometia um reset.
+     */
+    @Test
+    fun `a projecao de um saldo sem reset nao fala em reset`() {
+        val risk = QuotaRiskSummary(
+            level = UsageRiskLevel.AT_RISK,
+            estimatedExhaustionAt = Instant.parse("2026-11-02T16:38:00Z"),
+            hasKnownResetAt = false
+        )
+
+        val pt = riskDotTooltipSubtitle(risk, AppLanguage.PT)
+        val en = riskDotTooltipSubtitle(risk, AppLanguage.EN)
+
+        assertEquals(false, pt.contains("reset", ignoreCase = true))
+        assertEquals(false, en.contains("reset", ignoreCase = true))
+        assertEquals(true, pt.contains("créditos devem acabar"))
+        assertEquals(true, en.contains("credits should run out"))
+    }
+
+    /** Saldo sem consumo observado: nenhuma data, e nenhuma promessa de reset. */
+    @Test
+    fun `saldo sem previsao diz que nao ha estimativa`() {
+        val risk = QuotaRiskSummary(
+            level = UsageRiskLevel.ON_TRACK,
+            estimatedExhaustionAt = null,
+            hasKnownResetAt = false
+        )
+
+        val pt = riskDotTooltipSubtitle(risk, AppLanguage.PT)
+
+        assertEquals(false, pt.contains("reset", ignoreCase = true))
+        assertEquals(true, pt.contains("não há previsão de término"))
+    }
+
+    /** Cota com reset continua com a frase de sempre. */
+    @Test
+    fun `a projecao de uma cota com reset continua falando em reset`() {
+        val risk = QuotaRiskSummary(
+            level = UsageRiskLevel.WILL_EXCEED,
+            estimatedExhaustionAt = Instant.parse("2026-08-11T22:00:00Z")
+        )
+
+        assertEquals(true, riskDotTooltipSubtitle(risk, AppLanguage.PT).contains("antes do reset"))
     }
 }

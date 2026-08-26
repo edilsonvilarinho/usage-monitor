@@ -124,6 +124,7 @@ internal object ScreenshotFixtures {
 
     val primaryAnthropicTarget = UsageTargetKey(ApiSource.ANTHROPIC, PRIMARY_PROFILE_ID)
     private val secondaryAnthropicTarget = UsageTargetKey(ApiSource.ANTHROPIC, SECONDARY_PROFILE_ID)
+    private val deepSeekTarget = UsageTargetKey(ApiSource.DEEPSEEK)
 
     val dashboardStats: List<ApiUsageStats> = listOf(
         ApiUsageStats(
@@ -176,13 +177,16 @@ internal object ScreenshotFixtures {
             source = ApiSource.DEEPSEEK,
             apiName = "DeepSeek",
             quotas = listOf(
+                // `INTERVAL` como o `DeepSeekMapper` grava, e não `REPORTED`: o
+                // tipo decide se a série sequer calcula projeção, e a captura
+                // precisa mostrar o que a app mostra.
                 QuotaInfo(
                     label = DeepSeekQuotaLabels.BALANCE,
                     used = 0L,
                     total = 1_284L,
                     periodEndAt = UNKNOWN_RESET_AT,
                     hasKnownResetAt = false,
-                    periodType = PeriodType.REPORTED,
+                    periodType = PeriodType.INTERVAL,
                     unit = UsageUnit.CURRENCY_USD
                 )
             )
@@ -195,6 +199,16 @@ internal object ScreenshotFixtures {
             QuotaSeriesKey(AnthropicQuotaLabels.FIVE_HOUR, PeriodType.INTERVAL) to QuotaRiskSummary(
                 level = UsageRiskLevel.AT_RISK,
                 estimatedExhaustionAt = NOW.plusHours(1)
+            )
+        ),
+        // Saldo pré-pago com folga: `ON_TRACK` **com** data prevista, que é o
+        // caso que a issue #109 abriu. Antes dela esta mesma entrada saía como
+        // Crítico, porque a régua comparava a previsão com um reset inexistente.
+        deepSeekTarget to mapOf(
+            QuotaSeriesKey(DeepSeekQuotaLabels.BALANCE, PeriodType.INTERVAL) to QuotaRiskSummary(
+                level = UsageRiskLevel.ON_TRACK,
+                estimatedExhaustionAt = NOW.plusHours(68 * 24),
+                hasKnownResetAt = false
             )
         )
     )

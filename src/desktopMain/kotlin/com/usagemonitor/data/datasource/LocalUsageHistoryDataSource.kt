@@ -65,6 +65,7 @@ class LocalUsageHistoryDataSource(
                             } else {
                                 statement.setLong(11, accountId)
                             }
+                            statement.setInt(12, if (quota.hasKnownResetAt) 1 else 0)
                             statement.addBatch()
                         }
                         statement.executeBatch()
@@ -167,7 +168,8 @@ class LocalUsageHistoryDataSource(
                                 rawUsed = resultSet.getLong("raw_used"),
                                 rawTotal = resultSet.getLong("raw_total"),
                                 periodEndAt = Instant.fromEpochMilliseconds(resultSet.getLong("period_end_at")),
-                                capturedAt = Instant.fromEpochMilliseconds(resultSet.getLong("captured_at"))
+                                capturedAt = Instant.fromEpochMilliseconds(resultSet.getLong("captured_at")),
+                                hasKnownResetAt = resultSet.getInt("has_known_reset_at") != 0
                             )
                         }
                     }
@@ -193,6 +195,12 @@ class LocalUsageHistoryDataSource(
         if (!hasColumn(connection, "usage_snapshots", "account_id")) {
             connection.createStatement().use { statement ->
                 statement.execute(ADD_ACCOUNT_ID_COLUMN_SQL)
+            }
+        }
+
+        if (!hasColumn(connection, "usage_snapshots", "has_known_reset_at")) {
+            connection.createStatement().use { statement ->
+                statement.execute(ADD_HAS_KNOWN_RESET_COLUMN_SQL)
             }
         }
 
@@ -311,7 +319,8 @@ class LocalUsageHistoryDataSource(
                 raw_total INTEGER NOT NULL,
                 period_end_at INTEGER NOT NULL,
                 captured_at INTEGER NOT NULL,
-                account_id INTEGER REFERENCES usage_accounts(id)
+                account_id INTEGER REFERENCES usage_accounts(id),
+                has_known_reset_at INTEGER NOT NULL DEFAULT 1
             );
         """
 
@@ -326,6 +335,16 @@ class LocalUsageHistoryDataSource(
         const val ADD_ACCOUNT_ID_COLUMN_SQL = """
             ALTER TABLE usage_snapshots
             ADD COLUMN account_id INTEGER REFERENCES usage_accounts(id);
+        """
+
+        // `DEFAULT 1` e não `0`: a linha gravada antes desta coluna afirmava
+        // implicitamente que havia reset, e é isso que ela continua afirmando.
+        // A decisão de risco lê o **último** ponto da série, que é sempre de
+        // agora — então a primeira coleta depois da migração já corrige a cota
+        // que nunca teve reset, sem precisar reescrever o histórico.
+        const val ADD_HAS_KNOWN_RESET_COLUMN_SQL = """
+            ALTER TABLE usage_snapshots
+            ADD COLUMN has_known_reset_at INTEGER NOT NULL DEFAULT 1;
         """
 
         const val CREATE_INDEX_BY_SOURCE_SQL = """
@@ -378,13 +397,13 @@ class LocalUsageHistoryDataSource(
         const val INSERT_SQL = """
             INSERT INTO usage_snapshots (
                 source, quota_label, period_type, unit, used, total, raw_used, raw_total,
-                period_end_at, captured_at, account_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                period_end_at, captured_at, account_id, has_known_reset_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
 
         const val SELECT_COLUMNS = """
             source, quota_label, period_type, unit, used, total, raw_used, raw_total,
-            period_end_at, captured_at
+            period_end_at, captured_at, has_known_reset_at
         """
 
         const val SELECT_BY_SOURCE_SQL = """
@@ -396,7 +415,7 @@ class LocalUsageHistoryDataSource(
 
         const val SELECT_BY_ACCOUNT_SQL = """
             SELECT s.source, s.quota_label, s.period_type, s.unit, s.used, s.total,
-                   s.raw_used, s.raw_total, s.period_end_at, s.captured_at
+                   s.raw_used, s.raw_total, s.period_end_at, s.captured_at, s.has_known_reset_at
             FROM usage_snapshots s
             INNER JOIN usage_accounts a ON a.id = s.account_id
             WHERE a.source = ?

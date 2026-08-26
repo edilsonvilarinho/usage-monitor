@@ -350,8 +350,35 @@ internal fun riskDotTooltipTitle(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Projeção de uso" else "Usage projection"
 }
 
+/**
+ * A frase que explica o nível de risco.
+ *
+ * Ela falava em "reset" nos dois ramos, e para um saldo pré-pago isso é uma
+ * afirmação falsa: o card imprime "Saldo não expira" na linha de cima e a
+ * tooltip prometia um reset logo abaixo (issue #109). Sem reset a frase é sobre
+ * quando os créditos acabam, que é a única coisa que o consumo permite prever.
+ */
 internal fun riskDotTooltipSubtitle(risk: QuotaRiskSummary, language: AppLanguage): String {
     val exhaustionAt = risk.estimatedExhaustionAt
+
+    if (!risk.hasKnownResetAt) {
+        // Saldo sem previsão é saldo parado: sem consumo observado não há data a
+        // dar, e prometer uma seria inventar.
+        if (exhaustionAt == null) {
+            return if (language == AppLanguage.PT) {
+                "Sem consumo observado no período — não há previsão de término."
+            } else {
+                "No usage observed in the period — no depletion estimate."
+            }
+        }
+        val formattedInstant = formatBrtDateTime(exhaustionAt, language)
+        return if (language == AppLanguage.PT) {
+            "No ritmo atual, os créditos devem acabar em $formattedInstant BRT."
+        } else {
+            "At the current pace, the credits should run out on $formattedInstant BRT."
+        }
+    }
+
     return if (exhaustionAt == null) {
         if (language == AppLanguage.PT) {
             "No ritmo atual, a cota deve resetar antes de esgotar."

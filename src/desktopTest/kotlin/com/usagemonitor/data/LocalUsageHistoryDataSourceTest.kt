@@ -185,6 +185,90 @@ class LocalUsageHistoryDataSourceTest {
         tempDir.deleteRecursively()
     }
 
+    /**
+     * A coluna da issue #109 nasce numa base que já existe, e as duas afirmações
+     * que importam são opostas: a linha antiga tem de continuar dizendo que há
+     * reset, e a linha nova tem de conseguir dizer que não há.
+     *
+     * Sem a segunda o histórico volta a não distinguir "reset muito distante" de
+     * "não existe reset", que é a causa do Crítico permanente no card do
+     * DeepSeek.
+     */
+    @Test
+    fun `migrates database without the reset column and round-trips the flag`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val databaseFile = File(tempDir, "history.db")
+        DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute(
+                    """
+                    CREATE TABLE usage_snapshots (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source TEXT NOT NULL,
+                        quota_label TEXT NOT NULL,
+                        period_type TEXT NOT NULL,
+                        unit TEXT NOT NULL,
+                        used INTEGER NOT NULL,
+                        total INTEGER NOT NULL,
+                        raw_used INTEGER NOT NULL,
+                        raw_total INTEGER NOT NULL,
+                        period_end_at INTEGER NOT NULL,
+                        captured_at INTEGER NOT NULL,
+                        account_id INTEGER
+                    );
+                    """.trimIndent()
+                )
+                statement.execute(
+                    """
+                    INSERT INTO usage_snapshots (
+                        source, quota_label, period_type, unit, used, total,
+                        raw_used, raw_total, period_end_at, captured_at
+                    ) VALUES (
+                        'DEEPSEEK', 'Saldo antigo', 'INTERVAL', 'CURRENCY_USD', 0, 500,
+                        500, 500, 1777410000000, 1777399200000
+                    );
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val dataSource = LocalUsageHistoryDataSource(databaseFile)
+        dataSource.insertSnapshot(balanceStats(), Instant.parse("2026-04-29T12:00:00Z"))
+
+        val records = dataSource.readSnapshots(
+            source = ApiSource.DEEPSEEK,
+            since = Instant.parse("2026-04-01T00:00:00Z")
+        )
+
+        val legacy = records.single { it.quotaLabel == "Saldo antigo" }
+        val fresh = records.single { it.quotaLabel == "Saldo" }
+        assertTrue(legacy.hasKnownResetAt, "linha anterior à coluna deve manter o que afirmava")
+        assertEquals(false, fresh.hasKnownResetAt)
+
+        dataSource.close()
+        tempDir.deleteRecursively()
+    }
+
+    private fun balanceStats(): ApiUsageStats {
+        return ApiUsageStats(
+            source = ApiSource.DEEPSEEK,
+            apiName = "DeepSeek",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Saldo",
+                    used = 0L,
+                    total = 227L,
+                    rawUsed = 227L,
+                    rawTotal = 227L,
+                    periodEndAt = Instant.DISTANT_FUTURE,
+                    hasKnownResetAt = false,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.CURRENCY_USD
+                )
+            )
+        )
+    }
+
     @Test
     fun `keeps same email isolated across different workspaces`() = runTest {
         val tempDir = createTempDirectory().toFile()

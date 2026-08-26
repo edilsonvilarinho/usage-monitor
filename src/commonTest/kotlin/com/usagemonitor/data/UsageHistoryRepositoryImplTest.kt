@@ -369,6 +369,92 @@ class UsageHistoryRepositoryImplTest {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Saldo pré-pago, sem reset (issue #109)
+    // ------------------------------------------------------------------
+
+    /**
+     * A forma exata que `DeepSeekMapper` grava: `CURRENCY_USD`, o saldo em
+     * `rawUsed`/`rawTotal`, `periodEndAt = Instant.DISTANT_FUTURE` e sem reset
+     * conhecido. O saldo **cai** ao longo dos pontos, que é como o consumo se
+     * manifesta nessa unidade.
+     */
+    private fun balanceRecords(
+        first: Long,
+        second: Long,
+        third: Long
+    ): List<UsageSnapshotRecord> {
+        return listOf(
+            balanceRecord("2026-04-28T14:00:00Z", first),
+            balanceRecord("2026-04-28T15:00:00Z", second),
+            balanceRecord("2026-04-28T16:00:00Z", third)
+        )
+    }
+
+    private fun balanceRecord(capturedAt: String, cents: Long): UsageSnapshotRecord {
+        return UsageSnapshotRecord(
+            source = ApiSource.DEEPSEEK,
+            quotaLabel = "Saldo",
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.CURRENCY_USD,
+            used = 0L,
+            total = cents,
+            rawUsed = cents,
+            rawTotal = cents,
+            periodEndAt = Instant.DISTANT_FUTURE,
+            capturedAt = Instant.parse(capturedAt),
+            hasKnownResetAt = false
+        )
+    }
+
+    /**
+     * O que a issue #109 relata: consumo lento num saldo grande ficava em
+     * Crítico permanente, porque a razão contra `Instant.DISTANT_FUTURE` dá
+     * praticamente zero. Aqui o saldo cai 2 centavos/hora sobre 10.000, o que dá
+     * mais de 200 dias de autonomia.
+     */
+    @Test
+    fun `saldo sem reset com muita autonomia fica ON_TRACK`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(balanceRecords(10_000L, 9_998L, 9_996L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.DEEPSEEK, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.EstimatedExhaustionAt>(series.forecast)
+        assertEquals(UsageRiskLevel.ON_TRACK, series.riskSummary?.level)
+        // A data continua sendo entregue: é a resposta a "quando acaba".
+        assertEquals(false, series.riskSummary?.hasKnownResetAt)
+        assertEquals(true, series.riskSummary?.estimatedExhaustionAt != null)
+    }
+
+    /** Consumo alto no mesmo saldo: 40 centavos/hora esgotam 100 em 2h30. */
+    @Test
+    fun `saldo sem reset prestes a acabar fica critico`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(balanceRecords(180L, 140L, 100L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.DEEPSEEK, HistoryRange.LAST_24_HOURS, now)
+
+        assertEquals(UsageRiskLevel.WILL_EXCEED, report.series.single().riskSummary?.level)
+    }
+
+    /** Saldo parado não tem previsão: inventar uma seria afirmar consumo que não houve. */
+    @Test
+    fun `saldo sem reset e sem consumo nao tem previsao`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(balanceRecords(5_000L, 5_000L, 5_000L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.DEEPSEEK, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.NoGrowth>(series.forecast)
+        assertNull(series.riskSummary)
+    }
+
     private fun steadyGrowthRecords(): List<UsageSnapshotRecord> {
         return listOf(
             record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 200, 1000),

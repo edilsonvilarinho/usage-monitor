@@ -408,6 +408,26 @@ linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
   já existia. O badge inteiro também abre um `HoverTooltipBox` persistente: ele informa a cota que
   determinou o pior estado e reutiliza a explicação da projeção, inclusive para `Normal` — a cota
   deve resetar antes de esgotar — e para `Atenção`/`Crítico` — a cota deve esgotar antes do reset.
+- **Saldo pré-pago não usa a régua de razão** (`riskSummary` com `hasKnownResetAt = false`): aquela
+  régua pergunta "quanto do tempo até o reset a cota aguenta", e um saldo não reseta. O DeepSeek
+  grava `periodEndAt = Instant.DISTANT_FUTURE`, o que dava razão de ~0,002 e fazia **qualquer**
+  consumo maior que zero virar `WILL_EXCEED` — card em Crítico permanente, ponto de risco da bandeja
+  aceso para sempre e a tooltip prometendo um reset uma linha abaixo de "Saldo não expira"
+  (issue #109). Sem reset a pergunta é absoluta: **tempo de autonomia**, com
+  `BALANCE_CRITICAL_RUNWAY_MILLIS` (7 dias) e `BALANCE_WARNING_RUNWAY_MILLIS` (14 dias), e a data
+  prevista continua preenchida **inclusive em `ON_TRACK`** — ali ela é a resposta a "quando acaba",
+  não o aviso. A conta em si já estava certa e não mudou: para `CURRENCY_USD`,
+  `calculatePositiveDelta` soma as **quedas** do saldo e `remaining` é o saldo atual.
+  - **`hasKnownResetAt` passou a ser persistido** (`usage_snapshots.has_known_reset_at`, `DEFAULT 1`,
+    migração por `hasColumn` como a de `account_id`). Sem a coluna o histórico só via `periodEndAt`,
+    e ele não distingue "reset distante" de "não existe reset": DeepSeek grava `DISTANT_FUTURE`,
+    Kilo e OpenCode gravam o próprio `capturedAt`, os créditos da Anthropic gravam outra sentinela.
+    A decisão lê o **último** ponto da série, então a primeira coleta depois da migração já corrige a
+    cota — não é preciso reescrever histórico.
+  - **`currentSegment` não foi tocado**, e é por isso que Kilo e OpenCode continuam sem projeção
+    nenhuma: com `periodEndAt = capturedAt` cada coleta parece um reset, o segmento fica com um ponto
+    e o forecast devolve `InsufficientData`. Mesma raiz, sintoma oposto, issue própria — ligá-la aqui
+    acenderia projeção em duas fontes sem verificação delas.
 
 **Aviso de fonte é hint, não banner** (`CardNoticeHint` em `ApiUsageCard.kt`): os
 `ApiUsageNotice` saem como uma exclamação âmbar (`Icons.Rounded.ErrorOutline`) no cabeçalho, ao
