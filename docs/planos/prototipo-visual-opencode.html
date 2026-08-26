@@ -1306,7 +1306,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="panel"><div class="pbody flush"><div class="scroller"><table class="dt">
       <thead><tr><th>Estado</th><th>Integrante</th><th>Máquina</th><th class="num">Sessões ativas</th><th>Último sinal</th><th>Último turno</th><th>Status</th><th></th></tr></thead>
       <tbody>
-        <tr><td><span class="st ok">Trabalhando agora</span></td><td>dev-01 <span class="dim">· esta máquina</span></td><td>DESKTOP-A1</td><td class="num">2</td><td>12/08 10:58 BRT</td><td>12/08 10:58 BRT</td><td><span class="st crit">Saturada</span></td><td><button class="btn icon" type="button" disabled aria-label="Remover integrante">×</button></td></tr>
+        <tr><td><span class="st ok">Trabalhando agora</span></td><td>dev-01 <span class="dim">· esta máquina</span><!-- sem recuo: no modal de uma conta não há faixa acima da linha --></td><td>DESKTOP-A1</td><td class="num">2</td><td>12/08 10:58 BRT</td><td>12/08 10:58 BRT</td><td><span class="st crit">Saturada</span></td><td><button class="btn icon" type="button" disabled aria-label="Remover integrante">×</button></td></tr>
         <tr><td><span class="st info" style="color:var(--info)">Conectado</span></td><td>dev-02</td><td>NOTE-B2</td><td class="num">0</td><td>12/08 10:49 BRT</td><td>12/08 10:49 BRT</td><td><span class="st warn">Atenção</span></td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
         <tr><td><span class="st off">Desconectado</span></td><td>dev-03</td><td>NOTE-C3</td><td class="num">0</td><td>12/08 02:00 BRT</td><td class="dim">—</td><td></td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
       </tbody>
@@ -1338,16 +1338,17 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="srcmark" style="background:var(--cread)"></span>
         <span style="width:132px"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
-        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v" style="font-weight:500">ana@example.com</span><span class="k">account-primary</span></div>
         <span style="width:104px"></span>
         <span class="v sm dim" style="width:328px">2 de 2 conectados · 1 trabalhando</span>
         <span class="sp"></span>
         <button class="btn icon danger" type="button" disabled aria-label="Apagar conta">×</button>
       </div>
       <div class="row">
-        <span class="srcmark" style="background:var(--cread)"></span>
+        <span class="srcmark" style="background:var(--anthropic)"></span>
         <span class="st ok" style="width:132px">Trabalhando agora</span>
-        <div class="stack" style="gap:0;width:150px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
+        <span style="width:12px"></span>
+        <div class="stack" style="gap:0;width:138px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
         <span class="v sm" style="width:104px">DESKTOP-A1</span>
         <span class="v sm" style="width:96px">2</span>
         <span class="v sm dim" style="width:116px">12/08 10:58 BRT</span>
@@ -1357,9 +1358,10 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <button class="btn icon danger" type="button" disabled aria-label="Remover integrante">×</button>
       </div>
       <div class="row">
-        <span class="srcmark" style="background:var(--info)"></span>
+        <span class="srcmark" style="background:var(--anthropic)"></span>
         <span class="st info" style="color:var(--info);width:132px">Conectado</span>
-        <div class="stack" style="gap:0;width:150px"><span class="v sm">dev-02</span></div>
+        <span style="width:12px"></span>
+        <div class="stack" style="gap:0;width:138px"><span class="v sm">dev-02</span></div>
         <span class="v sm" style="width:104px">NOTE-B2</span>
         <span class="v sm dim" style="width:96px">0</span>
         <span class="v sm dim" style="width:116px">12/08 10:49 BRT</span>
@@ -1372,7 +1374,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="srcmark" style="background:var(--cread)"></span>
         <span style="width:132px"></span>
         <button class="btn ghost icon" type="button" aria-label="Expandir conta">▸</button>
-        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">bruno@example.com</span><span class="k">account-sandbox</span></div>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v" style="font-weight:500">bruno@example.com</span><span class="k">account-sandbox</span></div>
         <span style="width:104px"></span>
         <span class="v sm dim" style="width:328px">0 de 1 conectados · 0 trabalhando</span>
         <span class="sp"></span>
@@ -1382,6 +1384,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note"><b>A faixa da conta é a mesma da lista de consumo</b>: superfície <code>--raised</code>, marcador de 2dp, a palavra "Conta" antes do e-mail e divisória embaixo. Sem ela, conta e integrante eram dois retângulos transparentes de mesmo peso separados por um vão de 8dp — e a faixa entregava um e-mail e um uuid, que é exatamente o que a linha do integrante também tem. Aqui há dois níveis, não três: a presença não abre sessões.</p>
+<p class="note"><b>Três degraus aqui e quatro na lista de consumo, e a diferença é o rótulo.</b> Recuo de 12px dentro da coluna de identidade, marcador distinto e o e-mail um degrau tipográfico acima do apelido — os mesmos da §9. O que <b>não</b> entra é a palavra do nível na linha: lá ela vem emendada na máquina, que já ocupava a linha abaixo do apelido e deixou de ser coluna; aqui a máquina <b>é</b> coluna própria, e a legenda desta coluna já diz "Integrante" uma vez para a lista inteira. Repeti-la em cada linha é o rótulo por célula que a issue #81 desfez.</p>
+<p class="note"><b>O marcador da linha deixou de carregar o estado.</b> Ele era verde para quem trabalha, azul para quem está online e neutro para offline — a mesma escala de três valores que a coluna Estado, a primeira da linha, já diz com <b>ponto e palavra</b>. Duas codificações da mesma coisa, e uma delas só por cor. Pior: o verde é o mesmo marcador da faixa da conta, então capa e item ficavam idênticos justamente na linha de quem está trabalhando. Agora ele é o acento da <b>fonte</b> para quem está conectado e neutro para offline, que é a mesma gramática de "sem atividade" da lista de consumo.</p>
 <p class="note"><b>Os agregados da conta são uma célula só, atravessando as três colunas que a conta não tem.</b> Com a faixa reservando as mesmas colunas da linha, nenhuma delas tem por valor "1 trabalhando" — e um número cru sob a legenda "Último turno" diria uma coisa e valeria outra. A frase se descreve, então pode atravessar; o número não pode.</p>
 <p class="note"><b>A coluna de ação fica fora do bloco que quebra.</b> Enquanto o botão destrutivo era o último item do bloco de colunas, ele era o primeiro a cair para a linha seguinte quando a janela encolhia — e o que aparecia era um ícone vermelho solto abaixo do e-mail, sem coluna, sem legenda e sem dizer a que linha pertence. Ele é coluna fixa à direita, e a janela tem largura mínima para as colunas nunca chegarem lá.</p>
 

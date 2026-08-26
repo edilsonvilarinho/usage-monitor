@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberPresence
@@ -126,7 +127,20 @@ private val PRESENCE_COLUMN_STATUS = 88.dp
 
 private val PRESENCE_COLUMN_SPACING = 16.dp
 private val PRESENCE_ROW_CONTENT_PADDING = 14.dp
-private val PRESENCE_ACCOUNT_VERTICAL_PADDING = 10.dp
+
+// A faixa da conta é a capa, e capa mais baixa que o item é o defeito que a
+// issue #104 abriu na lista de consumo. Aqui ela nasce mais alta pelo padding e
+// pelo degrau tipográfico do e-mail.
+private val PRESENCE_ACCOUNT_VERTICAL_PADDING = AppSpacing.md
+
+// Degrau de aninhamento, aplicado **dentro da coluna de identidade**, como na
+// lista de consumo.
+//
+// A faixa da conta e a linha do integrante têm a identidade no mesmo x — as duas
+// começam depois da coluna de estado —, e é ali que o olho compara os dois
+// níveis. Recuar a linha inteira desalinharia a faixa de legendas, que é uma só
+// para a lista e descreve todas as linhas (issue #81).
+private val PRESENCE_NEST_INDENT = AppSpacing.md
 
 /** Largura fixa: num `FlowRow` um campo elástico empurraria os indicadores. */
 private val PRESENCE_FILTER_FIELD_WIDTH = 200.dp
@@ -425,6 +439,14 @@ private fun TeamPresenceList(
                     for (account in emailGroup.accounts) {
                         val isLocalAccount = localDeviceId != null &&
                             account.entries.any { entry -> entry.deviceId == localDeviceId }
+                        // Um degrau por nível que existe acima do integrante. No
+                        // modal de uma conta não há faixa nenhuma e o recuo é
+                        // zero, que é a geometria de sempre.
+                        val entryIndent = when {
+                            !state.isAdminOverview -> 0.dp
+                            emailGroup.accounts.size > 1 -> PRESENCE_NEST_INDENT * 2
+                            else -> PRESENCE_NEST_INDENT
+                        }
                         if (state.isAdminOverview) {
                             item(key = "uuid:${account.accountKey}") {
                                 TeamPresenceAccountSubgroupHeader(
@@ -444,6 +466,7 @@ private fun TeamPresenceList(
                             entry = entry,
                             language = language,
                             isLocalMachine = isLocalMachine,
+                            indent = entryIndent,
                             // Mesma regra do modal de consumo: esta máquina volta
                             // no próximo envio, então o botão entregaria uma
                             // remoção que se desfaz sozinha.
@@ -714,9 +737,12 @@ private fun TeamPresenceEmailHeader(
                                 )
                             }
                         }
+                        // `titleMedium` e não `titleSmall`, como na lista de
+                        // consumo: aquele tem o mesmo corpo de 12sp do
+                        // `labelMedium` das células e difere só no peso.
                         Text(
                             text = group.accountEmail ?: TeamUsageLabels.unlabeledAccount(language),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -848,6 +874,8 @@ private fun TeamPresenceRow(
     entry: TeamMemberPresence,
     language: AppLanguage,
     isLocalMachine: Boolean,
+    /** Degrau de aninhamento, aplicado **dentro** da coluna de identidade. */
+    indent: Dp,
     removable: Boolean,
     /** A lista tem coluna de status; esta linha reserva a casa mesmo sem veredito. */
     hasHealthColumn: Boolean,
@@ -857,13 +885,16 @@ private fun TeamPresenceRow(
 ) {
     val accents = AppAccents.current
 
-    // Neutro para offline, na mesma gramática de "sem atividade" da tela de
-    // consumo; quem está trabalhando ganha o acento mais forte.
-    val accent = when {
-        entry.isWorkingNow -> accents.cacheRead
-        entry.isOnline -> accents.input
-        else -> MaterialTheme.colorScheme.outline
-    }
+    // Acento da fonte para quem está conectado e neutro para offline, na mesma
+    // gramática de "sem atividade" da lista de consumo.
+    //
+    // Ele carregava a escala de três estados — verde trabalhando, azul online,
+    // neutro offline — e isso tinha dois problemas ao mesmo tempo (issue #104):
+    // o verde é o mesmo marcador da faixa da conta logo acima, então capa e item
+    // ficavam idênticos justamente na linha de quem está trabalhando; e o estado
+    // já tem coluna própria, a primeira da linha, com ponto **e** palavra. Duas
+    // codificações da mesma coisa, uma delas só por cor.
+    val accent = if (entry.isOnline) accents.anthropic else MaterialTheme.colorScheme.outline
 
     // Linha de tabela, como as outras listas do app: eram painéis empilhados com
     // vão entre eles, e uma lista de vinte máquinas virava vinte blocos.
@@ -894,7 +925,27 @@ private fun TeamPresenceRow(
                     .testTag("$PRESENCE_STATE_TAG_PREFIX${entry.memberKey}")
             )
 
-            Column(modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY)) {
+            Row(
+                modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY),
+                horizontalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                // O degrau vive dentro da coluna, que é de largura fixa: o que
+                // ele consome sai do texto e nenhuma coluna à direita se move.
+                if (indent > 0.dp) {
+                    Spacer(modifier = Modifier.width(indent))
+                }
+                // Sem a palavra do nível, ao contrário da lista de consumo.
+                //
+                // Lá ela vem emendada na máquina, que já ocupava a linha abaixo
+                // do apelido e deixou de ser coluna. Aqui a máquina **é** coluna
+                // própria, então o rótulo não carregaria nada além de si mesmo —
+                // e a legenda desta coluna já diz "Integrante", uma vez para a
+                // lista inteira. Repeti-la em cada linha é exatamente o rótulo
+                // por célula que a issue #81 desfez.
+                //
+                // Quem separa capa de item aqui são os outros três degraus: o
+                // recuo, o marcador e o peso do e-mail da faixa.
+                Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = entry.alias,
                     style = MaterialTheme.typography.titleSmall,
@@ -911,6 +962,7 @@ private fun TeamPresenceRow(
                             "$PRESENCE_LOCAL_BADGE_TAG_PREFIX${entry.memberKey}"
                         )
                     )
+                }
                 }
             }
 
