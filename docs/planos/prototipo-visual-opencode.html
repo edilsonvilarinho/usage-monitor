@@ -702,6 +702,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
           <span class="srcmark" style="background:var(--deepseek)"></span>
           <span class="ptitle">DeepSeek</span>
           <span class="sp"></span>
+          <span class="st ok" title="Projeção de uso · Cota Saldo · Status Normal · No ritmo atual, os créditos devem acabar em Seg 02/11 13h38 BRT.">Normal</span>
           <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
           <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
         </div>
@@ -728,7 +729,13 @@ table.dt td.num, table.dt th.num { text-align: right; }
 <p class="note"><b>O status do cabeçalho também é um hint.</b> Passe o cursor sobre <code>Normal</code>, <code>Atenção</code>
 ou <code>Crítico</code> para ver a cota que determinou o pior estado e a projeção que explica o rótulo. O texto do hint
 repete a regra usada no card: a cota deve resetar antes de esgotar em <code>Normal</code>; deve esgotar antes do reset em
-<code>Atenção</code> e <code>Crítico</code>, com a previsão da coleta. <b>As ações de navegação do card são botões de ícone, não de texto.</b> A
+<code>Atenção</code> e <code>Crítico</code>, com a previsão da coleta.
+<b>Saldo pré-pago não entra nessa regra</b> (issue #109): ele não reseta, então a frase é sobre quando os créditos acabam
+e a régua é <b>tempo de autonomia</b> — menos de 7 dias é <code>Crítico</code>, menos de 14 é <code>Atenção</code>, acima
+disso é <code>Normal</code> <b>com a data ainda impressa</b>, porque ali a previsão é a resposta e não o aviso.
+A régua de razão não servia: com um <code>periodEndAt</code> no infinito ela dava ~0,002 e qualquer consumo maior que
+zero virava <code>Crítico</code> — o card do DeepSeek ficava vermelho para sempre, o ponto de risco da bandeja junto, e a
+tooltip prometia um reset uma linha abaixo de "Saldo não expira". <b>As ações de navegação do card são botões de ícone, não de texto.</b> A
 <code>contentDescription</code> de cada uma carrega a explicação do pisca do semáforo ("1 sessão ativa agora pede
 atenção: …"), que é a razão de o semáforo existir e o que os testes de componente observam — botão de texto não teria
 onde levá-la. O rodapé da janela vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e

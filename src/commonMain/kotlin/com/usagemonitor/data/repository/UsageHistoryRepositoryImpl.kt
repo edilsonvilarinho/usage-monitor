@@ -141,7 +141,11 @@ class UsageHistoryRepositoryImpl(
             forecast = forecast,
             riskSummary = forecast.riskSummary(
                 referenceAt = currentPoint.capturedAt,
-                periodEndAt = currentPoint.periodEndAt
+                periodEndAt = currentPoint.periodEndAt,
+                // Do **último** ponto, não do primeiro: é ele que descreve a cota
+                // como ela é agora, e é isso que faz a coleta seguinte à migração
+                // já corrigir uma série cujas linhas antigas não tinham a coluna.
+                hasKnownResetAt = currentPoint.hasKnownResetAt
             ),
             comparison = buildComparison(deltaDisplayUsed, previousRecords, unit)
         )
@@ -206,6 +210,15 @@ class UsageHistoryRepositoryImpl(
         val estimatedInstant = Instant.fromEpochMilliseconds(
             lastPoint.capturedAt.toEpochMilliseconds() + millisUntilExhaustion
         )
+
+        // Sem reset conhecido não há o que a previsão possa perder para: o saldo
+        // acaba na data e pronto. Consultar `periodEndAt` aqui é o que fazia o
+        // DeepSeek — que grava `Instant.DISTANT_FUTURE` — nunca cair neste ramo,
+        // e o Kilo e o OpenCode — que gravam o próprio `capturedAt` — caírem
+        // nele sempre (issue #109).
+        if (!lastPoint.hasKnownResetAt) {
+            return UsageForecast.EstimatedExhaustionAt(estimatedInstant)
+        }
 
         return if (estimatedInstant > lastPoint.periodEndAt) {
             UsageForecast.ResetsBeforeExhaustion
@@ -287,7 +300,8 @@ class UsageHistoryRepositoryImpl(
             total = record.total,
             rawUsed = record.rawUsed,
             rawTotal = record.rawTotal,
-            periodEndAt = record.periodEndAt
+            periodEndAt = record.periodEndAt,
+            hasKnownResetAt = record.hasKnownResetAt
         )
     }
 
