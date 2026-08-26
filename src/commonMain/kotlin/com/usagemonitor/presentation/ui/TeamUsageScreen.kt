@@ -72,7 +72,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
-import com.usagemonitor.presentation.ui.components.DepthSurface
+import com.usagemonitor.presentation.ui.components.appNestedGroupGuide
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -644,6 +644,10 @@ private fun TeamUsageList(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(MaterialTheme.colorScheme.surface)
+                                        .appNestedGroupGuide(
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            indent = sessionIndent
+                                        )
                                         .padding(start = sessionIndent, top = AppSpacing.sm)
                                 ) {
                                     CliSessionColumnHeader(
@@ -669,10 +673,18 @@ private fun TeamUsageList(
                                 // `surfaceVariant` porque `surfaceVariant` é o realce
                                 // de hover do `AppDataRow`: com ele aqui, passar o
                                 // mouse numa sessão deixaria de dar retorno nenhum.
+                                //
+                                // A guia atravessa o cabeçalho e todas as sessões:
+                                // é ela que diz que estes itens irmãos pertencem à
+                                // linha do integrante logo acima.
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(MaterialTheme.colorScheme.surface)
+                                        .appNestedGroupGuide(
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            indent = sessionIndent
+                                        )
                                         .padding(start = sessionIndent)
                                         .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
                                 ) {

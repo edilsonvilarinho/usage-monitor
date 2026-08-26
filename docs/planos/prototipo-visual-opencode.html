@@ -558,6 +558,24 @@ table.dt td.num, table.dt th.num { text-align: right; }
 </div>
 <p class="note">O carregamento é <b>esqueleto estático</b>, não shimmer. A única animação infinita que existe hoje (<code>ShimmerBox</code>) fica como está onde já está, mas não se replica.</p>
 
+<h3>appNestedGroupGuide</h3>
+<div class="panel"><div class="pbody flush">
+  <div class="row">
+    <span class="srcmark" style="background:var(--anthropic)"></span>
+    <span style="width:12px"></span>
+    <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
+    <div class="stack" style="gap:0"><span class="k">Integrante · DESKTOP-A1</span><span class="v sm">dev-01</span></div>
+  </div>
+  <div class="row" style="padding-left:38px;background:var(--bg);border-left:2px solid var(--border);margin-left:24px">
+    <div class="stack" style="gap:0"><span class="v sm">7c4a1f92</span><span class="k">api-gateway · 48 turnos</span></div>
+  </div>
+  <div class="row" style="padding-left:38px;background:var(--bg);border-left:2px solid var(--border);margin-left:24px">
+    <div class="stack" style="gap:0"><span class="v sm">b81e35c0</span><span class="k">checkout-web · 26 turnos</span></div>
+  </div>
+</div></div>
+<p class="note"><b>Um traço de 2dp ligando um bloco aninhado à linha que o abriu.</b> Uma lista que abre sub-itens numa <code>LazyColumn</code> não pode aninhar uma lista dentro da outra — aninhar quebra a rolagem e desliga o reaproveitamento de itens —, então os filhos entram como itens <b>irmãos</b> do pai. O preço é que nada na árvore diz que aqueles itens pertencem à linha de cima: eram retângulos soltos com um recuo, e recuo sozinho lê como alinhamento diferente, não como nível abaixo. O traço é desenhado <b>por item</b> e sai contínuo porque a lista não tem vão entre eles — a mesma razão pela qual cada linha carrega a própria divisória.</p>
+<p class="note"><b>É <code>drawBehind</code> e não <code>Modifier.border</code>.</b> Aquele arredonda a espessura para cima e pinta <b>depois</b> do conteúdo, que é o defeito medido na issue #83: numa caixa apertada o anel de 1dp vira 2px a partir de densidade 1,05 e come a caixa. Aqui o traço não ocupa layout nenhum; quem reserva o espaço é o <code>padding</code> do próprio item. Ele fica na <b>metade</b> do recuo: encostado no conteúdo viraria borda da célula, encostado na borda do item viraria borda da lista.</p>
+
 <!-- ═══════════════════════════════ MARCA ═════════════════════════════ -->
 <h2 id="marca">3 · Marca e ícones</h2>
 <p class="lede">Monograma geométrico próprio, construção determinística por script. Três hastes unidas por um bojo: lê como <b>U</b> e <b>M</b> sobrepostos em tamanho grande e mantém silhueta distinta em 16px, que é onde ícone de bandeja vive.</p>
@@ -1188,7 +1206,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <div class="stack" style="gap:2px;width:96px"><span class="v sm">70%</span><div class="track info"><i style="width:70%"></i></div></div>
         <span class="st crit" style="width:96px">Saturada</span>
       </div>
-      <div class="row" style="padding-left:38px;background:var(--bg)">
+      <div class="row" style="padding-left:38px;background:var(--bg);border-left:2px solid var(--border);margin-left:24px">
         <div class="stack" style="gap:var(--s2);flex:1">
           <div class="colhead" style="padding-left:0">
             <span style="width:170px">Sessão</span><span style="width:130px">Projeto</span>
@@ -1237,7 +1255,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="statusbar"><span class="st ok">AO VIVO · 5s</span><span class="sp"></span><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
   </div>
 </div>
-<p class="note"><b>Um degrau de superfície por nível, e <code>--raised</code> fica reservado ao hover.</b> A faixa da conta é o único nível que o usa como fundo fixo; o bloco de sessões fica <b>um degrau de distância do fundo da lista</b>, na direção que houver — aqui a lista mora num <code>.panel</code> em <code>--surface</code> e o bloco desce para <code>--bg</code>; no Compose a lista mora sobre <code>--bg</code> e o bloco sobe para <code>--surface</code>. O bloco aninhado era <code>--raised</code> nesta página e isso estava tecnicamente errado: <code>--raised</code> é o realce de <code>.row:hover</code>, e com ele no bloco passar o mouse numa sessão deixava de dar retorno nenhum. A faixa só aparece na visão de todas as contas — no modal de uma conta ela seria repetição do título da janela.</p>
+<p class="note"><b>Um degrau de superfície por nível, e <code>--raised</code> fica reservado ao hover.</b> A faixa da conta é o único nível que o usa como fundo fixo; o bloco de sessões fica <b>um degrau de distância do fundo da lista</b>, na direção que houver — aqui a lista mora num <code>.panel</code> em <code>--surface</code> e o bloco desce para <code>--bg</code>; no Compose a lista mora sobre <code>--bg</code> e o bloco sobe para <code>--surface</code>. O bloco aninhado era <code>--raised</code> nesta página e isso estava tecnicamente errado: <code>--raised</code> é o realce de <code>.row:hover</code>, e com ele no bloco passar o mouse numa sessão deixava de dar retorno nenhum. A faixa só aparece na visão de todas as contas — no modal de uma conta ela seria repetição do título da janela. E a superfície não trabalha sozinha: o bloco carrega a <b>guia vertical</b> de <code>appNestedGroupGuide</code>, porque as sessões são itens <b>irmãos</b> do integrante na mesma lista e nada mais na árvore diz que pertencem a ele.</p>
 <p class="note"><b>O que separa a capa do item são quatro coisas, e nenhuma delas é a superfície sozinha</b> (issue #104). A faixa da conta e a linha do integrante tinham o mesmo <code>x</code>, o mesmo marcador verde, o mesmo corpo de texto e — medido — a capa era <b>um dp mais baixa</b> que o item que ela cobre. Os quatro degraus, na ordem em que o olho os usa: (1) a <b>palavra do nível</b>, "Conta · N integrantes" contra "Integrante · MÁQUINA"; (2) o <b>recuo</b> de 12px por nível; (3) o <b>marcador</b>, verde de agregação na conta e acento da <b>fonte</b> no integrante; (4) o <b>peso</b>, com o e-mail da conta um degrau tipográfico acima do apelido. Entre as quatro superfícies vizinhas há ~3% de luminância, e <code>--raised</code> ainda é o hover da linha: superfície sozinha nunca ia bastar.</p>
 <p class="note"><b>O recuo mora dentro da coluna de identidade, não no início da linha.</b> A faixa da conta é totalizadora, e o número dela só serve para comparar se cair no mesmo <code>x</code> do número do integrante; recuar a linha inteira tiraria as colunas de lugar. E a faixa de legendas é <b>uma só</b>, acima da lista inteira — se as linhas recuassem, ela deixaria de descrever a maioria delas, que é exatamente o que a issue #81 proibiu. A coluna de identidade cede a mesma largura que o degrau ocupa: o apelido trunca um pouco antes e nada mais se move. Na visão global o degrau é de 12px; quando o mesmo e-mail tem mais de uma conta, a sub-faixa de uuid ocupa o primeiro degrau e o integrante vai para o segundo. No modal de uma conta não há capa nenhuma e o recuo é zero.</p>
 <p class="note"><b>A máquina vem emendada na palavra do nível, e não em linha própria.</b> Ela já era a segunda linha da coluna de identidade; emendá-la mantém as três linhas que existiam e o rótulo sai de graça. Uma quarta linha por integrante seria clareza paga em rolagem, e uma lista de vinte máquinas é o caso que a tela precisa aguentar.</p>
