@@ -564,7 +564,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <span class="srcmark" style="background:var(--anthropic)"></span>
     <span style="width:12px"></span>
     <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
-    <div class="stack" style="gap:0"><span class="k">Integrante · DESKTOP-A1</span><span class="v sm">dev-01</span></div>
+    <div class="stack" style="gap:0"><span class="v sm">dev-01</span><span class="k">DESKTOP-A1</span></div>
   </div>
   <div class="row" style="padding-left:38px;background:var(--bg);border-left:2px solid var(--border);margin-left:24px">
     <div class="stack" style="gap:0"><span class="v sm">7c4a1f92</span><span class="k">api-gateway · 48 turnos</span></div>
@@ -1187,7 +1187,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="row" style="background:var(--raised)">
         <span class="srcmark" style="background:var(--cread)"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
-        <div class="stack" style="gap:0;width:142px"><span class="k">Conta · 3 integrantes</span><span class="v" style="font-weight:500">ana@example.com</span><span class="k">account-primary</span></div>
+        <div class="stack" style="gap:0;width:142px"><span class="k">Conta · 3 integrantes</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
         <span class="v sm" style="width:60px">4</span>
         <span class="v sm" style="width:136px">8,97 M</span>
         <span class="v sm" style="width:96px">US$ 14,2092</span>
@@ -1198,7 +1198,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <span style="width:12px"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
-        <div class="stack" style="gap:0;width:130px"><span class="k">Integrante · DESKTOP-A1</span><span class="v sm">dev-01</span><span class="k">envio 12/08 10:58 BRT</span></div>
+        <div class="stack" style="gap:0;width:130px"><span class="v sm">dev-01</span><span class="k">DESKTOP-A1</span><span class="k">envio 12/08 10:58 BRT</span></div>
         <span class="v sm" style="width:60px">2</span>
         <span class="v sm" style="width:136px">6,32 M</span>
         <span class="v sm" style="width:96px">US$ 9,0892</span>
@@ -1231,7 +1231,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <span style="width:12px"></span>
         <button class="btn ghost icon" type="button" aria-label="Expandir integrante">▸</button>
-        <div class="stack" style="gap:0;width:130px"><span class="k">Integrante · NOTE-B2</span><span class="v sm">dev-02</span><span class="k">envio 12/08 10:49 BRT</span></div>
+        <div class="stack" style="gap:0;width:130px"><span class="v sm">dev-02</span><span class="k">NOTE-B2</span><span class="k">envio 12/08 10:49 BRT</span></div>
         <span class="v sm" style="width:60px">1</span>
         <span class="v sm" style="width:136px">2,65 M</span>
         <span class="v sm" style="width:96px">US$ 5,1200</span>
@@ -1242,8 +1242,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="row">
         <span class="srcmark" style="background:var(--border)"></span>
         <span style="width:12px"></span>
-        <span style="width:26px"></span>
-        <div class="stack" style="gap:0;width:130px"><span class="k">Integrante · NOTE-C3</span><span class="v sm">dev-03</span><span class="k">envio 12/08 02:00 BRT</span></div>
+        <span style="width:24px"></span>
+        <div class="stack" style="gap:0;width:130px"><span class="v sm">dev-03</span><span class="k">NOTE-C3</span><span class="k">envio 12/08 02:00 BRT</span></div>
         <span class="v sm" style="width:60px">0</span>
         <span class="v sm dim" style="width:136px">sem uso no período</span>
         <span class="v sm" style="width:96px">US$ 0,0000</span>
@@ -1256,9 +1256,12 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note"><b>Um degrau de superfície por nível, e <code>--raised</code> fica reservado ao hover.</b> A faixa da conta é o único nível que o usa como fundo fixo; o bloco de sessões fica <b>um degrau de distância do fundo da lista</b>, na direção que houver — aqui a lista mora num <code>.panel</code> em <code>--surface</code> e o bloco desce para <code>--bg</code>; no Compose a lista mora sobre <code>--bg</code> e o bloco sobe para <code>--surface</code>. O bloco aninhado era <code>--raised</code> nesta página e isso estava tecnicamente errado: <code>--raised</code> é o realce de <code>.row:hover</code>, e com ele no bloco passar o mouse numa sessão deixava de dar retorno nenhum. A faixa só aparece na visão de todas as contas — no modal de uma conta ela seria repetição do título da janela. E a superfície não trabalha sozinha: o bloco carrega a <b>guia vertical</b> de <code>appNestedGroupGuide</code>, porque as sessões são itens <b>irmãos</b> do integrante na mesma lista e nada mais na árvore diz que pertencem a ele.</p>
-<p class="note"><b>O que separa a capa do item são quatro coisas, e nenhuma delas é a superfície sozinha</b> (issue #104). A faixa da conta e a linha do integrante tinham o mesmo <code>x</code>, o mesmo marcador verde, o mesmo corpo de texto e — medido — a capa era <b>um dp mais baixa</b> que o item que ela cobre. Os quatro degraus, na ordem em que o olho os usa: (1) a <b>palavra do nível</b>, "Conta · N integrantes" contra "Integrante · MÁQUINA"; (2) o <b>recuo</b> de 12px por nível; (3) o <b>marcador</b>, verde de agregação na conta e acento da <b>fonte</b> no integrante; (4) o <b>peso</b>, com o e-mail da conta um degrau tipográfico acima do apelido. Entre as quatro superfícies vizinhas há ~3% de luminância, e <code>--raised</code> ainda é o hover da linha: superfície sozinha nunca ia bastar.</p>
+<p class="note"><b>O que separa a capa do item são quatro coisas, e nenhuma delas é a superfície sozinha</b> (issue #104). A faixa da conta e a linha do integrante tinham o mesmo <code>x</code>, o mesmo marcador verde, o mesmo corpo de texto e — medido — a capa era <b>um dp mais baixa</b> que o item que ela cobre. Os quatro degraus: (1) a <b>palavra</b>, que só a capa carrega — "Conta · N integrantes" contra uma linha que não se anuncia; (2) o <b>recuo</b> de 12px por nível; (3) o <b>marcador</b>, verde de agregação na conta e acento da <b>fonte</b> no integrante; (4) a <b>altura</b>, pelo padding vertical da faixa. Entre as quatro superfícies vizinhas há ~3% de luminância, e <code>--raised</code> ainda é o hover da linha: superfície sozinha nunca ia bastar.</p>
+<p class="note"><b>A altura vem do padding e não do corpo do texto, e isso foi medido.</b> O e-mail da conta subiu para 16sp — o degrau tipográfico que separaria a capa do apelido — e a captura saiu com <code>ana@example…</code>: 16sp não cabe nos 148dp úteis da coluna de identidade da §9 nem nos 118dp da §10b. Truncar a identidade da conta é pior que a capa ser um degrau menos pesada, e o padding entrega a mesma altura sem custar largura nenhuma.</p>
+<p class="note"><b>A linha do integrante não repete a palavra, e a tentativa está registrada porque ela parecia óbvia.</b> "Integrante" já é a legenda desta coluna, uma vez para a lista inteira — repeti-la em cada linha é o rótulo por célula que a issue #81 desfez, e o teste que a issue deixou reprovou a tentativa na tela de presença. Emendada na máquina para não custar uma quarta linha, ela ainda estourava os 148dp úteis da coluna: a captura do README saiu com <code>Integrante · DESKTOP-…</code>, truncando o dado que identifica a máquina. <b>Assimetria é o sinal:</b> a capa se anuncia, o item não, e é a capa que precisa se distinguir.</p>
 <p class="note"><b>O recuo mora dentro da coluna de identidade, não no início da linha.</b> A faixa da conta é totalizadora, e o número dela só serve para comparar se cair no mesmo <code>x</code> do número do integrante; recuar a linha inteira tiraria as colunas de lugar. E a faixa de legendas é <b>uma só</b>, acima da lista inteira — se as linhas recuassem, ela deixaria de descrever a maioria delas, que é exatamente o que a issue #81 proibiu. A coluna de identidade cede a mesma largura que o degrau ocupa: o apelido trunca um pouco antes e nada mais se move. Na visão global o degrau é de 12px; quando o mesmo e-mail tem mais de uma conta, a sub-faixa de uuid ocupa o primeiro degrau e o integrante vai para o segundo. No modal de uma conta não há capa nenhuma e o recuo é zero.</p>
-<p class="note"><b>A máquina vem emendada na palavra do nível, e não em linha própria.</b> Ela já era a segunda linha da coluna de identidade; emendá-la mantém as três linhas que existiam e o rótulo sai de graça. Uma quarta linha por integrante seria clareza paga em rolagem, e uma lista de vinte máquinas é o caso que a tela precisa aguentar.</p>
+<p class="note"><b>A casa do ícone de expandir fica reservada mesmo na linha que não o tem.</b> O integrante sem atividade no período não abre sessões e por isso não ganha ícone; sem a casa reservada ele começava 24px à esquerda dos outros, e a coluna inteira lia como desalinhada. Vale para toda coluna cujo primeiro item é condicional.</p>
+<p class="note"><b>A máquina continua na segunda linha da coluna de identidade.</b> Ela não é uma medida ao lado de custo e tokens — é quem é a pessoa —, e por isso deixou de ser coluna. A coluna de identidade tem três linhas e não quatro: numa lista de vinte máquinas, cada linha a mais é rolagem.</p>
 <p class="note"><b>O botão de copiar existe só na sessão desta máquina.</b> O integrante desenhado acima é a instalação local — <code>deviceId</code> igual ao do <code>team.json</code> —, e por isso a linha de sessão dele traz o botão: o transcript está no disco e o <code>claude --resume</code> abre a conversa. Nas sessões dos outros integrantes ele <b>não é desenhado</b> (issue #102): a linha continua clicável e o detalhe segue abrindo, porque é ele que permite diagnosticar a sessão saturada de um colega. Sem <code>deviceId</code> local — integração desligada, instalação só de administração — nenhuma linha tem botão, que é o resultado seguro.</p>
 <p class="note"><b>A ordem das contas é alfabética pelo e-mail</b>, e o consumo ordena de novo dentro de cada uma. Ordenar as contas por consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s. Conta sem chave emitida vai para o fim: sem e-mail não há o que comparar, e abrir a lista com um uuid cru seria pior que fechá-la com ele.</p>
 
@@ -1338,7 +1341,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="srcmark" style="background:var(--cread)"></span>
         <span style="width:132px"></span>
         <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
-        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v" style="font-weight:500">ana@example.com</span><span class="k">account-primary</span></div>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
         <span style="width:104px"></span>
         <span class="v sm dim" style="width:328px">2 de 2 conectados · 1 trabalhando</span>
         <span class="sp"></span>
@@ -1347,8 +1350,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="row">
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <span class="st ok" style="width:132px">Trabalhando agora</span>
-        <span style="width:12px"></span>
-        <div class="stack" style="gap:0;width:138px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
+        <span style="width:44px"></span>
+        <div class="stack" style="gap:0;width:106px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
         <span class="v sm" style="width:104px">DESKTOP-A1</span>
         <span class="v sm" style="width:96px">2</span>
         <span class="v sm dim" style="width:116px">12/08 10:58 BRT</span>
@@ -1360,8 +1363,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="row">
         <span class="srcmark" style="background:var(--anthropic)"></span>
         <span class="st info" style="color:var(--info);width:132px">Conectado</span>
-        <span style="width:12px"></span>
-        <div class="stack" style="gap:0;width:138px"><span class="v sm">dev-02</span></div>
+        <span style="width:44px"></span>
+        <div class="stack" style="gap:0;width:106px"><span class="v sm">dev-02</span></div>
         <span class="v sm" style="width:104px">NOTE-B2</span>
         <span class="v sm dim" style="width:96px">0</span>
         <span class="v sm dim" style="width:116px">12/08 10:49 BRT</span>
@@ -1374,7 +1377,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="srcmark" style="background:var(--cread)"></span>
         <span style="width:132px"></span>
         <button class="btn ghost icon" type="button" aria-label="Expandir conta">▸</button>
-        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v" style="font-weight:500">bruno@example.com</span><span class="k">account-sandbox</span></div>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">bruno@example.com</span><span class="k">account-sandbox</span></div>
         <span style="width:104px"></span>
         <span class="v sm dim" style="width:328px">0 de 1 conectados · 0 trabalhando</span>
         <span class="sp"></span>
@@ -1384,7 +1387,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note"><b>A faixa da conta é a mesma da lista de consumo</b>: superfície <code>--raised</code>, marcador de 2dp, a palavra "Conta" antes do e-mail e divisória embaixo. Sem ela, conta e integrante eram dois retângulos transparentes de mesmo peso separados por um vão de 8dp — e a faixa entregava um e-mail e um uuid, que é exatamente o que a linha do integrante também tem. Aqui há dois níveis, não três: a presença não abre sessões.</p>
-<p class="note"><b>Três degraus aqui e quatro na lista de consumo, e a diferença é o rótulo.</b> Recuo de 12px dentro da coluna de identidade, marcador distinto e o e-mail um degrau tipográfico acima do apelido — os mesmos da §9. O que <b>não</b> entra é a palavra do nível na linha: lá ela vem emendada na máquina, que já ocupava a linha abaixo do apelido e deixou de ser coluna; aqui a máquina <b>é</b> coluna própria, e a legenda desta coluna já diz "Integrante" uma vez para a lista inteira. Repeti-la em cada linha é o rótulo por célula que a issue #81 desfez.</p>
+<p class="note"><b>Os mesmos quatro degraus da §9</b>: a palavra que só a capa carrega, o recuo de 12px dentro da coluna de identidade, o marcador distinto e a altura pelo padding da faixa. Foi aqui que a tentativa de dar a palavra também à linha reprovou — o teste de "as legendas de coluna aparecem uma vez para a lista inteira", que a issue #81 deixou —, e a decisão valeu para as duas telas.</p>
+<p class="note"><b>O recuo aqui é de 44px e não de 12px, e a diferença é o ícone.</b> A faixa abre com um ícone de recolher e a linha do integrante não tem ícone nenhum, ao contrário da §9, onde as duas têm. Com o degrau de 12px o apelido começava <b>à esquerda</b> do e-mail que o cobre — um degrau invertido, medido na captura do README —, e o recuo trabalhava contra a hierarquia. Os 44px são a casa do ícone mais o vão (32px) e só então o degrau (12px). O que importa é o resultado, não o número: o texto do filho começa um degrau à direita do texto do pai.</p>
 <p class="note"><b>O marcador da linha deixou de carregar o estado.</b> Ele era verde para quem trabalha, azul para quem está online e neutro para offline — a mesma escala de três valores que a coluna Estado, a primeira da linha, já diz com <b>ponto e palavra</b>. Duas codificações da mesma coisa, e uma delas só por cor. Pior: o verde é o mesmo marcador da faixa da conta, então capa e item ficavam idênticos justamente na linha de quem está trabalhando. Agora ele é o acento da <b>fonte</b> para quem está conectado e neutro para offline, que é a mesma gramática de "sem atividade" da lista de consumo.</p>
 <p class="note"><b>Os agregados da conta são uma célula só, atravessando as três colunas que a conta não tem.</b> Com a faixa reservando as mesmas colunas da linha, nenhuma delas tem por valor "1 trabalhando" — e um número cru sob a legenda "Último turno" diria uma coisa e valeria outra. A frase se descreve, então pode atravessar; o número não pode.</p>
 <p class="note"><b>A coluna de ação fica fora do bloco que quebra.</b> Enquanto o botão destrutivo era o último item do bloco de colunas, ele era o primeiro a cair para a linha seguinte quando a janela encolhia — e o que aparecia era um ícone vermelho solto abaixo do e-mail, sem coluna, sem legenda e sem dizer a que linha pertence. Ele é coluna fixa à direita, e a janela tem largura mínima para as colunas nunca chegarem lá.</p>

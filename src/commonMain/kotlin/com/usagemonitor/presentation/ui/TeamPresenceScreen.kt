@@ -142,6 +142,13 @@ private val PRESENCE_ACCOUNT_VERTICAL_PADDING = AppSpacing.md
 // para a lista e descreve todas as linhas (issue #81).
 private val PRESENCE_NEST_INDENT = AppSpacing.md
 
+// A faixa da conta abre com um ícone de recolher e a linha do integrante não
+// tem ícone nenhum, ao contrário da lista de consumo. Sem compensar essa casa, o
+// apelido do integrante começava **à esquerda** do e-mail da conta que o cobre —
+// um degrau invertido, medido na captura do README —, e o recuo trabalhava
+// contra a hierarquia em vez de a favor.
+private val PRESENCE_BAND_ICON_GUTTER = 24.dp + 8.dp
+
 /** Largura fixa: num `FlowRow` um campo elástico empurraria os indicadores. */
 private val PRESENCE_FILTER_FIELD_WIDTH = 200.dp
 
@@ -444,8 +451,9 @@ private fun TeamPresenceList(
                         // zero, que é a geometria de sempre.
                         val entryIndent = when {
                             !state.isAdminOverview -> 0.dp
-                            emailGroup.accounts.size > 1 -> PRESENCE_NEST_INDENT * 2
-                            else -> PRESENCE_NEST_INDENT
+                            emailGroup.accounts.size > 1 ->
+                                PRESENCE_BAND_ICON_GUTTER + PRESENCE_NEST_INDENT * 2
+                            else -> PRESENCE_BAND_ICON_GUTTER + PRESENCE_NEST_INDENT
                         }
                         if (state.isAdminOverview) {
                             item(key = "uuid:${account.accountKey}") {
@@ -737,12 +745,13 @@ private fun TeamPresenceEmailHeader(
                                 )
                             }
                         }
-                        // `titleMedium` e não `titleSmall`, como na lista de
-                        // consumo: aquele tem o mesmo corpo de 12sp do
-                        // `labelMedium` das células e difere só no peso.
+                        // Continua em `titleSmall`, como na lista de consumo:
+                        // com 16sp o e-mail não cabe nos 118dp úteis da coluna e
+                        // a captura saiu com "ana@example…". A altura da faixa
+                        // vem do padding vertical, que não custa largura.
                         Text(
                             text = group.accountEmail ?: TeamUsageLabels.unlabeledAccount(language),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,

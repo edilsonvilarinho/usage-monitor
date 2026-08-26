@@ -126,25 +126,31 @@ class TeamUsageScreenTest {
         )
 
         onNodeWithText("edilson").assertIsDisplayed()
+        onNodeWithText("DESKTOP-A1").assertIsDisplayed()
         onNodeWithText("maria").assertIsDisplayed()
-        // Por trecho: a máquina vem emendada na palavra do nível ("Integrante ·
-        // DESKTOP-A1"), que é o que separa esta linha da faixa da conta.
-        onNodeWithText("DESKTOP-A1", substring = true).assertIsDisplayed()
-        onNodeWithText("NOTE-B2", substring = true).assertIsDisplayed()
+        onNodeWithText("NOTE-B2").assertIsDisplayed()
     }
 
-    /** Issue #104: a linha se anuncia como integrante, igual à faixa como conta. */
+    /**
+     * Issue #104: a palavra do nível é da faixa, e a linha não a repete.
+     *
+     * Ela chegou a ser emendada na máquina na linha do integrante, e as duas
+     * coisas deram errado ao mesmo tempo: duplicava a legenda da coluna, que já
+     * diz "Integrante" uma vez para a lista inteira, e estourava a largura útil
+     * da coluna, truncando a máquina em "DESKTOP-…".
+     */
     @Test
-    fun `linha do integrante se anuncia como integrante`() = runDesktopComposeUiTest {
+    fun `a palavra do nivel aparece uma vez fora da faixa de legendas`() = runDesktopComposeUiTest {
         renderSuccess(
             TeamUsageUiState.Success(
                 members = listOf(
-                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1", tokens = 500L)))
+                    member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1", tokens = 500L))),
+                    member("device-2", "maria", "NOTE-B2", listOf(session("s2", tokens = 400L)))
                 )
             )
         )
 
-        onNodeWithText("Integrante · DESKTOP-A1").assertIsDisplayed()
+        onAllNodesWithText("Integrante", useUnmergedTree = true).assertCountEquals(1)
     }
 
     @Test

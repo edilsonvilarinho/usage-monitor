@@ -146,6 +146,9 @@ private val TEAM_COLUMN_SPACING = 16.dp
 /** Mesma pegada do `AppIconButton`, para o cabeçalho reservar a casa certa. */
 private val TEAM_ACTION_SLOT = 26.dp
 
+/** Pegada do `Icon` do Material, para a linha sem ícone reservar a mesma casa. */
+private val TEAM_EXPAND_ICON_SIZE = 24.dp
+
 // O padding horizontal é compartilhado entre a faixa da conta e a linha do
 // integrante: é ele que mantém as colunas das duas no mesmo x, que é a
 // comparação que a faixa existe para permitir.
@@ -906,13 +909,15 @@ private fun TeamAccountGroupHeader(
                         // O e-mail é o dado, e dado fica na cor do texto. Quem
                         // identifica a faixa como conta é o marcador de 2dp à
                         // esquerda e a palavra logo acima.
-                        // `titleMedium` e não `titleSmall`: aquele é o mesmo
-                        // corpo de 12sp do `labelMedium` das células e difere só
-                        // no peso, e era por isso que a capa lia com o tamanho do
-                        // item que ela cobre (issue #104).
+                        // Continua em `titleSmall`, e o degrau tipográfico foi
+                        // medido e recusado: com `titleMedium` (16sp) o e-mail
+                        // não cabe nos 148dp úteis da coluna e a captura saiu com
+                        // "ana@example…" — truncar a identidade da conta é pior
+                        // que a capa ser um degrau menos pesada. A altura da
+                        // faixa vem do padding vertical, que não custa largura.
                         Text(
                             text = group.accountEmail ?: TeamUsageLabels.unlabeledAccount(language),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -1362,30 +1367,39 @@ private fun TeamMemberRow(
                         },
                         tint = accent
                     )
+                } else {
+                    // A casa do ícone fica reservada. Sem ela o integrante sem
+                    // atividade começava 24dp à esquerda dos outros, e numa lista
+                    // com um único integrante parado a coluna inteira lia como
+                    // desalinhada — medido na captura do README.
+                    Spacer(modifier = Modifier.width(TEAM_EXPAND_ICON_SIZE))
                 }
-                // A palavra do nível, o apelido e o último envio, espelhando a
-                // estrutura de três linhas da faixa da conta. A faixa se anuncia
-                // ("Conta · 3 integrantes") e a linha não se anunciava: era um
-                // nome com dois carimbos, do mesmo tamanho e no mesmo x.
+                // Apelido, máquina e último envio: identidade e os dois carimbos
+                // que a qualificam. A máquina deixou de ser coluna própria — ela
+                // não é uma medida ao lado de custo e tokens, é quem é a pessoa.
                 //
-                // A máquina vem emendada no rótulo em vez de ocupar linha
-                // própria, então a altura da linha não muda — ela continua sendo
-                // quem qualifica o integrante, como "esta máquina" na presença.
+                // **Sem a palavra do nível**, e a tentativa está registrada
+                // porque ela parecia a resposta óbvia para a issue #104. Ela
+                // duplicaria a legenda desta coluna, que já diz "Integrante" uma
+                // vez para a lista inteira — o rótulo por célula que a issue #81
+                // desfez. E emendada na máquina para não custar uma quarta linha,
+                // ela estourava os 148dp úteis da coluna: a captura do README
+                // saiu com "Integrante · DESKTOP-…", truncando justamente o dado
+                // que identifica a máquina. Quem separa capa de item aqui são o
+                // recuo, o marcador, o peso do e-mail da faixa e a palavra que a
+                // **faixa** carrega.
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = TeamUsageLabels.memberBandWithMachine(
-                            machineLabel = member.machineLabel,
-                            language = language
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                     Text(
                         text = member.alias,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = member.machineLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
