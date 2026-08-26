@@ -159,6 +159,31 @@ export const overviewQuerySchema = withUntilAfterSince({
 });
 
 /**
+ * Teto de linhas por pagina de relatorio.
+ *
+ * O default cobre a leitura tipica em uma requisicao; o teto existe porque a
+ * resposta cresce com sessoes x modelos, e um `limit` sem limite viraria a
+ * varredura da tabela inteira a pedido de qualquer portador do token.
+ */
+export const DEFAULT_REPORT_LIMIT = 500;
+const REPORT_LIMIT_MAX = 5000;
+
+const reportWindow = {
+  since: z.coerce.number().int().nonnegative().optional(),
+  until: z.coerce.number().int().nonnegative().optional(),
+  limit: z.coerce.number().int().positive().max(REPORT_LIMIT_MAX).optional(),
+  // Opaco para quem chama: e o `base64url` que a resposta anterior devolveu.
+  cursor: z.string().min(1).max(TEXT_MAX).optional(),
+};
+
+export const reportUsageQuerySchema = withUntilAfterSince(reportWindow);
+
+export const reportActivityQuerySchema = withUntilAfterSince({
+  ...reportWindow,
+  gapCutoffMs: z.coerce.number().int().positive().max(GAP_CUTOFF_MAX_MS).optional(),
+});
+
+/**
  * Teto de contas por chave.
  *
  * O default `1` implementa "uma chave, um time" sem obrigar o admin a pensar

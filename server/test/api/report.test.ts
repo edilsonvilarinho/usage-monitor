@@ -2,8 +2,12 @@ import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ACCOUNT_A,
+  ACCOUNT_B,
   createHarness,
+  createKeyViaAdmin,
   makePayload,
+  makeSession,
+  makeTurn,
   TEST_ADMIN_TOKEN,
   TEST_REPORT_TOKEN,
   TEST_TEAM_KEY,
@@ -188,5 +192,226 @@ describe('alcance do token de relatório', () => {
       .get('/api/admin/v1/overview')
       .set('x-report-key', TEST_REPORT_TOKEN);
     expect(overview.status).toBe(401);
+  });
+});
+
+// --- A05: rotas planas e paginadas ----------------------------------------
+
+const T0 = Date.UTC(2026, 7, 10, 0, 0, 0);
+const MINUTE = 60 * 1_000;
+
+/** Duas contas, duas maquinas, tres sessoes: o suficiente para a ordem importar. */
+async function seedReport(app: Harness['app']): Promise<void> {
+  const plans = [
+    { accountKey: ACCOUNT_A, deviceId: 'device-1', sessionId: 'session-a' },
+    { accountKey: ACCOUNT_A, deviceId: 'device-2', sessionId: 'session-b' },
+    { accountKey: ACCOUNT_B, deviceId: 'device-1', sessionId: 'session-c' },
+  ];
+
+  for (const plan of plans) {
+    const response = await request(app)
+      .post('/api/v1/ingest')
+      .set('x-team-key', TEST_TEAM_KEY)
+      .send(
+        makePayload({
+          accountKey: plan.accountKey,
+          member: {
+            deviceId: plan.deviceId,
+            alias: plan.deviceId,
+            hostName: null,
+            organizationUuid: null,
+            organizationName: null,
+          },
+          sessions: [makeSession({ sessionId: plan.sessionId, firstTs: T0, lastTs: T0 + 2 * MINUTE })],
+          turns: [0, 1, 2].map((index) =>
+            makeTurn({
+              sessionId: plan.sessionId,
+              messageId: `msg-${index}`,
+              ts: T0 + index * MINUTE,
+              model: index === 2 ? 'claude-sonnet-5' : 'claude-opus-5',
+            }),
+          ),
+        }),
+      );
+
+    if (response.status !== 200) {
+      throw new Error(`ingest falhou: ${response.status} ${response.text}`);
+    }
+  }
+}
+
+function reportGet(app: Harness['app'], path: string, query: Record<string, string | number> = {}) {
+  return request(app).get(path).query(query).set('x-report-key', TEST_REPORT_TOKEN);
+}
+
+/** Percorre a rota inteira com o `limit` pedido e devolve todas as linhas. */
+async function walk(
+  app: Harness['app'],
+  path: string,
+  limit: number,
+  query: Record<string, string | number> = {},
+): Promise<unknown[]> {
+  const collected: unknown[] = [];
+  let cursor: string | null = null;
+  // Teto de seguranca: um cursor que nao avanca viraria laco infinito no teste, e
+  // o sintoma seria a suite travando em vez de falhando.
+  for (let page = 0; page < 50; page += 1) {
+    const response: import('supertest').Response = await reportGet(app, path, {
+      ...query,
+      limit,
+      ...(cursor === null ? {} : { cursor }),
+    });
+    expect(response.status).toBe(200);
+    collected.push(...response.body.rows);
+    cursor = response.body.nextCursor;
+    if (cursor === null) {
+      return collected;
+    }
+  }
+  throw new Error('a paginacao nao terminou em 50 paginas');
+}
+
+describe('GET /api/v1/report/usage', () => {
+  it('paginado de um em um devolve exatamente o mesmo conjunto', async () => {
+    const { app } = start();
+    await seedReport(app);
+
+    const whole = await reportGet(app, '/api/v1/report/usage');
+    const walked = await walk(app, '/api/v1/report/usage', 1);
+
+    expect(whole.body.nextCursor).toBeNull();
+    expect(whole.body.rows.length).toBe(6);
+    expect(walked).toEqual(whole.body.rows);
+  });
+
+  // A ultima pagina cheia nao pode devolver cursor: ele abriria uma pagina vazia.
+  it('não devolve cursor quando a página fecha o conjunto', async () => {
+    const { app } = start();
+    await seedReport(app);
+
+    const response = await reportGet(app, '/api/v1/report/usage', { limit: 6 });
+
+    expect(response.body.rows.length).toBe(6);
+    expect(response.body.nextCursor).toBeNull();
+  });
+
+  it('ordena por conta, máquina, sessão e modelo', async () => {
+    const { app } = start();
+    await seedReport(app);
+
+    const response = await reportGet(app, '/api/v1/report/usage');
+    const keys = response.body.rows.map(
+      (row: { accountKey: string; deviceId: string; sessionId: string; model: string | null }) =>
+        [row.accountKey, row.deviceId, row.sessionId, row.model ?? ''].join('|'),
+    );
+
+    expect(keys).toEqual([...keys].sort());
+  });
+
+  it('recorta pela janela semiaberta', async () => {
+    const { app } = start();
+    await seedReport(app);
+
+    const response = await reportGet(app, '/api/v1/report/usage', {
+      since: T0,
+      until: T0 + 2 * MINUTE,
+    });
+    const turns = response.body.rows.reduce(
+      (total: number, row: { turnCount: number }) => total + row.turnCount,
+      0,
+    );
+
+    // Tres sessoes x dois turnos dentro da janela; o terceiro de cada uma cai
+    // exatamente em `until` e fica de fora.
+    expect(turns).toBe(6);
+  });
+
+  it('responde 400 para cursor ilegível', async () => {
+    const { app } = start();
+
+    const response = await reportGet(app, '/api/v1/report/usage', { cursor: 'nao-e-base64-de-json' });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('recusa a chave de time', async () => {
+    const { app } = start();
+
+    const response = await request(app).get('/api/v1/report/usage').set('x-team-key', TEST_TEAM_KEY);
+
+    expect(response.status).toBe(401);
+  });
+});
+
+describe('GET /api/v1/report/activity', () => {
+  it('paginado de um em um devolve exatamente o mesmo conjunto', async () => {
+    const { app } = start();
+    await seedReport(app);
+
+    const whole = await reportGet(app, '/api/v1/report/activity');
+    const walked = await walk(app, '/api/v1/report/activity', 1);
+
+    expect(whole.body.rows.length).toBe(3);
+    expect(walked).toEqual(whole.body.rows);
+  });
+
+  // O tempo de uma sessao nao pode depender da pagina em que ela caiu: o cursor
+  // filtra sessoes inteiras, nunca turnos dentro de uma.
+  it('mede o mesmo tempo em qualquer tamanho de página', async () => {
+    const { app } = start();
+    await seedReport(app);
+
+    const whole = await reportGet(app, '/api/v1/report/activity');
+    const walked = (await walk(app, '/api/v1/report/activity', 1)) as Array<{ activeMillis: number }>;
+
+    const sum = (rows: Array<{ activeMillis: number }>): number =>
+      rows.reduce((total, row) => total + row.activeMillis, 0);
+    expect(sum(walked)).toBe(sum(whole.body.rows));
+    expect(sum(whole.body.rows)).toBe(3 * 2 * MINUTE);
+  });
+
+  it('responde 400 para cursor ilegível', async () => {
+    const { app } = start();
+
+    expect((await reportGet(app, '/api/v1/report/activity', { cursor: '%%%' })).status).toBe(400);
+  });
+});
+
+describe('GET /api/v1/report/members', () => {
+  it('lista as contas com integrantes, rótulo e origem do e-mail', async () => {
+    const { app } = start();
+    await seedReport(app);
+
+    const response = await reportGet(app, '/api/v1/report/members');
+
+    expect(response.status).toBe(200);
+    const account = response.body.accounts.find(
+      (candidate: { accountKey: string }) => candidate.accountKey === ACCOUNT_A,
+    );
+    expect(account.members.length).toBe(2);
+    // Sem chave emitida e sem e-mail reportado os tres campos sao nulos, e
+    // `emailSource` nulo diz exatamente isso em vez de sugerir identidade.
+    expect(account.label).toBeNull();
+    expect(account.accountEmail).toBeNull();
+    expect(account.emailSource).toBeNull();
+  });
+
+  it('marca como label o e-mail que veio do rótulo administrativo', async () => {
+    const local = start();
+    await seedReport(local.app);
+    const key = await createKeyViaAdmin(local, 'pessoa@empresa.com');
+    await request(local.app)
+      .post('/api/v1/claim')
+      .set('x-team-key', key.key)
+      .send({ accountKey: ACCOUNT_A });
+
+    const response = await reportGet(local.app, '/api/v1/report/members');
+    const account = response.body.accounts.find(
+      (candidate: { accountKey: string }) => candidate.accountKey === ACCOUNT_A,
+    );
+
+    expect(account.label).toBe('pessoa@empresa.com');
+    expect(account.accountEmail).toBe('pessoa@empresa.com');
+    expect(account.emailSource).toBe('label');
   });
 });

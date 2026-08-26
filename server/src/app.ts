@@ -68,7 +68,7 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
   // Incondicional: sem `TEAM_REPORT_TOKEN` as rotas respondem 401 em vez de nao
   // existir. Rota ausente faria "credencial errada" e "variavel nao definida"
   // chegarem ao consumidor como o mesmo 404.
-  app.use('/api', createReportRouter({ config }));
+  app.use('/api', createReportRouter({ config, repository, keyRepository }));
   app.use('/api', createVerifyRouter({ config, keyRepository, now }));
 
   // Sem token de administracao as rotas nem existem: caem na coringa 404 abaixo,
