@@ -54,6 +54,7 @@ import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import androidx.compose.foundation.BorderStroke
 
 /**
  * Primitivas de controle.
@@ -448,6 +449,42 @@ private fun AppSegmentItem(
 }
 
 /**
+ * A bolha de uma tooltip: superfície `raised`, raio 6, borda de 1dp e 2dp de
+ * sombra.
+ *
+ * Existe porque a anatomia estava escrita por extenso em quatro lugares — a
+ * tooltip de texto aqui, a de métricas do card, a do gráfico de turnos e a do
+ * gráfico de histórico — e as quatro flutuam sobre o mesmo tipo de conteúdo.
+ * Duas tooltips sobre o mesmo gráfico em alturas diferentes é o defeito que a
+ * repetição produz sozinha.
+ *
+ * **Overlay curto: 2dp, não 8.** Oito é a elevação de diálogo e de menu, que
+ * cobrem a janela; a bolha cobre um ponto do gráfico. É `tonalElevation` **e**
+ * `shadowElevation` no mesmo patamar, senão o tom sobe sem a sombra acompanhar e
+ * a bolha lê como bloco chapado.
+ *
+ * Só o conteúdo é do chamador: cada bolha tem o próprio `padding` e a própria
+ * largura máxima, e é por isso que isto é superfície e não contêiner.
+ */
+@Composable
+fun AppTooltipSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = AppShapes.small,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = AppElevation.raised,
+        shadowElevation = AppElevation.raised,
+        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant),
+        content = content
+    )
+}
+
+/**
  * Tooltip de texto simples.
  *
  * Persistente como a `HoverTooltipBox` dos gráficos, e pelo mesmo motivo: aqui
@@ -464,17 +501,7 @@ fun AppTooltip(
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = AppShapes.small,
-                tonalElevation = AppElevation.raised,
-                shadowElevation = AppElevation.raised,
-                border = androidx.compose.foundation.BorderStroke(
-                    AppBorderWidth,
-                    MaterialTheme.colorScheme.outlineVariant
-                )
-            ) {
+            AppTooltipSurface {
                 Text(
                     text = text,
                     style = MaterialTheme.typography.labelMedium,

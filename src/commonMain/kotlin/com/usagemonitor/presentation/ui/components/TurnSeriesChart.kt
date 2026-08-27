@@ -1,6 +1,5 @@
 package com.usagemonitor.presentation.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,7 +42,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
-import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 
 private val CHART_HEIGHT = 148.dp
@@ -230,17 +227,10 @@ private fun ChartTooltip(
         }
         val clampedX = (anchorX - tooltipWidthPx / 2f).coerceIn(0f, (plotWidthPx - tooltipWidthPx).coerceAtLeast(0f))
 
-        Surface(
+        AppTooltipSurface(
             modifier = Modifier
                 .width(TOOLTIP_WIDTH)
-                .offset { IntOffset(clampedX.roundToInt(), 0) },
-            shape = AppShapes.small,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            // Overlay curto, como as outras tooltips de gráfico: 2dp e borda de
-            // 1dp. Os 10dp de sombra a punham na altura de um diálogo.
-            tonalElevation = AppElevation.raised,
-            shadowElevation = AppElevation.raised,
-            border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
+                .offset { IntOffset(clampedX.roundToInt(), 0) }
         ) {
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                 Text(

@@ -56,7 +56,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isSamePeriod
-import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 
 private const val HISTORY_TOOLTIP_PADDING_PX = 8f
@@ -538,17 +537,10 @@ private fun HistoryTooltipBubble(
     model: HistoryTooltipModel,
     modifier: Modifier = Modifier
 ) {
-    // Mesmo desenho de `UsageTooltip`: overlay curto é 2dp, não 6 de tom mais 10
-    // de sombra. Duas tooltips sobre o mesmo tipo de gráfico não podem flutuar em
-    // alturas diferentes.
-    Surface(
-        modifier = modifier.widthIn(max = 230.dp),
-        shape = AppShapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = AppElevation.raised,
-        shadowElevation = AppElevation.raised,
-        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
-    ) {
+    // Mesma bolha das outras três: `AppTooltipSurface`. Duas tooltips sobre o
+    // mesmo tipo de gráfico não podem flutuar em alturas diferentes, e era a
+    // anatomia repetida por extenso que deixava isso acontecer.
+    AppTooltipSurface(modifier = modifier.widthIn(max = 230.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

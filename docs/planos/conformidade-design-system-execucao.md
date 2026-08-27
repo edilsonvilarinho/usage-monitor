@@ -11,17 +11,19 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A08 concluídas`
+**Estado atual:** `Em andamento — A00 a A09 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A09 — Tooltips.** Quatro bolhas com `Surface` próprio, e `AppTooltip` com zero chamadas.
+**A10 — `AppEmptyState`.** Nove estados vazios desenhados à mão, com a copy já centralizada.
 
 ### ⏭ Próxima atividade
 
-**A10 — `AppEmptyState`.** Nove estados vazios desenhados à mão, com a copy já centralizada.
+**A11 — Cromo das janelas.** `DesktopWindowFrame.kt`, o arquivo de maior risco do plano: vive em
+`desktopMain` e não tem nenhum teste de componente. A suíte dele é escrita **antes** de o código
+mudar.
 
 ---
 
@@ -90,8 +92,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A05 — Sessões CLI | 5 | ✅ | `a6ff0d0` |
 | A06 — Card de uso | 2 | ✅ | `53b4943` |
 | A07 — Faixa de atualização | 3 | ✅ | `fd3ac5c` |
-| A08 — Configurações | 9 | ✅ | *(hash registrado na A09)* |
-| A09 — Tooltips | 4 arquivos | ⬜ | |
+| A08 — Configurações | 9 | ✅ | `0127909` |
+| A09 — Tooltips | 4 arquivos | ✅ | *(hash registrado na A10)* |
 | A10 — `AppEmptyState` | 9 estados | ⬜ | |
 | A11 — Cromo das janelas | 11 | ⬜ | |
 | A12 — Protótipo, kit e capturas | — | ⬜ | |
@@ -329,14 +331,38 @@ Não é débito, com o motivo:
 Verificado: `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests
 AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas**.
 
-### A09 — Tooltips
+### A09 — Tooltips — ✅
 
-- `UsageTooltip.kt:50`, `TurnSeriesChart.kt:233`, `UsageHistoryLineChart.kt:510` e `:544` →
-  `AppTooltip` (`AppControls.kt:459`), que já define a anatomia e tem zero chamadas.
-- ⚠ A assinatura atual recebe texto e as bolhas carregam listas de métrica. Generalizá-la entra
-  neste commit.
-- Verificar: `--tests "com.usagemonitor.ui.ComponentTest"` + `commonTest`
-  `UsageHistoryLineChartTest` (31).
+**`AppTooltip` não era a primitiva que faltava.** Ele é um `TooltipBox` inteiro com uma bolha de
+texto simples dentro; as quatro bolhas carregam listas de métrica e são posicionadas por
+`HoverTooltipBox` e pelos gráficos. O que as cinco repetiam era a **anatomia da bolha**, não o
+comportamento de hover.
+
+- **`AppTooltipSurface` criada** em `AppControls.kt`: superfície `surfaceVariant`, raio 6, borda de
+  1dp e 2dp de overlay curto — `tonalElevation` **e** `shadowElevation` no mesmo patamar, senão o tom
+  sobe sem a sombra acompanhar e a bolha lê como bloco chapado. Oito é elevação de diálogo e de
+  menu, que cobrem a janela; a bolha cobre um ponto do gráfico.
+- **Só o conteúdo é do chamador**, e é por isso que é superfície e não contêiner: cada bolha tem o
+  próprio `padding` e a própria largura máxima (280dp no card, 230dp no histórico,
+  `TOOLTIP_WIDTH` no gráfico de turnos).
+- **Quatro call sites**: o próprio `AppTooltip`, `UsageTooltipContent`, `ChartTooltip`
+  (`TurnSeriesChart`) e `HistoryTooltipBubble` (`UsageHistoryLineChart`). Sete imports saíram dos três
+  arquivos de gráfico.
+- Era essa repetição que deixava "duas tooltips sobre o mesmo tipo de gráfico flutuando em alturas
+  diferentes" acontecer — o comentário estava escrito em dois dos arquivos, cada um corrigindo o
+  outro à mão.
+
+Não convertido, com o motivo:
+
+- **`HistoryAnnotationLabel`** continua com `Surface` próprio. Ele não é bolha: é um rótulo **chapado**
+  de anotação sobre o eixo, com raio 4 e **sem** elevação nenhuma. Passá-lo pela superfície de
+  tooltip o faria flutuar sobre o gráfico que ele anota.
+- **`AppTooltip` continua com zero chamadas.** Ele agora compartilha a bolha, mas nenhuma tela o usa —
+  as que precisam de tooltip usam `HoverTooltipBox`, que é persistente e aceita métricas. E o design
+  system **não publica componente de tooltip nenhum**: não há `AppTooltip.prompt.md`. Está no débito.
+
+Verificado: `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests
+AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas**.
 
 ### A10 — `AppEmptyState`
 
@@ -389,7 +415,8 @@ nunca a intenção.
 | 7 | `53b4943` | A06 | `Modifier.appSurfaceBlock` criada e adotada nos seis pontos do card; o último `Card()` do Material saiu da aplicação, com `BorderStroke` e `CardDefaults` junto | `gradlew.bat desktopTest --tests ComponentTest --tests AppThemeScaleTest --tests AppStructureTest` → 75 + 2 + 7 = **84 testes, 0 falhas** |
 | 8 | `fd3ac5c` | A07 | `AppUpdateBanner` passou a ser `AppBanner`; a primitiva ganhou título de uma linha, que era a única diferença real entre as duas | `gradlew.bat desktopTest --tests AppUpdateBannerTest --tests AppStatesTest --tests ComponentTest --tests CliSessionsScreenTest` → 8 + 7 + 75 + 45 = **135 testes, 0 falhas** |
 | 9 | — | fase 3 | Fechamento da fase do dashboard | `gradlew.bat allTests` → **BUILD SUCCESSFUL** em 1m30s |
-| 10 | *(a preencher na A09)* | A08 | `AppSettingsNav` saiu de dentro do diálogo e virou primitiva publicada, com o nome que o design system já usava; um teste novo mede a largura fixa do trilho | `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas** |
+| 10 | `0127909` | A08 | `AppSettingsNav` saiu de dentro do diálogo e virou primitiva publicada, com o nome que o design system já usava; um teste novo mede a largura fixa do trilho | `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas** |
+| 11 | *(a preencher na A10)* | A09 | `AppTooltipSurface` criada e adotada nas quatro bolhas, incluindo a do próprio `AppTooltip`; sete imports saíram dos três arquivos de gráfico | `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas** |
 
 ---
 
@@ -498,7 +525,9 @@ poderem virar issue própria depois. **Não corrigir dentro desta iniciativa.**
 2. **Código morto.** `ShimmerBox` tem **zero** call sites, e três comentários do repositório
    (`AppTheme.kt:35`, `AppStates.kt:257`, `DashboardScreen.kt:337`) ainda afirmam que ele é "a única
    animação infinita da app" — o design system proíbe shimmer explicitamente. `UsageArcChart` só é
-   referenciado por `ComponentTest`. Decidir remover ou justificar.
+   referenciado por `ComponentTest`. **`AppTooltip` continua com zero chamadas** mesmo depois da A09:
+   as telas que precisam de tooltip usam `HoverTooltipBox`, que é persistente e aceita métricas, e o
+   design system **não publica componente de tooltip nenhum**. Decidir remover ou justificar os três.
 3. **`SettingsToast`.** `docs/design-system/components/feedback/AppBanner.prompt.md` afirma que o app
    não tem toast, porque um monitor de ciclo de 10 min não pode reportar falha com algo que
    desaparece. O toast das Configurações existe (`SettingsToast.kt`, consumido em
