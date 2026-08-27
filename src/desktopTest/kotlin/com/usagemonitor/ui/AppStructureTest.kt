@@ -17,6 +17,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
+import com.usagemonitor.presentation.ui.components.AppGroupBand
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
@@ -151,5 +152,63 @@ class AppStructureTest {
         val withoutGuide = onNodeWithText("sem guia").getUnclippedBoundsInRoot().left
 
         assertEquals(withoutGuide, withGuide)
+    }
+
+    /**
+     * O recuo da sub-faixa **soma** ao padding horizontal da lista, e é isso que
+     * mantém o rótulo dela no mesmo x das linhas abaixo, deslocado só pelo nível.
+     * Se ele substituísse o padding, a faixa de nível zero começaria colada na
+     * borda e a de nível um começaria onde a lista começa — nenhuma das duas no
+     * lugar certo.
+     */
+    @Test
+    fun `o recuo da sub-faixa soma ao padding horizontal`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(600.dp).height(200.dp)) {
+                    Column {
+                        AppGroupBand(
+                            label = "sem recuo",
+                            horizontalPadding = 14.dp
+                        )
+                        AppGroupBand(
+                            label = "com recuo",
+                            horizontalPadding = 14.dp,
+                            indent = 24.dp
+                        )
+                    }
+                }
+            }
+        }
+
+        val flat = onNodeWithText("sem recuo").getUnclippedBoundsInRoot().left
+        val nested = onNodeWithText("com recuo").getUnclippedBoundsInRoot().left
+
+        assertEquals(flat + 24.dp, nested)
+    }
+
+    /**
+     * A faixa fala **baixo**: o rótulo dela é `labelSmall`, um degrau abaixo do
+     * `titleSmall` do cabeçalho de painel. Trocar uma primitiva pela outra
+     * inverteria a hierarquia da escada de superfícies, e a sub-faixa passaria a
+     * gritar mais que o grupo que a cobre.
+     */
+    @Test
+    fun `a sub-faixa mostra rotulo detalhe e acao`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(600.dp).height(200.dp)) {
+                    AppGroupBand(
+                        label = "Conta · 3f9c",
+                        detail = "2 de 5 online",
+                        trailing = { Text("Apagar") }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Conta · 3f9c").assertIsDisplayed()
+        onNodeWithText("2 de 5 online").assertIsDisplayed()
+        onNodeWithText("Apagar").assertIsDisplayed()
     }
 }

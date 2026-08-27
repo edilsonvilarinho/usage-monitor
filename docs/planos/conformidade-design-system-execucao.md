@@ -11,20 +11,19 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A03 concluídas`
+**Estado atual:** `Em andamento — A00 a A04 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A04 — Presença e chaves das contas.** As duas telas dependem da mesma extensão de primitiva:
-`AppSectionHeader` precisa de um recuo para caber nas sub-faixas de conta (`TeamPresenceScreen:814`
-e `TeamUsageScreen:997`, este último deixado em aberto na A02). Junto vai a raiz
-`Surface(background)` de `TeamKeysAdminScreen` para `AppWindowScaffold`.
+**A05 — Sessões CLI.** `CliSessionsScreen.kt`: `CostDistributionBar` e a legenda dela, `LiveBadge` e
+`GlossaryPanel`.
 
 ### ⏭ Próxima atividade
 
-**A05 — Sessões CLI.** `CostDistributionBar`, `LiveBadge` e `GlossaryPanel`.
+**A06 — Card de uso.** `ApiUsageCard.kt`: o único `Card()` cru da aplicação e os quatro pares
+`.background + .border` que reimplementam `AppDataSurface` e `AppMetricBlock`.
 
 ---
 
@@ -88,8 +87,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A00 — Regra de precedência no `CLAUDE.md` + skill | — | ✅ | `6ed23fd` |
 | A01 — Plano e issue de rastreio | — | ✅ | `df73cd2` |
 | A02 — Uso do time | 6 | ✅ | `176bcb8` |
-| A03 — Primitiva duplicada `DepthSurface` | 5, 7, 8 | ✅ | *(hash registrado na A04)* |
-| A04 — Presença e chaves das contas | 7, 8 | ⬜ | |
+| A03 — Primitiva duplicada `DepthSurface` | 5, 7, 8 | ✅ | `7039daa` |
+| A04 — Presença e chaves das contas | 6, 7, 8 | ✅ | *(hash registrado na A05)* |
 | A05 — Sessões CLI | 5 | ⬜ | |
 | A06 — Card de uso | 2 | ⬜ | |
 | A07 — Faixa de atualização | 3 | ⬜ | |
@@ -164,22 +163,39 @@ Verificado: `gradlew.bat desktopTest --tests TeamPresenceScreenTest --tests CliS
 --tests AppStructureTest --tests TeamKeysAdminScreenTest --tests TeamAdminSectionTest` →
 **92 testes, 0 falhas**.
 
-### A04 — Presença e chaves das contas
+### A04 — Presença e chaves das contas — ✅
 
-As duas telas ficaram na mesma atividade porque dependem da **mesma** extensão de primitiva.
+**`AppSectionHeader` não era a primitiva certa, e o parâmetro de recuo não era o que faltava.** Ler
+as duas sub-faixas mostrou que elas falam **baixo** de propósito: rótulo em `labelSmall` sobre
+`onSurfaceVariant`. `AppSectionHeader` fala alto — `titleSmall` sobre `onSurface`, altura mínima de
+barra. Adotá-lo inverteria a escada: a sub-faixa passaria a gritar mais que a faixa de conta que a
+cobre. Ver a ocorrência O4.
 
-- **`AppSectionHeader` precisa de recuo.** A anatomia dele — título, subtítulo e ação à direita — é
-  exatamente a de `TeamPresenceAccountSubgroupHeader` (`:814`) e a de `TeamUsageScreen:997`, mas o
-  padding horizontal dele é interno e fixo em `AppSpacing.md`, e as duas sub-faixas precisam de
-  `PRESENCE_ROW_CONTENT_PADDING + recuo` (14dp + nível). Sem o parâmetro, adotar a primitiva
-  desalinharia a faixa das linhas abaixo dela em 2dp. **Este é o item que fechou como pendente na
-  A02** (`TeamAccountUuidHeader`).
-- `Surface(background)` raiz de `TeamKeysAdminScreen` `:83` → `AppWindowScaffold`.
-- `:683` `TeamPresenceEmailHeader` é irmã de `TeamAccountGroupHeader`: carrega colunas alinhadas ao
-  `AppDataRow` do integrante e cai na mesma conclusão da O1 — conferir e registrar, não converter.
-- Verificar: `--tests "com.usagemonitor.ui.TeamPresenceScreenTest"` (31),
-  `--tests "com.usagemonitor.ui.TeamKeysAdminScreenTest"` (5),
-  `--tests "com.usagemonitor.ui.TeamUsageScreenTest"` (52).
+Feito:
+
+- **`AppGroupBand` criada** em `AppStructure.kt`: rótulo quieto, `detail` opcional, `indent` que
+  **soma** ao `horizontalPadding` da lista, ação opcional à direita e a divisória própria — como a de
+  `AppDataRow`, que é o que dispensa vão entre itens. Registrada no design system em
+  `components/data/AppGroupBand.{prompt.md,jsx,d.ts}` e indexada no `readme.md`, conforme a regra que
+  entrou no `CLAUDE.md` na A00.
+- **Adotada nas duas telas**: `TeamAccountUuidHeader` (`TeamUsageScreen`), que era o item deixado
+  pendente na A02, e `TeamPresenceAccountSubgroupHeader` (`TeamPresenceScreen`), que ainda carregava
+  o botão de apagar conta — agora no `trailing`.
+- **`TeamKeysList` → `AppWindowScaffold`.** O corpo era `Column(fillMaxSize).padding(16.dp)` com
+  `spacedBy(12.dp)`: exatamente o que a primitiva faz, com os dois valores escritos como literal em
+  vez de saírem de `AppSpacing.lg` e `AppSpacing.md`. A raiz `Surface(background)` de `:83` **fica** —
+  ela é o padrão compartilhado das janelas (`CliSessionsScreen`, `TeamUsageScreen` e
+  `TeamPresenceScreen` têm a mesma), e o que faltava era o scaffold dentro dela, não no lugar dela.
+- **Dois testes novos** em `AppStructureTest`: o recuo soma ao padding, e a faixa mostra rótulo,
+  detalhe e ação.
+
+Não convertido, com o motivo:
+
+- **`TeamPresenceEmailHeader` (`:683`)** é irmã de `TeamAccountGroupHeader`: mesma faixa de conta com
+  colunas alinhadas ao `AppDataRow` do integrante. Mesma conclusão da O1.
+
+Verificado: `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`,
+`TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → **101 testes, 0 falhas**.
 
 ### A05 — Sessões CLI · `CliSessionsScreen.kt`
 
@@ -280,7 +296,8 @@ nunca a intenção.
 | 1 | `6ed23fd` | A00 | Tabela de precedência, regra de não reimplementar primitiva e regra de acento no `CLAUDE.md`; skill do design system registrada em `.claude/skills/usage-monitor-design/` | Diff inspecionado — mudança só de documentação, sem código |
 | 2 | `df73cd2` | A01 | Este plano, com o levantamento das 13 superfícies e a medição de adoção por primitiva; issue de rastreio [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) criada com o mesmo ponto de situação | `gh issue create` devolveu `issues/117`; contagens conferidas por `grep` sobre `presentation/ui/` |
 | 3 | `176bcb8` | A02 | `Modifier.appNestedGroupItem` criada e adotada nos dois blocos aninhados; `TeamHealthCell` passou a ser `AppStatusIndicator` e perdeu o parâmetro `showLabel`, cujo ramo `true` era morto; o chamador da tela de presença acompanhou | `gradlew.bat desktopTest --tests TeamUsageScreenTest --tests TeamPresenceScreenTest` → 52 + 31 = **83 testes, 0 falhas** |
-| 4 | *(a preencher na A04)* | A03 | `AppDataSurface` ganhou `verticalArrangement`; os quatro call sites de `DepthSurface` migraram com `Arrangement.Top`; `DepthSurface.kt` removido | `gradlew.bat desktopTest` sobre `TeamPresenceScreenTest`, `CliSessionsScreenTest`, `AppStructureTest`, `TeamKeysAdminScreenTest` e `TeamAdminSectionTest` → 31 + 45 + 5 + 5 + 6 = **92 testes, 0 falhas** |
+| 4 | `7039daa` | A03 | `AppDataSurface` ganhou `verticalArrangement`; os quatro call sites de `DepthSurface` migraram com `Arrangement.Top`; `DepthSurface.kt` removido | `gradlew.bat desktopTest` sobre `TeamPresenceScreenTest`, `CliSessionsScreenTest`, `AppStructureTest`, `TeamKeysAdminScreenTest` e `TeamAdminSectionTest` → 31 + 45 + 5 + 5 + 6 = **92 testes, 0 falhas** |
+| 5 | *(a preencher na A05)* | A04 | `AppGroupBand` criada, registrada no design system e adotada nas duas sub-faixas de conta; `TeamKeysList` passou a `AppWindowScaffold`; dois testes novos de primitiva | `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`, `TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → 52 + 31 + 5 + 6 + 7 = **101 testes, 0 falhas** |
 
 ---
 
@@ -312,9 +329,22 @@ Ela virou **atividade própria**: a extensão de `AppDataSurface`, os quatro cal
 arquivo no mesmo commit. A A03 e a A04 foram redefinidas em volta disso, e a A04 passou a juntar
 Presença e Chaves — as duas dependem da mesma extensão de `AppSectionHeader`.
 
-**Consequência para o resto do plano:** cada atividade lê os call sites antes de aceitar a primitiva
-que este documento nomeia, e **débito que atravessa telas vira atividade própria** em vez de item
-repetido em cada uma. A contagem por `grep` mede o tamanho do débito, não a solução dele. As
+**O4 · 2026-08-27 · A04 — a primitiva certa não era a que tinha a anatomia parecida.**
+
+A A04 tinha sido escrita para dar um parâmetro de recuo ao `AppSectionHeader`, porque a anatomia
+batia: título, subtítulo, ação à direita. Batia mesmo — e ainda assim era a primitiva errada. As duas
+sub-faixas de conta desenham o rótulo em `labelSmall` sobre `onSurfaceVariant`, e o
+`AppSectionHeader` desenha em `titleSmall` sobre `onSurface`, com altura mínima de barra. A escada
+de superfícies é uma hierarquia de **peso**, não de forma: adotar o cabeçalho de painel faria a
+sub-faixa gritar mais que a faixa de conta que a cobre.
+
+`AppGroupBand` nasceu daí — o degrau quieto, que o protótipo desenha e não nomeia. Ela foi
+registrada no design system no mesmo commit, pela regra que entrou no `CLAUDE.md` na A00.
+
+**Consequência para o resto do plano:** anatomia parecida não é a mesma primitiva. Antes de adotar,
+comparar também **estilo de texto e cor** — é ali que mora a hierarquia. E cada atividade lê os call
+sites antes de aceitar a primitiva que este documento nomeia; **débito que atravessa telas vira
+atividade própria** em vez de item repetido em cada uma. A contagem por `grep` mede o tamanho do débito, não a solução dele. As
 atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como hipótese.
 
 | Data | Atividade | O que aconteceu | Como foi resolvido |
@@ -323,6 +353,7 @@ atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como 
 | 2026-08-27 | A02 | `TeamHealthCell` tinha um ramo `showLabel = true` que nenhum dos três chamadores usava | Ramo removido junto com o parâmetro, na migração para `AppStatusIndicator` |
 | 2026-08-27 | A03 | `DepthSurface` atravessava três telas e não cabia dentro de nenhuma atividade de tela (O2) | Virou atividade própria, com a extensão de `AppDataSurface` e os quatro call sites no mesmo commit |
 | 2026-08-27 | A03 | O plano mandava rodar `--tests "com.usagemonitor.ui.TeamAdminUiTest"`, e **nenhum teste roda com esse filtro** | `TeamAdminUiTest.kt` é um arquivo com duas classes, `TeamAdminSectionTest` (6) e `TeamKeysAdminScreenTest` (5). O filtro do Gradle casa nome de classe, não de arquivo, e não falha quando outro filtro da mesma chamada casa. Os nomes certos estão na seção *Verificação* |
+| 2026-08-27 | A04 | O plano queria dar um parâmetro de recuo ao `AppSectionHeader`; o problema não era o recuo, era o peso visual (O4) | `AppGroupBand`, primitiva própria para o degrau quieto da escada, registrada no design system |
 
 ---
 

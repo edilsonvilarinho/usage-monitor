@@ -274,6 +274,73 @@ fun AppSectionHeader(
 }
 
 /**
+ * Sub-faixa de um grupo dentro de uma lista.
+ *
+ * Não é [AppSectionHeader]. Aquele é o cabeçalho de um painel e fala alto —
+ * título em `titleSmall` sobre `onSurface`, altura mínima de barra. Esta é o
+ * degrau **quieto** da escada: rótulo em `labelSmall` sobre `onSurfaceVariant`,
+ * um degrau abaixo da faixa que a cobre e um acima da linha que ela agrupa.
+ * Trocar uma pela outra inverteria a hierarquia que a escada existe para
+ * construir — a sub-faixa passaria a gritar mais que o grupo dela.
+ *
+ * O [indent] soma ao [horizontalPadding] em vez de substituí-lo: o conteúdo da
+ * faixa tem de começar no mesmo x das linhas abaixo dela, deslocado só pelo
+ * nível. A divisória é da própria faixa, como a de [AppDataRow], e por isso a
+ * lista não precisa de vão entre itens.
+ */
+@Composable
+fun AppGroupBand(
+    label: String,
+    modifier: Modifier = Modifier,
+    detail: String? = null,
+    indent: Dp = 0.dp,
+    horizontalPadding: Dp = AppSpacing.md,
+    trailing: @Composable (RowScope.() -> Unit)? = null
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(
+                    start = horizontalPadding + indent,
+                    end = horizontalPadding,
+                    top = AppSpacing.sm,
+                    bottom = AppSpacing.sm
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (detail != null) {
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (trailing != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+                    content = trailing
+                )
+            }
+        }
+        AppDivider()
+    }
+}
+
+/**
  * Marcador vertical de 2dp que identifica fonte ou severidade.
  *
  * `fillMaxHeight` não serve aqui: dentro de uma `Row` ele mediria a altura da

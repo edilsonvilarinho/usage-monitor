@@ -158,7 +158,7 @@ invented here.
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
 | `components/forms/` | AppTextField · AppSwitch · AppTabs · AppSegmentedControl |
-| `components/data/` | AppProgressTrack · AppStatusIndicator · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader |
+| `components/data/` | AppProgressTrack · AppStatusIndicator · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
 | `components/feedback/` | AppBanner · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
@@ -173,6 +173,10 @@ draws explicitly, this system adds four **chrome** components that the prototype
 without naming: `AppWindowFrame`, `AppStatusBar`, `AppToolbar`, `AppSettingsNav` — plus
 `AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados") and
 `AppColumnHeader` (its `.colhead` strip). Nothing else was invented.
+
+`AppGroupBand` was added on 2026-08-27, during the conformance pass: the team usage and
+presence screens both drew the quiet account sub-band by hand, and it is the third step of
+the surface ladder the prototype draws but does not name.
 
 ---
 

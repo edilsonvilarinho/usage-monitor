@@ -29,6 +29,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppDataSurface
+import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -128,10 +129,10 @@ private fun TeamKeysList(
     onUnclaim: (String, String) -> Unit,
     onDismissError: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    // O corpo desta janela era `Column(fillMaxSize).padding(16.dp)` com
+    // `spacedBy(12.dp)` — exatamente o que `AppWindowScaffold` faz, com os dois
+    // valores escritos como literal em vez de sair de `AppSpacing`.
+    AppWindowScaffold(modifier = Modifier.fillMaxSize()) {
         Text(
             text = TeamKeysLabels.explanation(language),
             style = MaterialTheme.typography.bodySmall,
@@ -163,7 +164,7 @@ private fun TeamKeysList(
 
         if (state.keys.isEmpty()) {
             CenteredMessage(TeamKeysLabels.empty(language))
-            return@Column
+            return@AppWindowScaffold
         }
 
         LazyColumn(

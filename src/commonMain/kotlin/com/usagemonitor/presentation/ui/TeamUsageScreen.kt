@@ -59,6 +59,7 @@ import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
+import com.usagemonitor.presentation.ui.components.AppGroupBand
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppMetricBlock
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
@@ -980,27 +981,11 @@ private fun TeamAccountUuidHeader(
     /** Um degrau abaixo da faixa do e-mail e um acima do integrante que ela cobre. */
     indent: Dp
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(
-                start = TEAM_ROW_HORIZONTAL_PADDING + indent,
-                end = TEAM_ROW_HORIZONTAL_PADDING,
-                top = AppSpacing.sm,
-                bottom = AppSpacing.sm
-            ),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "${TeamUsageLabels.accountBand(language)} · ${account.accountKey.orEmpty()}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-    AppDivider()
+    AppGroupBand(
+        label = "${TeamUsageLabels.accountBand(language)} · ${account.accountKey.orEmpty()}",
+        indent = indent,
+        horizontalPadding = TEAM_ROW_HORIZONTAL_PADDING
+    )
 }
 
 /**

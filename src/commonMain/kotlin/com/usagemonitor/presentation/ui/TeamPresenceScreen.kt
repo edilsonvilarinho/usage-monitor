@@ -58,6 +58,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
+import com.usagemonitor.presentation.ui.components.AppGroupBand
 import com.usagemonitor.presentation.ui.components.AppToggleChip
 import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppIconButton
@@ -811,37 +812,17 @@ private fun TeamPresenceAccountSubgroupHeader(
     hasActionColumn: Boolean,
     onDelete: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(
-                start = PRESENCE_ROW_CONTENT_PADDING + AppSpacing.xl,
-                end = PRESENCE_ROW_CONTENT_PADDING,
-                top = AppSpacing.sm,
-                bottom = AppSpacing.sm
-            ),
-        verticalAlignment = Alignment.CenterVertically
+    AppGroupBand(
+        label = "${TeamUsageLabels.accountBand(language)} · ${group.accountKey.orEmpty()}",
+        detail = TeamPresenceLabels.accountBandSummary(
+            online = group.onlineCount,
+            total = group.totalCount,
+            working = group.workingCount,
+            language = language
+        ),
+        indent = AppSpacing.xl,
+        horizontalPadding = PRESENCE_ROW_CONTENT_PADDING
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "${TeamUsageLabels.accountBand(language)} · ${group.accountKey.orEmpty()}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = TeamPresenceLabels.accountBandSummary(
-                    online = group.onlineCount,
-                    total = group.totalCount,
-                    working = group.workingCount,
-                    language = language
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
         if (deletable) {
             AppIconButton(
                 contentDescription = TeamPresenceLabels.deleteAccount(language),
@@ -860,7 +841,6 @@ private fun TeamPresenceAccountSubgroupHeader(
             Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
         }
     }
-    AppDivider()
 }
 
 /**
