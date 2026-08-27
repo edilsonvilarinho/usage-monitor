@@ -36,6 +36,7 @@ import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
+import com.usagemonitor.presentation.ui.components.ThemePresetPicker
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
@@ -53,7 +54,7 @@ import kotlinx.datetime.Instant
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
-import com.usagemonitor.domain.entity.AppTheme as AppThemePreference
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
 /**
  * Gera as capturas de tela do README a partir dos composables reais, com os
@@ -97,6 +98,7 @@ fun main(args: Array<String>) {
     generator.dashboard()
     generator.history()
     generator.settings()
+    generator.themePresets()
     generator.settingsTeam()
     generator.cliSessions()
     generator.cliBreakdown()
@@ -208,23 +210,38 @@ private class ScreenshotGenerator(private val outputDir: File) {
         )
     }
 
-    // O diálogo é dividido em abas, então a captura mostra a fileira de abas e a
-    // primeira delas inteira. Altura maior sobraria como faixa vazia embaixo.
-    fun settings() = capture("settings", widthDp = 640, heightDp = 460) {
+    // O diálogo é dividido em abas e a grade de temas é rolável, então a captura
+    // usa a mesma moldura de 820 x 720 dp da janela real.
+    fun settings() = capture("settings", widthDp = 820, heightDp = 720) {
         SettingsDialogContent(
-            currentTheme = AppThemePreference.DARK,
+            currentTheme = AppThemePreset.OBSIDIANA_DARK,
             currentLanguage = AppLanguage.PT,
             enabledApis = ScreenshotFixtures.enabledApis,
             autoStartEnabled = true,
             alwaysOnTopEnabled = false,
             windowOpacityPercent = 92,
-            onThemeToggle = {},
+            onThemeChange = {},
             onLanguageChange = {},
             onAutoStartChange = {},
             onAlwaysOnTopChange = {},
             onApiToggle = { _, _ -> },
             anthropicProfiles = ScreenshotFixtures.anthropicProfiles
         )
+    }
+
+    fun themePresets() = capture("theme-presets", widthDp = 760, heightDp = 560) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AppSpacing.lg)
+        ) {
+            ThemePresetPicker(
+                selected = AppThemePreset.OBSIDIANA_DARK,
+                language = AppLanguage.PT,
+                onSelect = {},
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 
     /**

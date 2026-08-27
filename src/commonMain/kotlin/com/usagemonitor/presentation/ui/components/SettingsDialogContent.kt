@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
@@ -53,7 +56,6 @@ import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
 import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.AppTheme
 import com.usagemonitor.domain.entity.DEFAULT_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MAX_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MAX_WINDOW_OPACITY_PERCENT
@@ -64,6 +66,7 @@ import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
@@ -77,6 +80,7 @@ const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
 const val AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG = "autoUpdateFeedOverride"
+const val THEME_PRESET_TEST_TAG_PREFIX = "themePreset_"
 
 /**
  * Seções das Configurações, uma por aba.
@@ -116,7 +120,7 @@ data class AnthropicProfileUiModel(
 
 @Composable
 fun SettingsDialogContent(
-    currentTheme: AppTheme,
+    currentTheme: AppThemePreset,
     currentLanguage: AppLanguage,
     enabledApis: Set<ApiSource>,
     autoStartEnabled: Boolean,
@@ -126,7 +130,7 @@ fun SettingsDialogContent(
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
     onUiScaleChange: (Int) -> Unit = {},
-    onThemeToggle: () -> Unit,
+    onThemeChange: (AppThemePreset) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit = {},
@@ -250,7 +254,7 @@ fun SettingsDialogContent(
                         autoUpdatePlatform = autoUpdatePlatform,
                         lastUpdateReceipt = lastUpdateReceipt,
                         autoUpdateFeedOverride = autoUpdateFeedOverride,
-                        onThemeToggle = onThemeToggle,
+                        onThemeChange = onThemeChange,
                         onLanguageChange = onLanguageChange,
                         onAutoStartChange = onAutoStartChange,
                         onAlwaysOnTopChange = onAlwaysOnTopChange,
@@ -363,7 +367,7 @@ private fun SettingsOptionRow(
 
 @Composable
 private fun GeneralSettingsTab(
-    currentTheme: AppTheme,
+    currentTheme: AppThemePreset,
     currentLanguage: AppLanguage,
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean,
@@ -376,7 +380,7 @@ private fun GeneralSettingsTab(
     autoUpdatePlatform: AppUpdatePlatform?,
     lastUpdateReceipt: AppUpdateReceipt?,
     autoUpdateFeedOverride: String?,
-    onThemeToggle: () -> Unit,
+    onThemeChange: (AppThemePreset) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit,
@@ -394,12 +398,29 @@ private fun GeneralSettingsTab(
     AppDataSurfaceFlush(
         header = { AppSectionHeader(title = if (isPt) "Aparência" else "Appearance") }
     ) {
-        SettingsOptionRow(label = if (isPt) "Tema" else "Theme") {
-            ThemeToggle(
-                isDark = currentTheme == AppTheme.DARK,
-                language = currentLanguage,
-                onToggle = onThemeToggle
-            )
+        AppDataRow {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (isPt) "Tema" else "Theme",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (isPt) {
+                        "Escolha uma das oito paletas claras ou oito escuras."
+                    } else {
+                        "Choose one of eight light or eight dark palettes."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ThemePresetPicker(
+                    selected = currentTheme,
+                    language = currentLanguage,
+                    onSelect = onThemeChange,
+                    modifier = Modifier.padding(top = AppSpacing.sm)
+                )
+            }
         }
         SettingsOptionRow(label = if (isPt) "Idioma" else "Language") {
             LanguageSelector(
@@ -714,7 +735,122 @@ private fun AnthropicProfileRow(
 }
 
 /**
- * Seletor de tema: segmentado de duas opções, como no protótipo.
+ * Grade responsiva com as dezesseis paletas disponíveis.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ThemePresetPicker(
+    selected: AppThemePreset,
+    language: AppLanguage = AppLanguage.PT,
+    onSelect: (AppThemePreset) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isPt = language == AppLanguage.PT
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        ThemePresetGroup(
+            title = if (isPt) "Escuros" else "Dark",
+            presets = AppThemePreset.dark,
+            selected = selected,
+            language = language,
+            onSelect = onSelect
+        )
+        ThemePresetGroup(
+            title = if (isPt) "Claros" else "Light",
+            presets = AppThemePreset.light,
+            selected = selected,
+            language = language,
+            onSelect = onSelect
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ThemePresetGroup(
+    title: String,
+    presets: List<AppThemePreset>,
+    selected: AppThemePreset,
+    language: AppLanguage,
+    onSelect: (AppThemePreset) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+        ) {
+            presets.forEach { preset ->
+                ThemePresetCard(
+                    preset = preset,
+                    selected = preset == selected,
+                    language = language,
+                    onClick = { onSelect(preset) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemePresetCard(
+    preset: AppThemePreset,
+    selected: Boolean,
+    language: AppLanguage,
+    onClick: () -> Unit
+) {
+    val label = if (language == AppLanguage.PT) preset.labelPt else preset.labelEn
+    Surface(
+        modifier = Modifier
+            .width(126.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick
+            )
+            .testTag(THEME_PRESET_TEST_TAG_PREFIX + preset.name),
+        shape = AppShapes.small,
+        color = preset.surface,
+        contentColor = preset.foreground,
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (selected) 2.dp else 1.dp,
+            color = if (selected) preset.primary else preset.border
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(AppSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.weight(1f).height(12.dp).background(preset.background)
+                )
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.weight(1f).height(12.dp).background(preset.raised)
+                )
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.weight(1f).height(12.dp).background(preset.primary)
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = preset.foreground,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * Seletor de tema legado: segmentado de duas opções, mantido para consumidores
+ * de componente que ainda precisam escolher apenas o modo claro/escuro.
  *
  * Era um rótulo com emoji ao lado de um interruptor, e a forma mentia sobre a
  * natureza da escolha: interruptor diz ligado/desligado, e tema é uma escolha

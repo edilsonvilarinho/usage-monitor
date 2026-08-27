@@ -70,7 +70,6 @@ import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.domain.entity.AppTheme as ThemeMode
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
@@ -219,7 +218,6 @@ private const val TEAM_PRESENCE_LIVE_INTERVAL_MILLIS = 5_000L
  */
 private const val SESSION_PULSE_INTERVAL_MILLIS = 30_000L
 private const val ENABLED_APIS_KEY = "enabledApis"
-private const val IS_DARK_KEY = "isDark"
 private const val LANGUAGE_KEY = "language"
 
 /** Idioma persistido; valor irreconhecivel cai no default em vez de derrubar. */
@@ -228,6 +226,7 @@ private fun storedLanguage(settings: Settings): AppLanguage {
         ?.let { stored -> runCatching { AppLanguage.valueOf(stored) }.getOrNull() }
         ?: AppLanguage.PT
 }
+
 private const val AUTO_START_KEY = "autoStart"
 private const val ALWAYS_ON_TOP_KEY = "alwaysOnTop"
 private const val CARD_ORDER_KEY = "cardOrder"
@@ -871,7 +870,7 @@ fun main(args: Array<String>) = application {
         writeUsageTargetCollection(settings, CARD_ORDER_KEY, cardOrder)
         writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, minimizedCards)
     }
-    var isDark by remember { mutableStateOf(settings.getBoolean(IS_DARK_KEY, true)) }
+    var themePreset by remember { mutableStateOf(readPersistedThemePreset(settings)) }
     var language by remember { mutableStateOf(storedLanguage(settings)) }
     var autoStartEnabled by remember { mutableStateOf(storedAutoStartPreference) }
     LaunchedEffect(settings) {
@@ -1293,7 +1292,7 @@ fun main(args: Array<String>) = application {
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
-        AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopWindowFrame(
                 title = "Usage Monitor",
                 iconPainter = iconImage,
@@ -1456,7 +1455,7 @@ fun main(args: Array<String>) = application {
             LaunchedEffect(historyOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = historyWindowTitle(source, language),
                     iconPainter = iconImage,
@@ -1501,7 +1500,7 @@ fun main(args: Array<String>) = application {
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = cliSessionsTitle,
                     iconPainter = iconImage,
@@ -1547,7 +1546,7 @@ fun main(args: Array<String>) = application {
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = teamTitle,
                     iconPainter = iconImage,
@@ -1596,7 +1595,7 @@ fun main(args: Array<String>) = application {
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = presenceTitle,
                     iconPainter = iconImage,
@@ -1618,7 +1617,7 @@ fun main(args: Array<String>) = application {
     ReleaseNotesWindow(
         controller = releaseNotes,
         language = language,
-        isDark = isDark,
+        themePreset = themePreset,
         uiScalePercent = uiScalePercent,
         iconImage = iconImage,
         screenWorkArea = screenWorkArea,
@@ -1649,7 +1648,7 @@ fun main(args: Array<String>) = application {
             ),
             undecorated = true
         ) {
-            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = keysTitle,
                     iconPainter = iconImage,
@@ -1687,14 +1686,14 @@ fun main(args: Array<String>) = application {
             LaunchedEffect(settingsOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = if (language == AppLanguage.PT) "Configurações" else "Settings",
                     iconPainter = iconImage,
                     onCloseRequest = { isSettingsDialogOpen = false }
                 ) {
                     SettingsDialogContent(
-                        currentTheme = if (isDark) ThemeMode.DARK else ThemeMode.LIGHT,
+                        currentTheme = themePreset,
                         currentLanguage = language,
                         enabledApis = enabledApisState,
                         autoStartEnabled = autoStartEnabled,
@@ -1708,9 +1707,9 @@ fun main(args: Array<String>) = application {
                             // opacidade: quem persiste é o coletor com debounce.
                             uiScalePercent = clampUiScalePercent(percent)
                         },
-                        onThemeToggle = {
-                            isDark = !isDark
-                            settings.putBoolean(IS_DARK_KEY, isDark)
+                        onThemeChange = { selectedPreset ->
+                            themePreset = selectedPreset
+                            persistThemePreset(settings, selectedPreset)
                             showSettingsToast(SettingsToast.Saved(SettingsField.THEME))
                         },
                         onLanguageChange = { selectedLanguage ->

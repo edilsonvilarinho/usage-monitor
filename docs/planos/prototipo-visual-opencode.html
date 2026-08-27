@@ -342,6 +342,21 @@ table.dt td.num, table.dt th.num { text-align: right; }
   display: flex; justify-content: space-between; gap: var(--s2); background: var(--surface); }
 .swatch .lab span:last-child { color: var(--muted); }
 
+/* Seletor de presets de tema */
+.theme-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s3); }
+.theme-card { border: 1px solid var(--border); border-radius: var(--r2); padding: var(--s2);
+  background: var(--surface); cursor: default; }
+.theme-card.selected { border: 2px solid var(--primary); padding: calc(var(--s2) - 1px); }
+.theme-card .preview { display: grid; grid-template-columns: 1fr 1fr 1fr; height: 38px;
+  overflow: hidden; border: 1px solid var(--border); border-radius: 4px; }
+.theme-card .preview i:nth-child(1) { background: var(--preview-bg); }
+.theme-card .preview i:nth-child(2) { background: var(--preview-surface); }
+.theme-card .preview i:nth-child(3) { background: var(--preview-primary); }
+.theme-card .name { display: flex; justify-content: space-between; gap: var(--s2); margin-top: var(--s2);
+  font-family: var(--mono); font-size: var(--t10); color: var(--fg); }
+.theme-card .name span:last-child { color: var(--muted); }
+@media (max-width: 900px) { .theme-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* Gráfico */
 .chart { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r3); padding: var(--s3); }
 .spark { display: block; width: 100%; height: auto; }
@@ -383,6 +398,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   </div>
   <div class="grp">Fundação</div>
   <a href="#tokens">Prancha de tokens</a>
+  <a href="#temas">16 presets de tema</a>
   <a href="#primitivas">Primitivas</a>
   <a href="#marca">Marca e ícones</a>
   <div class="grp">Telas</div>
@@ -460,6 +476,28 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <span><i style="background:var(--kilo)"></i>Kilo</span>
 </div>
 <p class="note">Os acentos são os que já passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre si). <b>Não mudam.</b> O que muda é a área: de fundo de card inteiro para um marcador de 2px, linha de gráfico e texto de valor. E a cor <code>opencode</code> continua sendo a da <b>integração</b> monitorada — não vira a cor da marca do app.</p>
+
+<h3 id="temas">Presets configuráveis — 8 claros e 8 escuros</h3>
+<p class="lede">O seletor da aplicação apresenta a mesma grade abaixo em Configurações → Geral. Cada cartão expõe a família de superfícies e seu acento estrutural; a seleção persistida vale para todas as janelas. Os marcadores de sucesso, atenção, erro e as cores das integrações permanecem semânticos.</p>
+<div class="theme-board">
+  <div class="theme-card selected" style="--preview-bg:#131010;--preview-surface:#1B1818;--preview-primary:#4C8DFF"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Obsidiana</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#111315;--preview-surface:#1A1D20;--preview-primary:#7DB3FF"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Grafite</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#0E1420;--preview-surface:#151D2B;--preview-primary:#6FB5FF"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Meia-noite</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#0F1713;--preview-surface:#16231B;--preview-primary:#68D391"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Floresta</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#0C171A;--preview-surface:#132429;--preview-primary:#59D0D9"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Oceano</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#160F19;--preview-surface:#201622;--preview-primary:#D7A4FF"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Ameixa</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#1A110E;--preview-surface:#241915;--preview-primary:#FF9B77"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Brasa</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#0F121C;--preview-surface:#171C2B;--preview-primary:#91A7FF"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Cobalto</span><span>escuro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#F6F3F3;--preview-surface:#FFFCFC;--preview-primary:#1565C0"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Porcelana</span><span>claro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#F5F6F8;--preview-surface:#FFFFFF;--preview-primary:#2459A6"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Papel</span><span>claro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#F2F6FA;--preview-surface:#FBFDFF;--preview-primary:#1D5F9F"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Névoa</span><span>claro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#F3F7F3;--preview-surface:#FCFFFC;--preview-primary:#236B3A"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Sálvia</span><span>claro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#F1F8F9;--preview-surface:#FBFFFF;--preview-primary:#006B73"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Gelo</span><span>claro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#F7F4FA;--preview-surface:#FEFBFF;--preview-primary:#6B3FA0"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Lavanda</span><span>claro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#FFF6F1;--preview-surface:#FFFCFA;--preview-primary:#9D472A"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Pêssego</span><span>claro</span></div></div>
+  <div class="theme-card" style="--preview-bg:#FAF7EF;--preview-surface:#FFFDF8;--preview-primary:#7B5A00"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Areia</span><span>claro</span></div></div>
+</div>
+<p class="note">O cartão selecionado usa borda de 2px com o <code>primary</code> do preset e os demais usam a borda de 1px. A grade reorganiza-se em duas colunas em janelas estreitas, sem depender de cor para comunicar a seleção.</p>
 
 <h3>Tipografia</h3>
 <div class="panel"><div class="pbody">
@@ -1438,7 +1476,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     </div>
     <div class="body">
       <div class="panel"><div class="phead"><span class="ptitle">Aparência</span></div><div class="pbody flush">
-        <div class="row"><span class="v sm">Tema</span><span class="sp"></span><div class="seg"><button class="on" type="button">Escuro</button><button type="button">Claro</button></div></div>
+        <div class="row" style="display:block"><div class="stack" style="gap:var(--s2)"><span class="v sm">Tema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Escolha uma das oito paletas claras ou oito escuras.</span><div class="theme-board" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s2)"><span class="theme-card selected" style="--preview-bg:#131010;--preview-surface:#1B1818;--preview-primary:#4C8DFF"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Obsidiana</span><span>escuro</span></span></span><span class="theme-card" style="--preview-bg:#F1F8F9;--preview-surface:#FBFFFF;--preview-primary:#006B73"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Gelo</span><span>claro</span></span></span></div></div></div>
         <div class="row"><span class="v sm">Idioma</span><span class="sp"></span><div class="seg"><button class="on" type="button">PT</button><button type="button">EN</button></div></div>
         <div class="row"><span class="v sm">Opacidade da janela</span><span class="sp"></span><span class="v sm">92%</span><div class="track" style="width:150px"><i style="width:92%"></i></div></div>
       </div></div>
