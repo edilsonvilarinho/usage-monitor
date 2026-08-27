@@ -1,0 +1,20 @@
+/* ── Motion ──────────────────────────────────────────────────────────────
+   Three durations, one easing. NO infinite animation anywhere: an endless
+   animation hangs waitForIdle in the Compose component tests, and a shimmer
+   on a dashboard that refreshes every 10 minutes is noise, not feedback.
+   Loading is a static skeleton.
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --dur-hover:  120ms;  /* hover, focus, press */
+  --dur-select: 180ms;  /* selection, tab change */
+  --dur-expand: 240ms;  /* expand / collapse, card minimize */
+  --ease: cubic-bezier(.2, 0, .2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-hover: 0ms;
+    --dur-select: 0ms;
+    --dur-expand: 0ms;
+  }
+}

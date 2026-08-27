@@ -1,0 +1,35 @@
+<!-- @dsCard group="Colors" viewport="700x190" name="Semantic state" subtitle="Color reinforces, never informs alone — every state ships dot + word" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 158px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+  <div class="sw"><div class="chip" style="background:var(--ok)"></div><div class="lab"><span>ok</span><span>--ok</span></div></div><div class="sw"><div class="chip" style="background:var(--warn)"></div><div class="lab"><span>atenção</span><span>--warn</span></div></div><div class="sw"><div class="chip" style="background:var(--crit)"></div><div class="lab"><span>crítico</span><span>--crit</span></div></div><div class="sw"><div class="chip" style="background:var(--info)"></div><div class="lab"><span>informação</span><span>--info</span></div></div>
+</div>
+<div class="r" style="margin-top:14px">
+  <span class="st" style="color:var(--ok)">Normal</span>
+  <span class="st" style="color:var(--warn)">Atenção</span>
+  <span class="st" style="color:var(--crit)">Crítico</span>
+  <span class="st" style="color:var(--info)">Trabalhando agora</span>
+  <span class="st" style="color:var(--muted)">Desconectado</span>
+</div>
+</body>
+</html>

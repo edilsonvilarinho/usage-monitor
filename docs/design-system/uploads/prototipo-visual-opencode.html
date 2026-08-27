@@ -1,0 +1,1685 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usage Monitor Visual System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   TOKENS
+   O tema é dark-first: `:root` carrega a paleta escura completa, que é a
+   referência aprovada. A clara entra por `prefers-color-scheme` e pelo
+   seletor explícito, nunca só por media query.
+   ═════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:        #131010;
+  --surface:   #1B1818;
+  --raised:    #211E1E;
+  --border:    #3D3838;
+  --fg:        #F2EDED;
+  --muted:     #B8B2B2;
+
+  --ok:        #4CAF50;
+  --warn:      #FFA726;
+  --crit:      #E86A6A;
+  --info:      #4C8DFF;
+
+  --anthropic: #4F8CFF;
+  --codex:     #27BFA3;
+  --deepseek:  #C084FC;
+  --minimax:   #FF8A3D;
+  --oc:        #7BD389;
+  --kilo:      #E6D84E;
+
+  --input:     #4C8DFF;
+  --output:    #B07CFF;
+  --cread:     #4CAF50;
+  --cwrite:    #FFA726;
+  --savings:   #26C6DA;
+
+  --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
+  --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+
+  --r1: 4px;  --r2: 6px;  --r3: 8px;  --r4: 10px;
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px;
+
+  --t10: 10px; --t12: 12px; --t14: 14px; --t16: 16px; --t20: 20px; --t28: 28px;
+
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --sans: "IBM Plex Sans", ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-app-theme="dark"]) {
+    --bg:      #F6F3F3;
+    --surface: #FFFCFC;
+    --raised:  #EFEAEA;
+    --border:  #D7D0D0;
+    --fg:      #171414;
+    --muted:   #686060;
+
+    --ok:      #2E7D32;
+    --warn:    #8A5000;
+    --crit:    #B3261E;
+    --info:    #1565C0;
+
+    --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
+    --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
+
+    --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
+    --cwrite:#8A5000; --savings:#00697A;
+
+    --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
+    --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+  }
+}
+
+:root[data-app-theme="light"] {
+  --bg:      #F6F3F3;
+  --surface: #FFFCFC;
+  --raised:  #EFEAEA;
+  --border:  #D7D0D0;
+  --fg:      #171414;
+  --muted:   #686060;
+
+  --ok:      #2E7D32;
+  --warn:    #8A5000;
+  --crit:    #B3261E;
+  --info:    #1565C0;
+
+  --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
+  --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
+
+  --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
+  --cwrite:#8A5000; --savings:#00697A;
+
+  --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
+  --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+}
+
+:root[data-app-theme="dark"] {
+  --bg:#131010; --surface:#1B1818; --raised:#211E1E; --border:#3D3838;
+  --fg:#F2EDED; --muted:#B8B2B2;
+  --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --info:#4C8DFF;
+  --anthropic:#4F8CFF; --codex:#27BFA3; --deepseek:#C084FC;
+  --minimax:#FF8A3D; --oc:#7BD389; --kilo:#E6D84E;
+  --input:#4C8DFF; --output:#B07CFF; --cread:#4CAF50;
+  --cwrite:#FFA726; --savings:#26C6DA;
+  --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
+  --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PÁGINA (cromo da revisão, não faz parte do app)
+   ═════════════════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: var(--t14);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell { display: grid; grid-template-columns: 236px minmax(0,1fr); min-height: 100vh; }
+
+nav.index {
+  position: sticky; top: 0; align-self: start; height: 100vh;
+  overflow-y: auto; padding: var(--s6) var(--s4);
+  border-right: 1px solid var(--border); background: var(--surface);
+  display: flex; flex-direction: column; gap: var(--s2);
+}
+nav.index .brandline { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); }
+nav.index .brandline b { font-family: var(--mono); font-size: var(--t12); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+nav.index a {
+  font-family: var(--mono); font-size: var(--t12); color: var(--muted);
+  text-decoration: none; padding: 5px var(--s2); border-radius: var(--r1);
+  border-left: 2px solid transparent;
+}
+nav.index a:hover { color: var(--fg); background: var(--raised); }
+nav.index a:focus-visible { outline: 2px solid var(--info); outline-offset: 1px; }
+nav.index .grp { font-family: var(--mono); font-size: var(--t10); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); opacity: .7; margin-top: var(--s3); }
+
+main { padding: var(--s8) var(--s8) 96px; max-width: 1180px; }
+
+.toolbar-fixed {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3) var(--s8); margin: calc(var(--s8) * -1) calc(var(--s8) * -1) var(--s6);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
+.toolbar-fixed .sp { flex: 1; }
+
+h1 { font-family: var(--mono); font-size: var(--t28); font-weight: 600; letter-spacing: -.02em;
+  margin: 0 0 var(--s2); text-wrap: balance; }
+h2 { font-family: var(--mono); font-size: var(--t20); font-weight: 600; letter-spacing: -.01em;
+  margin: var(--s8) 0 var(--s3); padding-top: var(--s6); border-top: 1px solid var(--border); scroll-margin-top: 64px; }
+h2:first-of-type { border-top: 0; padding-top: 0; }
+h3 { font-family: var(--mono); font-size: var(--t12); font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin: var(--s6) 0 var(--s2); }
+p.lede { color: var(--muted); max-width: 68ch; margin: 0 0 var(--s4); }
+p.note { color: var(--muted); font-size: var(--t12); max-width: 74ch; margin: var(--s2) 0 0;
+  border-left: 2px solid var(--border); padding-left: var(--s3); }
+p.note b { color: var(--fg); font-weight: 600; }
+code { font-family: var(--mono); font-size: .92em; background: var(--raised);
+  padding: 1px 5px; border-radius: var(--r1); border: 1px solid var(--border); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PRIMITIVAS DO APP
+   ═════════════════════════════════════════════════════════════════════════ */
+.win {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r4);
+  box-shadow: var(--shadow-8); overflow: hidden; margin-bottom: var(--s4);
+  font-family: var(--sans); color: var(--fg);
+}
+.win.narrow { max-width: 380px; }
+.win.mid { max-width: 720px; }
+
+.titlebar {
+  display: flex; align-items: center; gap: var(--s2); height: 34px; padding: 0 0 0 var(--s3);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.titlebar .t { font-family: var(--mono); font-size: var(--t12); font-weight: 500; flex: 1; }
+.titlebar .wbtn {
+  width: 40px; height: 33px; display: grid; place-items: center; font-family: var(--mono);
+  font-size: var(--t12); color: var(--muted); cursor: default;
+}
+.titlebar .wbtn:hover { background: var(--raised); color: var(--fg); }
+.titlebar .wbtn.close:hover { background: var(--crit); color: #fff; }
+
+.body { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.body.tight { padding: var(--s3); gap: var(--s2); }
+
+/* Superfície de dados: borda de 1dp, sem brilho, sem gradiente */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r3); }
+.panel > .phead {
+  display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+.panel > .phead .ptitle { font-family: var(--mono); font-size: var(--t12); font-weight: 600; letter-spacing: .02em; }
+.panel > .phead .psub { font-family: var(--mono); font-size: var(--t10); color: var(--muted); }
+.panel > .phead .sp { flex: 1; }
+.pbody { padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
+.pbody.flush { padding: 0; }
+
+/* Linha de dados */
+.row { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--border); }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--raised); }
+.row .sp { flex: 1; }
+
+/* Marcador de fonte: 2px, discreto */
+.srcmark { width: 2px; align-self: stretch; border-radius: 1px; background: var(--muted); }
+
+.k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em;
+  text-transform: uppercase; color: var(--muted); }
+.v { font-family: var(--mono); font-size: var(--t14); font-variant-numeric: tabular-nums; }
+.v.big { font-size: var(--t20); font-weight: 500; letter-spacing: -.01em; }
+.v.sm { font-size: var(--t12); }
+.dim { color: var(--muted); }
+
+/* Barra de progresso */
+.track { height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden;
+  border: 1px solid var(--border); }
+.track > i { display: block; height: 100%; background: var(--fg); }
+.track.ok > i { background: var(--ok); } .track.warn > i { background: var(--warn); }
+.track.crit > i { background: var(--crit); } .track.info > i { background: var(--info); }
+
+/* Indicador de estado: ponto + texto, nunca só cor */
+.st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+  font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.st::before { content:""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st.ok { color: var(--ok); } .st.warn { color: var(--warn); }
+.st.crit { color: var(--crit); } .st.off { color: var(--muted); }
+.st.off::before { background: transparent; border: 1px solid currentColor; }
+
+/* Botões */
+.btn { font-family: var(--mono); font-size: var(--t12); line-height: 1; padding: 7px 11px;
+  border: 1px solid var(--border); border-radius: var(--r2); background: var(--surface);
+  color: var(--fg); cursor: default; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--raised); }
+.btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--fg); background: var(--raised); }
+.btn.danger { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--border)); }
+.btn.icon { padding: 6px; width: 26px; height: 26px; justify-content: center; }
+.btn[disabled] { opacity: .42; }
+
+/* Abas: sublinhado, não pílula */
+.tabs { display: flex; gap: var(--s3); border-bottom: 1px solid var(--border); }
+.tabs button { font-family: var(--mono); font-size: var(--t12); background: none; border: 0;
+  color: var(--muted); padding: 6px 2px; border-bottom: 2px solid transparent; cursor: default; }
+.tabs button.on { color: var(--fg); border-bottom-color: var(--fg); }
+
+/* Controle segmentado (janelas de tempo) */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+.seg button { font-family: var(--mono); font-size: var(--t12); background: var(--surface); border: 0;
+  border-right: 1px solid var(--border); color: var(--muted); padding: 6px 10px; cursor: default; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--raised); color: var(--fg); }
+
+/* Campo */
+.field { font-family: var(--mono); font-size: var(--t12); background: var(--bg); color: var(--fg);
+  border: 1px solid var(--border); border-radius: var(--r2); padding: 7px 9px; width: 100%; }
+.field::placeholder { color: var(--muted); }
+.field:focus-visible { outline: 2px solid var(--info); outline-offset: -1px; }
+
+/* Switch */
+.sw { width: 30px; height: 17px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--raised); position: relative; flex: none; }
+.sw::after { content:""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px;
+  border-radius: 50%; background: var(--muted); }
+.sw.on { background: color-mix(in srgb, var(--ok) 30%, var(--raised)); border-color: var(--ok); }
+.sw.on::after { left: auto; right: 2px; background: var(--ok); }
+
+/* Banner */
+.banner { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s2) var(--s3);
+  border: 1px solid var(--border); border-radius: var(--r2); background: var(--surface); }
+.banner .bar { width: 2px; align-self: stretch; border-radius: 1px; background: var(--muted); }
+.banner.warn .bar { background: var(--warn); } .banner.crit .bar { background: var(--crit); }
+.banner.info .bar { background: var(--info); }
+.banner .bt { font-family: var(--mono); font-size: var(--t12); font-weight: 600; }
+.banner .bd { font-size: var(--t12); color: var(--muted); }
+
+/* Estados */
+.state { display: flex; flex-direction: column; align-items: center; gap: var(--s2);
+  padding: 44px var(--s4); text-align: center; }
+.state .icon { font-family: var(--mono); font-size: var(--t20); color: var(--muted); }
+.state .msg { font-family: var(--mono); font-size: var(--t12); color: var(--muted); max-width: 46ch; }
+.skel { height: 10px; border-radius: var(--r1); background: var(--raised); border: 1px solid var(--border); }
+
+/* Tabela */
+table.dt { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: var(--t12); }
+table.dt th { text-align: left; font-weight: 500; font-size: var(--t10); letter-spacing: .07em;
+  text-transform: uppercase; color: var(--muted); padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.dt td { padding: 7px var(--s3); border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.dt tr:last-child td { border-bottom: 0; }
+table.dt tr:hover td { background: var(--raised); }
+table.dt td.num, table.dt th.num { text-align: right; }
+.scroller { overflow-x: auto; }
+
+/* Faixa de legendas de coluna, acima de uma lista de .row. A legenda pertence a
+   coluna, nao a celula: repetida em cada linha ela dobra o texto da tela. */
+.colhead { display: flex; gap: var(--s3); padding: 0 var(--s3) var(--s2) calc(var(--s3) + 14px);
+  font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); white-space: nowrap; }
+
+/* Grades utilitárias */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--s3); }
+.g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: var(--s3); }
+.stack { display: flex; flex-direction: column; gap: var(--s2); }
+.hstack { display: flex; align-items: center; gap: var(--s2); }
+.wrap { flex-wrap: wrap; }
+@media (max-width: 900px) { .g2, .g3, .g4 { grid-template-columns: 1fr; } }
+
+/* Métrica em bloco */
+.metric { border: 1px solid var(--border); border-radius: var(--r2); padding: var(--s2) var(--s3);
+  background: var(--surface); display: flex; flex-direction: column; gap: 2px; }
+
+/* Status bar do dashboard */
+.statusbar { display: flex; align-items: center; gap: var(--s3); height: 30px; padding: 0 var(--s3);
+  border-top: 1px solid var(--border); background: var(--surface);
+  font-family: var(--mono); font-size: var(--t10); color: var(--muted); }
+.statusbar .sp { flex: 1; }
+
+/* Amostra de token */
+.swatch { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+.swatch .chip { height: 46px; }
+.swatch .lab { padding: 6px var(--s2); font-family: var(--mono); font-size: var(--t10);
+  display: flex; justify-content: space-between; gap: var(--s2); background: var(--surface); }
+.swatch .lab span:last-child { color: var(--muted); }
+
+/* Gráfico */
+.chart { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r3); padding: var(--s3); }
+.spark { display: block; width: 100%; height: auto; }
+
+/* Heatmap */
+.heat { display: grid; grid-template-columns: 32px repeat(24, 1fr); gap: 2px; align-items: center; }
+.heat > .k { justify-self: start; }
+.heat i { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--raised);
+  border: 1px solid var(--border); }
+
+/* Marca */
+.markgrid { display: flex; align-items: flex-end; gap: var(--s4); flex-wrap: wrap; }
+.markgrid figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.markgrid figcaption { font-family: var(--mono); font-size: var(--t10); color: var(--muted); }
+
+/* PDF */
+.pdf { background: #131010; color: #F2EDED; border: 1px solid #3D3838; border-radius: var(--r2);
+  padding: 22px 26px; font-family: var(--mono); font-size: 11px; max-width: 660px; }
+.pdf .prow { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #2A2626; }
+.pdf .prow.h { color: #B8B2B2; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.pdf .prow.alt { background: #1B1818; }
+
+.legend { display: flex; gap: var(--s3); flex-wrap: wrap; font-family: var(--mono); font-size: var(--t10); color: var(--muted); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+
+.cap { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); margin: var(--s4) 0 var(--s2); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (max-width: 860px) { .shell { grid-template-columns: 1fr; } nav.index { position: static; height: auto; } }
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="index">
+  <div class="brandline">
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg>
+    <b>Sistema visual</b>
+  </div>
+  <div class="grp">Fundação</div>
+  <a href="#tokens">Prancha de tokens</a>
+  <a href="#primitivas">Primitivas</a>
+  <a href="#marca">Marca e ícones</a>
+  <div class="grp">Telas</div>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#dash-estados">Dashboard · estados</a>
+  <a href="#atualizacao">Faixa de atualização</a>
+  <a href="#novidades">Novidades da versão</a>
+  <a href="#historico">Histórico</a>
+  <a href="#sessoes">Sessões CLI</a>
+  <a href="#detalhe">Detalhe de sessão</a>
+  <a href="#resumo">Resumo por eixo</a>
+  <a href="#time">Uso do time</a>
+  <a href="#tendencia">Tendência do time</a>
+  <a href="#presenca">Presença</a>
+  <a href="#presenca-contas">Presença · todas as contas</a>
+  <a href="#chaves">Administração de chaves</a>
+  <div class="grp">Configurações</div>
+  <a href="#cfg-geral">Geral</a>
+  <a href="#cfg-alertas">Alertas</a>
+  <a href="#cfg-apis">APIs</a>
+  <a href="#cfg-contas">Contas</a>
+  <a href="#cfg-time">Time</a>
+  <div class="grp">Saídas</div>
+  <a href="#pdf">Relatório PDF</a>
+  <a href="#chrome">Molduras e densidade</a>
+  <a href="#checklist">Checklist de aprovação</a>
+</nav>
+
+<main>
+<div class="toolbar-fixed">
+  <span class="k">Protótipo · Fase A</span>
+  <span class="sp"></span>
+  <span class="k" id="themelabel">tema escuro</span>
+  <button class="btn" id="toggle" type="button">Alternar tema</button>
+</div>
+
+<h1>Usage Monitor — sistema visual</h1>
+<p class="lede">Protótipo da refatoração inspirada no OpenCode. Todo dado desta página é sintético, vindo de <code>ScreenshotFixtures</code>: nenhuma conta, máquina, caminho de projeto ou chave real. Nenhum asset do OpenCode foi usado — a inspiração é a linguagem visual, não o material.</p>
+<p class="note"><b>O que aprovar aqui:</b> paleta, tipografia, marca, densidade, dashboard, telas tabulares, configurações, PDF e tema claro. Rejeição em qualquer um desses pontos atualiza este protótipo — não começa o código.</p>
+
+<!-- ═══════════════════════════════════ TOKENS ═════════════════════════ -->
+<h2 id="tokens">1 · Prancha de tokens</h2>
+<p class="lede">A aprovação é sobre o sistema, não sobre 24 telas soltas. Tudo abaixo é o vocabulário fechado de que as telas seguintes se servem.</p>
+
+<h3>Superfícies e texto</h3>
+<div class="g3">
+  <div class="swatch"><div class="chip" style="background:var(--bg)"></div><div class="lab"><span>background</span><span class="tokv" data-t="--bg"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--surface)"></div><div class="lab"><span>surface</span><span class="tokv" data-t="--surface"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--raised)"></div><div class="lab"><span>surface raised</span><span class="tokv" data-t="--raised"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--border)"></div><div class="lab"><span>border</span><span class="tokv" data-t="--border"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--fg)"></div><div class="lab"><span>foreground</span><span class="tokv" data-t="--fg"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--muted)"></div><div class="lab"><span>muted</span><span class="tokv" data-t="--muted"></span></div></div>
+</div>
+<p class="note">Quatro superfícies dentro de ~14% de luminância. A profundidade vem da <b>borda de 1dp e do espaçamento</b>, não de sombra nem de gradiente. O <code>DepthSurface</code> atual, que pinta um brilho de acento no topo de toda superfície, sai de cena.</p>
+
+<h3>Semântica — cor nunca sozinha</h3>
+<div class="g4">
+  <div class="swatch"><div class="chip" style="background:var(--ok)"></div><div class="lab"><span>ok</span><span class="tokv" data-t="--ok"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--warn)"></div><div class="lab"><span>atenção</span><span class="tokv" data-t="--warn"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--crit)"></div><div class="lab"><span>crítico</span><span class="tokv" data-t="--crit"></span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--info)"></div><div class="lab"><span>informação</span><span class="tokv" data-t="--info"></span></div></div>
+</div>
+<div class="hstack wrap" style="margin-top:var(--s3)">
+  <span class="st ok">Normal</span><span class="st warn">Atenção</span><span class="st crit">Crítico</span><span class="st off">Desconectado</span>
+</div>
+<p class="note">Todo estado carrega <b>ponto + palavra</b>. A cor reforça, não informa sozinha — é o que mantém a tela legível para quem não distingue as matizes.</p>
+
+<h3>Identidade das seis integrações</h3>
+<div class="legend" style="margin-bottom:var(--s2)">
+  <span><i style="background:var(--anthropic)"></i>Anthropic</span>
+  <span><i style="background:var(--codex)"></i>Codex</span>
+  <span><i style="background:var(--deepseek)"></i>DeepSeek</span>
+  <span><i style="background:var(--minimax)"></i>MiniMax</span>
+  <span><i style="background:var(--oc)"></i>OpenCode</span>
+  <span><i style="background:var(--kilo)"></i>Kilo</span>
+</div>
+<p class="note">Os acentos são os que já passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre si). <b>Não mudam.</b> O que muda é a área: de fundo de card inteiro para um marcador de 2px, linha de gráfico e texto de valor. E a cor <code>opencode</code> continua sendo a da <b>integração</b> monitorada — não vira a cor da marca do app.</p>
+
+<h3>Tipografia</h3>
+<div class="panel"><div class="pbody">
+  <div style="font-family:var(--mono);font-size:var(--t28);font-weight:600;letter-spacing:-.02em">28 · IBM Plex Mono SemiBold</div>
+  <div style="font-family:var(--mono);font-size:var(--t20);font-weight:600">20 · título de janela</div>
+  <div style="font-family:var(--mono);font-size:var(--t16);font-weight:500">16 · valor principal de métrica</div>
+  <div style="font-family:var(--mono);font-size:var(--t14)">14 · 1.284.000 tokens · US$ 5,4792 <span class="dim">— tabular-nums alinha a coluna</span></div>
+  <div style="font-family:var(--mono);font-size:var(--t12)">12 · rótulo, controle, célula de tabela</div>
+  <div style="font-family:var(--mono);font-size:var(--t10);letter-spacing:.07em;text-transform:uppercase">10 · eyebrow e cabeçalho de coluna</div>
+  <hr style="border:0;border-top:1px solid var(--border);margin:var(--s2) 0">
+  <div style="font-family:var(--sans);font-size:var(--t14);max-width:66ch">14 · IBM Plex Sans em texto corrido. Este parágrafo é o tipo de conteúdo que existe nas Configurações e no glossário de sessões: explicação de duas ou três linhas que o usuário lê uma vez e precisa entender de primeira.</div>
+</div></div>
+<p class="note"><b>Duas famílias, não uma.</b> Mono em título, rótulo, número, tabela e cromo — onde o alinhamento tabular importa. Sans em parágrafo descritivo. Mono em texto corrido fica ~8% mais largo e mais lento de ler, e este app tem bastante texto explicativo. Pesos 400/500/600 apenas.</p>
+
+<h3>Forma, elevação, espaço e motion</h3>
+<div class="g4">
+  <div class="metric"><span class="k">raio</span><span class="v sm">4 · 6 · 8 · 10 dp</span></div>
+  <div class="metric"><span class="k">elevação</span><span class="v sm">0 · 2 · 8 dp</span></div>
+  <div class="metric"><span class="k">grade</span><span class="v sm">4 · 8 · 12 · 16 · 24 · 32</span></div>
+  <div class="metric"><span class="k">motion</span><span class="v sm">120 · 180 · 240 ms</span></div>
+</div>
+<div class="hstack wrap" style="margin-top:var(--s3)">
+  <div style="width:76px;height:44px;border:1px solid var(--border);background:var(--surface);border-radius:4px;display:grid;place-items:center" class="k">r 4</div>
+  <div style="width:76px;height:44px;border:1px solid var(--border);background:var(--surface);border-radius:6px;display:grid;place-items:center" class="k">r 6</div>
+  <div style="width:76px;height:44px;border:1px solid var(--border);background:var(--surface);border-radius:8px;display:grid;place-items:center" class="k">r 8</div>
+  <div style="width:76px;height:44px;border:1px solid var(--border);background:var(--surface);border-radius:10px;display:grid;place-items:center" class="k">r 10</div>
+  <div style="width:110px;height:44px;border:1px solid var(--border);background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);display:grid;place-items:center" class="k">elev 2</div>
+  <div style="width:110px;height:44px;border:1px solid var(--border);background:var(--surface);border-radius:8px;box-shadow:var(--shadow-8);display:grid;place-items:center" class="k">elev 8</div>
+</div>
+<p class="note">Hoje os raios vão de 10 a 28dp e quase toda superfície é um card grande. O teto de 10dp e a elevação 8 restrita a diálogo, menu e overlay são o que faz a hierarquia voltar a ser lida por <b>camada e divisória</b>. 120ms para hover e foco, 180ms para seleção, 240ms para expandir e recolher; <b>nenhuma animação infinita</b> — animação sem fim trava o <code>waitForIdle</code> dos testes de componente.</p>
+
+<!-- ═══════════════════════════════ PRIMITIVAS ═════════════════════════ -->
+<h2 id="primitivas">2 · Primitivas compartilhadas</h2>
+<p class="lede">Dezessete componentes internos, todos stateless: dados por parâmetro, eventos por lambda. É o que impede a próxima tela de reinventar um retângulo.</p>
+
+<div class="g2">
+  <div class="panel">
+    <div class="phead"><span class="ptitle">AppButton · AppIconButton</span></div>
+    <div class="pbody">
+      <div class="hstack wrap">
+        <button class="btn primary" type="button">Salvar</button>
+        <button class="btn" type="button">Atualizar</button>
+        <button class="btn ghost" type="button">Cancelar</button>
+        <button class="btn danger" type="button">Remover</button>
+        <button class="btn" type="button" disabled>Indisponível</button>
+        <button class="btn icon" type="button" title="Atualizar" aria-label="Atualizar">↻</button>
+        <button class="btn icon" type="button" title="Minimizar card" aria-label="Minimizar card">–</button>
+      </div>
+      <p class="note" style="border:0;padding:0">Retângulo de raio 6, altura 28dp. Os botões circulares pesados do card atual saem.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="ptitle">AppTabs · segmentado · filtro</span></div>
+    <div class="pbody">
+      <div class="tabs"><button class="on" type="button">Sessões</button><button type="button">Resumo</button><button type="button">Tendência</button></div>
+      <div class="hstack wrap">
+        <div class="seg"><button class="on" type="button">5h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
+      </div>
+      <input class="field" type="text" placeholder="Filtrar projeto, branch ou modelo">
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="ptitle">AppSwitch · AppProgressTrack</span></div>
+    <div class="pbody">
+      <div class="hstack"><span class="sw on"></span><span class="v sm">Iniciar com o sistema</span></div>
+      <div class="hstack"><span class="sw"></span><span class="v sm">Sempre visível</span></div>
+      <div class="stack" style="margin-top:var(--s2)">
+        <div class="track ok"><i style="width:41%"></i></div>
+        <div class="track warn"><i style="width:68%"></i></div>
+        <div class="track crit"><i style="width:94%"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="ptitle">AppBanner</span></div>
+    <div class="pbody">
+      <div class="banner warn"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Anthropic — Padrão</span><span class="bd">Limite de requisições atingido. Aguarde antes de tentar de novo.</span></div><span class="sp"></span><button class="btn ghost" type="button">Tentar de novo</button></div>
+      <div class="banner crit"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Créditos de uso indisponíveis</span><span class="bd">A resposta veio sem limite mensal. A linha de créditos não é exibida nesta coleta.</span></div></div>
+      <div class="banner info"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Versão 36.0.0 disponível</span></div><span class="sp"></span><button class="btn ghost" type="button">Ver release</button></div>
+    </div>
+  </div>
+</div>
+
+<h3>AppEmptyState · AppLoadingState · AppErrorState</h3>
+<div class="g3">
+  <div class="panel"><div class="state"><span class="icon">·</span><span class="msg">Nenhum turno nesta janela.</span></div></div>
+  <div class="panel"><div class="pbody" style="padding:var(--s4)">
+    <div class="skel" style="width:38%"></div><div class="skel" style="width:82%"></div>
+    <div class="skel" style="width:64%"></div><div class="skel" style="width:74%"></div>
+    <span class="k" style="margin-top:var(--s2)">Carregando dados das APIs…</span>
+  </div></div>
+  <div class="panel"><div class="state"><span class="icon st crit" style="gap:0"></span><span class="msg">Erro ao carregar histórico</span><button class="btn" type="button">Tentar novamente</button></div></div>
+</div>
+<p class="note">O carregamento é <b>esqueleto estático</b>, não shimmer. A única animação infinita que existe hoje (<code>ShimmerBox</code>) fica como está onde já está, mas não se replica.</p>
+
+<h3>appNestedGroupGuide</h3>
+<div class="panel"><div class="pbody flush">
+  <div class="row">
+    <span class="srcmark" style="background:var(--anthropic)"></span>
+    <span style="width:12px"></span>
+    <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
+    <div class="stack" style="gap:0"><span class="v sm">dev-01</span><span class="k">DESKTOP-A1</span></div>
+  </div>
+  <div class="row" style="padding-left:38px;background:var(--bg);border-left:2px solid var(--border);margin-left:24px">
+    <div class="stack" style="gap:0"><span class="v sm">7c4a1f92</span><span class="k">api-gateway · 48 turnos</span></div>
+  </div>
+  <div class="row" style="padding-left:38px;background:var(--bg);border-left:2px solid var(--border);margin-left:24px">
+    <div class="stack" style="gap:0"><span class="v sm">b81e35c0</span><span class="k">checkout-web · 26 turnos</span></div>
+  </div>
+</div></div>
+<p class="note"><b>Um traço de 2dp ligando um bloco aninhado à linha que o abriu.</b> Uma lista que abre sub-itens numa <code>LazyColumn</code> não pode aninhar uma lista dentro da outra — aninhar quebra a rolagem e desliga o reaproveitamento de itens —, então os filhos entram como itens <b>irmãos</b> do pai. O preço é que nada na árvore diz que aqueles itens pertencem à linha de cima: eram retângulos soltos com um recuo, e recuo sozinho lê como alinhamento diferente, não como nível abaixo. O traço é desenhado <b>por item</b> e sai contínuo porque a lista não tem vão entre eles — a mesma razão pela qual cada linha carrega a própria divisória.</p>
+<p class="note"><b>É <code>drawBehind</code> e não <code>Modifier.border</code>.</b> Aquele arredonda a espessura para cima e pinta <b>depois</b> do conteúdo, que é o defeito medido na issue #83: numa caixa apertada o anel de 1dp vira 2px a partir de densidade 1,05 e come a caixa. Aqui o traço não ocupa layout nenhum; quem reserva o espaço é o <code>padding</code> do próprio item. Ele fica na <b>metade</b> do recuo: encostado no conteúdo viraria borda da célula, encostado na borda do item viraria borda da lista.</p>
+
+<!-- ═══════════════════════════════ MARCA ═════════════════════════════ -->
+<h2 id="marca">3 · Marca e ícones</h2>
+<p class="lede">Monograma geométrico próprio, construção determinística por script. Três hastes unidas por um bojo: lê como <b>U</b> e <b>M</b> sobrepostos em tamanho grande e mantém silhueta distinta em 16px, que é onde ícone de bandeja vive.</p>
+
+<div class="markgrid">
+  <figure><svg width="128" height="128" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg><figcaption>128</figcaption></figure>
+  <figure><svg width="64" height="64" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg><figcaption>64</figcaption></figure>
+  <figure><svg width="32" height="32" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg><figcaption>32</figcaption></figure>
+  <figure><svg width="24" height="24" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg><figcaption>24</figcaption></figure>
+  <figure><svg width="16" height="16" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg><figcaption>16</figcaption></figure>
+  <figure>
+    <div class="hstack" style="gap:var(--s3)">
+      <svg width="32" height="32" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/><circle cx="19" cy="19" r="5" fill="var(--warn)" stroke="var(--bg)" stroke-width="1.6"/></svg>
+      <svg width="32" height="32" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/><circle cx="19" cy="19" r="5" fill="var(--crit)" stroke="var(--bg)" stroke-width="1.6"/></svg>
+    </div>
+    <figcaption>bandeja · atenção e crítico</figcaption>
+  </figure>
+</div>
+<div class="hstack" style="gap:var(--s3);margin-top:var(--s6)">
+  <svg width="28" height="28" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg>
+  <span style="font-family:var(--mono);font-size:var(--t20);font-weight:500;letter-spacing:-.01em">usage monitor</span>
+</div>
+<p class="note"><b>Verificação pendente:</b> o <code>.icns</code> do macOS não é validável na máquina Windows onde a implementação roda. Ele é montado por script determinístico e a checagem real acontece no job <code>build-macos</code> do release. O <code>.ico</code> sai do <code>build-ico.ps1</code> que já existe no repositório. O ícone da bandeja recebe o ponto de risco por cima — <code>ON_TRACK</code> não acende nada, porque ponto verde permanente vira decoração.</p>
+
+<!-- ═══════════════════════════════ DASHBOARD ═════════════════════════ -->
+<h2 id="dashboard">4 · Dashboard</h2>
+<p class="lede">Cada cota vira uma <b>linha compacta</b>: rótulo, valor, percentual, barra e reinício. O card deixa de ser um bloco colorido e passa a ser um painel neutro identificado por um marcador de 2px e pelo nome.</p>
+<p class="note"><b>Corpo denso (<code>--s3</code> de padding, <code>--s2</code> de vão), não o padrão de <code>--s4</code>.</b> Esta é a janela que o usuário deixa estreita ao lado do editor: com 16px de margem externa mais 16px entre os cards, a largura que sobrava não era suficiente para as cotas caberem numa linha só. As demais janelas continuam em <code>--s4</code> — elas abrem largas. O vão da grade já era <code>--s3</code> aqui; era o Compose que usava 16.</p>
+
+<div class="win">
+  <div class="titlebar">
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <span class="t">Usage Monitor</span>
+    <span class="wbtn">–</span><span class="wbtn">□</span><span class="wbtn close">×</span>
+  </div>
+  <div class="body tight">
+    <div class="g2">
+
+      <!-- Anthropic padrão -->
+      <div class="panel">
+        <div class="phead">
+          <span class="srcmark" style="background:var(--anthropic)"></span>
+          <div class="stack" style="gap:0">
+            <span class="ptitle">Anthropic · Padrão</span>
+            <span class="psub">dev@example.com — Example Org</span>
+          </div>
+          <span class="sp"></span>
+          <span class="st warn" title="Projeção de uso · Cota Sessão 5h · Status Atenção · No ritmo atual, a cota deve esgotar antes do reset. Previsão: Qua 13/08 13h00 BRT.">Atenção</span>
+          <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
+          <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
+        </div>
+        <div class="pbody flush">
+          <div class="row">
+            <div class="stack" style="gap:3px;flex:1">
+              <div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">68%</span></div>
+              <div class="track warn"><i style="width:68%"></i></div>
+              <span class="k dim">Reinício: Qua 13h00 BRT</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="stack" style="gap:3px;flex:1">
+              <div class="hstack"><span class="k">Semanal</span><span class="sp"></span><span class="v">41%</span></div>
+              <div class="track ok"><i style="width:41%"></i></div>
+              <span class="k dim">Reinício: Sáb 15/08 21h00 BRT</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="stack" style="gap:3px;flex:1">
+              <div class="hstack"><span class="k">Créditos de uso</span><span class="sp"></span><span class="v">US$ 190,00 <span class="dim">/ 500,00</span></span></div>
+              <div class="track info"><i style="width:38%"></i></div>
+              <span class="k dim">Reinicia no início do mês</span>
+            </div>
+          </div>
+        </div>
+        <div class="statusbar">
+          <button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button>
+          <button class="btn icon" type="button" aria-label="Sessões CLI" title="Sessões CLI">▣</button>
+          <button class="btn icon" type="button" aria-label="Uso do time" title="Uso do time">◫</button>
+          <button class="btn icon" type="button" aria-label="Conectados agora" title="Conectados agora">◉</button>
+        </div>
+      </div>
+
+      <!-- Anthropic sandbox -->
+      <div class="panel">
+        <div class="phead">
+          <span class="srcmark" style="background:var(--anthropic)"></span>
+          <div class="stack" style="gap:0">
+            <span class="ptitle">Anthropic · Sandbox</span>
+            <span class="psub">qa@example.com — Example Org (Sandbox)</span>
+          </div>
+          <span class="sp"></span>
+          <span class="st ok" title="Projeção de uso · Cota Sessão 5h · Status Normal · No ritmo atual, a cota deve resetar antes de esgotar.">Normal</span>
+          <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
+          <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
+        </div>
+        <div class="pbody flush">
+          <div class="row"><div class="stack" style="gap:3px;flex:1">
+            <div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">12%</span></div>
+            <div class="track ok"><i style="width:12%"></i></div>
+            <span class="k dim">Reinício: Qua 15h00 BRT</span>
+          </div></div>
+          <div class="row"><div class="stack" style="gap:3px;flex:1">
+            <div class="hstack"><span class="k">Semanal</span><span class="sp"></span><span class="v">7%</span></div>
+            <div class="track ok"><i style="width:7%"></i></div>
+            <span class="k dim">Reinício: Dom 16/08 21h00 BRT</span>
+          </div></div>
+        </div>
+        <div class="statusbar">
+          <button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button>
+          <button class="btn icon" type="button" aria-label="Sessões CLI" title="Sessões CLI">▣</button>
+        </div>
+      </div>
+
+      <!-- Codex -->
+      <div class="panel">
+        <div class="phead">
+          <span class="srcmark" style="background:var(--codex)"></span>
+          <span class="ptitle">Codex</span>
+          <span class="sp"></span>
+          <span class="st crit" title="Projeção de uso · Cota Codex 5h · Status Crítico · No ritmo atual, a cota deve esgotar antes do reset. Previsão: Qua 13/08 18h51 BRT.">Crítico</span>
+          <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
+          <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
+        </div>
+        <div class="pbody flush">
+          <div class="row"><div class="stack" style="gap:3px;flex:1">
+            <div class="hstack"><span class="k">Codex 5h</span><span class="sp"></span><span class="v">75%</span></div>
+            <div class="track crit"><i style="width:75%"></i></div>
+            <span class="k dim">Reinício: Qua 20h51 BRT</span>
+          </div></div>
+          <div class="row"><div class="stack" style="gap:3px;flex:1">
+            <div class="hstack"><span class="k">Codex 7d</span><span class="sp"></span><span class="v">12%</span></div>
+            <div class="track ok"><i style="width:12%"></i></div>
+            <span class="k dim">Reinício: Ter 01/09 15h51 BRT</span>
+          </div></div>
+        </div>
+        <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
+      </div>
+
+      <!-- DeepSeek -->
+      <div class="panel">
+        <div class="phead">
+          <span class="srcmark" style="background:var(--deepseek)"></span>
+          <span class="ptitle">DeepSeek</span>
+          <span class="sp"></span>
+          <span class="st ok" title="Projeção de uso · Cota Saldo · Status Normal · No ritmo atual, os créditos devem acabar em Seg 02/11 13h38 BRT.">Normal</span>
+          <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
+          <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
+        </div>
+        <div class="pbody flush">
+          <div class="row"><div class="stack" style="gap:3px;flex:1">
+            <div class="hstack"><span class="k">Saldo atual</span><span class="sp"></span><span class="v big">US$ 1.284,00</span></div>
+            <span class="k dim">Saldo não expira</span>
+          </div></div>
+        </div>
+        <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
+      </div>
+
+    </div>
+  </div>
+  <div class="statusbar">
+    <span>v35.0.0</span>
+    <span>Próxima coleta em 06:41</span>
+    <span class="sp"></span>
+    <span class="st ok">4 fontes</span>
+    <button class="btn ghost" type="button">Atualizar tudo</button>
+    <button class="btn ghost" type="button">Configurações</button>
+  </div>
+</div>
+<p class="note"><b>O status do cabeçalho também é um hint.</b> Passe o cursor sobre <code>Normal</code>, <code>Atenção</code>
+ou <code>Crítico</code> para ver a cota que determinou o pior estado e a projeção que explica o rótulo. O texto do hint
+repete a regra usada no card: a cota deve resetar antes de esgotar em <code>Normal</code>; deve esgotar antes do reset em
+<code>Atenção</code> e <code>Crítico</code>, com a previsão da coleta.
+<b>Saldo pré-pago não entra nessa regra</b> (issue #109): ele não reseta, então a frase é sobre quando os créditos acabam
+e a régua é <b>tempo de autonomia</b> — menos de 7 dias é <code>Crítico</code>, menos de 14 é <code>Atenção</code>, acima
+disso é <code>Normal</code> <b>com a data ainda impressa</b>, porque ali a previsão é a resposta e não o aviso.
+A régua de razão não servia: com um <code>periodEndAt</code> no infinito ela dava ~0,002 e qualquer consumo maior que
+zero virava <code>Crítico</code> — o card do DeepSeek ficava vermelho para sempre, o ponto de risco da bandeja junto, e a
+tooltip prometia um reset uma linha abaixo de "Saldo não expira". <b>As ações de navegação do card são botões de ícone, não de texto.</b> A
+<code>contentDescription</code> de cada uma carrega a explicação do pisca do semáforo ("1 sessão ativa agora pede
+atenção: …"), que é a razão de o semáforo existir e o que os testes de componente observam — botão de texto não teria
+onde levá-la. O rodapé da janela vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e
+configurações. A contagem de fontes desenhada aqui como <code>4 fontes</code> <b>não foi implementada</b>: ela afirma um
+estado agregado que o app não calcula, e com uma fonte em erro o verde mentiria — escolher o tom seria inventar
+semântica que este protótipo não define. Falha de fonte já tem o banner por alvo. Preservados: múltiplos perfis Anthropic, as seis integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
+
+<h3>Modo somente cards</h3>
+<p class="lede">A mesma janela sem barra de título e sem rodapé: o app fica do tamanho do que ele informa. A moldura não some para sempre — ela volta como faixa sobreposta enquanto o mouse está nos 34px do topo.</p>
+
+<div class="win narrow">
+  <div class="body tight">
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · Padrão</span></div>
+    <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">0%</span></div><div class="track ok"><i style="width:0%"></i></div></div></div></div></div>
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · INFORMATA</span></div>
+    <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 7d</span><span class="sp"></span><span class="v">8%</span></div><div class="track ok"><i style="width:8%"></i></div></div></div></div></div>
+  </div>
+</div>
+<p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
+
+<h2 id="dash-estados">4b · Dashboard — os estados que o card precisa cobrir</h2>
+<div class="g2">
+  <div>
+    <div class="cap">Card minimizado</div>
+    <div class="panel">
+      <div class="phead">
+        <span class="srcmark" style="background:var(--anthropic)"></span>
+        <span class="ptitle">Anthropic · Padrão</span>
+        <span class="sp"></span>
+        <span class="st warn">Atenção</span>
+        <button class="btn icon" type="button" aria-label="Expandir card">+</button>
+      </div>
+      <div class="pbody" style="padding:var(--s2) var(--s3)">
+        <div class="hstack">
+          <div class="metric" style="flex:1;align-items:center"><span class="k">Sessão 5h</span><span class="v big">68%</span></div>
+          <div class="metric" style="flex:1;align-items:center"><span class="k">Semanal</span><span class="v big">41%</span></div>
+        </div>
+      </div>
+      <div class="pbody" style="padding:var(--s2) var(--s3)">
+        <div class="banner crit"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Créditos de uso indisponíveis</span><span class="bd">Aviso visível mesmo com o card fechado.</span></div></div>
+      </div>
+    </div>
+    <p class="note">Foi o card fechado que escondeu o episódio dos créditos em agosto. O aviso <b>continua visível
+    minimizado</b>. O resumo "68% · 41%" que esta prancha desenhava antes <b>não foi implementado</b>: aquela forma apaga
+    o rótulo de cada cota e a tooltip por cota, que são dado e ação existentes. O card fechado mostra um badge por cota,
+    com rótulo, percentual e a mesma tooltip do card aberto.</p>
+  </div>
+
+  <div>
+    <div class="cap">Atualização em andamento</div>
+    <div class="panel">
+      <div class="phead">
+        <span class="srcmark" style="background:var(--codex)"></span>
+        <span class="ptitle">Codex</span>
+        <span class="sp"></span>
+        <span class="k">Atualizando…</span>
+        <button class="btn icon" type="button" disabled aria-label="Atualizando">↻</button>
+      </div>
+      <div class="pbody flush">
+        <div class="row"><div class="stack" style="gap:3px;flex:1;opacity:.5">
+          <div class="hstack"><span class="k">Codex atual</span><span class="sp"></span><span class="v">23%</span></div>
+          <div class="track"><i style="width:23%"></i></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note">Aviso em <b>texto</b>, nunca indicador animado: trocar a janela não passa por <code>Loading</code>, e o número antigo na tela sem aviso é lido como resposta nova.</p>
+  </div>
+
+  <div>
+    <div class="cap">Sucesso parcial</div>
+    <div class="win narrow" style="max-width:none">
+      <div class="body tight">
+        <div class="banner warn"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Codex</span><span class="bd">Sessão expirada. Faça login pelo CLI e atualize.</span></div><span class="sp"></span><button class="btn ghost" type="button">Recarregar Codex</button></div>
+        <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · Padrão</span><span class="sp"></span><span class="st ok" title="Projeção de uso · Cota Sessão 5h · Status Normal · No ritmo atual, a cota deve resetar antes de esgotar.">Normal</span></div>
+        <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">68%</span></div><div class="track warn"><i style="width:68%"></i></div></div></div></div></div>
+      </div>
+    </div>
+    <p class="note">O banner é <b>por alvo</b>: título com o perfil, e a ação recarrega só ele. Com duas contas Anthropic, título fixo produzia dois banners idênticos.</p>
+  </div>
+
+  <div>
+    <div class="cap">Erro total · lista vazia · confirmação</div>
+    <div class="stack">
+      <div class="panel"><div class="state">
+        <span class="msg">Erro ao carregar dados</span>
+        <span class="msg dim">Nenhuma das fontes habilitadas respondeu.</span>
+        <button class="btn" type="button">Tentar novamente</button>
+      </div></div>
+      <div class="panel"><div class="state">
+        <span class="msg">Nenhuma API monitorada está habilitada</span>
+        <button class="btn primary" type="button">Abrir configurações</button>
+      </div></div>
+      <div class="panel" style="box-shadow:var(--shadow-8)">
+        <div class="phead"><span class="ptitle">Atualizar agora?</span></div>
+        <div class="pbody">
+          <span class="v sm dim">Coletas manuais frequentes podem esgotar o limite da própria API de uso.</span>
+          <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Cancelar</button><button class="btn primary" type="button">Atualizar</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ FAIXA DE ATUALIZAÇÃO ═══════════════════════ -->
+<h2 id="atualizacao">4c · Faixa de atualização — os quatro estados</h2>
+<p class="lede">A faixa de uma linha da issue #67 ganhou os estados da atualização automática (issue #75). Ela continua sendo <b>uma linha de 28dp no topo do dashboard</b>, com o marcador de 2dp à esquerda, o título cedendo espaço numa janela estreita e o rótulo da ação como única pista de que a linha é clicável. Sem botão, sem parágrafo de descrição.</p>
+
+<div class="panel"><div class="pbody">
+  <div class="cap">Disponível — atualização automática desligada, que é o padrão</div>
+  <div class="banner info"><span class="bar"></span><span class="bt" style="flex:1">Nova versão 38.0.0 disponível</span><span class="bt" style="color:var(--info)">Baixar atualização →</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Baixando — em segundo plano, com o interruptor ligado</div>
+  <div class="banner info"><span class="bar"></span><span class="bt" style="flex:1">Baixando a versão 38.0.0 — 42%</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Pronta — será aplicada ao fechar o app</div>
+  <div class="banner"><span class="bar" style="background:var(--ok)"></span><span class="bt" style="flex:1">Versão 38.0.0 pronta — será aplicada ao fechar</span><span class="bt" style="color:var(--ok)">Reiniciar e atualizar agora →</span></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Falhou — a versão instalada continua intacta</div>
+  <div class="banner warn"><span class="bar"></span><span class="bt" style="flex:1">Falha ao baixar a versão 38.0.0</span><span class="bt" style="color:var(--warn)">Baixar manualmente →</span></div>
+</div></div>
+
+<p class="note"><b>Três decisões que a imagem não mostra.</b> O progresso é <b>texto</b>, nunca indicador animado: animação infinita trava o <code>waitForIdle</code> dos testes de componente, e é a mesma regra que já vale para o resto do app. <b>Baixando não tem rótulo de ação e a faixa deixa de ser clicável</b> — faixa clicável sem rótulo seria um alvo de clique invisível. E <b>falha devolve o caminho manual</b>, que é o comportamento que o app sempre teve: a atualização automática que não deu certo não pode deixar o usuário sem saída.</p>
+
+<p class="note">Sem tamanho declarado no asset não há porcentagem, e a faixa diz só <span class="v sm">Baixando a versão 38.0.0…</span> — inventar um percentual seria pior que omiti-lo.</p>
+
+<!-- ═══════════════════════════════ NOVIDADES ════════════════════════ -->
+<h2 id="novidades">4d · Novidades da versão</h2>
+<p class="lede">Diálogo da <b>primeira abertura depois de uma atualização que deu certo</b> (issue #74). A atualização automática é silenciosa por construção: o app fecha, o instalador roda sem tela e o app volta com outro número no rodapé. Sem esta janela, a única pista de que algo mudou é uma linha em Configurações → Geral, que ninguém abre.</p>
+
+<div class="panel"><div class="pbody">
+  <div class="cap">560 × 520dp, <code>undecorated</code> com a moldura de diálogo do §14</div>
+  <div class="win" style="max-width:520px">
+    <div class="wbar"><span class="wdot"></span><span class="wtitle">Novidades da versão 39.0.0</span><span class="wclose">✕</span></div>
+    <div class="wbody" style="padding:0">
+      <div class="sec"><span class="secmark"></span><span class="sect">Novidades</span><span class="secsub">Atualizado de 37.0.0 · 24/08/2026</span></div>
+      <div class="surface" style="margin:0 var(--s4)">
+        <div class="row"><span class="v sm" style="color:var(--accent);width:16px">•</span><span class="b">prune the applied artifact</span></div>
+        <div class="row"><span class="v sm" style="color:var(--accent);width:16px">•</span><span class="b">stop killing every JVM on the machine</span></div>
+        <div class="row" style="border-bottom:none"><span class="v sm" style="color:var(--accent);width:16px">•</span><span class="b">show the release notes after an update</span></div>
+      </div>
+      <div style="display:flex;gap:var(--s2);justify-content:flex-end;padding:var(--s4)">
+        <span class="btn">Ver no GitHub</span><span class="btn pri">Fechar</span>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<p class="note"><b>O conteúdo é filtrado, não o corpo cru da release.</b> O corpo é gerado pelo CI a partir dos assuntos de commit em Conventional Commits, com o hash no fim. Só <code>feat</code> e <code>fix</code> entram, sem o prefixo do tipo e sem o hash: numa tela chamada "Novidades", <code>chore</code>, <code>docs</code>, <code>ci</code> e <code>build</code> empurram para fora da vista justamente o que ela existe para mostrar. Linha que <b>não</b> casa Conventional passa como está — release editada à mão não pode virar tela vazia. Os itens ficam no idioma do commit; só o cromo é PT/EN.</p>
+
+<p class="note"><b>O cabeçalho não repete o título da moldura.</b> A barra da janela já diz <span class="v sm">Novidades da versão 39.0.0</span>; o mesmo texto duas vezes a 40dp de distância gasta a altura que a lista precisa. E a superfície da lista <b>para de crescer quando os itens acabam</b>, em vez de esticar até o rodapé — com três itens numa janela de 520dp, o resto era uma caixa vazia.</p>
+
+<p class="note"><b>Sem itens não há janela</b>, e não uma janela vazia: lista vazia numa tela de novidades afirma que a versão não trouxe nada. E <b>fechar é a primária</b> — a tela informa, não propõe trabalho; "Ver no GitHub" leva para fora do app.</p>
+
+<p class="note"><b>Ela abre uma vez.</b> O recibo da atualização só é sobrescrito na atualização seguinte, então sozinho ele não distingue a primeira abertura das demais: quem marca é a preferência <code>releaseNotesSeenVersion</code>, gravada <b>ao abrir</b>. Release sem nada a mostrar também marca — retentar a cada abertura seria requisição perpétua por uma resposta que não muda. Falha de rede <b>não</b> marca, e a abertura seguinte tenta de novo.</p>
+
+<!-- ═══════════════════════════════ HISTÓRICO ═════════════════════════ -->
+<h2 id="historico">5 · Histórico</h2>
+<p class="lede">Fonte, conta e intervalo se juntam numa <b>toolbar única de 34dp</b>. O gráfico ganha um painel neutro e as métricas viram tabela.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Histórico de uso — Anthropic · Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="panel"><div class="phead" style="gap:var(--s3)">
+      <span class="k">API</span>
+      <div class="seg"><button class="on" type="button">Anthropic</button><button type="button">Codex</button><button type="button">DeepSeek</button></div>
+      <span class="k">Conta</span>
+      <div class="seg"><button class="on" type="button">dev@example.com</button><button type="button">qa@example.com</button></div>
+      <span class="sp"></span>
+      <div class="seg"><button class="on" type="button">24h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
+    </div></div>
+
+    <div class="chart">
+      <div class="hstack" style="margin-bottom:var(--s2)">
+        <span class="k">Consumo ao longo do intervalo selecionado</span>
+        <span class="sp"></span>
+        <span class="legend"><span><i style="background:var(--anthropic)"></i>Sessão 5h</span><span><i style="background:var(--output)"></i>Semanal</span></span>
+      </div>
+      <svg class="spark" viewBox="0 0 700 180" role="img" aria-label="Consumo das janelas ao longo de 24 horas">
+        <g stroke="var(--border)" stroke-width="1">
+          <line x1="0" y1="20" x2="700" y2="20"/><line x1="0" y1="60" x2="700" y2="60"/>
+          <line x1="0" y1="100" x2="700" y2="100"/><line x1="0" y1="140" x2="700" y2="140"/>
+        </g>
+        <line x1="350" y1="8" x2="350" y2="160" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 4"/>
+        <text x="356" y="18" fill="var(--muted)" font-family="IBM Plex Mono" font-size="10">reinício</text>
+        <polyline fill="none" stroke="var(--anthropic)" stroke-width="2" stroke-linejoin="round"
+          points="0,153 29,139 58,122 88,109 117,92 146,77 175,66 204,56 233,44 262,34 292,22 321,12 350,148 379,136 408,126 437,114 466,102 496,87 525,71 554,57 583,46 612,36 641,29 670,25 700,25"/>
+        <polyline fill="none" stroke="var(--output)" stroke-width="2" stroke-linejoin="round" stroke-dasharray="1 0"
+          points="0,124 29,122 58,120 88,118 117,116 146,114 175,112 204,110 233,108 262,106 292,104 321,102 350,100 379,98 408,96 437,94 466,92 496,90 525,88 554,86 583,84 612,82 641,80 670,78 700,76"/>
+        <circle cx="700" cy="25" r="3.5" fill="var(--anthropic)"/>
+        <circle cx="700" cy="76" r="3.5" fill="var(--output)"/>
+      </svg>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><span class="ptitle">Sessão 5h</span><span class="sp"></span><span class="st warn">Atenção</span></div>
+      <div class="scroller"><table class="dt">
+        <tr><td>Uso atual</td><td class="num">68% de 100%</td><td>Consumido no período</td><td class="num">62 pp</td></tr>
+        <tr><td>Média por hora</td><td class="num">5,6 pp/h</td><td>Previsão</td><td class="num">Esgota Qua 17h00 BRT</td></tr>
+        <tr><td>Reinício</td><td class="num">Qua 13h00 BRT</td><td>Variação observada</td><td class="num" style="color:var(--warn)">+18% vs. período anterior</td></tr>
+      </table></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><span class="ptitle">Semanal</span><span class="sp"></span><span class="st ok">Normal</span></div>
+      <div class="scroller"><table class="dt">
+        <tr><td>Uso atual</td><td class="num">41% de 100%</td><td>Consumido no período</td><td class="num">23 pp</td></tr>
+        <tr><td>Média por hora</td><td class="num">1,0 pp/h</td><td>Previsão</td><td class="num">A janela deve reiniciar antes do limite</td></tr>
+        <tr><td>Reinício</td><td class="num">Sáb 15/08 21h00 BRT</td><td>Variação observada</td><td class="num" style="color:var(--ok)">−4% vs. período anterior</td></tr>
+      </table></div>
+    </div>
+    <div class="statusbar"><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
+  </div>
+</div>
+<p class="note">Preservados: seleção por fonte e por conta, as quatro janelas, reinícios, média por hora, forecast, comparação com o período anterior e as regras próprias de saldo e de créditos. Os pontos da janela anterior continuam <b>fora do gráfico</b> — entram só no delta.</p>
+
+<!-- ═══════════════════════════════ SESSÕES ═══════════════════════════ -->
+<h2 id="sessoes">6 · Sessões CLI</h2>
+<p class="lede">A listagem vira <b>linha alinhada</b>, próxima de tabela: colunas estáveis, fundo neutro, marcador semântico discreto no lugar do bloco colorido.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões CLI — Anthropic · Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="tabs" style="flex:1"><button class="on" type="button">Sessões</button><button type="button">Resumo</button></div>
+      <div class="seg"><button class="on" type="button">5h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
+      <span class="st ok">AO VIVO</span>
+      <button class="btn" type="button">Exportar CSV</button>
+      <button class="btn" type="button">Exportar JSON</button>
+      <button class="btn" type="button">Relatório PDF</button>
+      <button class="btn ghost" type="button" title="Como ler esta tela">?</button>
+    </div>
+
+    <div class="g4">
+      <div class="metric"><span class="k">Sessões</span><span class="v big">3</span></div>
+      <div class="metric"><span class="k">Tokens (com cache)</span><span class="v big">6,53 M</span></div>
+      <div class="metric"><span class="k">Custo estimado</span><span class="v big">US$ 9,5012</span></div>
+      <div class="metric"><span class="k">Tempo ativo</span><span class="v big">4h 3min</span></div>
+    </div>
+
+    <div class="colhead">
+      <span style="width:170px">Sessão</span><span style="width:130px">Projeto</span>
+      <span style="width:136px">Tokens (com cache)</span><span style="width:90px">Cache</span>
+      <span style="width:96px">Custo</span><span style="width:84px">Tempo ativo</span>
+    </div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
+        <div class="hstack" style="gap:var(--s3)">
+          <div class="stack" style="gap:0;width:170px"><span class="v sm">7c4a1f92</span><span class="k">12/08 10:58 BRT</span></div>
+          <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
+          <div class="stack" style="gap:0;width:130px"><span class="v sm">api-gateway</span><span class="k">48 turnos</span></div>
+          <span class="v sm" style="width:136px">4,40 M</span>
+          <div class="stack" style="gap:0;width:90px"><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
+          <span class="v sm" style="width:96px">US$ 5,4792</span>
+          <span class="v sm" style="width:84px">2h 14min</span>
+        </div>
+        <div class="hstack" style="gap:var(--s2)"><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
+      </div></div>
+      <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
+        <div class="hstack" style="gap:var(--s3)">
+          <div class="stack" style="gap:0;width:170px"><span class="v sm">b81e35c0</span><span class="k">12/08 10:33 BRT</span></div>
+          <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
+          <div class="stack" style="gap:0;width:130px"><span class="v sm">checkout-web</span><span class="k">26 turnos</span></div>
+          <span class="v sm" style="width:136px">1,92 M</span>
+          <div class="stack" style="gap:0;width:90px"><span class="v sm">95%</span><div class="track ok"><i style="width:95%"></i></div></div>
+          <span class="v sm" style="width:96px">US$ 3,6100</span>
+          <span class="v sm" style="width:84px">1h 5min</span>
+        </div>
+        <div class="hstack" style="gap:var(--s2)"><span class="st warn">Atenção</span><span class="k">46% da janela · US$ 0,2300 por mensagem</span></div>
+      </div></div>
+    </div></div>
+    <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>A legenda vive uma vez só, numa faixa acima da lista.</b>
+    Esta seção dizia o contrário até a issue #81: o rótulo era repetido em cada célula porque elas somavam quase 1.000dp
+    e a janela abre em 960, então a linha precisava quebrar — e cabeçalho fixo sobre linha que quebra desalinha. O que
+    desfez a concessão foi o <b>veredito sair do fluxo de colunas</b>: ele media 210dp e desceu para a segunda linha da
+    própria linha, junto da razão que o gerou. Com ele fora as seis colunas somam 766dp com o vão, a linha não quebra, e a
+    janela ganha piso de 960dp para que ela continue não quebrando quando o usuário arrasta a borda.</p>
+
+    <div class="g2">
+      <div><div class="cap">Lista vazia</div><div class="panel"><div class="state"><span class="msg">Nenhum turno nesta janela.</span></div></div></div>
+      <div><div class="cap">Indexando</div><div class="panel"><div class="pbody"><div class="banner info"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Indexando transcripts…</span><span class="bd">Os números abaixo continuam sendo os da leitura anterior.</span></div></div></div></div></div>
+    </div>
+    <div class="statusbar"><span>Recarregando…</span><span class="sp"></span><span>3 sessões · janela de 5h</span></div>
+  </div>
+</div>
+<p class="note">O botão de retomada copia <code>claude --resume &lt;uuid completo&gt;</code>: o id truncado em 8 que aparece na coluna <b>não retoma nada</b> — com prefixo o CLI cai no seletor interativo.</p>
+<p class="note"><b>O botão só existe na linha de uma sessão desta máquina.</b> Ele teve um segundo modo, que copiava apenas o identificador na lista do time, e esse modo saiu: sessão de outro integrante não oferece botão nenhum (issue #102). Rótulo diferente para a mesma ação continuava entregando o dado que a issue pede para não entregar, e um <code>--resume</code> com transcript de outra máquina cairia num seletor vazio. A linha continua clicável e o detalhe segue abrindo — é ele que permite diagnosticar a sessão saturada de um colega, que é para o que a lista do time existe.</p>
+
+<!-- ═══════════════════════════════ DETALHE ═══════════════════════════ -->
+<h2 id="detalhe">7 · Detalhe de sessão</h2>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões CLI — Anthropic · Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack">
+      <button class="btn ghost" type="button">← Voltar</button>
+      <span class="v sm">7c4a1f92d8b3</span>
+      <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
+      <span class="sp"></span>
+      <span class="st crit">Sessão saturada</span>
+    </div>
+
+    <div class="banner crit"><span class="bar"></span><div class="stack" style="gap:2px">
+      <span class="bt">Contexto em 72% da janela de 1 M</span>
+      <span class="bd">Retomar do resumo mantém o custo por turno estável. Cada turno novo relê todo o contexto acumulado.</span>
+    </div><span class="sp"></span><button class="btn" type="button">Copiar comando de retomada</button></div>
+
+    <div class="g4">
+      <div class="metric"><span class="k">Turnos</span><span class="v big">48</span></div>
+      <div class="metric"><span class="k">Contexto vivo</span><span class="v big" style="color:var(--crit)">720 K</span></div>
+      <div class="metric"><span class="k">Custo</span><span class="v big">US$ 5,4792</span></div>
+      <div class="metric"><span class="k">Tempo ativo</span><span class="v big">2h 14min</span></div>
+    </div>
+
+    <div class="chart">
+      <div class="hstack" style="margin-bottom:var(--s2)">
+        <span class="k">Contexto por turno</span><span class="sp"></span>
+        <span class="legend"><span><i style="background:var(--cread)"></i>Cache lido</span><span><i style="background:var(--cwrite)"></i>Cache gravado</span><span><i style="background:var(--input)"></i>Input</span><span><i style="background:var(--output)"></i>Output</span></span>
+      </div>
+      <svg class="spark" viewBox="0 0 700 160" role="img" aria-label="Crescimento do contexto ao longo de 18 turnos">
+        <g stroke="var(--border)" stroke-width="1"><line x1="0" y1="40" x2="700" y2="40"/><line x1="0" y1="80" x2="700" y2="80"/><line x1="0" y1="120" x2="700" y2="120"/></g>
+        <g fill="var(--cread)">
+          <rect x="6" y="147" width="26" height="9" rx="1"/><rect x="45" y="139" width="26" height="17" rx="1"/>
+          <rect x="84" y="130" width="26" height="26" rx="1"/><rect x="123" y="123" width="26" height="33" rx="1"/>
+          <rect x="162" y="113" width="26" height="43" rx="1"/><rect x="201" y="101" width="26" height="55" rx="1"/>
+          <rect x="240" y="89" width="26" height="67" rx="1"/><rect x="279" y="76" width="26" height="80" rx="1"/>
+          <rect x="318" y="65" width="26" height="91" rx="1"/><rect x="357" y="50" width="26" height="106" rx="1"/>
+          <rect x="396" y="40" width="26" height="116" rx="1"/><rect x="435" y="25" width="26" height="131" rx="1"/>
+          <rect x="474" y="12" width="26" height="144" rx="1"/><rect x="513" y="1" width="26" height="155" rx="1"/>
+          <rect x="552" y="-13" width="26" height="169" rx="1"/><rect x="591" y="-27" width="26" height="183" rx="1"/>
+          <rect x="630" y="-36" width="26" height="192" rx="1"/><rect x="669" y="-45" width="26" height="201" rx="1"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="g2">
+      <div class="panel"><div class="phead"><span class="ptitle">Composição</span></div><div class="pbody flush">
+        <div class="row"><span class="k">Input</span><span class="sp"></span><span class="v sm">31.400</span></div>
+        <div class="row"><span class="k">Output</span><span class="sp"></span><span class="v sm">62.800</span></div>
+        <div class="row"><span class="k">Cache lido</span><span class="sp"></span><span class="v sm">4.120.000</span></div>
+        <div class="row"><span class="k">Cache gravado</span><span class="sp"></span><span class="v sm">186.000</span></div>
+      </div></div>
+      <div class="panel"><div class="phead"><span class="ptitle">Avançado</span><span class="sp"></span><span class="k">recolher</span></div><div class="pbody flush">
+        <div class="row"><span class="k">Taxa de acerto de cache</span><span class="sp"></span><span class="v sm">97,8%</span></div>
+        <div class="row"><span class="k">Economia do cache</span><span class="sp"></span><span class="v sm" style="color:var(--savings)">US$ 41,2010</span></div>
+        <div class="row"><span class="k">Contexto médio/turno</span><span class="sp"></span><span class="v sm">386 K</span></div>
+        <div class="row"><span class="k">Custo da próxima msg</span><span class="sp"></span><span class="v sm">US$ 0,2160</span></div>
+      </div></div>
+    </div>
+    <span class="k">Estimado a preço de tabela. Não é uma fatura.</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ RESUMO ════════════════════════════ -->
+<h2 id="resumo">8 · Resumo por eixo</h2>
+<p class="lede">Uma aba por eixo, com filtro, ordem e paginação presos no topo — os três escolhem parâmetros do mesmo conteúdo e por isso vivem na mesma faixa. Os totais entram na área rolável: com altura fixa lá em cima, numa janela baixa eles empurram a lista para fora. Os totais são blocos de métrica e as qualificações longas ficam fora deles, porque dentro um rodapé de quatro medidas mede três vezes a largura do bloco vizinho.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões CLI — Resumo</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="tabs" style="flex:1"><button type="button">Sessões</button><button class="on" type="button">Resumo</button></div>
+      <div class="seg"><button class="on" type="button">5h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
+    </div>
+    <div class="tabs"><button class="on" type="button">Projeto</button><button type="button">Modelo</button><button type="button">Branch</button><button type="button">Ferramentas</button><button type="button">Atividade</button></div>
+    <div class="hstack wrap">
+      <input class="field" type="text" placeholder="Filtrar" style="max-width:220px">
+      <span class="k">Ordenar por</span>
+      <div class="seg"><button class="on" type="button">Custo</button><button type="button">Tokens</button><button type="button">Nome</button></div>
+      <button class="btn icon" type="button" aria-label="Maior primeiro" title="Maior primeiro">↓</button>
+      <button class="btn ghost" type="button">‹ Página anterior</button>
+      <span class="k">1–2 de 2</span>
+      <button class="btn ghost" type="button">Próxima página ›</button>
+      <span class="k">Por página</span>
+      <div class="seg"><button type="button">5</button><button class="on" type="button">10</button><button type="button">50</button><button type="button">100</button></div>
+    </div>
+
+    <div class="g3">
+      <div class="metric"><span class="k">Custo estimado</span><span class="v big">US$ 9,5012</span></div>
+      <div class="metric"><span class="k">Economia do cache</span><span class="v big">US$ 62,4</span></div>
+      <div class="metric"><span class="k">Ritmo de queima</span><span class="v big">US$ 2,34/h</span><span class="k dim">medido sobre o tempo decorrido</span></div>
+    </div>
+    <div class="stack" style="gap:var(--s1)">
+      <span class="k">3 sessões · 101 turnos · 7,3M tokens · 4h38 tempo ativo</span>
+      <span class="k">Cache economizou US$ 62,4 (79% do que seria gasto) · reaproveitamento 95%</span>
+      <span class="k">815,5K tokens por hora. Medido sobre 2h30 decorridos da janela, não sobre a duração nominal dela.</span>
+      <span class="k">As seções descrevem os mesmos turnos por eixos diferentes — não se somam.</span>
+    </div>
+
+    <div class="panel"><div class="pbody flush"><div class="scroller"><table class="dt">
+      <thead><tr><th>Projeto</th><th class="num">Sessões</th><th class="num">Turnos</th><th class="num">Tokens</th><th class="num">Custo</th><th class="num">Tempo ativo</th><th style="width:120px">Participação</th></tr></thead>
+      <tbody>
+        <tr><td>api-gateway</td><td class="num">2</td><td class="num">57</td><td class="num">4,66 M</td><td class="num">US$ 5,8912</td><td class="num">2h 52min</td><td><div class="track info"><i style="width:62%"></i></div></td></tr>
+        <tr><td>checkout-web</td><td class="num">1</td><td class="num">26</td><td class="num">1,92 M</td><td class="num">US$ 3,6100</td><td class="num">1h 5min</td><td><div class="track info"><i style="width:38%"></i></div></td></tr>
+      </tbody>
+    </table></div></div></div>
+
+    <div class="panel">
+      <div class="phead"><span class="ptitle">Atividade por hora</span><span class="sp"></span><span class="k">intensidade pelo custo, relativa ao pico da janela</span></div>
+      <div class="pbody">
+        <!-- 7 x 24: dia da semana por hora local, e nao uma fileira de 24 horas.
+             Agrupar so por hora perderia a diferenca entre a terca de manha e o
+             sabado de manha, que e o padrao que a grade existe para mostrar. -->
+        <div class="heat" id="heat"></div>
+        <div class="hstack" style="padding-left:34px"><span class="k">00h</span><span class="sp"></span><span class="k">12h</span><span class="sp"></span><span class="k">23h BRT</span></div>
+      </div>
+    </div>
+    <p class="note" style="margin:0"><b>As três listas descrevem os mesmos turnos.</b> Somar baldes de listas diferentes contaria o mesmo gasto três vezes — e a tela diz isso em texto. Modelo sem tarifa não vira custo zero: o valor exibido leva <code>+</code>, marcando piso e não total.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ TIME ══════════════════════════════ -->
+<h2 id="time">9 · Uso do time</h2>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões do time — Example Org</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="tabs" style="flex:1"><button class="on" type="button">Integrantes</button><button type="button">Resumo</button><button type="button">Tendência</button></div>
+      <span class="st ok">AO VIVO</span>
+      <div class="seg"><button class="on" type="button">5h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
+      <button class="btn" type="button">Relatório PDF</button>
+    </div>
+    <span class="k">ana@example.com — Example Org</span>
+
+    <div class="g3">
+      <div class="metric"><span class="k">Integrantes</span><span class="v big">3</span></div>
+      <div class="metric"><span class="k">Tokens (com cache)</span><span class="v big">8,97 M</span></div>
+      <div class="metric"><span class="k">Custo estimado</span><span class="v big">US$ 14,2092</span></div>
+    </div>
+
+    <div class="colhead">
+      <span style="width:180px">Integrante</span><span style="width:60px">Sessões</span>
+      <span style="width:136px">Tokens (com cache)</span><span style="width:96px">Custo</span>
+      <span style="width:76px">Tempo ativo</span><span style="width:96px">Participação</span>
+      <span style="width:96px">Status</span>
+    </div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row" style="background:var(--raised)">
+        <span class="srcmark" style="background:var(--cread)"></span>
+        <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
+        <div class="stack" style="gap:0;width:142px"><span class="k">Conta · 3 integrantes</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <span class="v sm" style="width:60px">4</span>
+        <span class="v sm" style="width:136px">8,97 M</span>
+        <span class="v sm" style="width:96px">US$ 14,2092</span>
+        <span style="width:76px"></span>
+        <span class="v sm" style="width:96px">100%</span>
+      </div>
+      <div class="row">
+        <span class="srcmark" style="background:var(--anthropic)"></span>
+        <span style="width:12px"></span>
+        <button class="btn ghost icon" type="button" aria-label="Recolher integrante">▾</button>
+        <div class="stack" style="gap:0;width:130px"><span class="v sm">dev-01</span><span class="k">DESKTOP-A1</span><span class="k">envio 12/08 10:58 BRT</span></div>
+        <span class="v sm" style="width:60px">2</span>
+        <span class="v sm" style="width:136px">6,32 M</span>
+        <span class="v sm" style="width:96px">US$ 9,0892</span>
+        <span class="v sm" style="width:76px">3h19</span>
+        <div class="stack" style="gap:2px;width:96px"><span class="v sm">70%</span><div class="track info"><i style="width:70%"></i></div></div>
+        <span class="st crit" style="width:96px">Saturada</span>
+      </div>
+      <div class="row" style="padding-left:38px;background:var(--bg);border-left:2px solid var(--border);margin-left:24px">
+        <div class="stack" style="gap:var(--s2);flex:1">
+          <div class="colhead" style="padding-left:0">
+            <span style="width:170px">Sessão</span><span style="width:130px">Projeto</span>
+            <span style="width:136px">Tokens (com cache)</span><span style="width:90px">Cache</span>
+            <span style="width:96px">Custo</span><span style="width:84px">Tempo ativo</span>
+          </div>
+          <div class="stack" style="gap:var(--s1)">
+            <div class="hstack" style="gap:var(--s3)">
+              <div class="stack" style="gap:0;width:170px"><span class="v sm">7c4a1f92</span><span class="k">12/08 10:58 BRT</span></div>
+              <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
+              <div class="stack" style="gap:0;width:130px"><span class="v sm">api-gateway</span><span class="k">48 turnos</span></div>
+              <span class="v sm" style="width:136px">4,40 M</span>
+              <div class="stack" style="gap:0;width:90px"><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
+              <span class="v sm" style="width:96px">US$ 5,4792</span>
+              <span class="v sm" style="width:84px">2h 14min</span>
+            </div>
+            <div class="hstack" style="gap:var(--s2)"><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="srcmark" style="background:var(--anthropic)"></span>
+        <span style="width:12px"></span>
+        <button class="btn ghost icon" type="button" aria-label="Expandir integrante">▸</button>
+        <div class="stack" style="gap:0;width:130px"><span class="v sm">dev-02</span><span class="k">NOTE-B2</span><span class="k">envio 12/08 10:49 BRT</span></div>
+        <span class="v sm" style="width:60px">1</span>
+        <span class="v sm" style="width:136px">2,65 M</span>
+        <span class="v sm" style="width:96px">US$ 5,1200</span>
+        <span class="v sm" style="width:76px">1h27</span>
+        <div class="stack" style="gap:2px;width:96px"><span class="v sm">30%</span><div class="track info"><i style="width:30%"></i></div></div>
+        <span class="st warn" style="width:96px">Atenção</span>
+      </div>
+      <div class="row">
+        <span class="srcmark" style="background:var(--border)"></span>
+        <span style="width:12px"></span>
+        <span style="width:24px"></span>
+        <div class="stack" style="gap:0;width:130px"><span class="v sm">dev-03</span><span class="k">NOTE-C3</span><span class="k">envio 12/08 02:00 BRT</span></div>
+        <span class="v sm" style="width:60px">0</span>
+        <span class="v sm dim" style="width:136px">sem uso no período</span>
+        <span class="v sm" style="width:96px">US$ 0,0000</span>
+        <span class="v sm dim" style="width:76px">—</span>
+        <div class="stack" style="gap:2px;width:96px"><span class="v sm">0%</span><div class="track info"><i style="width:0%"></i></div></div>
+        <span style="width:96px"></span>
+      </div>
+    </div></div>
+    <div class="statusbar"><span class="st ok">AO VIVO · 5s</span><span class="sp"></span><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
+  </div>
+</div>
+<p class="note"><b>Um degrau de superfície por nível, e <code>--raised</code> fica reservado ao hover.</b> A faixa da conta é o único nível que o usa como fundo fixo; o bloco de sessões fica <b>um degrau de distância do fundo da lista</b>, na direção que houver — aqui a lista mora num <code>.panel</code> em <code>--surface</code> e o bloco desce para <code>--bg</code>; no Compose a lista mora sobre <code>--bg</code> e o bloco sobe para <code>--surface</code>. O bloco aninhado era <code>--raised</code> nesta página e isso estava tecnicamente errado: <code>--raised</code> é o realce de <code>.row:hover</code>, e com ele no bloco passar o mouse numa sessão deixava de dar retorno nenhum. A faixa só aparece na visão de todas as contas — no modal de uma conta ela seria repetição do título da janela. E a superfície não trabalha sozinha: o bloco carrega a <b>guia vertical</b> de <code>appNestedGroupGuide</code>, porque as sessões são itens <b>irmãos</b> do integrante na mesma lista e nada mais na árvore diz que pertencem a ele.</p>
+<p class="note"><b>O que separa a capa do item são quatro coisas, e nenhuma delas é a superfície sozinha</b> (issue #104). A faixa da conta e a linha do integrante tinham o mesmo <code>x</code>, o mesmo marcador verde, o mesmo corpo de texto e — medido — a capa era <b>um dp mais baixa</b> que o item que ela cobre. Os quatro degraus: (1) a <b>palavra</b>, que só a capa carrega — "Conta · N integrantes" contra uma linha que não se anuncia; (2) o <b>recuo</b> de 12px por nível; (3) o <b>marcador</b>, verde de agregação na conta e acento da <b>fonte</b> no integrante; (4) a <b>altura</b>, pelo padding vertical da faixa. Entre as quatro superfícies vizinhas há ~3% de luminância, e <code>--raised</code> ainda é o hover da linha: superfície sozinha nunca ia bastar.</p>
+<p class="note"><b>A altura vem do padding e não do corpo do texto, e isso foi medido.</b> O e-mail da conta subiu para 16sp — o degrau tipográfico que separaria a capa do apelido — e a captura saiu com <code>ana@example…</code>: 16sp não cabe nos 148dp úteis da coluna de identidade da §9 nem nos 118dp da §10b. Truncar a identidade da conta é pior que a capa ser um degrau menos pesada, e o padding entrega a mesma altura sem custar largura nenhuma.</p>
+<p class="note"><b>A linha do integrante não repete a palavra, e a tentativa está registrada porque ela parecia óbvia.</b> "Integrante" já é a legenda desta coluna, uma vez para a lista inteira — repeti-la em cada linha é o rótulo por célula que a issue #81 desfez, e o teste que a issue deixou reprovou a tentativa na tela de presença. Emendada na máquina para não custar uma quarta linha, ela ainda estourava os 148dp úteis da coluna: a captura do README saiu com <code>Integrante · DESKTOP-…</code>, truncando o dado que identifica a máquina. <b>Assimetria é o sinal:</b> a capa se anuncia, o item não, e é a capa que precisa se distinguir.</p>
+<p class="note"><b>O recuo mora dentro da coluna de identidade, não no início da linha.</b> A faixa da conta é totalizadora, e o número dela só serve para comparar se cair no mesmo <code>x</code> do número do integrante; recuar a linha inteira tiraria as colunas de lugar. E a faixa de legendas é <b>uma só</b>, acima da lista inteira — se as linhas recuassem, ela deixaria de descrever a maioria delas, que é exatamente o que a issue #81 proibiu. A coluna de identidade cede a mesma largura que o degrau ocupa: o apelido trunca um pouco antes e nada mais se move. Na visão global o degrau é de 12px; quando o mesmo e-mail tem mais de uma conta, a sub-faixa de uuid ocupa o primeiro degrau e o integrante vai para o segundo. No modal de uma conta não há capa nenhuma e o recuo é zero.</p>
+<p class="note"><b>A casa do ícone de expandir fica reservada mesmo na linha que não o tem.</b> O integrante sem atividade no período não abre sessões e por isso não ganha ícone; sem a casa reservada ele começava 24px à esquerda dos outros, e a coluna inteira lia como desalinhada. Vale para toda coluna cujo primeiro item é condicional.</p>
+<p class="note"><b>A máquina continua na segunda linha da coluna de identidade.</b> Ela não é uma medida ao lado de custo e tokens — é quem é a pessoa —, e por isso deixou de ser coluna. A coluna de identidade tem três linhas e não quatro: numa lista de vinte máquinas, cada linha a mais é rolagem.</p>
+<p class="note"><b>O botão de copiar existe só na sessão desta máquina.</b> O integrante desenhado acima é a instalação local — <code>deviceId</code> igual ao do <code>team.json</code> —, e por isso a linha de sessão dele traz o botão: o transcript está no disco e o <code>claude --resume</code> abre a conversa. Nas sessões dos outros integrantes ele <b>não é desenhado</b> (issue #102): a linha continua clicável e o detalhe segue abrindo, porque é ele que permite diagnosticar a sessão saturada de um colega. Sem <code>deviceId</code> local — integração desligada, instalação só de administração — nenhuma linha tem botão, que é o resultado seguro.</p>
+<p class="note"><b>A ordem das contas é alfabética pelo e-mail</b>, e o consumo ordena de novo dentro de cada uma. Ordenar as contas por consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s. Conta sem chave emitida vai para o fim: sem e-mail não há o que comparar, e abrir a lista com um uuid cru seria pior que fechá-la com ele.</p>
+
+<h2 id="tendencia">9b · Tendência do time</h2>
+<div class="win mid" style="max-width:none">
+  <div class="body">
+    <div class="tabs"><button type="button">Integrantes</button><button type="button">Resumo</button><button class="on" type="button">Tendência</button></div>
+    <div class="chart">
+      <div class="hstack" style="margin-bottom:var(--s2)"><span class="k">Custo por dia · escala única entre integrantes</span><span class="sp"></span><span class="legend"><span><i style="background:var(--anthropic)"></i>dev-01 · US$ 47,60 no período</span><span><i style="background:var(--codex)"></i>dev-02 · US$ 24,00 no período</span><span><i style="background:var(--deepseek)"></i>dev-03 · US$ 3,60 no período</span></span></div>
+      <svg class="spark" viewBox="0 0 700 150" role="img" aria-label="Custo diário por integrante nos últimos sete dias">
+        <g stroke="var(--border)" stroke-width="1"><line x1="0" y1="40" x2="700" y2="40"/><line x1="0" y1="80" x2="700" y2="80"/><line x1="0" y1="120" x2="700" y2="120"/></g>
+        <g>
+          <rect x="14" y="72" width="22" height="48" fill="var(--anthropic)" rx="1"/><rect x="38" y="104" width="22" height="16" fill="var(--codex)" rx="1"/><rect x="62" y="118" width="22" height="2" fill="var(--deepseek)" rx="1"/>
+          <rect x="114" y="46" width="22" height="74" fill="var(--anthropic)" rx="1"/><rect x="138" y="92" width="22" height="28" fill="var(--codex)" rx="1"/><rect x="162" y="118" width="22" height="2" fill="var(--deepseek)" rx="1"/>
+          <rect x="214" y="88" width="22" height="32" fill="var(--anthropic)" rx="1"/><rect x="238" y="66" width="22" height="54" fill="var(--codex)" rx="1"/><rect x="262" y="112" width="22" height="8" fill="var(--deepseek)" rx="1"/>
+          <rect x="314" y="30" width="22" height="90" fill="var(--anthropic)" rx="1"/><rect x="338" y="80" width="22" height="40" fill="var(--codex)" rx="1"/><rect x="362" y="118" width="22" height="2" fill="var(--deepseek)" rx="1"/>
+          <rect x="414" y="58" width="22" height="62" fill="var(--anthropic)" rx="1"/><rect x="438" y="98" width="22" height="22" fill="var(--codex)" rx="1"/><rect x="462" y="106" width="22" height="14" fill="var(--deepseek)" rx="1"/>
+          <rect x="514" y="18" width="22" height="102" fill="var(--anthropic)" rx="1"/><rect x="538" y="74" width="22" height="46" fill="var(--codex)" rx="1"/><rect x="562" y="118" width="22" height="2" fill="var(--deepseek)" rx="1"/>
+          <rect x="614" y="52" width="22" height="68" fill="var(--anthropic)" rx="1"/><rect x="638" y="86" width="22" height="34" fill="var(--codex)" rx="1"/><rect x="662" y="114" width="22" height="6" fill="var(--deepseek)" rx="1"/>
+        </g>
+        <g fill="var(--muted)" font-family="IBM Plex Mono" font-size="10">
+          <text x="30" y="140">06/08</text><text x="130" y="140">07/08</text><text x="230" y="140">08/08</text>
+          <text x="330" y="140">09/08</text><text x="430" y="140">10/08</text><text x="530" y="140">11/08</text><text x="630" y="140">12/08</text>
+        </g>
+      </svg>
+    </div>
+    <p class="note" style="margin:0">Todo integrante ganha ponto em todo dia — série com buracos desenharia continuidade onde houve silêncio. Barra de altura mínima visível é <b>zero explícito</b>, não ausência de dado.</p>
+    <p class="note" style="margin:var(--s3) 0 0"><b>A largura da barra tem piso e teto.</b> Esta página desenha sete dias por três integrantes, que é o caso confortável; a janela padrão do app é de <b>trinta</b> dias, e com cinco integrantes seriam 150 barras — sem piso o gráfico vira um borrão, e abaixo dele a área de plotagem passa a rolar na horizontal, o mesmo recurso da grade de atividade. Sem teto, o caso desta página daria barras de mais de 40dp: retângulo desse tamanho lê como bloco e o vão entre os dias some. O que sobra depois do teto vira distância entre grupos, que é o que faz um grupo ser um dia.</p>
+    <p class="note" style="margin:var(--s3) 0 0"><b>A cor identifica o integrante</b>, e é a única exceção à regra de que acento é identidade de fonte e não de valor: num gráfico agrupado a cor é o único jeito de dizer de quem é a barra. A paleta reusa os acentos de fonte já medidos contra as duas superfícies e <b>cicla</b> — com sete ou mais integrantes duas séries repetem o tom, e quem as separa é a legenda.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ PRESENÇA ══════════════════════════ -->
+<h2 id="presenca">10 · Presença</h2>
+<div class="win">
+  <div class="titlebar"><span class="t">Conectados agora</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="hstack" style="gap:var(--s4)">
+        <span class="st ok">1 trabalhando</span><span class="st info" style="color:var(--info)">2 conectados</span><span class="st off">3 conhecidos</span>
+      </div>
+      <button class="btn" type="button">Somente conectados</button>
+      <input class="field" type="text" placeholder="Filtrar integrante" style="max-width:200px">
+    </div>
+    <div class="panel"><div class="pbody flush"><div class="scroller"><table class="dt">
+      <thead><tr><th>Estado</th><th>Integrante</th><th>Máquina</th><th class="num">Sessões ativas</th><th>Último sinal</th><th>Último turno</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><span class="st ok">Trabalhando agora</span></td><td>dev-01 <span class="dim">· esta máquina</span><!-- sem recuo: no modal de uma conta não há faixa acima da linha --></td><td>DESKTOP-A1</td><td class="num">2</td><td>12/08 10:58 BRT</td><td>12/08 10:58 BRT</td><td><span class="st crit">Saturada</span></td><td><button class="btn icon" type="button" disabled aria-label="Remover integrante">×</button></td></tr>
+        <tr><td><span class="st info" style="color:var(--info)">Conectado</span></td><td>dev-02</td><td>NOTE-B2</td><td class="num">0</td><td>12/08 10:49 BRT</td><td>12/08 10:49 BRT</td><td><span class="st warn">Atenção</span></td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
+        <tr><td><span class="st off">Desconectado</span></td><td>dev-03</td><td>NOTE-C3</td><td class="num">0</td><td>12/08 02:00 BRT</td><td class="dim">—</td><td></td><td><button class="btn icon danger" type="button" aria-label="Remover integrante">×</button></td></tr>
+      </tbody>
+    </table></div></div></div>
+    <p class="note" style="margin:0"><b>Duas camadas, não uma escala.</b> <i>Conectado</i> é heartbeat dentro de 90s; <i>trabalhando agora</i> é turno dentro de 5min. Colapsá-las esconderia exatamente o caso que a tela existe para mostrar: quem está com o app aberto e parado. As três combinações que existem — trabalhar implica estar online — cabem numa coluna só, e ela é <b>ponto e palavra</b>. O ponto <b>não pisca</b>: animação infinita numa lista trava o teste de componente. A própria máquina não tem botão de remover.</p>
+    <p class="note" style="margin:var(--s3) 0 0"><b>Um dado por célula, e por isso sete colunas.</b> Os dois carimbos moravam dentro das células de Estado e de Trabalhando, junto da palavra e da contagem — e uma célula com dois dados não tem uma legenda. Cada carimbo é <code>12/08 10:58 BRT</code> por extenso, então as sete colunas somam 802dp e a janela ganha piso de <b>1030 × 460 dp</b>: truncar em <code>12/08 10:58 B…</code> apagaria justamente o fuso que a frase existe para dizer. É a mais larga das três janelas de lista, porque é a única que imprime duas datas por linha. O chip liga uma restrição e o campo estreita por nome — num time de vinte máquinas o chip sozinho não acha ninguém.</p>
+  </div>
+</div>
+
+
+<h2 id="presenca-contas">10b · Presença — todas as contas</h2>
+<p class="lede">A mesma tela na visão global do administrador, onde a lista mistura contas. Janela em 1030 × 620 dp: abaixo disso as sete colunas mais a coluna de ação não cabem.</p>
+<div class="win">
+  <div class="titlebar"><span class="t">Conectados agora — todas as contas</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="hstack" style="gap:var(--s4)"><span class="st ok">1 trabalhando</span><span class="st info" style="color:var(--info)">2 conectados</span><span class="st off">3 conhecidos</span></div>
+      <button class="btn" type="button">Somente conectados</button>
+      <input class="field" type="text" placeholder="Filtrar integrante" style="max-width:200px">
+    </div>
+    <div class="colhead">
+      <span style="width:132px">Estado</span><span style="width:150px">Integrante</span>
+      <span style="width:104px">Máquina</span><span style="width:96px">Sessões ativas</span>
+      <span style="width:116px">Último sinal</span><span style="width:116px">Último turno</span>
+      <span style="width:88px">Status</span>
+    </div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row" style="background:var(--raised)">
+        <span class="srcmark" style="background:var(--cread)"></span>
+        <span style="width:132px"></span>
+        <button class="btn ghost icon" type="button" aria-label="Recolher conta">▾</button>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">ana@example.com</span><span class="k">account-primary</span></div>
+        <span style="width:104px"></span>
+        <span class="v sm dim" style="width:328px">2 de 2 conectados · 1 trabalhando</span>
+        <span class="sp"></span>
+        <button class="btn icon danger" type="button" disabled aria-label="Apagar conta">×</button>
+      </div>
+      <div class="row">
+        <span class="srcmark" style="background:var(--anthropic)"></span>
+        <span class="st ok" style="width:132px">Trabalhando agora</span>
+        <span style="width:44px"></span>
+        <div class="stack" style="gap:0;width:106px"><span class="v sm">dev-01</span><span class="k">esta máquina</span></div>
+        <span class="v sm" style="width:104px">DESKTOP-A1</span>
+        <span class="v sm" style="width:96px">2</span>
+        <span class="v sm dim" style="width:116px">12/08 10:58 BRT</span>
+        <span class="v sm dim" style="width:116px">12/08 10:58 BRT</span>
+        <span class="st crit" style="width:88px">Saturada</span>
+        <span class="sp"></span>
+        <button class="btn icon danger" type="button" disabled aria-label="Remover integrante">×</button>
+      </div>
+      <div class="row">
+        <span class="srcmark" style="background:var(--anthropic)"></span>
+        <span class="st info" style="color:var(--info);width:132px">Conectado</span>
+        <span style="width:44px"></span>
+        <div class="stack" style="gap:0;width:106px"><span class="v sm">dev-02</span></div>
+        <span class="v sm" style="width:104px">NOTE-B2</span>
+        <span class="v sm dim" style="width:96px">0</span>
+        <span class="v sm dim" style="width:116px">12/08 10:49 BRT</span>
+        <span class="v sm dim" style="width:116px">12/08 10:49 BRT</span>
+        <span style="width:88px"></span>
+        <span class="sp"></span>
+        <button class="btn icon danger" type="button" aria-label="Remover integrante">×</button>
+      </div>
+      <div class="row" style="background:var(--raised)">
+        <span class="srcmark" style="background:var(--cread)"></span>
+        <span style="width:132px"></span>
+        <button class="btn ghost icon" type="button" aria-label="Expandir conta">▸</button>
+        <div class="stack" style="gap:0;width:114px"><span class="k">Conta</span><span class="v sm">bruno@example.com</span><span class="k">account-sandbox</span></div>
+        <span style="width:104px"></span>
+        <span class="v sm dim" style="width:328px">0 de 1 conectados · 0 trabalhando</span>
+        <span class="sp"></span>
+        <button class="btn icon danger" type="button" aria-label="Apagar conta">×</button>
+      </div>
+    </div></div>
+  </div>
+</div>
+<p class="note"><b>A faixa da conta é a mesma da lista de consumo</b>: superfície <code>--raised</code>, marcador de 2dp, a palavra "Conta" antes do e-mail e divisória embaixo. Sem ela, conta e integrante eram dois retângulos transparentes de mesmo peso separados por um vão de 8dp — e a faixa entregava um e-mail e um uuid, que é exatamente o que a linha do integrante também tem. Aqui há dois níveis, não três: a presença não abre sessões.</p>
+<p class="note"><b>Os mesmos quatro degraus da §9</b>: a palavra que só a capa carrega, o recuo de 12px dentro da coluna de identidade, o marcador distinto e a altura pelo padding da faixa. Foi aqui que a tentativa de dar a palavra também à linha reprovou — o teste de "as legendas de coluna aparecem uma vez para a lista inteira", que a issue #81 deixou —, e a decisão valeu para as duas telas.</p>
+<p class="note"><b>O recuo aqui é de 44px e não de 12px, e a diferença é o ícone.</b> A faixa abre com um ícone de recolher e a linha do integrante não tem ícone nenhum, ao contrário da §9, onde as duas têm. Com o degrau de 12px o apelido começava <b>à esquerda</b> do e-mail que o cobre — um degrau invertido, medido na captura do README —, e o recuo trabalhava contra a hierarquia. Os 44px são a casa do ícone mais o vão (32px) e só então o degrau (12px). O que importa é o resultado, não o número: o texto do filho começa um degrau à direita do texto do pai.</p>
+<p class="note"><b>O marcador da linha deixou de carregar o estado.</b> Ele era verde para quem trabalha, azul para quem está online e neutro para offline — a mesma escala de três valores que a coluna Estado, a primeira da linha, já diz com <b>ponto e palavra</b>. Duas codificações da mesma coisa, e uma delas só por cor. Pior: o verde é o mesmo marcador da faixa da conta, então capa e item ficavam idênticos justamente na linha de quem está trabalhando. Agora ele é o acento da <b>fonte</b> para quem está conectado e neutro para offline, que é a mesma gramática de "sem atividade" da lista de consumo.</p>
+<p class="note"><b>Os agregados da conta são uma célula só, atravessando as três colunas que a conta não tem.</b> Com a faixa reservando as mesmas colunas da linha, nenhuma delas tem por valor "1 trabalhando" — e um número cru sob a legenda "Último turno" diria uma coisa e valeria outra. A frase se descreve, então pode atravessar; o número não pode.</p>
+<p class="note"><b>A coluna de ação fica fora do bloco que quebra.</b> Enquanto o botão destrutivo era o último item do bloco de colunas, ele era o primeiro a cair para a linha seguinte quando a janela encolhia — e o que aparecia era um ícone vermelho solto abaixo do e-mail, sem coluna, sem legenda e sem dizer a que linha pertence. Ele é coluna fixa à direita, e a janela tem largura mínima para as colunas nunca chegarem lá.</p>
+
+<!-- ═══════════════════════════════ CHAVES ════════════════════════════ -->
+<h2 id="chaves">11 · Administração de chaves</h2>
+<div class="win mid">
+  <div class="titlebar"><span class="t">Chaves de time</span><span class="wbtn">×</span></div>
+  <div class="body">
+    <div class="hstack"><input class="field" type="text" placeholder="Rótulo — e-mail da pessoa"><button class="btn primary" type="button">Emitir chave</button></div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">ana@example.com</span><span class="k">conta account-primary · 1 de 1</span></div><span class="st ok">Ativa</span><button class="btn ghost" type="button">Desvincular</button><button class="btn danger" type="button">Revogar</button></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">bruno@example.com</span><span class="k">sem conta vinculada · 0 de 1</span></div><span class="st off">Aguardando</span><button class="btn danger" type="button">Revogar</button></div>
+    </div></div>
+    <div class="panel" style="box-shadow:var(--shadow-8)">
+      <div class="phead"><span class="srcmark" style="background:var(--crit)"></span><span class="ptitle">Apagar a conta account-primary?</span></div>
+      <div class="pbody">
+        <span class="v sm">Isto remove integrantes, sessões, turnos e o vínculo da chave. O histórico enviado por essas máquinas não volta.</span>
+        <span class="k">Apagar não impede a conta de voltar: ingest e presença reivindicam sozinhos.</span>
+        <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Cancelar</button><button class="btn danger" type="button">Apagar conta</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ CONFIG ════════════════════════════ -->
+<h2 id="cfg-geral">12 · Configurações — navegação lateral</h2>
+<p class="lede">A fileira de chips vira navegação lateral, como na documentação do OpenCode. Só a seção escolhida entra na composição — com todas montadas, a navegação seria decoração sobre a mesma coluna. Janela em 820 × 720 dp.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Configurações</span><span class="wbtn">×</span></div>
+  <div style="display:grid;grid-template-columns:180px 1fr;min-height:420px">
+    <div style="border-right:1px solid var(--border);background:var(--surface);padding:var(--s3);display:flex;flex-direction:column;gap:2px">
+      <span class="k" style="margin-bottom:var(--s2)">Seções</span>
+      <button class="btn ghost" type="button" style="justify-content:flex-start;color:var(--fg);background:var(--raised)">Geral</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Alertas</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">APIs</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Contas</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Time</button>
+    </div>
+    <div class="body">
+      <div class="panel"><div class="phead"><span class="ptitle">Aparência</span></div><div class="pbody flush">
+        <div class="row"><span class="v sm">Tema</span><span class="sp"></span><div class="seg"><button class="on" type="button">Escuro</button><button type="button">Claro</button></div></div>
+        <div class="row"><span class="v sm">Idioma</span><span class="sp"></span><div class="seg"><button class="on" type="button">PT</button><button type="button">EN</button></div></div>
+        <div class="row"><span class="v sm">Opacidade da janela</span><span class="sp"></span><span class="v sm">92%</span><div class="track" style="width:150px"><i style="width:92%"></i></div></div>
+      </div></div>
+      <div class="panel"><div class="phead"><span class="ptitle">Sistema</span></div><div class="pbody flush">
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Iniciar com o sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sempre visível</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Mantém a janela acima das demais.</span></div><span class="sw"></span></div>
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
+      </div></div>
+
+      <div class="panel"><div class="phead"><span class="ptitle">Atualização automática — indisponível, com o motivo por plataforma</span></div><div class="pbody flush">
+        <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Disponível apenas na instalação feita pelo instalador .exe. Esta cópia veio do MSI ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação.</span><span class="k">Windows · origem não gerenciada</span></div><span class="sw"></span></div>
+        <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Disponível apenas na instalação em user-space feita pelo instalador .sh. Esta cópia veio de um pacote .deb/.rpm ou de fora dele, e atualizá-la por aqui mexeria em arquivos do gerenciador de pacotes.</span><span class="k">Linux · origem não gerenciada</span></div><span class="sw"></span></div>
+        <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Não há pacote publicado para a arquitetura desta máquina. A atualização automática cobre apenas x86_64.</span><span class="k">Linux ARM64 · sem artefato</span></div><span class="sw"></span></div>
+        <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Não disponível no macOS: o pacote não é assinado e o Gatekeeper exige liberação manual.</span><span class="k">macOS · plataforma sem suporte</span></div><span class="sw"></span></div>
+      </div></div>
+      <p class="note">O motivo é <b>função do suporte e da plataforma</b>: o mesmo <code>UNSUPPORTED_INSTALL_ORIGIN</code> nomeia o <code>.exe</code> no Windows e o <code>.sh</code> em user-space no Linux, porque o risco é outro — lá é criar uma segunda instalação, aqui é mexer em arquivo do gerenciador de pacotes. ARM64 ganhou valor próprio (<code>UNSUPPORTED_ARCHITECTURE</code>): a plataforma tem suporte e o pacote é que não existe, e sem o valor a tela diria a razão errada. Plataforma que o app não reconhece cai num texto genérico — nomear o instalador errado é pior que não nomear nenhum.</p>
+      <div class="panel"><div class="phead"><span class="ptitle">Orçamento mensal</span></div><div class="pbody">
+        <div class="hstack"><input class="field" type="text" value="150.00" style="max-width:120px"><span class="k">USD · teto contra o custo estimado do índice CLI no mês corrente</span></div>
+        <div class="track ok"><i style="width:34%"></i></div>
+        <div class="hstack"><span class="v sm">US$ 51,20 de 150,00</span><span class="sp"></span><span class="k">Créditos Anthropic: R$ 190,00 — linha separada, moeda diferente</span></div>
+      </div></div>
+      <div class="banner info" style="box-shadow:var(--shadow-8)"><span class="bar"></span><span class="bd">Orçamento mensal salvo.</span></div>
+    </div>
+  </div>
+</div>
+
+<p class="note"><b>Por que o interruptor de atualização diz o tamanho e o momento.</b> Os dois surpreendem: são ~120 MB por versão, sem atualização delta, e a troca dos arquivos acontece <b>sem nenhuma confirmação</b> no instante em que o usuário fecha a janela. Ele vem <b>desmarcado</b>, e o texto de apoio existe porque um interruptor que não avisa disso liga uma coisa que ninguém escolheu.</p>
+
+<p class="note"><b>Desabilitado, ele carrega o motivo</b> — plataforma, origem da instalação ou build sem o mecanismo. Um controle cinza sem explicação é pior que controle nenhum: o usuário não descobre se é limitação ou defeito. E sem suporte o interruptor <b>mostra desligado</b>, e não o valor guardado: ligado-mas-inerte seria promessa falsa. A linha do recibo só aparece depois da primeira atualização silenciosa, e diz explicitamente quando ela falhou — atualização automática que falha é invisível por natureza.</p>
+
+<h2 id="cfg-alertas">12b · Configurações — Alertas</h2>
+<div class="win mid" style="max-width:none">
+  <div class="body">
+    <div class="panel"><div class="phead"><span class="ptitle">Alertas na bandeja</span><span class="sp"></span><span class="sw on"></span></div><div class="pbody flush">
+      <div class="row"><span class="v sm">Limiares de cota</span><span class="sp"></span><div class="hstack"><input class="field" value="75" style="width:56px"><input class="field" value="90" style="width:56px"><input class="field" value="100" style="width:56px"><span class="k">%</span></div></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI saturada</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só o veredito saturado vira notificação. Atenção apareceu em 7 de 70 sessões medidas — notificar nesse patamar tornaria o alerta rotina.</span></div><span class="sw on"></span></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Silenciar até</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">No período silenciado o limiar cruzado não é marcado como disparado: o aviso sai quando o silêncio terminar.</span></div><input class="field" value="18:00" style="width:90px"></div>
+    </div></div>
+  </div>
+</div>
+
+<h2 id="cfg-apis">12c · Configurações — APIs</h2>
+<div class="win mid" style="max-width:none">
+  <div class="body"><div class="panel"><div class="phead"><span class="ptitle">APIs monitoradas</span></div><div class="pbody flush">
+    <div class="row"><span class="srcmark" style="background:var(--anthropic)"></span><span class="v sm" style="flex:1">Anthropic</span><span class="st ok">Credencial válida</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--codex)"></span><span class="v sm" style="flex:1">Codex</span><span class="st warn">Fonte instável</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--deepseek)"></span><span class="v sm" style="flex:1">DeepSeek</span><span class="st ok">Credencial válida</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st crit">MINIMAX_API_KEY ausente</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo</span><span class="st off">Desativada</span><span class="sw"></span></div>
+  </div></div></div>
+</div>
+
+<h2 id="cfg-contas">12d · Configurações — Contas</h2>
+<div class="win mid" style="max-width:none">
+  <div class="body"><div class="panel">
+    <div class="phead"><span class="ptitle">Perfis Anthropic</span><span class="sp"></span><button class="btn ghost" type="button">Reescanear</button><button class="btn" type="button">Adicionar perfil</button></div>
+    <div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Padrão</span><span class="k">~/.claude · dev@example.com — Example Org</span></div><span class="st ok">Pronto</span><button class="btn ghost icon" type="button" aria-label="Renomear perfil">✎</button><span class="sw on"></span></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sandbox</span><span class="k">~/.claude-sandbox · qa@example.com — Example Org (Sandbox)</span></div><span class="st ok">Pronto</span><button class="btn ghost icon" type="button" aria-label="Renomear perfil">✎</button><button class="btn ghost icon danger" type="button" aria-label="Remover perfil">×</button><span class="sw on"></span></div>
+    </div>
+  </div></div>
+</div>
+
+<h2 id="cfg-time">12e · Configurações — Time</h2>
+<div class="g2">
+  <div>
+    <div class="cap">Integração ativa</div>
+    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
+      <div class="phead"><span class="ptitle">Integração com time</span><span class="sp"></span><span class="sw on"></span></div>
+      <div class="pbody">
+        <div class="stack"><span class="k">Servidor</span><input class="field" value="https://usage.example.com"></div>
+        <div class="stack"><span class="k">Chave de time</span><input class="field" type="password" value="um_sk_exemplo_nao_use"></div>
+        <div class="stack"><span class="k">Apelido</span><input class="field" value="dev-01"></div>
+        <div class="hstack"><button class="btn" type="button">Testar conexão</button><span class="st ok">Conexão confirmada.</span></div>
+        <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)"><span class="v sm" style="flex:1">Padrão — dev@example.com</span><span class="k">participa</span><span class="sw on"></span></div>
+        <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)"><span class="v sm" style="flex:1">Sandbox — qa@example.com</span><span class="k">não participa</span><span class="sw"></span></div>
+      </div>
+    </div></div></div>
+  </div>
+  <div>
+    <div class="cap">Integração inativa</div>
+    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
+      <div class="phead"><span class="ptitle">Integração com time</span><span class="sp"></span><span class="sw"></span></div>
+      <div class="pbody"><div class="state" style="padding:32px var(--s4)">
+        <span class="msg">Recurso opcional, desligado por padrão.</span>
+        <span class="msg dim">Só metadados de uso são enviados — nunca conteúdo de prompt ou resposta.</span>
+      </div></div>
+    </div></div></div>
+    <div class="cap">Modo administrativo</div>
+    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
+      <div class="phead"><span class="ptitle">Administração</span><span class="sp"></span><span class="st ok">Token validado</span></div>
+      <div class="pbody"><div class="hstack"><input class="field" type="password" value="admin_token_exemplo"><button class="btn" type="button">Validar</button></div>
+      <div class="hstack"><button class="btn" type="button">Gerenciar chaves</button><button class="btn ghost" type="button">Sair do modo admin</button></div></div>
+    </div></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ PDF ═══════════════════════════════ -->
+<h2 id="pdf">13 · Relatório PDF</h2>
+<p class="lede">Layout canônico escuro, independente do tema da interface. IBM Plex embutida, cabeçalho compacto, tabelas com alternância discreta de superfície e cor semântica restrita.</p>
+<div class="pdf">
+  <div style="display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid #3D3838">
+    <svg width="22" height="22" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#F2EDED"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="#131010" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="#131010" stroke-width="2.1" stroke-linecap="round"/></svg>
+    <div style="flex:1">
+      <div style="font-weight:600">usage monitor · relatório de sessões</div>
+      <div style="color:#B8B2B2;font-size:9px">Anthropic · Padrão — janela de 5h — gerado em 12/08/2026 11:00 BRT</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:26px;padding:12px 0;border-bottom:1px solid #3D3838">
+    <div><div style="color:#B8B2B2;font-size:9px">SESSÕES</div><div style="font-size:15px">3</div></div>
+    <div><div style="color:#B8B2B2;font-size:9px">TOKENS</div><div style="font-size:15px">6,53 M</div></div>
+    <div><div style="color:#B8B2B2;font-size:9px">CUSTO</div><div style="font-size:15px">US$ 9,5012</div></div>
+    <div><div style="color:#B8B2B2;font-size:9px">TEMPO ATIVO</div><div style="font-size:15px">4h 3min</div></div>
+  </div>
+  <div style="margin-top:14px;color:#B8B2B2;font-size:9px;letter-spacing:.08em">POR PROJETO</div>
+  <div class="prow h"><span style="flex:2">PROJETO</span><span style="flex:1;text-align:right">SESSÕES</span><span style="flex:1;text-align:right">TOKENS</span><span style="flex:1;text-align:right">CUSTO</span></div>
+  <div class="prow alt"><span style="flex:2">api-gateway</span><span style="flex:1;text-align:right">2</span><span style="flex:1;text-align:right">4,66 M</span><span style="flex:1;text-align:right">US$ 5,8912</span></div>
+  <div class="prow"><span style="flex:2">checkout-web</span><span style="flex:1;text-align:right">1</span><span style="flex:1;text-align:right">1,92 M</span><span style="flex:1;text-align:right">US$ 3,6100</span></div>
+  <div style="margin-top:14px;color:#B8B2B2;font-size:9px;letter-spacing:.08em">SESSÕES</div>
+  <div class="prow h"><span style="flex:1">STATUS</span><span style="flex:1">SESSÃO</span><span style="flex:2">PROJETO</span><span style="flex:1;text-align:right">CUSTO</span></div>
+  <div class="prow alt"><span style="flex:1;color:#E86A6A">Saturada</span><span style="flex:1">7c4a1f92</span><span style="flex:2">api-gateway</span><span style="flex:1;text-align:right">US$ 5,4792</span></div>
+  <div class="prow"><span style="flex:1;color:#FFA726">Atenção</span><span style="flex:1">b81e35c0</span><span style="flex:2">checkout-web</span><span style="flex:1;text-align:right">US$ 3,6100</span></div>
+  <div class="prow alt"><span style="flex:1;color:#4CAF50">Saudável</span><span style="flex:1">2f9d64ba</span><span style="flex:2">api-gateway</span><span style="flex:1;text-align:right">US$ 0,4120</span></div>
+  <div style="display:flex;color:#B8B2B2;font-size:9px;padding-top:12px;margin-top:10px;border-top:1px solid #3D3838">
+    <span style="flex:1">Estimado a preço de tabela. Não é uma fatura.</span><span>1 / 3</span>
+  </div>
+</div>
+<p class="note"><b>O maior risco técnico da iniciativa está aqui.</b> Todo o alinhamento de colunas e toda a paginação dependem hoje do <code>getStringWidth</code> do Helvetica base-14. Embutir a Plex recalcula isso do zero — por isso é um commit isolado, validado com relatórios curto, médio e longo antes de qualquer mudança de cor.</p>
+
+<!-- ═══════════════════════════════ CHROME ════════════════════════════ -->
+<h2 id="chrome">14 · Molduras e densidade</h2>
+<div class="g2">
+  <div>
+    <div class="cap">Janela estreita — uma coluna</div>
+    <div class="win narrow">
+      <div class="titlebar"><span class="t">Usage Monitor</span><span class="wbtn">–</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+      <div class="body tight">
+        <div class="panel">
+          <div class="phead"><span class="srcmark" style="background:var(--anthropic)"></span><span class="ptitle">Anthropic · Padrão</span><span class="sp"></span><span class="st warn">Atenção</span></div>
+          <div class="pbody flush">
+            <div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">68%</span></div><div class="track warn"><i style="width:68%"></i></div></div></div>
+            <div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Semanal</span><span class="sp"></span><span class="v">41%</span></div><div class="track ok"><i style="width:41%"></i></div></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="phead"><span class="srcmark" style="background:var(--codex)"></span><span class="ptitle">Codex</span><span class="sp"></span><span class="st ok">Normal</span></div>
+          <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Codex atual</span><span class="sp"></span><span class="v">23%</span></div><div class="track ok"><i style="width:23%"></i></div></div></div></div>
+        </div>
+      </div>
+      <div class="statusbar"><span>v35.0.0</span><span class="sp"></span><span>06:41</span><button class="btn ghost icon" type="button" aria-label="Atualizar">↻</button><button class="btn ghost icon" type="button" aria-label="Configurações">⚙</button></div>
+    </div>
+  </div>
+  <div>
+    <div class="cap">Title bar padronizada nas seis janelas</div>
+    <div class="stack">
+      <div class="win" style="margin:0"><div class="titlebar"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.4" stroke-linecap="round"/></svg><span class="t">Usage Monitor</span><span class="wbtn">–</span><span class="wbtn">□</span><span class="wbtn close">×</span></div></div>
+      <div class="win" style="margin:0"><div class="titlebar"><span class="t">Histórico de uso — Anthropic · Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div></div>
+      <div class="win" style="margin:0"><div class="titlebar"><span class="t">Sessões CLI — Anthropic · Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div></div>
+      <div class="win" style="margin:0"><div class="titlebar"><span class="t">Sessões do time — Example Org</span><span class="wbtn">□</span><span class="wbtn close">×</span></div></div>
+      <div class="win" style="margin:0"><div class="titlebar"><span class="t">Conectados agora</span><span class="wbtn">□</span><span class="wbtn close">×</span></div></div>
+      <div class="win" style="margin:0"><div class="titlebar"><span class="t">Configurações</span><span class="wbtn close">×</span></div></div>
+    </div>
+    <p class="note">Janelas continuam <em>undecorated</em>, com área arrastável, geometria persistida, sempre-visível e opacidade preservados. Altura da barra cai de 42 para 34dp; o raio da janela acompanha a escala nova.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
+<h2 id="checklist">15 · O que este protótipo não decide</h2>
+<div class="panel"><div class="pbody flush">
+  <div class="row"><span class="st warn">A verificar</span><span class="v sm" style="flex:1">Assinatura exata da API de carregamento de fonte no Compose Desktop 1.7.1</span><span class="k">commit C3</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>.icns</code> só é validável no job <code>build-macos</code> do release</span><span class="k">commit J2</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Fonte embutida no PDFBox recalcula largura de todas as colunas</span><span class="k">commit K1</span></div>
+  <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhum texto de interface muda — ~390 asserts observam essas strings</span><span class="k">todas as fases</span></div>
+  <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhuma ação, filtro, gráfico, exportação ou mensagem é removida</span><span class="k">todas as fases</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Com <code>USAGE_MONITOR_UPDATE_FEED_URL</code> definida, o feed de releases é outro — e o SHA-256 que barra artefato adulterado vem de lá. A aba Geral mostra um aviso em tom âmbar enquanto ela estiver ativa</span><span class="k">issue #75</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>Setup.exe</code> não é assinado: SmartScreen ou antivírus podem barrar a atualização silenciosa, que então cai na faixa "Baixar manualmente"</span><span class="k">issue #75</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">A atualização automática do Linux sai <b>desligada por build</b> (<code>LINUX_AUTO_UPDATE_SHIPPED = false</code>): CI e containers cobrem script e extração, mas ninguém a exercitou numa sessão gráfica real. A máquina de desenvolvimento é Windows</span><span class="k">issue #100</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">~125 MB por versão no Linux, e ~600 MB em disco com as duas versões retidas em <code>~/.local/share</code> — a atual e uma anterior, para o rollback do ciclo seguinte</span><span class="k">issue #100</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>.tar.gz</code> não é assinado. A integridade vem do campo <code>digest</code> da API do GitHub por TLS, o mesmo portão do Windows</span><span class="k">issue #100</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Uma instalação <code>.deb</code>/<code>.rpm</code> existente exige migração manual: o instalador user-space detecta e <b>para</b>, sem tocar em <code>/opt</code> nem em arquivo do gerenciador de pacotes</span><span class="k">issue #100</span></div>
+  <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Sem marcador <code>.usage-monitor-managed</code> na raiz, o script de troca aborta <b>sem tocar em nada</b> — nem recibo ele escreve</span><span class="k">issue #100</span></div>
+</div></div>
+<p class="note">Aprovado o protótipo, a execução começa pela Fase C (fundação): fontes, paleta, escala tipográfica, tokens de forma e as dezessete primitivas — oito commits antes de qualquer tela mudar de aparência.</p>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('toggle');
+  var label = document.getElementById('themelabel');
+
+  // Semeia pelo tema do visualizador quando ele declarou um; senão pelo SO.
+  var host = root.getAttribute('data-theme');
+  var seed = host || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  apply(seed);
+
+  function apply(mode) {
+    root.setAttribute('data-app-theme', mode);
+    label.textContent = mode === 'dark' ? 'tema escuro' : 'tema claro';
+    readTokens();
+  }
+
+  function readTokens() {
+    var cs = getComputedStyle(root);
+    document.querySelectorAll('.tokv').forEach(function (el) {
+      el.textContent = cs.getPropertyValue(el.dataset.t).trim().toUpperCase();
+    });
+  }
+
+  btn.addEventListener('click', function () {
+    apply(root.getAttribute('data-app-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  // Grade de atividade 7 x 24: dia da semana por hora local, intensidade
+  // determinística e sem Math.random. Sete linhas e não uma: agrupar só por hora
+  // perderia a diferença entre a terça de manhã e o sábado de manhã.
+  var heat = document.getElementById('heat');
+  var days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  var pattern = [0,0,0,0,0,0,0,2,6,14,22,31,26,12,34,41,38,29,18,9,4,2,1,0];
+  // Peso do dia: a semana concentra, o fim de semana quase some.
+  var weight = [1, 0.9, 1, 0.85, 0.7, 0.15, 0.1];
+  var peak = Math.max.apply(null, pattern);
+  days.forEach(function (day, row) {
+    var label = document.createElement('span');
+    label.className = 'k';
+    label.textContent = day;
+    heat.appendChild(label);
+    pattern.forEach(function (v, hour) {
+      var value = Math.round(v * weight[row]);
+      var i = document.createElement('i');
+      if (value > 0) {
+        i.style.background = 'color-mix(in srgb, var(--info) ' + Math.round((value / peak) * 100) + '%, var(--raised))';
+      }
+      i.title = day + ' ' + hour + 'h · ' + value + ' turnos';
+      heat.appendChild(i);
+    });
+  });
+})();
+</script>
+</body>
+</html>

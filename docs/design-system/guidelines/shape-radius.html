@@ -1,0 +1,28 @@
+<!-- @dsCard group="Patterns" viewport="700x140" name="Radius ramp" subtitle="4 chip · 6 control · 8 panel · 10 window — 10dp is the ceiling" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 108px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div class="r">
+  <div style="text-align:center"><div class="box" style="width:120px;height:52px;border-radius:var(--r1)"><span class="k">4dp</span></div><div class="k" style="margin-top:5px">chip</div></div><div style="text-align:center"><div class="box" style="width:120px;height:52px;border-radius:var(--r2)"><span class="k">6dp</span></div><div class="k" style="margin-top:5px">controle</div></div><div style="text-align:center"><div class="box" style="width:120px;height:52px;border-radius:var(--r3)"><span class="k">8dp</span></div><div class="k" style="margin-top:5px">painel</div></div><div style="text-align:center"><div class="box" style="width:120px;height:52px;border-radius:var(--r4)"><span class="k">10dp</span></div><div class="k" style="margin-top:5px">janela</div></div>
+</div>
+</body>
+</html>

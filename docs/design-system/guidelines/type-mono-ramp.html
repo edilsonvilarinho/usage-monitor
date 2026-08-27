@@ -1,0 +1,33 @@
+<!-- @dsCard group="Type" viewport="700x260" name="IBM Plex Mono — the ramp" subtitle="Titles, labels, numbers, tables, window chrome. Six sizes, weights 400/500/600" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 228px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div class="g" style="gap:6px;font-family:var(--mono)">
+  <div style="font-size:var(--t28);font-weight:600;letter-spacing:-.02em">28 · SemiBold — título de página</div>
+  <div style="font-size:var(--t20);font-weight:600;letter-spacing:-.01em">20 · SemiBold — título de janela</div>
+  <div style="font-size:var(--t16);font-weight:500">16 · Medium — valor principal de métrica</div>
+  <div style="font-size:var(--t14)">14 · Regular — valor de dado</div>
+  <div style="font-size:var(--t12)">12 · Regular — rótulo, controle, célula de tabela</div>
+  <div style="font-size:var(--t10);letter-spacing:.07em;text-transform:uppercase">10 · eyebrow e cabeçalho de coluna</div>
+</div>
+</body>
+</html>

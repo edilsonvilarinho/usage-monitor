@@ -1,0 +1,29 @@
+/* ── Type ────────────────────────────────────────────────────────────────
+   Two families, not one. Mono for titles, labels, numbers, tables and window
+   chrome — everywhere tabular alignment matters. Sans for running prose.
+   Mono in body copy runs ~8% wider and reads slower, and this app carries a
+   lot of explanatory text. Weights 400 / 500 / 600 only.
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --sans: "IBM Plex Sans", ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+
+  /* the closed size ramp — six steps, no others */
+  --t10: 10px;  /* eyebrow, column header, unit label — always uppercase + .07em */
+  --t12: 12px;  /* label, control, table cell */
+  --t14: 14px;  /* body, data value */
+  --t16: 16px;  /* primary metric value */
+  --t20: 20px;  /* window title, big metric */
+  --t28: 28px;  /* page title (review surfaces only) */
+
+  --w-regular: 400;
+  --w-medium:  500;
+  --w-semibold: 600;
+
+  --lh-tight: 1.2;
+  --lh-body:  1.55;
+
+  --ls-eyebrow: .07em;   /* with text-transform: uppercase */
+  --ls-title:  -.01em;
+  --ls-display: -.02em;
+}

@@ -1,0 +1,123 @@
+/* ── Color ───────────────────────────────────────────────────────────────
+   Dark-first. :root carries the full dark palette (the approved reference).
+   Light arrives through prefers-color-scheme AND the explicit
+   [data-app-theme="light"] scope — never through the media query alone,
+   because the app has its own theme switch that must win.
+
+   Four surfaces inside ~14% luminance. Depth comes from the 1dp border and
+   from spacing — not from shadow, not from gradient.
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  /* surfaces + text */
+  --bg:        #131010;
+  --surface:   #1B1818;
+  --raised:    #211E1E;
+  --border:    #3D3838;
+  --fg:        #F2EDED;
+  --muted:     #B8B2B2;
+
+  /* semantic state — never used without an accompanying word */
+  --ok:        #4CAF50;
+  --warn:      #FFA726;
+  --crit:      #E86A6A;
+  --info:      #4C8DFF;
+
+  /* integration identity — AA 4.5:1 on both surfaces, hue preserved across
+     themes, >=20 degrees apart from each other. These do not change. */
+  --anthropic: #4F8CFF;
+  --codex:     #27BFA3;
+  --deepseek:  #C084FC;
+  --minimax:   #FF8A3D;
+  --oc:        #7BD389;
+  --kilo:      #E6D84E;
+
+  /* token/cost composition series (charts, stacked bars, legends) */
+  --input:     #4C8DFF;
+  --output:    #B07CFF;
+  --cread:     #4CAF50;
+  --cwrite:    #FFA726;
+  --savings:   #26C6DA;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-app-theme="dark"]) {
+    --bg:      #F6F3F3;
+    --surface: #FFFCFC;
+    --raised:  #EFEAEA;
+    --border:  #D7D0D0;
+    --fg:      #171414;
+    --muted:   #686060;
+
+    --ok:      #2E7D32;
+    --warn:    #8A5000;
+    --crit:    #B3261E;
+    --info:    #1565C0;
+
+    --anthropic: #1565C0;
+    --codex:     #00695C;
+    --deepseek:  #7B3FC4;
+    --minimax:   #9A4A00;
+    --oc:        #2E7D32;
+    --kilo:      #5F5500;
+
+    --input:   #1565C0;
+    --output:  #6A3FB5;
+    --cread:   #2E7D32;
+    --cwrite:  #8A5000;
+    --savings: #00697A;
+  }
+}
+
+:root[data-app-theme="light"] {
+  --bg:      #F6F3F3;
+  --surface: #FFFCFC;
+  --raised:  #EFEAEA;
+  --border:  #D7D0D0;
+  --fg:      #171414;
+  --muted:   #686060;
+
+  --ok:      #2E7D32;
+  --warn:    #8A5000;
+  --crit:    #B3261E;
+  --info:    #1565C0;
+
+  --anthropic: #1565C0;
+  --codex:     #00695C;
+  --deepseek:  #7B3FC4;
+  --minimax:   #9A4A00;
+  --oc:        #2E7D32;
+  --kilo:      #5F5500;
+
+  --input:   #1565C0;
+  --output:  #6A3FB5;
+  --cread:   #2E7D32;
+  --cwrite:  #8A5000;
+  --savings: #00697A;
+}
+
+:root[data-app-theme="dark"] {
+  --bg:      #131010;
+  --surface: #1B1818;
+  --raised:  #211E1E;
+  --border:  #3D3838;
+  --fg:      #F2EDED;
+  --muted:   #B8B2B2;
+
+  --ok:      #4CAF50;
+  --warn:    #FFA726;
+  --crit:    #E86A6A;
+  --info:    #4C8DFF;
+
+  --anthropic: #4F8CFF;
+  --codex:     #27BFA3;
+  --deepseek:  #C084FC;
+  --minimax:   #FF8A3D;
+  --oc:        #7BD389;
+  --kilo:      #E6D84E;
+
+  --input:   #4C8DFF;
+  --output:  #B07CFF;
+  --cread:   #4CAF50;
+  --cwrite:  #FFA726;
+  --savings: #26C6DA;
+}

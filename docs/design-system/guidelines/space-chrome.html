@@ -1,0 +1,28 @@
+<!-- @dsCard group="Spacing" viewport="700x200" name="Chrome heights" subtitle="Fixed dp contracts with Compose: 34 title bar, 34 toolbar, 30 status bar, 28 update strip, 28 control" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 168px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div class="g" style="gap:8px">
+  <div class="r" style="gap:10px"><div style="width:210px;height:var(--h-titlebar);background:var(--surface);border:1px solid var(--border);border-radius:var(--r2)"></div><span class="k">34dp</span><span style="font-family:var(--mono);font-size:var(--t12);color:var(--muted)">barra de título</span></div><div class="r" style="gap:10px"><div style="width:210px;height:var(--h-toolbar);background:var(--surface);border:1px solid var(--border);border-radius:var(--r2)"></div><span class="k">34dp</span><span style="font-family:var(--mono);font-size:var(--t12);color:var(--muted)">toolbar de parâmetros</span></div><div class="r" style="gap:10px"><div style="width:210px;height:var(--h-statusbar);background:var(--surface);border:1px solid var(--border);border-radius:var(--r2)"></div><span class="k">30dp</span><span style="font-family:var(--mono);font-size:var(--t12);color:var(--muted)">status bar</span></div><div class="r" style="gap:10px"><div style="width:210px;height:var(--h-updatestrip);background:var(--surface);border:1px solid var(--border);border-radius:var(--r2)"></div><span class="k">28dp</span><span style="font-family:var(--mono);font-size:var(--t12);color:var(--muted)">faixa de atualização</span></div><div class="r" style="gap:10px"><div style="width:210px;height:var(--h-control);background:var(--surface);border:1px solid var(--border);border-radius:var(--r2)"></div><span class="k">28dp</span><span style="font-family:var(--mono);font-size:var(--t12);color:var(--muted)">botão e campo</span></div>
+</div>
+</body>
+</html>

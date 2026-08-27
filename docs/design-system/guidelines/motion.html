@@ -1,0 +1,31 @@
+<!-- @dsCard group="Patterns" viewport="700x170" name="Motion" subtitle="120 hover · 180 selection · 240 expand. No infinite animation, anywhere" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 138px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div class="g" style="gap:10px">
+  <div class="r"><span class="k" style="width:70px">120ms</span><span style="font-family:var(--mono);font-size:var(--t12)">hover, foco, press</span></div>
+  <div class="r"><span class="k" style="width:70px">180ms</span><span style="font-family:var(--mono);font-size:var(--t12)">seleção, troca de aba</span></div>
+  <div class="r"><span class="k" style="width:70px">240ms</span><span style="font-family:var(--mono);font-size:var(--t12)">expandir, recolher, minimizar card</span></div>
+  <div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:2px">Animação infinita trava o <code style="border:0;background:none;padding:0;color:var(--fg)">waitForIdle</code> dos testes de componente. Carregamento é esqueleto estático.</div>
+</div>
+</body>
+</html>

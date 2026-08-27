@@ -1,0 +1,4 @@
+/* IBM Plex Mono + IBM Plex Sans, weights 400/500/600 only.
+   The desktop app embeds the same TTFs via Compose resources; here they come
+   from Google Fonts so every card and kit renders with the real faces. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap");

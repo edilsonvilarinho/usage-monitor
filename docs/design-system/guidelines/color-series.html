@@ -1,0 +1,32 @@
+<!-- @dsCard group="Colors" viewport="700x190" name="Cost composition series" subtitle="Token and cost breakdown: input, output, cache read, cache write, savings" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 158px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+  <div class="sw"><div class="chip" style="background:var(--input)"></div><div class="lab"><span>input</span><span>--input</span></div></div><div class="sw"><div class="chip" style="background:var(--output)"></div><div class="lab"><span>output</span><span>--output</span></div></div><div class="sw"><div class="chip" style="background:var(--cread)"></div><div class="lab"><span>cache read</span><span>--cread</span></div></div><div class="sw"><div class="chip" style="background:var(--cwrite)"></div><div class="lab"><span>cache write</span><span>--cwrite</span></div></div><div class="sw"><div class="chip" style="background:var(--savings)"></div><div class="lab"><span>savings</span><span>--savings</span></div></div>
+</div>
+<div style="margin-top:14px;display:flex;height:14px;border:1px solid var(--border);border-radius:var(--r1);overflow:hidden">
+  <span style="width:22%;background:var(--input)"></span><span style="width:13%;background:var(--output)"></span><span style="width:47%;background:var(--cread)"></span><span style="width:8%;background:var(--cwrite)"></span><span style="width:10%;background:var(--savings)"></span>
+</div>
+<div class="k" style="margin-top:6px">composição de 1 284 000 tokens · uma barra, cinco parcelas</div>
+</body>
+</html>

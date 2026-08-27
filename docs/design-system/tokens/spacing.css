@@ -1,0 +1,20 @@
+/* ── Space ───────────────────────────────────────────────────────────────
+   4px grid. Two densities: --s3 padding / --s2 gap inside the dashboard
+   window (the one the user keeps narrow beside the editor), --s4 everywhere
+   else (those windows open wide).
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s6: 24px;
+  --s8: 32px;
+
+  /* fixed chrome heights, in dp — these are contracts with Compose */
+  --h-titlebar:  34px;
+  --h-statusbar: 30px;
+  --h-toolbar:   34px;
+  --h-control:   28px;
+  --h-updatestrip: 28px;
+}

@@ -1,0 +1,81 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Core — button, icon button, panel, marker, metric" subtitle="The five primitives every screen is built from" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Core</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../../_ds_local.js"></script>
+<style>
+  body { padding: 16px; width: 700px; }
+  .grid { display: grid; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cap { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+let DS = {};
+function Demo() {
+  const { AppButton, AppIconButton, AppPanel, AppPanelHeader, AppPanelBody, AppSourceMark, AppSourceDot, AppMetric, AppStatusIndicator, AppDataRow, AppKey, AppValue, AppProgressTrack } = DS;
+  const [tab] = React.useState(0);
+  return (
+    <div className="grid">
+      <div className="row">
+        <AppButton variant="primary">Salvar</AppButton>
+        <AppButton>Atualizar</AppButton>
+        <AppButton variant="ghost">Cancelar</AppButton>
+        <AppButton variant="danger">Remover</AppButton>
+        <AppButton disabled title="Indisponível: instalação .deb pertence ao gerenciador de pacotes.">Atualizar agora</AppButton>
+        <AppIconButton glyph="↻" label="Atualizar" />
+        <AppIconButton glyph="–" label="Minimizar card" />
+        <AppIconButton variant="ghost" glyph="▾" label="Recolher" />
+      </div>
+      <AppPanel>
+        <AppPanelHeader
+          mark={<AppSourceMark source="anthropic" />}
+          title="Anthropic · Padrão"
+          subtitle="dev@example.com — Example Org"
+          status={<AppStatusIndicator level="warn" title="Cota Sessão 5h · deve esgotar antes do reset. Previsão: Qua 13/08 13h00 BRT.">Atenção</AppStatusIndicator>}
+          actions={<React.Fragment><AppIconButton glyph="↻" label="Atualizar" /><AppIconButton glyph="–" label="Minimizar card" /></React.Fragment>}
+        />
+        <AppPanelBody flush>
+          <AppDataRow last>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+                <AppKey>Sessão 5h</AppKey><span style={{ flex: 1 }} /><AppValue>68%</AppValue>
+              </div>
+              <AppProgressTrack percent={68} level="warn" label="Sessão 5h" />
+              <AppKey dim>Reinício: Qua 13h00 BRT</AppKey>
+            </div>
+          </AppDataRow>
+        </AppPanelBody>
+      </AppPanel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+        <AppMetric label="Ritmo" value="US$ 1,84/h" />
+        <AppMetric label="Tokens/h" value="412 900" />
+        <AppMetric label="Sessão 5h" value="68%" size="lg" align="center" />
+        <AppMetric label="Cache" value="US$ 12,40" hint="72% dos tokens" />
+      </div>
+      <div className="row">
+        <span className="cap">acentos</span>
+        {['anthropic','codex','deepseek','minimax','opencode','kilo'].map(s => (
+          <span key={s} style={{ display:'inline-flex', alignItems:'center', gap:6, fontFamily:'var(--mono)', fontSize:10, color:'var(--muted)' }}>
+            <AppSourceDot source={s} />{s}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+(async () => {
+  DS = await window.DSReady('../../');
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+})();
+</script>
+</body>
+</html>

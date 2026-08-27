@@ -1,0 +1,58 @@
+<!-- @dsCard group="Patterns" viewport="700x230" name="Quota row anatomy" subtitle="Label, value, 4dp track, reset line — the canonical composition of this app" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 198px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r3)">
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
+    <span style="width:2px;align-self:stretch;min-height:22px;background:var(--anthropic);border-radius:1px"></span>
+    <div style="display:flex;flex-direction:column">
+      <span style="font-family:var(--mono);font-size:var(--t12);font-weight:600">Anthropic · Padrão</span>
+      <span style="font-family:var(--mono);font-size:var(--t10);color:var(--muted)">dev@example.com — Example Org</span>
+    </div>
+    <span style="flex:1"></span>
+    <span class="st" style="color:var(--warn)">Atenção</span>
+  </div>
+  
+  <div style="display:flex;padding:8px 12px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+      <div style="display:flex;align-items:center;gap:8px"><span class="k">Sessão 5h</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:var(--t14);font-variant-numeric:tabular-nums">68%</span></div>
+      <div style="height:4px;border-radius:2px;background:var(--raised);border:1px solid var(--border);overflow:hidden"><span style="display:block;height:100%;width:68%;background:var(--warn)"></span></div>
+      <span class="k">Reinício: Qua 13h00 BRT</span>
+    </div>
+  </div>
+  <div style="display:flex;padding:8px 12px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+      <div style="display:flex;align-items:center;gap:8px"><span class="k">Semanal</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:var(--t14);font-variant-numeric:tabular-nums">41%</span></div>
+      <div style="height:4px;border-radius:2px;background:var(--raised);border:1px solid var(--border);overflow:hidden"><span style="display:block;height:100%;width:41%;background:var(--ok)"></span></div>
+      <span class="k">Reinício: Sáb 15/08 21h00 BRT</span>
+    </div>
+  </div>
+  <div style="display:flex;padding:8px 12px;">
+    <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+      <div style="display:flex;align-items:center;gap:8px"><span class="k">Créditos de uso</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:var(--t14);font-variant-numeric:tabular-nums">US$ 190,00 / 500,00</span></div>
+      <div style="height:4px;border-radius:2px;background:var(--raised);border:1px solid var(--border);overflow:hidden"><span style="display:block;height:100%;width:38%;background:var(--info)"></span></div>
+      <span class="k">Reinicia no início do mês</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

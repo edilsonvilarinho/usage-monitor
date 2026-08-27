@@ -1,0 +1,85 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Data — status, track, rows, column strip, table" subtitle="Dot plus word, 4dp quota track, the 2dp nested-group guide" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Data</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../../_ds_local.js"></script>
+<style>
+  body { padding: 16px; width: 700px; }
+  .grid { display: grid; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cap { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+let DS = {};
+function Demo() {
+  const { AppStatusIndicator, AppProgressTrack, AppDataRow, AppKey, AppValue, AppColumnHeader, AppDataTable, AppPanel, AppPanelBody, AppSourceMark, AppIconButton } = DS;
+  return (
+    <div className="grid">
+      <div className="row">
+        <AppStatusIndicator level="ok">Normal</AppStatusIndicator>
+        <AppStatusIndicator level="warn">Atenção</AppStatusIndicator>
+        <AppStatusIndicator level="crit">Crítico</AppStatusIndicator>
+        <AppStatusIndicator level="off">Desconectado</AppStatusIndicator>
+        <AppStatusIndicator level="info">Trabalhando agora</AppStatusIndicator>
+      </div>
+      <div className="grid" style={{ gap: 8 }}>
+        <AppProgressTrack percent={41} level="ok" label="Semanal" />
+        <AppProgressTrack percent={68} level="warn" label="Sessão 5h" />
+        <AppProgressTrack percent={94} level="crit" label="Codex 5h" />
+        <AppProgressTrack percent={38} level="info" label="Créditos de uso" />
+      </div>
+      <AppPanel>
+        <AppPanelBody flush>
+          <AppDataRow mark={<AppSourceMark source="anthropic" />}>
+            <AppIconButton variant="ghost" glyph="▾" label="Recolher integrante" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <AppValue size="sm">dev-01</AppValue><AppKey>DESKTOP-A1</AppKey>
+            </div>
+            <span style={{ flex: 1 }} />
+            <AppValue size="sm">US$ 4,8120</AppValue>
+          </AppDataRow>
+          <AppDataRow guide indent={26}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <AppValue size="sm">7c4a1f92</AppValue><AppKey>api-gateway · 48 turnos</AppKey>
+            </div>
+            <span style={{ flex: 1 }} />
+            <AppValue size="sm">US$ 3,1841</AppValue>
+          </AppDataRow>
+          <AppDataRow guide indent={26} last>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <AppValue size="sm">b81e35c0</AppValue><AppKey>checkout-web · 26 turnos</AppKey>
+            </div>
+            <span style={{ flex: 1 }} />
+            <AppValue size="sm">US$ 1,6279</AppValue>
+          </AppDataRow>
+        </AppPanelBody>
+      </AppPanel>
+      <AppPanel>
+        <AppDataTable
+          columns={[{ key: 'p', label: 'Projeto' }, { key: 'm', label: 'Modelo' }, { key: 't', label: 'Tokens', numeric: true }, { key: 'c', label: 'Custo', numeric: true }]}
+          rows={[
+            { id: 1, p: 'api-gateway', m: 'sonnet-4-5', t: '1 284 000', c: 'US$ 3,1841' },
+            { id: 2, p: 'checkout-web', m: 'sonnet-4-5', t: '612 400', c: 'US$ 1,6279' },
+            { id: 3, p: 'infra-terraform', m: 'haiku-4-5', t: '208 100', c: 'US$ 0,1904' }
+          ]}
+        />
+      </AppPanel>
+    </div>
+  );
+}
+(async () => {
+  DS = await window.DSReady('../../');
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+})();
+</script>
+</body>
+</html>

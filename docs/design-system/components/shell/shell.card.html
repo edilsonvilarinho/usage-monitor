@@ -1,0 +1,58 @@
+<!-- @dsCard group="Components" viewport="700x420" name="Shell — window, toolbar, status bar, update strip, settings nav" subtitle="34dp title bar, 34dp toolbar, 30dp status bar, 28dp update strip" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Shell</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../../_ds_local.js"></script>
+<style>
+  body { padding: 16px; width: 700px; }
+  .grid { display: grid; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cap { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+let DS = {};
+function Demo() {
+  const { AppWindowFrame, AppStatusBar, AppToolbar, AppUpdateStrip, AppSettingsNav, AppButton, AppSegmentedControl, AppTextField, AppStatusIndicator, AppSwitch } = DS;
+  const [sec, setSec] = React.useState('Geral');
+  const [win, setWin] = React.useState('7 dias');
+  return (
+    <AppWindowFrame
+      title="Sessões CLI — dev@example.com"
+      dense
+      footer={<AppStatusBar left={<React.Fragment><span>v35.0.0</span><span>Próxima coleta em 06:41</span></React.Fragment>} right={<AppButton variant="ghost">Atualizar tudo</AppButton>} />}
+    >
+      <AppUpdateStrip state="downloading" message="Baixando 36.0.0" progress={62} />
+      <AppToolbar>
+        <AppSegmentedControl items={['5h', '7 dias', '30 dias', 'Total']} value={win} onChange={setWin} />
+        <AppTextField placeholder="Filtrar projeto ou branch" style={{ maxWidth: 190 }} />
+        <span style={{ flex: 1 }} />
+        <AppStatusIndicator level="warn">2 pedem atenção</AppStatusIndicator>
+        <AppButton variant="ghost">CSV</AppButton>
+      </AppToolbar>
+      <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--r3)', overflow: 'hidden', background: 'var(--surface)' }}>
+        <AppSettingsNav items={['Geral', 'Alertas', 'APIs', 'Contas', 'Time']} value={sec} onChange={setSec} />
+        <div style={{ flex: 1, padding: 'var(--s3)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <AppSwitch checked label="Iniciar com o sistema" />
+          <AppSwitch checked={false} label="Sempre visível" />
+          <AppSwitch checked={false} disabled label="Atualização automática" reason="Instalação .deb: os arquivos pertencem ao gerenciador de pacotes." />
+        </div>
+      </div>
+    </AppWindowFrame>
+  );
+}
+(async () => {
+  DS = await window.DSReady('../../');
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+/* ── Shape + elevation ───────────────────────────────────────────────────
+   Radius ceiling is 10dp. Elevation 8 is reserved for dialog, menu and
+   overlay; data surfaces sit at 0 and are separated by a 1dp border.
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --r1: 4px;   /* chip, skeleton, inline code */
+  --r2: 6px;   /* button, field, banner, metric */
+  --r3: 8px;   /* panel */
+  --r4: 10px;  /* window — the ceiling */
+
+  --border-w: 1px;
+  --mark-w: 2px;      /* source marker / nested-group guide stroke */
+  --track-h: 4px;     /* progress track */
+
+  --shadow-0: none;
+  --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
+  --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-app-theme="dark"]) {
+    --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
+    --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+  }
+}
+
+:root[data-app-theme="light"] {
+  --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
+  --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+}
+
+:root[data-app-theme="dark"] {
+  --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
+  --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+}

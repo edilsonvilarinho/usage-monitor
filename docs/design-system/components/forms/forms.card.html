@@ -1,0 +1,54 @@
+<!-- @dsCard group="Components" viewport="700x310" name="Forms — tabs, segmented, field, switch" subtitle="Content tabs vs. parameter segments; a disabled switch always carries its reason" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Forms</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../../_ds_local.js"></script>
+<style>
+  body { padding: 16px; width: 700px; }
+  .grid { display: grid; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cap { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+let DS = {};
+function Demo() {
+  const { AppTabs, AppSegmentedControl, AppTextField, AppSwitch } = DS;
+  const [tab, setTab] = React.useState('Sessões');
+  const [win, setWin] = React.useState('5h');
+  const [q, setQ] = React.useState('');
+  const [auto, setAuto] = React.useState(true);
+  const [top, setTop] = React.useState(false);
+  return (
+    <div className="grid">
+      <AppTabs items={['Sessões', 'Resumo', 'Tendência']} value={tab} onChange={setTab} />
+      <div className="row">
+        <AppSegmentedControl items={['5h', '7 dias', '30 dias', 'Total']} value={win} onChange={setWin} />
+        <span className="cap">janela ancorada no reset da conta</span>
+      </div>
+      <AppTextField placeholder="Filtrar projeto, branch ou modelo" value={q} onChange={setQ} />
+      <AppTextField label="Servidor do time" placeholder="https://usage.example.com" hint="A chave fica em ~/.usage-monitor/team.json, fora das preferências do registro." />
+      <div className="grid" style={{ gap: 10 }}>
+        <AppSwitch checked={auto} onChange={setAuto} label="Iniciar com o sistema" />
+        <AppSwitch checked={top} onChange={setTop} label="Sempre visível" />
+        <AppSwitch checked={false} disabled label="Atualização automática"
+          reason="macOS: o DMG não tem Developer ID, e remontar o bundle sob quarentena do Gatekeeper não fecha de forma confiável." />
+      </div>
+    </div>
+  );
+}
+(async () => {
+  DS = await window.DSReady('../../');
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+})();
+</script>
+</body>
+</html>

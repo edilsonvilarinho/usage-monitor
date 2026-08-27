@@ -1,0 +1,129 @@
+<!-- @dsCard group="Desktop app" viewport="1030x620" name="Usage Monitor — desktop" subtitle="Click-through recreation: dashboard, history, CLI sessions, team, presence, settings" -->
+<!-- @startingPoint section="Desktop app" subtitle="Full Usage Monitor click-through" viewport="1030x620" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usage Monitor — UI kit</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../../_ds_local.js"></script>
+<style>
+  body { display: flex; min-height: 100vh; }
+  nav.kit {
+    position: sticky; top: 0; align-self: flex-start; height: 100vh; width: 208px; flex: none;
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: var(--s4) var(--s3); display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+  }
+  nav.kit .brand { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+  nav.kit .brand b { font-family: var(--mono); font-size: var(--t12); font-weight: 500; letter-spacing: -.01em; }
+  nav.kit .grp { font-family: var(--mono); font-size: var(--t10); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: var(--s3) 0 var(--s1); }
+  nav.kit button {
+    text-align: left; font-family: var(--mono); font-size: var(--t12); padding: 6px var(--s2);
+    border: 0; border-left: 2px solid transparent; border-radius: var(--r1);
+    background: transparent; color: var(--muted); cursor: default;
+    transition: background var(--dur-hover) var(--ease);
+  }
+  nav.kit button:hover { background: var(--raised); color: var(--fg); }
+  nav.kit button[aria-current] { background: var(--raised); color: var(--fg); border-left-color: var(--fg); }
+  main.kit { flex: 1; padding: var(--s8); display: flex; flex-direction: column; gap: var(--s4); min-width: 0; overflow-x: auto; }
+  main.kit > #root { min-width: 1030px; }
+  .themebar { display: flex; align-items: center; gap: var(--s3); }
+</style>
+</head>
+<body>
+<nav class="kit">
+  <div class="brand">
+    <img src="../../assets/mark.svg" width="20" height="20" alt="">
+    <b>usage monitor</b>
+  </div>
+  <div id="nav"></div>
+</nav>
+<main class="kit">
+  <div class="themebar" id="themebar"></div>
+  <div id="root"></div>
+</main>
+
+<script type="text/babel" data-presets="react">
+const SCREENS = [
+  { id: 'dashboard', file: 'Dashboard.jsx', name: 'Dashboard', component: 'Dashboard', group: 'Painel' },
+  { id: 'cards', file: 'CardsOnly.jsx', name: 'Modo somente cards', component: 'CardsOnly', group: 'Painel' },
+  { id: 'history', file: 'History.jsx', name: 'Histórico', component: 'History', group: 'Consumo' },
+  { id: 'cli', file: 'CliSessions.jsx', name: 'Sessões CLI', component: 'CliSessions', group: 'Consumo' },
+  { id: 'detail', file: 'SessionDetail.jsx', name: 'Detalhe de sessão', component: 'SessionDetail', group: 'Consumo' },
+  { id: 'team', file: 'TeamUsage.jsx', name: 'Uso do time', component: 'TeamUsage', group: 'Time' },
+  { id: 'presence', file: 'Presence.jsx', name: 'Conectados agora', component: 'Presence', group: 'Time' },
+  { id: 'settings', file: 'Settings.jsx', name: 'Configurações', component: 'Settings', group: 'Sistema' }
+];
+
+const ORDER = ['dashboard', 'history', 'cli', 'detail', 'settings'];
+
+async function loadScreens(DS) {
+  const out = {};
+  for (const s of SCREENS) {
+    let src = await (await fetch(s.file)).text();
+    src = src.replace(/^[\t ]*import[^;]+;[\r\n]*/gm, '').replace(/\bexport\s+function\b/g, 'function');
+    const names = [];
+    const re = /function\s+([A-Za-z_$][\w$]*)/g;
+    let m;
+    while ((m = re.exec(src)) !== null) names.push(m[1]);
+    const code = Babel.transform(src, { presets: [['react', { runtime: 'classic' }]] }).code;
+    Object.assign(out, new Function('React', 'DS', code + '\nreturn {' + names.join(',') + '};')(React, DS));
+  }
+  return out;
+}
+
+function App({ DS, S }) {
+  const [screen, setScreen] = React.useState('dashboard');
+  const [theme, setTheme] = React.useState('dark');
+  React.useEffect(() => { document.documentElement.setAttribute('data-app-theme', theme); }, [theme]);
+
+  const { AppSegmentedControl, AppKey } = DS;
+  const groups = [];
+  SCREENS.forEach((s) => {
+    const g = groups.find((x) => x.name === s.group);
+    if (g) g.items.push(s); else groups.push({ name: s.group, items: [s] });
+  });
+
+  const openFromCard = (i) => setScreen(ORDER[i] || 'dashboard');
+  const current = SCREENS.find((s) => s.id === screen);
+  const Comp = S[current.component];
+
+  return (
+    <React.Fragment>
+      {ReactDOM.createPortal(
+        groups.map((g) => (
+          <React.Fragment key={g.name}>
+            <div className="grp">{g.name}</div>
+            {g.items.map((s) => (
+              <button key={s.id} type="button" aria-current={s.id === screen || undefined} onClick={() => setScreen(s.id)}>{s.name}</button>
+            ))}
+          </React.Fragment>
+        )),
+        document.getElementById('nav')
+      )}
+      {ReactDOM.createPortal(
+        <React.Fragment>
+          <AppKey>tema</AppKey>
+          <AppSegmentedControl items={[{ id: 'dark', label: 'Escuro' }, { id: 'light', label: 'Claro' }]} value={theme} onChange={setTheme} />
+          <span style={{ flex: 1 }} />
+          <AppKey>dados sintéticos · nenhuma conta, máquina ou chave real</AppKey>
+        </React.Fragment>,
+        document.getElementById('themebar')
+      )}
+      <Comp onOpen={openFromCard} onOpenSession={() => setScreen('detail')} />
+    </React.Fragment>
+  );
+}
+
+(async () => {
+  const DS = await window.DSReady('../../');
+  const S = await loadScreens(DS);
+  ReactDOM.createRoot(document.getElementById('root')).render(<App DS={DS} S={S} />);
+})();
+</script>
+</body>
+</html>

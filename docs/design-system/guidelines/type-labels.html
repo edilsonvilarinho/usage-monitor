@@ -1,0 +1,30 @@
+<!-- @dsCard group="Type" viewport="700x160" name="Label casing" subtitle="Mono 10 uppercase + .07em tracking for every eyebrow; sentence case for prose" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 128px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div class="g">
+  <div class="r"><span class="k">Sessão 5h</span><span class="k">Semanal</span><span class="k">Créditos de uso</span><span class="k">Ritmo</span><span class="k">Tempo ativo</span></div>
+  <div style="font-family:var(--mono);font-size:var(--t12)">Sessões CLI · Resumo · Tendência — <span style="color:var(--muted)">controles e abas em sentence case</span></div>
+  <div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Nunca versalete em título. Nunca uppercase acima de 10px.</div>
+</div>
+</body>
+</html>

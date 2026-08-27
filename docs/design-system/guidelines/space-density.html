@@ -1,0 +1,43 @@
+<!-- @dsCard group="Spacing" viewport="700x230" name="Two densities" subtitle="--s3/--s2 in the dashboard window; --s4 everywhere else" -->
+<!DOCTYPE html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 16px; width: 700px; height: 198px; overflow: hidden; }
+  .g { display: grid; gap: 8px; }
+  .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+  .sw .chip { height: 44px; }
+  .sw .lab { padding: 5px 8px; font-family: var(--mono); font-size: var(--t10); display: flex; justify-content: space-between; gap: 8px; background: var(--surface); }
+  .sw .lab span:last-child { color: var(--muted); }
+  .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
+  .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
+
+</style>
+</head>
+<body>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <div>
+    <div class="k" style="margin-bottom:6px">densa — dashboard</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r3);padding:var(--s3);display:flex;flex-direction:column;gap:var(--s2)">
+      <div style="height:26px;background:var(--raised);border:1px solid var(--border);border-radius:var(--r2)"></div>
+      <div style="height:26px;background:var(--raised);border:1px solid var(--border);border-radius:var(--r2)"></div>
+      <div style="height:26px;background:var(--raised);border:1px solid var(--border);border-radius:var(--r2)"></div>
+    </div>
+  </div>
+  <div>
+    <div class="k" style="margin-bottom:6px">padrão — demais janelas</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r3);padding:var(--s4);display:flex;flex-direction:column;gap:var(--s3)">
+      <div style="height:26px;background:var(--raised);border:1px solid var(--border);border-radius:var(--r2)"></div>
+      <div style="height:26px;background:var(--raised);border:1px solid var(--border);border-radius:var(--r2)"></div>
+    </div>
+  </div>
+</div>
+<div class="k" style="margin-top:10px">a janela do dashboard fica estreita ao lado do editor — 16+16px não deixavam a cota caber numa linha</div>
+</body>
+</html>
