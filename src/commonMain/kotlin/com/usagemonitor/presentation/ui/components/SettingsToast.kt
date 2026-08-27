@@ -13,6 +13,7 @@ enum class SettingsField {
     UI_SCALE,
     ALERTS,
     MONITORED_APIS,
+    API_KEY,
     ANTHROPIC_PROFILES,
     ANTHROPIC_PROFILE_LABEL,
     TEAM_INTEGRATION,
@@ -91,6 +92,7 @@ private fun savedMessage(field: SettingsField, isPt: Boolean): String {
         SettingsField.UI_SCALE -> "Tamanho da interface salvo"
         SettingsField.ALERTS -> "Preferências de alerta salvas"
         SettingsField.MONITORED_APIS -> "APIs monitoradas salvas"
+        SettingsField.API_KEY -> "Chave de API salva"
         SettingsField.ANTHROPIC_PROFILES -> "Contas Anthropic salvas"
         SettingsField.ANTHROPIC_PROFILE_LABEL -> "Apelido da conta salvo"
         SettingsField.TEAM_INTEGRATION -> "Integração com time salva"
@@ -113,6 +115,7 @@ private fun fieldLabel(field: SettingsField, isPt: Boolean): String {
         SettingsField.UI_SCALE -> if (isPt) "tamanho da interface" else "Interface size"
         SettingsField.ALERTS -> if (isPt) "preferências de alerta" else "Alert preferences"
         SettingsField.MONITORED_APIS -> if (isPt) "APIs monitoradas" else "Monitored APIs"
+        SettingsField.API_KEY -> if (isPt) "chave de API" else "API key"
         SettingsField.ANTHROPIC_PROFILES -> if (isPt) "contas Anthropic" else "Anthropic accounts"
         SettingsField.ANTHROPIC_PROFILE_LABEL -> if (isPt) "apelido da conta" else "Account label"
         SettingsField.TEAM_INTEGRATION -> if (isPt) "integração com time" else "Team integration"

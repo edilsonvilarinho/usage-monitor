@@ -328,14 +328,14 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     }
 
     @Test
-    fun `classifies MiniMax missing env var for persistent warning`() = runTest {
+    fun `classifies MiniMax missing API key for persistent warning`() = runTest {
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.success(sampleAnthropicStats)
         }
         val minimaxRepo = object : MiniMaxRepository {
             override suspend fun getUsage() = Result.failure<ApiUsageStats>(
-                IllegalStateException("Variável de ambiente MINIMAX_API_KEY não configurada.")
+                IllegalStateException("Chave da API MiniMax não configurada.")
             )
         }
         val codexRepo = object : CodexRepository {
@@ -362,7 +362,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         assertIs<UiState.Success>(state)
         assertEquals(1, state.errors.size)
         assertEquals(ApiSource.MINIMAX, state.errors.first().source)
-        assertTrue(state.errors.first().isMiniMaxEnvVarIssue)
+        assertTrue(state.errors.first().isMiniMaxApiKeyIssue)
         viewModel.onDestroy()
     }
 

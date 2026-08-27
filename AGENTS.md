@@ -19,12 +19,12 @@ gradlew.bat clean                             % limpa artefatos
 
 **Importante:** a task raiz `test` nao existe neste projeto KMP. Use `allTests`, `desktopTest` ou `build`.
 
-**Env var obrigatoria para MiniMax:**
-```bat
-set MINIMAX_API_KEY=your_key_here
-```
+**Chaves obrigatórias para MiniMax e DeepSeek:**
 
-Se a MiniMax estiver habilitada e a env var nao existir, o repositorio falha explicitamente.
+Ao habilitar qualquer uma das duas em Configurações -> APIs, a aplicação abre um
+campo mascarado para a API key. A chave é persistida em
+`~/.usage-monitor/api-keys.json`, com escrita atômica e acesso restrito ao usuário.
+As variáveis de ambiente não são lidas pela aplicação.
 
 ## Architecture
 
@@ -75,7 +75,7 @@ Regras importantes:
 ### MiniMax
 
 - Endpoint: `GET https://www.minimax.io/v1/token_plan/remains`
-- Autenticacao: `MINIMAX_API_KEY` via env var
+- Autenticacao: API key informada em Configurações -> APIs
 - **Nunca hardcode** a chave
 - A app hoje filtra quotas do modelo `MiniMax-M*`
 
@@ -86,7 +86,7 @@ Regras importantes:
   - bearer token de `~/.codex/auth.json` -> `tokens.access_token`
   - cookie `cap_sid` lido de `~/.codex/cap_sid`
 - O endpoint legado hoje deve ser tratado como fonte da quota 5h
-- A quota semanal do Codex depende de uma segunda fonte ainda nao descoberta/validada
+  - A quota semanal do Codex depende de uma segunda fonte ainda nao descoberta/validada
 
 ## Persistence and preferences
 

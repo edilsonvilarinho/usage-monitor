@@ -30,7 +30,7 @@ class DeepSeekRepositoryImplTest {
     fun `returns success when api key present and response ok`() = kotlinx.coroutines.test.runTest {
         val repo = DeepSeekRepositoryImpl(
             apiDataSource = fakeDataSource(successResponse),
-            envVarReader = { "test-key" }
+            apiKeyReader = { "test-key" }
         )
 
         val result = repo.getUsage()
@@ -43,13 +43,13 @@ class DeepSeekRepositoryImplTest {
     fun `returns failure when api key missing`() = kotlinx.coroutines.test.runTest {
         val repo = DeepSeekRepositoryImpl(
             apiDataSource = fakeDataSource(successResponse),
-            envVarReader = { null }
+            apiKeyReader = { null }
         )
 
         val result = repo.getUsage()
 
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()!!.message!!.contains("DEEPSEEK_API_KEY"))
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("Chave da API DeepSeek não configurada"))
     }
 
     @Test
@@ -62,7 +62,7 @@ class DeepSeekRepositoryImplTest {
 
         val repo = DeepSeekRepositoryImpl(
             apiDataSource = datasource,
-            envVarReader = { "test-key" }
+            apiKeyReader = { "test-key" }
         )
 
         val result = repo.getUsage()

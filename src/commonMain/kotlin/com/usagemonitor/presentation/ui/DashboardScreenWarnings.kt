@@ -154,19 +154,19 @@ internal fun warningFor(
         }
     }
 
-    if (error.isMiniMaxEnvVarIssue) {
+    if (error.isMiniMaxApiKeyIssue) {
         return if (language == AppLanguage.PT) {
             DashboardWarning(
                 target = error.target,
-                title = "MiniMax precisa de MINIMAX_API_KEY",
-                description = "Defina `MINIMAX_API_KEY` antes de abrir o app e reinicie o monitor. Windows: `set MINIMAX_API_KEY=sua_chave`. No macOS, o app aberto pelo Finder não herda o `export` do shell: use `launchctl setenv MINIMAX_API_KEY sua_chave`.",
+                title = "MiniMax precisa de uma API key",
+                description = "Abra Configurações > APIs, informe a chave da MiniMax e tente atualizar novamente.",
                 actionLabel = null
             )
         } else {
             DashboardWarning(
                 target = error.target,
-                title = "MiniMax needs MINIMAX_API_KEY",
-                description = "Set `MINIMAX_API_KEY` before opening the app and restart the monitor. Windows: `set MINIMAX_API_KEY=your_key`. On macOS the app launched from Finder does not inherit the shell `export`: use `launchctl setenv MINIMAX_API_KEY your_key`.",
+                title = "MiniMax needs an API key",
+                description = "Open Settings > APIs, enter the MiniMax key, and try refreshing again.",
                 actionLabel = null
             )
         }

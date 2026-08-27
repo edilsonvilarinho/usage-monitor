@@ -37,7 +37,7 @@ class DashboardScreenWarningsTest {
         val warning = warningFor(
             error = UiApiError(
                 source = ApiSource.MINIMAX,
-                message = "MINIMAX_API_KEY não configurada"
+                message = "Chave da API MiniMax não configurada"
             ),
             language = AppLanguage.PT
         )

@@ -72,8 +72,8 @@ data class UiApiError(
     val isAnthropicCredentialIssue: Boolean
         get() = source == ApiSource.ANTHROPIC && isAnthropicCredentialMessage(message)
 
-    val isMiniMaxEnvVarIssue: Boolean
-        get() = source == ApiSource.MINIMAX && isMiniMaxEnvVarMessage(message)
+    val isMiniMaxApiKeyIssue: Boolean
+        get() = source == ApiSource.MINIMAX && isMiniMaxApiKeyMessage(message)
 
     val isMiniMaxInactivePlanIssue: Boolean
         get() = source == ApiSource.MINIMAX && isMiniMaxInactivePlanMessage(message)
@@ -92,7 +92,7 @@ data class UiApiError(
 
     val isConfigurationIssue: Boolean
         get() = isAnthropicCredentialIssue ||
-            isMiniMaxEnvVarIssue ||
+            isMiniMaxApiKeyIssue ||
             isMiniMaxInactivePlanIssue ||
             isOpenCodeLocalIssue ||
             isKiloLocalIssue
@@ -122,7 +122,7 @@ private fun sourceLabel(source: ApiSource): String {
 }
 
 // Marcadores usados para classificar erros como problemas de configuração
-// (ex.: arquivo de credenciais ausente, env var faltando). Mantidos como
+// (ex.: arquivo de credenciais ausente, chave de API ausente). Mantidos como
 // substrings para tolerar pequenas variações de formatação nas mensagens.
 private val ANTHROPIC_CREDENTIAL_MARKERS = listOf(
     "Credenciais não encontradas",
@@ -139,8 +139,8 @@ private val ANTHROPIC_CREDENTIAL_MARKERS = listOf(
     "Claude Code session is missing the expected permission or is outdated"
 )
 
-private const val MINIMAX_ENV_VAR_NAME = "MINIMAX_API_KEY"
-private val MINIMAX_ENV_VAR_STATE_MARKERS = listOf("não configurada", "not configured")
+private const val MINIMAX_API_KEY_MISSING_MARKER = "Chave da API MiniMax não configurada"
+private const val MINIMAX_API_KEY_MISSING_MARKER_EN = "MiniMax API key not configured"
 private val MINIMAX_INACTIVE_PLAN_MARKERS = listOf(
     "MiniMax sem plano/token ativo",
     "no active token plan subscription",
@@ -172,11 +172,9 @@ private fun isAnthropicCredentialMessage(message: String): Boolean {
     return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }
 
-private fun isMiniMaxEnvVarMessage(message: String): Boolean {
-    if (!message.contains(MINIMAX_ENV_VAR_NAME, ignoreCase = true)) {
-        return false
-    }
-    return MINIMAX_ENV_VAR_STATE_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+private fun isMiniMaxApiKeyMessage(message: String): Boolean {
+    return message.contains(MINIMAX_API_KEY_MISSING_MARKER, ignoreCase = true) ||
+        message.contains(MINIMAX_API_KEY_MISSING_MARKER_EN, ignoreCase = true)
 }
 
 private fun isMiniMaxInactivePlanMessage(message: String): Boolean {

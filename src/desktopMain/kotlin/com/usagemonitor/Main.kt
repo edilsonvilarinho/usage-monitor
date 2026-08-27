@@ -37,6 +37,7 @@ import com.usagemonitor.data.datasource.LocalAnthropicCreditsDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
+import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
@@ -295,8 +296,21 @@ fun main(args: Array<String>) = application {
     val preferencesNode = remember { Preferences.userRoot().node("com.usagemonitor") }
     val settings = remember(preferencesNode) { PreferencesSettings(preferencesNode) }
 
-    val persistedApis = remember(settings) {
+    // Chaves de API são segredos: não entram em PreferencesSettings, que grava
+    // os valores em claro no registro do Windows.
+    val apiKeyDataSource = remember { LocalApiKeyDataSource() }
+    val apiKeySettings = remember(apiKeyDataSource) {
+        MutableStateFlow(apiKeyDataSource.load())
+    }
+    val currentApiKeySettings by apiKeySettings.collectAsState()
+
+    val persistedApis = remember(settings, currentApiKeySettings) {
         readApiSourceCollection(settings, ENABLED_APIS_KEY)
+            .toSet()
+            .filter { source ->
+                source != ApiSource.MINIMAX && source != ApiSource.DEEPSEEK ||
+                    currentApiKeySettings.forSource(source) != null
+            }
             .toSet()
             .ifEmpty { DEFAULT_ENABLED_APIS }
     }
@@ -418,13 +432,19 @@ fun main(args: Array<String>) = application {
         AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
     }
     val minimaxRepository = remember(remoteApiDataSource) {
-        MiniMaxRepositoryImpl(remoteApiDataSource)
+        MiniMaxRepositoryImpl(
+            apiDataSource = remoteApiDataSource,
+            apiKeyReader = { apiKeySettings.value.forSource(ApiSource.MINIMAX) }
+        )
     }
     val codexRepository = remember(codexAuthDataSource, remoteApiDataSource) {
         CodexRepositoryImpl(codexAuthDataSource, remoteApiDataSource)
     }
     val deepSeekRepository = remember(remoteApiDataSource) {
-        DeepSeekRepositoryImpl(remoteApiDataSource)
+        DeepSeekRepositoryImpl(
+            apiDataSource = remoteApiDataSource,
+            apiKeyReader = { apiKeySettings.value.forSource(ApiSource.DEEPSEEK) }
+        )
     }
     val openCodeRepository = remember(openCodeUsageDataSource) {
         OpenCodeRepositoryImpl(openCodeUsageDataSource)
@@ -1722,6 +1742,7 @@ fun main(args: Array<String>) = application {
                         currentTheme = themePreset,
                         currentLanguage = language,
                         enabledApis = enabledApisState,
+                        configuredApiKeys = currentApiKeySettings.configuredSources(),
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
                         cardsOnlyMode = cardsOnlyMode,
@@ -1806,6 +1827,21 @@ fun main(args: Array<String>) = application {
                             writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
                             viewModel.refresh(api)
                             showSettingsToast(SettingsToast.Saved(SettingsField.MONITORED_APIS))
+                        },
+                        onApiKeySave = { api, apiKey ->
+                            runCatching {
+                                apiKeyDataSource.save(api, apiKey)
+                                apiKeySettings.value = apiKeySettings.value.withKey(api, apiKey.trim())
+                            }.fold(
+                                onSuccess = {
+                                    showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
+                                    true
+                                },
+                                onFailure = {
+                                    showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
+                                    false
+                                }
+                            )
                         },
                         anthropicProfiles = profileUiModels,
                         onAnthropicProfileToggle = { profileId, checked ->

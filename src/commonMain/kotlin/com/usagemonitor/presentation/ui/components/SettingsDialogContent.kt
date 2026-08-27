@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -41,6 +42,10 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +55,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
@@ -69,6 +75,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
+const val API_KEY_DIALOG_FIELD_TEST_TAG = "apiKeyDialogField"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 
 /** Mesma razão da tag de opacidade: "115%" também é rótulo de chip no cartão de alertas. */
@@ -123,6 +130,7 @@ fun SettingsDialogContent(
     currentTheme: AppThemePreset,
     currentLanguage: AppLanguage,
     enabledApis: Set<ApiSource>,
+    configuredApiKeys: Set<ApiSource> = emptySet(),
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean = false,
     cardsOnlyMode: Boolean = false,
@@ -157,6 +165,7 @@ fun SettingsDialogContent(
     monthlyBudgetText: String = "",
     onMonthlyBudgetCommit: (String) -> Unit = {},
     onApiToggle: (ApiSource, Boolean) -> Unit,
+    onApiKeySave: (ApiSource, String) -> Boolean = { _, _ -> false },
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
     onAnthropicProfileRename: (String, String) -> Unit = { _, _ -> },
@@ -277,7 +286,9 @@ fun SettingsDialogContent(
                     SettingsTab.APIS -> MonitoredApisTab(
                         currentLanguage = currentLanguage,
                         enabledApis = enabledApis,
-                        onApiToggle = onApiToggle
+                        configuredApiKeys = configuredApiKeys,
+                        onApiToggle = onApiToggle,
+                        onApiKeySave = onApiKeySave
                     )
 
                     SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
@@ -481,8 +492,12 @@ private fun GeneralSettingsTab(
 private fun MonitoredApisTab(
     currentLanguage: AppLanguage,
     enabledApis: Set<ApiSource>,
-    onApiToggle: (ApiSource, Boolean) -> Unit
+    configuredApiKeys: Set<ApiSource>,
+    onApiToggle: (ApiSource, Boolean) -> Unit,
+    onApiKeySave: (ApiSource, String) -> Boolean
 ) {
+    var pendingApiKeySource by remember { mutableStateOf<ApiSource?>(null) }
+
     AppDataSurfaceFlush(
         header = {
             AppSectionHeader(
@@ -492,10 +507,141 @@ private fun MonitoredApisTab(
     ) {
         ApiSelector(
             enabledApis = enabledApis,
+            configuredApiKeys = configuredApiKeys,
             language = currentLanguage,
-            onToggle = onApiToggle
+            onToggle = { api, checked ->
+                if (checked && api.requiresApiKey() && api !in configuredApiKeys) {
+                    pendingApiKeySource = api
+                } else {
+                    onApiToggle(api, checked)
+                }
+            }
         )
     }
+
+    val source = pendingApiKeySource
+    if (source != null) {
+        ApiKeyDialog(
+            source = source,
+            language = currentLanguage,
+            onSave = { apiKey ->
+                if (onApiKeySave(source, apiKey)) {
+                    onApiToggle(source, true)
+                    pendingApiKeySource = null
+                }
+            },
+            onDismiss = { pendingApiKeySource = null }
+        )
+    }
+}
+
+private fun ApiSource.requiresApiKey(): Boolean {
+    return this == ApiSource.MINIMAX || this == ApiSource.DEEPSEEK
+}
+
+@Composable
+private fun ApiKeyDialog(
+    source: ApiSource,
+    language: AppLanguage,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isPt = language == AppLanguage.PT
+    var apiKey by remember(source) { mutableStateOf("") }
+    var revealed by remember(source) { mutableStateOf(false) }
+    var showError by remember(source) { mutableStateOf(false) }
+    val sourceName = source.displayName(language)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (isPt) "Configurar $sourceName" else "Configure $sourceName",
+                style = MaterialTheme.typography.titleSmall
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                Text(
+                    text = if (isPt) {
+                        "Informe a API key para habilitar esta integração. A chave será armazenada localmente com acesso restrito."
+                    } else {
+                        "Enter the API key to enable this integration. The key is stored locally with restricted access."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = if (isPt) "API key" else "API key",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+                ) {
+                    AppTextField(
+                        value = apiKey,
+                        onValueChange = {
+                            apiKey = it
+                            showError = false
+                        },
+                        visualTransformation = if (revealed) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        modifier = Modifier.weight(1f).testTag(API_KEY_DIALOG_FIELD_TEST_TAG)
+                    )
+                    AppIconButton(
+                        contentDescription = if (revealed) {
+                            if (isPt) "Ocultar chave" else "Hide key"
+                        } else {
+                            if (isPt) "Mostrar chave" else "Show key"
+                        },
+                        onClick = { revealed = !revealed }
+                    ) {
+                        Icon(
+                            imageVector = if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (showError) {
+                    Text(
+                        text = if (isPt) "Informe uma API key." else "Enter an API key.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        shape = AppShapes.large,
+        containerColor = MaterialTheme.colorScheme.surface,
+        confirmButton = {
+            AppButton(
+                label = if (isPt) "Salvar" else "Save",
+                tone = AppButtonTone.PRIMARY,
+                onClick = {
+                    val normalized = apiKey.trim()
+                    if (normalized.isBlank()) {
+                        showError = true
+                    } else {
+                        onSave(normalized)
+                    }
+                }
+            )
+        },
+        dismissButton = {
+            AppButton(
+                label = if (isPt) "Cancelar" else "Cancel",
+                tone = AppButtonTone.GHOST,
+                onClick = onDismiss
+            )
+        }
+    )
 }
 
 @Composable

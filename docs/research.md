@@ -119,15 +119,13 @@ GET https://www.minimax.io/v1/token_plan/remains
 
 ### Autenticação
 
-A API Key é lida **exclusivamente** de variável de ambiente (segurança — nunca hardcoded):
-```kotlin
-val apiKey = System.getenv("MINIMAX_API_KEY")
-    ?: error("Variável de ambiente MINIMAX_API_KEY não configurada")
-```
+No aplicativo, a API Key é informada em **Configurações > APIs** quando a
+integração é habilitada e persistida em `~/.usage-monitor/api-keys.json`, com
+escrita atômica e acesso restrito ao usuário. Variáveis de ambiente não são lidas.
 
-Header HTTP:
+Header HTTP (a chave vem do armazenamento local da aplicação):
 ```
-Authorization: Bearer <MINIMAX_API_KEY>
+Authorization: Bearer <api-key>
 Content-Type: application/json
 ```
 
@@ -143,7 +141,7 @@ Execute o comando abaixo e cole o JSON de resposta neste documento:
 
 ```bash
 curl --location 'https://www.minimax.io/v1/token_plan/remains' \
-  --header "Authorization: Bearer $MINIMAX_API_KEY" \
+  --header "Authorization: Bearer <api-key>" \
   --header 'Content-Type: application/json'
 ```
 
@@ -202,7 +200,7 @@ curl --location 'https://www.minimax.io/v1/token_plan/remains' \
 | Decisão | Justificativa |
 |---------|---------------|
 | OAuth token para Anthropic | Único token disponível no `.credentials.json`; não é uma API key de developer |
-| MINIMAX_API_KEY via env var | Segurança — proibido hardcode por protocolo do projeto |
+| API key local protegida | Segurança — proibido hardcode e proibida gravação em preferências comuns |
 | `GET /api/oauth/usage` para Anthropic | Leitura direta das janelas e dos créditos, sem consumir token do plano |
 | Polling a cada 10 minutos | Equilíbrio entre atualização e carga na API |
 | Timezone `America/Sao_Paulo` | Requisito explícito do projeto; label "BRT" em PT-BR |

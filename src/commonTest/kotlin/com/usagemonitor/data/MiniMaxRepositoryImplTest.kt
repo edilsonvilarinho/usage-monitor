@@ -18,18 +18,17 @@ import kotlin.test.assertTrue
 class MiniMaxRepositoryImplTest {
 
     @Test
-    fun `returns failure when env var missing`() = runTest {
+    fun `returns failure when api key missing`() = runTest {
         val repo = MiniMaxRepositoryImpl(
             apiDataSource = stubRemote(successResponse()),
-            envVarReader = { null }
+            apiKeyReader = { null }
         )
 
         val result = repo.getUsage()
 
         assertTrue(result.isFailure)
         val message = result.exceptionOrNull()?.message ?: ""
-        assertTrue(message.contains("MINIMAX_API_KEY"))
-        assertTrue(message.contains("não configurada"))
+        assertTrue(message.contains("Chave da API MiniMax não configurada"))
     }
 
     @Test
@@ -40,7 +39,7 @@ class MiniMaxRepositoryImplTest {
         )
         val repo = MiniMaxRepositoryImpl(
             apiDataSource = stubRemote(response),
-            envVarReader = { "fake-key" }
+            apiKeyReader = { "fake-key" }
         )
 
         val result = repo.getUsage()
@@ -62,7 +61,7 @@ class MiniMaxRepositoryImplTest {
         )
         val repo = MiniMaxRepositoryImpl(
             apiDataSource = stubRemote(response),
-            envVarReader = { "fake-key" }
+            apiKeyReader = { "fake-key" }
         )
 
         val result = repo.getUsage()
@@ -76,7 +75,7 @@ class MiniMaxRepositoryImplTest {
     fun `returns success and maps response when status_code is 0`() = runTest {
         val repo = MiniMaxRepositoryImpl(
             apiDataSource = stubRemote(successResponse()),
-            envVarReader = { "fake-key" }
+            apiKeyReader = { "fake-key" }
         )
 
         val stats = repo.getUsage().getOrNull()

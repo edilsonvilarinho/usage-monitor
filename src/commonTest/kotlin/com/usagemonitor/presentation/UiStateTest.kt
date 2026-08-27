@@ -68,36 +68,36 @@ class UiStateTest {
     }
 
     @Test
-    fun `isMiniMaxEnvVarIssue true for PT env-var message`() {
+    fun `isMiniMaxApiKeyIssue true for PT missing-key message`() {
         val error = UiApiError(
             source = ApiSource.MINIMAX,
-            message = "Variável de ambiente MINIMAX_API_KEY não configurada."
+            message = "Chave da API MiniMax não configurada."
         )
-        assertTrue(error.isMiniMaxEnvVarIssue)
+        assertTrue(error.isMiniMaxApiKeyIssue)
     }
 
     @Test
-    fun `isMiniMaxEnvVarIssue true for EN env-var message`() {
+    fun `isMiniMaxApiKeyIssue true for EN missing-key message`() {
         val error = UiApiError(
             source = ApiSource.MINIMAX,
-            message = "Environment variable MINIMAX_API_KEY not configured"
+            message = "MiniMax API key not configured"
         )
-        assertTrue(error.isMiniMaxEnvVarIssue)
+        assertTrue(error.isMiniMaxApiKeyIssue)
     }
 
     @Test
-    fun `isMiniMaxEnvVarIssue false when message lacks env var name`() {
+    fun `isMiniMaxApiKeyIssue false when message lacks key marker`() {
         val error = UiApiError(source = ApiSource.MINIMAX, message = "não configurada")
-        assertFalse(error.isMiniMaxEnvVarIssue)
+        assertFalse(error.isMiniMaxApiKeyIssue)
     }
 
     @Test
-    fun `isMiniMaxEnvVarIssue false when source is Anthropic`() {
+    fun `isMiniMaxApiKeyIssue false when source is Anthropic`() {
         val error = UiApiError(
             source = ApiSource.ANTHROPIC,
-            message = "MINIMAX_API_KEY not configured"
+            message = "MiniMax API key not configured"
         )
-        assertFalse(error.isMiniMaxEnvVarIssue)
+        assertFalse(error.isMiniMaxApiKeyIssue)
     }
 
     @Test
@@ -130,7 +130,7 @@ class UiStateTest {
     @Test
     fun `isConfigurationIssue true if any sub-check passes`() {
         val anthropicError = UiApiError(source = ApiSource.ANTHROPIC, message = "Credenciais não encontradas")
-        val miniMaxError = UiApiError(source = ApiSource.MINIMAX, message = "MINIMAX_API_KEY not configured")
+        val miniMaxError = UiApiError(source = ApiSource.MINIMAX, message = "MiniMax API key not configured")
         val inactivePlanError = UiApiError(
             source = ApiSource.MINIMAX,
             message = "MiniMax sem plano/token ativo"

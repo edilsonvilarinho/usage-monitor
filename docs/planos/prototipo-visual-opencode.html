@@ -1523,11 +1523,22 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="body"><div class="panel"><div class="phead"><span class="ptitle">APIs monitoradas</span></div><div class="pbody flush">
     <div class="row"><span class="srcmark" style="background:var(--anthropic)"></span><span class="v sm" style="flex:1">Anthropic</span><span class="st ok">Credencial válida</span><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--codex)"></span><span class="v sm" style="flex:1">Codex</span><span class="st warn">Fonte instável</span><span class="sw on"></span></div>
-    <div class="row"><span class="srcmark" style="background:var(--deepseek)"></span><span class="v sm" style="flex:1">DeepSeek</span><span class="st ok">Credencial válida</span><span class="sw on"></span></div>
-    <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st crit">MINIMAX_API_KEY ausente</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--deepseek)"></span><span class="v sm" style="flex:1">DeepSeek</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode</span><span class="st off">Desativada</span><span class="sw"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo</span><span class="st off">Desativada</span><span class="sw"></span></div>
   </div></div></div>
+</div>
+<p class="note"><b>Ativação de MiniMax e DeepSeek.</b> Ao ligar uma dessas integrações sem chave cadastrada, o interruptor não é persistido imediatamente: abre-se o diálogo abaixo. A chave é mascarada por padrão, pode ser revelada pelo olho e só habilita a integração depois de <b>Salvar</b>. Ela fica em armazenamento local protegido; variáveis de ambiente não são lidas.</p>
+<div class="win small" style="max-width:560px;margin:0 auto 28px">
+  <div class="titlebar"><span class="brand">◉</span><span>Configurar MiniMax</span><span class="sp"></span><span class="x">×</span></div>
+  <div class="body"><div class="panel">
+    <div class="phead"><span class="ptitle">Chave da API</span></div>
+    <div class="pbody">
+      <div class="stack"><span class="k">Informe a API key para habilitar esta integração. A chave será armazenada localmente com acesso restrito.</span><div class="hstack"><input class="field" type="password" value="sk-minimax-exemplo-nao-use" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div></div>
+      <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Cancelar</button><button class="btn" type="button">Salvar</button></div>
+    </div>
+  </div></div>
 </div>
 
 <h2 id="cfg-contas">12d · Configurações — Contas</h2>

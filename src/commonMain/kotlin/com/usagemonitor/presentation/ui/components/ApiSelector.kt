@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,10 @@ import com.usagemonitor.domain.entity.statusSupportingText
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+
+const val API_SELECTOR_ROW_TEST_TAG_PREFIX = "apiSelectorRow_"
+
+fun apiSelectorRowTestTag(api: ApiSource): String = "$API_SELECTOR_ROW_TEST_TAG_PREFIX${api.name}"
 
 /**
  * As seis integrações, uma por linha, com o interruptor à direita.
@@ -41,6 +46,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 @Composable
 fun ApiSelector(
     enabledApis: Set<ApiSource>,
+    configuredApiKeys: Set<ApiSource> = emptySet(),
     language: AppLanguage,
     onToggle: (ApiSource, Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -51,6 +57,7 @@ fun ApiSelector(
                 api = api,
                 language = language,
                 isChecked = api in enabledApis,
+                hasConfiguredApiKey = api in configuredApiKeys,
                 onCheckedChange = { checked -> onToggle(api, checked) },
                 showDivider = index != ApiSource.entries.lastIndex
             )
@@ -75,11 +82,20 @@ fun ApiCheckboxRow(
     api: ApiSource,
     language: AppLanguage = AppLanguage.PT,
     isChecked: Boolean,
+    hasConfiguredApiKey: Boolean = false,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     showDivider: Boolean = false
 ) {
-    val badgeLabel = api.statusBadgeLabel(language)
+    val badgeLabel = if (api == ApiSource.MINIMAX || api == ApiSource.DEEPSEEK) {
+        if (hasConfiguredApiKey) {
+            if (language == AppLanguage.PT) "Chave configurada" else "Key configured"
+        } else {
+            if (language == AppLanguage.PT) "Chave necessária" else "Key required"
+        }
+    } else {
+        api.statusBadgeLabel(language)
+    }
     val supportingText = api.statusSupportingText(language)
 
     AppDataRow(
@@ -87,7 +103,7 @@ fun ApiCheckboxRow(
             value = isChecked,
             role = Role.Checkbox,
             onValueChange = onCheckedChange
-        ),
+        ).testTag(apiSelectorRowTestTag(api)),
         showDivider = showDivider
     ) {
         // A identidade da fonte cabe no traço de 2dp, como no card do dashboard.

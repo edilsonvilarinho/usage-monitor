@@ -62,6 +62,8 @@ import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_HINT_TA
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
+import com.usagemonitor.presentation.ui.components.apiSelectorRowTestTag
+import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -1946,6 +1948,43 @@ class ComponentTest {
     }
 
     // ── SettingsDialogContent ───────────────────────────────────────────
+
+    @Test
+    fun `SettingsDialogContent requests an API key before enabling MiniMax`() = runDesktopComposeUiTest {
+        var toggledApi: ApiSource? = null
+        var savedKey: String? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { api, checked ->
+                        if (checked) toggledApi = api
+                    },
+                    onApiKeySave = { api, key ->
+                        savedKey = "$api:$key"
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorRowTestTag(ApiSource.MINIMAX)).performClick()
+        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
+        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-secret")
+        onNodeWithText("Salvar").performClick()
+
+        assertEquals("MINIMAX:minimax-secret", savedKey)
+        assertEquals(ApiSource.MINIMAX, toggledApi)
+    }
 
     /**
      * Issue #70: o interruptor que esconde a moldura da janela mora ao lado de

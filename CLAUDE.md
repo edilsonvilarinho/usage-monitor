@@ -36,11 +36,6 @@ gradlew.bat koverHtmlReport -Pcoverage
 gradlew.bat clean
 ```
 
-Antes de rodar, definir variável de ambiente:
-```bat
-set MINIMAX_API_KEY=sua_chave_aqui
-```
-
 Servidor de time (`server/`, opcional — só quem usa a integração com time):
 ```bash
 cd server
@@ -74,7 +69,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
 ### Camada data (`commonMain/data/` + `desktopMain/data/`)
 
 - DTOs com `@Serializable` + `@SerialName` para mapear snake_case do JSON.
-- `LocalCredentialDataSource` em **desktopMain** (usa `java.io.File`). Lê `~/.claude/.credentials.json` → `claudeAiOauth.accessToken`. Valida `expiresAt`. A origem sai de `AnthropicCredentialStore`: o ficheiro tem prioridade sempre; **no macOS**, quando ele não existe, cai na entrada `Claude Code-credentials` do Keychain via `security` (só para o perfil padrão — perfis de `CLAUDE_CONFIG_DIR` não têm entrada lá). A gravação pós-refresh volta para a mesma origem.
+- `LocalCredentialDataSource` e `LocalApiKeyDataSource` ficam em **desktopMain** (usam `java.io.File`). O primeiro lê `~/.claude/.credentials.json` → `claudeAiOauth.accessToken`; o segundo persiste as chaves MiniMax/DeepSeek em `~/.usage-monitor/api-keys.json`, com escrita atômica e acesso restrito ao usuário. A origem Anthropic sai de `AnthropicCredentialStore`: o ficheiro tem prioridade sempre; **no macOS**, quando ele não existe, cai na entrada `Claude Code-credentials` do Keychain via `security` (só para o perfil padrão — perfis de `CLAUDE_CONFIG_DIR` não têm entrada lá). A gravação pós-refresh volta para a mesma origem.
 - **Renovação do token OAuth** (`LocalCredentialDataSource.refreshToken`): o corpo do `POST` precisa de `client_id` e `scope` além de `grant_type`/`refresh_token`. O endpoint valida o **formato** antes de olhar o grant: sem `client_id` responde `HTTP 400 "Invalid request format"` com qualquer refresh token, e era por isso que a renovação nunca acontecia — o app dependia do CLI para renovar e a tela pedia login a cada ~8h (issue #64). `OAUTH_REFRESH_URL` (`platform.claude.com/v1/oauth/token`), o client id e os escopos default são **espelhados da configuração de produção do binário do CLI**; o client id é público, vem embutido no binário distribuído. O `scope` sai dos escopos do próprio ficheiro quando existem — pedir a lista fixa numa conta com menos escopos seria pedir permissão que ela não concedeu.
   - **O status HTTP é checado antes de desserializar.** `TokenRefreshResponse` tem todos os campos opcionais e o `HttpClient` não liga `expectSuccess`: o corpo de erro `{"type":"error",...}` desserializa **sem lançar**, e a falha chegava à tela como "sem access_token", sem status nem motivo. Foi por isso que o episódio de abril de 2026 (commit `198a0a7`, logs depois removidos) não deixou rastro.
   - **A regravação é patch de `JsonObject`, não `encodeToString(CredentialsFileDto)`.** O ficheiro tem nós que o app não declara — `mcpOAuth` (autenticação dos MCP servers) e `refreshTokenExpiresAt` —, e o roundtrip pelo DTO com `ignoreUnknownKeys` os apagava em silêncio. Só `accessToken`/`refreshToken`/`expiresAt` são substituídos. Ao acrescentar campo ao `OAuthCredentialsDto`, pergunte se a escrita ainda preserva o que ele não conhece.
@@ -84,7 +79,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
   - **`is_enabled` falso continua escondendo a linha em silêncio** — é o estado normal de quem não contratou créditos, e avisar ali viraria alerta permanente. Só `LIMIT_ABSENT` e `UNSUPPORTED_EXPONENT` (`AnthropicCreditsOutcome.signalsFailure`) viram `ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE`, que a `ApiUsageCard` mostra **também com o card minimizado**: foi o card fechado que escondeu o episódio. O aviso vive no **cabeçalho**, que é composto nos dois estados — ver `CardNoticeHint`.
   - **Expoente monetário diferente de 2 não vira cota.** `formatCents` assume duas casas; aceitar outro expoente mostraria o valor errado por um fator de dez, o que é pior que omitir a linha.
   - **Diagnóstico opt-in** (`USAGE_MONITOR_DEBUG_ANTHROPIC_CREDITS=1` → `~/.usage-monitor/diagnostics/anthropic-credits.jsonl`, mesmo desenho do recorder do Codex): guarda os nós `extra_usage` e `spend` **crus**, porque campo derivado não revela campo renomeado. Com o registro desligado o corpo continua sendo lido uma vez só, pelo `ContentNegotiation`.
-- `MiniMaxRepositoryImpl` lê `System.getenv("MINIMAX_API_KEY")` — nunca hardcode.
+- `MiniMaxRepositoryImpl` e `DeepSeekRepositoryImpl` recebem o leitor da chave por injeção; no desktop ele lê exclusivamente `LocalApiKeyDataSource`. Nunca hardcode credenciais nem leia variáveis de ambiente para essas integrações.
 - Ambos os repos usam `Result.runCatching { }` para encapsular falhas.
 
 ### Camada presentation (`commonMain/presentation/`)
@@ -526,7 +521,7 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
 |---|---|---|
 | Anthropic | `GET https://api.anthropic.com/api/oauth/usage` | `Authorization: Bearer {accessToken}` do credentials.json + `anthropic-beta: oauth-2025-04-20` |
 | Anthropic (renovação) | `POST https://platform.claude.com/v1/oauth/token` | Corpo JSON com `grant_type`, `refresh_token`, `client_id` e `scope` — sem `client_id` responde 400 `Invalid request format` |
-| MiniMax | `GET https://www.minimax.io/v1/token_plan/remains` | `Authorization: Bearer {MINIMAX_API_KEY}` |
+| MiniMax | `GET https://www.minimax.io/v1/token_plan/remains` | `Authorization: Bearer {apiKey}` lida de `~/.usage-monitor/api-keys.json` |
 
 Response Anthropic retorna `five_hour`/`seven_day` com `utilization` em **percentual** (0–100) e `resets_at` em ISO 8601 (pode ser nulo), mais `extra_usage`/`spend` com os créditos de uso em unidades menores da moeda da conta.
 

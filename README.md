@@ -138,8 +138,8 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 |---|---|---|---|
 | Anthropic | Remota | `GET https://api.anthropic.com/api/oauth/usage` | `~/.claude/.credentials.json` |
 | Codex | Remota | `GET https://chatgpt.com/backend-api/wham/usage` | `~/.codex/auth.json` e `~/.codex/cap_sid` |
-| MiniMax | Remota | `GET https://www.minimax.io/v1/token_plan/remains` | `MINIMAX_API_KEY` |
-| DeepSeek | Remota | `GET https://api.deepseek.com/user/balance` | `DEEPSEEK_API_KEY` |
+| MiniMax | Remota | `GET https://www.minimax.io/v1/token_plan/remains` | Chave informada em **Configurações > APIs** |
+| DeepSeek | Remota | `GET https://api.deepseek.com/user/balance` | Chave informada em **Configurações > APIs** |
 | OpenCode Zen Free | Local | leitura de `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
 | Kilo Free | Local | leitura de `~/.local/share/kilo/kilo.db` | base local do Kilo existente |
 
@@ -166,13 +166,15 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 
 ### MiniMax
 
-- Le a chave exclusivamente da variavel de ambiente `MINIMAX_API_KEY`.
+- Ao habilitar em **Configurações > APIs**, solicita a chave em campo mascarado e só ativa a integração depois do salvamento.
+- A chave fica em `~/.usage-monitor/api-keys.json`, com escrita atômica e acesso restrito ao usuário.
 - A app filtra quotas do modelo `MiniMax-M*`.
 - Nunca hardcode a chave.
 
 ### DeepSeek
 
-- Le a chave exclusivamente da variavel de ambiente `DEEPSEEK_API_KEY`.
+- Ao habilitar em **Configurações > APIs**, solicita a chave em campo mascarado e só ativa a integração depois do salvamento.
+- A chave fica em `~/.usage-monitor/api-keys.json`, com escrita atômica e acesso restrito ao usuário.
 - O dashboard mostra saldo pago e, quando existir, saldo concedido.
 - Os valores sao tratados em USD.
 
@@ -198,18 +200,12 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 - JDK 17.
 - Credenciais validas apenas para as integracoes que voce quiser habilitar.
 
-### Variaveis de ambiente
+### Chaves das integrações remotas
 
-```bat
-set MINIMAX_API_KEY=your_key_here
-set DEEPSEEK_API_KEY=your_key_here
-```
-
-Importante:
-
-- Se a MiniMax estiver habilitada e `MINIMAX_API_KEY` nao existir, a app falha explicitamente.
-- Se a DeepSeek estiver habilitada e `DEEPSEEK_API_KEY` nao existir, a app falha explicitamente.
-- No macOS, app aberta pelo Finder nao herda `export` do shell. Defina as chaves com `launchctl setenv MINIMAX_API_KEY sua_chave` (vale ate reiniciar a sessao) ou abra a app pelo terminal.
+MiniMax e DeepSeek solicitam a API key em **Configurações > APIs** no momento da
+ativação. O campo é mascarado por padrão. As chaves são gravadas em
+`~/.usage-monitor/api-keys.json`, fora das preferências comuns, com escrita atômica
+e acesso restrito ao usuário. Variáveis de ambiente não são lidas pela aplicação.
 
 ### Ficheiros locais esperados
 
@@ -218,6 +214,7 @@ Importante:
 - Anthropic personalizado: `<CLAUDE_CONFIG_DIR>/.credentials.json` + `<CLAUDE_CONFIG_DIR>/.claude.json`
 - Codex token: `~/.codex/auth.json`
 - Codex cookie: `~/.codex/cap_sid`
+- Chaves MiniMax/DeepSeek: `~/.usage-monitor/api-keys.json`
 - OpenCode: `~/.local/share/opencode/opencode.db`
 - Kilo: `~/.local/share/kilo/kilo.db`
 
