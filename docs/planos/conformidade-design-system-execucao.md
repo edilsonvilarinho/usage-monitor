@@ -11,18 +11,28 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A12 concluídas`
+**Estado atual:** `Concluída. As treze atividades estão na main, publicadas. Falta a aceitação visual do usuário`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A13 — Fechamento.** Ponto de situação final aqui e na issue.
+**Nenhuma.** A execução terminou.
 
 ### ⏭ Próxima atividade
 
-**Nenhuma.** O que resta é a verificação que só a máquina do usuário faz — ver *Fora de escopo*,
-item 0.
+**Nenhuma dentro deste plano.** O que resta é decisão e verificação do usuário:
+
+1. **Rodar `gradlew.bat run`** em modo normal e em modo somente cards, nas duas línguas, olhando
+   hover, foco, arrasto de card, redimensionamento, o botão de fechar em vermelho e a faixa de hover
+   do topo. Nenhuma das onze atividades de código foi olhada na janela real — ver *Fora de escopo*,
+   item 0.
+2. **Decidir sobre os oito débitos** de *Fora de escopo*. O item 1, os acentos congelados na variante
+   escura, é o único que produz um defeito observável hoje: no tema claro eles dão 2,64:1 contra a
+   superfície.
+
+A issue [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) **fica aberta** até a
+aceitação visual. Fechá-la agora afirmaria que a passada foi vista funcionando, e ela não foi.
 
 ---
 
@@ -104,8 +114,8 @@ listado como "primitiva duplicada" sem contar os call sites.
 | A09 — Tooltips | 4 arquivos | ✅ | `b92b7eb` |
 | A10 — Vazio, carregando e erro | 22 pontos | ✅ | `632cde9` |
 | A11 — Cromo das janelas | 11 | ✅ | `b912e9e` |
-| A12 — Protótipo, kit e capturas | — | ✅ | *(hash registrado na A13)* |
-| A13 — Fechamento | — | ⬜ | |
+| A12 — Protótipo, kit e capturas | — | ✅ | `305bf48` |
+| A13 — Fechamento | — | ✅ | *(este commit)* |
 
 Legenda: ⬜ pendente · 🟡 em andamento · ✅ concluída · ⛔ bloqueada
 
@@ -462,9 +472,35 @@ topo. A captura offscreen do `generateScreenshots` não desenha moldura de janel
   Onde o desenho mudou de fato — os três estados de tela — a mudança está descrita no protótipo, que
   é onde o kit não chega (ele recria oito telas, e nenhuma delas é um estado de carregamento).
 
-### A13 — Fechamento
+### A13 — Fechamento — ✅
 
-- Ponto de situação final aqui e na issue; fechar a issue.
+As doze atividades de execução estão na `main`, publicadas. O que a passada entregou:
+
+**Regra.** O `CLAUDE.md` carrega a tabela de precedência — design system para token, primitiva, copy
+e iconografia; protótipo para o mockup de cada tela; Compose é implementação —, a regra de que
+nenhuma tela reimplementa primitiva, a regra de que acento sai de `AppAccents.current` e nunca de
+`darkAppAccents`, e a obrigação de registrar toda alteração de tela nos dois documentos no mesmo
+commit. A skill do design system virou `/usage-monitor-design`.
+
+**Seis primitivas**, cada uma nascida de uma repetição medida: `Modifier.appNestedGroupItem`,
+`AppGroupBand`, `Modifier.appSurfaceBlock`, `AppSettingsNav`, `AppTooltipSurface` e `AppChrome`. As
+três que têm contraparte no design system foram registradas lá no mesmo commit que as criou.
+
+**Quatro coisas deixaram de existir no produto:** o último `Card()` do Material, a primitiva
+duplicada `DepthSurface`, o `HorizontalDivider` do Material e o último `Color(0x…)` fora de `theme/`.
+
+**Cinquenta e um pontos convertidos**, nove registrados como não convertíveis com o motivo, e quatro
+que o `grep` do levantamento tinha contado por engano.
+
+**A suíte cresceu de 1462 para 1472 testes**, todos verdes, e ganhou a primeira cobertura do cromo
+das janelas — um arquivo que não tinha nenhuma.
+
+**As sete ocorrências adversas estão registradas**, e a lição que atravessa cinco delas é uma só:
+contagem por `grep` mede o tamanho da suspeita, não o do débito, e anatomia parecida não é a mesma
+primitiva. Cada atividade passou a ler os call sites antes de aceitar a primitiva que o plano
+nomeava, e foi assim que três primitivas nasceram no lugar de três conversões erradas.
+
+**O que falta é a verificação que só a máquina do usuário faz.** Ver *Fora de escopo*, item 0.
 
 ---
 
@@ -488,7 +524,8 @@ nunca a intenção.
 | 11 | `b92b7eb` | A09 | `AppTooltipSurface` criada e adotada nas quatro bolhas, incluindo a do próprio `AppTooltip`; sete imports saíram dos três arquivos de gráfico | `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas** |
 | 12 | `632cde9` | A10 | `CenteredMessage` removida; os 22 pontos de cinco telas passaram a `AppLoadingState` (7), `AppErrorState` (6) e `AppEmptyState` (9) | `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes |
 | 13 | `b912e9e` | A11 | `AppChrome` com os cinco patamares do cromo; as duas divisórias do Material viraram `AppDivider`; o literal `Color(0xFFC62828)` do botão de fechar virou `colorScheme.error`; `DesktopWindowFrameTest` criado | `gradlew.bat allTests` → **1472 testes, 0 falhas** |
-| 14 | *(a preencher na A13)* | A12 | 13 capturas regeneradas, 9 mudaram; protótipo e design system registram a passada; levantamento reaberto com o número real | `gradlew.bat generateScreenshots` → 13 cenas; `dashboard.png` e `presence-accounts.png` conferidos a olho |
+| 14 | `305bf48` | A12 | 13 capturas regeneradas, 9 mudaram; protótipo e design system registram a passada; levantamento reaberto com o número real | `gradlew.bat generateScreenshots` → 13 cenas; `dashboard.png` e `presence-accounts.png` conferidos a olho |
+| 15 | *(este commit)* | A13 | Ponto de situação final; a issue #117 fica aberta até a aceitação visual | `gradlew.bat allTests` na A11 → **1472 testes, 0 falhas**. A A12 e a A13 não tocam em código |
 
 ---
 
