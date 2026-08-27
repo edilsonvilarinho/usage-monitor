@@ -11,18 +11,17 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A07 concluídas`
+**Estado atual:** `Em andamento — A00 a A08 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A08 — Configurações.** `SettingsDialogContent.kt`: navegação lateral, `ThemePresetCard` e o
-`HorizontalDivider` do Material.
+**A09 — Tooltips.** Quatro bolhas com `Surface` próprio, e `AppTooltip` com zero chamadas.
 
 ### ⏭ Próxima atividade
 
-**A09 — Tooltips.** Quatro bolhas com `Surface` próprio, e `AppTooltip` com zero chamadas.
+**A10 — `AppEmptyState`.** Nove estados vazios desenhados à mão, com a copy já centralizada.
 
 ---
 
@@ -90,8 +89,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A04 — Presença e chaves das contas | 6, 7, 8 | ✅ | `2307760` |
 | A05 — Sessões CLI | 5 | ✅ | `a6ff0d0` |
 | A06 — Card de uso | 2 | ✅ | `53b4943` |
-| A07 — Faixa de atualização | 3 | ✅ | *(hash registrado na A08)* |
-| A08 — Configurações | 9 | ⬜ | |
+| A07 — Faixa de atualização | 3 | ✅ | `fd3ac5c` |
+| A08 — Configurações | 9 | ✅ | *(hash registrado na A09)* |
 | A09 — Tooltips | 4 arquivos | ⬜ | |
 | A10 — `AppEmptyState` | 9 estados | ⬜ | |
 | A11 — Cromo das janelas | 11 | ⬜ | |
@@ -289,18 +288,46 @@ Verificado: `gradlew.bat desktopTest --tests AppUpdateBannerTest --tests AppStat
 ComponentTest --tests CliSessionsScreenTest` → 8 + 7 + 75 + 45 = **135 testes, 0 falhas**. As duas
 últimas porque a mudança no título do `AppBanner` alcança os outros chamadores dele.
 
-### A08 — Configurações · `SettingsDialogContent.kt`
+### A08 — Configurações · `SettingsDialogContent.kt` — ✅
 
-- `SettingsSideNav` `:724`/`:733` e `SettingsNavItem` `:755`/`:776` → contrato de
-  `AppSettingsNav.prompt.md`.
-- `ThemePresetCard` `:945`/`:952` e as três amostras `:978`/`:981`/`:984` → `AppDataSurface` +
-  `AppSourceMarker`.
-- `HorizontalDivider` do Material → `AppDivider`.
-- `Surface` raiz `:227` → `AppWindowScaffold`.
-- `AppSliderThumb` `:1312` **fica**: o design system especifica trilha de 4dp e polegar de 12dp com
-  os slots do `Slider` do Material, para a semântica de progresso continuar vindo dele.
-- Verificar: `--tests "com.usagemonitor.ui.ComponentTest"`, `AutoUpdateToggleTest` (17),
-  `ThemePresetPickerTest` (3).
+**Um dos seis débitos era débito.** Ver a ocorrência O6.
+
+Feito:
+
+- **`AppSettingsNav` saiu da tela e virou primitiva publicada.** O design system já publicava o
+  componente (`components/shell/AppSettingsNav.prompt.md`); o Kotlin o tinha como duas composables
+  `private` dentro do diálogo, com o nome errado (`SettingsSideNav` / `SettingsNavItem`). Agora o
+  nome é o mesmo dos dois lados.
+- Ela reaproveita `AppTab` como item — rótulo mais a `testTag` que a suíte observa —, porque um
+  segundo tipo para os mesmos dois campos só daria duas coisas para manter em sincronia.
+- **Irmã do `AppTabs`, não uma variante dele**: aba troca o que a tela mostra, numa faixa horizontal
+  sublinhada; o trilho troca a seção de uma janela alta, numa coluna que **não rola**. Largura fixa
+  porque item selecionado não pode mudar a largura do trilho, ou a lista inteira se mexe a cada
+  clique — e é isso que o teste novo mede, em pixels.
+- **O item selecionado ganha `surfaceVariant` sem borda**, e por isso ele **não** usa
+  `Modifier.appSurfaceBlock`, que sempre desenha o anel: um anel em volta de cada item transformaria
+  o trilho numa pilha de caixas.
+
+Não é débito, com o motivo:
+
+- **`Surface(background)` da raiz** é o padrão compartilhado das janelas, o mesmo de
+  `CliSessionsScreen`, `TeamUsageScreen`, `TeamPresenceScreen` e `TeamKeysAdminScreen`. Mesma
+  conclusão da A04.
+- **A coluna de conteúdo** já usa `AppSpacing.lg` de padding e `AppSpacing.md` de vão — os defaults
+  do `AppWindowScaffold` —, mas é um `verticalScroll` dentro de um `Box` que também hospeda a barra
+  de rolagem. O scaffold é uma `Column` com `weight`; não cabe, e forçá-lo tiraria a barra de dentro
+  da área rolável, que é onde ela precisa estar para não cobrir o trilho.
+- **`ThemePresetCard` e as três amostras de cor** pintam as cores do **preset**, não as do tema em
+  vigor — é o que um previsualizador de dezesseis temas faz. É a mesma categoria do gráfico da O5: o
+  único lugar em que pintar cor arbitrária é o comportamento certo.
+- **`AppSliderThumb`** fica, como o plano já previa: o design system especifica trilha de 4dp e
+  polegar de 12dp com os slots do `Slider` do Material, para a semântica de progresso continuar
+  vindo dele.
+- **O `HorizontalDivider` do Material não existe neste arquivo.** `grep -c` devolve zero. O
+  levantamento o contou por engano.
+
+Verificado: `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests
+AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas**.
 
 ### A09 — Tooltips
 
@@ -360,7 +387,9 @@ nunca a intenção.
 | 5 | `2307760` | A04 | `AppGroupBand` criada, registrada no design system e adotada nas duas sub-faixas de conta; `TeamKeysList` passou a `AppWindowScaffold`; dois testes novos de primitiva | `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`, `TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → 52 + 31 + 5 + 6 + 7 = **101 testes, 0 falhas** |
 | 6 | `a6ff0d0` | A05 | `LiveBadge` passou a `AppStatusIndicator`, o que também tira o acento congelado no escuro dos três chamadores; barra de composição, `HelpDot` e `GlossaryPanel` reavaliados e retirados da conta de débito | `gradlew.bat desktopTest --tests CliSessionsScreenTest --tests TeamPresenceScreenTest --tests TeamUsageScreenTest` → 45 + 31 + 52 = **128 testes, 0 falhas** |
 | 7 | `53b4943` | A06 | `Modifier.appSurfaceBlock` criada e adotada nos seis pontos do card; o último `Card()` do Material saiu da aplicação, com `BorderStroke` e `CardDefaults` junto | `gradlew.bat desktopTest --tests ComponentTest --tests AppThemeScaleTest --tests AppStructureTest` → 75 + 2 + 7 = **84 testes, 0 falhas** |
-| 8 | *(a preencher na A08)* | A07 | `AppUpdateBanner` passou a ser `AppBanner`; a primitiva ganhou título de uma linha, que era a única diferença real entre as duas | `gradlew.bat desktopTest --tests AppUpdateBannerTest --tests AppStatesTest --tests ComponentTest --tests CliSessionsScreenTest` → 8 + 7 + 75 + 45 = **135 testes, 0 falhas** |
+| 8 | `fd3ac5c` | A07 | `AppUpdateBanner` passou a ser `AppBanner`; a primitiva ganhou título de uma linha, que era a única diferença real entre as duas | `gradlew.bat desktopTest --tests AppUpdateBannerTest --tests AppStatesTest --tests ComponentTest --tests CliSessionsScreenTest` → 8 + 7 + 75 + 45 = **135 testes, 0 falhas** |
+| 9 | — | fase 3 | Fechamento da fase do dashboard | `gradlew.bat allTests` → **BUILD SUCCESSFUL** em 1m30s |
+| 10 | *(a preencher na A09)* | A08 | `AppSettingsNav` saiu de dentro do diálogo e virou primitiva publicada, com o nome que o design system já usava; um teste novo mede a largura fixa do trilho | `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas** |
 
 ---
 
@@ -391,6 +420,25 @@ commits deixaria a duplicata viva no meio do caminho e espalharia uma decisão s
 Ela virou **atividade própria**: a extensão de `AppDataSurface`, os quatro call sites e a remoção do
 arquivo no mesmo commit. A A03 e a A04 foram redefinidas em volta disso, e a A04 passou a juntar
 Presença e Chaves — as duas dependem da mesma extensão de `AppSectionHeader`.
+
+**O6 · 2026-08-27 · A08 — cinco dos seis débitos das Configurações não eram débito, e um deles não
+existia.**
+
+A O5 avisou que o número por tela é teto. Nas Configurações o teto era seis e o real é um. A raiz
+`Surface(background)` é o padrão de janela compartilhado; a coluna de conteúdo não cabe no
+`AppWindowScaffold` porque hospeda a barra de rolagem ao lado; `ThemePresetCard` e as amostras
+pintam as cores do preset previsto, não as do tema em vigor, que é a mesma categoria do gráfico da
+O5; o `AppSliderThumb` é decisão registrada. E o **`HorizontalDivider` do Material simplesmente não
+está no arquivo** — `grep -c` devolve zero.
+
+O único débito real era de **nome**: o design system publica `AppSettingsNav` e o Kotlin tinha o
+mesmo componente como duas composables `private` dentro do diálogo, com outro nome. Isso é o item 8
+de *Fora de escopo* aparecendo dentro do escopo: quando a divergência de nome esconde uma primitiva
+publicada que a tela reimplementou, ela deixa de ser questão de nomenclatura.
+
+**Consequência para o resto do plano:** o levantamento é reaberto na A12, com o número por tela
+corrigido para o que a leitura mostrou, e o total do débito passa a distinguir *convertido*,
+*não convertível com motivo* e *contado por engano*.
 
 **O5 · 2026-08-27 · A05 — a contagem por `grep` conta gráfico como retângulo pintado à mão.**
 
@@ -431,6 +479,7 @@ atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como 
 | 2026-08-27 | A03 | O plano mandava rodar `--tests "com.usagemonitor.ui.TeamAdminUiTest"`, e **nenhum teste roda com esse filtro** | `TeamAdminUiTest.kt` é um arquivo com duas classes, `TeamAdminSectionTest` (6) e `TeamKeysAdminScreenTest` (5). O filtro do Gradle casa nome de classe, não de arquivo, e não falha quando outro filtro da mesma chamada casa. Os nomes certos estão na seção *Verificação* |
 | 2026-08-27 | A04 | O plano queria dar um parâmetro de recuo ao `AppSectionHeader`; o problema não era o recuo, era o peso visual (O4) | `AppGroupBand`, primitiva própria para o degrau quieto da escada, registrada no design system |
 | 2026-08-27 | A05 | Três dos cinco débitos contados em `CliSessionsScreen` não eram débito: gráfico permitido, anel medido e painel já conforme (O5) | Retirados da conta com o motivo escrito; o número por tela passa a ser teto, não meta |
+| 2026-08-27 | A08 | Cinco dos seis débitos das Configurações não eram débito, e o `HorizontalDivider` do Material nem existe no arquivo (O6) | Reavaliados um a um; o único real era de nome, e virou a primitiva `AppSettingsNav` |
 
 ---
 

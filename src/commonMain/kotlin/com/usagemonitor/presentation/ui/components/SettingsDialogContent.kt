@@ -231,10 +231,16 @@ fun SettingsDialogContent(
         Row(modifier = Modifier.fillMaxSize()) {
             // A navegação fica à esquerda e não rola: ela é o controle, e o
             // conteúdo rolando não pode tirá-la da vista.
-            SettingsSideNav(
-                selected = selectedTab,
-                language = currentLanguage,
-                onSelect = { tab -> selectedTab = tab }
+            AppSettingsNav(
+                items = SettingsTab.entries.map { tab ->
+                    AppTab(
+                        label = settingsTabLabel(tab, currentLanguage),
+                        testTag = settingsTabTestTag(tab)
+                    )
+                },
+                selectedIndex = SettingsTab.entries.indexOf(selectedTab),
+                onSelect = { index -> selectedTab = SettingsTab.entries[index] },
+                header = if (currentLanguage == AppLanguage.PT) "Seções" else "Sections"
             )
             AppVerticalDivider()
 
@@ -720,75 +726,6 @@ private fun AnthropicAccountsTab(
  * Continua sendo o **enum existente**: nenhuma seção nova, nenhum valor novo em
  * `SettingsTab`, e a `testTag` de cada uma é a mesma.
  */
-@Composable
-private fun SettingsSideNav(
-    selected: SettingsTab,
-    language: AppLanguage,
-    onSelect: (SettingsTab) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .width(SETTINGS_NAV_WIDTH)
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(AppSpacing.sm),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Text(
-            text = if (language == AppLanguage.PT) "Seções" else "Sections",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs)
-        )
-        SettingsTab.entries.forEach { tab ->
-            SettingsNavItem(
-                label = settingsTabLabel(tab, language),
-                selected = tab == selected,
-                onClick = { onSelect(tab) },
-                modifier = Modifier.testTag(settingsTabTestTag(tab))
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsNavItem(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val container = if (selected) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        Color.Transparent
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(AppShapes.small)
-            .background(container)
-            .selectable(selected = selected, onClick = onClick)
-            .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = content,
-            maxLines = 1
-        )
-    }
-}
-
-/** Largura da coluna de navegação: cabe "Configurações" sem quebrar. */
-private val SETTINGS_NAV_WIDTH = 150.dp
-
 @Composable
 private fun AnthropicProfileRow(
     profile: AnthropicProfileUiModel,

@@ -273,6 +273,102 @@ fun AppSectionHeader(
     }
 }
 
+/** Largura da coluna de navegação: cabe "Configurações" sem quebrar. */
+private val SETTINGS_NAV_WIDTH = 150.dp
+
+/**
+ * Trilho de navegação vertical de um diálogo com seções.
+ *
+ * Irmão do [AppTabs] e não uma variante dele: aba troca o que a tela mostra numa
+ * faixa horizontal sublinhada, e este troca a seção de uma janela alta, numa
+ * coluna que **não rola**. A coluna é o controle; conteúdo que rola não pode
+ * tirá-la da vista. Largura fixa pelo mesmo motivo: item selecionado não pode
+ * mudar a largura do trilho, ou a lista inteira se mexe a cada clique.
+ *
+ * Reaproveita [AppTab] como item porque a forma é a mesma — rótulo mais a
+ * `testTag` que a suíte observa —, e um segundo tipo para os mesmos dois campos
+ * só daria duas coisas para manter em sincronia.
+ *
+ * O item selecionado ganha `surfaceVariant`, **sem borda**: aqui a superfície
+ * marca a seleção, e um anel em volta de cada item transformaria o trilho numa
+ * pilha de caixas. É por isso que ele não usa [Modifier.appSurfaceBlock], que
+ * sempre desenha a borda.
+ */
+@Composable
+fun AppSettingsNav(
+    items: List<AppTab>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    header: String? = null,
+    width: Dp = SETTINGS_NAV_WIDTH
+) {
+    Column(
+        modifier = modifier
+            .width(width)
+            .fillMaxHeight()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(AppSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        if (header != null) {
+            Text(
+                text = header,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs)
+            )
+        }
+        items.forEachIndexed { index, item ->
+            AppSettingsNavItem(
+                label = item.label,
+                selected = index == selectedIndex,
+                onClick = { onSelect(index) },
+                modifier = if (item.testTag == null) {
+                    Modifier
+                } else {
+                    Modifier.testTag(item.testTag)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppSettingsNavItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val container = if (selected) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        Color.Transparent
+    }
+    val content = if (selected) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(AppShapes.small)
+            .background(container)
+            .selectable(selected = selected, onClick = onClick)
+            .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = content,
+            maxLines = 1
+        )
+    }
+}
+
 /**
  * Bloco de superfície: recorte, fundo e a borda de 1dp, sem layout nenhum.
  *

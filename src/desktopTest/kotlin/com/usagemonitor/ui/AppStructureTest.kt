@@ -19,6 +19,7 @@ import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppGroupBand
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
+import com.usagemonitor.presentation.ui.components.AppSettingsNav
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
@@ -193,6 +194,42 @@ class AppStructureTest {
      * inverteria a hierarquia da escada de superfícies, e a sub-faixa passaria a
      * gritar mais que o grupo que a cobre.
      */
+    /**
+     * O trilho é o controle da janela e tem largura fixa: item selecionado não
+     * pode mudar a largura da coluna, ou a lista inteira se mexe a cada clique.
+     * O teste mede **pixels** dos dois itens — o selecionado e um vizinho — pela
+     * mesma razão do `AppThemeScaleTest`: `Dp` esconderia a diferença.
+     */
+    @Test
+    fun `o trilho de secoes seleciona sem mudar a largura`() = runDesktopComposeUiTest {
+        var selected = 0
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(600.dp).height(400.dp)) {
+                    AppSettingsNav(
+                        items = listOf(
+                            AppTab("Geral", "nav-geral"),
+                            AppTab("Alertas", "nav-alertas")
+                        ),
+                        selectedIndex = selected,
+                        onSelect = { index -> selected = index },
+                        header = "Seções"
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Seções").assertIsDisplayed()
+        onNodeWithText("Geral").assertIsDisplayed()
+
+        val first = onNodeWithText("Geral").getUnclippedBoundsInRoot()
+        val second = onNodeWithText("Alertas").getUnclippedBoundsInRoot()
+        assertEquals(first.left, second.left)
+
+        onNodeWithText("Alertas").performClick()
+        assertEquals(1, selected)
+    }
+
     @Test
     fun `a sub-faixa mostra rotulo detalhe e acao`() = runDesktopComposeUiTest {
         setContent {
