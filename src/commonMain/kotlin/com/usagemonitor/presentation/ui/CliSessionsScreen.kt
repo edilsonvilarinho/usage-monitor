@@ -49,6 +49,9 @@ import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.presentation.ui.components.AppLoadingState
+import com.usagemonitor.presentation.ui.components.AppErrorState
+import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppBorderWidth
 import com.usagemonitor.presentation.ui.components.AppButton
@@ -214,9 +217,9 @@ internal fun CliSessionsContent(
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (state) {
-            is CliSessionsUiState.Loading -> CenteredMessage(CliSessionsLabels.loading(language))
+            is CliSessionsUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
 
-            is CliSessionsUiState.Error -> CenteredMessage(state.message)
+            is CliSessionsUiState.Error -> AppErrorState(state.message)
 
             is CliSessionsUiState.Success -> {
                 val detail = state.detail
@@ -243,17 +246,6 @@ internal fun CliSessionsContent(
                 }
             }
         }
-    }
-}
-
-@Composable
-internal fun CenteredMessage(message: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -329,7 +321,7 @@ private fun CliSessionsList(
         }
 
         if (state.sessions.isEmpty()) {
-            CenteredMessage(CliSessionsLabels.emptyInRange(state.range, state.rangeAnchored, language))
+            AppEmptyState(CliSessionsLabels.emptyInRange(state.range, state.rangeAnchored, language))
             return@AppWindowScaffold
         }
 
@@ -845,8 +837,8 @@ private fun CliSessionDetailPane(
         }
 
         when (detail) {
-            is CliSessionDetailUiState.Loading -> CenteredMessage(CliSessionsLabels.loading(language))
-            is CliSessionDetailUiState.Error -> CenteredMessage(detail.message)
+            is CliSessionDetailUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
+            is CliSessionDetailUiState.Error -> AppErrorState(detail.message)
             is CliSessionDetailUiState.Ready -> CliSessionDetailBody(
                 detail = detail.result.detail,
                 analytics = detail.result.analytics,

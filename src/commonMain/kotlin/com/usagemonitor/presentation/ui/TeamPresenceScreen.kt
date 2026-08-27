@@ -47,6 +47,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamMemberPresence
+import com.usagemonitor.presentation.ui.components.AppLoadingState
+import com.usagemonitor.presentation.ui.components.AppErrorState
+import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
@@ -233,9 +236,9 @@ internal fun TeamPresenceContent(
 
     Box(modifier = modifier.fillMaxSize()) {
         when (state) {
-            is TeamPresenceUiState.Loading -> CenteredMessage(CliSessionsLabels.loading(language))
+            is TeamPresenceUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
 
-            is TeamPresenceUiState.Error -> CenteredMessage(
+            is TeamPresenceUiState.Error -> AppErrorState(
                 TeamPresenceLabels.error(state.message, language)
             )
 
@@ -383,7 +386,7 @@ private fun TeamPresenceList(
         }
 
         if (state.isEmpty) {
-            CenteredMessage(TeamPresenceLabels.empty(language))
+            AppEmptyState(TeamPresenceLabels.empty(language))
             return@Column
         }
 
@@ -391,7 +394,7 @@ private fun TeamPresenceList(
             // Dois filtros, duas mensagens: "desligue o filtro para ver o time
             // inteiro" não ajuda quem digitou um nome que não existe.
             val query = state.query.trim()
-            CenteredMessage(
+            AppEmptyState(
                 if (query.isEmpty()) {
                     TeamPresenceLabels.emptyFiltered(language)
                 } else {

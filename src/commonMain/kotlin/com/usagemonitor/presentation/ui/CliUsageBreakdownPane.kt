@@ -40,6 +40,9 @@ import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
+import com.usagemonitor.presentation.ui.components.AppLoadingState
+import com.usagemonitor.presentation.ui.components.AppErrorState
+import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.ActivityHeatmapGrid
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -131,18 +134,25 @@ internal fun CliUsageBreakdownPane(
     modifier: Modifier = Modifier
 ) {
     if (breakdown == null) {
-        CenteredMessage(errorMessage ?: CliSessionsLabels.loading(language))
+        // Aqui os dois estados moravam na mesma frase, por causa do `?:`. Eles são
+        // coisas diferentes: "ainda não chegou" é carregando, "não deu para ler" é
+        // erro — e o design system dá um desenho a cada um.
+        if (errorMessage == null) {
+            AppLoadingState(CliSessionsLabels.loading(language))
+        } else {
+            AppErrorState(errorMessage)
+        }
         return
     }
 
     if (breakdown.isEmpty) {
-        CenteredMessage(BreakdownLabels.empty(language))
+        AppEmptyState(BreakdownLabels.empty(language))
         return
     }
 
     val axes = availableBreakdownAxes(breakdown)
     if (axes.isEmpty()) {
-        CenteredMessage(BreakdownLabels.empty(language))
+        AppEmptyState(BreakdownLabels.empty(language))
         return
     }
 

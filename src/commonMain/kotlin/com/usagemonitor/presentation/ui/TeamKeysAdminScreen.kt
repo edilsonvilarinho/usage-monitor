@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamKeyEntry
+import com.usagemonitor.presentation.ui.components.AppLoadingState
+import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
@@ -82,7 +84,7 @@ internal fun TeamKeysAdminContent(
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (state) {
-            is TeamKeysUiState.Loading -> CenteredMessage(TeamKeysLabels.loading(language))
+            is TeamKeysUiState.Loading -> AppLoadingState(TeamKeysLabels.loading(language))
 
             is TeamKeysUiState.Error -> Column(
                 modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -163,7 +165,7 @@ private fun TeamKeysList(
         }
 
         if (state.keys.isEmpty()) {
-            CenteredMessage(TeamKeysLabels.empty(language))
+            AppEmptyState(TeamKeysLabels.empty(language))
             return@AppWindowScaffold
         }
 

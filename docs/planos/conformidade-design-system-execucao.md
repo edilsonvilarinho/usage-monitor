@@ -11,19 +11,19 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A09 concluídas`
+**Estado atual:** `Em andamento — A00 a A10 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A10 — `AppEmptyState`.** Nove estados vazios desenhados à mão, com a copy já centralizada.
-
-### ⏭ Próxima atividade
-
 **A11 — Cromo das janelas.** `DesktopWindowFrame.kt`, o arquivo de maior risco do plano: vive em
 `desktopMain` e não tem nenhum teste de componente. A suíte dele é escrita **antes** de o código
 mudar.
+
+### ⏭ Próxima atividade
+
+**A12 — Protótipo, kit e capturas**, com o levantamento reaberto e o número real por tela.
 
 ---
 
@@ -93,8 +93,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A06 — Card de uso | 2 | ✅ | `53b4943` |
 | A07 — Faixa de atualização | 3 | ✅ | `fd3ac5c` |
 | A08 — Configurações | 9 | ✅ | `0127909` |
-| A09 — Tooltips | 4 arquivos | ✅ | *(hash registrado na A10)* |
-| A10 — `AppEmptyState` | 9 estados | ⬜ | |
+| A09 — Tooltips | 4 arquivos | ✅ | `b92b7eb` |
+| A10 — Vazio, carregando e erro | 22 pontos | ✅ | *(hash registrado na A11)* |
 | A11 — Cromo das janelas | 11 | ⬜ | |
 | A12 — Protótipo, kit e capturas | — | ⬜ | |
 | A13 — Fechamento | — | ⬜ | |
@@ -364,14 +364,33 @@ Não convertido, com o motivo:
 Verificado: `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests
 AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas**.
 
-### A10 — `AppEmptyState`
+### A10 — Vazio, carregando e erro — ✅
 
-- Nove estados vazios desenhados à mão. A copy já está centralizada e já obedece à regra do design
-  system de nomear o recorte ("nesta janela", "neste projeto") — **não reescrever texto**, só trocar
-  o desenho: `CliSessionsFormatting.kt:180/199/205`, `CliUsageBreakdownLabels.kt:231`,
-  `TeamUsageFormatting.kt:310/318/324`, `TeamKeysAdminScreen.kt:485`,
-  `SettingsDialogContent.kt:687`, `TeamIntegrationSection.kt:165`, `DashboardScreen.kt:293`.
-- Verificar: `gradlew.bat allTests`.
+Não eram nove estados vazios. Eram **vinte e dois estados de três tipos diferentes** desenhados pela
+mesma função. Ver a ocorrência O7.
+
+`CenteredMessage` era uma frase centrada em `bodyMedium`, e as cinco telas a chamavam para *carregando*,
+para *erro* e para *vazio* — os três estados que o design system separa em três desenhos, com três
+significados. Ela saiu; os vinte e dois pontos passaram a chamar a primitiva do estado que descrevem:
+
+| Estado | Primitiva | Pontos |
+|---|---|---|
+| Carregando | `AppLoadingState` — esqueleto **estático**, sem shimmer | 7 |
+| Erro | `AppErrorState` — indicador crítico com ponto e palavra | 6 |
+| Vazio | `AppEmptyState` — frase centrada, sem ilustração e sem ação inventada | 9 |
+
+- **`CliUsageBreakdownPane` juntava dois estados numa frase só** com `errorMessage ?: loading`. Eles
+  não são a mesma coisa: "ainda não chegou" é carregando e "não deu para ler" é erro. Viraram um
+  `if`.
+- **A copy não foi tocada**, como o plano mandava: ela já estava centralizada nos arquivos de
+  formatação e já obedecia à regra do design system de nomear o recorte ("nesta janela", "neste
+  projeto"). O que mudou é o desenho.
+- O erro passou a ter ponto **e** palavra, porque `AppErrorState` é construído sobre
+  `AppStatusIndicator`. Antes o erro era indistinguível de "carregando" e de "vazio": três frases
+  cinzas no mesmo lugar.
+
+Verificado: `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes. Foi a passada mais
+larga do plano, e tinha de ser: a função saiu de cinco arquivos ao mesmo tempo.
 
 ### A11 — Cromo das janelas · `DesktopWindowFrame.kt`
 
@@ -416,7 +435,8 @@ nunca a intenção.
 | 8 | `fd3ac5c` | A07 | `AppUpdateBanner` passou a ser `AppBanner`; a primitiva ganhou título de uma linha, que era a única diferença real entre as duas | `gradlew.bat desktopTest --tests AppUpdateBannerTest --tests AppStatesTest --tests ComponentTest --tests CliSessionsScreenTest` → 8 + 7 + 75 + 45 = **135 testes, 0 falhas** |
 | 9 | — | fase 3 | Fechamento da fase do dashboard | `gradlew.bat allTests` → **BUILD SUCCESSFUL** em 1m30s |
 | 10 | `0127909` | A08 | `AppSettingsNav` saiu de dentro do diálogo e virou primitiva publicada, com o nome que o design system já usava; um teste novo mede a largura fixa do trilho | `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas** |
-| 11 | *(a preencher na A10)* | A09 | `AppTooltipSurface` criada e adotada nas quatro bolhas, incluindo a do próprio `AppTooltip`; sete imports saíram dos três arquivos de gráfico | `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas** |
+| 11 | `b92b7eb` | A09 | `AppTooltipSurface` criada e adotada nas quatro bolhas, incluindo a do próprio `AppTooltip`; sete imports saíram dos três arquivos de gráfico | `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas** |
+| 12 | *(a preencher na A11)* | A10 | `CenteredMessage` removida; os 22 pontos de cinco telas passaram a `AppLoadingState` (7), `AppErrorState` (6) e `AppEmptyState` (9) | `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes |
 
 ---
 
@@ -447,6 +467,22 @@ commits deixaria a duplicata viva no meio do caminho e espalharia uma decisão s
 Ela virou **atividade própria**: a extensão de `AppDataSurface`, os quatro call sites e a remoção do
 arquivo no mesmo commit. A A03 e a A04 foram redefinidas em volta disso, e a A04 passou a juntar
 Presença e Chaves — as duas dependem da mesma extensão de `AppSectionHeader`.
+
+**O7 · 2026-08-27 · A10 — o plano contou nove estados vazios; eram vinte e dois estados de três
+tipos.**
+
+A atividade estava escrita como "adotar `AppEmptyState` em nove estados vazios desenhados à mão". O
+que existia era uma função só, `CenteredMessage`, chamada em **vinte e dois** pontos de cinco telas
+para *carregando*, *erro* **e** *vazio* — os três estados que o design system separa em três
+primitivas, justamente porque significam coisas diferentes: "está chegando", "não deu para ler" e
+"não há nada aqui, e isso é um resultado legítimo". As três apareciam como a mesma frase cinza no
+meio da tela.
+
+Um dos pontos, no resumo por eixo, colapsava dois estados dentro de uma expressão
+(`errorMessage ?: loading`) — a forma mais curta possível de dizer que a distinção tinha se perdido.
+
+**Consequência para o resto do plano:** nenhuma. A atividade cobriu o que encontrou, e o
+levantamento reaberto na A12 registra o número real.
 
 **O6 · 2026-08-27 · A08 — cinco dos seis débitos das Configurações não eram débito, e um deles não
 existia.**
@@ -507,6 +543,7 @@ atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como 
 | 2026-08-27 | A04 | O plano queria dar um parâmetro de recuo ao `AppSectionHeader`; o problema não era o recuo, era o peso visual (O4) | `AppGroupBand`, primitiva própria para o degrau quieto da escada, registrada no design system |
 | 2026-08-27 | A05 | Três dos cinco débitos contados em `CliSessionsScreen` não eram débito: gráfico permitido, anel medido e painel já conforme (O5) | Retirados da conta com o motivo escrito; o número por tela passa a ser teto, não meta |
 | 2026-08-27 | A08 | Cinco dos seis débitos das Configurações não eram débito, e o `HorizontalDivider` do Material nem existe no arquivo (O6) | Reavaliados um a um; o único real era de nome, e virou a primitiva `AppSettingsNav` |
+| 2026-08-27 | A10 | O plano contou nove estados vazios; eram 22 pontos de três tipos, todos pela mesma `CenteredMessage` (O7) | Os três tipos separados nas três primitivas do sistema; a função saiu |
 
 ---
 

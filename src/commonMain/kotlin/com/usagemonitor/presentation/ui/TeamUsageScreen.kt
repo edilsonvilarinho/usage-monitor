@@ -52,6 +52,9 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamUsageTrend
+import com.usagemonitor.presentation.ui.components.AppLoadingState
+import com.usagemonitor.presentation.ui.components.AppErrorState
+import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppCellValue
@@ -261,11 +264,11 @@ internal fun TeamUsageContent(
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (state) {
-            is TeamUsageUiState.Loading -> CenteredMessage(
+            is TeamUsageUiState.Loading -> AppLoadingState(
                 if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"
             )
 
-            is TeamUsageUiState.Error -> CenteredMessage(
+            is TeamUsageUiState.Error -> AppErrorState(
                 TeamUsageLabels.serverError(state.message, language)
             )
 
@@ -549,7 +552,7 @@ private fun TeamUsageList(
         }
 
         if (state.isEmpty) {
-            CenteredMessage(
+            AppEmptyState(
                 TeamUsageLabels.emptyInRange(state.range, state.rangeAnchored, language)
             )
             return@AppWindowScaffold
@@ -744,11 +747,11 @@ private fun TeamUsageList(
 @Composable
 private fun TeamTrendPane(trend: TeamUsageTrend?, language: AppLanguage) {
     if (trend == null) {
-        CenteredMessage(TeamUsageLabels.trendUnavailable(language))
+        AppEmptyState(TeamUsageLabels.trendUnavailable(language))
         return
     }
     if (trend.isEmpty) {
-        CenteredMessage(TeamUsageLabels.trendEmpty(language))
+        AppEmptyState(TeamUsageLabels.trendEmpty(language))
         return
     }
 
@@ -1507,11 +1510,11 @@ private fun TeamSessionDetailPane(
         }
 
         when (detail) {
-            is TeamSessionDetailUiState.Loading -> CenteredMessage(
+            is TeamSessionDetailUiState.Loading -> AppLoadingState(
                 TeamUsageLabels.detailLoading(language)
             )
 
-            is TeamSessionDetailUiState.Error -> CenteredMessage(
+            is TeamSessionDetailUiState.Error -> AppErrorState(
                 TeamUsageLabels.serverError(detail.message, language)
             )
 
