@@ -1,6 +1,6 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -10,7 +10,6 @@ import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import com.usagemonitor.DEFAULT_MODAL_MIN_HEIGHT
 import com.usagemonitor.ApplyWindowMinimumSize
-import com.usagemonitor.rememberModalWindowAutoSizer
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
@@ -49,11 +48,6 @@ internal fun ReleaseNotesWindow(
             screenWorkArea
         )
     )
-    val onRequiredHeightChanged = rememberModalWindowAutoSizer(
-        windowState = windowState,
-        workArea = screenWorkArea
-    )
-
     DialogWindow(
         onCloseRequest = { controller.onDismiss() },
         title = title,
@@ -83,8 +77,7 @@ internal fun ReleaseNotesWindow(
                     language = language,
                     onOpenReleasePage = { onOpenReleasePage(notes.releasePageUrl) },
                     onClose = { controller.onDismiss() },
-                    onRequiredHeightChanged = onRequiredHeightChanged,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }

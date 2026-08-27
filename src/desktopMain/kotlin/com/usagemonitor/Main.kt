@@ -746,30 +746,6 @@ fun main(args: Array<String>) = application {
         uiScalePercent = uiScalePercent,
         workArea = screenWorkArea
     )
-    val onMainContentHeightChanged = rememberModalWindowAutoSizer(
-        windowState = mainWindowState,
-        workArea = screenWorkArea
-    )
-    val onHistoryContentHeightChanged = rememberModalWindowAutoSizer(
-        windowState = historyWindowState,
-        workArea = screenWorkArea,
-        minimumWindowHeight = 460.dp
-    )
-    val onCliSessionsContentHeightChanged = rememberModalWindowAutoSizer(
-        windowState = cliSessionsWindowState,
-        workArea = screenWorkArea,
-        minimumWindowHeight = CLI_SESSIONS_MIN_WINDOW_HEIGHT_DP.dp
-    )
-    val onTeamUsageContentHeightChanged = rememberModalWindowAutoSizer(
-        windowState = teamUsageWindowState,
-        workArea = screenWorkArea,
-        minimumWindowHeight = TEAM_USAGE_MIN_WINDOW_HEIGHT_DP.dp
-    )
-    val onTeamPresenceContentHeightChanged = rememberModalWindowAutoSizer(
-        windowState = teamPresenceWindowState,
-        workArea = screenWorkArea,
-        minimumWindowHeight = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP.dp
-    )
     val teamKeysWindowState = rememberDialogState(
         size = fitWindowSize(
             DpSize(
@@ -787,14 +763,6 @@ fun main(args: Array<String>) = application {
             ),
             screenWorkArea
         )
-    )
-    val onTeamKeysContentHeightChanged = rememberModalWindowAutoSizer(
-        windowState = teamKeysWindowState,
-        workArea = screenWorkArea
-    )
-    val onSettingsContentHeightChanged = rememberModalWindowAutoSizer(
-        windowState = settingsWindowState,
-        workArea = screenWorkArea
     )
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
@@ -1391,7 +1359,6 @@ fun main(args: Array<String>) = application {
                         minimizedCards = updatedMinimizedCards
                         writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
                     },
-                    onRequiredHeightChanged = onMainContentHeightChanged,
                     onOpenHistory = { source, accountKey ->
                         historyDialogSource = source
                         historyOpenGeneration++
@@ -1527,8 +1494,7 @@ fun main(args: Array<String>) = application {
                         language = language,
                         onBack = { historyDialogSource = null },
                         focusedSource = source,
-                        showSourceSelector = false,
-                        onRequiredHeightChanged = onHistoryContentHeightChanged
+                        showSourceSelector = false
                     )
                 }
             }
@@ -1570,8 +1536,7 @@ fun main(args: Array<String>) = application {
                 ) {
                     CliSessionsScreen(
                         viewModel = cliSessionsViewModel,
-                        language = language,
-                        onRequiredHeightChanged = onCliSessionsContentHeightChanged
+                        language = language
                     )
                 }
             }
@@ -1620,8 +1585,7 @@ fun main(args: Array<String>) = application {
                         language = language,
                         // Mesma origem que a tela de presença usa logo abaixo: é
                         // ela que separa a sessão desta máquina da de um colega.
-                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() },
-                        onRequiredHeightChanged = onTeamUsageContentHeightChanged
+                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
                     )
                 }
             }
@@ -1669,8 +1633,7 @@ fun main(args: Array<String>) = application {
                         viewModel = teamPresenceViewModel,
                         language = language,
                         localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() },
-                        canManage = teamSettings.isAdminMode,
-                        onRequiredHeightChanged = onTeamPresenceContentHeightChanged
+                        canManage = teamSettings.isAdminMode
                     )
                 }
             }
@@ -1720,8 +1683,7 @@ fun main(args: Array<String>) = application {
                 ) {
                     TeamKeysAdminScreen(
                         viewModel = teamKeysViewModel,
-                        language = language,
-                        onRequiredHeightChanged = onTeamKeysContentHeightChanged
+                        language = language
                     )
                 }
             }
@@ -2026,8 +1988,7 @@ fun main(args: Array<String>) = application {
                             isTeamKeysOpen = false
                             reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
                         },
-                        toastEvent = settingsToastEvent,
-                        onRequiredHeightChanged = onSettingsContentHeightChanged
+                        toastEvent = settingsToastEvent
                     )
                 }
             }

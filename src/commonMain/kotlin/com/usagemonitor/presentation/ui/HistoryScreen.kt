@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
@@ -42,7 +41,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Dp
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
@@ -97,7 +95,6 @@ fun HistoryScreen(
     onBack: () -> Unit,
     focusedSource: ApiSource? = null,
     showSourceSelector: Boolean = true,
-    onRequiredHeightChanged: (Dp) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -138,10 +135,8 @@ fun HistoryScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
+                    .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .then(rememberModalContentHeightReporter(onRequiredHeightChanged))
                     .padding(AppSpacing.lg)
                     .padding(end = AppSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md)

@@ -16,6 +16,9 @@ import java.awt.GraphicsEnvironment
  */
 internal val WINDOW_SCREEN_MARGIN = 24.dp
 
+/** Piso comum para impedir que qualquer janela fique sem área útil recuperável. */
+internal val DEFAULT_MODAL_MIN_HEIGHT = 320.dp
+
 /**
  * Piso absoluto de cada eixo, para uma área útil absurda não produzir janela de
  * alguns dp. Não é o tamanho mínimo de nenhuma janela — é rede contra medida

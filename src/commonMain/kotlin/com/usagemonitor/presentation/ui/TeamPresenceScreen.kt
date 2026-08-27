@@ -186,7 +186,6 @@ private fun presenceStateTone(entry: TeamMemberPresence): AppTone {
 fun TeamPresenceScreen(
     viewModel: TeamPresenceViewModel,
     language: AppLanguage,
-    onRequiredHeightChanged: (Dp) -> Unit = {},
     /** `deviceId` desta instalação; a linha correspondente ganha o selo. */
     localDeviceId: String?,
     /** Modo administrador: é o que libera os botões destrutivos. */
@@ -208,7 +207,6 @@ fun TeamPresenceScreen(
         onRemoveMember = { memberKey -> viewModel.removeMember(memberKey) },
         onDeleteAccount = { accountKey -> viewModel.deleteAccount(accountKey) },
         onDismissActionError = { viewModel.clearActionError() },
-        onRequiredHeightChanged = onRequiredHeightChanged,
         modifier = modifier
     )
 }
@@ -226,19 +224,14 @@ internal fun TeamPresenceContent(
     onQueryChange: (String) -> Unit = {},
     onRemoveMember: (String) -> Unit = {},
     onDeleteAccount: (String) -> Unit = {},
-    onDismissActionError: () -> Unit = {},
-    onRequiredHeightChanged: (Dp) -> Unit = {}
+    onDismissActionError: () -> Unit = {}
 ) {
     // O alvo pendente mora aqui, e não no ViewModel: é estado de diálogo, e o
     // laço ao vivo republica o estado a cada 5s sem saber que há um modal aberto.
     var pendingMember by remember { mutableStateOf<TeamMemberPresence?>(null) }
     var pendingAccount by remember { mutableStateOf<TeamPresenceAccountGroup?>(null) }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .then(rememberModalContentHeightReporter(onRequiredHeightChanged))
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         when (state) {
             is TeamPresenceUiState.Loading -> CenteredMessage(CliSessionsLabels.loading(language))
 

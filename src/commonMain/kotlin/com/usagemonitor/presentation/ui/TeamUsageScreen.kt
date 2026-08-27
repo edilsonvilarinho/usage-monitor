@@ -186,7 +186,6 @@ private val TEAM_SESSION_INDENT = AppSpacing.xl
 fun TeamUsageScreen(
     viewModel: TeamUsageViewModel,
     language: AppLanguage,
-    onRequiredHeightChanged: (Dp) -> Unit = {},
     /**
      * Máquina desta instalação, para separar a sessão própria da de um colega.
      *
@@ -222,7 +221,6 @@ fun TeamUsageScreen(
         onToggleGlossary = { viewModel.toggleGlossary() },
         onSelectView = { view -> viewModel.setView(view) },
         onExportReport = { viewModel.exportReport(language) },
-        onRequiredHeightChanged = onRequiredHeightChanged,
         modifier = modifier
     )
 }
@@ -251,8 +249,7 @@ internal fun TeamUsageContent(
     onToggleAdvanced: () -> Unit = {},
     onToggleGlossary: () -> Unit = {},
     onSelectView: (TeamUsageView) -> Unit = {},
-    onExportReport: () -> Unit = {},
-    onRequiredHeightChanged: (Dp) -> Unit = {}
+    onExportReport: () -> Unit = {}
 ) {
     // Qual integrante está aguardando confirmação. Estado de tela, não do
     // servidor: o laço ao vivo recarrega a lista a cada 5s e não pode fechar o
@@ -260,12 +257,7 @@ internal fun TeamUsageContent(
     var pendingRemoval by remember { mutableStateOf<TeamMemberUsage?>(null) }
     var pendingSessionRemoval by remember { mutableStateOf<PendingSessionRemoval?>(null) }
 
-    Surface(
-        modifier = modifier
-            .fillMaxSize()
-            .then(rememberModalContentHeightReporter(onRequiredHeightChanged)),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (state) {
             is TeamUsageUiState.Loading -> CenteredMessage(
                 if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"

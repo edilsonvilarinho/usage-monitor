@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
-import com.usagemonitor.DESKTOP_WINDOW_TITLE_BAR_HEIGHT
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -64,7 +63,7 @@ private val WindowCornerRadius = 10.dp
 internal const val COMPACT_EXIT_DESCRIPTION = "Sair do modo somente cards"
 
 /** Altura da barra de título das seis janelas. */
-private val TITLE_BAR_HEIGHT = DESKTOP_WINDOW_TITLE_BAR_HEIGHT
+private val TITLE_BAR_HEIGHT = 34.dp
 
 private fun WindowScope.applyWindowShape(density: androidx.compose.ui.unit.Density, cornerRadius: Dp) {
     val arcDiameter = with(density) { cornerRadius.toPx() * 2 }
