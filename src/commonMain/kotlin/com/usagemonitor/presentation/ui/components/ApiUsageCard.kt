@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -118,9 +119,17 @@ const val API_USAGE_CARD_STATUS_TAG = "apiUsageCardStatus"
 const val API_USAGE_CARD_STATUS_HINT_TAG = "apiUsageCardStatusHint"
 const val QUOTA_BLOCK_TAG_PREFIX = "quotaBlock:"
 const val QUOTA_PROGRESS_TRACK_TAG_PREFIX = "quotaProgress:"
+private const val OBSERVED_ACTIVITY_TRACK_TAG_PREFIX = "observedActivityTrack:"
+private const val OBSERVED_ACTIVITY_VALUE_TAG_PREFIX = "observedActivityValue:"
 
 /** O rótulo da cota é único dentro de um card: é a chave da série. */
 fun quotaBlockTag(label: String): String = "$QUOTA_BLOCK_TAG_PREFIX$label"
+
+internal fun observedActivityTrackTag(modelName: String, label: String): String =
+    "$OBSERVED_ACTIVITY_TRACK_TAG_PREFIX$modelName:$label"
+
+internal fun observedActivityValueTag(modelName: String, label: String): String =
+    "$OBSERVED_ACTIVITY_VALUE_TAG_PREFIX$modelName:$label"
 
 /** Âncora de teste da barra da cota expandida; não altera a semântica visual. */
 fun quotaProgressTrackTag(label: String): String = "$QUOTA_PROGRESS_TRACK_TAG_PREFIX$label"
@@ -153,6 +162,7 @@ fun ApiUsageCard(
     isDragTarget: Boolean = false,
     language: AppLanguage,
     animationDelayMillis: Int,
+    animateEntrance: Boolean = true,
     onRefresh: () -> Unit,
     onOpenHistory: () -> Unit = {},
     /** Só os cards Anthropic recebem: sessões do Claude Code pertencem a uma conta. */
@@ -191,11 +201,15 @@ fun ApiUsageCard(
 ) {
     val orderedQuotas = orderQuotasForCard(quotas)
 
-    var visible by remember(source) { mutableStateOf(false) }
+    var visible by remember(source, animateEntrance) { mutableStateOf(!animateEntrance) }
     val hoverInteraction = remember { MutableInteractionSource() }
     val isHovered by hoverInteraction.collectIsHoveredAsState()
 
-    LaunchedEffect(source) {
+    LaunchedEffect(source, animateEntrance) {
+        if (!animateEntrance) {
+            visible = true
+            return@LaunchedEffect
+        }
         visible = false
         delay(animationDelayMillis.toLong())
         visible = true
@@ -1019,13 +1033,25 @@ private fun OpenCodeInlineBar(
         ) {
             // A barra do sistema: 4dp, com borda e trilha neutra. Esta era a
             // única do app com 8dp e superfície com alpha própria.
-            AppProgressTrack(fraction = fraction, tone = AppTone.INFO)
+            AppProgressTrack(
+                fraction = fraction,
+                tone = AppTone.INFO,
+                modifier = Modifier.testTag(observedActivityTrackTag(modelName, label))
+            )
         }
 
         Text(
             text = if (language == AppLanguage.PT) "$value req." else "$value req.",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+            // O valor é uma coluna de dados, não texto flexível. Sem um piso
+            // ele recebe a largura residual e o Compose quebra cada caractere
+            // verticalmente quando o card fica estreito.
+            modifier = Modifier
+                .widthIn(min = 42.dp)
+                .testTag(observedActivityValueTag(modelName, label))
         )
     }
 }

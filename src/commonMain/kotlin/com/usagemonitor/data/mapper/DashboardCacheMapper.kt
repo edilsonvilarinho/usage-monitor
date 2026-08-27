@@ -12,6 +12,7 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.isObservedActivitySource
 import kotlinx.datetime.Instant
 
 fun ApiUsageStats.toCacheDto(): ApiUsageStatsCacheDto {
@@ -53,7 +54,7 @@ private fun ApiUsageStatsCacheDto.toDomainOrNull(): ApiUsageStats? {
     val parsedTargetKey = UsageTargetKey.fromStorageKey(targetKey) ?: return null
     val parsedSource = runCatching { ApiSource.valueOf(source) }.getOrNull() ?: return null
     val parsedQuotas = quotas.mapNotNull { quota -> quota.toDomainOrNull() }
-    if (parsedQuotas.isEmpty()) {
+    if (parsedQuotas.isEmpty() && !parsedSource.isObservedActivitySource()) {
         return null
     }
 

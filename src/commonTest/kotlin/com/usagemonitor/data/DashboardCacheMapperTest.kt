@@ -90,6 +90,46 @@ class DashboardCacheMapperTest {
     }
 
     @Test
+    fun `round trip preserves empty observed activity cards`() {
+        val originals = listOf(
+            ApiUsageStats(
+                source = ApiSource.OPENCODE,
+                apiName = "OpenCode Zen Free",
+                quotas = emptyList()
+            ),
+            ApiUsageStats(
+                source = ApiSource.KILO,
+                apiName = "Kilo Free",
+                quotas = emptyList()
+            )
+        )
+
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = originals.map { stats -> stats.toCacheDto() }
+        ).toDomain()
+
+        assertEquals(originals, restored)
+    }
+
+    @Test
+    fun `drops empty cards from sources that require quota data`() {
+        val dto = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(
+                com.usagemonitor.data.dto.ApiUsageStatsCacheDto(
+                    targetKey = "MINIMAX",
+                    source = "MINIMAX",
+                    apiName = "MiniMax",
+                    quotas = emptyList()
+                )
+            )
+        )
+
+        assertTrue(dto.toDomain().isEmpty())
+    }
+
+    @Test
     fun `round trip preserves stable Codex windows and account context`() {
         val original = ApiUsageStats(
             source = ApiSource.CODEX,

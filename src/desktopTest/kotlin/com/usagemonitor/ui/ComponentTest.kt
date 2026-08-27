@@ -3,6 +3,8 @@ package com.usagemonitor.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +63,8 @@ import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_TAG
 import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_HINT_TAG
 import com.usagemonitor.presentation.ui.components.ApiUsageCard
 import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
+import com.usagemonitor.presentation.ui.components.observedActivityTrackTag
+import com.usagemonitor.presentation.ui.components.observedActivityValueTag
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.apiSelectorRowTestTag
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
@@ -2432,6 +2436,64 @@ class ComponentTest {
     }
 
     @Test
+    fun `OpenCode and Kilo observed activity values stay horizontal in narrow expanded cards`() = runDesktopComposeUiTest(width = 260, height = 1_200) {
+        mainClock.autoAdvance = false
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(260.dp).height(1_200.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ApiUsageCard(
+                            source = ApiSource.OPENCODE,
+                            apiName = "OpenCode Zen Free",
+                            quotas = observedActivityQuotas("OpenCode model", 1L, 7L),
+                            showUsageDetails = true,
+                            isRefreshing = false,
+                            language = AppLanguage.PT,
+                            animationDelayMillis = 0,
+                            animateEntrance = false,
+                            modifier = Modifier.width(260.dp),
+                            onRefresh = {}
+                        )
+                        ApiUsageCard(
+                            source = ApiSource.KILO,
+                            apiName = "Kilo Free",
+                            quotas = observedActivityQuotas("Kilo model", 2L, 17L),
+                            showUsageDetails = true,
+                            isRefreshing = false,
+                            language = AppLanguage.PT,
+                            animationDelayMillis = 0,
+                            animateEntrance = false,
+                            modifier = Modifier.width(260.dp),
+                            onRefresh = {}
+                        )
+                    }
+                }
+            }
+        }
+
+        mainClock.advanceTimeBy(16)
+        mainClock.advanceTimeBy(1_000)
+        onNodeWithText("1 req.", useUnmergedTree = true).assertExists()
+        onNodeWithText("17 req.", useUnmergedTree = true).assertExists()
+        onNodeWithTag(
+            observedActivityValueTag("OpenCode model", "5h"),
+            useUnmergedTree = true
+        ).assertExists()
+        onNodeWithTag(
+            observedActivityValueTag("Kilo model", "7d"),
+            useUnmergedTree = true
+        ).assertExists()
+        onNodeWithTag(
+            observedActivityTrackTag("OpenCode model", "5h"),
+            useUnmergedTree = true
+        ).assertExists()
+        onNodeWithTag(
+            observedActivityTrackTag("Kilo model", "7d"),
+            useUnmergedTree = true
+        ).assertExists()
+    }
+
+    @Test
     fun `HistoryScreen renders one OpenCode chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
         val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
             source = ApiSource.OPENCODE,
@@ -3338,5 +3400,28 @@ private fun AnthropicCardWithSessionButtons(
         cliSessionPulse = cliPulse,
         teamSessionPulse = teamPulse,
         now = Instant.parse("2026-04-28T10:00:00Z")
+    )
+}
+
+private fun observedActivityQuotas(modelName: String, fiveHour: Long, sevenDay: Long): List<QuotaInfo> {
+    return listOf(
+        QuotaInfo(
+            label = "$modelName 5h",
+            used = fiveHour,
+            total = 0L,
+            periodEndAt = Instant.parse("2026-05-07T15:00:00Z"),
+            hasKnownResetAt = false,
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.REQUESTS
+        ),
+        QuotaInfo(
+            label = "$modelName 7d",
+            used = sevenDay,
+            total = 0L,
+            periodEndAt = Instant.parse("2026-05-07T15:00:00Z"),
+            hasKnownResetAt = false,
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.REQUESTS
+        )
     )
 }

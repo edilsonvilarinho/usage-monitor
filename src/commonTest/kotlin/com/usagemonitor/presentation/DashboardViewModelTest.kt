@@ -19,11 +19,13 @@ import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.CodexRepository
 import com.usagemonitor.domain.repository.DeepSeekRepository
 import com.usagemonitor.domain.repository.MiniMaxRepository
+import com.usagemonitor.domain.repository.KiloRepository
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
@@ -44,6 +46,47 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModelTest : DashboardViewModelTestSupport() {
+
+    @Test
+    fun `publishes an empty Kilo card when the source is enabled dynamically`() = runTest {
+        val enabledApis = MutableStateFlow<Set<ApiSource>>(emptySet())
+        val emptyKiloStats = ApiUsageStats(
+            source = ApiSource.KILO,
+            apiName = "Kilo Free",
+            quotas = emptyList()
+        )
+        val kiloRepository = object : KiloRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> = Result.success(emptyKiloStats)
+        }
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(object : AnthropicRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(object : MiniMaxRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getCodexUsage = GetCodexUsageUseCase(object : CodexRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(object : DeepSeekRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            enabledApis = enabledApis,
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getKiloUsage = GetKiloUsageUseCase(kiloRepository),
+            config = manualRefreshConfig()
+        )
+
+        enabledApis.value = setOf(ApiSource.KILO)
+        viewModel.refresh(ApiSource.KILO)
+
+        awaitCondition {
+            val state = viewModel.uiState.value as? UiState.Success ?: return@awaitCondition false
+            state.data.singleOrNull() == emptyKiloStats
+        }
+
+        viewModel.onDestroy()
+    }
 
     @Test
     fun `initial state is Loading`() = runTest {
