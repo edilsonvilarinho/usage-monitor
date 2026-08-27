@@ -558,26 +558,22 @@ private fun CliSessionsHeader(
     }
 }
 
-/** Sinal de que a tela se atualiza sozinha — o botão de atualizar não existe mais. */
+/**
+ * Sinal de que a tela se atualiza sozinha — o botão de atualizar não existe mais.
+ *
+ * É [AppStatusIndicator], a única insígnia de estado do sistema, e não um ponto
+ * próprio: ponto **e** palavra, e o tom saindo de [AppTone]. Ele desenhava o
+ * ponto com `CACHE_READ_COLOR`, que é `darkAppAccents.cacheRead` congelado num
+ * `val` de topo de arquivo — resolvido uma vez por processo, sem ler o tema em
+ * vigor. No tema claro aquele verde dá 2,64:1 contra a `surface`, e a primitiva
+ * o troca por `AppAccents.current.cacheRead`, que passa nos dois.
+ */
 @Composable
 internal fun LiveBadge(language: AppLanguage) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(7.dp)
-                .clip(AppShapes.small)
-                .background(CACHE_READ_COLOR)
-        )
-        Text(
-            text = CliSessionsLabels.live(language),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = CACHE_READ_COLOR
-        )
-    }
+    AppStatusIndicator(
+        label = CliSessionsLabels.live(language),
+        tone = AppTone.OK
+    )
 }
 
 /**

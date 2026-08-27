@@ -11,19 +11,19 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A04 concluídas`
+**Estado atual:** `Em andamento — A00 a A05 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A05 — Sessões CLI.** `CliSessionsScreen.kt`: `CostDistributionBar` e a legenda dela, `LiveBadge` e
-`GlossaryPanel`.
+**A06 — Card de uso.** `ApiUsageCard.kt`: o único `Card()` cru da aplicação e os quatro pares
+`.background + .border` que reimplementam `AppDataSurface` e `AppMetricBlock`.
 
 ### ⏭ Próxima atividade
 
-**A06 — Card de uso.** `ApiUsageCard.kt`: o único `Card()` cru da aplicação e os quatro pares
-`.background + .border` que reimplementam `AppDataSurface` e `AppMetricBlock`.
+**A07 — Faixa de atualização.** `DashboardScreenWarnings.kt`: `AppUpdateBanner` monta o próprio
+`Surface` e o próprio marcador de 2dp em vez de usar `AppBanner`.
 
 ---
 
@@ -88,8 +88,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A01 — Plano e issue de rastreio | — | ✅ | `df73cd2` |
 | A02 — Uso do time | 6 | ✅ | `176bcb8` |
 | A03 — Primitiva duplicada `DepthSurface` | 5, 7, 8 | ✅ | `7039daa` |
-| A04 — Presença e chaves das contas | 6, 7, 8 | ✅ | *(hash registrado na A05)* |
-| A05 — Sessões CLI | 5 | ⬜ | |
+| A04 — Presença e chaves das contas | 6, 7, 8 | ✅ | `2307760` |
+| A05 — Sessões CLI | 5 | ✅ | *(hash registrado na A06)* |
 | A06 — Card de uso | 2 | ⬜ | |
 | A07 — Faixa de atualização | 3 | ⬜ | |
 | A08 — Configurações | 9 | ⬜ | |
@@ -197,16 +197,35 @@ Não convertido, com o motivo:
 Verificado: `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`,
 `TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → **101 testes, 0 falhas**.
 
-### A05 — Sessões CLI · `CliSessionsScreen.kt`
+### A05 — Sessões CLI · `CliSessionsScreen.kt` — ✅
 
-- `CostDistributionBar` `:1613` (`:1621` trilha, `:1634` segmentos) e a legenda `:1661` →
-  `AppProgressTrack`. A barra é empilhada por tipo de token; se a primitiva não suportar segmentos, a
-  extensão dela entra **neste mesmo commit**.
-- `LiveBadge` `:572` → `AppStatusIndicator`.
-- `GlossaryPanel` `:1564` / `.border` cru `:1545` → `AppDataSurface`.
-- ⚠ `CACHE_READ_COLOR` (`:101`) é `darkAppAccents.cacheRead` congelado. O **uso** tocado aqui passa a
-  `AppAccents.current.cacheRead`; os outros 32 usos ficam no débito (item 1 de *Fora de escopo*).
-- Verificar: `--tests "com.usagemonitor.ui.CliSessionsScreenTest"` (45).
+**Três dos cinco débitos que o levantamento contou aqui não são débitos.** Ver a ocorrência O5.
+
+Feito:
+
+- **`LiveBadge` → `AppStatusIndicator`.** Ponto e palavra, com o tom saindo de `AppTone.OK`. Ele
+  pintava o ponto e o texto com `CACHE_READ_COLOR`, que é `darkAppAccents.cacheRead` congelado num
+  `val` de topo de arquivo: resolvido uma vez por processo, sem ler o tema em vigor. No tema claro
+  aquele verde dá **2,64:1** contra a `surface`. A primitiva o troca por
+  `AppAccents.current.cacheRead`, que passa nos dois — a correção sai de graça com a adoção, e vale
+  para os três chamadores (`CliSessionsScreen`, `TeamPresenceScreen`, `TeamUsageScreen`).
+
+Não é débito, com o motivo:
+
+- **`CostDistributionBar`, os segmentos dela e a amostra da legenda** são uma **barra de composição
+  empilhada**, que as fundações do design system listam entre os gráficos permitidos — "line charts,
+  bar series, a per-hour activity heatmap, stacked composition bars — all drawn in accent colors on
+  `--raised`", e `surfaceVariant` é `--raised`. `AppProgressTrack` é a barra de **cota**: uma fração,
+  um tom. Forçá-la aqui perderia as quatro faixas.
+- **O anel de 1dp do `HelpDot`** não cai na armadilha nº 6. Aquela é sobre caixa de 4dp: a 110% o
+  anel vira 2px de cada lado e cobre o trilho inteiro. Aqui a caixa tem 14dp (~15px na mesma escala)
+  e sobram ~11px para o `?`. Medido, não estimado.
+- **`GlossaryPanel` já era conforme**: `AppDataSurfaceFlush` + `AppSectionHeader` + `AppDataRow`. O
+  `.border` que o levantamento atribuiu a ele é do `HelpDot`, o vizinho de cima no arquivo.
+
+Verificado: `gradlew.bat desktopTest --tests CliSessionsScreenTest --tests TeamPresenceScreenTest
+--tests TeamUsageScreenTest` → 45 + 31 + 52 = **128 testes, 0 falhas**. As três porque `LiveBadge` é
+`internal` e as três telas a consomem.
 
 ### A06 — Card de uso · `ApiUsageCard.kt`
 
@@ -297,7 +316,8 @@ nunca a intenção.
 | 2 | `df73cd2` | A01 | Este plano, com o levantamento das 13 superfícies e a medição de adoção por primitiva; issue de rastreio [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) criada com o mesmo ponto de situação | `gh issue create` devolveu `issues/117`; contagens conferidas por `grep` sobre `presentation/ui/` |
 | 3 | `176bcb8` | A02 | `Modifier.appNestedGroupItem` criada e adotada nos dois blocos aninhados; `TeamHealthCell` passou a ser `AppStatusIndicator` e perdeu o parâmetro `showLabel`, cujo ramo `true` era morto; o chamador da tela de presença acompanhou | `gradlew.bat desktopTest --tests TeamUsageScreenTest --tests TeamPresenceScreenTest` → 52 + 31 = **83 testes, 0 falhas** |
 | 4 | `7039daa` | A03 | `AppDataSurface` ganhou `verticalArrangement`; os quatro call sites de `DepthSurface` migraram com `Arrangement.Top`; `DepthSurface.kt` removido | `gradlew.bat desktopTest` sobre `TeamPresenceScreenTest`, `CliSessionsScreenTest`, `AppStructureTest`, `TeamKeysAdminScreenTest` e `TeamAdminSectionTest` → 31 + 45 + 5 + 5 + 6 = **92 testes, 0 falhas** |
-| 5 | *(a preencher na A05)* | A04 | `AppGroupBand` criada, registrada no design system e adotada nas duas sub-faixas de conta; `TeamKeysList` passou a `AppWindowScaffold`; dois testes novos de primitiva | `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`, `TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → 52 + 31 + 5 + 6 + 7 = **101 testes, 0 falhas** |
+| 5 | `2307760` | A04 | `AppGroupBand` criada, registrada no design system e adotada nas duas sub-faixas de conta; `TeamKeysList` passou a `AppWindowScaffold`; dois testes novos de primitiva | `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`, `TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → 52 + 31 + 5 + 6 + 7 = **101 testes, 0 falhas** |
+| 6 | *(a preencher na A06)* | A05 | `LiveBadge` passou a `AppStatusIndicator`, o que também tira o acento congelado no escuro dos três chamadores; barra de composição, `HelpDot` e `GlossaryPanel` reavaliados e retirados da conta de débito | `gradlew.bat desktopTest --tests CliSessionsScreenTest --tests TeamPresenceScreenTest --tests TeamUsageScreenTest` → 45 + 31 + 52 = **128 testes, 0 falhas** |
 
 ---
 
@@ -329,6 +349,19 @@ Ela virou **atividade própria**: a extensão de `AppDataSurface`, os quatro cal
 arquivo no mesmo commit. A A03 e a A04 foram redefinidas em volta disso, e a A04 passou a juntar
 Presença e Chaves — as duas dependem da mesma extensão de `AppSectionHeader`.
 
+**O5 · 2026-08-27 · A05 — a contagem por `grep` conta gráfico como retângulo pintado à mão.**
+
+O levantamento marcou cinco débitos em `CliSessionsScreen`. Três não são: a barra de composição
+empilhada, os segmentos dela e a amostra de cor da legenda **são** desenho à mão, e é assim que o
+design system manda desenhá-los — gráfico é a única coisa que o sistema deixa pintar direto, em cor
+de acento sobre `--raised`. O quarto, o anel do `HelpDot`, foi medido contra a armadilha nº 6 e passa:
+aquela é sobre caixa de 4dp, esta tem 14. E o `GlossaryPanel` já usava as três primitivas certas — o
+`.border` que o levantamento pendurou nele é do `HelpDot`, o vizinho de cima no arquivo.
+
+**Consequência para o resto do plano:** o número de débitos por tela é **teto, não meta**.
+`ApiUsageCard` (6), `SettingsDialogContent` (6) e o cromo das janelas (5) serão reavaliados um a um
+antes de qualquer troca, e o que for gráfico ou já conforme sai da conta com o motivo escrito.
+
 **O4 · 2026-08-27 · A04 — a primitiva certa não era a que tinha a anatomia parecida.**
 
 A A04 tinha sido escrita para dar um parâmetro de recuo ao `AppSectionHeader`, porque a anatomia
@@ -354,6 +387,7 @@ atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como 
 | 2026-08-27 | A03 | `DepthSurface` atravessava três telas e não cabia dentro de nenhuma atividade de tela (O2) | Virou atividade própria, com a extensão de `AppDataSurface` e os quatro call sites no mesmo commit |
 | 2026-08-27 | A03 | O plano mandava rodar `--tests "com.usagemonitor.ui.TeamAdminUiTest"`, e **nenhum teste roda com esse filtro** | `TeamAdminUiTest.kt` é um arquivo com duas classes, `TeamAdminSectionTest` (6) e `TeamKeysAdminScreenTest` (5). O filtro do Gradle casa nome de classe, não de arquivo, e não falha quando outro filtro da mesma chamada casa. Os nomes certos estão na seção *Verificação* |
 | 2026-08-27 | A04 | O plano queria dar um parâmetro de recuo ao `AppSectionHeader`; o problema não era o recuo, era o peso visual (O4) | `AppGroupBand`, primitiva própria para o degrau quieto da escada, registrada no design system |
+| 2026-08-27 | A05 | Três dos cinco débitos contados em `CliSessionsScreen` não eram débito: gráfico permitido, anel medido e painel já conforme (O5) | Retirados da conta com o motivo escrito; o número por tela passa a ser teto, não meta |
 
 ---
 
