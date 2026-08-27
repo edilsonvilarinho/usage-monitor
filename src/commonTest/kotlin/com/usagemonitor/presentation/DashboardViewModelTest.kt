@@ -945,7 +945,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     }
 
     @Test
-    fun `new Codex response replaces the cached five hour and weekly quotas`() = runTest {
+    fun `standard Codex response replaces a cached monthly quota`() = runTest {
         val freshCodexStats = sampleCodexStats.copy(
             quotas = listOf(
                 sampleCodexStats.quotas[0].copy(used = 44L),
@@ -953,6 +953,14 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             )
         )
         var codexCalls = 0
+        val cachedMonthlyStats = sampleCodexStats.copy(
+            quotas = listOf(
+                sampleCodexStats.quotas.first().copy(
+                    label = "Codex mensal",
+                    periodType = PeriodType.MONTHLY
+                )
+            )
+        )
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
                 codexCalls += 1
@@ -966,7 +974,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             getDeepSeekUsage = GetDeepSeekUsageUseCase(failingDeepSeekRepository()),
             enabledApis = MutableStateFlow(setOf(ApiSource.CODEX)),
             recordUsageSnapshot = historyUseCase(mutableListOf()),
-            getCachedDashboardStats = cachedStatsUseCase(listOf(sampleCodexStats)),
+            getCachedDashboardStats = cachedStatsUseCase(listOf(cachedMonthlyStats)),
             clock = Clock.System,
             config = manualRefreshConfig()
         )
@@ -1031,20 +1039,20 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     }
 
     @Test
-    fun `degraded Codex response does not overwrite complete cached quotas`() = runTest {
+    fun `partial Codex response replaces the cached snapshot`() = runTest {
         var codexCalls = 0
-        val degradedStats = sampleCodexStats.copy(
+        val partialStats = sampleCodexStats.copy(
             quotas = listOf(
                 sampleCodexStats.quotas.first().copy(
-                    label = "Codex atual",
-                    periodType = PeriodType.REPORTED
+                    label = "Codex mensal",
+                    periodType = PeriodType.MONTHLY
                 )
             )
         )
         val codexRepo = object : CodexRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
                 codexCalls += 1
-                return Result.success(degradedStats)
+                return Result.success(partialStats)
             }
         }
         val viewModel = DashboardViewModel(
@@ -1067,15 +1075,15 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
                 (viewModel.uiState.value as? UiState.Success)
                     ?.data
                     ?.singleOrNull()
-                    ?.notices
-                    ?.contains(ApiUsageNotice.SOURCE_UNSTABLE) == true
+                    ?.quotas
+                    ?.singleOrNull()
+                    ?.periodType == PeriodType.MONTHLY
         }
 
         val state = viewModel.uiState.value as UiState.Success
         val codex = state.data.single()
-        assertEquals(listOf("Codex 5h", "Codex 7d"), codex.quotas.map { it.label })
-        assertEquals(listOf(23L, 11L), codex.quotas.map { it.used })
-        assertTrue(ApiUsageNotice.SOURCE_UNSTABLE in codex.notices)
+        assertEquals(listOf("Codex mensal"), codex.quotas.map { it.label })
+        assertEquals(listOf(23L), codex.quotas.map { it.used })
         viewModel.onDestroy()
     }
 

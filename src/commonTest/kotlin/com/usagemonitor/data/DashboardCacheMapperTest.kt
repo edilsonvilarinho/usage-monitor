@@ -177,6 +177,31 @@ class DashboardCacheMapperTest {
     }
 
     @Test
+    fun `round trip preserves a partial monthly Codex snapshot`() {
+        val original = ApiUsageStats(
+            source = ApiSource.CODEX,
+            apiName = "Codex",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Codex mensal",
+                    used = 45L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.MONTHLY,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            )
+        )
+
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(original.toCacheDto())
+        ).toDomain()
+
+        assertEquals(original, restored.single())
+    }
+
+    @Test
     fun `round trip preserves Codex reported fallback and notices`() {
         val original = ApiUsageStats(
             source = ApiSource.CODEX,

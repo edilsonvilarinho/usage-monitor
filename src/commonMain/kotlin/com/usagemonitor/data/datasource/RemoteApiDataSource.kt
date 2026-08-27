@@ -137,16 +137,23 @@ open class RemoteApiDataSource(
 
             return try {
                 val payload = response.body<CodexUsageResponse>()
+                val diagnosticWindow = payload.rateLimit.primaryWindow
+                    ?: payload.rateLimit.secondaryWindow
                 codexDiagnosticsRecorder.recordSuccess(
                     CodexDiagnosticsSuccessEvent(
                         timestamp = Clock.System.now().toString(),
+                        sourceKind = if (payload.rateLimit.primaryWindow != null) {
+                            "primary_window"
+                        } else {
+                            "secondary_window"
+                        },
                         planType = payload.planType,
                         allowed = payload.rateLimit.allowed,
                         limitReached = payload.rateLimit.limitReached,
-                        primaryUsedPercent = payload.rateLimit.primaryWindow.usedPercent,
-                        primaryResetAt = payload.rateLimit.primaryWindow.resetAt,
-                        primaryResetAfterSeconds = payload.rateLimit.primaryWindow.resetAfterSeconds,
-                        primaryLimitWindowSeconds = payload.rateLimit.primaryWindow.limitWindowSeconds
+                        primaryUsedPercent = diagnosticWindow?.usedPercent,
+                        primaryResetAt = diagnosticWindow?.resetAt,
+                        primaryResetAfterSeconds = diagnosticWindow?.resetAfterSeconds,
+                        primaryLimitWindowSeconds = diagnosticWindow?.limitWindowSeconds
                     )
                 )
                 payload

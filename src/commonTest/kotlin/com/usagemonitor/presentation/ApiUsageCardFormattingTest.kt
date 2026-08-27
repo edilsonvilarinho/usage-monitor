@@ -39,6 +39,11 @@ class ApiUsageCardFormattingTest {
         periodType = PeriodType.WEEKLY
     )
 
+    private val monthlyQuota = fiveHourQuota.copy(
+        label = "Codex mensal",
+        periodType = PeriodType.MONTHLY
+    )
+
     private val creditsQuota = QuotaInfo(
         label = AnthropicQuotaLabels.EXTRA_CREDITS,
         used = 60L,
@@ -76,6 +81,29 @@ class ApiUsageCardFormattingTest {
         val ordered = orderQuotasForCard(listOf(fiveHourQuota, codexQuota))
 
         assertEquals(listOf("Codex atual", AnthropicQuotaLabels.FIVE_HOUR), ordered.map { it.label })
+    }
+
+    @Test
+    fun `card ordering supports one two and three quota windows`() {
+        assertEquals(listOf(AnthropicQuotaLabels.FIVE_HOUR), orderQuotasForCard(listOf(fiveHourQuota)).map { it.label })
+        assertEquals(
+            listOf(AnthropicQuotaLabels.FIVE_HOUR, AnthropicQuotaLabels.SEVEN_DAY),
+            orderQuotasForCard(listOf(sevenDayQuota, fiveHourQuota)).map { it.label }
+        )
+        assertEquals(
+            listOf(AnthropicQuotaLabels.FIVE_HOUR, AnthropicQuotaLabels.SEVEN_DAY, "Codex mensal"),
+            orderQuotasForCard(listOf(monthlyQuota, sevenDayQuota, fiveHourQuota)).map { it.label }
+        )
+    }
+
+    @Test
+    fun `monthly quota uses monthly title and regular reset`() {
+        assertEquals("Mensal", expandedQuotaTitle(monthlyQuota, AppLanguage.PT))
+        assertEquals("Monthly", expandedQuotaTitle(monthlyQuota, AppLanguage.EN))
+        assertEquals(
+            "Reinício: Ter 11/08 17h00 BRT",
+            resetLabel(monthlyQuota, AppLanguage.PT, Instant.parse("2026-08-01T00:00:00Z"))
+        )
     }
 
     @Test

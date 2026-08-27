@@ -2,7 +2,6 @@ package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
-import com.usagemonitor.data.dto.CodexWeeklyUsageResponse
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -14,60 +13,85 @@ import kotlinx.datetime.Instant
 object CodexMapper {
 
     private const val PERCENT_SCALE = 100L
+    private const val SECONDS_PER_DAY = 24L * 60L * 60L
+    private const val FIVE_HOUR_SECONDS = 5L * 60L * 60L
+    private const val SEVEN_DAY_SECONDS = 7L * SECONDS_PER_DAY
+    private const val MONTHLY_MIN_SECONDS = 28L * SECONDS_PER_DAY
+    private const val MONTHLY_MAX_SECONDS = 31L * SECONDS_PER_DAY
 
-    fun toIntervalQuota(response: CodexUsageResponse): QuotaInfo {
-        return QuotaInfo(
-            label = "Codex 5h",
-            used = response.rateLimit.primaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
-            total = PERCENT_SCALE,
-            periodEndAt = Instant.fromEpochSeconds(response.rateLimit.primaryWindow.resetAt),
-            periodType = PeriodType.INTERVAL,
-            unit = UsageUnit.PERCENTAGE
+    fun toUsageStats(response: CodexUsageResponse): ApiUsageStats {
+        val windows = listOfNotNull(
+            response.rateLimit.primaryWindow,
+            response.rateLimit.secondaryWindow
         )
-    }
+        val quotasByPeriod = linkedMapOf<PeriodType, QuotaInfo>()
+        var hasUnknownWindow = false
+        var hasDuplicateWindow = false
 
-    fun toWeeklyQuota(window: CodexUsageWindowDto): QuotaInfo {
-        return QuotaInfo(
-            label = "Codex 7d",
-            used = window.usedPercent.coerceIn(0L, PERCENT_SCALE),
-            total = PERCENT_SCALE,
-            periodEndAt = Instant.fromEpochSeconds(window.resetAt),
-            periodType = PeriodType.WEEKLY,
-            unit = UsageUnit.PERCENTAGE
-        )
-    }
+        windows.forEach { window ->
+            val mapping = mapWindow(window)
+            if (mapping.periodType == PeriodType.REPORTED) {
+                hasUnknownWindow = true
+            }
+            if (quotasByPeriod.containsKey(mapping.periodType)) {
+                hasDuplicateWindow = true
+            } else {
+                quotasByPeriod[mapping.periodType] = mapping.quota
+            }
+        }
 
-    fun toWeeklyQuota(response: CodexWeeklyUsageResponse): QuotaInfo {
-        return QuotaInfo(
-            label = "Codex 7d",
-            used = response.usedPercent.coerceIn(0L, PERCENT_SCALE),
-            total = PERCENT_SCALE,
-            periodEndAt = Instant.fromEpochSeconds(response.resetAt),
-            periodType = PeriodType.WEEKLY,
-            unit = UsageUnit.PERCENTAGE
-        )
-    }
+        val notices = buildSet {
+            if (hasUnknownWindow || hasDuplicateWindow) {
+                add(ApiUsageNotice.SOURCE_UNSTABLE)
+            }
+        }
 
-    fun mergeStableUsage(
-        intervalQuota: QuotaInfo,
-        weeklyQuota: QuotaInfo
-    ): ApiUsageStats {
         return ApiUsageStats(
             source = ApiSource.CODEX,
             apiName = "Codex",
-            quotas = listOf(intervalQuota, weeklyQuota)
+            quotas = quotasByPeriod.values.sortedBy { quota -> periodRank(quota.periodType) },
+            notices = notices
         )
     }
 
-    fun mergeDegradedUsage(
-        intervalQuota: QuotaInfo,
-        weeklyQuota: QuotaInfo
-    ): ApiUsageStats {
-        return ApiUsageStats(
-            source = ApiSource.CODEX,
-            apiName = "Codex",
-            quotas = listOf(intervalQuota, weeklyQuota),
-            notices = setOf(ApiUsageNotice.SOURCE_UNSTABLE)
+    private fun mapWindow(window: CodexUsageWindowDto): CodexWindowMapping {
+        val periodType = when {
+            window.limitWindowSeconds == FIVE_HOUR_SECONDS -> PeriodType.INTERVAL
+            window.limitWindowSeconds == SEVEN_DAY_SECONDS -> PeriodType.WEEKLY
+            window.limitWindowSeconds in MONTHLY_MIN_SECONDS..MONTHLY_MAX_SECONDS -> PeriodType.MONTHLY
+            else -> PeriodType.REPORTED
+        }
+        val label = when (periodType) {
+            PeriodType.INTERVAL -> "Codex 5h"
+            PeriodType.WEEKLY -> "Codex 7d"
+            PeriodType.MONTHLY -> "Codex mensal"
+            PeriodType.REPORTED -> "Codex atual"
+        }
+
+        return CodexWindowMapping(
+            periodType = periodType,
+            quota = QuotaInfo(
+                label = label,
+                used = window.usedPercent.coerceIn(0L, PERCENT_SCALE),
+                total = PERCENT_SCALE,
+                periodEndAt = Instant.fromEpochSeconds(window.resetAt),
+                periodType = periodType,
+                unit = UsageUnit.PERCENTAGE
+            )
         )
     }
+
+    private fun periodRank(periodType: PeriodType): Int {
+        return when (periodType) {
+            PeriodType.INTERVAL -> 0
+            PeriodType.WEEKLY -> 1
+            PeriodType.MONTHLY -> 2
+            PeriodType.REPORTED -> 3
+        }
+    }
+
+    private data class CodexWindowMapping(
+        val periodType: PeriodType,
+        val quota: QuotaInfo
+    )
 }

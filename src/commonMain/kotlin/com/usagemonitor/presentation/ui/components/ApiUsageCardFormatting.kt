@@ -104,6 +104,7 @@ internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String
     return when (quota.periodType) {
         PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Sessão 5h" else "5h session"
         PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Semanal" else "Weekly"
+        PeriodType.MONTHLY -> if (language == AppLanguage.PT) "Mensal" else "Monthly"
         PeriodType.REPORTED -> if (language == AppLanguage.PT) "Uso atual" else "Current usage"
     }
 }
@@ -222,12 +223,14 @@ internal fun resetLabel(quota: QuotaInfo, language: AppLanguage, now: Instant): 
     return if (language == AppLanguage.PT) {
         when (quota.periodType) {
             PeriodType.WEEKLY -> "Reinício: $dayFormatted $dateFormatted $timeFormatted BRT"
+            PeriodType.MONTHLY -> "Reinício: $dayFormatted $dateFormatted $timeFormatted BRT"
             PeriodType.REPORTED -> "Reinício reportado: $dayFormatted $dateFormatted $timeFormatted BRT"
             PeriodType.INTERVAL -> "Reinício: $dayFormatted $timeFormatted BRT"
         }
     } else {
         when (quota.periodType) {
             PeriodType.WEEKLY -> "Reset: $dayFormatted $dateFormatted $timeFormatted BRT"
+            PeriodType.MONTHLY -> "Reset: $dayFormatted $dateFormatted $timeFormatted BRT"
             PeriodType.REPORTED -> "Reported reset: $dayFormatted $dateFormatted $timeFormatted BRT"
             PeriodType.INTERVAL -> "Reset: $dayFormatted $timeFormatted BRT"
         }
@@ -631,6 +634,7 @@ internal fun orderQuotasForCard(quotas: List<QuotaInfo>): List<QuotaInfo> {
         windowQuotas.firstOrNull { quota -> quota.periodType == PeriodType.REPORTED }?.let(::add)
         windowQuotas.firstOrNull { quota -> quota.periodType == PeriodType.INTERVAL }?.let(::add)
         windowQuotas.firstOrNull { quota -> quota.periodType == PeriodType.WEEKLY }?.let(::add)
+        windowQuotas.firstOrNull { quota -> quota.periodType == PeriodType.MONTHLY }?.let(::add)
         windowQuotas.filterNot { quota -> quota in this }.forEach(::add)
         if (creditsQuota != null) {
             add(creditsQuota)

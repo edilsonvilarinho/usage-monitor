@@ -290,6 +290,11 @@ internal fun openCodeHistorySubtitle(
         } else {
             "Observed free-model activity in the 7-day weekly window."
         }
+        PeriodType.MONTHLY -> if (language == AppLanguage.PT) {
+            "Atividade observada do modelo free na janela mensal."
+        } else {
+            "Observed free-model activity in the monthly window."
+        }
         PeriodType.REPORTED -> if (language == AppLanguage.PT) {
             "Janela reportada pela fonte."
         } else {
@@ -314,6 +319,7 @@ internal fun historySeriesDisplaySubtitle(
     return when (series.periodType) {
         PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Quota semanal" else "Weekly quota"
         PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Quota intervalar" else "Interval quota"
+        PeriodType.MONTHLY -> if (language == AppLanguage.PT) "Quota mensal" else "Monthly quota"
         PeriodType.REPORTED -> if (language == AppLanguage.PT) "Janela reportada" else "Reported window"
     }
 }
@@ -351,6 +357,7 @@ internal fun buildGenericHistoryGroups(series: List<UsageHistorySeries>): List<G
         when (item.periodType) {
             PeriodType.INTERVAL -> group.intervalSeries = item
             PeriodType.WEEKLY -> group.weeklySeries = item
+            PeriodType.MONTHLY -> group.otherSeries = item
             PeriodType.REPORTED -> group.otherSeries = item
         }
     }

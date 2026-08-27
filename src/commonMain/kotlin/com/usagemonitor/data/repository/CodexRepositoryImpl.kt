@@ -21,20 +21,11 @@ class CodexRepositoryImpl(
         for (attempt in 0..1) {
             val session = authDataSource.loadSession()
             val usageResponse = apiDataSource.fetchCodexFiveHourUsage(session)
-            val embeddedWeeklyWindow = usageResponse.rateLimit.secondaryWindow
-            val stats = if (embeddedWeeklyWindow != null) {
-                CodexMapper.mergeStableUsage(
-                    intervalQuota = CodexMapper.toIntervalQuota(usageResponse),
-                    weeklyQuota = CodexMapper.toWeeklyQuota(embeddedWeeklyWindow)
-                )
-            } else {
-                CodexMapper.mergeDegradedUsage(
-                    intervalQuota = CodexMapper.toIntervalQuota(usageResponse),
-                    weeklyQuota = CodexMapper.toWeeklyQuota(
-                        apiDataSource.fetchCodexWeeklyUsage(session)
-                    )
-                )
-            }.copy(accountContext = session.accountContext)
+            val stats = CodexMapper.toUsageStats(usageResponse)
+                .copy(accountContext = session.accountContext)
+            if (stats.quotas.isEmpty()) {
+                throw IllegalStateException("A resposta do Codex não trouxe nenhuma janela utilizável.")
+            }
 
             if (authDataSource.isSessionCurrent(session)) {
                 return stats

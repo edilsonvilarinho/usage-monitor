@@ -314,7 +314,8 @@ class UsageHistoryRepositoryImpl(
         return when (series.periodType) {
             PeriodType.INTERVAL -> 0
             PeriodType.WEEKLY -> 1
-            PeriodType.REPORTED -> 2
+            PeriodType.MONTHLY -> 2
+            PeriodType.REPORTED -> 3
         }
     }
 

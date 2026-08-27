@@ -77,5 +77,6 @@ enum class UsageUnit {
 enum class PeriodType {
     INTERVAL,  // janela curta (ex: 5 horas no MiniMax)
     WEEKLY,    // janela semanal
+    MONTHLY,   // janela mensal
     REPORTED   // janela reportada pela fonte, sem semântica local confiável
 }

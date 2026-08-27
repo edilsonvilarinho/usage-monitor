@@ -311,6 +311,28 @@ class UsageHistoryRepositoryImplTest {
     }
 
     @Test
+    fun `monthly Codex series remains available for history`() = kotlinx.coroutines.test.runTest {
+        val records = listOf(
+            record(
+                label = "Codex mensal",
+                source = ApiSource.CODEX,
+                capturedAt = "2026-04-28T17:00:00Z",
+                used = 45,
+                total = 100,
+                periodType = PeriodType.MONTHLY,
+                unit = UsageUnit.PERCENTAGE
+            )
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertEquals(1, report.series.size)
+        assertEquals("Codex mensal", report.series.single().quotaLabel)
+        assertEquals(PeriodType.MONTHLY, report.series.single().periodType)
+    }
+
+    @Test
     fun `account scoped report never mixes points from another workspace`() = kotlinx.coroutines.test.runTest {
         val accountA = account("same-user", "workspace-a")
         val accountB = account("same-user", "workspace-b")

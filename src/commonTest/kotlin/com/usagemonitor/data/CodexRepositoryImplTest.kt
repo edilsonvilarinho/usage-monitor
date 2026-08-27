@@ -6,12 +6,11 @@ import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.dto.CodexRateLimitDto
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
-import com.usagemonitor.data.dto.CodexWeeklyUsageResponse
 import com.usagemonitor.data.repository.CodexRepositoryImpl
-import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.PeriodType
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -21,13 +20,9 @@ import kotlin.test.assertTrue
 class CodexRepositoryImplTest {
 
     @Test
-    fun `uses five hour and weekly windows from the same payload when secondary window is present`() = runTest {
+    fun `uses all recognized windows from the same payload`() = runTest {
         val repository = repositoryWith(
             dataSource = object : FakeCodexDataSource() {
-                override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
-                    throw IllegalStateException("weekly source should not be called")
-                }
-
                 override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
                     return sampleStableResponse
                 }
@@ -36,54 +31,48 @@ class CodexRepositoryImplTest {
 
         val result = repository.getUsage().getOrThrow()
 
-        assertEquals(2, result.quotas.size)
-        assertEquals("codex@example.com", result.accountContext?.email)
         assertEquals(listOf("Codex 5h", "Codex 7d"), result.quotas.map { it.label })
-        assertEquals(emptySet(), result.notices)
+        assertEquals(listOf(PeriodType.INTERVAL, PeriodType.WEEKLY), result.quotas.map { it.periodType })
+        assertEquals("codex@example.com", result.accountContext?.email)
     }
 
     @Test
-    fun `fails closed when weekly quota is unavailable`() = runTest {
+    fun `does not call the unimplemented weekly source for a partial payload`() = runTest {
         val repository = repositoryWith(
             dataSource = object : FakeCodexDataSource() {
-                override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
-                    throw UnsupportedOperationException("weekly source unavailable")
-                }
-            }
-        )
-
-        val result = repository.getUsage()
-
-        assertTrue(result.isFailure)
-        assertEquals("weekly source unavailable", result.exceptionOrNull()?.message)
-    }
-
-    @Test
-    fun `keeps both quota labels when primary payload lacks secondary window`() = runTest {
-        val repository = repositoryWith(
-            dataSource = object : FakeCodexDataSource() {
-                override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
-                    return sampleWeeklyResponse
+                override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
+                    return sampleMonthlyResponse
                 }
             }
         )
 
         val result = repository.getUsage().getOrThrow()
 
-        assertEquals(listOf("Codex 5h", "Codex 7d"), result.quotas.map { it.label })
-        assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
+        assertEquals(listOf("Codex mensal"), result.quotas.map { it.label })
     }
 
     @Test
-    fun `fails when five hour source fails even if weekly source would succeed`() = runTest {
+    fun `accepts only weekly window from primary field`() = runTest {
         val repository = repositoryWith(
             dataSource = object : FakeCodexDataSource() {
                 override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
-                    throw IllegalStateException("five hour source failed")
+                    return response(window(45L, SEVEN_DAYS), null)
                 }
+            }
+        )
 
-                override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
-                    return sampleWeeklyResponse
+        val result = repository.getUsage().getOrThrow()
+
+        assertEquals(listOf("Codex 7d"), result.quotas.map { it.label })
+        assertEquals(PeriodType.WEEKLY, result.quotas.single().periodType)
+    }
+
+    @Test
+    fun `returns failure only when payload has no usable window`() = runTest {
+        val repository = repositoryWith(
+            dataSource = object : FakeCodexDataSource() {
+                override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
+                    return response(null, null)
                 }
             }
         )
@@ -91,7 +80,7 @@ class CodexRepositoryImplTest {
         val result = repository.getUsage()
 
         assertTrue(result.isFailure)
-        assertEquals("five hour source failed", result.exceptionOrNull()?.message)
+        assertEquals("A resposta do Codex não trouxe nenhuma janela utilizável.", result.exceptionOrNull()?.message)
     }
 
     @Test
@@ -134,17 +123,11 @@ class CodexRepositoryImplTest {
     private fun repositoryWith(dataSource: RemoteApiDataSource): CodexRepositoryImpl {
         return CodexRepositoryImpl(
             authDataSource = object : CodexAuthDataSource {
-                override suspend fun loadSession(): CodexSession = CodexSession(
-                    accessToken = "token",
-                    capSid = "cap",
-                    accountContext = UsageAccountContext(
-                        key = UsageAccountKey(
-                            source = ApiSource.CODEX,
-                            providerAccountId = "user-a",
-                            workspaceId = "workspace-a"
-                        ),
-                        email = "codex@example.com"
-                    )
+                override suspend fun loadSession(): CodexSession = session(
+                    token = "token",
+                    userId = "user-a",
+                    workspaceId = "workspace-a",
+                    email = "codex@example.com"
                 )
             },
             apiDataSource = dataSource
@@ -153,7 +136,7 @@ class CodexRepositoryImplTest {
 
     private open class FakeCodexDataSource : RemoteApiDataSource(HttpClient()) {
         override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
-            return sampleFiveHourResponse
+            return sampleStableResponse
         }
     }
 
@@ -178,46 +161,35 @@ class CodexRepositoryImplTest {
     }
 
     private companion object {
-        val sampleStableResponse = CodexUsageResponse(
-            planType = "plus",
-            rateLimit = CodexRateLimitDto(
-                allowed = true,
-                limitReached = false,
-                primaryWindow = CodexUsageWindowDto(
-                    usedPercent = 8L,
-                    limitWindowSeconds = 18_000L,
-                    resetAfterSeconds = 17_288L,
-                    resetAt = 1_777_398_377L
-                ),
-                secondaryWindow = CodexUsageWindowDto(
-                    usedPercent = 11L,
-                    limitWindowSeconds = 604_800L,
-                    resetAfterSeconds = 604_088L,
-                    resetAt = 1_777_985_177L
+        const val FIVE_HOURS = 18_000L
+        const val SEVEN_DAYS = 604_800L
+        const val THIRTY_DAYS = 30L * 24L * 60L * 60L
+
+        val sampleStableResponse = response(window(8L, FIVE_HOURS), window(11L, SEVEN_DAYS))
+        val sampleMonthlyResponse = response(window(45L, THIRTY_DAYS), null)
+
+        fun response(
+            primary: CodexUsageWindowDto?,
+            secondary: CodexUsageWindowDto?
+        ): CodexUsageResponse {
+            return CodexUsageResponse(
+                planType = "plus",
+                rateLimit = CodexRateLimitDto(
+                    allowed = true,
+                    limitReached = false,
+                    primaryWindow = primary,
+                    secondaryWindow = secondary
                 )
             )
-        )
+        }
 
-        val sampleFiveHourResponse = CodexUsageResponse(
-            planType = "plus",
-            rateLimit = CodexRateLimitDto(
-                allowed = true,
-                limitReached = false,
-                primaryWindow = CodexUsageWindowDto(
-                    usedPercent = 8L,
-                    limitWindowSeconds = 18_000L,
-                    resetAfterSeconds = 17_288L,
-                    resetAt = 1_777_398_377L
-                ),
-                secondaryWindow = null
+        fun window(usedPercent: Long, limitWindowSeconds: Long): CodexUsageWindowDto {
+            return CodexUsageWindowDto(
+                usedPercent = usedPercent,
+                limitWindowSeconds = limitWindowSeconds,
+                resetAfterSeconds = limitWindowSeconds,
+                resetAt = 1_777_398_377L
             )
-        )
-
-        val sampleWeeklyResponse = CodexWeeklyUsageResponse(
-            usedPercent = 11L,
-            limitWindowSeconds = 604_800L,
-            resetAfterSeconds = 604_088L,
-            resetAt = 1_777_985_177L
-        )
+        }
     }
 }

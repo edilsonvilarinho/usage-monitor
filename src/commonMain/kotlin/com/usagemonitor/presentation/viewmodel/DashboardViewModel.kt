@@ -481,7 +481,7 @@ class DashboardViewModel(
                             errorUpdates[target] = handleTargetFailure(
                                 target,
                                 IllegalStateException(
-                                    "A resposta do Codex não trouxe as cotas 5h e 7d válidas."
+                                    "A resposta do Codex não trouxe nenhuma janela utilizável."
                                 )
                             )
                         }
@@ -503,16 +503,16 @@ class DashboardViewModel(
                         cachedErrorsByTarget.remove(target)
                     } else {
                         val existingStats = cachedStatsByTarget[target]
-                        val canPreserveCompleteCodexCache =
+                        val canPreserveCodexCache =
                             target.source == ApiSource.CODEX &&
                                 existingStats != null &&
-                                isCompleteCodexSnapshot(existingStats)
+                                isPersistableDashboardStats(existingStats)
                         val shouldRemoveData =
-                            (!preserveDataOnFailure && !canPreserveCompleteCodexCache) ||
+                            (!preserveDataOnFailure && !canPreserveCodexCache) ||
                                 target !in cachedStatsByTarget
                         if (shouldRemoveData) {
                             cachedStatsByTarget.remove(target)
-                        } else if (canPreserveCompleteCodexCache) {
+                        } else if (canPreserveCodexCache) {
                             cachedStatsByTarget[target] = existingStats!!.copy(
                                 notices = existingStats.notices + ApiUsageNotice.SOURCE_UNSTABLE
                             )
@@ -716,30 +716,15 @@ class DashboardViewModel(
         cacheUseCase(snapshot, clock.now())
     }
 
-    /**
-     * A cache entry for Codex is usable only when both official windows are
-     * present. The old `Codex atual` representation must not return to the UI.
-     */
+    /** A quota Codex válida pode ser parcial: o plano pode expor uma só janela. */
     private fun isPersistableDashboardStats(stats: ApiUsageStats): Boolean {
         if (stats.source != ApiSource.CODEX) {
             return true
         }
-        return isCompleteCodexSnapshot(stats)
-    }
-
-    private fun isCompleteCodexSnapshot(stats: ApiUsageStats): Boolean {
-        if (stats.source != ApiSource.CODEX || stats.quotas.size != 2) {
+        if (stats.quotas.isEmpty()) {
             return false
         }
-
-        val fiveHour = stats.quotas.firstOrNull { quota ->
-            quota.label == "Codex 5h" && quota.periodType == PeriodType.INTERVAL
-        }
-        val weekly = stats.quotas.firstOrNull { quota ->
-            quota.label == "Codex 7d" && quota.periodType == PeriodType.WEEKLY
-        }
-        return fiveHour != null && weekly != null &&
-            isValidCodexQuota(fiveHour) && isValidCodexQuota(weekly)
+        return stats.quotas.all(::isValidCodexQuota)
     }
 
     private fun isValidCodexQuota(quota: QuotaInfo): Boolean {

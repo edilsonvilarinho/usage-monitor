@@ -22,10 +22,10 @@ data class CodexDiagnosticsSuccessEvent(
     val planType: String,
     val allowed: Boolean,
     val limitReached: Boolean,
-    val primaryUsedPercent: Long,
-    val primaryResetAt: Long,
-    val primaryResetAfterSeconds: Long,
-    val primaryLimitWindowSeconds: Long
+    val primaryUsedPercent: Long? = null,
+    val primaryResetAt: Long? = null,
+    val primaryResetAfterSeconds: Long? = null,
+    val primaryLimitWindowSeconds: Long? = null
 )
 
 @Serializable
