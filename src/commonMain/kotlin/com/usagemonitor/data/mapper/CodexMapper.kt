@@ -26,17 +26,6 @@ object CodexMapper {
         )
     }
 
-    fun toReportedQuota(response: CodexUsageResponse): QuotaInfo {
-        return QuotaInfo(
-            label = "Codex atual",
-            used = response.rateLimit.primaryWindow.usedPercent.coerceIn(0L, PERCENT_SCALE),
-            total = PERCENT_SCALE,
-            periodEndAt = Instant.fromEpochSeconds(response.rateLimit.primaryWindow.resetAt),
-            periodType = PeriodType.REPORTED,
-            unit = UsageUnit.PERCENTAGE
-        )
-    }
-
     fun toWeeklyQuota(window: CodexUsageWindowDto): QuotaInfo {
         return QuotaInfo(
             label = "Codex 7d",
@@ -70,27 +59,15 @@ object CodexMapper {
         )
     }
 
-    fun mergeReportedUsage(
-        reportedQuota: QuotaInfo,
-        weeklyQuota: QuotaInfo?
+    fun mergeDegradedUsage(
+        intervalQuota: QuotaInfo,
+        weeklyQuota: QuotaInfo
     ): ApiUsageStats {
-        val quotas = buildList {
-            add(reportedQuota)
-            if (weeklyQuota != null) {
-                add(weeklyQuota)
-            }
-        }
-
         return ApiUsageStats(
             source = ApiSource.CODEX,
             apiName = "Codex",
-            quotas = quotas,
-            notices = buildSet {
-                add(ApiUsageNotice.SOURCE_UNSTABLE)
-                if (weeklyQuota == null) {
-                    add(ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE)
-                }
-            }
+            quotas = listOf(intervalQuota, weeklyQuota),
+            notices = setOf(ApiUsageNotice.SOURCE_UNSTABLE)
         )
     }
 }

@@ -1,11 +1,15 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AnthropicProfileRef
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.repository.AppUpdateInstaller
@@ -227,7 +231,10 @@ class DashboardViewModel(
                 // guarda que deixa as duas rotinas correrem juntas.
                 val enabled = enabledTargets()
                 cachedStats.forEach { stats ->
-                    if (stats.targetKey in enabled && stats.targetKey !in cachedStatsByTarget) {
+                    if (isPersistableDashboardStats(stats) &&
+                        stats.targetKey in enabled &&
+                        stats.targetKey !in cachedStatsByTarget
+                    ) {
                         cachedStatsByTarget[stats.targetKey] = stats
                         restored += stats
                     }
@@ -465,10 +472,19 @@ class DashboardViewModel(
             fetchResults.forEach { (target, result) ->
                 result
                     .onSuccess { stats ->
-                        statsUpdates[target] = stats
-                        errorUpdates[target] = null
-                        persistSnapshot(stats, snapshotCapturedAt)
-                        refreshRiskSummaries(target, stats, snapshotCapturedAt)
+                        if (isPersistableDashboardStats(stats)) {
+                            statsUpdates[target] = stats
+                            errorUpdates[target] = null
+                            persistSnapshot(stats, snapshotCapturedAt)
+                            refreshRiskSummaries(target, stats, snapshotCapturedAt)
+                        } else {
+                            errorUpdates[target] = handleTargetFailure(
+                                target,
+                                IllegalStateException(
+                                    "A resposta do Codex não trouxe as cotas 5h e 7d válidas."
+                                )
+                            )
+                        }
                     }
                     .onFailure { error ->
                         errorUpdates[target] = handleTargetFailure(target, error)
@@ -486,9 +502,20 @@ class DashboardViewModel(
                         cachedStatsByTarget[target] = stats
                         cachedErrorsByTarget.remove(target)
                     } else {
-                        val shouldRemoveData = !preserveDataOnFailure || target !in cachedStatsByTarget
+                        val existingStats = cachedStatsByTarget[target]
+                        val canPreserveCompleteCodexCache =
+                            target.source == ApiSource.CODEX &&
+                                existingStats != null &&
+                                isCompleteCodexSnapshot(existingStats)
+                        val shouldRemoveData =
+                            (!preserveDataOnFailure && !canPreserveCompleteCodexCache) ||
+                                target !in cachedStatsByTarget
                         if (shouldRemoveData) {
                             cachedStatsByTarget.remove(target)
+                        } else if (canPreserveCompleteCodexCache) {
+                            cachedStatsByTarget[target] = existingStats!!.copy(
+                                notices = existingStats.notices + ApiUsageNotice.SOURCE_UNSTABLE
+                            )
                         }
 
                         val errorMessage = errorUpdates[target]
@@ -680,11 +707,44 @@ class DashboardViewModel(
 
     private suspend fun persistDashboardCache() {
         val cacheUseCase = saveDashboardCache ?: return
-        val snapshot = stateMutex.withLock { cachedStatsByTarget.values.toList() }
+        val snapshot = stateMutex.withLock {
+            cachedStatsByTarget.values.filter { stats -> isPersistableDashboardStats(stats) }
+        }
         if (snapshot.isEmpty()) {
             return
         }
         cacheUseCase(snapshot, clock.now())
+    }
+
+    /**
+     * A cache entry for Codex is usable only when both official windows are
+     * present. The old `Codex atual` representation must not return to the UI.
+     */
+    private fun isPersistableDashboardStats(stats: ApiUsageStats): Boolean {
+        if (stats.source != ApiSource.CODEX) {
+            return true
+        }
+        return isCompleteCodexSnapshot(stats)
+    }
+
+    private fun isCompleteCodexSnapshot(stats: ApiUsageStats): Boolean {
+        if (stats.source != ApiSource.CODEX || stats.quotas.size != 2) {
+            return false
+        }
+
+        val fiveHour = stats.quotas.firstOrNull { quota ->
+            quota.label == "Codex 5h" && quota.periodType == PeriodType.INTERVAL
+        }
+        val weekly = stats.quotas.firstOrNull { quota ->
+            quota.label == "Codex 7d" && quota.periodType == PeriodType.WEEKLY
+        }
+        return fiveHour != null && weekly != null &&
+            isValidCodexQuota(fiveHour) && isValidCodexQuota(weekly)
+    }
+
+    private fun isValidCodexQuota(quota: QuotaInfo): Boolean {
+        return quota.unit == UsageUnit.PERCENTAGE &&
+            quota.total > 0L && quota.used in 0L..quota.total
     }
 
     private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {

@@ -233,11 +233,19 @@ class ComponentTest {
                     apiName = "Codex",
                     quotas = listOf(
                         QuotaInfo(
-                            label = "Codex atual",
+                            label = "Codex 5h",
                             used = 42L,
                             total = 100L,
                             periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                            periodType = PeriodType.REPORTED,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = "Codex 7d",
+                            used = 17L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
                             unit = UsageUnit.PERCENTAGE
                         )
                     ),
@@ -350,7 +358,7 @@ class ComponentTest {
     }
 
     @Test
-    fun `ApiUsageCard shows inline Codex notice when weekly quota is unavailable`() = runDesktopComposeUiTest {
+    fun `ApiUsageCard keeps both Codex quotas while showing an inline notice`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 ApiUsageCard(
@@ -358,11 +366,19 @@ class ComponentTest {
                     apiName = "Codex",
                     quotas = listOf(
                         QuotaInfo(
-                            label = "Codex atual",
+                            label = "Codex 5h",
                             used = 42L,
                             total = 100L,
                             periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                            periodType = PeriodType.REPORTED,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = "Codex 7d",
+                            used = 17L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
                             unit = UsageUnit.PERCENTAGE
                         )
                     ),
@@ -382,8 +398,9 @@ class ComponentTest {
 
         onNodeWithText("Codex").assertIsDisplayed()
         onNodeWithText("42%").assertIsDisplayed()
-        onNodeWithText("Uso atual").assertIsDisplayed()
-        onNodeWithText("Reinício reportado: Ter 28/04 17h00 BRT").assertIsDisplayed()
+        onNodeWithText("17%").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Semanal").assertIsDisplayed()
         // Os dois avisos deixaram de ser banner e viraram uma exclamação no
         // cabeçalho (issue #76): o texto vive na descrição do ícone e na tooltip,
         // não mais no corpo do card.
@@ -396,7 +413,45 @@ class ComponentTest {
             substring = true
         ).assertIsDisplayed()
         onAllNodesWithText("Quota 7d indisponível na fonte semanal do Codex").assertCountEquals(0)
-        onAllNodesWithText("Codex 7d").assertCountEquals(0)
+    }
+
+    @Test
+    fun `ApiUsageCard keeps both Codex quotas when usage is zero`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Codex 5h",
+                            used = 0L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = "Codex 7d",
+                            used = 0L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Semanal").assertIsDisplayed()
+        onAllNodesWithText("0%").assertCountEquals(2)
     }
 
     @Test

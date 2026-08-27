@@ -3,6 +3,7 @@ package com.usagemonitor.data
 import com.usagemonitor.data.dto.CodexRateLimitDto
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
+import com.usagemonitor.data.dto.CodexWeeklyUsageResponse
 import com.usagemonitor.data.mapper.CodexMapper
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiSource
@@ -76,20 +77,20 @@ class CodexMapperTest {
     }
 
     @Test
-    fun `keeps only reported quota and emits notice when weekly quota is absent`() {
-        val result = CodexMapper.mergeReportedUsage(
-            reportedQuota = CodexMapper.toReportedQuota(sampleResponse),
-            weeklyQuota = null
+    fun `keeps both quota labels when weekly value comes from the fallback source`() {
+        val result = CodexMapper.mergeDegradedUsage(
+            intervalQuota = CodexMapper.toIntervalQuota(sampleResponse),
+            weeklyQuota = CodexMapper.toWeeklyQuota(
+                CodexWeeklyUsageResponse(
+                    usedPercent = 12L,
+                    limitWindowSeconds = 604_800L,
+                    resetAfterSeconds = 604_088L,
+                    resetAt = 1_777_985_177L
+                )
+            )
         )
 
-        assertEquals(1, result.quotas.size)
-        assertEquals("Codex atual", result.quotas.single().label)
-        assertEquals(
-            setOf(
-                ApiUsageNotice.SOURCE_UNSTABLE,
-                ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE
-            ),
-            result.notices
-        )
+        assertEquals(listOf("Codex 5h", "Codex 7d"), result.quotas.map { it.label })
+        assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
     }
 }

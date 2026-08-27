@@ -4,13 +4,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Resposta legada do endpoint privado GET /backend-api/codex/usage.
+ * Resposta do endpoint privado GET /backend-api/wham/usage.
  *
- * Quando `secondary_window` está presente, a app volta a tratar este payload
- * como fonte oficial das janelas 5h + 7d.
+ * Quando `secondary_window` está presente, a app trata este payload como fonte
+ * oficial das janelas 5h + 7d.
  *
- * Se `secondary_window` vier ausente, o monitor cai no modo degradado:
- * publica a janela primária como `REPORTED` e tenta uma fonte semanal separada.
+ * Se `secondary_window` vier ausente, a coleta é considerada incompleta. O
+ * ViewModel mantém a última leitura válida da cache e sinaliza a instabilidade;
+ * a janela primária nunca é duplicada para preencher a semanal.
  */
 @Serializable
 data class CodexUsageResponse(

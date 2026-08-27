@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AnthropicProfileRef
@@ -969,12 +970,69 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
 
         awaitCondition { viewModel.uiState.value is UiState.Success }
         viewModel.refresh(UsageTargetKey.forSource(ApiSource.CODEX))
-        awaitCondition { codexCalls == 1 && viewModel.uiState.value is UiState.Success }
+        awaitCondition {
+            codexCalls == 1 &&
+                (viewModel.uiState.value as? UiState.Success)
+                    ?.data
+                    ?.singleOrNull()
+                    ?.notices
+                    ?.contains(ApiUsageNotice.SOURCE_UNSTABLE) == true
+        }
 
         val state = viewModel.uiState.value as UiState.Success
         val codex = state.data.single()
         assertEquals(listOf(23L, 11L), codex.quotas.map { it.used })
         assertEquals(listOf("Codex 5h", "Codex 7d"), codex.quotas.map { it.label })
+        assertTrue(ApiUsageNotice.SOURCE_UNSTABLE in codex.notices)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `degraded Codex response does not overwrite complete cached quotas`() = runTest {
+        var codexCalls = 0
+        val degradedStats = sampleCodexStats.copy(
+            quotas = listOf(
+                sampleCodexStats.quotas.first().copy(
+                    label = "Codex atual",
+                    periodType = PeriodType.REPORTED
+                )
+            )
+        )
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                codexCalls += 1
+                return Result.success(degradedStats)
+            }
+        }
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(failingAnthropicRepository()),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(failingMiniMaxRepository()),
+            getCodexUsage = GetCodexUsageUseCase(codexRepo),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(failingDeepSeekRepository()),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX)),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getCachedDashboardStats = cachedStatsUseCase(listOf(sampleCodexStats)),
+            clock = Clock.System,
+            config = manualRefreshConfig(),
+            persistedNextRefreshAt = fixedInstant + with(kotlin.time.Duration.Companion) { 5.minutes }
+        )
+
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        viewModel.refresh(UsageTargetKey.forSource(ApiSource.CODEX))
+        awaitCondition {
+            codexCalls == 1 &&
+                (viewModel.uiState.value as? UiState.Success)
+                    ?.data
+                    ?.singleOrNull()
+                    ?.notices
+                    ?.contains(ApiUsageNotice.SOURCE_UNSTABLE) == true
+        }
+
+        val state = viewModel.uiState.value as UiState.Success
+        val codex = state.data.single()
+        assertEquals(listOf("Codex 5h", "Codex 7d"), codex.quotas.map { it.label })
+        assertEquals(listOf(23L, 11L), codex.quotas.map { it.used })
+        assertTrue(ApiUsageNotice.SOURCE_UNSTABLE in codex.notices)
         viewModel.onDestroy()
     }
 

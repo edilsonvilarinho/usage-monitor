@@ -28,13 +28,11 @@ class CodexRepositoryImpl(
                     weeklyQuota = CodexMapper.toWeeklyQuota(embeddedWeeklyWindow)
                 )
             } else {
-                val weeklyQuota = runCatching {
-                    apiDataSource.fetchCodexWeeklyUsage(session)
-                }.getOrNull()?.let(CodexMapper::toWeeklyQuota)
-
-                CodexMapper.mergeReportedUsage(
-                    reportedQuota = CodexMapper.toReportedQuota(usageResponse),
-                    weeklyQuota = weeklyQuota
+                CodexMapper.mergeDegradedUsage(
+                    intervalQuota = CodexMapper.toIntervalQuota(usageResponse),
+                    weeklyQuota = CodexMapper.toWeeklyQuota(
+                        apiDataSource.fetchCodexWeeklyUsage(session)
+                    )
                 )
             }.copy(accountContext = session.accountContext)
 

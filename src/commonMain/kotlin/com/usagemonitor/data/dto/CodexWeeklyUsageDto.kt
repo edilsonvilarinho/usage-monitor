@@ -3,9 +3,10 @@ package com.usagemonitor.data.dto
 /**
  * Contrato interno mínimo para a quota semanal do Codex.
  *
- * A API HTTP real ainda precisa ser descoberta na UI autenticada do ChatGPT.
- * Quando ela existir de forma reutilizável, a implementação remota deve mapear
- * o payload bruto para este formato estável antes de chegar ao mapper.
+ * Este contrato existe somente para uma fonte semanal de fallback. A coleta
+ * normal usa `secondary_window` da resposta oficial `/backend-api/wham/usage`;
+ * se ela não vier, o snapshot é rejeitado até que uma fonte semanal completa
+ * esteja disponível.
  */
 data class CodexWeeklyUsageResponse(
     val usedPercent: Long,

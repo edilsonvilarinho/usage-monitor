@@ -43,7 +43,7 @@ class CodexRepositoryImplTest {
     }
 
     @Test
-    fun `keeps reported quota and emits notice when weekly source is unavailable`() = runTest {
+    fun `fails closed when weekly quota is unavailable`() = runTest {
         val repository = repositoryWith(
             dataSource = object : FakeCodexDataSource() {
                 override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
@@ -52,21 +52,14 @@ class CodexRepositoryImplTest {
             }
         )
 
-        val result = repository.getUsage().getOrThrow()
+        val result = repository.getUsage()
 
-        assertEquals(1, result.quotas.size)
-        assertEquals("Codex atual", result.quotas.single().label)
-        assertEquals(
-            setOf(
-                ApiUsageNotice.SOURCE_UNSTABLE,
-                ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE
-            ),
-            result.notices
-        )
+        assertTrue(result.isFailure)
+        assertEquals("weekly source unavailable", result.exceptionOrNull()?.message)
     }
 
     @Test
-    fun `keeps reported quota and merges separate weekly source when primary payload lacks secondary window`() = runTest {
+    fun `keeps both quota labels when primary payload lacks secondary window`() = runTest {
         val repository = repositoryWith(
             dataSource = object : FakeCodexDataSource() {
                 override suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
@@ -77,7 +70,7 @@ class CodexRepositoryImplTest {
 
         val result = repository.getUsage().getOrThrow()
 
-        assertEquals(listOf("Codex atual", "Codex 7d"), result.quotas.map { it.label })
+        assertEquals(listOf("Codex 5h", "Codex 7d"), result.quotas.map { it.label })
         assertEquals(setOf(ApiUsageNotice.SOURCE_UNSTABLE), result.notices)
     }
 
@@ -126,7 +119,7 @@ class CodexRepositoryImplTest {
             apiDataSource = object : FakeCodexDataSource() {
                 override suspend fun fetchCodexFiveHourUsage(session: CodexSession): CodexUsageResponse {
                     apiCalls += 1
-                    return sampleFiveHourResponse
+                    return sampleStableResponse
                 }
             }
         )

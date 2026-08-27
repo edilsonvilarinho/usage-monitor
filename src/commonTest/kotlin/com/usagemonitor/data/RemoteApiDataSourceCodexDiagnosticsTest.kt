@@ -29,8 +29,12 @@ class RemoteApiDataSourceCodexDiagnosticsTest {
     @Test
     fun `records sanitized success payload for Codex five hour endpoint`() = runTest {
         val recorder = RecordingCodexDiagnosticsRecorder()
+        var requestedPath = ""
+        var accountHeader = ""
         val dataSource = RemoteApiDataSource(
-            httpClient = jsonHttpClient {
+            httpClient = jsonHttpClient { request ->
+                requestedPath = request.url.encodedPath
+                accountHeader = request.headers["ChatGPT-Account-Id"].orEmpty()
                 respond(
                     content = ByteReadChannel(
                         """
@@ -68,10 +72,12 @@ class RemoteApiDataSourceCodexDiagnosticsTest {
         assertEquals(1, recorder.successEvents.size)
         assertTrue(recorder.failureEvents.isEmpty())
         assertEquals(1L, recorder.successEvents.single().primaryUsedPercent)
+        assertEquals("/backend-api/wham/usage", requestedPath)
+        assertEquals("test-workspace", accountHeader)
     }
 
     @Test
-    fun `records sanitized success payload even when legacy response omits weekly window`() = runTest {
+    fun `records sanitized success payload even when official response omits weekly window`() = runTest {
         val recorder = RecordingCodexDiagnosticsRecorder()
         val dataSource = RemoteApiDataSource(
             httpClient = jsonHttpClient {

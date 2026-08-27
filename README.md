@@ -137,7 +137,7 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 | Integracao | Tipo | Origem dos dados | Requisito local |
 |---|---|---|---|
 | Anthropic | Remota | `GET https://api.anthropic.com/api/oauth/usage` | `~/.claude/.credentials.json` |
-| Codex | Remota | `GET https://chatgpt.com/backend-api/codex/usage` | `~/.codex/auth.json` e `~/.codex/cap_sid` |
+| Codex | Remota | `GET https://chatgpt.com/backend-api/wham/usage` | `~/.codex/auth.json` e `~/.codex/cap_sid` |
 | MiniMax | Remota | `GET https://www.minimax.io/v1/token_plan/remains` | `MINIMAX_API_KEY` |
 | DeepSeek | Remota | `GET https://api.deepseek.com/user/balance` | `DEEPSEEK_API_KEY` |
 | OpenCode Zen Free | Local | leitura de `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
@@ -162,7 +162,7 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 - Usa bearer token de `~/.codex/auth.json` em `tokens.access_token`.
 - Usa tambem o cookie `cap_sid` lido de `~/.codex/cap_sid`.
 - Quando o payload traz `primary_window` + `secondary_window`, o monitor usa a própria resposta como fonte oficial de `5h` e `7d`.
-- Se `secondary_window` vier ausente, a app cai num modo degradado: publica a janela principal como `Codex atual` e tenta uma fonte semanal separada.
+- A app só aceita e grava snapshots do Codex que contenham as duas cotas. Se a coleta vier incompleta, mantém a última leitura válida em cache e sinaliza a fonte como instável.
 
 ### MiniMax
 

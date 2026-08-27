@@ -109,9 +109,13 @@ open class RemoteApiDataSource(
         var failureRecorded = false
 
         try {
-            val response = httpClient.get("https://chatgpt.com/backend-api/codex/usage") {
+            val response = httpClient.get("https://chatgpt.com/backend-api/wham/usage") {
                 header("Authorization", "Bearer ${session.accessToken}")
                 header("Cookie", "cap_sid=${session.capSid}")
+                val accountId = session.accountContext.key.workspaceId
+                if (!accountId.isNullOrBlank()) {
+                    header("ChatGPT-Account-Id", accountId)
+                }
                 header("Accept", "application/json")
                 header("User-Agent", "Codex/0.125.0")
                 contentType(ContentType.Application.Json)
@@ -174,7 +178,7 @@ open class RemoteApiDataSource(
     open suspend fun fetchCodexWeeklyUsage(session: CodexSession): CodexWeeklyUsageResponse {
         throw UnsupportedOperationException(
             "Codex weekly usage source not implemented yet. " +
-            "No reusable HTTP endpoint was confirmed from the authenticated ChatGPT UI."
+            "The official Codex usage response did not include secondary_window."
         )
     }
 
