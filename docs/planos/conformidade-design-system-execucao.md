@@ -11,19 +11,19 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A05 concluídas`
+**Estado atual:** `Em andamento — A00 a A06 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A06 — Card de uso.** `ApiUsageCard.kt`: o único `Card()` cru da aplicação e os quatro pares
-`.background + .border` que reimplementam `AppDataSurface` e `AppMetricBlock`.
+**A07 — Faixa de atualização.** `DashboardScreenWarnings.kt`: `AppUpdateBanner` monta o próprio
+`Surface` e o próprio marcador de 2dp em vez de usar `AppBanner`.
 
 ### ⏭ Próxima atividade
 
-**A07 — Faixa de atualização.** `DashboardScreenWarnings.kt`: `AppUpdateBanner` monta o próprio
-`Surface` e o próprio marcador de 2dp em vez de usar `AppBanner`.
+**A08 — Configurações.** `SettingsDialogContent.kt`: navegação lateral, `ThemePresetCard` e o
+`HorizontalDivider` do Material.
 
 ---
 
@@ -89,8 +89,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A02 — Uso do time | 6 | ✅ | `176bcb8` |
 | A03 — Primitiva duplicada `DepthSurface` | 5, 7, 8 | ✅ | `7039daa` |
 | A04 — Presença e chaves das contas | 6, 7, 8 | ✅ | `2307760` |
-| A05 — Sessões CLI | 5 | ✅ | *(hash registrado na A06)* |
-| A06 — Card de uso | 2 | ⬜ | |
+| A05 — Sessões CLI | 5 | ✅ | `a6ff0d0` |
+| A06 — Card de uso | 2 | ✅ | *(hash registrado na A07)* |
 | A07 — Faixa de atualização | 3 | ⬜ | |
 | A08 — Configurações | 9 | ⬜ | |
 | A09 — Tooltips | 4 arquivos | ⬜ | |
@@ -227,17 +227,43 @@ Verificado: `gradlew.bat desktopTest --tests CliSessionsScreenTest --tests TeamP
 --tests TeamUsageScreenTest` → 45 + 31 + 52 = **128 testes, 0 falhas**. As três porque `LiveBadge` é
 `internal` e as três telas a consomem.
 
-### A06 — Card de uso · `ApiUsageCard.kt`
+### A06 — Card de uso · `ApiUsageCard.kt` — ✅
 
-- `Card(...)` do Material `:260` → `AppDataSurface`, com o arrasto por pressão longa preservado no
-  `Modifier` externo. É o único `Card()` cru da aplicação.
-- Os 4 pares `.background(surfaceVariant) + .border(...)` (`:800/801`, `:893/894`, `:1101/1102`,
-  `:1267/1268`) → `AppMetricBlock` nos badges de cota, `AppDataSurface` nos blocos de resumo.
-- `CardIconActionButton` `:1061` → `AppIconButton`.
-- ⚠ **Armadilha nº 6**: `Modifier.border` arredonda o traço para cima e pinta depois do conteúdo — o
-  anel de 1dp come uma caixa baixa a partir de densidade 1,05 (issue #83). A substituição é **fundo
-  mais padding**, não `Modifier.border`. Prova de pintura é `captureToImage`, nunca `boundsInRoot`.
-- Verificar: `--tests "com.usagemonitor.ui.ComponentTest"` (75) e `AppThemeScaleTest`.
+Os seis débitos eram **um** débito repetido: `clip` + `background` + `border` de 1dp escritos por
+extenso em seis pontos, cada um com o próprio `padding` e o próprio alinhamento.
+
+- **`Modifier.appSurfaceBlock(shape, color)` criada** em `AppStructure.kt`: o mesmo trio que
+  `AppDataSurface` aplica, separado do contêiner para os casos em que o layout já existe e só a
+  superfície falta. Não é contêiner porque os seis sites têm `padding` e arranjo diferentes — foi
+  a mesma leitura que produziu `appNestedGroupItem` na A02.
+- **O `color` é parâmetro** porque o hover deste sistema **é** troca de superfície neutra
+  (`surface` → `surfaceVariant`), e porque o bloco interno mora em `surfaceVariant` enquanto o painel
+  mora em `surface`. Não é porta para acento: acento vive no marcador de 2dp e na linha do gráfico.
+- **A primitiva não inclui sombra.** Elevação é de janela, diálogo, menu e overlay. Quem a pede aqui
+  é o card **enquanto está sendo arrastado** — nesse instante ele é overlay de fato —, e pede com um
+  `Modifier.shadow` explícito no ponto de uso, que com `cardElevation` em zero não desenha nada.
+- **O último `Card()` do Material saiu da aplicação.** A raiz do card virou `Box` com
+  `appSurfaceBlock(shape = AppShapes.medium, color = hoverBackground)`, preservando o arrasto por
+  pressão longa, o `animateContentSize` da minimização e o `graphicsLayer` da animação de entrada.
+  `BorderStroke` e `CardDefaults` saíram dos imports junto.
+- Os outros cinco sites: badge de estado da fonte (com `Color.Transparent`, que é o único sem fundo),
+  bloco de "nenhum uso free detectado", linha de modelo do OpenCode/Kilo, botão de ação do cabeçalho
+  (cor variável, acesa só quando o semáforo está aceso) e badge de cota do card minimizado.
+
+Não convertido, com o motivo:
+
+- **`CardIconActionButton` continua não sendo `AppIconButton`.** Ele carrega o semáforo de sessão:
+  `rememberSessionPulseFrame`, cor de contêiner que acende com a severidade e uma
+  `contentDescription` montada com o motivo do pisca. `AppIconButton` tem `tone`, não pulso. Colocar
+  o semáforo dentro da primitiva a faria conhecer `SessionPulse`, que é domínio de sessão CLI e não
+  de controle. A superfície dele, essa, passou a sair de `appSurfaceBlock`.
+- **O anel de 1dp segue sendo `Modifier.border` nos seis.** A armadilha nº 6 é sobre caixa de 4dp,
+  onde o anel arredondado para cima cobre o trilho inteiro; aqui as caixas são contêineres de texto
+  e ícone. Medição igual à da O5.
+
+Verificado: `gradlew.bat desktopTest --tests ComponentTest --tests AppThemeScaleTest --tests
+AppStructureTest` → 75 + 2 + 7 = **84 testes, 0 falhas**. O `ComponentTest` é onde vivem os ~30 casos
+do card, e é ele que responde pela troca do `Card` por `Box`.
 
 ### A07 — Faixa de atualização · `DashboardScreenWarnings.kt`
 
@@ -317,7 +343,8 @@ nunca a intenção.
 | 3 | `176bcb8` | A02 | `Modifier.appNestedGroupItem` criada e adotada nos dois blocos aninhados; `TeamHealthCell` passou a ser `AppStatusIndicator` e perdeu o parâmetro `showLabel`, cujo ramo `true` era morto; o chamador da tela de presença acompanhou | `gradlew.bat desktopTest --tests TeamUsageScreenTest --tests TeamPresenceScreenTest` → 52 + 31 = **83 testes, 0 falhas** |
 | 4 | `7039daa` | A03 | `AppDataSurface` ganhou `verticalArrangement`; os quatro call sites de `DepthSurface` migraram com `Arrangement.Top`; `DepthSurface.kt` removido | `gradlew.bat desktopTest` sobre `TeamPresenceScreenTest`, `CliSessionsScreenTest`, `AppStructureTest`, `TeamKeysAdminScreenTest` e `TeamAdminSectionTest` → 31 + 45 + 5 + 5 + 6 = **92 testes, 0 falhas** |
 | 5 | `2307760` | A04 | `AppGroupBand` criada, registrada no design system e adotada nas duas sub-faixas de conta; `TeamKeysList` passou a `AppWindowScaffold`; dois testes novos de primitiva | `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`, `TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → 52 + 31 + 5 + 6 + 7 = **101 testes, 0 falhas** |
-| 6 | *(a preencher na A06)* | A05 | `LiveBadge` passou a `AppStatusIndicator`, o que também tira o acento congelado no escuro dos três chamadores; barra de composição, `HelpDot` e `GlossaryPanel` reavaliados e retirados da conta de débito | `gradlew.bat desktopTest --tests CliSessionsScreenTest --tests TeamPresenceScreenTest --tests TeamUsageScreenTest` → 45 + 31 + 52 = **128 testes, 0 falhas** |
+| 6 | `a6ff0d0` | A05 | `LiveBadge` passou a `AppStatusIndicator`, o que também tira o acento congelado no escuro dos três chamadores; barra de composição, `HelpDot` e `GlossaryPanel` reavaliados e retirados da conta de débito | `gradlew.bat desktopTest --tests CliSessionsScreenTest --tests TeamPresenceScreenTest --tests TeamUsageScreenTest` → 45 + 31 + 52 = **128 testes, 0 falhas** |
+| 7 | *(a preencher na A07)* | A06 | `Modifier.appSurfaceBlock` criada e adotada nos seis pontos do card; o último `Card()` do Material saiu da aplicação, com `BorderStroke` e `CardDefaults` junto | `gradlew.bat desktopTest --tests ComponentTest --tests AppThemeScaleTest --tests AppStructureTest` → 75 + 2 + 7 = **84 testes, 0 falhas** |
 
 ---
 

@@ -274,6 +274,36 @@ fun AppSectionHeader(
 }
 
 /**
+ * Bloco de superfície: recorte, fundo e a borda de 1dp, sem layout nenhum.
+ *
+ * É o mesmo trio que [AppDataSurface] aplica — `clip`, `background`, `border` —
+ * separado do contêiner para os casos em que o layout já existe e só a
+ * superfície falta. O card do dashboard e os quatro blocos internos dele
+ * repetiam as três linhas por extenso, cada um com o próprio `padding`, o
+ * próprio alinhamento e, no card, uma cor de fundo animada no hover.
+ *
+ * O [color] é parâmetro porque o hover **é** uma troca de superfície neutra
+ * (`surface` → `surfaceVariant`), que é a regra de hover deste sistema, e porque
+ * o bloco interno mora em `surfaceVariant` enquanto o painel mora em `surface`.
+ * Não é porta para cor de acento: acento vive no marcador de 2dp e na linha do
+ * gráfico.
+ *
+ * **Não inclui sombra.** Elevação é de janela, diálogo, menu e overlay; quem a
+ * pede aqui é o card enquanto está sendo arrastado, que nesse instante é overlay
+ * de fato, e pede com um `Modifier.shadow` explícito no ponto de uso.
+ */
+@Composable
+fun Modifier.appSurfaceBlock(
+    shape: Shape = AppShapes.small,
+    color: Color = MaterialTheme.colorScheme.surfaceVariant
+): Modifier {
+    return this
+        .clip(shape)
+        .background(color)
+        .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+}
+
+/**
  * Sub-faixa de um grupo dentro de uma lista.
  *
  * Não é [AppSectionHeader]. Aquele é o cabeçalho de um painel e fala alto —

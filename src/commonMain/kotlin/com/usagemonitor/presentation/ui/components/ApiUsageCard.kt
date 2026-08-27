@@ -13,7 +13,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,8 +41,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Terminal
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -63,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -257,7 +255,17 @@ fun ApiUsageCard(
         label = "cardHoverBg"
     )
 
-    Card(
+    // Era o único `Card()` do Material que restava na aplicação. A superfície
+    // agora sai de `appSurfaceBlock` — o mesmo recorte, fundo e borda de 1dp que
+    // `AppDataSurface` aplica —, e a cor animada do hover entra por parâmetro:
+    // hover neste sistema é troca de superfície neutra, não mudança de cor.
+    //
+    // Sombra só enquanto o card está sendo arrastado, que é quando ele de fato
+    // flutua sobre os outros; com `cardElevation` em zero o `shadow` não desenha
+    // nada. Em repouso quem o separa do fundo é a borda de 1dp — e era a sombra
+    // em toda superfície que fazia o dashboard ler como uma pilha de blocos de
+    // mesmo peso.
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .testTag(apiUsageCardTag(apiName))
@@ -278,15 +286,9 @@ fun ApiUsageCard(
                 scaleX = cardScale
                 scaleY = cardScale
                 translationY = cardOffsetY.toPx()
-            },
-        shape = AppShapes.medium,
-        colors = CardDefaults.cardColors(containerColor = hoverBackground),
-        // Sombra só enquanto o card está sendo arrastado, que é quando ele de
-        // fato flutua sobre os outros. Em repouso quem o separa do fundo é a
-        // borda de 1dp — e era a sombra em toda superfície que fazia o dashboard
-        // ler como uma pilha de blocos de mesmo peso.
-        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
-        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
+            }
+            .shadow(cardElevation, AppShapes.medium)
+            .appSurfaceBlock(shape = AppShapes.medium, color = hoverBackground)
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -367,12 +369,7 @@ fun ApiUsageCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
-                                    .clip(AppShapes.small)
-                                    .border(
-                                        AppBorderWidth,
-                                        MaterialTheme.colorScheme.outlineVariant,
-                                        AppShapes.small
-                                    )
+                                    .appSurfaceBlock(color = Color.Transparent)
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -796,9 +793,7 @@ private fun OpenCodeUsageSummary(
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .clip(AppShapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                .appSurfaceBlock()
                 .padding(horizontal = AppSpacing.md, vertical = AppSpacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
@@ -889,9 +884,7 @@ private fun OpenCodeModelRowContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(AppShapes.small)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+            .appSurfaceBlock()
             .padding(horizontal = AppSpacing.md, vertical = if (compact) AppSpacing.sm else AppSpacing.md),
         verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else AppSpacing.md)
     ) {
@@ -1097,9 +1090,7 @@ private fun CardIconActionButton(
         Box(
             modifier = Modifier
                 .size(buttonSize)
-                .clip(AppShapes.small)
-                .background(containerColor)
-                .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                .appSurfaceBlock(color = containerColor)
                 .clickable(enabled = enabled, onClick = onClick)
                 .semantics {
                     contentDescription = description
@@ -1260,12 +1251,10 @@ private fun CompactQuotaBadgeContent(
         modifier = modifier
             .fillMaxWidth()
             .testTag(COMPACT_QUOTA_BADGE_TAG)
-            .clip(AppShapes.small)
             // Fundo neutro e borda: o tom de acento em bloco fazia o card
             // fechado — que existe para ocupar pouco — chamar mais atenção
             // que o aberto.
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+            .appSurfaceBlock()
             .padding(
                 horizontal = density.badgeHorizontalPadding,
                 vertical = density.badgeVerticalPadding
