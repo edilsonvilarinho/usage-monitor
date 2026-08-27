@@ -11,17 +11,18 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A11 concluídas`
+**Estado atual:** `Em andamento — A00 a A12 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A12 — Protótipo, kit e capturas**, com o levantamento reaberto e o número real por tela.
+**A13 — Fechamento.** Ponto de situação final aqui e na issue.
 
 ### ⏭ Próxima atividade
 
-**A13 — Fechamento.** Ponto de situação final aqui e na issue.
+**Nenhuma.** O que resta é a verificação que só a máquina do usuário faz — ver *Fora de escopo*,
+item 0.
 
 ---
 
@@ -37,44 +38,53 @@ Tomadas com o usuário em 2026-08-27, antes de a execução começar.
 
 ---
 
-## Levantamento — as superfícies visuais da aplicação
+## Levantamento — reaberto na A12 com o número real
 
-Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMain/`.
-"Débitos" = pontos onde a tela desenha um retângulo que já tem primitiva publicada, contados por
-`grep` de `Surface(`, `Card(`, `Modifier.border`, `.background(` com cor de superfície e
-`RoundedCornerShape(`.
+O levantamento original contou os débitos por `grep` de `Surface(`, `Card(`, `Modifier.border`,
+`.background(` e `RoundedCornerShape(`. Ele mede o **tamanho da suspeita**, não o do débito: gráfico,
+amostra de cor e previsualizador de tema desenham retângulo à mão porque é assim que o design system
+manda desenhá-los. As ocorrências O5, O6 e O7 são as três vezes em que isso apareceu.
 
-| # | Superfície | Arquivo de entrada | Janela | Débitos |
-|---|---|---|---|---|
-| 1 | Janela principal / Dashboard | `presentation/ui/DashboardScreen.kt` | própria | **0** — referência |
-| 2 | Card de uso | `presentation/ui/components/ApiUsageCard.kt` | dentro da 1 | 6 |
-| 3 | Faixa de atualização | `presentation/ui/DashboardScreenWarnings.kt` | dentro da 1 | 2 |
-| 4 | Histórico | `presentation/ui/HistoryScreen.kt` | própria | 0 |
-| 5 | Sessões CLI | `presentation/ui/CliSessionsScreen.kt` | própria | 5 |
-| 5b | Sessões CLI — aba Resumo | `presentation/ui/CliUsageBreakdownPane.kt` | dentro da 5 | **0** — referência |
-| 6 | Uso do time | `presentation/ui/TeamUsageScreen.kt` | própria | 5 |
-| 7 | Presença do time | `presentation/ui/TeamPresenceScreen.kt` | própria | 2 |
-| 8 | Chaves das contas | `presentation/ui/TeamKeysAdminScreen.kt` | própria (diálogo) | 2 |
-| 9 | Configurações | `presentation/ui/components/SettingsDialogContent.kt` | própria (diálogo) | 6 |
-| 10 | Notas da versão | `presentation/ui/ReleaseNotesContent.kt` | própria (diálogo) | 0 |
-| 11 | Cromo das 8 janelas | `desktopMain/presentation/ui/DesktopWindowFrame.kt` | raiz de todas | 5 |
-| — | Relatório PDF | `desktopMain/PdfUsageReportRenderer.kt` | — | fora: paleta própria, não é Compose |
-| — | Bandeja | `desktopMain/TrayRiskIcon.kt` | — | fora: não é Compose |
+A coluna **Contado** é o número da A01; **Real** é o que a leitura dos call sites mostrou.
 
-**A fundação já bate.** `AppSpacing`, `AppShapes`, `AppElevation`, `AppMotion`, a escala
-10/12/14/16/20/28, a divisão mono/sans e os hex de `OBSIDIANA_DARK` / `PORCELANA_LIGHT` /
-`AppAccents` são idênticos aos `docs/design-system/tokens/*.css`. Não há literal de cor fora de
-`theme/` (`grep -rn "Color(0x"` fora de `theme/` devolve zero). O que falta é adoção.
+| # | Superfície | Contado | Real | Convertido | Não convertível | Contado por engano |
+|---|---|---|---|---|---|---|
+| 1 | Dashboard | 0 | 0 | — | — | — |
+| 2 | Card de uso | 6 | 6 | 6 | 0 | 0 |
+| 3 | Faixa de atualização | 2 | 2 | 2 | 0 | 0 |
+| 4 | Histórico | 0 | 0 | — | — | — |
+| 5 | Sessões CLI | 5 | 2 | 1 | 1 | 3 |
+| 5b | Sessões CLI — Resumo | 0 | 0 | — | — | — |
+| 6 | Uso do time | 5 | 5 | 3 | 2 | 0 |
+| 7 | Presença do time | 2 | 3 | 2 | 1 | 0 |
+| 8 | Chaves das contas | 2 | 2 | 2 | 0 | 0 |
+| 9 | Configurações | 6 | 1 | 1 | 4 | 1 |
+| 10 | Notas da versão | 0 | 0 | — | — | — |
+| 11 | Cromo das janelas | 5 | 5 | 4 | 1 | 0 |
+| — | Estados de tela | — | 22 | 22 | 0 | 0 |
+| — | Bolhas de tooltip | — | 4 | 4 | 0 | 0 |
+| — | `DepthSurface` | — | 4 | 4 | 0 | 0 |
+| | **Total** | **33** | **56** | **51** | **9** | **4** |
 
-**Primitivas com adoção zero em produção**, medidas por chamada fora de `components/App*.kt`:
+O total **subiu**, não desceu: quatro itens foram contados por engano e nove não são convertíveis,
+mas trinta apareceram fora do `grep` original — os 22 estados de tela que uma função só desenhava
+(O7), as quatro bolhas de tooltip e os quatro usos de `DepthSurface`, que o levantamento tinha
+listado como "primitiva duplicada" sem contar os call sites.
 
-| Primitiva | Chamadas em produção | Onde deveria estar |
+**Adoção das primitivas, antes e depois:**
+
+| Primitiva | A01 | Agora |
 |---|---|---|
-| `AppEmptyState` | 0 (só o próprio teste) | 9 estados vazios desenhados à mão |
-| `AppTooltip` | 0 (nenhuma, nem em teste) | 4 bolhas com `Surface` próprio |
-| `AppWindowScaffold` | 3 de 7 janelas | `TeamKeysAdminScreen`, `SettingsDialogContent`, `TeamPresenceScreen`, `DashboardScreen` |
-| `AppToolbar` | 2 | telas que fixam parâmetros no topo |
-| `DepthSurface` | 3 telas | duplica `AppDataSurface`; as três migram |
+| `AppEmptyState` | 0 telas | 9 pontos |
+| `AppLoadingState` | 1 tela | 7 pontos |
+| `AppErrorState` | 1 tela | 6 pontos |
+| `AppWindowScaffold` | 3 de 7 janelas | 4 de 7 |
+| `AppTooltipSurface` | não existia | 4 |
+| `AppStatusIndicator` | 5 arquivos | 7 |
+| `DepthSurface` | 3 telas | **removida** |
+| `Card` do Material | 1 | **0** |
+| `Color(0x…)` fora de `theme/` | 2 (em `desktopMain`) | **0** |
+| `HorizontalDivider` do Material | 2 | **0** |
 
 ---
 
@@ -93,8 +103,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A08 — Configurações | 9 | ✅ | `0127909` |
 | A09 — Tooltips | 4 arquivos | ✅ | `b92b7eb` |
 | A10 — Vazio, carregando e erro | 22 pontos | ✅ | `632cde9` |
-| A11 — Cromo das janelas | 11 | ✅ | *(hash registrado na A12)* |
-| A12 — Protótipo, kit e capturas | — | ⬜ | |
+| A11 — Cromo das janelas | 11 | ✅ | `b912e9e` |
+| A12 — Protótipo, kit e capturas | — | ✅ | *(hash registrado na A13)* |
 | A13 — Fechamento | — | ⬜ | |
 
 Legenda: ⬜ pendente · 🟡 em andamento · ✅ concluída · ⛔ bloqueada
@@ -433,10 +443,24 @@ Verificado: `gradlew.bat allTests` → **1472 testes, 0 falhas** (1468 + os 4 no
 somente cards, olhando hover, arrasto da janela, o botão de fechar em vermelho e a faixa de hover do
 topo. A captura offscreen do `generateScreenshots` não desenha moldura de janela.
 
-### A12 — Protótipo, kit e capturas
+### A12 — Protótipo, kit e capturas — ✅
 
-- Registrar no protótipo cada tela que mudou; atualizar os `.jsx` das 8 telas com kit.
-- `gradlew.bat generateScreenshots` e comparar as 12 cenas com as anteriores.
+- **Capturas regeneradas**: `gradlew.bat generateScreenshots` produziu as 13 cenas, e **9 mudaram** —
+  exatamente as telas tocadas. `history`, `settings`, `theme-presets` e `settings-team` saíram byte a
+  byte iguais, e a de Configurações é o sinal que importa: a extração do `AppSettingsNav` foi
+  pixel-idêntica.
+- **`dashboard.png` e `presence-accounts.png` conferidos a olho**, que são as duas trocas de maior
+  risco: o card sem o `Card()` do Material e a sub-faixa de conta pela `AppGroupBand`.
+- **Protótipo**: a lede de §2 deixou de dizer "dezessete"; um painel novo lista as seis primitivas da
+  passada, com o motivo de cada uma; §4b ganhou a nota dos três estados de tela; e §15 recebeu cinco
+  linhas — a verificação pendente na janela real, as duas decisões de não converter e os dois riscos
+  de contraste.
+- **Design system**: `readme.md` ganhou a seção *The conformance pass*, com a tabela das seis
+  primitivas e o parágrafo do que **não** foi convertido; `github.md` registra a sincronia, desta vez
+  lendo o Kotlin direto — o que o `readme.md` original declarava não ter feito.
+- **Os `.jsx` do kit não mudaram**, e é o resultado certo: a passada foi de adoção, não de redesenho.
+  Onde o desenho mudou de fato — os três estados de tela — a mudança está descrita no protótipo, que
+  é onde o kit não chega (ele recria oito telas, e nenhuma delas é um estado de carregamento).
 
 ### A13 — Fechamento
 
@@ -463,7 +487,8 @@ nunca a intenção.
 | 10 | `0127909` | A08 | `AppSettingsNav` saiu de dentro do diálogo e virou primitiva publicada, com o nome que o design system já usava; um teste novo mede a largura fixa do trilho | `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas** |
 | 11 | `b92b7eb` | A09 | `AppTooltipSurface` criada e adotada nas quatro bolhas, incluindo a do próprio `AppTooltip`; sete imports saíram dos três arquivos de gráfico | `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas** |
 | 12 | `632cde9` | A10 | `CenteredMessage` removida; os 22 pontos de cinco telas passaram a `AppLoadingState` (7), `AppErrorState` (6) e `AppEmptyState` (9) | `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes |
-| 13 | *(a preencher na A12)* | A11 | `AppChrome` com os cinco patamares do cromo; as duas divisórias do Material viraram `AppDivider`; o literal `Color(0xFFC62828)` do botão de fechar virou `colorScheme.error`; `DesktopWindowFrameTest` criado | `gradlew.bat allTests` → **1472 testes, 0 falhas** |
+| 13 | `b912e9e` | A11 | `AppChrome` com os cinco patamares do cromo; as duas divisórias do Material viraram `AppDivider`; o literal `Color(0xFFC62828)` do botão de fechar virou `colorScheme.error`; `DesktopWindowFrameTest` criado | `gradlew.bat allTests` → **1472 testes, 0 falhas** |
+| 14 | *(a preencher na A13)* | A12 | 13 capturas regeneradas, 9 mudaram; protótipo e design system registram a passada; levantamento reaberto com o número real | `gradlew.bat generateScreenshots` → 13 cenas; `dashboard.png` e `presence-accounts.png` conferidos a olho |
 
 ---
 

@@ -531,7 +531,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
 
 <!-- ═══════════════════════════════ PRIMITIVAS ═════════════════════════ -->
 <h2 id="primitivas">2 · Primitivas compartilhadas</h2>
-<p class="lede">Dezessete componentes internos, todos stateless: dados por parâmetro, eventos por lambda. É o que impede a próxima tela de reinventar um retângulo.</p>
+<p class="lede">Componentes internos, todos stateless: dados por parâmetro, eventos por lambda. É o que impede a próxima tela de reinventar um retângulo. Eram dezessete no protótipo aprovado; a passada de conformidade com o design system (issue #117) acrescentou seis, cada uma nascida de uma repetição medida — o painel logo abaixo as lista.</p>
 
 <div class="g2">
   <div class="panel">
@@ -615,6 +615,18 @@ table.dt td.num, table.dt th.num { text-align: right; }
 <p class="note"><b>É <code>drawBehind</code> e não <code>Modifier.border</code>.</b> Aquele arredonda a espessura para cima e pinta <b>depois</b> do conteúdo, que é o defeito medido na issue #83: numa caixa apertada o anel de 1dp vira 2px a partir de densidade 1,05 e come a caixa. Aqui o traço não ocupa layout nenhum; quem reserva o espaço é o <code>padding</code> do próprio item. Ele fica na <b>metade</b> do recuo: encostado no conteúdo viraria borda da célula, encostado na borda do item viraria borda da lista.</p>
 
 <!-- ═══════════════════════════════ MARCA ═════════════════════════════ -->
+<div class="panel">
+  <div class="phead"><span class="ptitle">Primitivas da passada de conformidade · 2026-08-27</span></div>
+  <div class="pbody flush">
+    <div class="row"><span class="k">Modifier.appNestedGroupItem</span><span class="v sm" style="flex:1">O terceiro degrau da escada: fundo <code>surface</code>, guia de 2dp e o recuo do nível, por item de lista. <b>Não</b> é o painel de dados — aquele recorta e arredonda, e por item cortaria a guia, que só fica contínua porque a lista não tem vão</span><span class="k">A02</span></div>
+    <div class="row"><span class="k">AppGroupBand</span><span class="v sm" style="flex:1">Sub-faixa de grupo: rótulo em mono 10 sobre <code>--muted</code>, detalhe opcional, ação à direita, divisória própria. Fala <b>baixo</b> — o cabeçalho de painel fala alto, e trocá-los inverteria a hierarquia</span><span class="k">A04</span></div>
+    <div class="row"><span class="k">Modifier.appSurfaceBlock</span><span class="v sm" style="flex:1">Recorte, fundo e borda de 1dp, sem layout. Foi ela que tirou o último <code>Card</code> do Material do produto. A cor entra por parâmetro porque hover neste sistema <b>é</b> troca de superfície neutra</span><span class="k">A06</span></div>
+    <div class="row"><span class="k">AppSettingsNav</span><span class="v sm" style="flex:1">O trilho de seções, que o design system já publicava e o Compose tinha como duas funções privadas dentro do diálogo. Item selecionado em <code>--raised</code> <b>sem</b> borda: um anel por item viraria uma pilha de caixas</span><span class="k">A08</span></div>
+    <div class="row"><span class="k">AppTooltipSurface</span><span class="v sm" style="flex:1">A anatomia da bolha: <code>--raised</code>, raio 6, borda de 1dp e 2dp de overlay curto. Estava escrita por extenso em quatro lugares, e era isso que deixava duas tooltips do mesmo gráfico flutuarem em alturas diferentes</span><span class="k">A09</span></div>
+    <div class="row"><span class="k">AppChrome</span><span class="v sm" style="flex:1">Os cinco patamares fixos — barra de título 34, barra de controles 34, barra de estado 30, controle 28, faixa de atualização 28. Eram três constantes privadas em dois arquivos mais um literal na moldura</span><span class="k">A11</span></div>
+  </div>
+</div>
+
 <h2 id="marca">3 · Marca e ícones</h2>
 <p class="lede">Monograma geométrico próprio, construção determinística por script. Três hastes unidas por um bojo: lê como <b>U</b> e <b>M</b> sobrepostos em tamanho grande e mantém silhueta distinta em 16px, que é onde ícone de bandeja vive.</p>
 
@@ -925,6 +937,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 </div>
 
 <!-- ══════════════════════ FAIXA DE ATUALIZAÇÃO ═══════════════════════ -->
+<p class="note"><b>Carregando, erro e vazio são três desenhos, não três frases.</b> Até a passada de conformidade uma função só, <code>CenteredMessage</code>, desenhava os três em vinte e dois pontos de cinco telas: a mesma frase cinza no meio da tela. Agora carregando é esqueleto estático, erro é o indicador crítico com ponto e palavra, e vazio é a frase centrada que nomeia o recorte — "Nenhum turno <b>nesta janela</b>". Um "Nenhum dado" seco deixa quem lê sem saber se a culpa é do filtro ou da coleta.</p>
+
 <h2 id="atualizacao">4c · Faixa de atualização — os quatro estados</h2>
 <p class="lede">A faixa de uma linha da issue #67 ganhou os estados da atualização automática (issue #75). Ela continua sendo <b>uma linha de 28dp no topo do dashboard</b>, com o marcador de 2dp à esquerda, o título cedendo espaço numa janela estreita e o rótulo da ação como única pista de que a linha é clicável. Sem botão, sem parágrafo de descrição.</p>
 
@@ -1699,6 +1713,11 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>.tar.gz</code> não é assinado. A integridade vem do campo <code>digest</code> da API do GitHub por TLS, o mesmo portão do Windows</span><span class="k">issue #100</span></div>
   <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Uma instalação <code>.deb</code>/<code>.rpm</code> existente exige migração manual: o instalador user-space detecta e <b>para</b>, sem tocar em <code>/opt</code> nem em arquivo do gerenciador de pacotes</span><span class="k">issue #100</span></div>
   <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Sem marcador <code>.usage-monitor-managed</code> na raiz, o script de troca aborta <b>sem tocar em nada</b> — nem recibo ele escreve</span><span class="k">issue #100</span></div>
+  <div class="row"><span class="st crit">A verificar</span><span class="v sm" style="flex:1"><b>Nenhuma das onze atividades da passada de conformidade foi olhada na janela real.</b> <code>gradlew run</code> não foi executado: hover, foco, arrasto de card, redimensionamento, o botão de fechar em vermelho, a faixa de hover do modo somente cards e as duas línguas. A captura offscreen não desenha moldura de janela, e o harness de componente não alcança nada que seja <code>WindowScope.</code></span><span class="k">issue #117</span></div>
+  <div class="row"><span class="st warn">Decisão registrada</span><span class="v sm" style="flex:1">O botão de cromo <b>não</b> é o botão de ícone do sistema: ele preenche a altura da barra, e o do sistema tem 26dp e borda. O botão arredondado flutuando dentro da barra era o único lugar do app onde um controle não encostava na própria moldura</span><span class="k">issue #117</span></div>
+  <div class="row"><span class="st warn">Decisão registrada</span><span class="v sm" style="flex:1">As duas faixas de conta com colunas alinhadas não viram cabeçalho de painel: o cabeçalho é título, subtítulo e ações, e não tem onde pôr sete colunas alinhadas à linha do integrante</span><span class="k">issue #117</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Cinco acentos continuam congelados na variante escura num <code>val</code> de topo de arquivo da tela de sessões, usados em 33 pontos. No tema claro o verde deles dá 2,64:1 contra a superfície, contra os 4,5:1 que o teste de contraste garante para o resto</span><span class="k">issue #117</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Dos dezesseis temas do app, só dois — Obsidiana e Porcelana — têm os acentos medidos contra a própria superfície. Os outros catorze nunca foram</span><span class="k">issue #117</span></div>
 </div></div>
 <p class="note">Aprovado o protótipo, a execução começa pela Fase C (fundação): fontes, paleta, escala tipográfica, tokens de forma e as dezessete primitivas — oito commits antes de qualquer tela mudar de aparência.</p>
 

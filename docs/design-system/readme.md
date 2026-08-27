@@ -174,9 +174,26 @@ without naming: `AppWindowFrame`, `AppStatusBar`, `AppToolbar`, `AppSettingsNav`
 `AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados") and
 `AppColumnHeader` (its `.colhead` strip). Nothing else was invented.
 
-`AppGroupBand` was added on 2026-08-27, during the conformance pass: the team usage and
-presence screens both drew the quiet account sub-band by hand, and it is the third step of
-the surface ladder the prototype draws but does not name.
+### The conformance pass — 2026-08-27
+
+Adopting this system across the Compose app (issue #117) produced six primitives, each one born of a
+repetition that was measured, not guessed. Three are components; three are Compose `Modifier`
+extensions or token objects that have no counterpart here, and are listed for the record.
+
+| Name | What it is | Why it exists |
+| --- | --- | --- |
+| `AppGroupBand` | Component, `components/data/` | The quiet account sub-band. Team usage and presence both drew it by hand — it is the third step of the surface ladder the prototype draws but does not name. **Not** the panel header: that one speaks loud (`--t12` on `--fg`), this one speaks low (`--t10` on `--muted`), and swapping them inverts the hierarchy. |
+| `AppSettingsNav` | Component, `components/shell/` | Already published here; the Compose side had it as two private functions inside the dialog, under another name. The names now match. |
+| `AppTooltipSurface` | Component | The bubble anatomy — `--raised`, radius 6, 1px border, the short 2dp overlay — was written out in four places, which is what let two tooltips over the same chart float at different heights. |
+| `Modifier.appNestedGroupItem` | Compose-only | Surface + 2dp guide + indent, per list item. It cannot be the panel: that one clips and rounds, and applied per row it would box every child and cut the guide, which stays continuous only because the list has no gap. |
+| `Modifier.appSurfaceBlock` | Compose-only | Clip + fill + 1px border with no layout. It is what removed the product's last Material `Card`. Colour is a parameter because hover in this system **is** a neutral-surface swap. |
+| `AppChrome` | Compose-only token object | The five fixed heights `tokens/spacing.css` publishes. They lived as three private constants across two files plus a literal in the desktop frame — four owners for one value. |
+
+**What the pass did not convert, and why.** The chrome button is not `AppIconButton`: it fills the
+title bar's height, and the icon button is 26dp with a border. The two account bands that carry
+seven aligned columns are not panel headers: a header is title, subtitle and actions, with nowhere
+to put columns. Stacked composition bars, colour swatches and theme previews keep painting directly —
+charts and previews are the one place this system allows it.
 
 ---
 
