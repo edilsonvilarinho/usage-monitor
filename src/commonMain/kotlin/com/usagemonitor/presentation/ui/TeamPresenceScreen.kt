@@ -1014,8 +1014,7 @@ private fun TeamPresenceRow(
                 TeamHealthCell(
                     health = worstHealth,
                     language = language,
-                    modifier = Modifier.width(PRESENCE_COLUMN_STATUS),
-                    showLabel = false
+                    modifier = Modifier.width(PRESENCE_COLUMN_STATUS)
                 )
             } else if (hasHealthColumn) {
                 Spacer(modifier = Modifier.width(PRESENCE_COLUMN_STATUS))

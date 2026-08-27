@@ -320,6 +320,35 @@ fun Modifier.appNestedGroupGuide(color: Color, indent: Dp): Modifier {
 }
 
 /**
+ * Item de um bloco aninhado: o terceiro degrau da escada de superfícies.
+ *
+ * A escada tem três degraus neutros — a faixa do grupo em `surfaceVariant`, a
+ * linha do pai transparente sobre o fundo da janela e o bloco dos filhos em
+ * `surface`. O bloco é `surface` e **nunca** `surfaceVariant`: aquele é o realce
+ * de hover do [AppDataRow], e com ele aqui passar o mouse num filho deixaria de
+ * dar retorno nenhum.
+ *
+ * Não é [AppDataSurfaceFlush]. Aquele recorta, arredonda e desenha borda em
+ * volta do que envolve; aplicado por item de `LazyColumn` — que é como o bloco
+ * aninhado tem de ser montado, porque aninhar lista em lista quebra a rolagem —,
+ * ele poria uma caixa arredondada em volta de **cada** filho e cortaria a guia
+ * de 2dp, que só fica contínua porque a lista não tem vão entre itens.
+ *
+ * @param indent recuo do conteúdo, e o dobro da distância do traço à borda.
+ */
+@Composable
+fun Modifier.appNestedGroupItem(indent: Dp): Modifier {
+    return this
+        .fillMaxWidth()
+        .background(MaterialTheme.colorScheme.surface)
+        .appNestedGroupGuide(
+            color = MaterialTheme.colorScheme.outlineVariant,
+            indent = indent
+        )
+        .padding(start = indent)
+}
+
+/**
  * Linha de dados: altura mínima de 32dp, divisória embaixo e realce no hover.
  *
  * A divisória é do próprio item e não um separador entre itens porque a lista é

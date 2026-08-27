@@ -11,20 +11,20 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 e A01 concluídas`
+**Estado atual:** `Em andamento — A00, A01 e A02 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A02 — Cabeçalhos de grupo do Uso do time.** `TeamUsageScreen.kt` pinta cinco superfícies à mão
-(`:650`, `:687`, `:840`, `:997`, `:1041`) onde já existem `AppSectionHeader`,
-`AppDataSurfaceFlush` e `AppStatusIndicator`.
+**A03 — Presença do time.** `TeamPresenceScreen.kt`: o bloco aninhado de `:814` migra para
+`Modifier.appNestedGroupItem`, criada na A02, e os dois usos de `DepthSurface` vão para
+`AppDataSurface`.
 
 ### ⏭ Próxima atividade
 
-**A03 — Cabeçalhos de grupo da Presença do time.** `TeamPresenceScreen.kt` `:683` e `:814`, mais os
-dois usos de `DepthSurface`.
+**A04 — Chaves das contas.** `TeamKeysAdminScreen.kt`: `DepthSurface` no `TeamKeyCard` e a raiz
+`Surface(background)` para `AppWindowScaffold`.
 
 ---
 
@@ -86,8 +86,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | Atividade | Superfície | Estado | Commit |
 |---|---|---|---|
 | A00 — Regra de precedência no `CLAUDE.md` + skill | — | ✅ | `6ed23fd` |
-| A01 — Plano e issue de rastreio | — | ✅ | *(hash registrado na A02)* |
-| A02 — Uso do time | 6 | ⬜ | |
+| A01 — Plano e issue de rastreio | — | ✅ | `df73cd2` |
+| A02 — Uso do time | 6 | ✅ | *(hash registrado na A03)* |
 | A03 — Presença do time | 7 | ⬜ | |
 | A04 — Chaves das contas | 8 | ⬜ | |
 | A05 — Sessões CLI | 5 | ⬜ | |
@@ -106,22 +106,48 @@ Legenda: ⬜ pendente · 🟡 em andamento · ✅ concluída · ⛔ bloqueada
 
 ## Detalhe das atividades
 
-### A02 — Uso do time · `TeamUsageScreen.kt`
+### A02 — Uso do time · `TeamUsageScreen.kt` — ✅
 
-- `:840` `TeamAccountGroupHeader` e `:997` `TeamAccountUuidHeader` → `AppSectionHeader` com
-  `markerColor` (é o marcador de 2dp que os dois pintam à mão).
-- `:650` e `:687`, blocos de sessão aninhados → `AppDataSurfaceFlush`.
-- `:1041` `TeamHealthCell` → `AppStatusIndicator`, que já é ponto + palavra.
-- **A escada de três superfícies tem de sobreviver**: faixa da conta em `surfaceVariant`, linha do
-  integrante transparente, bloco aninhado em `surface`. O bloco aninhado **nunca** em
-  `surfaceVariant` — aquele é o realce de hover do `AppDataRow`, e com ele ali passar o mouse numa
-  sessão deixa de dar retorno.
-- Verificar: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.TeamUsageScreenTest"` (52 testes).
+Três dos cinco débitos foram fechados; **dois não são convertíveis** e viraram registro. Ver a
+ocorrência O1: a leitura dos call sites derrubou duas das três primitivas que este plano tinha
+nomeado a partir da contagem por `grep`.
+
+Feito:
+
+- **`Modifier.appNestedGroupItem(indent)` criada** em `AppStructure.kt` e adotada nos dois blocos
+  aninhados (`:650` cabeçalho de colunas, `:687` cada sessão). Ela carrega os três passos que os dois
+  sites repetiam por extenso: `fillMaxWidth`, fundo em `surface` e `appNestedGroupGuide` no recuo.
+  **Não é `AppDataSurfaceFlush`**: aquele recorta, arredonda e desenha borda em volta do que envolve,
+  e aplicado por item de `LazyColumn` poria uma caixa em volta de **cada** sessão e cortaria a guia
+  de 2dp, que só fica contínua porque a lista não tem vão entre itens.
+- **`TeamHealthCell` → `AppStatusIndicator`.** `healthTone` já existia (`CliSessionsScreen.kt`) e as
+  cores batem exatamente: `AppTone.CRITICAL` resolve para `colorScheme.error`, que é `#E86A6A` no
+  escuro e `#B3261E` no claro — os mesmos valores de `accents.saturated`. O parâmetro `showLabel`
+  saiu: os **três** chamadores passavam `false`, e o ramo `true` era código morto.
+- A escada de três superfícies sobreviveu: faixa da conta em `surfaceVariant`, linha do integrante
+  transparente, bloco aninhado em `surface`.
+
+Não convertido, com o motivo:
+
+- **`TeamAccountGroupHeader` (`:840`)** carrega sete colunas alinhadas ao mesmo x do `AppDataRow` da
+  linha do integrante — é essa comparação que a faixa existe para permitir. `AppSectionHeader` é
+  título, subtítulo e ações; ele não tem onde pôr colunas. Converter quebraria o alinhamento.
+- **`TeamAccountUuidHeader` (`:997`)** precisa de `start = TEAM_ROW_HORIZONTAL_PADDING + indent`, e o
+  padding de `AppSectionHeader` é interno e fixo. Só passaria a caber se a primitiva ganhasse um
+  parâmetro de recuo — decisão de sistema, não de tela, e por isso fora desta atividade.
+
+Verificado: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.TeamUsageScreenTest" --tests
+"com.usagemonitor.ui.TeamPresenceScreenTest"` → **83 testes, 0 falhas**. As duas suítes juntas porque
+`TeamHealthCell` é `internal` e a tela de presença a consome: o parâmetro removido obriga as duas a
+mudarem no mesmo commit, ou o commit não compila sozinho.
 
 ### A03 — Presença do time · `TeamPresenceScreen.kt`
 
-- `:683` `TeamPresenceEmailHeader` e `:814` `TeamPresenceAccountSubgroupHeader` → `AppSectionHeader`.
+- `:814` `TeamPresenceAccountSubgroupHeader` → `Modifier.appNestedGroupItem`, criada na A02.
 - `DepthSurface` (2 usos) → `AppDataSurface`.
+- `:683` `TeamPresenceEmailHeader` é a faixa de conta da tela de presença, irmã de
+  `TeamAccountGroupHeader`: pelo mesmo motivo da O1, conferir se ela carrega colunas alinhadas antes
+  de tentar `AppSectionHeader`.
 - Verificar: `--tests "com.usagemonitor.ui.TeamPresenceScreenTest"` (31).
 
 ### A04 — Chaves das contas · `TeamKeysAdminScreen.kt`
@@ -227,15 +253,38 @@ nunca a intenção.
 | # | Commit | Atividade | O que foi feito | Verificação |
 |---|---|---|---|---|
 | 1 | `6ed23fd` | A00 | Tabela de precedência, regra de não reimplementar primitiva e regra de acento no `CLAUDE.md`; skill do design system registrada em `.claude/skills/usage-monitor-design/` | Diff inspecionado — mudança só de documentação, sem código |
-| 2 | *(a preencher na A02)* | A01 | Este plano, com o levantamento das 13 superfícies e a medição de adoção por primitiva; issue de rastreio [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) criada com o mesmo ponto de situação | `gh issue create` devolveu `issues/117`; contagens conferidas por `grep` sobre `presentation/ui/` |
+| 2 | `df73cd2` | A01 | Este plano, com o levantamento das 13 superfícies e a medição de adoção por primitiva; issue de rastreio [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) criada com o mesmo ponto de situação | `gh issue create` devolveu `issues/117`; contagens conferidas por `grep` sobre `presentation/ui/` |
+| 3 | *(a preencher na A03)* | A02 | `Modifier.appNestedGroupItem` criada e adotada nos dois blocos aninhados; `TeamHealthCell` passou a ser `AppStatusIndicator` e perdeu o parâmetro `showLabel`, cujo ramo `true` era morto; o chamador da tela de presença acompanhou | `gradlew.bat desktopTest --tests TeamUsageScreenTest --tests TeamPresenceScreenTest` → 52 + 31 = **83 testes, 0 falhas** |
 
 ---
 
 ## Ocorrências adversas
 
+**O1 · 2026-08-27 · A02 — o mapeamento primitiva↔call site deste plano estava errado em dois de
+três itens.**
+
+O levantamento contou os débitos por `grep` de `Surface(`, `Card(`, `.background(` e
+`Modifier.border`, e atribuiu a primitiva pelo *nome* do que a tela desenha. Ler os call sites
+mostrou que duas das três atribuições não se sustentam:
+
+- `AppDataSurfaceFlush` recorta, arredonda e desenha borda **em volta** do que envolve. Os dois
+  blocos aninhados de `TeamUsageScreen` são itens irmãos de uma `LazyColumn` — têm de ser, porque
+  aninhar lista em lista quebra a rolagem —, e a primitiva aplicada por item poria uma caixa
+  arredondada em volta de cada sessão e cortaria a guia de 2dp, que só fica contínua porque a lista
+  não tem vão. **Resolvido criando a primitiva que faltava**, `Modifier.appNestedGroupItem`, em vez
+  de forçar a existente.
+- `AppSectionHeader` é título + subtítulo + ações, com padding interno fixo. As duas faixas de conta
+  carregam sete colunas alinhadas ao `AppDataRow` do integrante e um recuo por nível. **Não
+  convertidas**, com o motivo registrado no detalhe da A02.
+
+Consequência para o resto do plano: **cada atividade lê os call sites antes de aceitar a primitiva
+que este documento nomeia.** A contagem por `grep` mede o tamanho do débito, não a solução dele. As
+atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como hipótese.
+
 | Data | Atividade | O que aconteceu | Como foi resolvido |
 |---|---|---|---|
-| — | — | Nenhuma até aqui | — |
+| 2026-08-27 | A02 | O plano nomeava `AppDataSurfaceFlush` e `AppSectionHeader` para call sites que não as comportam (O1 acima) | Primitiva nova (`appNestedGroupItem`) para um caso; os outros dois registrados como não convertíveis, com o motivo |
+| 2026-08-27 | A02 | `TeamHealthCell` tinha um ramo `showLabel = true` que nenhum dos três chamadores usava | Ramo removido junto com o parâmetro, na migração para `AppStatusIndicator` |
 
 ---
 
@@ -267,7 +316,13 @@ poderem virar issue própria depois. **Não corrigir dentro desta iniciativa.**
    `uploads/prototipo-visual-opencode.html` como a fonte de **todos** os valores do sistema.
 6. **O kit cobre 8 das ~24 seções do protótipo.** Faltam, entre outras, Novidades da versão,
    Administração de chaves, Relatório PDF e a faixa de atualização.
-7. **Nomes divergentes entre o design system e o Kotlin.** `AppWindowFrame` × `AppWindowScaffold`,
+7. **O design system se contradiz no casing da insígnia de estado.**
+   `components/data/AppStatusIndicator.jsx` aplica `textTransform: uppercase` na palavra do estado;
+   o `readme.md` do mesmo sistema diz "Sentence case for titles, tabs, buttons and prose. UPPERCASE
+   only in mono-10 eyebrows and column headers" — e um estado não é nem eyebrow nem cabeçalho de
+   coluna. O Kotlin segue a regra escrita (sentence case) e **não** foi alterado. Decidir de que lado
+   corrigir.
+8. **Nomes divergentes entre o design system e o Kotlin.** `AppWindowFrame` × `AppWindowScaffold`,
    `AppUpdateStrip` × `AppUpdateBanner`, `AppColumnHeader` × `AppColumnHeaderRow`, `AppPanel` ×
    `AppDataSurface`, `AppMetric` × `AppMetricBlock`, `AppSourceMark` × `AppSourceMarker`. Renomear de
    um lado ou do outro é decisão pendente; enquanto ela não vier, o mapeamento vive aqui.

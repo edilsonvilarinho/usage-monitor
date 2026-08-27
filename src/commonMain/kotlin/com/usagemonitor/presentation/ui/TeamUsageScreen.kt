@@ -65,6 +65,7 @@ import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
+import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppToolbar
@@ -73,7 +74,7 @@ import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.ModalDialogText
-import com.usagemonitor.presentation.ui.components.appNestedGroupGuide
+import com.usagemonitor.presentation.ui.components.appNestedGroupItem
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -646,13 +647,8 @@ private fun TeamUsageList(
                             item(key = "${member.memberKey}:sessionHeader") {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .appNestedGroupGuide(
-                                            color = MaterialTheme.colorScheme.outlineVariant,
-                                            indent = sessionIndent
-                                        )
-                                        .padding(start = sessionIndent, top = AppSpacing.sm)
+                                        .appNestedGroupItem(indent = sessionIndent)
+                                        .padding(top = AppSpacing.sm)
                                 ) {
                                     CliSessionColumnHeader(
                                         language = language,
@@ -683,13 +679,7 @@ private fun TeamUsageList(
                                 // linha do integrante logo acima.
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .appNestedGroupGuide(
-                                            color = MaterialTheme.colorScheme.outlineVariant,
-                                            indent = sessionIndent
-                                        )
-                                        .padding(start = sessionIndent)
+                                        .appNestedGroupItem(indent = sessionIndent)
                                         .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
                                 ) {
                                     val session = member.sessions[index]
@@ -968,7 +958,6 @@ private fun TeamAccountGroupHeader(
                     TeamHealthCell(
                         health = worstHealth,
                         language = language,
-                        showLabel = false,
                         modifier = Modifier.width(TEAM_COLUMN_STATUS)
                     )
                 } else if (hasStatusColumn) {
@@ -1019,40 +1008,29 @@ private fun TeamAccountUuidHeader(
  *
  * `internal` porque a tela de presença mostra o mesmo veredito na mesma coluna:
  * duplicar a célula faria as duas divergirem no primeiro ajuste de cor.
+ *
+ * O desenho é o [AppStatusIndicator], não um ponto próprio. Ele é a única
+ * insígnia de estado do sistema, e a regra que ela carrega — cor nunca informa
+ * sozinha, todo estado leva ponto **e** palavra — vale igual aqui. O `when` que
+ * traduz o veredito em severidade é [healthTone]; [healthColor] continua
+ * existindo para quem precisa da cor crua num traço de gráfico.
+ *
+ * A célula fica em `t10` e não em `t12` como as vizinhas, e é assim no sistema:
+ * o kit de presença também desenha a insígnia dentro da linha da tabela. A
+ * coluna de estado é a única que responde com palavra fechada, não com número
+ * para alinhar.
  */
 @Composable
 internal fun TeamHealthCell(
     health: CliSessionHealth,
     language: AppLanguage,
-    modifier: Modifier = Modifier,
-    /** `false` onde a lista já carrega a legenda numa faixa de cabeçalho. */
-    showLabel: Boolean = true
+    modifier: Modifier = Modifier
 ) {
-    val healthAccent = healthColor(health, AppAccents.current)
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(healthAccent)
-        )
-        if (showLabel) {
-            MetricText(
-                label = TeamUsageLabels.columnStatus(language),
-                value = TeamUsageLabels.healthShort(health, language),
-                valueColor = healthAccent
-            )
-        } else {
-            MetricValue(
-                value = TeamUsageLabels.healthShort(health, language),
-                valueColor = healthAccent
-            )
-        }
-    }
+    AppStatusIndicator(
+        label = TeamUsageLabels.healthShort(health, language),
+        tone = healthTone(health),
+        modifier = modifier
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -1459,7 +1437,6 @@ private fun TeamMemberRow(
                 TeamHealthCell(
                     health = worstHealth,
                     language = language,
-                    showLabel = false,
                     modifier = Modifier
                         .width(TEAM_COLUMN_STATUS)
                         .testTag("$TEAM_MEMBER_HEALTH_TAG_PREFIX${member.deviceId}")
