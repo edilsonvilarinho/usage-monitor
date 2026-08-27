@@ -1,33 +1,25 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.presentation.ui.components.AppBorderWidth
+import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
-import com.usagemonitor.presentation.ui.theme.AppElevation
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.UiApiError
@@ -265,43 +257,21 @@ internal fun AppUpdateBanner(
         is AppUpdateUiState.Downloading -> null
     }
 
-    Surface(
+    // É o [AppBanner] do sistema, não um `Surface` próprio: mesma superfície,
+    // mesma borda de 1dp, mesmo marcador de 2dp à esquerda — o marcador que ele
+    // desenhava à mão era uma cópia do que a primitiva já traz. A faixa continua
+    // sem descrição, porque ela repetiria em prosa o que o rótulo da ação diz, e
+    // é isso que a mantém com um terço da altura de um aviso de duas linhas.
+    AppBanner(
+        title = content.title,
+        tone = content.tone,
         modifier = modifier
-            .fillMaxWidth()
             .then(if (action != null) Modifier.clickable(onClick = action) else Modifier)
             .testTag(APP_UPDATE_BANNER_TAG),
-        shape = AppShapes.small,
-        tonalElevation = AppElevation.banner,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // A barra de severidade no lugar do "i" desenhado com o tipo: o mesmo
-            // marcador de 2dp que todos os avisos do app usam.
-            Box(
-                modifier = Modifier
-                    .width(2.dp)
-                    .height(16.dp)
-                    .clip(AppShapes.extraSmall)
-                    .background(content.tone.color())
-            )
-            // Quem cede espaço numa janela estreita é o título: o rótulo da ação é
-            // a única pista de que a faixa é clicável.
-            Text(
-                text = content.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (content.actionLabel != null) {
+        action = if (content.actionLabel == null) {
+            null
+        } else {
+            {
                 Text(
                     text = "${content.actionLabel} →",
                     style = MaterialTheme.typography.labelLarge,
@@ -310,7 +280,7 @@ internal fun AppUpdateBanner(
                 )
             }
         }
-    }
+    )
 }
 
 internal fun updateBannerContent(

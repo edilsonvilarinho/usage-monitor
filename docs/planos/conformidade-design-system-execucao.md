@@ -11,19 +11,18 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A06 concluídas`
+**Estado atual:** `Em andamento — A00 a A07 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A07 — Faixa de atualização.** `DashboardScreenWarnings.kt`: `AppUpdateBanner` monta o próprio
-`Surface` e o próprio marcador de 2dp em vez de usar `AppBanner`.
+**A08 — Configurações.** `SettingsDialogContent.kt`: navegação lateral, `ThemePresetCard` e o
+`HorizontalDivider` do Material.
 
 ### ⏭ Próxima atividade
 
-**A08 — Configurações.** `SettingsDialogContent.kt`: navegação lateral, `ThemePresetCard` e o
-`HorizontalDivider` do Material.
+**A09 — Tooltips.** Quatro bolhas com `Surface` próprio, e `AppTooltip` com zero chamadas.
 
 ---
 
@@ -90,8 +89,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A03 — Primitiva duplicada `DepthSurface` | 5, 7, 8 | ✅ | `7039daa` |
 | A04 — Presença e chaves das contas | 6, 7, 8 | ✅ | `2307760` |
 | A05 — Sessões CLI | 5 | ✅ | `a6ff0d0` |
-| A06 — Card de uso | 2 | ✅ | *(hash registrado na A07)* |
-| A07 — Faixa de atualização | 3 | ⬜ | |
+| A06 — Card de uso | 2 | ✅ | `53b4943` |
+| A07 — Faixa de atualização | 3 | ✅ | *(hash registrado na A08)* |
 | A08 — Configurações | 9 | ⬜ | |
 | A09 — Tooltips | 4 arquivos | ⬜ | |
 | A10 — `AppEmptyState` | 9 estados | ⬜ | |
@@ -265,14 +264,30 @@ Verificado: `gradlew.bat desktopTest --tests ComponentTest --tests AppThemeScale
 AppStructureTest` → 75 + 2 + 7 = **84 testes, 0 falhas**. O `ComponentTest` é onde vivem os ~30 casos
 do card, e é ele que responde pela troca do `Card` por `Box`.
 
-### A07 — Faixa de atualização · `DashboardScreenWarnings.kt`
+### A07 — Faixa de atualização · `DashboardScreenWarnings.kt` — ✅
 
-- `AppUpdateBanner` `:248` monta `Surface` `:268` + marcador `Box` `:292` → `AppBanner`.
-- O contrato de `docs/design-system/components/shell/AppUpdateStrip.prompt.md` fixa 28dp e quatro
-  estados (`available` / `downloading` / `ready` / `failed`), com `failed` sempre oferecendo o
-  caminho manual — SmartScreen ou antivírus bloqueando o `Setup.exe` sem assinatura é desfecho
-  esperado, não exceção. Conferir os quatro antes de trocar.
-- Verificar: `--tests "com.usagemonitor.ui.AppUpdateBannerTest"` (8).
+O `AppUpdateBanner` montava um `Surface` com `BorderStroke` e desenhava o próprio marcador de 2dp —
+uma cópia linha a linha do que o `AppBanner` já traz. Agora é o `AppBanner`, com o rótulo da ação no
+slot `action`.
+
+- **Os quatro estados do contrato foram conferidos antes da troca**
+  (`docs/design-system/components/shell/AppUpdateStrip.prompt.md`): `Available` abre a release,
+  `Downloading` **não tem ação** — faixa clicável sem rótulo seria alvo de clique invisível —,
+  `Ready` reinicia e instala, e `Failed` abre a release. O caminho manual do `Failed` é o que o
+  contrato exige: SmartScreen ou antivírus bloqueando o `Setup.exe` sem assinatura é desfecho
+  esperado, não exceção.
+- **`AppBanner` passou a truncar o título em uma linha**, como o `AppSectionHeader` já fazia. Era a
+  única diferença real entre os dois: a faixa tinha `maxLines = 1` e a primitiva não, e sem isso um
+  título longo quebraria para uma segunda linha e empurraria os cards do dashboard para baixo — que é
+  exatamente o defeito da issue #67. A mudança vale também para os outros dois chamadores da
+  primitiva (`SessionHealthBanner` e `PersistentApiWarningBanner`).
+- A faixa continua **sem descrição**, e é isso que a mantém com um terço da altura de um aviso de
+  duas linhas: a descrição só repetiria em prosa o que o rótulo da ação diz.
+- `BorderStroke`, `Surface`, `AppElevation`, `AppShapes` e mais cinco imports saíram do arquivo.
+
+Verificado: `gradlew.bat desktopTest --tests AppUpdateBannerTest --tests AppStatesTest --tests
+ComponentTest --tests CliSessionsScreenTest` → 8 + 7 + 75 + 45 = **135 testes, 0 falhas**. As duas
+últimas porque a mudança no título do `AppBanner` alcança os outros chamadores dele.
 
 ### A08 — Configurações · `SettingsDialogContent.kt`
 
@@ -344,7 +359,8 @@ nunca a intenção.
 | 4 | `7039daa` | A03 | `AppDataSurface` ganhou `verticalArrangement`; os quatro call sites de `DepthSurface` migraram com `Arrangement.Top`; `DepthSurface.kt` removido | `gradlew.bat desktopTest` sobre `TeamPresenceScreenTest`, `CliSessionsScreenTest`, `AppStructureTest`, `TeamKeysAdminScreenTest` e `TeamAdminSectionTest` → 31 + 45 + 5 + 5 + 6 = **92 testes, 0 falhas** |
 | 5 | `2307760` | A04 | `AppGroupBand` criada, registrada no design system e adotada nas duas sub-faixas de conta; `TeamKeysList` passou a `AppWindowScaffold`; dois testes novos de primitiva | `gradlew.bat desktopTest` sobre `TeamUsageScreenTest`, `TeamPresenceScreenTest`, `TeamKeysAdminScreenTest`, `TeamAdminSectionTest` e `AppStructureTest` → 52 + 31 + 5 + 6 + 7 = **101 testes, 0 falhas** |
 | 6 | `a6ff0d0` | A05 | `LiveBadge` passou a `AppStatusIndicator`, o que também tira o acento congelado no escuro dos três chamadores; barra de composição, `HelpDot` e `GlossaryPanel` reavaliados e retirados da conta de débito | `gradlew.bat desktopTest --tests CliSessionsScreenTest --tests TeamPresenceScreenTest --tests TeamUsageScreenTest` → 45 + 31 + 52 = **128 testes, 0 falhas** |
-| 7 | *(a preencher na A07)* | A06 | `Modifier.appSurfaceBlock` criada e adotada nos seis pontos do card; o último `Card()` do Material saiu da aplicação, com `BorderStroke` e `CardDefaults` junto | `gradlew.bat desktopTest --tests ComponentTest --tests AppThemeScaleTest --tests AppStructureTest` → 75 + 2 + 7 = **84 testes, 0 falhas** |
+| 7 | `53b4943` | A06 | `Modifier.appSurfaceBlock` criada e adotada nos seis pontos do card; o último `Card()` do Material saiu da aplicação, com `BorderStroke` e `CardDefaults` junto | `gradlew.bat desktopTest --tests ComponentTest --tests AppThemeScaleTest --tests AppStructureTest` → 75 + 2 + 7 = **84 testes, 0 falhas** |
+| 8 | *(a preencher na A08)* | A07 | `AppUpdateBanner` passou a ser `AppBanner`; a primitiva ganhou título de uma linha, que era a única diferença real entre as duas | `gradlew.bat desktopTest --tests AppUpdateBannerTest --tests AppStatesTest --tests ComponentTest --tests CliSessionsScreenTest` → 8 + 7 + 75 + 45 = **135 testes, 0 falhas** |
 
 ---
 

@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
@@ -195,7 +196,14 @@ fun AppBanner(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                // Uma linha, como no [AppSectionHeader]. Título que quebra faz o
+                // banner crescer para baixo, e no dashboard ele empurra os cards
+                // — que é exatamente o defeito da issue #67. Quem cede espaço
+                // numa janela estreita é o título; o rótulo da ação é a única
+                // pista de que a faixa é clicável.
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             if (description != null) {
                 Text(
