@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui.theme
 import androidx.compose.foundation.LocalScrollbarStyle
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -256,101 +257,101 @@ private fun appTypography(fonts: AppFontFamilies) = Typography(
  */
 object AppSurfaces {
     // ── Escuro (a referência aprovada) ────────────────────────────────────────
-    val darkBackground = Color(0xFF131010)
-    val darkSurface    = Color(0xFF1B1818)
-    val darkRaised     = Color(0xFF211E1E)
-    val darkBorder     = Color(0xFF3D3838)
-    val darkForeground = Color(0xFFF2EDED)
-    val darkMuted      = Color(0xFFB8B2B2)
+    val darkBackground = AppThemePreset.OBSIDIANA_DARK.background
+    val darkSurface    = AppThemePreset.OBSIDIANA_DARK.surface
+    val darkRaised     = AppThemePreset.OBSIDIANA_DARK.raised
+    val darkBorder     = AppThemePreset.OBSIDIANA_DARK.border
+    val darkForeground = AppThemePreset.OBSIDIANA_DARK.foreground
+    val darkMuted      = AppThemePreset.OBSIDIANA_DARK.muted
 
     // ── Claro ─────────────────────────────────────────────────────────────────
-    val lightBackground = Color(0xFFF6F3F3)
-    val lightSurface    = Color(0xFFFFFCFC)
-    val lightRaised     = Color(0xFFEFEAEA)
-    val lightBorder     = Color(0xFFD7D0D0)
-    val lightForeground = Color(0xFF171414)
-    val lightMuted      = Color(0xFF686060)
+    val lightBackground = AppThemePreset.PORCELANA_LIGHT.background
+    val lightSurface    = AppThemePreset.PORCELANA_LIGHT.surface
+    val lightRaised     = AppThemePreset.PORCELANA_LIGHT.raised
+    val lightBorder     = AppThemePreset.PORCELANA_LIGHT.border
+    val lightForeground = AppThemePreset.PORCELANA_LIGHT.foreground
+    val lightMuted      = AppThemePreset.PORCELANA_LIGHT.muted
 }
 
 // O azul de informação é o mesmo `input` de `AppAccents`, e o vermelho é o mesmo
 // `saturated`: um segundo vermelho "de erro" ao lado do vermelho de contexto
 // saturado faria a tela ter duas cores para a mesma ideia.
-private val DarkInfo     = Color(0xFF4C8DFF)
 private val DarkCritical = Color(0xFFE86A6A)
-private val LightInfo     = Color(0xFF1565C0)
 private val LightCritical = Color(0xFFB3261E)
 
-// ── Paleta Dark ───────────────────────────────────────────────────────────────
-private val usageMonitorDarkColorScheme = darkColorScheme(
-    background              = AppSurfaces.darkBackground,
-    onBackground            = AppSurfaces.darkForeground,
-    surface                 = AppSurfaces.darkSurface,
-    onSurface               = AppSurfaces.darkForeground,
-    surfaceVariant          = AppSurfaces.darkRaised,
-    onSurfaceVariant        = AppSurfaces.darkMuted,
-    surfaceContainerLowest  = AppSurfaces.darkBackground,
-    surfaceContainerLow     = AppSurfaces.darkSurface,
-    surfaceContainer        = AppSurfaces.darkRaised,
-    surfaceContainerHigh    = AppSurfaces.darkRaised,
-    surfaceContainerHighest = AppSurfaces.darkRaised,
-    primary                 = DarkInfo,
-    onPrimary               = AppSurfaces.darkBackground,
-    primaryContainer        = AppSurfaces.darkRaised,
-    onPrimaryContainer      = AppSurfaces.darkForeground,
-    secondary               = AppSurfaces.darkMuted,
-    onSecondary             = AppSurfaces.darkBackground,
-    secondaryContainer      = AppSurfaces.darkRaised,
-    onSecondaryContainer    = AppSurfaces.darkMuted,
-    tertiary                = AppSurfaces.darkMuted,
-    onTertiary              = AppSurfaces.darkBackground,
-    tertiaryContainer       = AppSurfaces.darkRaised,
-    onTertiaryContainer     = AppSurfaces.darkForeground,
-    error                   = DarkCritical,
-    onError                 = AppSurfaces.darkBackground,
-    errorContainer          = AppSurfaces.darkRaised,
-    onErrorContainer        = DarkCritical,
-    outline                 = AppSurfaces.darkBorder,
-    outlineVariant          = AppSurfaces.darkBorder,
-    surfaceTint             = DarkInfo,
-    inverseSurface          = AppSurfaces.darkForeground,
-    inverseOnSurface        = AppSurfaces.darkBackground
-)
-
-// ── Paleta Light ──────────────────────────────────────────────────────────────
-private val usageMonitorLightColorScheme = lightColorScheme(
-    background              = AppSurfaces.lightBackground,
-    onBackground            = AppSurfaces.lightForeground,
-    surface                 = AppSurfaces.lightSurface,
-    onSurface               = AppSurfaces.lightForeground,
-    surfaceVariant          = AppSurfaces.lightRaised,
-    onSurfaceVariant        = AppSurfaces.lightMuted,
-    surfaceContainerLowest  = AppSurfaces.lightSurface,
-    surfaceContainerLow     = AppSurfaces.lightBackground,
-    surfaceContainer        = AppSurfaces.lightRaised,
-    surfaceContainerHigh    = AppSurfaces.lightRaised,
-    surfaceContainerHighest = AppSurfaces.lightRaised,
-    primary                 = LightInfo,
-    onPrimary               = AppSurfaces.lightSurface,
-    primaryContainer        = AppSurfaces.lightRaised,
-    onPrimaryContainer      = AppSurfaces.lightForeground,
-    secondary               = AppSurfaces.lightMuted,
-    onSecondary             = AppSurfaces.lightSurface,
-    secondaryContainer      = AppSurfaces.lightRaised,
-    onSecondaryContainer    = AppSurfaces.lightMuted,
-    tertiary                = AppSurfaces.lightMuted,
-    onTertiary              = AppSurfaces.lightSurface,
-    tertiaryContainer       = AppSurfaces.lightRaised,
-    onTertiaryContainer     = AppSurfaces.lightForeground,
-    error                   = LightCritical,
-    onError                 = AppSurfaces.lightSurface,
-    errorContainer          = AppSurfaces.lightRaised,
-    onErrorContainer        = LightCritical,
-    outline                 = AppSurfaces.lightBorder,
-    outlineVariant          = AppSurfaces.lightBorder,
-    surfaceTint             = LightInfo,
-    inverseSurface          = AppSurfaces.lightForeground,
-    inverseOnSurface        = AppSurfaces.lightSurface
-)
+private fun appColorScheme(preset: AppThemePreset): ColorScheme {
+    return if (preset.isDark) {
+        darkColorScheme(
+            background = preset.background,
+            onBackground = preset.foreground,
+            surface = preset.surface,
+            onSurface = preset.foreground,
+            surfaceVariant = preset.raised,
+            onSurfaceVariant = preset.muted,
+            surfaceContainerLowest = preset.background,
+            surfaceContainerLow = preset.surface,
+            surfaceContainer = preset.raised,
+            surfaceContainerHigh = preset.raised,
+            surfaceContainerHighest = preset.raised,
+            primary = preset.primary,
+            onPrimary = preset.background,
+            primaryContainer = preset.raised,
+            onPrimaryContainer = preset.foreground,
+            secondary = preset.muted,
+            onSecondary = preset.background,
+            secondaryContainer = preset.raised,
+            onSecondaryContainer = preset.muted,
+            tertiary = preset.muted,
+            onTertiary = preset.background,
+            tertiaryContainer = preset.raised,
+            onTertiaryContainer = preset.foreground,
+            error = DarkCritical,
+            onError = preset.background,
+            errorContainer = preset.raised,
+            onErrorContainer = DarkCritical,
+            outline = preset.border,
+            outlineVariant = preset.border,
+            surfaceTint = preset.primary,
+            inverseSurface = preset.foreground,
+            inverseOnSurface = preset.background
+        )
+    } else {
+        lightColorScheme(
+            background = preset.background,
+            onBackground = preset.foreground,
+            surface = preset.surface,
+            onSurface = preset.foreground,
+            surfaceVariant = preset.raised,
+            onSurfaceVariant = preset.muted,
+            surfaceContainerLowest = preset.surface,
+            surfaceContainerLow = preset.background,
+            surfaceContainer = preset.raised,
+            surfaceContainerHigh = preset.raised,
+            surfaceContainerHighest = preset.raised,
+            primary = preset.primary,
+            onPrimary = preset.surface,
+            primaryContainer = preset.raised,
+            onPrimaryContainer = preset.foreground,
+            secondary = preset.muted,
+            onSecondary = preset.surface,
+            secondaryContainer = preset.raised,
+            onSecondaryContainer = preset.muted,
+            tertiary = preset.muted,
+            onTertiary = preset.surface,
+            tertiaryContainer = preset.raised,
+            onTertiaryContainer = preset.foreground,
+            error = LightCritical,
+            onError = preset.surface,
+            errorContainer = preset.raised,
+            onErrorContainer = LightCritical,
+            outline = preset.border,
+            outlineVariant = preset.border,
+            surfaceTint = preset.primary,
+            inverseSurface = preset.foreground,
+            inverseOnSurface = preset.surface
+        )
+    }
+}
 
 private val rememberedTypography by lazy { appTypography(appFontFamilies) }
 
@@ -377,16 +378,12 @@ private val rememberedTypography by lazy { appTypography(appFontFamilies) }
  */
 @Composable
 fun AppTheme(
-    isDark: Boolean = true,
+    preset: AppThemePreset = AppThemePreset.OBSIDIANA_DARK,
     uiScalePercent: Int = 100,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (isDark) {
-        usageMonitorDarkColorScheme
-    } else {
-        usageMonitorLightColorScheme
-    }
-    val accents = if (isDark) darkAppAccents else lightAppAccents
+    val colorScheme = appColorScheme(preset)
+    val accents = if (preset.isDark) darkAppAccents else lightAppAccents
     // A escala é montada uma vez por processo: as famílias não mudam com o tema,
     // e reconstruir catorze `TextStyle` a cada troca seria trabalho sem efeito.
     val typography = rememberedTypography
@@ -422,4 +419,18 @@ fun AppTheme(
             content()
         }
     }
+}
+
+/** Compatibilidade para fixtures e consumidores que ainda escolhem só o modo. */
+@Composable
+fun AppTheme(
+    isDark: Boolean,
+    uiScalePercent: Int = 100,
+    content: @Composable () -> Unit
+) {
+    AppTheme(
+        preset = AppThemePreset.fromLegacyMode(isDark),
+        uiScalePercent = uiScalePercent,
+        content = content
+    )
 }

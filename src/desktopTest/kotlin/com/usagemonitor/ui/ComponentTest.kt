@@ -55,7 +55,7 @@ import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
-import com.usagemonitor.domain.entity.AppTheme as ThemeMode
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_TAG
 import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_HINT_TAG
@@ -1903,13 +1903,13 @@ class ComponentTest {
         setContent {
             AppTheme(isDark = true) {
                 SettingsDialogContent(
-                    currentTheme = ThemeMode.DARK,
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
                     enabledApis = setOf(ApiSource.ANTHROPIC),
                     autoStartEnabled = false,
                     cardsOnlyMode = false,
                     onCardsOnlyModeChange = { value -> enabled = value },
-                    onThemeToggle = {},
+                    onThemeChange = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> }
@@ -1927,13 +1927,13 @@ class ComponentTest {
         setContent {
             AppTheme(isDark = true) {
                 SettingsDialogContent(
-                    currentTheme = ThemeMode.DARK,
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.EN,
                     enabledApis = setOf(ApiSource.ANTHROPIC, ApiSource.CODEX),
                     autoStartEnabled = false,
                     windowOpacityPercent = 75,
                     uiScalePercent = 115,
-                    onThemeToggle = {},
+                    onThemeChange = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> },
@@ -1980,11 +1980,11 @@ class ComponentTest {
         setContent {
             AppTheme(isDark = true) {
                 SettingsDialogContent(
-                    currentTheme = ThemeMode.DARK,
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.EN,
                     enabledApis = setOf(ApiSource.ANTHROPIC),
                     autoStartEnabled = false,
-                    onThemeToggle = {},
+                    onThemeChange = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> }
@@ -2052,11 +2052,11 @@ class ComponentTest {
             AppTheme(isDark = true) {
                 var expandedProfileId by remember { mutableStateOf<String?>(null) }
                 SettingsDialogContent(
-                    currentTheme = ThemeMode.DARK,
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.EN,
                     enabledApis = setOf(ApiSource.ANTHROPIC),
                     autoStartEnabled = false,
-                    onThemeToggle = {},
+                    onThemeChange = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> },
@@ -2164,11 +2164,11 @@ class ComponentTest {
         setContent {
             AppTheme(isDark = true) {
                 SettingsDialogContent(
-                    currentTheme = ThemeMode.DARK,
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
                     enabledApis = setOf(ApiSource.ANTHROPIC),
                     autoStartEnabled = false,
-                    onThemeToggle = {},
+                    onThemeChange = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> }

@@ -10,6 +10,7 @@ import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.fitWindowSize
 import com.usagemonitor.uiScaleFactor
@@ -28,7 +29,7 @@ import com.usagemonitor.update.ReleaseNotesController
 internal fun ReleaseNotesWindow(
     controller: ReleaseNotesController,
     language: AppLanguage,
-    isDark: Boolean,
+    themePreset: AppThemePreset,
     uiScalePercent: Int,
     iconImage: Painter?,
     screenWorkArea: ScreenWorkArea,
@@ -55,7 +56,7 @@ internal fun ReleaseNotesWindow(
         ),
         undecorated = true
     ) {
-        AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
+        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopDialogFrame(
                 title = title,
                 iconPainter = iconImage,

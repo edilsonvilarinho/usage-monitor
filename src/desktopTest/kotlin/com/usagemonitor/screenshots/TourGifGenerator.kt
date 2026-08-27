@@ -49,7 +49,7 @@ import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import kotlinx.datetime.Instant
 import java.awt.image.BufferedImage
 import java.io.File
-import com.usagemonitor.domain.entity.AppTheme as AppThemePreference
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
 /**
  * Gera `img/tour.gif`: um passeio pelas telas da app, renderizado offscreen a
@@ -363,13 +363,13 @@ private fun SettingsTourScreen() {
             shadowElevation = 12.dp
         ) {
             SettingsDialogContent(
-                currentTheme = AppThemePreference.DARK,
+                currentTheme = AppThemePreset.OBSIDIANA_DARK,
                 currentLanguage = AppLanguage.PT,
                 enabledApis = ScreenshotFixtures.enabledApis,
                 autoStartEnabled = true,
                 alwaysOnTopEnabled = false,
                 windowOpacityPercent = 92,
-                onThemeToggle = {},
+                onThemeChange = {},
                 onLanguageChange = {},
                 onAutoStartChange = {},
                 onAlwaysOnTopChange = {},
