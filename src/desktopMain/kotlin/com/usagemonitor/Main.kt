@@ -180,6 +180,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+/** Piso horizontal do Dashboard; abaixo disso os cards já operam em coluna única. */
+private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
@@ -744,6 +746,56 @@ fun main(args: Array<String>) = application {
         uiScalePercent = uiScalePercent,
         workArea = screenWorkArea
     )
+    val onMainContentHeightChanged = rememberModalWindowAutoSizer(
+        windowState = mainWindowState,
+        workArea = screenWorkArea
+    )
+    val onHistoryContentHeightChanged = rememberModalWindowAutoSizer(
+        windowState = historyWindowState,
+        workArea = screenWorkArea,
+        minimumWindowHeight = 460.dp
+    )
+    val onCliSessionsContentHeightChanged = rememberModalWindowAutoSizer(
+        windowState = cliSessionsWindowState,
+        workArea = screenWorkArea,
+        minimumWindowHeight = CLI_SESSIONS_MIN_WINDOW_HEIGHT_DP.dp
+    )
+    val onTeamUsageContentHeightChanged = rememberModalWindowAutoSizer(
+        windowState = teamUsageWindowState,
+        workArea = screenWorkArea,
+        minimumWindowHeight = TEAM_USAGE_MIN_WINDOW_HEIGHT_DP.dp
+    )
+    val onTeamPresenceContentHeightChanged = rememberModalWindowAutoSizer(
+        windowState = teamPresenceWindowState,
+        workArea = screenWorkArea,
+        minimumWindowHeight = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP.dp
+    )
+    val teamKeysWindowState = rememberDialogState(
+        size = fitWindowSize(
+            DpSize(
+                width = 760.dp * uiScaleFactor(uiScalePercent),
+                height = 640.dp * uiScaleFactor(uiScalePercent)
+            ),
+            screenWorkArea
+        )
+    )
+    val settingsWindowState = rememberDialogState(
+        size = fitWindowSize(
+            DpSize(
+                width = 820.dp * uiScaleFactor(uiScalePercent),
+                height = 720.dp * uiScaleFactor(uiScalePercent)
+            ),
+            screenWorkArea
+        )
+    )
+    val onTeamKeysContentHeightChanged = rememberModalWindowAutoSizer(
+        windowState = teamKeysWindowState,
+        workArea = screenWorkArea
+    )
+    val onSettingsContentHeightChanged = rememberModalWindowAutoSizer(
+        windowState = settingsWindowState,
+        workArea = screenWorkArea
+    )
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -1276,6 +1328,13 @@ fun main(args: Array<String>) = application {
         LaunchedEffect(window) {
             mainWindowRef = window
         }
+        ApplyWindowMinimumSize(
+            window = window,
+            widthDp = MAIN_MIN_WINDOW_WIDTH_DP,
+            heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+            uiScalePercent = uiScalePercent,
+            workArea = screenWorkArea
+        )
         // O ACK sai daqui e nao do topo do `main()`: ele afirma que esta versao
         // subiu inteira, e o unico ponto em que isso e verdade e depois de o
         // `SingleInstanceGuard` ter deixado passar, dos recursos criticos terem
@@ -1332,6 +1391,7 @@ fun main(args: Array<String>) = application {
                         minimizedCards = updatedMinimizedCards
                         writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
                     },
+                    onRequiredHeightChanged = onMainContentHeightChanged,
                     onOpenHistory = { source, accountKey ->
                         historyDialogSource = source
                         historyOpenGeneration++
@@ -1467,7 +1527,8 @@ fun main(args: Array<String>) = application {
                         language = language,
                         onBack = { historyDialogSource = null },
                         focusedSource = source,
-                        showSourceSelector = false
+                        showSourceSelector = false,
+                        onRequiredHeightChanged = onHistoryContentHeightChanged
                     )
                 }
             }
@@ -1509,7 +1570,8 @@ fun main(args: Array<String>) = application {
                 ) {
                     CliSessionsScreen(
                         viewModel = cliSessionsViewModel,
-                        language = language
+                        language = language,
+                        onRequiredHeightChanged = onCliSessionsContentHeightChanged
                     )
                 }
             }
@@ -1558,7 +1620,8 @@ fun main(args: Array<String>) = application {
                         language = language,
                         // Mesma origem que a tela de presença usa logo abaixo: é
                         // ela que separa a sessão desta máquina da de um colega.
-                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
+                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() },
+                        onRequiredHeightChanged = onTeamUsageContentHeightChanged
                     )
                 }
             }
@@ -1606,7 +1669,8 @@ fun main(args: Array<String>) = application {
                         viewModel = teamPresenceViewModel,
                         language = language,
                         localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() },
-                        canManage = teamSettings.isAdminMode
+                        canManage = teamSettings.isAdminMode,
+                        onRequiredHeightChanged = onTeamPresenceContentHeightChanged
                     )
                 }
             }
@@ -1637,17 +1701,17 @@ fun main(args: Array<String>) = application {
             // O tamanho literal acompanha a escala: a 150% o conteúdo cresce e a
             // moldura fixa o espremeria. E é preso à área útil pelo mesmo motivo das
             // janelas: o diálogo também é `undecorated`.
-            state = rememberDialogState(
-                size = fitWindowSize(
-                    DpSize(
-                        width = 760.dp * uiScaleFactor(uiScalePercent),
-                        height = 640.dp * uiScaleFactor(uiScalePercent)
-                    ),
-                    screenWorkArea
-                )
-            ),
+            state = teamKeysWindowState,
+            resizable = true,
             undecorated = true
         ) {
+            ApplyWindowMinimumSize(
+                window = window,
+                widthDp = 320,
+                heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+                uiScalePercent = uiScalePercent,
+                workArea = screenWorkArea
+            )
             AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = keysTitle,
@@ -1656,7 +1720,8 @@ fun main(args: Array<String>) = application {
                 ) {
                     TeamKeysAdminScreen(
                         viewModel = teamKeysViewModel,
-                        language = language
+                        language = language,
+                        onRequiredHeightChanged = onTeamKeysContentHeightChanged
                     )
                 }
             }
@@ -1671,21 +1736,20 @@ fun main(args: Array<String>) = application {
             // 820 de largura: as Configurações passaram a ter navegação lateral
             // de 150dp, e em 620 o conteúdo ficava com menos de 470 — estreito
             // demais para as linhas de rótulo + controle das seções de Time.
-            state = rememberDialogState(
-                size = fitWindowSize(
-                    DpSize(
-                        width = 820.dp * uiScaleFactor(uiScalePercent),
-                        height = 720.dp * uiScaleFactor(uiScalePercent)
-                    ),
-                    screenWorkArea
-                )
-            ),
+            state = settingsWindowState,
             resizable = true,
             undecorated = true
         ) {
             LaunchedEffect(settingsOpenGeneration) {
                 activateWindow(window)
             }
+            ApplyWindowMinimumSize(
+                window = window,
+                widthDp = 320,
+                heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+                uiScalePercent = uiScalePercent,
+                workArea = screenWorkArea
+            )
             AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
                 DesktopDialogFrame(
                     title = if (language == AppLanguage.PT) "Configurações" else "Settings",
@@ -1962,7 +2026,8 @@ fun main(args: Array<String>) = application {
                             isTeamKeysOpen = false
                             reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
                         },
-                        toastEvent = settingsToastEvent
+                        toastEvent = settingsToastEvent,
+                        onRequiredHeightChanged = onSettingsContentHeightChanged
                     )
                 }
             }
@@ -1992,7 +2057,7 @@ fun main(args: Array<String>) = application {
  * JVM, e três cópias deste efeito seriam três lugares para o orçamento divergir.
  */
 @Composable
-private fun ApplyWindowMinimumSize(
+internal fun ApplyWindowMinimumSize(
     window: java.awt.Window,
     widthDp: Int,
     heightDp: Int,

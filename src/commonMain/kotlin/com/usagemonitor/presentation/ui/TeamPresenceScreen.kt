@@ -62,6 +62,7 @@ import com.usagemonitor.presentation.ui.components.AppToggleChip
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.DepthSurface
+import com.usagemonitor.presentation.ui.components.ModalDialogText
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -185,6 +186,7 @@ private fun presenceStateTone(entry: TeamMemberPresence): AppTone {
 fun TeamPresenceScreen(
     viewModel: TeamPresenceViewModel,
     language: AppLanguage,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     /** `deviceId` desta instalação; a linha correspondente ganha o selo. */
     localDeviceId: String?,
     /** Modo administrador: é o que libera os botões destrutivos. */
@@ -206,6 +208,7 @@ fun TeamPresenceScreen(
         onRemoveMember = { memberKey -> viewModel.removeMember(memberKey) },
         onDeleteAccount = { accountKey -> viewModel.deleteAccount(accountKey) },
         onDismissActionError = { viewModel.clearActionError() },
+        onRequiredHeightChanged = onRequiredHeightChanged,
         modifier = modifier
     )
 }
@@ -223,14 +226,19 @@ internal fun TeamPresenceContent(
     onQueryChange: (String) -> Unit = {},
     onRemoveMember: (String) -> Unit = {},
     onDeleteAccount: (String) -> Unit = {},
-    onDismissActionError: () -> Unit = {}
+    onDismissActionError: () -> Unit = {},
+    onRequiredHeightChanged: (Dp) -> Unit = {}
 ) {
     // O alvo pendente mora aqui, e não no ViewModel: é estado de diálogo, e o
     // laço ao vivo republica o estado a cada 5s sem saber que há um modal aberto.
     var pendingMember by remember { mutableStateOf<TeamMemberPresence?>(null) }
     var pendingAccount by remember { mutableStateOf<TeamPresenceAccountGroup?>(null) }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .then(rememberModalContentHeightReporter(onRequiredHeightChanged))
+    ) {
         when (state) {
             is TeamPresenceUiState.Loading -> CenteredMessage(CliSessionsLabels.loading(language))
 
@@ -305,7 +313,7 @@ private fun ConfirmationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { Text(message) },
+        text = { ModalDialogText(message) },
         confirmButton = {
             AppButton(
                 label = confirmLabel,

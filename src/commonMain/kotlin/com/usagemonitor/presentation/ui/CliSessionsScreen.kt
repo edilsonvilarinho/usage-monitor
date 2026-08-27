@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionAnalytics
@@ -178,6 +179,7 @@ private val SESSION_ACTION_SLOT = 26.dp
 fun CliSessionsScreen(
     viewModel: CliSessionsViewModel,
     language: AppLanguage,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -193,6 +195,7 @@ fun CliSessionsScreen(
         onSelectView = { view -> viewModel.setView(view) },
         onExport = { format -> viewModel.exportCurrentView(format) },
         onExportReport = { viewModel.exportReport(language) },
+        onRequiredHeightChanged = onRequiredHeightChanged,
         modifier = modifier
     )
 }
@@ -210,9 +213,15 @@ internal fun CliSessionsContent(
     onSelectView: (CliSessionsView) -> Unit = {},
     onExport: (UsageExportFormat) -> Unit = {},
     onExportReport: () -> Unit = {},
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(
+        modifier = modifier
+            .fillMaxSize()
+            .then(rememberModalContentHeightReporter(onRequiredHeightChanged)),
+        color = MaterialTheme.colorScheme.background
+    ) {
         when (state) {
             is CliSessionsUiState.Loading -> CenteredMessage(CliSessionsLabels.loading(language))
 

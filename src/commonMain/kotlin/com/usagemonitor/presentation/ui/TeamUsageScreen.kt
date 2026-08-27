@@ -72,6 +72,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
+import com.usagemonitor.presentation.ui.components.ModalDialogText
 import com.usagemonitor.presentation.ui.components.appNestedGroupGuide
 import com.usagemonitor.presentation.ui.components.TeamTrendChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
@@ -185,6 +186,7 @@ private val TEAM_SESSION_INDENT = AppSpacing.xl
 fun TeamUsageScreen(
     viewModel: TeamUsageViewModel,
     language: AppLanguage,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     /**
      * Máquina desta instalação, para separar a sessão própria da de um colega.
      *
@@ -220,6 +222,7 @@ fun TeamUsageScreen(
         onToggleGlossary = { viewModel.toggleGlossary() },
         onSelectView = { view -> viewModel.setView(view) },
         onExportReport = { viewModel.exportReport(language) },
+        onRequiredHeightChanged = onRequiredHeightChanged,
         modifier = modifier
     )
 }
@@ -248,7 +251,8 @@ internal fun TeamUsageContent(
     onToggleAdvanced: () -> Unit = {},
     onToggleGlossary: () -> Unit = {},
     onSelectView: (TeamUsageView) -> Unit = {},
-    onExportReport: () -> Unit = {}
+    onExportReport: () -> Unit = {},
+    onRequiredHeightChanged: (Dp) -> Unit = {}
 ) {
     // Qual integrante está aguardando confirmação. Estado de tela, não do
     // servidor: o laço ao vivo recarrega a lista a cada 5s e não pode fechar o
@@ -256,7 +260,12 @@ internal fun TeamUsageContent(
     var pendingRemoval by remember { mutableStateOf<TeamMemberUsage?>(null) }
     var pendingSessionRemoval by remember { mutableStateOf<PendingSessionRemoval?>(null) }
 
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(
+        modifier = modifier
+            .fillMaxSize()
+            .then(rememberModalContentHeightReporter(onRequiredHeightChanged)),
+        color = MaterialTheme.colorScheme.background
+    ) {
         when (state) {
             is TeamUsageUiState.Loading -> CenteredMessage(
                 if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"
@@ -350,7 +359,7 @@ private fun RemoveMemberConfirmation(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(TeamUsageLabels.removeMemberTitle(language)) },
-        text = { Text(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
+        text = { ModalDialogText(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
         confirmButton = {
             AppButton(
                 label = TeamUsageLabels.confirmRemoval(language),
@@ -380,7 +389,7 @@ private fun RemoveSessionConfirmation(
         onDismissRequest = onDismiss,
         title = { Text(TeamUsageLabels.removeSessionTitle(language)) },
         text = {
-            Text(
+            ModalDialogText(
                 TeamUsageLabels.removeSessionWarning(
                     sessionId = target.session.sessionId,
                     projectName = target.session.projectName,

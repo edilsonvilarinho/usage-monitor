@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ReleaseNotes
@@ -41,6 +44,7 @@ fun ReleaseNotesContent(
     language: AppLanguage,
     onOpenReleasePage: () -> Unit,
     onClose: () -> Unit,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isPt = language == AppLanguage.PT
@@ -48,6 +52,8 @@ fun ReleaseNotesContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .wrapContentHeight()
+            .then(rememberModalContentHeightReporter(onRequiredHeightChanged))
             .testTag(RELEASE_NOTES_CONTENT_TAG)
     ) {
         // O cabeçalho não repete a versão: a barra de título da moldura já diz
@@ -66,7 +72,9 @@ fun ReleaseNotesContent(
         // altura continua sendo o do Box, que é o que faz a lista longa rolar.
         Box(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .heightIn(max = 420.dp)
                 .padding(horizontal = AppSpacing.lg)
         ) {
             AppDataSurfaceFlush(modifier = Modifier.align(Alignment.TopStart)) {
