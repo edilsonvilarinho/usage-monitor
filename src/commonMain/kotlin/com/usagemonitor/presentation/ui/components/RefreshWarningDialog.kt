@@ -32,7 +32,7 @@ fun RefreshWarningDialog(
             Text(text = title, style = MaterialTheme.typography.titleSmall)
         },
         text = {
-            Text(text = body, style = MaterialTheme.typography.bodySmall)
+            ModalDialogText(text = body)
         },
         shape = AppShapes.large,
         containerColor = MaterialTheme.colorScheme.surface,

@@ -1,6 +1,6 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -8,6 +8,9 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
+import com.usagemonitor.DEFAULT_MODAL_MIN_HEIGHT
+import com.usagemonitor.ApplyWindowMinimumSize
+import com.usagemonitor.rememberModalWindowAutoSizer
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
@@ -37,6 +40,19 @@ internal fun ReleaseNotesWindow(
 ) {
     val notes = controller.notes ?: return
     val title = releaseNotesTitle(notes.version, language == AppLanguage.PT)
+    val windowState = rememberDialogState(
+        size = fitWindowSize(
+            DpSize(
+                width = 560.dp * uiScaleFactor(uiScalePercent),
+                height = 520.dp * uiScaleFactor(uiScalePercent)
+            ),
+            screenWorkArea
+        )
+    )
+    val onRequiredHeightChanged = rememberModalWindowAutoSizer(
+        windowState = windowState,
+        workArea = screenWorkArea
+    )
 
     DialogWindow(
         onCloseRequest = { controller.onDismiss() },
@@ -45,17 +61,17 @@ internal fun ReleaseNotesWindow(
         // Mesmo tratamento das outras janelas: o literal acompanha a escala,
         // porque a 150% o conteúdo cresce e a moldura fixa o espremeria, e é
         // preso à área útil porque o diálogo é `undecorated`.
-        state = rememberDialogState(
-            size = fitWindowSize(
-                DpSize(
-                    width = 560.dp * uiScaleFactor(uiScalePercent),
-                    height = 520.dp * uiScaleFactor(uiScalePercent)
-                ),
-                screenWorkArea
-            )
-        ),
+        state = windowState,
+        resizable = true,
         undecorated = true
     ) {
+        ApplyWindowMinimumSize(
+            window = window,
+            widthDp = 320,
+            heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+            uiScalePercent = uiScalePercent,
+            workArea = screenWorkArea
+        )
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopDialogFrame(
                 title = title,
@@ -67,7 +83,8 @@ internal fun ReleaseNotesWindow(
                     language = language,
                     onOpenReleasePage = { onOpenReleasePage(notes.releasePageUrl) },
                     onClose = { controller.onDismiss() },
-                    modifier = Modifier.fillMaxSize()
+                    onRequiredHeightChanged = onRequiredHeightChanged,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

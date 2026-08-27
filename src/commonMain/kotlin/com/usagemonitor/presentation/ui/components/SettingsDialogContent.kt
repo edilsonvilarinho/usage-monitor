@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -47,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.usagemonitor.domain.entity.ApiSource
@@ -67,6 +69,7 @@ import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
+import com.usagemonitor.presentation.ui.rememberModalContentHeightReporter
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
@@ -182,6 +185,7 @@ fun SettingsDialogContent(
     toastEvent: SettingsToastEvent? = null,
     /** Aba aberta ao entrar; existe para os geradores de captura escolherem a seção. */
     initialTab: SettingsTab = SettingsTab.GENERAL,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // A aba mora num `remember` do próprio diálogo: ele é uma janela separada e
@@ -234,8 +238,10 @@ fun SettingsDialogContent(
             Box(modifier = Modifier.fillMaxHeight().weight(1f)) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .wrapContentHeight()
                     .verticalScroll(scrollState)
+                    .then(rememberModalContentHeightReporter(onRequiredHeightChanged))
                     .padding(AppSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {

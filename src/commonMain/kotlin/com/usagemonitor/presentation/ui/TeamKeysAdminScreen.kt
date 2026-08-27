@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamKeyEntry
@@ -47,6 +48,7 @@ internal const val TEAM_KEYS_ERROR_TAG = "teamKeysError"
 fun TeamKeysAdminScreen(
     viewModel: TeamKeysAdminViewModel,
     language: AppLanguage,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -62,6 +64,7 @@ fun TeamKeysAdminScreen(
         onUnclaim = { id, accountKey -> viewModel.unclaim(id, accountKey) },
         onDismissError = { viewModel.clearActionError() },
         onRetry = { viewModel.refresh() },
+        onRequiredHeightChanged = onRequiredHeightChanged,
         modifier = modifier
     )
 }
@@ -78,9 +81,15 @@ internal fun TeamKeysAdminContent(
     onRevoke: (String) -> Unit = {},
     onUnclaim: (String, String) -> Unit = { _, _ -> },
     onDismissError: () -> Unit = {},
-    onRetry: () -> Unit = {}
+    onRetry: () -> Unit = {},
+    onRequiredHeightChanged: (Dp) -> Unit = {}
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(
+        modifier = modifier
+            .fillMaxSize()
+            .then(rememberModalContentHeightReporter(onRequiredHeightChanged)),
+        color = MaterialTheme.colorScheme.background
+    ) {
         when (state) {
             is TeamKeysUiState.Loading -> CenteredMessage(TeamKeysLabels.loading(language))
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
@@ -66,6 +68,9 @@ import com.usagemonitor.presentation.viewmodel.UiState
  * O reset da fonte não é instantâneo; acordar no milissegundo exato não ajuda.
  */
 private const val QUOTA_EXPIRY_MARGIN_MILLIS = 1_000L
+
+/** Divisória de 1dp mais a barra de estado de 30dp do rodapé do Dashboard. */
+private val DASHBOARD_FOOTER_HEIGHT = 31.dp
 
 /**
  * Próximo `periodEndAt` ainda no futuro entre as cotas na tela.
@@ -100,6 +105,7 @@ fun DashboardScreen(
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistory: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenSettings: () -> Unit,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     onOpenCliSessions: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
     /** Presença da conta do card — a porta do integrante comum. */
@@ -254,6 +260,14 @@ fun DashboardScreen(
                                     onRefreshCard = { target -> pendingRefreshAction = { viewModel.refresh(target) } },
                                     onMoveCardToIndex = onMoveCardToIndex,
                                     onToggleCardMinimized = onToggleCardMinimized,
+                                    onRequiredHeightChanged = { contentHeight ->
+                                        val footerHeight = if (showFooter) {
+                                            DASHBOARD_FOOTER_HEIGHT
+                                        } else {
+                                            0.dp
+                                        }
+                                        onRequiredHeightChanged(contentHeight + footerHeight)
+                                    },
                                     onOpenHistoryCard = onOpenHistory,
                                     onOpenCliSessionsCard = onOpenCliSessions,
                                     onOpenTeamUsageCard = onOpenTeamUsage,
@@ -412,6 +426,7 @@ private fun SuccessContent(
     onRefreshCard: (UsageTargetKey) -> Unit,
     onMoveCardToIndex: (UsageTargetKey, Int) -> Unit,
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
+    onRequiredHeightChanged: (Dp) -> Unit = {},
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
@@ -442,67 +457,73 @@ private fun SuccessContent(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            if (warnings.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-                ) {
-                    warnings.forEach { warning ->
-                        PersistentApiWarningBanner(
-                            title = warning.title,
-                            description = warning.description,
-                            actionLabel = warning.actionLabel,
-                            onAction = warningActionFor(
-                                warning = warning,
-                                onRetryTarget = onRetryTarget
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(rememberModalContentHeightReporter(onRequiredHeightChanged))
+            ) {
+                if (warnings.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+                    ) {
+                        warnings.forEach { warning ->
+                            PersistentApiWarningBanner(
+                                title = warning.title,
+                                description = warning.description,
+                                actionLabel = warning.actionLabel,
+                                onAction = warningActionFor(
+                                    warning = warning,
+                                    onRetryTarget = onRetryTarget
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+
+                genericErrors.forEach { error ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "⚠ ${error.formattedMessage}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
-            }
 
-            genericErrors.forEach { error ->
-                Row(
+                ResponsiveDashboardCardGrid(
+                    items = items,
+                    refreshingTargets = refreshingTargets,
+                    minimizedCards = minimizedCards,
+                    riskSummaries = riskSummaries,
+                    language = language,
+                    onRefreshCard = onRefreshCard,
+                    onMoveCardToIndex = onMoveCardToIndex,
+                    onToggleCardMinimized = onToggleCardMinimized,
+                    onOpenHistoryCard = onOpenHistoryCard,
+                    onOpenCliSessionsCard = onOpenCliSessionsCard,
+                    onOpenTeamUsageCard = onOpenTeamUsageCard,
+                    onOpenTeamPresenceCard = onOpenTeamPresenceCard,
+                    teamEnabledProfileIds = teamEnabledProfileIds,
+                    cliSessionPulses = cliSessionPulses,
+                    teamSessionPulses = teamSessionPulses,
+                    now = now,
+                    // 12/8 e não 16/12: numa janela estreita — que é como o app
+                    // costuma ficar — a margem antiga comia largura que o card usa
+                    // para caber sem quebrar as cotas em duas linhas.
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "⚠ ${error.formattedMessage}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
+                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
+                )
             }
-
-            ResponsiveDashboardCardGrid(
-                items = items,
-                refreshingTargets = refreshingTargets,
-                minimizedCards = minimizedCards,
-                riskSummaries = riskSummaries,
-                language = language,
-                onRefreshCard = onRefreshCard,
-                onMoveCardToIndex = onMoveCardToIndex,
-                onToggleCardMinimized = onToggleCardMinimized,
-                onOpenHistoryCard = onOpenHistoryCard,
-                onOpenCliSessionsCard = onOpenCliSessionsCard,
-                onOpenTeamUsageCard = onOpenTeamUsageCard,
-                onOpenTeamPresenceCard = onOpenTeamPresenceCard,
-                teamEnabledProfileIds = teamEnabledProfileIds,
-                cliSessionPulses = cliSessionPulses,
-                teamSessionPulses = teamSessionPulses,
-                now = now,
-                // 12/8 e não 16/12: numa janela estreita — que é como o app
-                // costuma ficar — a margem antiga comia largura que o card usa
-                // para caber sem quebrar as cotas em duas linhas.
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
-            )
         }
 
         VerticalScrollbar(
