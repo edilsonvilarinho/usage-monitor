@@ -248,17 +248,50 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 ## Sistema visual
 
 Refatoração de agosto de 2026, inspirada na linguagem do OpenCode. O plano de execução com o
-histórico das decisões está em [`docs/planos/refatoracao-visual-opencode-execucao.md`](docs/planos/refatoracao-visual-opencode-execucao.md);
-a especificação de aparência é o protótipo aprovado, [`docs/planos/prototipo-visual-opencode.html`](docs/planos/prototipo-visual-opencode.html).
-Divergência entre o Compose e o protótipo é defeito do Compose.
+histórico das decisões está em [`docs/planos/refatoracao-visual-opencode-execucao.md`](docs/planos/refatoracao-visual-opencode-execucao.md).
 
-**Toda alteração de tela é registrada no protótipo, no mesmo commit da mudança.** A regra de
-precedência do parágrafo acima só se sustenta enquanto o protótipo descrever o app inteiro; um
-protótipo desatualizado a transforma em ponteiro para um documento que não descreve mais o produto.
-Tela nova ou estado que ainda não existe ganha seção `<h2 id="…">N · …</h2>` própria mais o link em
-`nav.index`; controle, coluna ou texto novo dentro de tela já desenhada vira linha no mockup dela;
-risco conhecido e decisão pendente vão para `§15 #checklist`. Vale para qualquer superfície visível —
-janela, diálogo, faixa, bandeja e relatório PDF.
+### Design system — precedência
+
+**A fonte de verdade visual é [`docs/design-system/`](docs/design-system/).** Ali moram os tokens
+(`tokens/*.css`), as primitivas publicadas — cada uma com o contrato escrito em
+`components/**/*.prompt.md` — e as regras de conteúdo, iconografia e fundação do
+[`readme.md`](docs/design-system/readme.md). O protótipo aprovado,
+[`docs/planos/prototipo-visual-opencode.html`](docs/planos/prototipo-visual-opencode.html), continua
+sendo o mockup obrigatório de **cada tela** — layout, colunas, estados —, mas deixou de ser a
+especificação de token, primitiva e copy: o design system foi derivado dele e o descreve com mais
+precisão.
+
+| Divergência | Quem vence | O que fazer |
+|---|---|---|
+| Compose × design system | design system | corrigir o Compose |
+| Compose × protótipo (layout de tela) | protótipo | corrigir o Compose |
+| Design system × protótipo | design system | corrigir o protótipo, no mesmo commit |
+| Design system tecnicamente errado | o Kotlin | corrigir `docs/design-system/`, com a decisão registrada |
+
+**Nenhuma tela reimplementa uma primitiva.** Antes de escrever `Surface`, `Card`, `Modifier.border`,
+`.background` com cor de superfície ou `RoundedCornerShape`, procure em
+`presentation/ui/components/AppStructure.kt`, `AppControls.kt` e `AppStates.kt`. Se a primitiva não
+existir, o commit que a cria e o commit que a consome são o mesmo — primitiva construída e não
+adotada não conserta nada, e é exatamente assim que `AppWindowScaffold`, `AppToolbar`, `AppTooltip` e
+`AppEmptyState` ficaram meses com adoção zero.
+
+**Cor de acento sai de `AppAccents.current` e de `AppTone`**, nunca de `darkAppAccents` ou
+`lightAppAccents` diretamente. Um `val` de topo de arquivo é resolvido uma vez por processo e não lê
+o tema em vigor: congelar a variante escura faz o valor cair a 2,64:1 contra a `surface` clara, que é
+o que `AppAccentsContrastTest` existe para impedir.
+
+**Toda alteração de tela é registrada nos dois documentos, no mesmo commit da mudança.** A regra de
+precedência acima só se sustenta enquanto os dois descreverem o app inteiro; desatualizado, cada um
+vira ponteiro para um documento que não descreve mais o produto.
+
+- **No protótipo:** tela nova ou estado que ainda não existe ganha seção `<h2 id="…">N · …</h2>`
+  própria mais o link em `nav.index`; controle, coluna ou texto novo dentro de tela já desenhada vira
+  linha no mockup dela; risco conhecido e decisão pendente vão para `§15 #checklist`.
+- **No design system:** primitiva nova ou contrato alterado vira `components/<grupo>/<Nome>.prompt.md`
+  mais a entrada no índice do `readme.md`; tela que tem kit em `ui_kits/desktop-app/` tem o `.jsx`
+  correspondente atualizado.
+
+Vale para qualquer superfície visível — janela, diálogo, faixa, bandeja e relatório PDF.
 
 **Tokens** (`presentation/ui/theme/AppTheme.kt`): quatro superfícies neutras dentro de ~14% de
 luminância (`AppSurfaces`), raios 4/6/8/10 com **teto de 10** (`AppShapes`), elevação 0/2/8 —
