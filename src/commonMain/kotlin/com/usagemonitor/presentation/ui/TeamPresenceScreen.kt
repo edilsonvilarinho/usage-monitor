@@ -730,22 +730,13 @@ private fun TeamPresenceEmailHeader(
                         // endereço e um uuid sem dizer que aquilo é a conta, e ao lado de
                         // uma linha de integrante — que também tem nome e identificador —
                         // as duas liam igual.
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = TeamUsageLabels.accountBand(language),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                            if (group.hasProvisionalAccounts) {
-                                Text(
-                                    text = TeamUsageLabels.provisionalLabel(language),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = AppTone.WARNING.color(),
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                        Text(
+                            text = TeamUsageLabels.accountBand(language),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         // Continua em `titleSmall`, como na lista de consumo:
                         // com 16sp o e-mail não cabe nos 118dp úteis da coluna e
                         // a captura saiu com "ana@example…". A altura da faixa
@@ -763,7 +754,6 @@ private fun TeamPresenceEmailHeader(
                                 ?.let { accountKey -> accountKey }
                                 ?: TeamUsageLabels.technicalAccounts(
                                     count = group.accounts.size,
-                                    provisional = group.hasProvisionalAccounts,
                                     language = language
                                 ),
                             style = MaterialTheme.typography.labelSmall,

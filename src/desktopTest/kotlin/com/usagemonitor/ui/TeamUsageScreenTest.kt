@@ -1320,6 +1320,37 @@ class TeamUsageScreenTest {
             onNodeWithText("4 sessões").assertIsDisplayed()
         }
 
+    @Test
+    fun `conta provisoria nao exibe indicador na faixa`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamUsageUiState.Success(
+                    members = twoAccountMembers(),
+                    isAdminOverview = true
+                ),
+                width = 960.dp
+            )
+
+            onAllNodesWithText("rótulo provisório").assertCountEquals(0)
+            onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-b")
+                .assertTextContains("Conta · 1 integrante")
+
+            val provisionalBand = onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-a")
+                .getUnclippedBoundsInRoot()
+            val regularBand = onNodeWithTag("${TEAM_ACCOUNT_GROUP_TAG_PREFIX}account-b")
+                .getUnclippedBoundsInRoot()
+
+            assertTrue(
+                provisionalBand.bottom - provisionalBand.top == regularBand.bottom - regularBand.top,
+                "remover o indicador não deveria aumentar a altura da faixa"
+            )
+            assertEquals(
+                regularBand.right,
+                provisionalBand.right,
+                "as faixas devem preservar a mesma largura e as colunas numéricas"
+            )
+        }
+
     /**
      * Issue #45: a visão global nasce recolhida — a faixa de cada conta é a
      * lista inteira até alguém pedir o detalhe de uma delas.

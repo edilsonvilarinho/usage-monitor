@@ -362,6 +362,45 @@ class TeamPresenceScreenTest {
     }
 
     @Test
+    fun `conta provisoria nao exibe indicador na presenca`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                TeamPresenceUiState.Success(
+                    entries = listOf(
+                        entry(
+                            deviceId = "device-1",
+                            accountKey = "acc-a",
+                            accountLabel = "fulano@empresa.com"
+                        ),
+                        entry(
+                            deviceId = "device-2",
+                            alias = "maria",
+                            accountKey = "acc-b"
+                        )
+                    ),
+                    isAdminOverview = true
+                )
+            )
+
+            onAllNodesWithText("rótulo provisório").assertCountEquals(0)
+
+            val provisionalBand = onNodeWithTag("${PRESENCE_ACCOUNT_GROUP_TAG_PREFIX}acc-a")
+                .getUnclippedBoundsInRoot()
+            val regularBand = onNodeWithTag("${PRESENCE_ACCOUNT_GROUP_TAG_PREFIX}acc-b")
+                .getUnclippedBoundsInRoot()
+
+            assertTrue(
+                provisionalBand.bottom - provisionalBand.top == regularBand.bottom - regularBand.top,
+                "remover o indicador não deveria aumentar a altura da faixa"
+            )
+            assertEquals(
+                regularBand.right,
+                provisionalBand.right,
+                "as faixas devem preservar a mesma largura e as colunas"
+            )
+        }
+
+    @Test
     fun `abrir a conta emite o evento com a chave dela`() = runDesktopComposeUiTest {
         var toggled: String? = null
         renderSuccess(

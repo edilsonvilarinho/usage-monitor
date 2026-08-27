@@ -888,25 +888,16 @@ private fun TeamAccountGroupHeader(
                         // A contagem de integrantes vem emendada nela: a coluna
                         // que ela ocupava virou "Sessões", e um número sob a
                         // legenda "Tempo ativo" diria uma coisa e valeria outra.
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = TeamUsageLabels.accountBandWithMembers(
-                                    memberCount = group.activeMemberCount,
-                                    language = language
-                                ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                            if (group.hasProvisionalAccounts) {
-                                Text(
-                                    text = TeamUsageLabels.provisionalLabel(language),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = AppTone.WARNING.color(),
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                        Text(
+                            text = TeamUsageLabels.accountBandWithMembers(
+                                memberCount = group.activeMemberCount,
+                                language = language
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         // O e-mail é o dado, e dado fica na cor do texto. Quem
                         // identifica a faixa como conta é o marcador de 2dp à
                         // esquerda e a palavra logo acima.
@@ -929,7 +920,6 @@ private fun TeamAccountGroupHeader(
                                 ?.let { accountKey -> accountKey }
                                 ?: TeamUsageLabels.technicalAccounts(
                                     count = group.accountCount,
-                                    provisional = group.hasProvisionalAccounts,
                                     language = language
                                 ),
                             style = MaterialTheme.typography.labelSmall,

@@ -152,20 +152,12 @@ internal object TeamUsageLabels {
         }
     }
 
-    fun technicalAccounts(count: Int, provisional: Boolean, language: AppLanguage): String {
-        val accounts = if (language == AppLanguage.PT) {
+    fun technicalAccounts(count: Int, language: AppLanguage): String {
+        return if (language == AppLanguage.PT) {
             if (count == 1) "1 UUID" else "$count UUIDs"
         } else {
             if (count == 1) "1 UUID" else "$count UUIDs"
         }
-        if (!provisional) {
-            return accounts
-        }
-        return "$accounts · ${provisionalLabel(language)}"
-    }
-
-    fun provisionalLabel(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "rótulo provisório" else "provisional label"
     }
 
     /**
@@ -473,4 +465,3 @@ internal object TeamUsageLabels {
         }
     }
 }
-
