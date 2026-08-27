@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -65,7 +66,7 @@ import androidx.compose.foundation.BorderStroke
  */
 
 /** Altura de botão e campo. Um valor, para os controles alinharem entre si. */
-private val CONTROL_HEIGHT = 28.dp
+private val CONTROL_HEIGHT = AppChrome.control
 
 /** Lado do botão de ícone: quadrado, não círculo. */
 private val ICON_BUTTON_SIZE = 26.dp

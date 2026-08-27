@@ -75,6 +75,35 @@ object AppElevation {
 }
 
 /**
+ * Alturas fixas do cromo, em dp.
+ *
+ * São **contrato com o design system**, não escolha de tela: `tokens/spacing.css`
+ * publica os cinco valores como `--h-titlebar`, `--h-toolbar`, `--h-statusbar`,
+ * `--h-control` e `--h-updatestrip`, e é por eles que a barra de título de uma
+ * janela tem a mesma altura da barra de controles da janela ao lado.
+ *
+ * Existiam como três `private val` espalhados por dois arquivos de componente e
+ * um literal `34.dp` na moldura do desktop — quatro donos para um valor que o
+ * sistema define uma vez.
+ */
+object AppChrome {
+    /** Barra de título das janelas, e a faixa de hover do modo somente cards. */
+    val titleBar: Dp = 34.dp
+
+    /** Barra de controles fixada no topo de uma janela que fatia por tempo. */
+    val toolbar: Dp = 34.dp
+
+    /** Barra de estado do rodapé. */
+    val statusBar: Dp = 30.dp
+
+    /** Altura de um controle: botão, campo, segmento, chip. */
+    val control: Dp = 28.dp
+
+    /** Faixa de atualização, a linha mais baixa do sistema. */
+    val updateStrip: Dp = 28.dp
+}
+
+/**
  * Grade de espaçamento: 4 · 8 · 12 · 16 · 24 · 32.
  *
  * Existe para o padding parar de ser um literal diferente em cada arquivo. Os

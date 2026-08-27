@@ -11,19 +11,17 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 a A10 concluídas`
+**Estado atual:** `Em andamento — A00 a A11 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A11 — Cromo das janelas.** `DesktopWindowFrame.kt`, o arquivo de maior risco do plano: vive em
-`desktopMain` e não tem nenhum teste de componente. A suíte dele é escrita **antes** de o código
-mudar.
+**A12 — Protótipo, kit e capturas**, com o levantamento reaberto e o número real por tela.
 
 ### ⏭ Próxima atividade
 
-**A12 — Protótipo, kit e capturas**, com o levantamento reaberto e o número real por tela.
+**A13 — Fechamento.** Ponto de situação final aqui e na issue.
 
 ---
 
@@ -94,8 +92,8 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 | A07 — Faixa de atualização | 3 | ✅ | `fd3ac5c` |
 | A08 — Configurações | 9 | ✅ | `0127909` |
 | A09 — Tooltips | 4 arquivos | ✅ | `b92b7eb` |
-| A10 — Vazio, carregando e erro | 22 pontos | ✅ | *(hash registrado na A11)* |
-| A11 — Cromo das janelas | 11 | ⬜ | |
+| A10 — Vazio, carregando e erro | 22 pontos | ✅ | `632cde9` |
+| A11 — Cromo das janelas | 11 | ✅ | *(hash registrado na A12)* |
 | A12 — Protótipo, kit e capturas | — | ⬜ | |
 | A13 — Fechamento | — | ⬜ | |
 
@@ -392,20 +390,48 @@ significados. Ela saiu; os vinte e dois pontos passaram a chamar a primitiva do 
 Verificado: `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes. Foi a passada mais
 larga do plano, e tinha de ser: a função saiu de cinco arquivos ao mesmo tempo.
 
-### A11 — Cromo das janelas · `DesktopWindowFrame.kt`
+### A11 — Cromo das janelas · `DesktopWindowFrame.kt` — ✅
 
-- `DesktopTitleBar` `:281` e `DesktopDialogTitleBar` `:360`: altura 34dp literal → constante ao lado
-  de `TOOLBAR_HEIGHT` / `STATUS_BAR_HEIGHT` (`AppStructure.kt:74-75`), que já valem 34 e 30.
-- 3 `HorizontalDivider` do Material → `AppDivider`.
-- `TitleBarButton` `:429` → `AppIconButton`. O botão de fechar é a **única** exceção de hover do
-  sistema (preenche `--crit` com branco) — preservar.
-- ⚠ **Maior risco do plano.** O arquivo vive em `desktopMain` e não tem nenhum teste de componente.
-  Esta atividade abre `src/desktopTest/.../ui/DesktopWindowFrameTest.kt` **antes** de tocar no
-  código: três botões de cromo, o `compact` do modo somente cards e a faixa de hover.
-- ⚠ `CompactTitleBarOverlay` `:165` usa arrasto imediato (`WindowDraggableArea`) e o card usa
-  `detectDragGesturesAfterLongPress`. A faixa só pode ser composta durante o hover; presente o tempo
-  todo, o arrasto da janela vence a pressão longa e reordenar o primeiro card fica impossível.
-- Verificar: `gradlew.bat allTests` + `gradlew.bat run` em modo normal e em modo somente cards.
+O arquivo de maior risco do plano, e o único sem nenhum teste. A suíte foi escrita **antes** de o
+código mudar.
+
+Feito:
+
+- **`AppChrome` criado** em `AppTheme.kt`, com os cinco patamares que `tokens/spacing.css` publica:
+  `titleBar` 34, `toolbar` 34, `statusBar` 30, `control` 28, `updateStrip` 28. Eles existiam como
+  **três `private val` em dois arquivos de componente mais um literal `34.dp`** na moldura do
+  desktop — quatro donos para um valor que o sistema define uma vez. `AppStructure`, `AppControls` e
+  `DesktopWindowFrame` passaram a ler dali.
+- **As duas divisórias do cromo eram `HorizontalDivider` do Material com meia opacidade**
+  (`outlineVariant.copy(alpha = 0.5f)`). O sistema tem uma divisória só, de 1dp em `outlineVariant`,
+  e a moldura da janela não é exceção. Viraram `AppDivider`.
+- **A cor de hover do botão de fechar era um literal**, `Color(0xFFC62828)`, em dois pontos. Era o
+  único `Color(0x…)` fora de `theme/` em toda a aplicação — o `grep` da A01 não o pegou porque
+  varreu `commonMain`, e a moldura vive em `desktopMain`. Agora é `colorScheme.error`, que é `#E86A6A`
+  no escuro e `#B3261E` no claro. O design system pede exatamente isso: o botão de fechar é a **única**
+  exceção de hover do sistema, e ele preenche `--crit`.
+- **`DesktopWindowFrameTest` criado**, quatro casos: o botão preenche a altura da barra menos a
+  divisória, o glifo que não se explica carrega descrição semântica, o clique despacha, e as cinco
+  alturas batem com o contrato do design system.
+
+Não convertido, com o motivo:
+
+- **`TitleBarButton` continua não sendo `AppIconButton`.** Ele é um retângulo de 40 × 33dp que
+  preenche a altura da barra; `AppIconButton` tem 26dp **e borda**. O botão arredondado flutuando
+  dentro da barra era o único lugar do app onde um controle não encostava na própria moldura, e um
+  anel de 1dp em volta de cada botão de janela seria pior. A decisão está no comentário do arquivo
+  desde a refatoração de agosto; o design system diz que `AppIconButton` serve o cromo, mas ele diz
+  também que o botão de fechar é exceção — e é a exceção que descreve esta barra.
+- **O resto do arquivo não é alcançável pelo harness.** `DesktopWindowFrame`, `DesktopTitleBar`,
+  `DesktopDialogTitleBar` e `CompactTitleBarOverlay` são todos `WindowScope.`, porque o
+  `WindowDraggableArea` precisa de uma janela AWT real, e `runDesktopComposeUiTest` não fornece uma.
+  O que sobra é o botão, que é onde as três decisões do cromo moram.
+
+Verificado: `gradlew.bat allTests` → **1472 testes, 0 falhas** (1468 + os 4 novos).
+
+⚠ **Falta a verificação que só a máquina do usuário faz**: `gradlew.bat run` em modo normal e em modo
+somente cards, olhando hover, arrasto da janela, o botão de fechar em vermelho e a faixa de hover do
+topo. A captura offscreen do `generateScreenshots` não desenha moldura de janela.
 
 ### A12 — Protótipo, kit e capturas
 
@@ -436,7 +462,8 @@ nunca a intenção.
 | 9 | — | fase 3 | Fechamento da fase do dashboard | `gradlew.bat allTests` → **BUILD SUCCESSFUL** em 1m30s |
 | 10 | `0127909` | A08 | `AppSettingsNav` saiu de dentro do diálogo e virou primitiva publicada, com o nome que o design system já usava; um teste novo mede a largura fixa do trilho | `gradlew.bat desktopTest --tests AppStructureTest --tests ComponentTest --tests AutoUpdateToggleTest --tests ThemePresetPickerTest` → 8 + 75 + 17 + 3 = **103 testes, 0 falhas** |
 | 11 | `b92b7eb` | A09 | `AppTooltipSurface` criada e adotada nas quatro bolhas, incluindo a do próprio `AppTooltip`; sete imports saíram dos três arquivos de gráfico | `gradlew.bat desktopTest --tests ComponentTest --tests CliSessionsScreenTest --tests AppControlsTest` → 75 + 45 + 9 = **129 testes, 0 falhas** |
-| 12 | *(a preencher na A11)* | A10 | `CenteredMessage` removida; os 22 pontos de cinco telas passaram a `AppLoadingState` (7), `AppErrorState` (6) e `AppEmptyState` (9) | `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes |
+| 12 | `632cde9` | A10 | `CenteredMessage` removida; os 22 pontos de cinco telas passaram a `AppLoadingState` (7), `AppErrorState` (6) e `AppEmptyState` (9) | `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes |
+| 13 | *(a preencher na A12)* | A11 | `AppChrome` com os cinco patamares do cromo; as duas divisórias do Material viraram `AppDivider`; o literal `Color(0xFFC62828)` do botão de fechar virou `colorScheme.error`; `DesktopWindowFrameTest` criado | `gradlew.bat allTests` → **1472 testes, 0 falhas** |
 
 ---
 
@@ -552,6 +579,11 @@ atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como 
 Achados no levantamento de 2026-08-27, deixados de fora por D2. Registrados com a evidência para
 poderem virar issue própria depois. **Não corrigir dentro desta iniciativa.**
 
+0. **`gradlew.bat run` não foi executado.** Nenhuma das onze atividades foi olhada na janela real —
+   hover, foco, arrasto de card, redimensionamento, o botão de fechar em vermelho, a faixa de hover
+   do modo somente cards e as duas línguas. A captura offscreen do `generateScreenshots` não desenha
+   moldura de janela, e o harness de componente não alcança nada que seja `WindowScope.`. **É a
+   verificação que falta, e só a máquina do usuário a faz.**
 1. **Acentos congelados na variante escura.** `CliSessionsScreen.kt:99-103` declara cinco `val` de
    topo de arquivo a partir de `darkAppAccents` (`INPUT_COLOR`, `OUTPUT_COLOR`, `CACHE_READ_COLOR`,
    `CACHE_WRITE_COLOR`, `SAVINGS_COLOR`), usados em 33 pontos do arquivo. `val` de topo de arquivo é

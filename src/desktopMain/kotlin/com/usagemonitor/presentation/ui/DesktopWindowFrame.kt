@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
+import com.usagemonitor.presentation.ui.components.AppDivider
+import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -62,8 +64,14 @@ private val WindowCornerRadius = 10.dp
 /** Descrição semântica do botão que devolve a moldura completa da janela. */
 internal const val COMPACT_EXIT_DESCRIPTION = "Sair do modo somente cards"
 
-/** Altura da barra de título das seis janelas. */
-private val TITLE_BAR_HEIGHT = 34.dp
+/**
+ * Altura da barra de título das seis janelas.
+ *
+ * Sai de [AppChrome], onde os cinco patamares do cromo vivem: era um literal
+ * aqui e um `private val` em `AppStructure`, os dois com o mesmo 34 e nenhum
+ * sabendo do outro.
+ */
+private val TITLE_BAR_HEIGHT = AppChrome.titleBar
 
 private fun WindowScope.applyWindowShape(density: androidx.compose.ui.unit.Density, cornerRadius: Dp) {
     val arcDiameter = with(density) { cornerRadius.toPx() * 2 }
@@ -346,14 +354,17 @@ private fun WindowScope.DesktopTitleBar(
                 )
                 TitleBarButton(
                     label = "×",
-                    hoverColor = Color(0xFFC62828),
+                    hoverColor = MaterialTheme.colorScheme.error,
                     onClick = onCloseRequest
                 )
             }
         }
     }
 
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    // `AppDivider`, e não o `HorizontalDivider` do Material com meia opacidade:
+    // o sistema tem uma divisória só, de 1dp em `outlineVariant`, e a moldura da
+    // janela não é exceção.
+    AppDivider()
 }
 
 @Composable
@@ -415,18 +426,18 @@ private fun WindowScope.DesktopDialogTitleBar(
 
                 TitleBarButton(
                     label = "×",
-                    hoverColor = Color(0xFFC62828),
+                    hoverColor = MaterialTheme.colorScheme.error,
                     onClick = onCloseRequest
                 )
             }
         }
     }
 
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    AppDivider()
 }
 
 @Composable
-private fun TitleBarButton(
+internal fun TitleBarButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,

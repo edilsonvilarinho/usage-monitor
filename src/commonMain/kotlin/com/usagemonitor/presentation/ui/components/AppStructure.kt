@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
@@ -71,8 +72,8 @@ private val MARKER_WIDTH = 2.dp
 val AppMarkerGutter: Dp = MARKER_WIDTH + AppSpacing.md
 
 /** Altura da barra de controles e da barra de estado. */
-private val TOOLBAR_HEIGHT = 34.dp
-private val STATUS_BAR_HEIGHT = 30.dp
+private val TOOLBAR_HEIGHT = AppChrome.toolbar
+private val STATUS_BAR_HEIGHT = AppChrome.statusBar
 
 /** Altura mínima de uma linha de dados: alvo de clique sem inchar a lista. */
 private val ROW_MIN_HEIGHT = 32.dp
