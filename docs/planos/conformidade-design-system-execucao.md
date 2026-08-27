@@ -11,20 +11,20 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00, A01 e A02 concluídas`
+**Estado atual:** `Em andamento — A00 a A03 concluídas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
 ### ▶ Atividade corrente
 
-**A03 — Presença do time.** `TeamPresenceScreen.kt`: o bloco aninhado de `:814` migra para
-`Modifier.appNestedGroupItem`, criada na A02, e os dois usos de `DepthSurface` vão para
-`AppDataSurface`.
+**A04 — Presença e chaves das contas.** As duas telas dependem da mesma extensão de primitiva:
+`AppSectionHeader` precisa de um recuo para caber nas sub-faixas de conta (`TeamPresenceScreen:814`
+e `TeamUsageScreen:997`, este último deixado em aberto na A02). Junto vai a raiz
+`Surface(background)` de `TeamKeysAdminScreen` para `AppWindowScaffold`.
 
 ### ⏭ Próxima atividade
 
-**A04 — Chaves das contas.** `TeamKeysAdminScreen.kt`: `DepthSurface` no `TeamKeyCard` e a raiz
-`Surface(background)` para `AppWindowScaffold`.
+**A05 — Sessões CLI.** `CostDistributionBar`, `LiveBadge` e `GlossaryPanel`.
 
 ---
 
@@ -87,9 +87,9 @@ Feito em 2026-08-27 sobre `src/commonMain/.../presentation/ui/` e `src/desktopMa
 |---|---|---|---|
 | A00 — Regra de precedência no `CLAUDE.md` + skill | — | ✅ | `6ed23fd` |
 | A01 — Plano e issue de rastreio | — | ✅ | `df73cd2` |
-| A02 — Uso do time | 6 | ✅ | *(hash registrado na A03)* |
-| A03 — Presença do time | 7 | ⬜ | |
-| A04 — Chaves das contas | 8 | ⬜ | |
+| A02 — Uso do time | 6 | ✅ | `176bcb8` |
+| A03 — Primitiva duplicada `DepthSurface` | 5, 7, 8 | ✅ | *(hash registrado na A04)* |
+| A04 — Presença e chaves das contas | 7, 8 | ⬜ | |
 | A05 — Sessões CLI | 5 | ⬜ | |
 | A06 — Card de uso | 2 | ⬜ | |
 | A07 — Faixa de atualização | 3 | ⬜ | |
@@ -141,20 +141,45 @@ Verificado: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.TeamUsageScree
 `TeamHealthCell` é `internal` e a tela de presença a consome: o parâmetro removido obriga as duas a
 mudarem no mesmo commit, ou o commit não compila sozinho.
 
-### A03 — Presença do time · `TeamPresenceScreen.kt`
+### A03 — Primitiva duplicada `DepthSurface` — ✅
 
-- `:814` `TeamPresenceAccountSubgroupHeader` → `Modifier.appNestedGroupItem`, criada na A02.
-- `DepthSurface` (2 usos) → `AppDataSurface`.
-- `:683` `TeamPresenceEmailHeader` é a faixa de conta da tela de presença, irmã de
-  `TeamAccountGroupHeader`: pelo mesmo motivo da O1, conferir se ela carrega colunas alinhadas antes
-  de tentar `AppSectionHeader`.
-- Verificar: `--tests "com.usagemonitor.ui.TeamPresenceScreenTest"` (31).
+`DepthSurface` era a mesma superfície de `AppDataSurface` — mesmo `clip`, mesmo fundo `surface`,
+mesma borda de 1dp, mesmo `padding` — com duas diferenças: um `Surface` a mais em volta, só para
+carregar `shadowElevation`, e nenhum `verticalArrangement`. **Os quatro chamadores estavam em
+elevação zero**, três pelo default e um passando `AppElevation.card` explicitamente, então o
+`Surface` externo não desenhava nada em lugar nenhum.
 
-### A04 — Chaves das contas · `TeamKeysAdminScreen.kt`
+- `AppDataSurface` ganhou `verticalArrangement`, com default `spacedBy(AppSpacing.sm)` — o
+  comportamento de quem já a usava não muda. Um parâmetro resolve o que uma segunda função resolvia.
+- Os quatro call sites passaram a `AppDataSurface(..., verticalArrangement = Arrangement.Top)`, que
+  preserva exatamente o espaçamento de hoje: `TeamPresenceHeader`, `TeamKeyCard`,
+  `AdvancedDisclosure` e `SessionMetadataCard` separam os filhos com `Spacer` próprio, e o `spacedBy`
+  default somaria 8dp a cada um.
+- `DepthSurface.kt` removido. Nenhuma referência restou.
 
-- `DepthSurface` em `TeamKeyCard` `:291` → `AppDataSurfaceFlush` + `AppSectionHeader`.
-- `Surface(background)` raiz `:83` → `AppWindowScaffold`.
-- Verificar: `--tests "com.usagemonitor.ui.TeamAdminUiTest"` (11).
+Esta atividade **não** existia com esta forma no plano original: ela era um item dentro da A03 e da
+A04. Ver a ocorrência O2.
+
+Verificado: `gradlew.bat desktopTest --tests TeamPresenceScreenTest --tests CliSessionsScreenTest
+--tests AppStructureTest --tests TeamKeysAdminScreenTest --tests TeamAdminSectionTest` →
+**92 testes, 0 falhas**.
+
+### A04 — Presença e chaves das contas
+
+As duas telas ficaram na mesma atividade porque dependem da **mesma** extensão de primitiva.
+
+- **`AppSectionHeader` precisa de recuo.** A anatomia dele — título, subtítulo e ação à direita — é
+  exatamente a de `TeamPresenceAccountSubgroupHeader` (`:814`) e a de `TeamUsageScreen:997`, mas o
+  padding horizontal dele é interno e fixo em `AppSpacing.md`, e as duas sub-faixas precisam de
+  `PRESENCE_ROW_CONTENT_PADDING + recuo` (14dp + nível). Sem o parâmetro, adotar a primitiva
+  desalinharia a faixa das linhas abaixo dela em 2dp. **Este é o item que fechou como pendente na
+  A02** (`TeamAccountUuidHeader`).
+- `Surface(background)` raiz de `TeamKeysAdminScreen` `:83` → `AppWindowScaffold`.
+- `:683` `TeamPresenceEmailHeader` é irmã de `TeamAccountGroupHeader`: carrega colunas alinhadas ao
+  `AppDataRow` do integrante e cai na mesma conclusão da O1 — conferir e registrar, não converter.
+- Verificar: `--tests "com.usagemonitor.ui.TeamPresenceScreenTest"` (31),
+  `--tests "com.usagemonitor.ui.TeamKeysAdminScreenTest"` (5),
+  `--tests "com.usagemonitor.ui.TeamUsageScreenTest"` (52).
 
 ### A05 — Sessões CLI · `CliSessionsScreen.kt`
 
@@ -254,7 +279,8 @@ nunca a intenção.
 |---|---|---|---|---|
 | 1 | `6ed23fd` | A00 | Tabela de precedência, regra de não reimplementar primitiva e regra de acento no `CLAUDE.md`; skill do design system registrada em `.claude/skills/usage-monitor-design/` | Diff inspecionado — mudança só de documentação, sem código |
 | 2 | `df73cd2` | A01 | Este plano, com o levantamento das 13 superfícies e a medição de adoção por primitiva; issue de rastreio [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) criada com o mesmo ponto de situação | `gh issue create` devolveu `issues/117`; contagens conferidas por `grep` sobre `presentation/ui/` |
-| 3 | *(a preencher na A03)* | A02 | `Modifier.appNestedGroupItem` criada e adotada nos dois blocos aninhados; `TeamHealthCell` passou a ser `AppStatusIndicator` e perdeu o parâmetro `showLabel`, cujo ramo `true` era morto; o chamador da tela de presença acompanhou | `gradlew.bat desktopTest --tests TeamUsageScreenTest --tests TeamPresenceScreenTest` → 52 + 31 = **83 testes, 0 falhas** |
+| 3 | `176bcb8` | A02 | `Modifier.appNestedGroupItem` criada e adotada nos dois blocos aninhados; `TeamHealthCell` passou a ser `AppStatusIndicator` e perdeu o parâmetro `showLabel`, cujo ramo `true` era morto; o chamador da tela de presença acompanhou | `gradlew.bat desktopTest --tests TeamUsageScreenTest --tests TeamPresenceScreenTest` → 52 + 31 = **83 testes, 0 falhas** |
+| 4 | *(a preencher na A04)* | A03 | `AppDataSurface` ganhou `verticalArrangement`; os quatro call sites de `DepthSurface` migraram com `Arrangement.Top`; `DepthSurface.kt` removido | `gradlew.bat desktopTest` sobre `TeamPresenceScreenTest`, `CliSessionsScreenTest`, `AppStructureTest`, `TeamKeysAdminScreenTest` e `TeamAdminSectionTest` → 31 + 45 + 5 + 5 + 6 = **92 testes, 0 falhas** |
 
 ---
 
@@ -277,14 +303,26 @@ mostrou que duas das três atribuições não se sustentam:
   carregam sete colunas alinhadas ao `AppDataRow` do integrante e um recuo por nível. **Não
   convertidas**, com o motivo registrado no detalhe da A02.
 
-Consequência para o resto do plano: **cada atividade lê os call sites antes de aceitar a primitiva
-que este documento nomeia.** A contagem por `grep` mede o tamanho do débito, não a solução dele. As
+**O2 · 2026-08-27 · A03 — a fatia por tela não cabe numa primitiva que atravessa telas.**
+
+`DepthSurface` aparecia como um item dentro da A03 (Presença) e outro dentro da A04 (Chaves), e o
+levantamento não tinha visto os dois usos em `CliSessionsScreen`. Migrar a primitiva em três
+commits deixaria a duplicata viva no meio do caminho e espalharia uma decisão só por três registros.
+Ela virou **atividade própria**: a extensão de `AppDataSurface`, os quatro call sites e a remoção do
+arquivo no mesmo commit. A A03 e a A04 foram redefinidas em volta disso, e a A04 passou a juntar
+Presença e Chaves — as duas dependem da mesma extensão de `AppSectionHeader`.
+
+**Consequência para o resto do plano:** cada atividade lê os call sites antes de aceitar a primitiva
+que este documento nomeia, e **débito que atravessa telas vira atividade própria** em vez de item
+repetido em cada uma. A contagem por `grep` mede o tamanho do débito, não a solução dele. As
 atividades A03 a A11 seguem com a primitiva sugerida, agora explicitamente como hipótese.
 
 | Data | Atividade | O que aconteceu | Como foi resolvido |
 |---|---|---|---|
 | 2026-08-27 | A02 | O plano nomeava `AppDataSurfaceFlush` e `AppSectionHeader` para call sites que não as comportam (O1 acima) | Primitiva nova (`appNestedGroupItem`) para um caso; os outros dois registrados como não convertíveis, com o motivo |
 | 2026-08-27 | A02 | `TeamHealthCell` tinha um ramo `showLabel = true` que nenhum dos três chamadores usava | Ramo removido junto com o parâmetro, na migração para `AppStatusIndicator` |
+| 2026-08-27 | A03 | `DepthSurface` atravessava três telas e não cabia dentro de nenhuma atividade de tela (O2) | Virou atividade própria, com a extensão de `AppDataSurface` e os quatro call sites no mesmo commit |
+| 2026-08-27 | A03 | O plano mandava rodar `--tests "com.usagemonitor.ui.TeamAdminUiTest"`, e **nenhum teste roda com esse filtro** | `TeamAdminUiTest.kt` é um arquivo com duas classes, `TeamAdminSectionTest` (6) e `TeamKeysAdminScreenTest` (5). O filtro do Gradle casa nome de classe, não de arquivo, e não falha quando outro filtro da mesma chamada casa. Os nomes certos estão na seção *Verificação* |
 
 ---
 
@@ -330,6 +368,16 @@ poderem virar issue própria depois. **Não corrigir dentro desta iniciativa.**
 ---
 
 ## Verificação
+
+**Nome de classe, não de arquivo.** O filtro `--tests` do Gradle casa a classe, e três arquivos de
+teste deste repositório declaram mais de uma:
+
+| Arquivo | Classes | @Test |
+|---|---|---|
+| `TeamAdminUiTest.kt` | `TeamAdminSectionTest` · `TeamKeysAdminScreenTest` | 6 · 5 |
+
+Um filtro que não casa nada **não derruba a chamada** quando outro filtro da mesma linha casa: a
+suíte passa em verde sem ter executado o que se queria executar.
 
 | Quando | Comando |
 |---|---|

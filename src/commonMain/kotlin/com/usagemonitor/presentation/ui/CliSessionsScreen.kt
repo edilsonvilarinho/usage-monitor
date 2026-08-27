@@ -57,6 +57,7 @@ import com.usagemonitor.presentation.ui.components.AppCellValue
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppMetricBlock
@@ -72,7 +73,6 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.BinMode
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
-import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.HoverTooltipBox
 import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.components.TurnSeries
@@ -1230,9 +1230,10 @@ internal fun AdvancedDisclosure(
     content: @Composable () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        DepthSurface(
+        AppDataSurface(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
-            contentPadding = 14.dp
+            contentPadding = 14.dp,
+            verticalArrangement = Arrangement.Top
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1297,9 +1298,10 @@ internal fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLa
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SessionMetadataCard(summary: CliSessionSummary, language: AppLanguage) {
-    DepthSurface(
+    AppDataSurface(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = 14.dp
+        contentPadding = 14.dp,
+        verticalArrangement = Arrangement.Top
     ) {
         FlowRow(
             modifier = Modifier.fillMaxWidth(),

@@ -59,12 +59,11 @@ import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppToggleChip
+import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
-import com.usagemonitor.presentation.ui.components.DepthSurface
 import com.usagemonitor.presentation.ui.components.ModalDialogText
 import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceEmailGroup
@@ -510,9 +509,13 @@ private fun TeamPresenceHeader(
 ) {
     // Superfície de dados como as outras: `AppElevation.dialog` num painel dentro
     // da janela punha 8dp de sombra sob um bloco que não flutua sobre nada.
-    DepthSurface(
+    //
+    // `Arrangement.Top` porque este bloco separa os filhos com o `Spacer` que ele
+    // já traz; o `spacedBy` default somaria 8dp a cada um deles.
+    AppDataSurface(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = AppSpacing.md
+        contentPadding = AppSpacing.md,
+        verticalArrangement = Arrangement.Top
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

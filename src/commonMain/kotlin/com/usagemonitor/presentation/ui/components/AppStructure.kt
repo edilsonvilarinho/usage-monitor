@@ -166,6 +166,16 @@ fun AppDataSurface(
     modifier: Modifier = Modifier,
     shape: Shape = AppShapes.medium,
     contentPadding: Dp = AppSpacing.md,
+    /**
+     * O vão entre os filhos diretos.
+     *
+     * Existe porque o painel que espaça os filhos e o que os deixa encostados
+     * eram duas primitivas — `DepthSurface` era esta mesma superfície sem o
+     * `spacedBy`, e com um `Surface` a mais em volta para uma sombra que todo
+     * chamador dela pedia em zero. Um parâmetro resolve o que uma segunda
+     * função resolvia, e o default mantém o comportamento de quem já usava esta.
+     */
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(AppSpacing.sm),
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
@@ -175,7 +185,7 @@ fun AppDataSurface(
             .background(MaterialTheme.colorScheme.surface)
             .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
             .padding(contentPadding),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        verticalArrangement = verticalArrangement,
         content = content
     )
 }

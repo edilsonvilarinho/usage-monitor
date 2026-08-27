@@ -28,10 +28,9 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.AppButtonTone
-import com.usagemonitor.presentation.ui.components.DepthSurface
-import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamKeysUiState
@@ -288,11 +287,11 @@ private fun TeamKeyCard(
     var revealed by remember(entry.id) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
-    DepthSurface(
+    AppDataSurface(
         modifier = Modifier.fillMaxWidth().testTag("$TEAM_KEYS_ROW_TAG_PREFIX${entry.id}"),
         shape = AppShapes.large,
-        elevation = AppElevation.card,
-        contentPadding = 12.dp
+        contentPadding = 12.dp,
+        verticalArrangement = Arrangement.Top
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
