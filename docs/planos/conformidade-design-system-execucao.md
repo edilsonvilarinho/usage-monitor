@@ -11,7 +11,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Concluída. As treze atividades estão na main, publicadas. Falta a aceitação visual do usuário`
+**Estado atual:** `Concluída e fechada. As treze atividades estão na main, publicadas`
 **Última atualização:** 2026-08-27
 **Branch:** `main`
 
@@ -31,8 +31,9 @@
    escura, é o único que produz um defeito observável hoje: no tema claro eles dão 2,64:1 contra a
    superfície.
 
-A issue [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) **fica aberta** até a
-aceitação visual. Fechá-la agora afirmaria que a passada foi vista funcionando, e ela não foi.
+A issue [#117](https://github.com/edilsonvilarinho/usage-monitor/issues/117) foi **fechada por
+decisão do usuário em 2026-08-27**, com o item 1 acima ainda pendente. O registro fica: a passada não
+foi olhada na janela real, e o fechamento não afirma que foi.
 
 ---
 
@@ -500,7 +501,8 @@ contagem por `grep` mede o tamanho da suspeita, não o do débito, e anatomia pa
 primitiva. Cada atividade passou a ler os call sites antes de aceitar a primitiva que o plano
 nomeava, e foi assim que três primitivas nasceram no lugar de três conversões erradas.
 
-**O que falta é a verificação que só a máquina do usuário faz.** Ver *Fora de escopo*, item 0.
+**O que falta é a verificação que só a máquina do usuário faz.** Ver *Fora de escopo*, item 0. A
+issue foi fechada em 2026-08-27 por decisão do usuário, com essa verificação ainda pendente.
 
 ---
 
@@ -525,7 +527,8 @@ nunca a intenção.
 | 12 | `632cde9` | A10 | `CenteredMessage` removida; os 22 pontos de cinco telas passaram a `AppLoadingState` (7), `AppErrorState` (6) e `AppEmptyState` (9) | `gradlew.bat allTests` → **1468 testes, 0 falhas** em 135 classes |
 | 13 | `b912e9e` | A11 | `AppChrome` com os cinco patamares do cromo; as duas divisórias do Material viraram `AppDivider`; o literal `Color(0xFFC62828)` do botão de fechar virou `colorScheme.error`; `DesktopWindowFrameTest` criado | `gradlew.bat allTests` → **1472 testes, 0 falhas** |
 | 14 | `305bf48` | A12 | 13 capturas regeneradas, 9 mudaram; protótipo e design system registram a passada; levantamento reaberto com o número real | `gradlew.bat generateScreenshots` → 13 cenas; `dashboard.png` e `presence-accounts.png` conferidos a olho |
-| 15 | *(este commit)* | A13 | Ponto de situação final; a issue #117 fica aberta até a aceitação visual | `gradlew.bat allTests` na A11 → **1472 testes, 0 falhas**. A A12 e a A13 não tocam em código |
+| 15 | `9382bd2` | A13 | Ponto de situação final | `gradlew.bat allTests` na A11 → **1472 testes, 0 falhas**. A A12 e a A13 não tocam em código |
+| 16 | *(este commit)* | A13 | Issue #117 fechada por decisão do usuário, com a verificação em janela real ainda pendente | `gradlew.bat allTests` → **BUILD SUCCESSFUL**, sem mudança de código desde a A11 |
 
 ---
 
