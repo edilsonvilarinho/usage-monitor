@@ -197,8 +197,13 @@ jobs:
           TAR_PATH="dist-build/$TARBALL"
 
           tar -tvzf "$TAR_PATH" > listing.txt
+          # As colunas de `tar -tv` sao separadas por espaco e o nome da raiz tem
+          # um: `$NF` recortava `Usage Monitor/bin/...` em `Monitor/bin/...` e a
+          # checagem de raiz unica nunca poderia passar. Os nomes crus vem do
+          # `-t` sem `-v`, que nao tem coluna nenhuma antes deles.
+          tar -tzf "$TAR_PATH" > names.txt
 
-          roots="$(awk '{ print $NF }' listing.txt | cut -d/ -f1 | sort -u)"
+          roots="$(cut -d/ -f1 names.txt | sort -u)"
           if [ "$roots" != "Usage Monitor" ]; then
             echo "Expected a single 'Usage Monitor' root, found:" >&2
             echo "$roots" >&2
@@ -220,7 +225,7 @@ jobs:
           fi
 
           echo "Tarball: $(wc -l < listing.txt) entries, single root, no links, launcher 0755."
-          rm -f listing.txt
+          rm -f listing.txt names.txt
 
       # O SHA-256 daqui serve SO ao instalador inicial: ele nao fala com a API do
       # GitHub. Quem se atualiza sozinho usa o campo `digest` da release, que
