@@ -130,7 +130,7 @@ guarda o **assunto** do commit, não o hash: um commit não pode conter o própr
 | # | Data | Commit | Micro-atividade | Estado | Evidência |
 |---|---|---|---|---|---|
 | A01 | 2026-08-29 | `docs(plan): open the execution plan for the linux autostart and always on top issue` | Este plano | concluída | Worktree criada com `git worktree add ../usage-monitor-120 -b fix/linux-autostart-and-always-on-top main`: `Preparing worktree (new branch 'fix/linux-autostart-and-always-on-top')` / `HEAD is now at bc7c848`. O defeito do `Path=` foi lido no código (`AutoStartManager.kt:290`, `quoteDesktopValue` aplicado às duas chaves) e a ausência de asserção sobre ele confirmada em `AutoStartManagerTest.kt:124-128`, que só afirma o `Exec=` |
-| A02 | — | — | Comentário vivo na issue | pendente | — |
+| A02 | 2026-08-29 | `docs(plan): publish the live status comment on issue 120` | Comentário vivo na issue | concluída | `gh issue comment 120 --body-file status-120.md` devolveu `https://github.com/edilsonvilarinho/usage-monitor/issues/120#issuecomment-5462954374`. O comentário abre com `🤖 Escrito por Claude Code, a pedido de @edilsonvilarinho` e carrega a mesma tabela desta seção; as atualizações seguintes usam `--edit-last` sobre ele |
 | A03 | — | — | Teste vermelho do `Path=` | pendente | — |
 | A04 | — | — | Correção do `Path=` | pendente | — |
 | A05 | — | — | `linuxGraphicsEnvironment()` | pendente | — |
