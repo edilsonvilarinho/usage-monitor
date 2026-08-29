@@ -125,6 +125,64 @@ internal data class StartupDiagnosticsEntry(
 )
 
 /**
+ * Contexto da maquina no instante do arranque, resolvido uma vez e reusado
+ * pelos tres pontos que gravam.
+ *
+ * Objeto proprio em vez de sete parametros em [StartupDiagnostics.record]: os
+ * sete sao a mesma medida e viajam juntos, e a resolucao deles toca disco
+ * (le a entrada de autostart) -- fazer isso a cada chamada repetiria I/O que a
+ * resposta nao muda.
+ */
+internal data class StartupMachineContext(
+    val osName: String? = null,
+    val osVersion: String? = null,
+    val sessionType: String? = null,
+    val desktop: String? = null,
+    val alwaysOnTopSupported: Boolean? = null,
+    val autostartEntryPresent: Boolean? = null,
+    val autostartEntryValid: Boolean? = null
+) {
+    internal companion object {
+        /**
+         * Nada medido. E o default de [StartupDiagnostics.record] para a suite
+         * nao tocar disco nem AWT ao exercitar o formato do arquivo -- quem mede
+         * de verdade e o `main()`, que passa [current] explicitamente.
+         */
+        val EMPTY = StartupMachineContext()
+
+        fun current(): StartupMachineContext {
+            val isLinux = AutoStartManager.currentPlatform() == AutoStartManager.Platform.LINUX
+
+            // So o Linux mede ambiente grafico e entrada de autostart. Nas outras
+            // plataformas o campo fica `null` = "nao medido"; `false` ali
+            // afirmaria uma medida que ninguem fez.
+            val graphics = if (isLinux) linuxGraphicsEnvironment() else null
+            val autostartEntry = if (isLinux) {
+                runCatching { AutoStartManager.inspectLinuxAutostartEntry() }.getOrNull()
+            } else {
+                null
+            }
+
+            return StartupMachineContext(
+                osName = System.getProperty("os.name"),
+                osVersion = System.getProperty("os.version"),
+                sessionType = graphics?.sessionType,
+                desktop = graphics?.desktop,
+                // A pergunta e do toolkit e nao da janela: ela responde se o
+                // ambiente **aceita** o pedido, e separa "o app nao pediu" de "o
+                // sistema nao suporta". A janela em si so pode ser lida depois de
+                // mapeada, e isso e o segundo registro.
+                alwaysOnTopSupported = runCatching {
+                    java.awt.Toolkit.getDefaultToolkit().isAlwaysOnTopSupported
+                }.getOrNull(),
+                autostartEntryPresent = autostartEntry?.present,
+                autostartEntryValid = autostartEntry?.valid
+            )
+        }
+    }
+}
+
+/**
  * Uma linha por arranque em `~/.usage-monitor/diagnostics/startup.jsonl`.
  *
  * **Sempre ligado**, ao contrario do recorder de creditos da Anthropic e do
@@ -149,7 +207,8 @@ internal class StartupDiagnostics(
         version: String = CURRENT_APP_VERSION,
         pid: Long = ProcessHandle.current().pid(),
         processStartedAtMillis: Long? = currentProcessStartMillis(),
-        nowMillis: Long = Clock.System.now().toEpochMilliseconds()
+        nowMillis: Long = Clock.System.now().toEpochMilliseconds(),
+        machineContext: StartupMachineContext = StartupMachineContext.EMPTY
     ) {
         val entry = StartupDiagnosticsEntry(
             ts = isoOf(nowMillis),
@@ -158,7 +217,14 @@ internal class StartupDiagnostics(
             origin = origin.wireValue,
             outcome = outcome.wireValue,
             processStartedAt = processStartedAtMillis?.let(::isoOf),
-            startupLatencyMillis = processStartedAtMillis?.let { nowMillis - it }
+            startupLatencyMillis = processStartedAtMillis?.let { nowMillis - it },
+            osName = machineContext.osName,
+            osVersion = machineContext.osVersion,
+            sessionType = machineContext.sessionType,
+            desktop = machineContext.desktop,
+            alwaysOnTopSupported = machineContext.alwaysOnTopSupported,
+            autostartEntryPresent = machineContext.autostartEntryPresent,
+            autostartEntryValid = machineContext.autostartEntryValid
         )
 
         // Falha aqui nao pode derrubar o arranque: o registro existe para explicar

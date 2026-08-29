@@ -140,7 +140,12 @@ object AutoStartManager {
         return !argument.containsMatchIn(command)
     }
 
-    private fun currentPlatform(): Platform {
+    /**
+     * Interna e nao privada porque o registro de arranque decide por ela o que
+     * medir: ambiente grafico e entrada de autostart so existem no Linux. Uma
+     * segunda leitura de `os.name` seria um segundo dono da mesma decisao.
+     */
+    internal fun currentPlatform(): Platform {
         val osName = System.getProperty("os.name").lowercase()
         return when {
             osName.contains("win") -> Platform.WINDOWS

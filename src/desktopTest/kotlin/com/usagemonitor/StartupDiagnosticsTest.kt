@@ -139,6 +139,65 @@ class StartupDiagnosticsTest {
         assertTrue(line.contains("\"autostartEntryValid\":false"), line)
     }
 
+    /**
+     * O contexto viaja como objeto e nao como sete parametros: os sete sao a
+     * mesma medida, e resolve-los toca disco -- fazer isso a cada uma das tres
+     * gravacoes repetiria I/O cuja resposta nao muda dentro do processo.
+     */
+    @Test
+    fun `the recorded line carries the machine context it was given`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.STARTED,
+                version = "38.0.2",
+                pid = 4242,
+                processStartedAtMillis = null,
+                nowMillis = 1L,
+                machineContext = StartupMachineContext(
+                    osName = "Linux",
+                    osVersion = "6.16.3-200.bazzite.fc42.x86_64",
+                    sessionType = "wayland",
+                    desktop = "KDE",
+                    alwaysOnTopSupported = true,
+                    autostartEntryPresent = true,
+                    autostartEntryValid = false
+                )
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"osName\":\"Linux\""), entry)
+            assertTrue(entry.contains("\"sessionType\":\"wayland\""), entry)
+            assertTrue(entry.contains("\"desktop\":\"KDE\""), entry)
+            assertTrue(entry.contains("\"alwaysOnTopSupported\":true"), entry)
+            assertTrue(entry.contains("\"autostartEntryValid\":false"), entry)
+        }
+    }
+
+    /**
+     * O default e `EMPTY`, e nao `current()`: a suite exercita o formato do
+     * arquivo, e nao pode tocar disco nem AWT para isso. Quem mede de verdade e o
+     * `main()`, que passa o contexto explicitamente.
+     */
+    @Test
+    fun `without a machine context nothing is asserted about the machine`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.MANUAL,
+                outcome = StartupOutcome.STARTED,
+                version = "38.0.2",
+                pid = 1,
+                processStartedAtMillis = null,
+                nowMillis = 1L
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"sessionType\":null"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopSupported\":null"), entry)
+            assertTrue(entry.contains("\"autostartEntryPresent\":null"), entry)
+        }
+    }
+
     // --- Ambiente grafico do Linux -------------------------------------------
 
     /**
