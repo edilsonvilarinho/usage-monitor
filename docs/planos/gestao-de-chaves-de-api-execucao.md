@@ -50,11 +50,15 @@ reinício.
 A remoção reusa `SettingsField.API_KEY`: é a mesma coisa sendo gravada, e um valor novo obrigaria
 ramo em cada `when` de mensagem sem dizer nada que o usuário não veja na tela.
 
-### `clear` grava string vazia, não remove o campo do JSON
+### `clear` apaga uma chave, nunca o arquivo
 
-`ApiKeySettingsDto` tem default `""` em todos os campos, então o arquivo continua legível por
-versões anteriores do app — que leem "sem chave", exatamente o que aconteceu. Apagar a chave e
-apagar o arquivo inteiro não são a mesma coisa: as outras duas chaves continuam lá.
+`clear` grava string vazia no modelo e reescreve o arquivo inteiro. Medido ao escrever o teste: o
+`Json` da classe está com `encodeDefaults` desligado, então na prática **o campo sai do JSON** em vez
+de ficar `""` — que é exatamente o estado que uma fonte nunca configurada já tem hoje no mesmo
+arquivo. `ApiKeySettingsDto` tem default `""` em todos os campos, então versão anterior do app lê
+"sem chave" em vez de falhar no parse.
+
+Apagar a chave e apagar o arquivo não são a mesma coisa: as outras duas chaves continuam lá.
 
 ### O `toggleable` sai da linha e fica só no interruptor
 
@@ -85,7 +89,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C01 | Este plano, com a tabela de pontos de situação | ✅ Concluída | — (documento) |
 | C02 | Comentário vivo criado na issue #125 | ✅ Concluída | `gh issue comment 125` → comentário `5462955570` publicado |
 | C03 | `ApiKeySettings.withoutKey(source)` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 6 testes, 0 falhas |
-| C04 | `LocalApiKeyDataSource.clear(source)` | ⏳ Pendente | — |
+| C04 | `LocalApiKeyDataSource.clear(source)` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 8 testes, 0 falhas |
 | C05 | `toggleable` movido da linha para o `AppSwitch` + `apiSelectorSwitchTestTag` | ⏳ Pendente | — |
 | C06 | `onEditApiKey` + `AppIconButton` de lápis em `ApiCheckboxRow` | ⏳ Pendente | — |
 | C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ⏳ Pendente | — |

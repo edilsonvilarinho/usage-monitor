@@ -9,7 +9,9 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LocalApiKeyDataSourceTest {
     private val tempDir = createTempDirectory("api-key-settings-test").toFile()
@@ -90,6 +92,39 @@ class LocalApiKeyDataSourceTest {
         val settings = ApiKeySettings(minimax = "minimax-secret")
 
         assertEquals(settings, settings.withoutKey(ApiSource.ANTHROPIC))
+    }
+
+    /**
+     * Issue #125: até esta passada não existia caminho nenhum para apagar uma
+     * chave — `save` recusa branco e não havia `clear`.
+     */
+    @Test
+    fun `clear removes a single key and keeps the file readable`() {
+        val dataSource = LocalApiKeyDataSource(settingsFile)
+        dataSource.save(ApiSource.MINIMAX, "minimax-secret")
+        dataSource.save(ApiSource.DEEPSEEK, "deepseek-secret")
+
+        dataSource.clear(ApiSource.MINIMAX)
+
+        val loaded = LocalApiKeyDataSource(settingsFile).load()
+        assertNull(loaded.forSource(ApiSource.MINIMAX))
+        assertEquals("deepseek-secret", loaded.forSource(ApiSource.DEEPSEEK))
+        assertEquals(setOf(ApiSource.DEEPSEEK), loaded.configuredSources())
+        // `encodeDefaults` está desligado, então o campo apagado sai do JSON —
+        // o mesmo estado de uma fonte que nunca foi configurada. O arquivo
+        // continua legível por versão anterior do app, que cai no default `""`.
+        val written = settingsFile.readText()
+        assertFalse(written.contains("minimax"))
+        assertTrue(written.contains("deepseek-secret"))
+    }
+
+    @Test
+    fun `clear refuses a source that has no local api key`() {
+        val dataSource = LocalApiKeyDataSource(settingsFile)
+
+        assertFailsWith<IllegalArgumentException> {
+            dataSource.clear(ApiSource.OPENCODE)
+        }
     }
 
     @Test
