@@ -1,6 +1,10 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.breadcrumbReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliQuotaWindows
@@ -65,7 +69,9 @@ class CliSessionsViewModel(
     autoLoad: Boolean = true,
     private val backgroundIndexIntervalMillis: Long? = null,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    /** Trilha do relatório de bug; ver [BreadcrumbRecorder]. */
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -300,7 +306,17 @@ class CliSessionsViewModel(
         val useCase = getMonthlyBudgetStatus ?: return
         budgetJob?.cancel()
         budgetJob = viewModelScope.launch {
-            val status = useCase(profileId = profileId, limitMicros = budgetLimitMicros).getOrNull()
+            val result = useCase(profileId = profileId, limitMicros = budgetLimitMicros)
+            // O cartão some sem nada dizer quando esta leitura falha, e o usuário
+            // reporta "o orçamento não aparece". Carga por abertura de janela, não
+            // por tique: não há risco de encher a trilha.
+            result.exceptionOrNull()?.let { error ->
+                breadcrumbs.record(
+                    BreadcrumbCategory.ERROR,
+                    "orçamento mensal não pôde ser lido: ${breadcrumbReasonOf(error)}"
+                )
+            }
+            val status = result.getOrNull()
             val latest = _uiState.value as? CliSessionsUiState.Success ?: return@launch
             // Falha mantém o cartão anterior: o orçamento é referência, não alarme.
             if (status != null || budgetLimitMicros <= 0L) {

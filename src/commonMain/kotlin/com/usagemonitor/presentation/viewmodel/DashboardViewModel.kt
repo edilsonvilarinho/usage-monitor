@@ -12,6 +12,10 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.breadcrumbReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdatePreparation
 import com.usagemonitor.domain.repository.AppUpdateSupport
@@ -131,7 +135,16 @@ class DashboardViewModel(
         MutableStateFlow(listOf(AnthropicProfileRef.DEFAULT)),
     private val config: DashboardViewModelConfig = DashboardViewModelConfig(),
     private val persistedNextRefreshAt: Instant? = null,
-    private val onNextRefreshAtChanged: (Instant) -> Unit = {}
+    private val onNextRefreshAtChanged: (Instant) -> Unit = {},
+    /**
+     * Trilha de eventos do relatório de bug.
+     *
+     * Default nulo-de-comportamento pelo mesmo motivo do
+     * `UnsupportedAppUpdateReleaseOpener`: nenhum dos vinte testes que constroem
+     * este view model tem para onde gravar um passo, e um parâmetro anulável
+     * espalharia `?.` por cada ponto de chamada.
+     */
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private data class PendingFetchRequest(
         val targets: Set<UsageTargetKey>,
@@ -238,7 +251,17 @@ class DashboardViewModel(
     private fun loadCachedStateIfAvailable() {
         val cacheUseCase = getCachedDashboardStats ?: return
         viewModelScope.launch {
-            val cachedStats = cacheUseCase().getOrNull().orEmpty()
+            val cacheResult = cacheUseCase()
+            // Falha aqui era silenciosa e o sintoma é o app abrir vazio esperando
+            // a primeira coleta -- indistinguível de "a coleta está demorando".
+            // Uma vez por arranque, então não há risco de encher a trilha.
+            cacheResult.exceptionOrNull()?.let { error ->
+                breadcrumbs.record(
+                    BreadcrumbCategory.ERROR,
+                    "cache do dashboard não pôde ser lido: ${breadcrumbReasonOf(error)}"
+                )
+            }
+            val cachedStats = cacheResult.getOrNull().orEmpty()
             if (cachedStats.isEmpty()) {
                 return@launch
             }
@@ -564,6 +587,12 @@ class DashboardViewModel(
     }
 
     fun refresh() {
+        // Só a coleta **pedida pelo usuário** vira passo. O laço de 10 minutos
+        // não anota nada quando dá certo: a trilha tem 200 linhas de orçamento, e
+        // "coleta ok" repetida é exatamente o que expulsaria dela o passo que
+        // explica a falha. O que interessa aqui é a ação que o usuário vai
+        // descrever ("cliquei em atualizar e...").
+        breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de todas as fontes pedida")
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = enabledTargets())
@@ -576,6 +605,7 @@ class DashboardViewModel(
             return
         }
 
+        breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${source.name} pedida")
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(
@@ -589,6 +619,9 @@ class DashboardViewModel(
         if (target !in enabledTargets()) {
             return
         }
+        // O alvo carrega `profileId`, que é interno do app e não identifica
+        // ninguém; o apelido do perfil, que é o e-mail digitado, fica de fora.
+        breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${target.source.name} pedida")
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = setOf(target), preserveDataOnFailure = true)
@@ -646,6 +679,15 @@ class DashboardViewModel(
         }
         val rawMessage = error.message ?: error::class.simpleName ?: "erro desconhecido"
         val message = sanitizeUiErrorMessage(source, rawMessage)
+
+        // Funil único de toda falha de coleta, e por isso o único ponto de
+        // gravação: um passo por fonte que falhou, em qualquer caminho — poll
+        // silencioso, atualização pedida ou recarga de um banner.
+        //
+        // Vai a mensagem **saneada**, a mesma que a tela mostra, e nunca a crua:
+        // `sanitizeUiErrorMessage` já é o filtro que decide o que pode aparecer
+        // para o usuário, e o relatório é ainda mais público que a tela dele.
+        breadcrumbs.record(BreadcrumbCategory.API_CALL, "${source.name}: falhou — $message")
 
         if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
             _toastMessage.value = DashboardToast.RateLimit(source)

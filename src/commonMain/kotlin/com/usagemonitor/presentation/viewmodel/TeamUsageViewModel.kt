@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.breadcrumbReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliRangeWindow
@@ -84,7 +88,9 @@ class TeamUsageViewModel(
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
     private val clock: Clock = Clock.System,
-    private val computeAnalytics: ComputeCliSessionAnalyticsUseCase = ComputeCliSessionAnalyticsUseCase()
+    private val computeAnalytics: ComputeCliSessionAnalyticsUseCase = ComputeCliSessionAnalyticsUseCase(),
+    /** Trilha do relatório de bug; ver [BreadcrumbRecorder]. */
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -578,7 +584,19 @@ class TeamUsageViewModel(
         val useCase = getTeamUsageTrend ?: return
         trendJob?.cancel()
         trendJob = viewModelScope.launch {
-            val trend = useCase(accountKey).getOrNull() ?: return@launch
+            val result = useCase(accountKey)
+            // O gráfico some sem erro na tela -- de propósito, porque o consumo
+            // do time continua sendo a informação principal. Mas "a aba de
+            // tendência não mostra nada" é reportável, e sem esta linha não há
+            // como separar rota ausente de servidor fora do ar. Uma leitura por
+            // abertura de janela, fora do laço de 5s.
+            result.exceptionOrNull()?.let { error ->
+                breadcrumbs.record(
+                    BreadcrumbCategory.ERROR,
+                    "tendência do time não pôde ser lida: ${breadcrumbReasonOf(error)}"
+                )
+            }
+            val trend = result.getOrNull() ?: return@launch
             val current = _uiState.value as? TeamUsageUiState.Success ?: return@launch
             _uiState.value = current.copy(trend = trend)
         }

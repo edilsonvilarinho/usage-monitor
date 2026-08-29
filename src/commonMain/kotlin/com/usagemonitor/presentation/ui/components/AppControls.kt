@@ -245,6 +245,69 @@ fun AppTextField(
 }
 
 /**
+ * Campo de texto de várias linhas.
+ *
+ * Irmão do [AppTextField] e não um parâmetro dele: os dois têm alturas, alinhamento
+ * vertical e papéis diferentes — aquele é filtro, URL, apelido e chave, este é
+ * texto que a pessoa escreve. Um `singleLine` configurável faria a mesma
+ * primitiva responder a duas perguntas e deixaria a altura mínima sem dono.
+ *
+ * O [modifier] do chamador desce até o `BasicTextField` pelo mesmo motivo do
+ * campo de uma linha: é ele que carrega a `testTag` e o `RequestFocus` que o
+ * `performTextInput` exige.
+ */
+@Composable
+fun AppTextArea(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    enabled: Boolean = true
+) {
+    val alpha = if (enabled) 1f else DISABLED_ALPHA
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.defaultMinSize(minHeight = TEXT_AREA_HEIGHT),
+        enabled = enabled,
+        singleLine = false,
+        textStyle = MaterialTheme.typography.bodySmall.copy(
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+        ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .clip(AppShapes.small)
+                    .background(MaterialTheme.colorScheme.background)
+                    .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                    .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
+                // Topo, e não centro: texto que cresce para baixo tem de começar
+                // sempre no mesmo lugar, senão a primeira linha se move enquanto
+                // a pessoa digita.
+                contentAlignment = Alignment.TopStart
+            ) {
+                if (value.isEmpty() && placeholder != null) {
+                    // Fora da árvore semântica: o `BasicTextField` mescla os
+                    // descendentes, e sem isto um campo vazio passa a "conter" o
+                    // texto de exemplo.
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                        modifier = Modifier.clearAndSetSemantics { }
+                    )
+                }
+                innerTextField()
+            }
+        }
+    )
+}
+
+/** Altura mínima do campo de várias linhas: cerca de cinco linhas de `bodySmall`. */
+private val TEXT_AREA_HEIGHT = 96.dp
+
+/**
  * Interruptor de 30 × 17.
  *
  * A transição do botão é de 120ms e **termina**: `animateDpAsState` chega ao

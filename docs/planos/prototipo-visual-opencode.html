@@ -273,6 +273,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
   border: 1px solid var(--border); border-radius: var(--r2); padding: 7px 9px; width: 100%; }
 .field::placeholder { color: var(--muted); }
 .field:focus-visible { outline: 2px solid var(--info); outline-offset: -1px; }
+/* Campo de várias linhas: única prosa do app, por isso sans e ancorado no topo. */
+.field.area { font-family: var(--sans); min-height: 96px; resize: vertical; }
 
 /* Switch */
 .sw { width: 30px; height: 17px; border-radius: 9px; border: 1px solid var(--border);
@@ -288,6 +290,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
 .banner .bar { width: 2px; align-self: stretch; border-radius: 1px; background: var(--muted); }
 .banner.warn .bar { background: var(--warn); } .banner.crit .bar { background: var(--crit); }
 .banner.info .bar { background: var(--info); }
+/* O tom `ok` faltava: o retorno de "arquivo salvo" é o mesmo verde do indicador. */
+.banner.ok .bar { background: var(--ok); }
 .banner .bt { font-family: var(--mono); font-size: var(--t12); font-weight: 600; }
 .banner .bd { font-size: var(--t12); color: var(--muted); }
 
@@ -421,6 +425,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#cfg-apis">APIs</a>
   <a href="#cfg-contas">Contas</a>
   <a href="#cfg-time">Time</a>
+  <a href="#cfg-bug">Relatório de bug</a>
   <div class="grp">Saídas</div>
   <a href="#pdf">Relatório PDF</a>
   <a href="#chrome">Molduras e densidade</a>
@@ -1583,6 +1588,10 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
       </div></div>
 
+      <div class="panel"><div class="phead"><span class="ptitle">Diagnóstico</span><span class="sp"></span><button class="btn primary" type="button">Reportar um bug</button></div><div class="pbody flush">
+        <div class="row"><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">O app guarda uma trilha dos últimos passos e dos erros em <code>~/.usage-monitor/diagnostics</code>. Ao reportar, você revisa o pacote antes de publicá-lo: nada é enviado automaticamente.</span></div>
+      </div></div>
+
       <div class="panel"><div class="phead"><span class="ptitle">Atualização automática — indisponível, com o motivo por plataforma</span></div><div class="pbody flush">
         <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Disponível apenas na instalação feita pelo instalador .exe. Esta cópia veio do MSI ou de fora dele, e atualizá-la por aqui criaria uma segunda instalação.</span><span class="k">Windows · origem não gerenciada</span></div><span class="sw"></span></div>
         <div class="row" style="opacity:.55"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Disponível apenas na instalação em user-space feita pelo instalador .sh. Esta cópia veio de um pacote .deb/.rpm ou de fora dele, e atualizá-la por aqui mexeria em arquivos do gerenciador de pacotes.</span><span class="k">Linux · origem não gerenciada</span></div><span class="sw"></span></div>
@@ -1698,6 +1707,65 @@ direita só existe na que depende de chave.</p>
     </div></div></div>
   </div>
 </div>
+
+<h2 id="cfg-bug">12f · Relatório de bug</h2>
+<p class="lede">Aberto pelo botão <b>Reportar um bug</b> da aba Geral, e sozinho no arranque seguinte a uma queda. Ele mora sobre a <b>janela principal</b>, não sobre as Configurações: é a janela principal que a captura enquadra, e é a única que existe depois de uma queda. Por isso o clique nas Configurações fecha aquela janela.</p>
+
+<div class="g2">
+  <div>
+    <div class="cap">Descrição em branco — as duas ações desabilitadas, com o motivo</div>
+    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
+      <div class="phead"><span class="ptitle">Reportar um bug</span></div>
+      <div class="pbody">
+        <span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Salve o pacote de diagnóstico e abra a issue no GitHub. Nada é enviado automaticamente: você revisa e publica.</span>
+        <div class="stack"><span class="k">O que aconteceu</span><textarea class="field area" placeholder="Descreva o que você fez e o que aconteceu."></textarea></div>
+        <span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Escreva a descrição para habilitar as ações.</span>
+        <div class="row" style="padding-left:0;padding-right:0"><div class="stack" style="gap:0;flex:1"><span class="v sm">Incluir captura da janela</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">A imagem é só da janela do app e é salva ao lado do arquivo.</span></div><span class="sw on"></span></div>
+        <div class="hstack"><button class="btn ghost" type="button">Ver prévia</button><span class="sp"></span><button class="btn" type="button" disabled>Abrir issue no GitHub</button><button class="btn primary" type="button" disabled>Salvar arquivo</button></div>
+      </div>
+    </div></div></div>
+  </div>
+  <div>
+    <div class="cap">Arranque depois de uma queda — descrição sugerida, prévia aberta</div>
+    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
+      <div class="phead"><span class="ptitle">Reportar um bug</span></div>
+      <div class="pbody">
+        <div class="stack"><span class="k">O que aconteceu</span><textarea class="field area">O app fechou inesperadamente.
+
+Falha registrada: IllegalStateException na thread main.</textarea></div>
+        <div class="row" style="padding-left:0;padding-right:0"><div class="stack" style="gap:0;flex:1"><span class="v sm">Incluir captura da janela</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">A imagem é só da janela do app e é salva ao lado do arquivo.</span></div><span class="sw on"></span></div>
+        <div class="hstack"><button class="btn ghost" type="button">Ocultar prévia</button></div>
+        <div style="max-height:160px;overflow:auto;font-family:var(--mono);font-size:var(--t10);color:var(--muted);white-space:pre-wrap">## O que aconteceu
+
+O app fechou inesperadamente.
+
+## Ambiente
+
+- App: 38.0.2
+- OS: Windows 11 10.0.26200 (amd64)
+- JVM: 21.0.4
+- Idioma: PT
+- Escala da interface: 115%
+
+## Trilha de eventos (últimos 30 de 143)
+
+```
+2026-08-29T14:04:51Z  navigation  abriu as Configurações
+2026-08-29T14:05:02Z  api-call    CODEX: falhou — sessão inválida
+2026-08-29T14:05:09Z  crash       IllegalStateException em main
+```</div>
+        <div class="banner ok"><span class="bar"></span><span class="bd">Arquivo salvo em C:\Users\…\usage-monitor-bug-report-20260829140509.json (imagem ao lado)</span></div>
+        <div class="hstack"><span class="sp"></span><button class="btn" type="button">Abrir issue no GitHub</button><button class="btn primary" type="button">Salvar arquivo</button></div>
+      </div>
+    </div></div></div>
+  </div>
+</div>
+
+<p class="note"><b>Por que <code>PRIMARY</code> é "Salvar arquivo".</b> A ordem do fluxo é salvar e depois anexar: o botão que abre o navegador antes de existir arquivo levaria o usuário a publicar uma issue sem o pacote, que é exatamente o caso que este formulário existe para evitar. E <code>PRIMARY</code> é uma por tela — a aba Geral não tinha nenhuma antes de "Reportar um bug".</p>
+
+<p class="note"><b>A prévia nasce recolhida</b> porque o corpo da issue tem milhares de caracteres e, aberto de saída, empurraria o campo de descrição para fora da janela. Ela entra e sai da composição <b>sem transição</b>: animação infinita trava o <code>waitForIdle</code> da suíte, e uma finita não acrescenta nada a um bloco de texto.</p>
+
+<p class="note"><b>A caixa da captura some quando não há captura.</b> Sem tela — ambiente headless, janela ainda não mapeada — a imagem não vem, e um interruptor marcado prometeria algo que não acontece. A captura enquadra <b>só a janela do app</b>, nunca a tela inteira: o pacote vira o corpo de uma issue pública, e a tela inteira traria o que mais estivesse aberto.</p>
 
 <!-- ═══════════════════════════════ PDF ═══════════════════════════════ -->
 <h2 id="pdf">13 · Relatório PDF</h2>

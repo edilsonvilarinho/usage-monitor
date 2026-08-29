@@ -44,6 +44,9 @@ import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
+import com.usagemonitor.data.diagnostics.LocalBreadcrumbRecorder
+import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
@@ -107,6 +110,7 @@ import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
 import com.usagemonitor.domain.usecase.RemoveAdminTeamSessionUseCase
+import com.usagemonitor.domain.usecase.GenerateBugReportUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
@@ -114,6 +118,8 @@ import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import com.usagemonitor.presentation.ui.DesktopDialogFrame
+import com.usagemonitor.presentation.ui.BugReportHost
+import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
@@ -259,7 +265,54 @@ private fun loadWindowIcon() = runCatching {
 }.getOrNull()
 
 @OptIn(kotlinx.coroutines.FlowPreview::class)
-fun main(args: Array<String>) = application {
+/**
+ * Ponto de entrada.
+ *
+ * Corpo de bloco, e nao expressao: a trilha de eventos precisa nascer **antes**
+ * da janela, porque quem a consome primeiro e o handler de excecao nao tratada,
+ * que roda fora de qualquer composicao. O corpo gigante continua em uma funcao
+ * so -- [runUsageMonitor] --, entao isto nao reparte `main()` nem cria
+ * composable nova.
+ */
+fun main(args: Array<String>) {
+    val breadcrumbs = LocalBreadcrumbRecorder()
+
+    // Registrado ANTES da janela: uma exceção que derrube uma thread durante a
+    // construção dos recursos -- que é onde o app some sem deixar nada -- só tem
+    // handler se ele já estiver de pé aqui.
+    CrashHandler(
+        breadcrumbs = breadcrumbs,
+        screenshots = RobotWindowScreenshotCapturer { appMainWindow }
+    ).install()
+
+    runUsageMonitor(args, breadcrumbs)
+}
+
+/**
+ * A janela principal vista de **fora** da composição.
+ *
+ * `mainWindowRef` é estado de composição e o handler de crash roda fora dela,
+ * possivelmente com a composição já morta. `@Volatile` porque quem escreve é a
+ * thread da UI e quem lê é a thread que caiu.
+ */
+@Volatile
+private var appMainWindow: java.awt.Window? = null
+
+/**
+ * Passo de navegacao: uma tela ou modal que o usuario abriu.
+ *
+ * Funcao de topo e nao literal repetido em cada lambda: o texto do passo e o que
+ * o leitor do relatorio vai reconhecer, e oito formas de escrever a mesma frase
+ * dariam oito trilhas diferentes para o mesmo app.
+ */
+private fun BreadcrumbRecorder.recordScreenOpened(screen: String) {
+    record(BreadcrumbCategory.NAVIGATION, "abriu $screen")
+}
+
+private fun runUsageMonitor(
+    args: Array<String>,
+    breadcrumbs: BreadcrumbRecorder
+) = application {
 
     // Forma de expressao de proposito: ela expoe `args` ao corpo sem reindentar
     // as mil linhas que vem abaixo, e mantem a regra de nao criar composable nova
@@ -573,7 +626,8 @@ fun main(args: Array<String>) = application {
             isAppVisible = isAppVisible,
             anthropicProfiles = enabledAnthropicProfiles,
             persistedNextRefreshAt = persistedNextRefreshAt,
-            onNextRefreshAtChanged = { instant -> settings.putLong(NEXT_REFRESH_AT_KEY, instant.toEpochMilliseconds()) }
+            onNextRefreshAtChanged = { instant -> settings.putLong(NEXT_REFRESH_AT_KEY, instant.toEpochMilliseconds()) },
+            breadcrumbs = breadcrumbs
         )
     }
     val historyViewModel = remember(getUsageHistory, enabledApis) {
@@ -612,7 +666,8 @@ fun main(args: Array<String>) = application {
             getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(cliSessionRepository),
             autoLoad = false,
             backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
-            liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
+            liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS,
+            breadcrumbs = breadcrumbs
         )
     }
     val teamUsageViewModel = remember(teamUsageRepository, teamAdminRepository) {
@@ -625,7 +680,8 @@ fun main(args: Array<String>) = application {
             removeAdminTeamSession = RemoveAdminTeamSessionUseCase(teamAdminRepository),
             getTeamUsageTrend = GetTeamUsageTrendUseCase(teamUsageRepository),
             exportWriter = usageExportWriter,
-            liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
+            liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS,
+            breadcrumbs = breadcrumbs
         )
     }
     val teamPresenceViewModel = remember(teamUsageRepository, teamAdminRepository, teamServerClockOffset) {
@@ -655,7 +711,8 @@ fun main(args: Array<String>) = application {
                 )
             },
             isAppVisible = isAppVisible,
-            intervalMillis = SESSION_PULSE_INTERVAL_MILLIS
+            intervalMillis = SESSION_PULSE_INTERVAL_MILLIS,
+            breadcrumbs = breadcrumbs
         )
     }
     val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()
@@ -1047,6 +1104,26 @@ fun main(args: Array<String>) = application {
     var monthlyBudgetMicros by remember { mutableStateOf(readPersistedBudgetMicros(settings)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
+
+    // A queda da sessão anterior é lida **e consumida** uma vez por arranque: este
+    // é o mesmo arranque que abre o relatório, então ela foi oferecida. Sem o
+    // consumo, o app ofereceria a mesma queda para sempre.
+    val pendingCrash = remember { consumePendingCrash() }
+    var isBugReportOpen by remember { mutableStateOf(pendingCrash != null) }
+    val generateBugReport = remember(breadcrumbs) {
+        GenerateBugReportUseCase(
+            breadcrumbs = breadcrumbs,
+            // Função, e não valor: idioma e escala mudam nas Configurações
+            // enquanto o app roda, e congelá-los aqui faria o relatório descrever
+            // um estado que já não é o do momento da falha.
+            machineInfo = { desktopBugReportMachineInfo(language, uiScalePercent) },
+            // O corte do arquivo tem um dono só, e é o registro de arranque.
+            breadcrumbLimit = StartupDiagnostics.MAX_LINES
+        )
+    }
+    val bugReportWriter = remember { DesktopBugReportWriter(parentWindow = { mainWindowRef }) }
+    val bugReportIssueOpener = remember { BugReportIssueOpener() }
+    val bugReportCapturer = remember { RobotWindowScreenshotCapturer { mainWindowRef } }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
     var historyOpenGeneration by remember { mutableStateOf(0) }
     var isCliSessionsOpen by remember { mutableStateOf(false) }
@@ -1298,6 +1375,7 @@ fun main(args: Array<String>) = application {
                 Item(
                     text = if (language == AppLanguage.PT) "Configurações" else "Settings",
                     onClick = {
+                        breadcrumbs.recordScreenOpened("Configurações (bandeja)")
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
                     }
@@ -1360,6 +1438,11 @@ fun main(args: Array<String>) = application {
     ) {
         LaunchedEffect(window) {
             mainWindowRef = window
+            // A mesma janela, também fora da composição: é dela que a captura em
+            // caso de queda tira os limites do recorte. A atribuição vem **antes**
+            // do registro de diagnóstico: aquele suspende numa ida à IO, e uma
+            // queda nesse intervalo não teria de onde tirar os limites do recorte.
+            appMainWindow = window
 
             // Segundo registro do mesmo arranque. `started` e gravado antes de
             // existir janela e nao consegue responder o que o sistema fez com o
@@ -1446,11 +1529,15 @@ fun main(args: Array<String>) = application {
                         writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
                     },
                     onOpenHistory = { source, accountKey ->
+                        // O nome da fonte entra; a chave da conta não. Ela é
+                        // identidade, e o pacote vira issue pública.
+                        breadcrumbs.recordScreenOpened("histórico de ${source.name}")
                         historyDialogSource = source
                         historyOpenGeneration++
                         historyViewModel.openForSource(source, accountKey)
                     },
                     onOpenSettings = {
+                        breadcrumbs.recordScreenOpened("Configurações")
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
                     },
@@ -1459,6 +1546,7 @@ fun main(args: Array<String>) = application {
                     // não exige participar de nenhum time.
                     onOpenAdminOverview = if (teamSettings.isAdminMode) {
                         {
+                            breadcrumbs.recordScreenOpened("visão global do time (admin)")
                             teamUsageAccountLabel = null
                             teamUsageProfileId = null
                             teamUsageIsAdminOverview = true
@@ -1474,6 +1562,7 @@ fun main(args: Array<String>) = application {
                     // já é escopado na conta dele.
                     onOpenTeamPresenceOverview = if (teamSettings.isAdminMode) {
                         {
+                            breadcrumbs.recordScreenOpened("presença global do time (admin)")
                             teamPresenceAccountLabel = null
                             teamPresenceIsAdminOverview = true
                             isTeamPresenceOpen = true
@@ -1484,6 +1573,9 @@ fun main(args: Array<String>) = application {
                         null
                     },
                     onOpenCliSessions = { target ->
+                        // Sem o apelido do perfil: ele é digitado pelo usuário e
+                        // costuma ser o e-mail da conta.
+                        breadcrumbs.recordScreenOpened("sessões CLI da máquina")
                         val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
                         val label = profileRecords
                             .firstOrNull { record -> record.id == profileId }
@@ -1506,6 +1598,7 @@ fun main(args: Array<String>) = application {
                         // consultar o servidor com uma chave inventada.
                         val accountKey = accountContext?.key?.providerAccountId
                         if (accountKey != null) {
+                            breadcrumbs.recordScreenOpened("uso do time")
                             teamUsageAccountLabel = accountContext.displayLabel
                             teamUsageProfileId = profileId
                             teamUsageIsAdminOverview = false
@@ -1527,6 +1620,7 @@ fun main(args: Array<String>) = application {
                         val accountContext = profileResolution.inspections[profileId]?.accountContext
                         val accountKey = accountContext?.key?.providerAccountId
                         if (accountKey != null) {
+                            breadcrumbs.recordScreenOpened("presença do time")
                             teamPresenceAccountLabel = accountContext.displayLabel
                             teamPresenceIsAdminOverview = false
                             isTeamPresenceOpen = true
@@ -1551,6 +1645,28 @@ fun main(args: Array<String>) = application {
                     cliSessionPulses = cliSessionPulses,
                     teamSessionPulses = teamSessionPulses,
                     showFooter = !cardsOnlyMode
+                )
+            }
+
+            // Dentro da janela principal, e não da janela de Configurações: é ela
+            // que a captura enquadra, e é ela que existe no arranque depois de uma
+            // queda -- quando as Configurações nem foram abertas.
+            if (isBugReportOpen) {
+                BugReportHost(
+                    generateBugReport = generateBugReport,
+                    writer = bugReportWriter,
+                    issueOpener = bugReportIssueOpener,
+                    screenshots = bugReportCapturer,
+                    language = language,
+                    crashPrefill = pendingCrash?.let { crash ->
+                        crashPrefillDescription(
+                            exception = crash.marker.exception,
+                            thread = crash.marker.thread,
+                            isPt = language == AppLanguage.PT
+                        )
+                    },
+                    crashScreenshotPng = pendingCrash?.screenshotPng,
+                    onDismiss = { isBugReportOpen = false }
                 )
             }
         }
@@ -1819,6 +1935,14 @@ fun main(args: Array<String>) = application {
                             // Aviso e gravação não saem daqui pelo mesmo motivo da
                             // opacidade: quem persiste é o coletor com debounce.
                             uiScalePercent = clampUiScalePercent(percent)
+                        },
+                        onReportBug = {
+                            // As Configurações fecham: o formulário mora na janela
+                            // principal, e a janela de Configurações ficaria por
+                            // cima dele -- e dentro da captura.
+                            isSettingsDialogOpen = false
+                            isBugReportOpen = true
+                            breadcrumbs.recordScreenOpened("relatório de bug")
                         },
                         onThemeChange = { selectedPreset ->
                             themePreset = selectedPreset
@@ -2107,6 +2231,7 @@ fun main(args: Array<String>) = application {
                             }
                         },
                         onTeamOpenKeysManager = {
+                            breadcrumbs.recordScreenOpened("chaves das contas (admin)")
                             isTeamKeysOpen = true
                             teamKeysViewModel.open()
                         },
