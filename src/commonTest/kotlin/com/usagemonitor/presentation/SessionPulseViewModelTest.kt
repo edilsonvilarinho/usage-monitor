@@ -229,6 +229,45 @@ class SessionPulseViewModelTest {
         assertEquals(callsBeforeDestroy, repository.syncCalls)
     }
 
+    /**
+     * O laço roda de 30 em 30 segundos. Sem a deduplicação uma leitura quebrada
+     * escreveria 120 passos por hora e expulsaria da trilha tudo o que explica o
+     * defeito que se está investigando.
+     */
+    @Test
+    fun `a repeated read failure is recorded once, not once per tick`() = runTest {
+        val repository = FakePulseCliRepository()
+        repository.sessionsFailure = IllegalStateException("banco travado")
+        val recorder = RecordingBreadcrumbRecorder()
+        val viewModel = buildViewModel(repository, breadcrumbs = recorder)
+
+        repeat(4) { viewModel.refreshOnce() }
+
+        assertEquals(
+            listOf("semáforo de sessões não pôde ser lido: IllegalStateException"),
+            recorder.messages
+        )
+        viewModel.onDestroy()
+    }
+
+    /** Voltou a funcionar e quebrou de novo: são duas falhas, e a trilha diz isso. */
+    @Test
+    fun `a failure after a recovery is recorded again`() = runTest {
+        val repository = FakePulseCliRepository()
+        repository.sessionsFailure = IllegalStateException("banco travado")
+        val recorder = RecordingBreadcrumbRecorder()
+        val viewModel = buildViewModel(repository, breadcrumbs = recorder)
+
+        viewModel.refreshOnce()
+        repository.sessionsFailure = null
+        viewModel.refreshOnce()
+        repository.sessionsFailure = IllegalStateException("banco travado")
+        viewModel.refreshOnce()
+
+        assertEquals(2, recorder.messages.size, recorder.messages.toString())
+        viewModel.onDestroy()
+    }
+
     private fun buildViewModel(
         repository: FakePulseCliRepository,
         teamRepository: FakePulseTeamRepository = FakePulseTeamRepository(),
@@ -236,7 +275,9 @@ class SessionPulseViewModelTest {
         isAppVisible: MutableStateFlow<Boolean> = MutableStateFlow(true),
         clock: Clock = MutableTestClock(NOW),
         dispatcher: kotlinx.coroutines.CoroutineDispatcher = UnconfinedTestDispatcher(),
-        autoStart: Boolean = false
+        autoStart: Boolean = false,
+        breadcrumbs: com.usagemonitor.domain.repository.BreadcrumbRecorder =
+            com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
     ): SessionPulseViewModel {
         return SessionPulseViewModel(
             getCliPulses = GetActiveCliSessionPulsesUseCase(repository, clock),
@@ -247,7 +288,8 @@ class SessionPulseViewModelTest {
             intervalMillis = INTERVAL_MILLIS,
             dispatcher = dispatcher,
             clock = clock,
-            autoStart = autoStart
+            autoStart = autoStart,
+            breadcrumbs = breadcrumbs
         )
     }
 
@@ -282,6 +324,9 @@ private class FakePulseCliRepository(
     var lastSinceEpochMillis: Long? = null
     var lastProfileId: String? = null
 
+    /** Não nulo faz a leitura do índice falhar; ver o teste de trilha do semáforo. */
+    var sessionsFailure: Throwable? = null
+
     override suspend fun syncIndex(): Result<CliSessionIndexReport> {
         syncCalls++
         return Result.success(CliSessionIndexReport())
@@ -293,7 +338,8 @@ private class FakePulseCliRepository(
     ): Result<List<CliSessionSummary>> {
         lastProfileId = profileId
         lastSinceEpochMillis = sinceEpochMillis
-        return Result.success(sessions)
+        return sessionsFailure?.let { failure -> Result.failure(failure) }
+            ?: Result.success(sessions)
     }
 
     override suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?> {

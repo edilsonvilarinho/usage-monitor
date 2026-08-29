@@ -104,6 +104,22 @@ fun normalizeBreadcrumbMessage(message: String): String {
     return collapsed.take(Breadcrumb.MAX_MESSAGE_LENGTH - TRUNCATION_MARKER.length) + TRUNCATION_MARKER
 }
 
+/**
+ * Motivo curto de uma falha interna, para entrar num passo da trilha.
+ *
+ * **Só o nome da classe da exceção, nunca a `message`.** A mensagem de uma falha
+ * de I/O ou de SQLite carrega o caminho absoluto do arquivo, e caminho absoluto
+ * no Windows começa com `C:\Users\<nome da pessoa>` — o pacote vira issue
+ * pública, e o nome do usuário é exatamente o que ele não pode carregar. A
+ * classe responde "que tipo de falha foi" sem responder "de quem é a máquina".
+ *
+ * As falhas de **coleta** são o outro caso e não passam por aqui: a mensagem
+ * delas já atravessou `sanitizeUiErrorMessage` e já está na tela do usuário.
+ */
+fun breadcrumbReasonOf(error: Throwable): String {
+    return error::class.simpleName ?: "falha desconhecida"
+}
+
 /** ASCII puro: o texto atravessa uma URL e um arquivo, e não vale um caractere a explicar. */
 private const val TRUNCATION_MARKER = "..."
 

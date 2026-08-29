@@ -79,6 +79,21 @@ usuário.
   onde toda coleta que dá errado passa — poll silencioso, atualização pedida ou recarga de banner. É
   um desvio consciente da leitura literal de "início e resultado" da issue, e a razão é medível:
   sete fontes × dois passos × seis coletas por hora esvaziariam a trilha a cada duas horas e meia.
+- **Falha interna vira `nome da classe da exceção`, nunca `error.message`** (`breadcrumbReasonOf`).
+  Mensagem de falha de I/O ou de SQLite carrega o caminho absoluto do arquivo, e no Windows caminho
+  absoluto começa com `C:\Users\<nome da pessoa>`. A classe responde "que tipo de falha foi" sem
+  responder "de quem é a máquina".
+- **Quatro `catch` silenciosos entraram no B11**, todos de caminho de baixa frequência: restauração
+  do cache do dashboard (uma vez por arranque), orçamento mensal e tendência do time (uma leitura por
+  abertura de janela) e o semáforo de sessões (laço de 30s, com deduplicação por motivo).
+  - O semáforo precisa da deduplicação: sem ela, uma leitura quebrada escreveria 120 passos por hora.
+    Um `var` simples basta e não há corrida — quem chama `refreshCliPulses` é o laço único de
+    `start()`, sempre na mesma coroutine.
+  - **`refreshRiskSummaries` ficou de fora, e isso é decisão registrada, não esquecimento.** Ele roda
+    em **paralelo por alvo** a cada coleta bem-sucedida, então a deduplicação precisaria de um mapa
+    compartilhado com trava — e `commonMain` não tem `synchronized`. Sem trava seria a mesma corrida
+    que o próprio `historyUseCase` já documenta; com flood, sete fontes falhando esvaziariam a trilha
+    em duas horas. Fica como candidato a issue própria.
 - **A mensagem gravada é a saneada, nunca a crua.** `sanitizeUiErrorMessage` já é o filtro que decide
   o que pode aparecer na tela do usuário, e o relatório é mais público que a tela dele.
 - **Passo de navegação não carrega identidade.** O apelido do perfil é digitado pelo usuário e
@@ -102,7 +117,7 @@ usuário.
 | B08 | `LocalBreadcrumbRecorder` — jsonl, lock, trim 200/100, `restrictToOwnerReadWrite` | ✅ Concluída | `887b7a3` | `desktopTest --tests "com.usagemonitor.data.LocalBreadcrumbRecorderTest"` → `tests="7" failures="0" errors="0"` |
 | B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ✅ Concluída | `d60f74e` | `gradlew.bat compileKotlinDesktop` → BUILD SUCCESSFUL. **Nenhum teste da suíte exercita `main()`**; quem fecha isto é a `allTests` da auditoria |
 | B10 | Pontos de chamada de use case (pedido do usuário e falha) | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 32 classes, 382 testes, nenhuma `failures>0` (inclui os 4 do `DashboardViewModelBreadcrumbTest`) |
-| B11 | Pontos de chamada nos `catch` que hoje falham em silêncio | ⏳ Pendente | — | — |
+| B11 | Pontos de chamada nos `catch` que hoje falham em silêncio | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 384 testes, nenhuma `failures>0` (382 antes, +2 da deduplicação do semáforo) |
 | B12 | `GenerateBugReportUseCase` | ⏳ Pendente | — | — |
 | B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ⏳ Pendente | — | — |
 | B14 | Captura best-effort da janela via capturer injetável | ⏳ Pendente | — | — |

@@ -632,7 +632,8 @@ private fun runUsageMonitor(
             getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(cliSessionRepository),
             autoLoad = false,
             backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
-            liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS
+            liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS,
+            breadcrumbs = breadcrumbs
         )
     }
     val teamUsageViewModel = remember(teamUsageRepository, teamAdminRepository) {
@@ -645,7 +646,8 @@ private fun runUsageMonitor(
             removeAdminTeamSession = RemoveAdminTeamSessionUseCase(teamAdminRepository),
             getTeamUsageTrend = GetTeamUsageTrendUseCase(teamUsageRepository),
             exportWriter = usageExportWriter,
-            liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS
+            liveIntervalMillis = TEAM_USAGE_LIVE_INTERVAL_MILLIS,
+            breadcrumbs = breadcrumbs
         )
     }
     val teamPresenceViewModel = remember(teamUsageRepository, teamAdminRepository, teamServerClockOffset) {
@@ -675,7 +677,8 @@ private fun runUsageMonitor(
                 )
             },
             isAppVisible = isAppVisible,
-            intervalMillis = SESSION_PULSE_INTERVAL_MILLIS
+            intervalMillis = SESSION_PULSE_INTERVAL_MILLIS,
+            breadcrumbs = breadcrumbs
         )
     }
     val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()

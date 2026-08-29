@@ -13,6 +13,7 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.breadcrumbReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.repository.AppUpdateInstaller
@@ -250,7 +251,17 @@ class DashboardViewModel(
     private fun loadCachedStateIfAvailable() {
         val cacheUseCase = getCachedDashboardStats ?: return
         viewModelScope.launch {
-            val cachedStats = cacheUseCase().getOrNull().orEmpty()
+            val cacheResult = cacheUseCase()
+            // Falha aqui era silenciosa e o sintoma é o app abrir vazio esperando
+            // a primeira coleta -- indistinguível de "a coleta está demorando".
+            // Uma vez por arranque, então não há risco de encher a trilha.
+            cacheResult.exceptionOrNull()?.let { error ->
+                breadcrumbs.record(
+                    BreadcrumbCategory.ERROR,
+                    "cache do dashboard não pôde ser lido: ${breadcrumbReasonOf(error)}"
+                )
+            }
+            val cachedStats = cacheResult.getOrNull().orEmpty()
             if (cachedStats.isEmpty()) {
                 return@launch
             }

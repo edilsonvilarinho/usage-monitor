@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.breadcrumbReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -62,7 +66,9 @@ class SessionPulseViewModel(
     private val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: Clock = Clock.System,
-    autoStart: Boolean = true
+    autoStart: Boolean = true,
+    /** Trilha do relatório de bug; ver [BreadcrumbRecorder]. */
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
     private var loopJob: Job? = null
@@ -132,13 +138,40 @@ class SessionPulseViewModel(
     }
 
     private suspend fun refreshCliPulses(now: Instant) {
+        val result = getCliPulses()
+
+        // Este laço roda de 30 em 30 segundos: sem a deduplicação, uma leitura
+        // quebrada escreveria 120 passos por hora e expulsaria da trilha tudo o
+        // que explica o defeito. A anotação sai na PRIMEIRA falha e só volta a
+        // sair se o motivo mudar ou se a leitura voltar a funcionar antes de
+        // falhar de novo.
+        //
+        // Um `var` simples basta e não há corrida: quem chama isto é o laço
+        // único de [start], sempre na mesma coroutine.
+        val failure = result.exceptionOrNull()
+        if (failure == null) {
+            lastCliPulseFailure = null
+        } else {
+            val reason = breadcrumbReasonOf(failure)
+            if (reason != lastCliPulseFailure) {
+                lastCliPulseFailure = reason
+                breadcrumbs.record(
+                    BreadcrumbCategory.ERROR,
+                    "semáforo de sessões não pôde ser lido: $reason"
+                )
+            }
+        }
+
         // Leitura falhou: mantém o mapa anterior, que envelhece no `prunedAt`.
-        val pulses = getCliPulses().getOrNull()
+        val pulses = result.getOrNull()
             ?.mapKeys { (profileId, _) -> UsageTargetKey(ApiSource.ANTHROPIC, profileId) }
             ?: _cliPulses.value
 
         _cliPulses.value = pulses.prunedAt(now)
     }
+
+    /** Ver [refreshCliPulses]: motivo da última falha anotada, para não repeti-la. */
+    private var lastCliPulseFailure: String? = null
 
     private suspend fun refreshTeamPulses(now: Instant) {
         val targets = teamTargetsProvider()

@@ -2,7 +2,6 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
-import com.usagemonitor.domain.entity.Breadcrumb
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -19,17 +18,6 @@ import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-
-/** Recorder que só guarda o que recebeu; a trilha real tem teste próprio. */
-private class RecordingBreadcrumbRecorder : BreadcrumbRecorder {
-    val steps = mutableListOf<Pair<BreadcrumbCategory, String>>()
-
-    override fun record(category: BreadcrumbCategory, message: String) {
-        steps += category to message
-    }
-
-    override fun read(limit: Int): List<Breadcrumb> = emptyList()
-}
 
 class DashboardViewModelBreadcrumbTest : DashboardViewModelTestSupport() {
 
