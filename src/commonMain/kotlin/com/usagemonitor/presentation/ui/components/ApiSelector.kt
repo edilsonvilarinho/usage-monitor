@@ -196,10 +196,17 @@ fun ApiCheckboxRow(
         // desenha na aba Contas, a outra linha do app com switch e lápis.
         if (onEditApiKey != null) {
             AppIconButton(
+                // O nome da fonte entra no rótulo: são três lápis no mesmo
+                // painel, e sem ele o leitor de tela anuncia três ações
+                // idênticas — o que as separa está num nó irmão, que não é lido
+                // junto. Em português a identidade vem depois do travessão, como
+                // em `UiApiError.targetLabel` ("Anthropic — <perfil>"): o artigo
+                // muda com o nome da fonte ("da MiniMax", "do DeepSeek") e uma
+                // frase montada erraria a concordância em parte delas.
                 contentDescription = if (language == AppLanguage.PT) {
-                    "Gerenciar chave"
+                    "Gerenciar chave — ${apiLabel(api, language)}"
                 } else {
-                    "Manage key"
+                    "Manage ${apiLabel(api, language)} key"
                 },
                 onClick = onEditApiKey,
                 modifier = Modifier.testTag(apiSelectorEditKeyTestTag(api))

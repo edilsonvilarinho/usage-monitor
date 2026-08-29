@@ -38,6 +38,19 @@ elemento das sete linhas e fica no mesmo x, com ou sem lápis. Com ele por últi
 chave empurrariam o interruptor para a esquerda e a coluna quebraria. É também a ordem que o
 protótipo desenha na aba Contas (`§12d`), a outra linha do app com switch e lápis juntos.
 
+**O rótulo acessível carrega o nome da fonte** (achado da auditoria). São três lápis no mesmo painel,
+e três `contentDescription` iguais anunciam ao leitor de tela três ações indistinguíveis — o que as
+separa está num nó irmão, que não é lido junto com a ação. Em português a identidade vem depois do
+travessão, como em `UiApiError.targetLabel` ("Anthropic — <perfil>"), e não numa frase montada: o
+artigo muda com o nome da fonte ("da MiniMax", "do DeepSeek") e a concordância erraria em parte
+delas. Em inglês o nome entra no meio ("Manage MiniMax key"), onde não há esse problema. As `testTag`
+continuam sendo o caminho dos testes; o que mudou é o rótulo.
+
+**Nenhuma captura do README é afetada** (verificado na auditoria): `ScreenshotGenerator.settings()`
+chama `SettingsDialogContent` **sem** `initialTab`, e o default é `SettingsTab.GENERAL`. A aba APIs
+não é capturada por gerador nenhum, então o lápis não chega a imagem alguma e não há captura a
+regenerar.
+
 ### O campo nunca é pré-preenchido com a chave guardada
 
 A linha já diz "Chave configurada". Trazer o segredo para dentro da composição não ajuda a trocá-la
@@ -148,6 +161,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C09 | `onApiKeyRemove` fiado em `Main.kt` | ✅ Concluída | `gradlew.bat desktopJar` → `BUILD SUCCESSFUL`; `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 0 falhas. `allTests` fica para a auditoria final, que roda as três branches em série |
 | C10 | Troca de chave pelo lápis com a fonte já ligada | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 302 testes, 0 falhas |
 | C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ✅ Concluída | Inspeção da seção `#cfg-apis`: lápis nas três linhas com chave, "Remover chave" no rodapé do diálogo, campo esvaziado, duas notas novas |
+| F1 | Nome da fonte no `contentDescription` do lápis (achado da auditoria) | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 303 testes, 0 falhas |
 | C12 | `allTests` verde + QA manual | 🚧 Entregue à auditoria | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.presentation.*"` → `BUILD SUCCESSFUL`, 88 classes, 1013 testes, 0 falhas. `allTests` e o QA manual **não** foram executados aqui — ver abaixo |
 
 ### O que C12 não fechou, e por quê

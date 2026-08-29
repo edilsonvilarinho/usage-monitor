@@ -1802,11 +1802,41 @@ class ComponentTest {
             }
         }
 
-        onNodeWithContentDescription("Gerenciar chave").performClick()
+        // O rótulo carrega o nome da fonte: são três lápis no mesmo painel, e
+        // três `contentDescription` iguais anunciariam ações indistinguíveis.
+        onNodeWithContentDescription("Gerenciar chave — MiniMax").performClick()
 
         assertEquals(true, edited)
         assertEquals(false, toggled)
         onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).assertIsOn()
+    }
+
+    /**
+     * Issue #125: o painel tem três lápis, e o que os separa — o nome da fonte —
+     * está num nó irmão que o leitor de tela não lê junto com a ação.
+     */
+    @Test
+    fun `ApiSelector gives each edit icon a distinct accessible label`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Gerenciar chave — MiniMax").assertExists()
+        onNodeWithContentDescription("Gerenciar chave — DeepSeek").assertExists()
+        onNodeWithContentDescription("Gerenciar chave — OpenCode Go").assertExists()
     }
 
     // ── ThemeToggle ───────────────────────────────────────────────────────
