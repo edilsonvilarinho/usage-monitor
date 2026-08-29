@@ -1360,6 +1360,27 @@ fun main(args: Array<String>) = application {
     ) {
         LaunchedEffect(window) {
             mainWindowRef = window
+
+            // Segundo registro do mesmo arranque. `started` e gravado antes de
+            // existir janela e nao consegue responder o que o sistema fez com o
+            // pedido de "sempre visivel" (issue #120).
+            //
+            // O efetivo e lido **de volta da AWT**, nao da preferencia: a
+            // diferenca entre os dois separa "o app nao pediu" de "o pedido foi
+            // engolido". As duas leituras ficam na thread da interface -- so a
+            // escrita no arquivo vai para a IO.
+            val alwaysOnTopRequested = alwaysOnTopEnabled
+            val alwaysOnTopEffective = runCatching { window.isAlwaysOnTop }.getOrNull()
+            withContext(Dispatchers.IO) {
+                startupDiagnostics.record(
+                    startupOrigin,
+                    StartupOutcome.WINDOW_SHOWN,
+                    machineContext = startupMachineContext.copy(
+                        alwaysOnTopRequested = alwaysOnTopRequested,
+                        alwaysOnTopEffective = alwaysOnTopEffective
+                    )
+                )
+            }
         }
         ApplyWindowMinimumSize(
             window = window,

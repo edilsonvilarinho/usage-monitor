@@ -138,7 +138,9 @@ internal data class StartupDiagnosticsEntry(
     val desktop: String? = null,
     val alwaysOnTopSupported: Boolean? = null,
     val autostartEntryPresent: Boolean? = null,
-    val autostartEntryValid: Boolean? = null
+    val autostartEntryValid: Boolean? = null,
+    val alwaysOnTopRequested: Boolean? = null,
+    val alwaysOnTopEffective: Boolean? = null
 )
 
 /**
@@ -157,7 +159,15 @@ internal data class StartupMachineContext(
     val desktop: String? = null,
     val alwaysOnTopSupported: Boolean? = null,
     val autostartEntryPresent: Boolean? = null,
-    val autostartEntryValid: Boolean? = null
+    val autostartEntryValid: Boolean? = null,
+    // So a linha `window-shown` os preenche: nas outras tres a janela ainda nao
+    // existe, e um `false` ali seria leitura de um objeto que nao ha.
+    // `Requested` e a preferencia que o app pediu; `Effective` e o que a AWT
+    // devolve depois de criada a janela. A diferenca entre os dois separa "o app
+    // nao pediu" de "o pedido foi engolido" -- e se os dois vierem `true` com a
+    // janela ainda atras, quem recusa e o compositor.
+    val alwaysOnTopRequested: Boolean? = null,
+    val alwaysOnTopEffective: Boolean? = null
 ) {
     internal companion object {
         /**
@@ -241,7 +251,9 @@ internal class StartupDiagnostics(
             desktop = machineContext.desktop,
             alwaysOnTopSupported = machineContext.alwaysOnTopSupported,
             autostartEntryPresent = machineContext.autostartEntryPresent,
-            autostartEntryValid = machineContext.autostartEntryValid
+            autostartEntryValid = machineContext.autostartEntryValid,
+            alwaysOnTopRequested = machineContext.alwaysOnTopRequested,
+            alwaysOnTopEffective = machineContext.alwaysOnTopEffective
         )
 
         // Falha aqui nao pode derrubar o arranque: o registro existe para explicar

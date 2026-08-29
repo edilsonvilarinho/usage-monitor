@@ -111,6 +111,60 @@ class StartupDiagnosticsTest {
         }
     }
 
+    /**
+     * As tres leituras do "sempre visivel" moram na mesma linha de proposito: a
+     * preferencia que o app pediu, o que a AWT devolveu depois de criada a
+     * janela, e se o ambiente sequer suporta o recurso. Espalhadas em linhas
+     * diferentes elas nao poderiam ser comparadas entre si.
+     */
+    @Test
+    fun `the window shown line compares the requested flag with the effective one`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.WINDOW_SHOWN,
+                version = "38.0.2",
+                pid = 7,
+                processStartedAtMillis = null,
+                nowMillis = 1L,
+                machineContext = StartupMachineContext(
+                    sessionType = "wayland",
+                    desktop = "KDE",
+                    alwaysOnTopSupported = true
+                ).copy(
+                    alwaysOnTopRequested = true,
+                    alwaysOnTopEffective = false
+                )
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"alwaysOnTopRequested\":true"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopEffective\":false"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopSupported\":true"), entry)
+            assertTrue(entry.contains("\"sessionType\":\"wayland\""), entry)
+        }
+    }
+
+    /** Nas linhas gravadas antes da janela nao ha o que ler dela. */
+    @Test
+    fun `lines written before the window says nothing about the always on top flag`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.STARTED,
+                version = "38.0.2",
+                pid = 7,
+                processStartedAtMillis = null,
+                nowMillis = 1L,
+                machineContext = StartupMachineContext(alwaysOnTopSupported = true)
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"alwaysOnTopRequested\":null"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopEffective\":null"), entry)
+        }
+    }
+
     // --- Contexto da maquina no registro --------------------------------------
 
     /**
