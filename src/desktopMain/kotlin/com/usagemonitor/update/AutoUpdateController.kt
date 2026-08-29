@@ -39,17 +39,23 @@ internal const val AUTO_UPDATE_SHIPPED = true
 /**
  * Se **esta build** traz a atualização automática do Linux.
  *
- * Sai em `false`, e o motivo é o mesmo que manteve o caminho do Windows inerte
- * até o `.nsi` entender `/UPDATE`: com ele falso, `installer` é nulo no Linux e
- * **não existe caminho de código** que extraia tarball ou troque diretório de
- * instalação. Um mecanismo que ainda não foi exercitado numa máquina real não
- * pode virar acidente.
+ * **A14 concluída em 2026-08-29**, numa Bazzite real (issue #121): com a v38.0.1
+ * publicada já trazendo os dois fixes (symlink ostree em `LinuxInstallOrigin` e
+ * `LD_LIBRARY_PATH` obsoleto no `linux-updater.sh`), um binário local com esta
+ * flag ligada detectou a v38.0.1 no feed real do GitHub, baixou o tarball
+ * verdadeiro, promoveu, relançou e recebeu o ACK — `~/.usage-monitor/diagnostics/
+ * linux-update.log` registrou `OK promoted 38.0.1` e o recibo saiu
+ * `status=success`, a primeira vez que o ciclo inteiro fechou sem rollback.
+ * Antes disso ficava em `false` pelo mesmo motivo que manteve o caminho do
+ * Windows inerte até o `.nsi` entender `/UPDATE`: com ele falso, `installer` é
+ * nulo no Linux e não existe caminho de código que extraia tarball ou troque
+ * diretório de instalação — um mecanismo que ainda não tinha sido exercitado
+ * numa máquina real não podia virar acidente.
  *
- * A atividade A14 vira este valor **junto** com
- * [MIN_LINUX_UPDATABLE_TARGET_VERSION], depois do aceite em máquina Linux, e
+ * Vira **junto** com [MIN_LINUX_UPDATABLE_TARGET_VERSION], e
  * `AutoUpdateWiringTest` reprova a combinação inconsistente nos dois sentidos.
  */
-internal const val LINUX_AUTO_UPDATE_SHIPPED = false
+internal const val LINUX_AUTO_UPDATE_SHIPPED = true
 
 /**
  * Tudo que a janela principal precisa saber sobre atualização automática.

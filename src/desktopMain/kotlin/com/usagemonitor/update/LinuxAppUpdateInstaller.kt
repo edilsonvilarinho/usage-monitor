@@ -28,12 +28,16 @@ import java.io.File
  *
  * Quem decide é a **versão baixada**, não a instalada.
  *
- * `999.0.0` é sentinela inalcançável: enquanto ele estiver aqui, nenhuma release
- * é alvo aceito. A atividade A14 o troca pela versão que sair, **junto** com
- * [LINUX_AUTO_UPDATE_SHIPPED], e `AutoUpdateWiringTest` reprova a combinação
- * inconsistente nos dois sentidos.
+ * **`38.0.1` é a versão testada de verdade** (A14, 2026-08-29, issue #121): é a
+ * primeira release publicada depois dos fixes de symlink ostree e de
+ * `LD_LIBRARY_PATH` obsoleto, e foi contra o tarball real dela, baixado do
+ * `github.com`, que o ciclo completo de promoção + ACK foi observado com
+ * `status=success` pela primeira vez. Antes disso o valor era o sentinela
+ * inalcançável `999.0.0`: enquanto ele ficava de pé, nenhuma release era alvo
+ * aceito. `AutoUpdateWiringTest` reprova a combinação inconsistente com
+ * [LINUX_AUTO_UPDATE_SHIPPED] nos dois sentidos.
  */
-internal const val MIN_LINUX_UPDATABLE_TARGET_VERSION = "999.0.0"
+internal const val MIN_LINUX_UPDATABLE_TARGET_VERSION = "38.0.1"
 
 /**
  * Log do updater, ao lado do `startup.jsonl`.
