@@ -14,10 +14,15 @@
 #   $6 launcher         launcher estavel (~/.local/bin/usage-monitor)
 #   $7 ack_file         arquivo de ACK
 #   $8 receipt_file     recibo lido pela tela de Configuracoes
+#   $9 log_file         mesmo linux-update.log que a saida deste script usa
 #
 # Entrada vem de /dev/null e saida/erro vao para o log, os dois pelo
-# ProcessBuilder. Este script NAO apaga o archive baixado: quem descarta os
-# ~125 MB e `shouldDiscardUpdateArtifacts`, no arranque seguinte do app.
+# ProcessBuilder. O processo relancado (passo 6) e o de rollback (dentro de
+# `rollback`) escrevem no MESMO log_file -- antes iam para /dev/null, e um
+# crash ali nao deixava rastro nenhum: foi assim que o health-timeout medido
+# numa Bazzite real (issue #118) ficou sem causa por varias tentativas. Este
+# script NAO apaga o archive baixado: quem descarta os ~125 MB e
+# `shouldDiscardUpdateArtifacts`, no arranque seguinte do app.
 #
 # `set -e` de proposito NAO esta ligado: cada passo destrutivo tem tratamento
 # proprio, e abortar no meio de um swap e o unico jeito de deixar a instalacao
@@ -25,8 +30,8 @@
 
 set -u
 
-if [ "$#" -ne 8 ]; then
-    printf 'usage: linux-updater.sh root version previous_version pid token launcher ack receipt\n' >&2
+if [ "$#" -ne 9 ]; then
+    printf 'usage: linux-updater.sh root version previous_version pid token launcher ack receipt log\n' >&2
     exit 2
 fi
 
@@ -38,6 +43,7 @@ ack_token=$5
 launcher=$6
 ack_file=$7
 receipt_file=$8
+log_file=$9
 
 marker=$root/.usage-monitor-managed
 current_file=$root/current
@@ -190,8 +196,11 @@ rollback() {
     write_receipt failed "$rollback_reason"
     cleanup
     # Relanca a versao anterior: o usuario fechou o app esperando que ele
-    # voltasse, e voltar na versao velha e melhor que nao voltar.
-    ( "$launcher" >/dev/null 2>&1 & ) 2>/dev/null
+    # voltasse, e voltar na versao velha e melhor que nao voltar. A saida vai
+    # para o mesmo log_file, anexada -- se o relancamento tambem falhar, o
+    # motivo fica registrado em vez de silencioso. `unset LD_LIBRARY_PATH`
+    # pelo mesmo motivo do lancamento do passo 6 -- ver o comentario la.
+    ( unset LD_LIBRARY_PATH; "$launcher" >>"$log_file" 2>&1 & ) 2>/dev/null
     exit 1
 }
 
@@ -213,7 +222,25 @@ fi
 
 rm -f "$ack_file" 2>/dev/null
 
-( "$launcher" "--update-ack=$ack_token" >/dev/null 2>&1 & ) 2>/dev/null
+# Saida para o log_file, anexada: se este processo cair antes do ACK, o
+# motivo fica aqui em vez de sumir em /dev/null.
+#
+# O token vai por VARIAVEL DE AMBIENTE, nao por argumento `--update-ack=X`
+# (endurecimento; nao era a causa raiz, ver abaixo). Variavel de ambiente
+# nao passa por parser de argv nenhum.
+#
+# `unset LD_LIBRARY_PATH` E A CAUSA RAIZ do health-timeout medido ao vivo
+# numa Bazzite real (issue #118, issue #121 documenta a investigacao
+# inteira). Este processo e filho da JVM que esta saindo, e herda o
+# `LD_LIBRARY_PATH` QUE ELA setou -- apontando para o `lib/app` da versao
+# ANTERIOR. O launcher nativo do jpackage usa essa variavel para se
+# autolocalizar; com ela ja setada (apontando para a versao errada), ele
+# pula a propria etapa de autoconfiguracao e a JVM sobe sem saber qual
+# classe rodar -- imprime o "uso" do `java` na propria saida e sai, sem
+# nunca chegar em `main()`. `unset` aqui faz o launcher da versao nova se
+# autoconfigurar do zero, como faz numa instalacao/execucao normal, onde
+# nao ha JVM pai nenhuma para herdar a variavel errada.
+( unset LD_LIBRARY_PATH; USAGE_MONITOR_UPDATE_ACK="$ack_token" "$launcher" >>"$log_file" 2>&1 & ) 2>/dev/null
 
 # --- 7. espera o ACK ---
 

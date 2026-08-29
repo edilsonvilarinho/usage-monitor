@@ -65,7 +65,18 @@ internal fun linuxUpdaterCommand(
     ackToken: String,
     launcherPath: String,
     ackFilePath: String,
-    receiptFilePath: String
+    receiptFilePath: String,
+    /**
+     * O mesmo arquivo que [launchDetachedProcess] já usa para a saída do
+     * script — passado por argumento porque o script não tem outro jeito de
+     * conhecê-lo, e sem ele a versão relançada (passo 6, `--update-ack`) e o
+     * relançamento de rollback (passo 9) escreviam em `/dev/null`. Um crash
+     * ali não deixava rastro nenhum: foi assim que o health-timeout medido ao
+     * vivo numa Bazzite real (issue #118) ficou sem causa por várias
+     * tentativas — o processo relançado morria antes do ACK, e não havia
+     * onde olhar.
+     */
+    logFilePath: String
 ): List<String> {
     return listOf(
         "/bin/sh",
@@ -77,7 +88,8 @@ internal fun linuxUpdaterCommand(
         ackToken,
         launcherPath,
         ackFilePath,
-        receiptFilePath
+        receiptFilePath,
+        logFilePath
     )
 }
 

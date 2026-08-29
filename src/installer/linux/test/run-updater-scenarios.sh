@@ -104,9 +104,12 @@ build_launcher() {
             if [ -n "$launcher_delay" ]; then
                 printf 'sleep %s\n' "$launcher_delay"
             fi
-            printf 'for a in "$@"; do\n'
-            printf '  case $a in --update-ack=*) printf "%%s" "${a#--update-ack=}" > "%s" ;; esac\n' "$launcher_ack"
-            printf 'done\n'
+            # O token vem de USAGE_MONITOR_UPDATE_ACK, nao de argv: um
+            # `--update-ack=X` na linha de comando podia ser interpretado pelo
+            # launcher nativo do jpackage como opcao da propria JVM em vez de
+            # argumento do app, e a JVM recusava subir (medido ao vivo numa
+            # Bazzite real, issue #118).
+            printf 'if [ -n "${USAGE_MONITOR_UPDATE_ACK:-}" ]; then printf "%%s" "$USAGE_MONITOR_UPDATE_ACK" > "%s"; fi\n' "$launcher_ack"
         fi
     } > "$launcher_path"
     chmod 0755 "$launcher_path"
@@ -139,7 +142,7 @@ work=$(mktemp -d)
 build_tree "$work/root" 38.0.0 39.0.0
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 999999 tok-s1 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 0' 0 $?
 check 'current aponta para a versao nova' 39.0.0 "$(read_current "$work/root")"
 check 'recibo de sucesso' success "$(receipt_field "$work/receipt" status)"
@@ -158,7 +161,7 @@ build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh -c 'sleep 2' &
 slow_pid=$!
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 "$slow_pid" tok-s2 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 0 depois de esperar' 0 $?
 check 'current aponta para a versao nova' 39.0.0 "$(read_current "$work/root")"
 check 'recibo de sucesso' success "$(receipt_field "$work/receipt" status)"
@@ -173,7 +176,7 @@ build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh -c 'sleep 30' &
 stuck_pid=$!
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 "$stuck_pid" tok-s3 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 1' 1 $?
 kill "$stuck_pid" 2>/dev/null
 check 'current INTACTO' 38.0.0 "$(read_current "$work/root")"
@@ -191,7 +194,7 @@ build_tree "$work/root" 38.0.0 39.0.0
 rm -f "$work/root/updates/39.0.0.staging/Usage Monitor/bin/Usage Monitor"
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 999999 tok-s4 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 1' 1 $?
 check 'current restaurado' 38.0.0 "$(read_current "$work/root")"
 check 'motivo nomeado' launch-failed "$(receipt_field "$work/receipt" reason)"
@@ -206,7 +209,7 @@ work=$(mktemp -d)
 build_tree "$work/root" 38.0.0 39.0.0
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' silent
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 999999 tok-s5 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 1' 1 $?
 check 'current restaurado' 38.0.0 "$(read_current "$work/root")"
 check 'motivo nomeado' health-timeout "$(receipt_field "$work/receipt" reason)"
@@ -222,7 +225,7 @@ mkdir -p "$work"
 build_tree "$work/root dir" 38.0.0 39.0.0
 build_launcher "$work/bin dir/usage-monitor" "$work/ack file" '' normal
 sh "$(updater_copy "$work")" "$work/root dir" 39.0.0 38.0.0 999999 tok-s6 \
-    "$work/bin dir/usage-monitor" "$work/ack file" "$work/receipt file" > "$work/log" 2>&1
+    "$work/bin dir/usage-monitor" "$work/ack file" "$work/receipt file" "$work/log" > "$work/log" 2>&1
 check 'exit 0' 0 $?
 check 'current aponta para a versao nova' 39.0.0 "$(read_current "$work/root dir")"
 check 'recibo de sucesso' success "$(receipt_field "$work/receipt file" status)"
@@ -235,7 +238,7 @@ work=$(mktemp -d)
 build_tree "$work/root" 38.0.0 ''
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 999999 tok-s7 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 1' 1 $?
 check 'current INTACTO' 38.0.0 "$(read_current "$work/root")"
 check 'motivo nomeado' missing-staging "$(receipt_field "$work/receipt" reason)"
@@ -248,7 +251,7 @@ work=$(mktemp -d)
 build_tree "$work/root" 38.0.0 39.0.0
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh "$(updater_copy "$work")" "$work/root" '../../etc' 38.0.0 999999 tok-s8 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 1' 1 $?
 check 'current INTACTO' 38.0.0 "$(read_current "$work/root")"
 check 'motivo nomeado' invalid-version "$(receipt_field "$work/receipt" reason)"
@@ -262,7 +265,7 @@ build_tree "$work/root" 38.0.0 39.0.0
 rm -f "$work/root/.usage-monitor-managed"
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 999999 tok-s9 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 1' 1 $?
 check 'current INTACTO' 38.0.0 "$(read_current "$work/root")"
 # Sem marcador a arvore nao e nossa, e ate o recibo seria uma escrita a mais.
@@ -278,7 +281,7 @@ build_tree "$work/root" 38.0.0 39.0.0
 mkdir -p "$work/root/versions/30.0.0" "$work/root/versions/37.0.0"
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 38.0.0 999999 tok-s10 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 0' 0 $?
 check_file_present 'a versao nova ficou' "$work/root/versions/39.0.0"
 check_file_present 'a anterior ficou, para rollback' "$work/root/versions/38.0.0"
@@ -293,7 +296,7 @@ work=$(mktemp -d)
 build_tree "$work/root" 39.0.0 39.0.0
 build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
 sh "$(updater_copy "$work")" "$work/root" 39.0.0 39.0.0 999999 tok-s11 \
-    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" > "$work/log" 2>&1
+    "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
 check 'exit 1' 1 $?
 check 'current INTACTO' 39.0.0 "$(read_current "$work/root")"
 check 'motivo nomeado' same-version "$(receipt_field "$work/receipt" reason)"

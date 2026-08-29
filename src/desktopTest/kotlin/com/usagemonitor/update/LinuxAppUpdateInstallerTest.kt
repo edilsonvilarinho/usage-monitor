@@ -215,8 +215,11 @@ class LinuxAppUpdateInstallerTest {
         assertEquals(File(workDirectory, "update-receipt.properties").absolutePath, command[9])
         assertEquals(layout.updatesDirectory.absolutePath, directory?.absolutePath)
         // A saída vai para um arquivo, e é assim que o log do updater é escrito
-        // sem o script precisar conhecer o caminho.
+        // sem o script precisar conhecer o caminho. O mesmo arquivo viaja como
+        // argumento (command[10]): é onde o processo relançado grava a saída
+        // dele, em vez de /dev/null.
         assertEquals(File(workDirectory, "linux-update.log").absolutePath, logFile?.absolutePath)
+        assertEquals(File(workDirectory, "linux-update.log").absolutePath, command[10])
     }
 
     @Test

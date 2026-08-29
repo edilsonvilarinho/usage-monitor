@@ -93,7 +93,8 @@ class LinuxUpdaterScriptTest {
             ackToken = "4321-1756000000",
             launcherPath = "/home/d'arcy/.local/bin/usage-monitor",
             ackFilePath = "/home/d'arcy/.usage-monitor/update-ack",
-            receiptFilePath = "/home/d'arcy/.usage-monitor/update-receipt.properties"
+            receiptFilePath = "/home/d'arcy/.usage-monitor/update-receipt.properties",
+            logFilePath = "/home/d'arcy/.usage-monitor/diagnostics/linux-update.log"
         )
 
         assertEquals(
@@ -107,7 +108,8 @@ class LinuxUpdaterScriptTest {
                 "4321-1756000000",
                 "/home/d'arcy/.local/bin/usage-monitor",
                 "/home/d'arcy/.usage-monitor/update-ack",
-                "/home/d'arcy/.usage-monitor/update-receipt.properties"
+                "/home/d'arcy/.usage-monitor/update-receipt.properties",
+                "/home/d'arcy/.usage-monitor/diagnostics/linux-update.log"
             ),
             command
         )
@@ -128,11 +130,12 @@ class LinuxUpdaterScriptTest {
             ackToken = "t",
             launcherPath = "/l",
             ackFilePath = "/a",
-            receiptFilePath = "/r"
+            receiptFilePath = "/r",
+            logFilePath = "/log"
         )
 
         assertEquals("-", command[4])
-        assertEquals(10, command.size)
+        assertEquals(11, command.size)
         assertEquals(
             "-",
             linuxUpdaterCommand(
@@ -144,7 +147,8 @@ class LinuxUpdaterScriptTest {
                 ackToken = "t",
                 launcherPath = "/l",
                 ackFilePath = "/a",
-                receiptFilePath = "/r"
+                receiptFilePath = "/r",
+                logFilePath = "/log"
             )[4]
         )
     }
@@ -155,10 +159,10 @@ class LinuxUpdaterScriptTest {
      * acrescentar um argumento num lado só.
      */
     @Test
-    fun `the script and the command agree on eight positional arguments`() {
+    fun `the script and the command agree on nine positional arguments`() {
         val body = materialize().readText()
 
-        assertTrue(body.contains("""if [ "${'$'}#" -ne 8 ]; then"""), "o script nao confere a contagem")
+        assertTrue(body.contains("""if [ "${'$'}#" -ne 9 ]; then"""), "o script nao confere a contagem")
         val command = linuxUpdaterCommand(
             script = File(workDirectory, LINUX_UPDATER_SCRIPT_NAME),
             rootPath = "/root",
@@ -168,10 +172,11 @@ class LinuxUpdaterScriptTest {
             ackToken = "t",
             launcherPath = "/l",
             ackFilePath = "/a",
-            receiptFilePath = "/r"
+            receiptFilePath = "/r",
+            logFilePath = "/log"
         )
-        // `/bin/sh` + caminho do script + os oito posicionais.
-        assertEquals(10, command.size)
+        // `/bin/sh` + caminho do script + os nove posicionais.
+        assertEquals(11, command.size)
     }
 
     /**

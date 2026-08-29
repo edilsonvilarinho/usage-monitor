@@ -3,15 +3,25 @@ package com.usagemonitor.update
 import java.io.File
 
 /**
- * Argumento privado que o `linux-updater.sh` passa à versão recém-promovida.
+ * Variável de ambiente que o `linux-updater.sh` define ao lançar a versão
+ * recém-promovida.
+ *
+ * **Não é argumento de linha de comando**, e chegou a ser (`--update-ack=X`)
+ * até isso quebrar ao vivo numa Bazzite real (issue #118): o launcher nativo
+ * do jpackage deixava esse `--xxx=yyy` vazar como opção da própria JVM em vez
+ * de repassá-lo para `main()` — `Unrecognized option`, e a JVM nem chegava a
+ * subir. Como a saída ia para `/dev/null`, o sintoma era só "a versão nunca
+ * confirma", sem rastro nenhum. Variável de ambiente não passa por parser de
+ * argv de nenhuma camada (launcher nativo, JVM, shell) — é como
+ * [com.usagemonitor.SingleInstanceGuard]/`app.lock` evitam qualquer coisa que
+ * dependa de interpretação de linha de comando.
  *
  * **Não é um valor novo em [com.usagemonitor.StartupOrigin]**, e nem chega perto
  * dele: aquele enum responde "autostart ou manual", e o health check não é uma
  * terceira origem — a versão nova pode ter sido lançada pelo script tanto num
- * arranque manual quanto num autostart. Ele é parseado por
- * [parseUpdateAckToken], que devolve `null` para tudo que não reconhece.
+ * arranque manual quanto num autostart.
  */
-internal const val UPDATE_ACK_ARGUMENT_PREFIX = "--update-ack="
+internal const val UPDATE_ACK_ENV_VAR = "USAGE_MONITOR_UPDATE_ACK"
 
 /**
  * Canal de confirmação entre a versão recém-promovida e o script que a promoveu.
@@ -29,7 +39,7 @@ internal const val UPDATE_ACK_ARGUMENT_PREFIX = "--update-ack="
  * granularidade do sistema de arquivos.
  *
  * Sem ACK o script faz rollback. Isso torna o piso de versão-alvo obrigatório e
- * não precaução: uma versão anterior a este código ignora o argumento, sobe
+ * não precaução: uma versão anterior a este código ignora a variável, sobe
  * normalmente e **nunca confirma** — e o rollback desfaria uma atualização que
  * deu certo.
  */
@@ -42,7 +52,7 @@ internal class UpdateAckChannel(
      * rollback, e derrubar o arranque do app custaria o app.
      */
     fun acknowledge(token: String): Boolean {
-        if (parseUpdateAckToken(UPDATE_ACK_ARGUMENT_PREFIX + token) == null) {
+        if (!isValidUpdateAckToken(token)) {
             return false
         }
         return runCatching {
@@ -74,25 +84,22 @@ internal class UpdateAckChannel(
 }
 
 /**
- * Token de ACK vindo da linha de comando, ou `null` quando o argumento não é um.
- *
- * O valor vem de `argv` e vira **conteúdo de arquivo** e comparação de igualdade
- * do outro lado; o alfabeto restrito é o que impede quebra de linha, espaço e
- * caractere de controle de chegarem lá. Sessenta e quatro caracteres cobrem com
- * folga o `<pid>-<epoch>` que o script gera.
+ * Alfabeto restrito do token: ele vira **conteúdo de arquivo** e comparação de
+ * igualdade do outro lado, e quebra de linha, espaço e caractere de controle
+ * não podem chegar lá. Sessenta e quatro caracteres cobrem com folga o
+ * `<pid>-<epoch>` que o script gera.
  */
-internal fun parseUpdateAckToken(argument: String): String? {
-    val trimmed = argument.trim()
-    if (!trimmed.startsWith(UPDATE_ACK_ARGUMENT_PREFIX)) {
-        return null
-    }
-    val token = trimmed.removePrefix(UPDATE_ACK_ARGUMENT_PREFIX)
-    return if (UPDATE_ACK_TOKEN_PATTERN.matches(token)) token else null
+internal fun isValidUpdateAckToken(token: String): Boolean {
+    return UPDATE_ACK_TOKEN_PATTERN.matches(token)
 }
 
-/** Primeiro token válido da linha de comando, ou `null`. */
-internal fun updateAckTokenFrom(arguments: Array<String>): String? {
-    return arguments.firstNotNullOfOrNull { argument -> parseUpdateAckToken(argument) }
+/**
+ * Token de ACK vindo do ambiente deste processo, ou `null` quando a variável
+ * não existe ou não passa no alfabeto restrito.
+ */
+internal fun updateAckTokenFromEnv(env: (String) -> String? = System::getenv): String? {
+    val raw = env(UPDATE_ACK_ENV_VAR)?.trim() ?: return null
+    return raw.takeIf(::isValidUpdateAckToken)
 }
 
 private val UPDATE_ACK_TOKEN_PATTERN = Regex("""^[A-Za-z0-9_-]{1,64}$""")
