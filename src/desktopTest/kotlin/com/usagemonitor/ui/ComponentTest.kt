@@ -67,7 +67,7 @@ import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
 import com.usagemonitor.presentation.ui.components.observedActivityTrackTag
 import com.usagemonitor.presentation.ui.components.observedActivityValueTag
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
-import com.usagemonitor.presentation.ui.components.apiSelectorRowTestTag
+import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
@@ -1735,8 +1735,13 @@ class ComponentTest {
         ).assertCountEquals(0)
     }
 
+    /**
+     * Issue #125: o alvo do clique é o interruptor, não a linha. O `toggleable`
+     * saiu dela para o `AppIconButton` de edição poder conviver ali — com ele na
+     * linha, `mergeDescendants` engoliria o `contentDescription` do ícone.
+     */
     @Test
-    fun `ApiCheckboxRow triggers onCheckedChange on click`() = runDesktopComposeUiTest {
+    fun `ApiCheckboxRow triggers onCheckedChange from the switch`() = runDesktopComposeUiTest {
         var toggled = false
 
         setContent {
@@ -1749,8 +1754,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("MiniMax").performClick()
-        // O clique no label deve acionar o callback
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).assertIsOff().performClick()
         assertEquals(true, toggled)
     }
 
@@ -2039,7 +2043,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithTag(apiSelectorRowTestTag(ApiSource.MINIMAX)).performClick()
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performClick()
         onNodeWithText("Configurar MiniMax").assertIsDisplayed()
         onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-secret")
         onNodeWithText("Salvar").performClick()
@@ -2081,7 +2085,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithTag(apiSelectorRowTestTag(ApiSource.OPENCODE_GO)).performScrollTo().performClick()
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.OPENCODE_GO)).performScrollTo().performClick()
         onNodeWithText("Configurar OpenCode Go").assertIsDisplayed()
         onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("opencode-secret")
         onNodeWithText("Salvar").performClick()
@@ -2118,7 +2122,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithTag(apiSelectorRowTestTag(ApiSource.OPENCODE)).performScrollTo().performClick()
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.OPENCODE)).performScrollTo().performClick()
 
         assertEquals(ApiSource.OPENCODE, toggledApi)
         onAllNodesWithText("Configurar OpenCode Zen Free").assertCountEquals(0)

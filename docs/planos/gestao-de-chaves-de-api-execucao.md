@@ -74,6 +74,12 @@ exatamente o que `AnthropicProfileRow` já faz no mesmo arquivo, com switch e bo
 convivendo. O hover da linha não depende do `toggleable`: ele vem do `hoverable` interno do
 `AppDataRow`.
 
+Foram **quatro** testes redirecionados, não três: além dos três de `SettingsDialogContent` que
+clicavam na linha (`ComponentTest.kt`), `ApiCheckboxRow triggers onCheckedChange on click` clicava no
+**texto** "MiniMax" e só passava porque o `toggleable` da linha capturava o clique. Ele virou
+`ApiCheckboxRow triggers onCheckedChange from the switch` e mira o interruptor, com `assertIsOff`
+antes do clique — que é a afirmação que a linha nunca chegou a fazer.
+
 ### Nenhuma primitiva nova
 
 `AppIconButton`, `AppSwitch` e `AppDataRow` cobrem tudo. Nada a acrescentar em `docs/design-system/`
@@ -90,7 +96,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C02 | Comentário vivo criado na issue #125 | ✅ Concluída | `gh issue comment 125` → comentário `5462955570` publicado |
 | C03 | `ApiKeySettings.withoutKey(source)` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 6 testes, 0 falhas |
 | C04 | `LocalApiKeyDataSource.clear(source)` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 8 testes, 0 falhas |
-| C05 | `toggleable` movido da linha para o `AppSwitch` + `apiSelectorSwitchTestTag` | ⏳ Pendente | — |
+| C05 | `toggleable` movido da linha para o `AppSwitch` + `apiSelectorSwitchTestTag` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 294 testes, 0 falhas |
 | C06 | `onEditApiKey` + `AppIconButton` de lápis em `ApiCheckboxRow` | ⏳ Pendente | — |
 | C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ⏳ Pendente | — |
 | C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ⏳ Pendente | — |

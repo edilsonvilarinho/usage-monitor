@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -26,8 +24,20 @@ import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 const val API_SELECTOR_ROW_TEST_TAG_PREFIX = "apiSelectorRow_"
+const val API_SELECTOR_SWITCH_TEST_TAG_PREFIX = "apiSelectorSwitch_"
 
 fun apiSelectorRowTestTag(api: ApiSource): String = "$API_SELECTOR_ROW_TEST_TAG_PREFIX${api.name}"
+
+/**
+ * Marca do interruptor da linha, separada da marca da linha.
+ *
+ * A linha deixou de ser o alvo do clique de ligar/desligar (ver
+ * [ApiCheckboxRow]), então quem quer alternar a fonte mira aqui. A marca da
+ * linha continua existindo: é ela que localiza a linha inteira para rolar até
+ * ela e para afirmar o que está escrito.
+ */
+fun apiSelectorSwitchTestTag(api: ApiSource): String =
+    "$API_SELECTOR_SWITCH_TEST_TAG_PREFIX${api.name}"
 
 /**
  * As integrações, uma por linha, com o interruptor à direita.
@@ -74,8 +84,18 @@ fun ApiSelector(
  * ou desligado —, que é o que o interruptor diz e o mesmo controle que as outras
  * opções das Configurações já usam.
  *
- * O `role` da semântica continua `Checkbox`, e não `Switch`: é ele que
- * `assertIsOn`/`assertIsOff` observam, e o que a linha faz não mudou.
+ * O `toggleable` **não fica na linha**, e sim no interruptor. `toggleable` traz
+ * `mergeDescendants = true`: com ele na linha inteira, o `contentDescription`
+ * de qualquer botão de ícone colocado ali seria mesclado no nó do pai, e
+ * `performClick()` sobre ele alternaria o interruptor em vez de disparar a ação
+ * do botão — a armadilha 3 do `CLAUDE.md` na versão de botão de ícone. É por
+ * isso que `AnthropicProfileRow` já faz assim no mesmo arquivo das
+ * Configurações, com switch e lápis convivendo na mesma linha.
+ *
+ * `assertIsOn`/`assertIsOff` continuam funcionando: `AppSwitch` publica
+ * `ToggleableState` com `Role.Switch`, agora no nó do próprio interruptor
+ * ([apiSelectorSwitchTestTag]). O realce de hover da linha não depende do
+ * `toggleable` — ele vem do `hoverable` interno do [AppDataRow].
  */
 @Composable
 fun ApiCheckboxRow(
@@ -103,11 +123,7 @@ fun ApiCheckboxRow(
     val supportingText = api.statusSupportingText(language)
 
     AppDataRow(
-        modifier = modifier.toggleable(
-            value = isChecked,
-            role = Role.Checkbox,
-            onValueChange = onCheckedChange
-        ).testTag(apiSelectorRowTestTag(api)),
+        modifier = modifier.testTag(apiSelectorRowTestTag(api)),
         showDivider = showDivider
     ) {
         // A identidade da fonte cabe no traço de 2dp, como no card do dashboard.
@@ -139,7 +155,11 @@ fun ApiCheckboxRow(
                 )
             }
         }
-        AppSwitch(checked = isChecked, onCheckedChange = onCheckedChange)
+        AppSwitch(
+            checked = isChecked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.testTag(apiSelectorSwitchTestTag(api))
+        )
     }
 }
 
