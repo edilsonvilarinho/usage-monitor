@@ -76,8 +76,8 @@ usuário.
 | B02 | Comentário vivo criado na issue #123 com a tabela | ✅ Concluída | `20e588d` | `gh issue comment 123 --body-file status-123.md` → `issues/123#issuecomment-5462958514` |
 | B03 | `BreadcrumbCategory` + `Breadcrumb` (domain) | ✅ Concluída | `ba721bf` | `desktopTest --tests "com.usagemonitor.domain.BreadcrumbTest"` → `tests="6" failures="0" errors="0"`, BUILD SUCCESSFUL em 34s |
 | B04 | `BugReportMachineInfo` — OS, versão, arquitetura, JVM, versão do app, idioma, escala de UI, resolução, fuso | ✅ Concluída | `24e30b0` | `desktopTest --tests "com.usagemonitor.domain.BugReportMachineInfoTest"` → `tests="3" failures="0" errors="0"`, BUILD SUCCESSFUL em 33s |
-| B05 | `BugReportEnvelope` + `toJson()` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.BugReportEnvelopeJsonTest"` → `tests="5" failures="0" errors="0"`, BUILD SUCCESSFUL em 29s |
-| B06 | `toGithubIssueBody()` com truncagem (30 breadcrumbs, 6.000 chars) | ⏳ Pendente | — | — |
+| B05 | `BugReportEnvelope` + `toJson()` | ✅ Concluída | `3aa760e` | `desktopTest --tests "com.usagemonitor.domain.BugReportEnvelopeJsonTest"` → `tests="5" failures="0" errors="0"`, BUILD SUCCESSFUL em 29s |
+| B06 | `toGithubIssueBody()` com truncagem (30 breadcrumbs, 6.000 chars) | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.BugReportIssueBodyTest"` → `tests="7" failures="0" errors="0"`, BUILD SUCCESSFUL em 1m 7s |
 | B07 | `BreadcrumbRecorder` (interface no domain) + implementação nula | ⏳ Pendente | — | — |
 | B08 | `LocalBreadcrumbRecorder` — jsonl, lock, trim 200/100, `restrictToOwnerReadWrite` | ⏳ Pendente | — | — |
 | B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ⏳ Pendente | — | — |
