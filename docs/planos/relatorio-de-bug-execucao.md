@@ -94,8 +94,30 @@ usuário.
     compartilhado com trava — e `commonMain` não tem `synchronized`. Sem trava seria a mesma corrida
     que o próprio `historyUseCase` já documenta; com flood, sete fontes falhando esvaziariam a trilha
     em duas horas. Fica como candidato a issue própria.
-- **A mensagem gravada é a saneada, nunca a crua.** `sanitizeUiErrorMessage` já é o filtro que decide
-  o que pode aparecer na tela do usuário, e o relatório é mais público que a tela dele.
+- **A trilha tem redação própria e NÃO herda `sanitizeUiErrorMessage`** (`redactBreadcrumbIdentity`).
+  Esta decisão substitui a primeira redação deste plano, que estava **errada** e foi corrigida na
+  auditoria. O erro tinha duas partes, as duas verificáveis:
+  1. *"já está na tela do usuário" não é o teste certo.* A tela é privada à máquina; o corpo da issue é
+     público. O critério correto é o que `BugReportMachineInfo` já usava — isto explica um defeito ou
+     identifica quem o reportou? — e é por ele que hostname e usuário do sistema ficaram de fora.
+  2. *`sanitizeUiErrorMessage` não redige caminho.* As quatro expressões dele (`UiState.kt:109-126`)
+     cobrem `Bearer`, `cap_sid`, `access_token` e `refresh_token`, e nenhuma toca em caminho de arquivo.
+  **A prova é um caso real, não uma hipótese:** `AnthropicCredentialStore.missingCredentialsMessage`
+  monta `"Credenciais não encontradas para o perfil '<e-mail>': C:\Users\<nome>\.claude\.credentials.json."`,
+  é lançada em `LocalCredentialDataSource.kt:89`, cai em `handleTargetFailure` e virava breadcrumb. É a
+  falha mais rotineira do app e justamente a que faz alguém abrir um relatório. O teto de 200 caracteres
+  não salvava: `C:\Users\<nome>` são os **primeiros** caracteres do caminho.
+  - **O e-mail entrou na redação junto com o caminho**, e não foi pedido: a mesma mensagem interpola o
+    apelido do perfil, que é texto digitado e na prática é o e-mail da conta. Os passos de navegação já
+    o mantinham de fora por decisão registrada; a mensagem de credencial o trazia de volta pela porta
+    dos fundos.
+  - **Redação antes do corte.** Cortar primeiro não protegeria nada, e há teste afirmando a ordem.
+  - **As raízes POSIX são enumeradas** (`/home/`, `/Users/`, `/root/`). Redigir toda barra apagaria
+    `/api/oauth/usage`, que é rota e não identidade — também com teste.
+  - **A defesa é única, não a última** (F2): `LocalBreadcrumbRecorder` tinha caminho de escrita próprio
+    e só normalizava; agora ele constrói por `Breadcrumb.of`. Auditado por `grep`: nenhuma outra
+    implementação de `BreadcrumbRecorder` em `commonMain`/`desktopMain` escreve, e `NoOpBreadcrumbRecorder`
+    não grava nada. Ponto de chamada esquecido é como este defeito nasceu.
 - **Passo de navegação não carrega identidade.** O apelido do perfil é digitado pelo usuário e
   costuma ser o e-mail da conta; a `accountKey` é identificador de conta. Nenhum dos dois entra na
   trilha — o nome da tela responde à pergunta "onde ele estava" sem responder "quem ele é".
@@ -204,6 +226,7 @@ usuário.
 | B19 | "Abrir issue no GitHub" — URL montada e navegador aberto | ✅ Concluída | (este commit) | `desktopTest --tests "…BugReportIssueOpenerTest" --tests "…DesktopAppUpdateReleaseOpenerTest"` → `tests="6"` e `tests="4"`, `failures="0"` nos dois |
 | B20 | Fluxo do marcador + fiação do diálogo no `Main.kt` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="13" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
 | B21 | Protótipo: `§12 #cfg-geral` ganha a seção e nasce `§12f #cfg-bug` | ✅ Concluída | (este commit) | Inspeção do HTML: `grep -c 'id="cfg-bug"'` → 1; entrada no `nav.index`; `.banner.ok` e `.field.area` acrescentados ao CSS |
+| F1+F2 | Redação de identidade na trilha — caminho absoluto e e-mail, na fábrica, com caminho de escrita único | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.*"` → 26 classes / 241 testes; `--tests "…presentation.*"` → 32 / 384; `--tests "…data.*"` → 41 / 337; nenhuma com `failures>0` |
 | B22 | `allTests` verde + QA manual: crash proposital, dark/light, PT/EN | 🚧 Bloqueada — fora do alcance deste agente | — | Passadas com filtro, todas verdes: `--tests "com.usagemonitor.ui.*"` → 309 testes; `--tests "com.usagemonitor.presentation.*"` → 384; `--tests "…domain.*" + "…data.*" + "…update.*"` → 80 classes / 725 testes, nenhuma com `failures>0`. A `allTests` completa é da auditoria, rodada em série; o QA manual exige sessão gráfica interativa |
 
 ## O que fica para a auditoria

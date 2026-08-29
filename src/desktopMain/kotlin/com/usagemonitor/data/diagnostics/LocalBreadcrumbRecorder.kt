@@ -4,7 +4,6 @@ import com.usagemonitor.StartupDiagnostics
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
 import com.usagemonitor.domain.entity.Breadcrumb
 import com.usagemonitor.domain.entity.BreadcrumbCategory
-import com.usagemonitor.domain.entity.normalizeBreadcrumbMessage
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -56,12 +55,19 @@ class LocalBreadcrumbRecorder(
     private val lock = Any()
 
     override fun record(category: BreadcrumbCategory, message: String) {
+        // Passa pela fábrica do domain, e não por uma normalização própria: é ela
+        // que redige caminho absoluto e e-mail antes de cortar. Chamar só o
+        // normalizador daqui abriria um **segundo** caminho de escrita, e uma
+        // defesa que existe em dois lugares é uma a mais para alguém esquecer.
+        val breadcrumb = Breadcrumb.of(
+            at = Instant.fromEpochMilliseconds(nowMillis()),
+            category = category,
+            message = message
+        )
         val line = BreadcrumbLineDto(
-            ts = Instant.fromEpochMilliseconds(nowMillis()).toString(),
-            category = category.wireValue,
-            // A normalização é do domain e vale aqui também: quem chama pode ter
-            // interpolado uma mensagem de exceção de três linhas.
-            message = normalizeBreadcrumbMessage(message)
+            ts = breadcrumb.at.toString(),
+            category = breadcrumb.category.wireValue,
+            message = breadcrumb.message
         )
 
         // Anotar o passo não pode virar a segunda falha do dia -- muito menos a

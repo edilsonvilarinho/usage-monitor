@@ -42,6 +42,27 @@ class LocalBreadcrumbRecorderTest {
     }
 
     /**
+     * F2: o recorder tinha um caminho de escrita próprio, que só normalizava. A
+     * redação precisa valer **no disco**, e não só na fábrica do domain — uma
+     * defesa que existe em dois lugares é uma a mais para alguém esquecer.
+     */
+    @Test
+    fun `the file on disk never carries the user name or the account e-mail`() {
+        withTempFile { file ->
+            recorderOn(file).record(
+                BreadcrumbCategory.API_CALL,
+                "ANTHROPIC: falhou — Credenciais não encontradas para o perfil " +
+                    "'edilson.messias@example.com': C:\\Users\\edilson\\.claude\\.credentials.json."
+            )
+
+            val written = file.readText()
+            assertTrue(!written.contains("edilson", ignoreCase = true), written)
+            assertTrue(!written.contains("example.com"), written)
+            assertTrue(written.contains("<caminho>/.credentials.json"), written)
+        }
+    }
+
+    /**
      * Mesmo corte do registro de arranque, lido das constantes daquele arquivo:
      * dois cortes para o mesmo tipo de arquivo seriam dois donos da decisão.
      */
