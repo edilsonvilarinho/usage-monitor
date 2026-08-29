@@ -71,6 +71,16 @@ usuário.
   - Os passos de navegação entram como **uma linha dentro de lambdas que já existem** (`onOpenSettings`,
     `onOpenCliSessions`, …). Nenhum `LaunchedEffect` novo: o de #120 já registrou que o jeito de não
     crescer `main()` é usar os que já estão lá.
+- **Sucesso repetido não vira passo — a trilha tem 200 linhas de orçamento.** O laço do dashboard
+  roda a cada 10 min e os das janelas ao vivo a cada 5s; anotar "coleta ok" em todos eles encheria o
+  arquivo em minutos e expulsaria dele justamente o passo que explica a falha. Por isso o B10 grava
+  em **dois** pontos, e não em quatro: o pedido **do usuário** (`refresh()` e suas sobrecargas), que
+  é a ação que ele vai descrever, e a **falha**, em `handleTargetFailure`, que é o funil único por
+  onde toda coleta que dá errado passa — poll silencioso, atualização pedida ou recarga de banner. É
+  um desvio consciente da leitura literal de "início e resultado" da issue, e a razão é medível:
+  sete fontes × dois passos × seis coletas por hora esvaziariam a trilha a cada duas horas e meia.
+- **A mensagem gravada é a saneada, nunca a crua.** `sanitizeUiErrorMessage` já é o filtro que decide
+  o que pode aparecer na tela do usuário, e o relatório é mais público que a tela dele.
 - **Passo de navegação não carrega identidade.** O apelido do perfil é digitado pelo usuário e
   costuma ser o e-mail da conta; a `accountKey` é identificador de conta. Nenhum dos dois entra na
   trilha — o nome da tela responde à pergunta "onde ele estava" sem responder "quem ele é".
@@ -90,8 +100,8 @@ usuário.
 | B06 | `toGithubIssueBody()` com truncagem (30 breadcrumbs, 6.000 chars) | ✅ Concluída | `89f1ddf` | `desktopTest --tests "com.usagemonitor.domain.BugReportIssueBodyTest"` → `tests="7" failures="0" errors="0"`, BUILD SUCCESSFUL em 1m 7s |
 | B07 | `BreadcrumbRecorder` (interface no domain) + implementação nula | ✅ Concluída | `b4d5516` | `desktopTest --tests "com.usagemonitor.domain.BreadcrumbRecorderTest"` → `tests="1" failures="0" errors="0"`, BUILD SUCCESSFUL em 39s |
 | B08 | `LocalBreadcrumbRecorder` — jsonl, lock, trim 200/100, `restrictToOwnerReadWrite` | ✅ Concluída | `887b7a3` | `desktopTest --tests "com.usagemonitor.data.LocalBreadcrumbRecorderTest"` → `tests="7" failures="0" errors="0"` |
-| B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ✅ Concluída | (este commit) | `gradlew.bat compileKotlinDesktop` → BUILD SUCCESSFUL. **Nenhum teste da suíte exercita `main()`**; quem fecha isto é a `allTests` da auditoria |
-| B10 | Pontos de chamada de use case (início e resultado) | ⏳ Pendente | — | — |
+| B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ✅ Concluída | `d60f74e` | `gradlew.bat compileKotlinDesktop` → BUILD SUCCESSFUL. **Nenhum teste da suíte exercita `main()`**; quem fecha isto é a `allTests` da auditoria |
+| B10 | Pontos de chamada de use case (pedido do usuário e falha) | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 32 classes, 382 testes, nenhuma `failures>0` (inclui os 4 do `DashboardViewModelBreadcrumbTest`) |
 | B11 | Pontos de chamada nos `catch` que hoje falham em silêncio | ⏳ Pendente | — | — |
 | B12 | `GenerateBugReportUseCase` | ⏳ Pendente | — | — |
 | B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ⏳ Pendente | — | — |

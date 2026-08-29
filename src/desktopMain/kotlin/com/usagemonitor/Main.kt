@@ -592,7 +592,8 @@ private fun runUsageMonitor(
             isAppVisible = isAppVisible,
             anthropicProfiles = enabledAnthropicProfiles,
             persistedNextRefreshAt = persistedNextRefreshAt,
-            onNextRefreshAtChanged = { instant -> settings.putLong(NEXT_REFRESH_AT_KEY, instant.toEpochMilliseconds()) }
+            onNextRefreshAtChanged = { instant -> settings.putLong(NEXT_REFRESH_AT_KEY, instant.toEpochMilliseconds()) },
+            breadcrumbs = breadcrumbs
         )
     }
     val historyViewModel = remember(getUsageHistory, enabledApis) {
