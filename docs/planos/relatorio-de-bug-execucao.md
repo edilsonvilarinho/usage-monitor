@@ -149,6 +149,16 @@ usuário.
 - **A caixa da captura some quando não há como capturar** (`screenshotSupported = false`). Interruptor
   que não pode fazer nada é pior que interruptor nenhum: a caixa marcada prometeria uma imagem que
   nunca vem.
+- **A abertura de navegador virou `openInBrowser`, comum aos dois abridores.** O
+  `DesktopAppUpdateReleaseOpener` já tinha os comandos por plataforma, e o abridor da issue precisa dos
+  mesmos. O que **não** é comum é a validação: aquele prende a URL a `/releases/`, este a
+  `/issues/new`, e cada um continua dono da sua. Duas versões de "como se abre um navegador no Linux"
+  é que não podem existir.
+- **O validador de saída fica, mesmo com a URL montada aqui dentro.** O que vai para o navegador leva
+  texto digitado pelo usuário; o validador é o que garante que nenhuma montagem futura consiga apontar
+  para outro lugar.
+- **A truncagem do corpo acontece antes do percent-encoding**, e é por isso que ela mora no domain:
+  cortar depois partiria uma sequência `%C3%A7` no meio e produziria um caractere quebrado.
 - **Nenhuma animação infinita** no diálogo — trava o `waitForIdle` dos testes de componente. A prévia
   entra e sai da composição, sem transição: animação finita não acrescenta nada a um bloco de texto.
 - **Sem hostname e sem usuário do sistema.** O pacote vira o corpo de uma issue pública, e as duas
@@ -176,7 +186,7 @@ usuário.
 | B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.DesktopBugReportWriterTest"` → `tests="3" failures="0" errors="0"` |
 | B17 | `BugReportDialog` stateless + primitiva `AppTextArea` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.BugReportDialogTest"` → `tests="12" failures="0" errors="0"` |
 | B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.*"` → 309 testes, nenhuma `failures>0` (inclui os 3 do `DiagnosticsSettingsSectionTest`) |
-| B19 | Botão "Abrir issue no GitHub" — URL montada e navegador aberto | ⏳ Pendente | — | — |
+| B19 | "Abrir issue no GitHub" — URL montada e navegador aberto | ✅ Concluída | (este commit) | `desktopTest --tests "…BugReportIssueOpenerTest" --tests "…DesktopAppUpdateReleaseOpenerTest"` → `tests="6"` e `tests="4"`, `failures="0"` nos dois |
 | B20 | Fluxo do marcador: arranque seguinte oferece o relatório e apaga o marcador | ⏳ Pendente | — | — |
 | B21 | `prototipo-visual-opencode.html` — `§12 #cfg-geral` ganha a seção nova | ⏳ Pendente | — | — |
 | B22 | `allTests` verde + QA manual: crash proposital, dark/light, PT/EN | ⏳ Pendente | — | — |
