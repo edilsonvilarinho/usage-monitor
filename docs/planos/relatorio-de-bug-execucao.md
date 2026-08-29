@@ -132,7 +132,25 @@ usuário.
   de falhar, e o marcador sozinho já entrega o relatório. Na ordem inversa, uma captura travada
   levaria junto o registro da queda. Sem captura, a imagem de uma queda anterior é **apagada** — ela
   mostraria uma tela que não é a do defeito sendo reportado.
-- **Nenhuma animação infinita** no diálogo — trava o `waitForIdle` dos testes de componente.
+- **`AppTextArea` é primitiva nova, criada e consumida no mesmo commit.** A descrição do bug é o único
+  texto corrido que alguém escreve neste app, e o `AppTextField` é `singleLine` — uma descrição longa
+  rolaria na horizontal numa linha só. Irmã e não um `singleLine` configurável: aquele campo é filtro,
+  URL, apelido e chave numa linha de altura de controle, este cresce para baixo e ancora no topo, e um
+  parâmetro faria a mesma primitiva responder a duas perguntas deixando a altura mínima sem dono.
+  Registrada em `docs/design-system/components/forms/` (`.prompt.md`, `.jsx`, `.d.ts`) e no índice do
+  `readme.md`, no mesmo commit — a regra de precedência só se sustenta enquanto os dois documentos
+  descreverem o app inteiro.
+- **`PRIMARY` do diálogo é "Salvar arquivo", não "Abrir issue no GitHub".** A ordem do fluxo é salvar e
+  depois anexar; o botão que abre o navegador antes de existir arquivo levaria o usuário a publicar uma
+  issue sem o pacote, que é o caso que o formulário existe para evitar. E `PRIMARY` é uma por tela.
+- **Ação desabilitada carrega o motivo na tela.** Com a descrição em branco os dois botões ficam
+  desabilitados e uma frase diz o que falta — controle cinza sem explicação é pior que controle nenhum,
+  a mesma régua do interruptor de atualização automática.
+- **A caixa da captura some quando não há como capturar** (`screenshotSupported = false`). Interruptor
+  que não pode fazer nada é pior que interruptor nenhum: a caixa marcada prometeria uma imagem que
+  nunca vem.
+- **Nenhuma animação infinita** no diálogo — trava o `waitForIdle` dos testes de componente. A prévia
+  entra e sai da composição, sem transição: animação finita não acrescenta nada a um bloco de texto.
 - **Sem hostname e sem usuário do sistema.** O pacote vira o corpo de uma issue pública, e as duas
   informações identificam a pessoa sem ajudar a diagnosticar o app.
 
@@ -156,7 +174,7 @@ usuário.
 | B14 | Captura best-effort da janela via capturer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "…CrashHandlerTest" --tests "…WindowScreenshotCapturerTest"` → `tests="6"` e `tests="2"`, `failures="0"` nos dois |
 | B15 | Registro do handler antes de `application { }`; `readPendingCrashMarker()` disponível | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="10" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
 | B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.DesktopBugReportWriterTest"` → `tests="3" failures="0" errors="0"` |
-| B17 | `BugReportDialog` stateless | ⏳ Pendente | — | — |
+| B17 | `BugReportDialog` stateless + primitiva `AppTextArea` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.BugReportDialogTest"` → `tests="12" failures="0" errors="0"` |
 | B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ⏳ Pendente | — | — |
 | B19 | Botão "Abrir issue no GitHub" — URL montada e navegador aberto | ⏳ Pendente | — | — |
 | B20 | Fluxo do marcador: arranque seguinte oferece o relatório e apaga o marcador | ⏳ Pendente | — | — |

@@ -164,7 +164,7 @@ invented here.
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
-| `components/forms/` | AppTextField · AppSwitch · AppTabs · AppSegmentedControl |
+| `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
 | `components/data/` | AppProgressTrack · AppStatusIndicator · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
 | `components/feedback/` | AppBanner · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav |
