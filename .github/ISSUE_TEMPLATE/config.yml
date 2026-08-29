@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/edilsonvilarinho/usage-monitor/security/advisories/new
+    about: Report it privately. Do not open a public issue.
+  - name: Integration reference
+    url: https://github.com/edilsonvilarinho/usage-monitor/blob/main/docs/integrations.md
+    about: Endpoints, credential paths and known limits for every source, before you file a bug.
+  - name: Team server setup
+    url: https://github.com/edilsonvilarinho/usage-monitor/blob/main/server/README.md
+    about: API contract and deployment guide for the optional self-hosted server.

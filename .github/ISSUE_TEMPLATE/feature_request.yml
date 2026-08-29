@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest a capability or an improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: Describe the situation you are in, not the solution you already picked.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - A new integration or data source
+        - Dashboard and cards
+        - Claude Code sessions and usage breakdown
+        - History, forecast and budget
+        - Alerts and tray
+        - Export and reports
+        - Team integration
+        - Installation and updates
+        - Appearance and accessibility
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead
+      description: Workarounds, other tools, or nothing at all.
+
+  - type: markdown
+    attributes:
+      value: |
+        **For a new integration**, the deciding factor is whether a usage endpoint or a local
+        database actually exists and what it returns. If you know of one, link it here — that is
+        usually the whole difference between "maybe" and "doable".
