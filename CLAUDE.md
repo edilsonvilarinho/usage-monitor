@@ -167,6 +167,43 @@ Arranque e segunda instância (`SingleInstanceGuard`, `FocusRequestChannel`, `St
 - **`activateWindow` alterna `alwaysOnTop` (`false → true → valor anterior`), e não "liga se estiver desligado".** Medido: com o sinalizador já ligado, atribuir `true` de novo não reordena nada e a janela continua atrás da que a cobre — exatamente o caso de quem usa "manter sempre visível". `toFront()` sozinho não vence o bloqueio de primeiro plano do Windows: ele só pisca o botão na barra.
 - **O registro de arranque é sempre ligado** (`~/.usage-monitor/diagnostics/startup.jsonl`), ao contrário dos recorders de créditos e do Codex, que são opt-in por variável de ambiente. Aqueles gravam corpo de resposta a cada coleta; este grava uma linha por arranque, com corte por contagem. Diagnóstico que exige variável configurada **antes** do fato não serve para investigar o boot que já passou. `FOCUS_REQUEST_SERVED` existe para separar "o pedido nunca foi lido" de "foi lido e a janela não subiu", que são defeitos em lugares diferentes.
 
+**Atualização automática** (`desktopMain/update/`; planos
+[`atualizacao-automatica-windows-execucao.md`](docs/planos/atualizacao-automatica-windows-execucao.md)
+e [`atualizacao-automatica-linux-execucao.md`](docs/planos/atualizacao-automatica-linux-execucao.md)):
+interruptor "Atualização automática" nas Configurações → Geral, desmarcado por padrão
+(`autoUpdateEnabled` em `PreferencesSettings`). Ligado, baixa a release em segundo plano, valida o
+SHA-256 contra o `digest` da API do GitHub (não o hash publicado no workflow, que serve só ao
+instalador inicial) e troca ao fechar o app — ou pelo botão "Reiniciar e atualizar agora".
+`rememberAutoUpdateController` (`AutoUpdateController.kt`) escolhe **um** instalador por plataforma —
+`WindowsAppUpdateInstaller` ou `LinuxAppUpdateInstaller` — cada um atrás da própria flag de build
+(`AUTO_UPDATE_SHIPPED`, `LINUX_AUTO_UPDATE_SHIPPED`, **as duas em `true` desde a v38.0.1**) e de um
+piso de versão-alvo (`MIN_UPDATABLE_TARGET_VERSION` / `MIN_LINUX_UPDATABLE_TARGET_VERSION`): abaixo do
+piso a versão instalada não reconhece o mecanismo de confirmação, e o instalador desfaria uma
+atualização que funcionou. macOS fica em `UNSUPPORTED_PLATFORM` (sem Developer ID, sem caminho
+confiável de remontar o bundle sob quarentena) e Linux ARM64 em `UNSUPPORTED_ARCHITECTURE` — exceção
+declarada à regra de não criar valor novo em enum existente, porque há **um** `when` exaustivo sobre
+`AppUpdateSupport` e o erro de compilação garante que o texto novo existe.
+- **Windows**: só a instalação pelo NSIS per-user, sem UAC (`RequestExecutionLevel user`) — é o que
+  torna a troca silenciosa viável; MSI e cópia manual ficam com o interruptor desabilitado. O
+  instalador extrai para `$INSTDIR.new` e só troca por dois `Rename` no mesmo volume quando a árvore
+  nova está completa: falha antes do primeiro deixa `$INSTDIR` intacto, e o `Rename` bem-sucedido **é**
+  a prova de que o processo anterior saiu — não `taskkill /F`, que mataria no meio de uma escrita do
+  SQLite.
+- **Linux**: só a instalação `.sh` user-space em árvore XDG gerenciada (marcador
+  `.usage-monitor-managed` **e** executável em execução dentro de `versions/`); `.deb`/`.rpm` e cópia
+  manual ficam com o motivo na tela. `current` é arquivo de texto com a versão, não symlink — `mv -T`
+  não é POSIX —, o script promove por `rename(2)` puro e relança o launcher estável
+  (`~/.local/bin/usage-monitor`), que espera um ACK em arquivo (token gerado pelo script, não carimbo
+  de tempo) antes de gravar `status=success`; sem ACK em 60s, desfaz. Log sempre em
+  `~/.usage-monitor/diagnostics/linux-update.log`. A ativação real (A14) só veio depois de dois
+  defeitos achados numa Bazzite/rpm-ostree real e não previstos no plano: origem `UNMANAGED` por
+  comparar caminho não canonicalizado contra symlink do ostree, e o processo relançado herdando o
+  `LD_LIBRARY_PATH` da versão anterior e morrendo antes de `main()` — os dois só apareceram medindo ao
+  vivo, não lendo o código.
+- Nenhuma animação infinita para o progresso — é **texto** ("Baixando 42%"), pelo motivo de sempre
+  (`waitForIdle`). `AppUpdateUiState` é `sealed interface`, não enum: valor novo ali é erro de
+  compilação nos `when`, e portanto visível.
+
 ### Injeção de dependências
 
 Manual, em `Main.kt` (desktopMain). Sem framework.
@@ -539,10 +576,18 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
 
 - **Nomes em inglês**, comentários em português.
 - Evitar scope functions aninhadas (`let`, `apply`, `run`). Preferir fluxo explícito.
-- Commits: Conventional Commits em inglês + `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`.
+- Commits: Conventional Commits em inglês + `Co-Authored-By: Claude <nome do modelo> <noreply@anthropic.com>`
+  — o nome do modelo que gerou o commit (ex.: `Claude Sonnet 5`, `Claude Opus 5`), não um valor fixo:
+  planos em `docs/planos/` já registram qual modelo executou cada atividade, e o trailer do commit é a
+  mesma informação em outro lugar.
 - **Uma atividade, um commit.** Cada unidade de trabalho fecha sozinha: código, teste e documentação
   da mesma decisão entram juntos. Commit que só compila com o próximo não é atômico, e commit que
   junta duas decisões impede reverter uma sem perder a outra.
+- **Issue ou comentário criado no GitHub abre com `🤖 Escrito por Claude Code, a pedido de
+  @<usuário>`.** O `gh` CLI fica autenticado com a conta pessoal do usuário, não com uma conta ou bot
+  próprio de Claude — sem a linha, o texto aparece publicamente como se o usuário tivesse escrito, o
+  que já causou confusão (issue #124). Vale para `gh issue create`/`gh issue comment`/`gh api` sobre
+  `issues/comments`; não muda a autoria de commit, que já tem o trailer acima.
 - **Trabalho com plano em `docs/planos/` mantém ali a tabela de pontos de situação**, uma linha por
   atividade, escrita **no mesmo commit** da atividade que ela descreve — em commit separado a linha
   pode existir sem a mudança e vice-versa, e o registro deixa de servir para auditoria. Cada entrada
