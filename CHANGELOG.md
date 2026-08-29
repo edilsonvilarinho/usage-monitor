@@ -1,0 +1,27 @@
+# Changelog
+
+Notable changes to Usage Monitor, in the format of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+**The complete per-version history is on the
+[releases page](https://github.com/edilsonvilarinho/usage-monitor/releases)**, where every tag since
+v1 carries its own notes, generated from the commits it shipped. This file is not a transcript of
+that — it starts here, and from now on each release gets a human summary of what actually changed for
+someone using the app.
+
+## [Unreleased]
+
+### Added
+
+- MIT license, and the repository metadata that goes with an open project: description, topics,
+  contribution guide, security policy, and issue and pull request templates.
+- English `README.md`, with a Portuguese mirror in
+  [`README.pt-BR.md`](README.pt-BR.md).
+- Reference documentation split out of the README:
+  [`docs/integrations.md`](docs/integrations.md),
+  [`docs/architecture.md`](docs/architecture.md) and
+  [`docs/build-and-release.md`](docs/build-and-release.md).
+
+---
+
+For versions up to and including **38.0.2**, see the
+[releases page](https://github.com/edilsonvilarinho/usage-monitor/releases).
