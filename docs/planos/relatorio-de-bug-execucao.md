@@ -118,7 +118,7 @@ usuário.
 | B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ✅ Concluída | `d60f74e` | `gradlew.bat compileKotlinDesktop` → BUILD SUCCESSFUL. **Nenhum teste da suíte exercita `main()`**; quem fecha isto é a `allTests` da auditoria |
 | B10 | Pontos de chamada de use case (pedido do usuário e falha) | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 32 classes, 382 testes, nenhuma `failures>0` (inclui os 4 do `DashboardViewModelBreadcrumbTest`) |
 | B11 | Pontos de chamada nos `catch` que hoje falham em silêncio | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 384 testes, nenhuma `failures>0` (382 antes, +2 da deduplicação do semáforo) |
-| B12 | `GenerateBugReportUseCase` | ⏳ Pendente | — | — |
+| B12 | `GenerateBugReportUseCase` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.GenerateBugReportUseCaseTest"` → `tests="2" failures="0" errors="0"` |
 | B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ⏳ Pendente | — | — |
 | B14 | Captura best-effort da janela via capturer injetável | ⏳ Pendente | — | — |
 | B15 | Registro do handler antes de `application { }` e leitura do marcador no arranque | ⏳ Pendente | — | — |
