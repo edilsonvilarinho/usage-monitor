@@ -148,4 +148,20 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C09 | `onApiKeyRemove` fiado em `Main.kt` | ✅ Concluída | `gradlew.bat desktopJar` → `BUILD SUCCESSFUL`; `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 0 falhas. `allTests` fica para a auditoria final, que roda as três branches em série |
 | C10 | Troca de chave pelo lápis com a fonte já ligada | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 302 testes, 0 falhas |
 | C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ✅ Concluída | Inspeção da seção `#cfg-apis`: lápis nas três linhas com chave, "Remover chave" no rodapé do diálogo, campo esvaziado, duas notas novas |
-| C12 | `allTests` verde + QA manual | ⏳ Pendente | — |
+| C12 | `allTests` verde + QA manual | 🚧 Entregue à auditoria | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.presentation.*"` → `BUILD SUCCESSFUL`, 88 classes, 1013 testes, 0 falhas. `allTests` e o QA manual **não** foram executados aqui — ver abaixo |
+
+### O que C12 não fechou, e por quê
+
+`gradlew.bat allTests` e o QA manual ficaram para a auditoria final, por instrução da execução: três
+branches foram desenvolvidas em paralelo em worktrees separadas, e a suíte completa roda de uma
+worktree por vez, em série. O que rodou aqui foram os três filtros acima, no estado final da árvore.
+
+Roteiro do QA manual que falta rodar, na ordem:
+
+1. Ligar MiniMax sem chave — o diálogo abre, "Remover chave" **não** aparece, salvar liga a fonte.
+2. Clicar no lápis da mesma linha — o diálogo abre com o campo **vazio**; salvar uma chave nova
+   mantém o interruptor ligado e o aviso é "chave de API salva", não "APIs monitoradas".
+3. Clicar no lápis e usar "Remover chave" — o interruptor desliga, o card some do dashboard e
+   `~/.usage-monitor/api-keys.json` fica sem o campo daquela fonte, com as outras duas intactas.
+4. Conferir que Anthropic, Codex, OpenCode Zen Free e Kilo Free **não** têm lápis.
+5. Repetir em tema claro e em inglês (`Manage key` / `Remove key`).
