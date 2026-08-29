@@ -175,7 +175,7 @@ usuário.
 | B15 | Registro do handler antes de `application { }`; `readPendingCrashMarker()` disponível | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="10" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
 | B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.DesktopBugReportWriterTest"` → `tests="3" failures="0" errors="0"` |
 | B17 | `BugReportDialog` stateless + primitiva `AppTextArea` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.BugReportDialogTest"` → `tests="12" failures="0" errors="0"` |
-| B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ⏳ Pendente | — | — |
+| B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.*"` → 309 testes, nenhuma `failures>0` (inclui os 3 do `DiagnosticsSettingsSectionTest`) |
 | B19 | Botão "Abrir issue no GitHub" — URL montada e navegador aberto | ⏳ Pendente | — | — |
 | B20 | Fluxo do marcador: arranque seguinte oferece o relatório e apaga o marcador | ⏳ Pendente | — | — |
 | B21 | `prototipo-visual-opencode.html` — `§12 #cfg-geral` ganha a seção nova | ⏳ Pendente | — | — |

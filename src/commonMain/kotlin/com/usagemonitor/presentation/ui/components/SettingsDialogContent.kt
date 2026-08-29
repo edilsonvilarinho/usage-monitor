@@ -89,6 +89,9 @@ const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
 const val AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG = "autoUpdateFeedOverride"
 const val THEME_PRESET_TEST_TAG_PREFIX = "themePreset_"
 
+/** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
+const val REPORT_BUG_BUTTON_TEST_TAG = "reportBugButton"
+
 /**
  * Seções das Configurações, uma por aba.
  *
@@ -138,6 +141,8 @@ fun SettingsDialogContent(
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
     onUiScaleChange: (Int) -> Unit = {},
+    /** Abre o diálogo de relatório de bug. Default vazio: os geradores de captura não o abrem. */
+    onReportBug: () -> Unit = {},
     onThemeChange: (AppThemePreset) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
@@ -276,7 +281,8 @@ fun SettingsDialogContent(
                         onCardsOnlyModeChange = onCardsOnlyModeChange,
                         onAutoUpdateChange = onAutoUpdateChange,
                         onWindowOpacityChange = onWindowOpacityChange,
-                        onUiScaleChange = onUiScaleChange
+                        onUiScaleChange = onUiScaleChange,
+                        onReportBug = onReportBug
                     )
 
                     SettingsTab.ALERTS -> {
@@ -404,7 +410,8 @@ private fun GeneralSettingsTab(
     onCardsOnlyModeChange: (Boolean) -> Unit,
     onAutoUpdateChange: (Boolean) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
-    onUiScaleChange: (Int) -> Unit
+    onUiScaleChange: (Int) -> Unit,
+    onReportBug: () -> Unit
 ) {
     val isPt = currentLanguage == AppLanguage.PT
 
@@ -490,6 +497,46 @@ private fun GeneralSettingsTab(
             onToggle = onCardsOnlyModeChange,
             showDivider = false
         )
+    }
+
+    // Seção própria, e não mais uma linha em "Sistema": aquelas quatro são
+    // interruptores de comportamento contínuo do app, e esta é uma ação que o
+    // usuário dispara uma vez. A ação vai no `trailing` do cabeçalho porque age
+    // sobre a seção inteira -- mesmo lugar do "Adicionar" da aba Contas.
+    //
+    // `PRIMARY` porque a aba Geral não tinha nenhum botão primário: `PRIMARY` é
+    // uma por tela, e esta é a única ação que a tela propõe.
+    AppDataSurfaceFlush(
+        header = {
+            AppSectionHeader(
+                title = if (isPt) "Diagnóstico" else "Diagnostics",
+                trailing = {
+                    AppButton(
+                        label = if (isPt) "Reportar um bug" else "Report a bug",
+                        tone = AppButtonTone.PRIMARY,
+                        onClick = onReportBug,
+                        modifier = Modifier.testTag(REPORT_BUG_BUTTON_TEST_TAG)
+                    )
+                }
+            )
+        }
+    ) {
+        AppDataRow(showDivider = false) {
+            Text(
+                text = if (isPt) {
+                    "O app guarda uma trilha dos últimos passos e dos erros em " +
+                        "~/.usage-monitor/diagnostics. Ao reportar, você revisa o pacote antes de " +
+                        "publicá-lo: nada é enviado automaticamente."
+                } else {
+                    "The app keeps a trail of the last steps and errors in " +
+                        "~/.usage-monitor/diagnostics. When reporting, you review the package " +
+                        "before publishing it: nothing is sent automatically."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
