@@ -155,7 +155,7 @@ usuário.
 | B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="4" failures="0" errors="0"` |
 | B14 | Captura best-effort da janela via capturer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "…CrashHandlerTest" --tests "…WindowScreenshotCapturerTest"` → `tests="6"` e `tests="2"`, `failures="0"` nos dois |
 | B15 | Registro do handler antes de `application { }`; `readPendingCrashMarker()` disponível | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="10" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
-| B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ⏳ Pendente | — | — |
+| B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.DesktopBugReportWriterTest"` → `tests="3" failures="0" errors="0"` |
 | B17 | `BugReportDialog` stateless | ⏳ Pendente | — | — |
 | B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ⏳ Pendente | — | — |
 | B19 | Botão "Abrir issue no GitHub" — URL montada e navegador aberto | ⏳ Pendente | — | — |
