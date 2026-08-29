@@ -87,6 +87,30 @@ class StartupDiagnosticsTest {
         assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(arrayOf("--autostart-ish")))
     }
 
+    /**
+     * `STARTED` e gravado antes de existir janela e nao consegue dizer o que o
+     * sistema fez com o pedido de "sempre visivel". O segundo registro e por
+     * desfecho e nao por campo: e assim que se acham as duas linhas do mesmo
+     * arranque.
+     */
+    @Test
+    fun `the window shown outcome has its own wire value`() {
+        assertEquals("window-shown", StartupOutcome.WINDOW_SHOWN.wireValue)
+
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.WINDOW_SHOWN,
+                version = "38.0.2",
+                pid = 7,
+                processStartedAtMillis = null,
+                nowMillis = 1L
+            )
+
+            assertTrue(file.readLines().single().contains("\"outcome\":\"window-shown\""))
+        }
+    }
+
     // --- Contexto da maquina no registro --------------------------------------
 
     /**

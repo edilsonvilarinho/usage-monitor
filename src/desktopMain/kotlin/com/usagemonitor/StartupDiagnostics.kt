@@ -41,13 +41,30 @@ internal enum class StartupOutcome {
      * nao ha como separar "o pedido nunca foi lido" de "foi lido e a janela nao
      * veio para a frente" -- que sao defeitos em lugares diferentes.
      */
-    FOCUS_REQUEST_SERVED;
+    FOCUS_REQUEST_SERVED,
+
+    /**
+     * A janela principal foi mapeada e ja pode ser lida de volta.
+     *
+     * `STARTED` e gravado antes de existir janela, e por isso nao consegue
+     * responder o que o sistema fez com o pedido de "sempre visivel" -- ele so
+     * pode ser lido depois do mapeamento (issue #120). Separar o segundo
+     * registro por desfecho, e nao por campo, e o que permite achar as duas
+     * linhas do mesmo arranque e comparar o que foi pedido com o que ficou.
+     *
+     * Valor novo em enum existente e **excecao declarada** a regra do
+     * `CLAUDE.md`, pelo mesmo motivo de `FOCUS_REQUEST_SERVED`: ha um `when`
+     * exaustivo sobre `wireValue`, e o erro de compilacao garante que o valor de
+     * fio existe.
+     */
+    WINDOW_SHOWN;
 
     val wireValue: String
         get() = when (this) {
             STARTED -> "started"
             SECOND_INSTANCE_EXIT -> "second-instance-exit"
             FOCUS_REQUEST_SERVED -> "focus-request-served"
+            WINDOW_SHOWN -> "window-shown"
         }
 }
 
