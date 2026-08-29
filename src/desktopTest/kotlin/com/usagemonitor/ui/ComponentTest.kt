@@ -27,6 +27,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -67,8 +68,10 @@ import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
 import com.usagemonitor.presentation.ui.components.observedActivityTrackTag
 import com.usagemonitor.presentation.ui.components.observedActivityValueTag
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
-import com.usagemonitor.presentation.ui.components.apiSelectorRowTestTag
+import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
+import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
+import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_REMOVE_TEST_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -1735,8 +1738,13 @@ class ComponentTest {
         ).assertCountEquals(0)
     }
 
+    /**
+     * Issue #125: o alvo do clique é o interruptor, não a linha. O `toggleable`
+     * saiu dela para o `AppIconButton` de edição poder conviver ali — com ele na
+     * linha, `mergeDescendants` engoliria o `contentDescription` do ícone.
+     */
     @Test
-    fun `ApiCheckboxRow triggers onCheckedChange on click`() = runDesktopComposeUiTest {
+    fun `ApiCheckboxRow triggers onCheckedChange from the switch`() = runDesktopComposeUiTest {
         var toggled = false
 
         setContent {
@@ -1749,9 +1757,86 @@ class ComponentTest {
             }
         }
 
-        onNodeWithText("MiniMax").performClick()
-        // O clique no label deve acionar o callback
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).assertIsOff().performClick()
         assertEquals(true, toggled)
+    }
+
+    /**
+     * Issue #125: fonte sem chave local não tem o que gerenciar, e um lápis que
+     * abrisse um diálogo vazio seria pior que ícone nenhum.
+     */
+    @Test
+    fun `ApiCheckboxRow omits the edit icon when there is no key to manage`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiCheckboxRow(
+                    api = ApiSource.ANTHROPIC,
+                    isChecked = true,
+                    onCheckedChange = {}
+                )
+            }
+        }
+
+        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.ANTHROPIC)).assertCountEquals(0)
+    }
+
+    /**
+     * O ponto que decide o desenho da linha: com o `toggleable` ainda na linha
+     * inteira, `mergeDescendants` mesclaria este `contentDescription` no nó do
+     * pai e o clique alternaria o interruptor em vez de abrir o diálogo.
+     */
+    @Test
+    fun `ApiCheckboxRow edit icon opens the key dialog without toggling`() = runDesktopComposeUiTest {
+        var edited = false
+        var toggled = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                ApiCheckboxRow(
+                    api = ApiSource.MINIMAX,
+                    isChecked = true,
+                    hasConfiguredApiKey = true,
+                    onCheckedChange = { toggled = true },
+                    onEditApiKey = { edited = true }
+                )
+            }
+        }
+
+        // O rótulo carrega o nome da fonte: são três lápis no mesmo painel, e
+        // três `contentDescription` iguais anunciariam ações indistinguíveis.
+        onNodeWithContentDescription("Gerenciar chave — MiniMax").performClick()
+
+        assertEquals(true, edited)
+        assertEquals(false, toggled)
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).assertIsOn()
+    }
+
+    /**
+     * Issue #125: o painel tem três lápis, e o que os separa — o nome da fonte —
+     * está num nó irmão que o leitor de tela não lê junto com a ação.
+     */
+    @Test
+    fun `ApiSelector gives each edit icon a distinct accessible label`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Gerenciar chave — MiniMax").assertExists()
+        onNodeWithContentDescription("Gerenciar chave — DeepSeek").assertExists()
+        onNodeWithContentDescription("Gerenciar chave — OpenCode Go").assertExists()
     }
 
     // ── ThemeToggle ───────────────────────────────────────────────────────
@@ -2039,7 +2124,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithTag(apiSelectorRowTestTag(ApiSource.MINIMAX)).performClick()
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performClick()
         onNodeWithText("Configurar MiniMax").assertIsDisplayed()
         onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-secret")
         onNodeWithText("Salvar").performClick()
@@ -2081,7 +2166,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithTag(apiSelectorRowTestTag(ApiSource.OPENCODE_GO)).performScrollTo().performClick()
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.OPENCODE_GO)).performScrollTo().performClick()
         onNodeWithText("Configurar OpenCode Go").assertIsDisplayed()
         onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("opencode-secret")
         onNodeWithText("Salvar").performClick()
@@ -2118,10 +2203,209 @@ class ComponentTest {
             }
         }
 
-        onNodeWithTag(apiSelectorRowTestTag(ApiSource.OPENCODE)).performScrollTo().performClick()
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.OPENCODE)).performScrollTo().performClick()
 
         assertEquals(ApiSource.OPENCODE, toggledApi)
         onAllNodesWithText("Configurar OpenCode Zen Free").assertCountEquals(0)
+    }
+
+    /**
+     * Issue #125: o caminho que não existia. Até esta passada o diálogo só abria
+     * ao **ligar** uma fonte sem chave; cadastrada uma vez, ela era definitiva
+     * pela interface. O lápis abre o mesmo diálogo com a fonte já configurada.
+     */
+    @Test
+    fun `SettingsDialogContent opens the key dialog from the pencil of a configured source`() = runDesktopComposeUiTest {
+        var savedKey: String? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.MINIMAX),
+                    configuredApiKeys = setOf(ApiSource.MINIMAX),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeySave = { api, key ->
+                        savedKey = "$api:$key"
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
+        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
+        // O campo nunca vem pré-preenchido com a chave guardada: para trocar,
+        // digita-se a nova.
+        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-rotated")
+        onNodeWithText("Salvar").performClick()
+
+        assertEquals("MINIMAX:minimax-rotated", savedKey)
+    }
+
+    /** Fonte sem chave local não ganha lápis: não há o que gerenciar. */
+    @Test
+    fun `SettingsDialogContent omits the pencil for sources without a local key`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.ANTHROPIC)).assertCountEquals(0)
+        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.OPENCODE)).assertCountEquals(0)
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().assertExists()
+    }
+
+    /**
+     * Issue #125: apagar a chave era impossível pela interface. O botão fica no
+     * mesmo diálogo, como `GHOST` — `PRIMARY` é uma por tela e continua sendo o
+     * "Salvar", que é o que o diálogo propõe.
+     */
+    @Test
+    fun `SettingsDialogContent removes a stored key from the dialog`() = runDesktopComposeUiTest {
+        var removed: ApiSource? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.DEEPSEEK),
+                    configuredApiKeys = setOf(ApiSource.DEEPSEEK),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeyRemove = { api ->
+                        removed = api
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().performClick()
+        onNodeWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).performClick()
+
+        assertEquals(ApiSource.DEEPSEEK, removed)
+        // Gravação confirmada fecha o diálogo.
+        onAllNodesWithText("Configurar DeepSeek").assertCountEquals(0)
+    }
+
+    /**
+     * Ligar uma fonte que nunca foi configurada abre o mesmo diálogo, e ali um
+     * botão de remover não teria o que remover.
+     */
+    @Test
+    fun `SettingsDialogContent hides the remove button when there is no stored key`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeySave = { _, _ -> true },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
+        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
+        onAllNodesWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).assertCountEquals(0)
+    }
+
+    /** Remoção recusada pela camada de dados mantém o diálogo aberto. */
+    @Test
+    fun `SettingsDialogContent keeps the dialog open when removal fails`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.DEEPSEEK),
+                    configuredApiKeys = setOf(ApiSource.DEEPSEEK),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeyRemove = { false },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().performClick()
+        onNodeWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).performClick()
+
+        onNodeWithText("Configurar DeepSeek").assertIsDisplayed()
+    }
+
+    /**
+     * Issue #125: trocar a chave de uma fonte já ligada não mexe no interruptor.
+     * Reafirmá-lo regravaria a preferência, dispararia uma segunda coleta e
+     * trocaria o aviso de "chave de API salva" pelo de "APIs monitoradas".
+     */
+    @Test
+    fun `SettingsDialogContent rotates a key without re-enabling the source`() = runDesktopComposeUiTest {
+        var savedKey: String? = null
+        var toggleCalls = 0
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.MINIMAX),
+                    configuredApiKeys = setOf(ApiSource.MINIMAX),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> toggleCalls += 1 },
+                    onApiKeySave = { api, key ->
+                        savedKey = "$api:$key"
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
+        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-rotated")
+        onNodeWithText("Salvar").performClick()
+
+        assertEquals("MINIMAX:minimax-rotated", savedKey)
+        assertEquals(0, toggleCalls)
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performScrollTo().assertIsOn()
     }
 
     /**

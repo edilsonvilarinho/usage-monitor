@@ -320,6 +320,10 @@ private fun runUsageMonitor(
     val startupDiagnostics = remember { StartupDiagnostics() }
     val startupOrigin = remember { StartupOrigin.from(args) }
 
+    // Resolvido uma vez e reusado pelos tres pontos que gravam: a resolucao le a
+    // entrada de autostart do disco, e a resposta nao muda dentro do processo.
+    val startupMachineContext = remember { StartupMachineContext.current() }
+
     val focusRequests = remember { FocusRequestChannel() }
 
     // Token do health check da atualizacao Linux, quando este processo foi
@@ -337,12 +341,20 @@ private fun runUsageMonitor(
         // produzir nada -- indistinguivel de "o app nao abre". O pedido de foco
         // fica no disco e a instancia viva o atende.
         focusRequests.request()
-        startupDiagnostics.record(startupOrigin, StartupOutcome.SECOND_INSTANCE_EXIT)
+        startupDiagnostics.record(
+            startupOrigin,
+            StartupOutcome.SECOND_INSTANCE_EXIT,
+            machineContext = startupMachineContext
+        )
         exitApplication()
         return@application
     }
     LaunchedEffect(startupDiagnostics, startupOrigin) {
-        startupDiagnostics.record(startupOrigin, StartupOutcome.STARTED)
+        startupDiagnostics.record(
+            startupOrigin,
+            StartupOutcome.STARTED,
+            machineContext = startupMachineContext
+        )
     }
 
     val httpClient = remember {
@@ -1328,7 +1340,11 @@ private fun runUsageMonitor(
             if (focusRequested) {
                 restoreMainWindow()
                 withContext(Dispatchers.IO) {
-                    startupDiagnostics.record(startupOrigin, StartupOutcome.FOCUS_REQUEST_SERVED)
+                    startupDiagnostics.record(
+                        startupOrigin,
+                        StartupOutcome.FOCUS_REQUEST_SERVED,
+                        machineContext = startupMachineContext
+                    )
                 }
             }
         }
@@ -1423,8 +1439,31 @@ private fun runUsageMonitor(
         LaunchedEffect(window) {
             mainWindowRef = window
             // A mesma janela, também fora da composição: é dela que a captura em
-            // caso de queda tira os limites do recorte.
+            // caso de queda tira os limites do recorte. A atribuição vem **antes**
+            // do registro de diagnóstico: aquele suspende numa ida à IO, e uma
+            // queda nesse intervalo não teria de onde tirar os limites do recorte.
             appMainWindow = window
+
+            // Segundo registro do mesmo arranque. `started` e gravado antes de
+            // existir janela e nao consegue responder o que o sistema fez com o
+            // pedido de "sempre visivel" (issue #120).
+            //
+            // O efetivo e lido **de volta da AWT**, nao da preferencia: a
+            // diferenca entre os dois separa "o app nao pediu" de "o pedido foi
+            // engolido". As duas leituras ficam na thread da interface -- so a
+            // escrita no arquivo vai para a IO.
+            val alwaysOnTopRequested = alwaysOnTopEnabled
+            val alwaysOnTopEffective = runCatching { window.isAlwaysOnTop }.getOrNull()
+            withContext(Dispatchers.IO) {
+                startupDiagnostics.record(
+                    startupOrigin,
+                    StartupOutcome.WINDOW_SHOWN,
+                    machineContext = startupMachineContext.copy(
+                        alwaysOnTopRequested = alwaysOnTopRequested,
+                        alwaysOnTopEffective = alwaysOnTopEffective
+                    )
+                )
+            }
         }
         ApplyWindowMinimumSize(
             window = window,
@@ -1985,6 +2024,35 @@ private fun runUsageMonitor(
                                 apiKeySettings.value = apiKeySettings.value.withKey(api, apiKey.trim())
                             }.fold(
                                 onSuccess = {
+                                    showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
+                                    true
+                                },
+                                onFailure = {
+                                    showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
+                                    false
+                                }
+                            )
+                        },
+                        onApiKeyRemove = { api ->
+                            runCatching {
+                                apiKeyDataSource.clear(api)
+                                apiKeySettings.value = apiKeySettings.value.withoutKey(api)
+                                // Apagar a chave desliga a fonte, e as duas
+                                // gravações andam juntas: deixá-la ligada faria a
+                                // coleta falhar com 401 a cada tique até o
+                                // próximo reinício, que é quando o filtro de
+                                // arranque `API_KEY_DEPENDENT_SOURCES` a
+                                // removeria de qualquer forma.
+                                val updatedApis = enabledApis.value - api
+                                enabledApis.value = updatedApis
+                                writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
+                                viewModel.refresh(api)
+                            }.fold(
+                                onSuccess = {
+                                    // Reusa `API_KEY`: é a mesma coisa sendo
+                                    // gravada, e um valor novo em `SettingsField`
+                                    // obrigaria ramo em cada `when` de mensagem
+                                    // sem dizer nada que a tela já não mostre.
                                     showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
                                     true
                                 },

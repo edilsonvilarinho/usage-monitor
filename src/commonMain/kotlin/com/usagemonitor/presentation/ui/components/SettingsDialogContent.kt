@@ -76,6 +76,7 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val API_KEY_DIALOG_FIELD_TEST_TAG = "apiKeyDialogField"
+const val API_KEY_DIALOG_REMOVE_TEST_TAG = "apiKeyDialogRemove"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 
 /** Mesma razão da tag de opacidade: "115%" também é rótulo de chip no cartão de alertas. */
@@ -171,6 +172,12 @@ fun SettingsDialogContent(
     onMonthlyBudgetCommit: (String) -> Unit = {},
     onApiToggle: (ApiSource, Boolean) -> Unit,
     onApiKeySave: (ApiSource, String) -> Boolean = { _, _ -> false },
+    /**
+     * Apaga a chave da fonte e devolve se a gravação foi feita. Espelha
+     * `onApiKeySave`: o diálogo só fecha quando a camada de dados confirma, e um
+     * `false` mantém a tela aberta com o aviso de falha.
+     */
+    onApiKeyRemove: (ApiSource) -> Boolean = { false },
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
     onAnthropicProfileRename: (String, String) -> Unit = { _, _ -> },
@@ -300,7 +307,8 @@ fun SettingsDialogContent(
                         enabledApis = enabledApis,
                         configuredApiKeys = configuredApiKeys,
                         onApiToggle = onApiToggle,
-                        onApiKeySave = onApiKeySave
+                        onApiKeySave = onApiKeySave,
+                        onApiKeyRemove = onApiKeyRemove
                     )
 
                     SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
@@ -547,7 +555,8 @@ private fun MonitoredApisTab(
     enabledApis: Set<ApiSource>,
     configuredApiKeys: Set<ApiSource>,
     onApiToggle: (ApiSource, Boolean) -> Unit,
-    onApiKeySave: (ApiSource, String) -> Boolean
+    onApiKeySave: (ApiSource, String) -> Boolean,
+    onApiKeyRemove: (ApiSource) -> Boolean
 ) {
     var pendingApiKeySource by remember { mutableStateOf<ApiSource?>(null) }
 
@@ -561,6 +570,11 @@ private fun MonitoredApisTab(
         ApiSelector(
             enabledApis = enabledApis,
             configuredApiKeys = configuredApiKeys,
+            // `requiresApiKey` continua sendo o dono da resposta, e não um
+            // literal novo: o conjunto das fontes que dependem de chave já tem
+            // dois donos — este e o filtro de arranque —, e um terceiro seria
+            // onde a fonte seguinte ficaria esquecida.
+            editableApiKeys = EDITABLE_API_KEY_SOURCES,
             language = currentLanguage,
             onToggle = { api, checked ->
                 if (checked && api.requiresApiKey() && api !in configuredApiKeys) {
@@ -568,7 +582,11 @@ private fun MonitoredApisTab(
                 } else {
                     onApiToggle(api, checked)
                 }
-            }
+            },
+            // Pelo lápis o diálogo abre com a fonte já configurada, que é o
+            // caminho que não existia: até aqui a chave só era pedida ao
+            // **ligar** uma fonte sem chave, e depois disso era definitiva.
+            onEditApiKey = { api -> pendingApiKeySource = api }
         )
     }
 
@@ -579,14 +597,46 @@ private fun MonitoredApisTab(
             language = currentLanguage,
             onSave = { apiKey ->
                 if (onApiKeySave(source, apiKey)) {
-                    onApiToggle(source, true)
+                    // Fonte já ligada não é religada. Reafirmar o mesmo conjunto
+                    // regravaria a preferência, dispararia uma segunda coleta e
+                    // trocaria o aviso de "chave de API salva" pelo de "APIs
+                    // monitoradas" — que não é o que quem trocou a chave fez.
+                    // Ligar continua acontecendo no caminho original, o de
+                    // configurar uma fonte que estava desligada.
+                    if (source !in enabledApis) {
+                        onApiToggle(source, true)
+                    }
                     pendingApiKeySource = null
                 }
+            },
+            // Sem chave guardada não há o que remover: o diálogo também abre no
+            // caminho de ligar uma fonte que nunca foi configurada.
+            onRemove = if (source in configuredApiKeys) {
+                {
+                    if (onApiKeyRemove(source)) {
+                        pendingApiKeySource = null
+                    }
+                }
+            } else {
+                null
             },
             onDismiss = { pendingApiKeySource = null }
         )
     }
 }
+
+/**
+ * Fontes cuja linha desta tela ganha o lápis de gerenciar chave.
+ *
+ * **Não é um segundo dono do conjunto**, e o nome diz isso: a resposta continua
+ * saindo de [requiresApiKey], e este val é só a projeção dela em `Set` para o
+ * [ApiSelector]. O nome `API_KEY_DEPENDENT_SOURCES` está tomado pelo literal do
+ * `Main.kt`, que é o filtro de arranque; dois símbolos com o mesmo nome fariam
+ * quem lê os dois concluir que são a mesma constante duplicada, quando um é
+ * literal e o outro é derivado.
+ */
+private val EDITABLE_API_KEY_SOURCES: Set<ApiSource> =
+    ApiSource.entries.filter { source -> source.requiresApiKey() }.toSet()
 
 private fun ApiSource.requiresApiKey(): Boolean {
     return this == ApiSource.MINIMAX ||
@@ -599,6 +649,12 @@ private fun ApiKeyDialog(
     source: ApiSource,
     language: AppLanguage,
     onSave: (String) -> Unit,
+    /**
+     * Apaga a chave guardada. `null` quando não há nenhuma — o diálogo também
+     * abre no caminho de **ligar** uma fonte que nunca foi configurada, e ali um
+     * botão de remover não teria o que remover.
+     */
+    onRemove: (() -> Unit)?,
     onDismiss: () -> Unit
 ) {
     val isPt = language == AppLanguage.PT
@@ -690,11 +746,25 @@ private fun ApiKeyDialog(
             )
         },
         dismissButton = {
-            AppButton(
-                label = if (isPt) "Cancelar" else "Cancel",
-                tone = AppButtonTone.GHOST,
-                onClick = onDismiss
-            )
+            // As duas ações secundárias moram no mesmo slot para o `AlertDialog`
+            // as manter na fileira do rodapé, à esquerda do `PRIMARY`. Remover é
+            // `GHOST` e não `DANGER`: `PRIMARY` é uma por tela e o realce forte
+            // aqui é do "Salvar", que é o que o diálogo propõe.
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                if (onRemove != null) {
+                    AppButton(
+                        label = if (isPt) "Remover chave" else "Remove key",
+                        tone = AppButtonTone.GHOST,
+                        onClick = onRemove,
+                        modifier = Modifier.testTag(API_KEY_DIALOG_REMOVE_TEST_TAG)
+                    )
+                }
+                AppButton(
+                    label = if (isPt) "Cancelar" else "Cancel",
+                    tone = AppButtonTone.GHOST,
+                    onClick = onDismiss
+                )
+            }
         }
     )
 }

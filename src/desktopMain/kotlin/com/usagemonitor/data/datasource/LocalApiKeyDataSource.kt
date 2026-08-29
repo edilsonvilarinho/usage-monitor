@@ -39,6 +39,23 @@ data class ApiKeySettings(
         }
     }
 
+    /**
+     * Irmã de [withKey]: apaga a chave de uma fonte, mantendo as outras.
+     *
+     * Existe como função própria, e não como `withKey(source, "")`, porque a
+     * string vazia é justamente o que [withKey] recebe quando alguém erra —
+     * o nome diz a intenção, e `forSource`/`configuredSources` já tratam
+     * branco como "sem chave", então o campo vazio é a representação certa.
+     */
+    fun withoutKey(source: ApiSource): ApiKeySettings {
+        return when (source) {
+            ApiSource.MINIMAX -> copy(minimax = "")
+            ApiSource.DEEPSEEK -> copy(deepSeek = "")
+            ApiSource.OPENCODE_GO -> copy(openCodeGo = "")
+            else -> this
+        }
+    }
+
     fun configuredSources(): Set<ApiSource> {
         return buildSet {
             if (minimax.isNotBlank()) add(ApiSource.MINIMAX)
@@ -71,6 +88,31 @@ internal class LocalApiKeyDataSource(
     }
 
     fun save(source: ApiSource, apiKey: String) {
+        requireLocalKeySource(source)
+        require(apiKey.isNotBlank()) { "A chave de API não pode ficar vazia." }
+        write(load().withKey(source, apiKey.trim()))
+    }
+
+    /**
+     * Apaga a chave de uma fonte, mantendo as outras e o arquivo no lugar.
+     *
+     * Grava string vazia no modelo e reescreve o arquivo inteiro. O `Json`
+     * desta classe está com `encodeDefaults` desligado, então na prática o
+     * campo **sai** do JSON — que é o mesmo que já acontece hoje com a chave de
+     * uma fonte que nunca foi configurada. `ApiKeySettingsDto` tem default `""`
+     * em todos os campos, então o arquivo continua legível por versões
+     * anteriores do app, que leem "sem chave" — exatamente o que aconteceu.
+     * Apagar o arquivo inteiro levaria junto as outras duas chaves.
+     *
+     * O `require` de fonte válida é o mesmo de [save]: quem não tem chave local
+     * não tem o que apagar, e aceitar em silêncio esconderia a chamada errada.
+     */
+    fun clear(source: ApiSource) {
+        requireLocalKeySource(source)
+        write(load().withoutKey(source))
+    }
+
+    private fun requireLocalKeySource(source: ApiSource) {
         require(
             source == ApiSource.MINIMAX ||
                 source == ApiSource.DEEPSEEK ||
@@ -78,8 +120,6 @@ internal class LocalApiKeyDataSource(
         ) {
             "Apenas MiniMax, DeepSeek e OpenCode Go possuem chave de API local."
         }
-        require(apiKey.isNotBlank()) { "A chave de API não pode ficar vazia." }
-        write(load().withKey(source, apiKey.trim()))
     }
 
     private fun readDto(): ApiKeySettingsDto {

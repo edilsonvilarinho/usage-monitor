@@ -1,8 +1,11 @@
 package com.usagemonitor
 
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class StartupDiagnosticsTest {
@@ -82,6 +85,246 @@ class StartupDiagnosticsTest {
         assertEquals(StartupOrigin.AUTOSTART, StartupOrigin.from(arrayOf("--other", " --autostart ")))
         assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(emptyArray()))
         assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(arrayOf("--autostart-ish")))
+    }
+
+    /**
+     * `STARTED` e gravado antes de existir janela e nao consegue dizer o que o
+     * sistema fez com o pedido de "sempre visivel". O segundo registro e por
+     * desfecho e nao por campo: e assim que se acham as duas linhas do mesmo
+     * arranque.
+     */
+    @Test
+    fun `the window shown outcome has its own wire value`() {
+        assertEquals("window-shown", StartupOutcome.WINDOW_SHOWN.wireValue)
+
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.WINDOW_SHOWN,
+                version = "38.0.2",
+                pid = 7,
+                processStartedAtMillis = null,
+                nowMillis = 1L
+            )
+
+            assertTrue(file.readLines().single().contains("\"outcome\":\"window-shown\""))
+        }
+    }
+
+    /**
+     * As tres leituras do "sempre visivel" moram na mesma linha de proposito: a
+     * preferencia que o app pediu, o que a AWT devolveu depois de criada a
+     * janela, e se o ambiente sequer suporta o recurso. Espalhadas em linhas
+     * diferentes elas nao poderiam ser comparadas entre si.
+     */
+    @Test
+    fun `the window shown line compares the requested flag with the effective one`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.WINDOW_SHOWN,
+                version = "38.0.2",
+                pid = 7,
+                processStartedAtMillis = null,
+                nowMillis = 1L,
+                machineContext = StartupMachineContext(
+                    sessionType = "wayland",
+                    desktop = "KDE",
+                    alwaysOnTopSupported = true
+                ).copy(
+                    alwaysOnTopRequested = true,
+                    alwaysOnTopEffective = false
+                )
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"alwaysOnTopRequested\":true"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopEffective\":false"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopSupported\":true"), entry)
+            assertTrue(entry.contains("\"sessionType\":\"wayland\""), entry)
+        }
+    }
+
+    /** Nas linhas gravadas antes da janela nao ha o que ler dela. */
+    @Test
+    fun `lines written before the window says nothing about the always on top flag`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.STARTED,
+                version = "38.0.2",
+                pid = 7,
+                processStartedAtMillis = null,
+                nowMillis = 1L,
+                machineContext = StartupMachineContext(alwaysOnTopSupported = true)
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"alwaysOnTopRequested\":null"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopEffective\":null"), entry)
+        }
+    }
+
+    // --- Contexto da maquina no registro --------------------------------------
+
+    /**
+     * Campo novo com default e retrocompativel: uma linha ja gravada, sem
+     * nenhum deles, continua desserializando. Valor novo de enum nao seria.
+     */
+    @Test
+    fun `a line written before the machine context still deserializes`() {
+        val legacyLine = """
+            {"ts":"2026-08-25T11:00:00Z","pid":42,"version":"37.0.0","origin":"autostart","outcome":"started"}
+        """.trimIndent()
+
+        val entry = Json { ignoreUnknownKeys = true }
+            .decodeFromString<StartupDiagnosticsEntry>(legacyLine)
+
+        assertEquals("autostart", entry.origin)
+        assertNull(entry.sessionType)
+        assertNull(entry.alwaysOnTopSupported)
+        assertNull(entry.autostartEntryValid)
+    }
+
+    /**
+     * `null` e "nao medido", nunca "medido e falso": nesta versao so o Linux mede
+     * o ambiente grafico e a entrada de autostart, e num arquivo do Windows um
+     * `false` afirmaria uma medida que ninguem fez.
+     */
+    @Test
+    fun `the machine context is written when it was measured`() {
+        val line = Json { encodeDefaults = true }.encodeToString(
+            StartupDiagnosticsEntry(
+                ts = "2026-08-29T11:00:00Z",
+                pid = 42,
+                version = "38.0.2",
+                origin = "autostart",
+                outcome = "started",
+                osName = "Linux",
+                osVersion = "6.16.3-200.bazzite.fc42.x86_64",
+                sessionType = "wayland",
+                desktop = "KDE",
+                alwaysOnTopSupported = true,
+                autostartEntryPresent = true,
+                autostartEntryValid = false
+            )
+        )
+
+        assertTrue(line.contains("\"sessionType\":\"wayland\""), line)
+        assertTrue(line.contains("\"desktop\":\"KDE\""), line)
+        assertTrue(line.contains("\"alwaysOnTopSupported\":true"), line)
+        assertTrue(line.contains("\"autostartEntryPresent\":true"), line)
+        assertTrue(line.contains("\"autostartEntryValid\":false"), line)
+    }
+
+    /**
+     * O contexto viaja como objeto e nao como sete parametros: os sete sao a
+     * mesma medida, e resolve-los toca disco -- fazer isso a cada uma das tres
+     * gravacoes repetiria I/O cuja resposta nao muda dentro do processo.
+     */
+    @Test
+    fun `the recorded line carries the machine context it was given`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.AUTOSTART,
+                outcome = StartupOutcome.STARTED,
+                version = "38.0.2",
+                pid = 4242,
+                processStartedAtMillis = null,
+                nowMillis = 1L,
+                machineContext = StartupMachineContext(
+                    osName = "Linux",
+                    osVersion = "6.16.3-200.bazzite.fc42.x86_64",
+                    sessionType = "wayland",
+                    desktop = "KDE",
+                    alwaysOnTopSupported = true,
+                    autostartEntryPresent = true,
+                    autostartEntryValid = false
+                )
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"osName\":\"Linux\""), entry)
+            assertTrue(entry.contains("\"sessionType\":\"wayland\""), entry)
+            assertTrue(entry.contains("\"desktop\":\"KDE\""), entry)
+            assertTrue(entry.contains("\"alwaysOnTopSupported\":true"), entry)
+            assertTrue(entry.contains("\"autostartEntryValid\":false"), entry)
+        }
+    }
+
+    /**
+     * O default e `EMPTY`, e nao `current()`: a suite exercita o formato do
+     * arquivo, e nao pode tocar disco nem AWT para isso. Quem mede de verdade e o
+     * `main()`, que passa o contexto explicitamente.
+     */
+    @Test
+    fun `without a machine context nothing is asserted about the machine`() {
+        withTempFile { file ->
+            StartupDiagnostics(diagnosticsFile = file).record(
+                origin = StartupOrigin.MANUAL,
+                outcome = StartupOutcome.STARTED,
+                version = "38.0.2",
+                pid = 1,
+                processStartedAtMillis = null,
+                nowMillis = 1L
+            )
+
+            val entry = file.readLines().single()
+            assertTrue(entry.contains("\"sessionType\":null"), entry)
+            assertTrue(entry.contains("\"alwaysOnTopSupported\":null"), entry)
+            assertTrue(entry.contains("\"autostartEntryPresent\":null"), entry)
+        }
+    }
+
+    // --- Ambiente grafico do Linux -------------------------------------------
+
+    /**
+     * O tipo de sessao e normalizado para minusculas: `X11` e `x11` sao a mesma
+     * resposta, e duas grafias no arquivo dariam duas linhas para o mesmo caso.
+     * O `XDG_CURRENT_DESKTOP` vai verbatim porque e uma lista separada por dois
+     * pontos, e recortar so o primeiro item perderia o que distingue uma sessao
+     * derivada da original.
+     */
+    @Test
+    fun `graphics environment normalizes the session type and keeps the desktop list intact`() {
+        val environment = linuxGraphicsEnvironment { name ->
+            when (name) {
+                "XDG_SESSION_TYPE" -> "Wayland"
+                "XDG_CURRENT_DESKTOP" -> "ubuntu:GNOME"
+                else -> null
+            }
+        }
+
+        assertEquals("wayland", environment.sessionType)
+        assertEquals("ubuntu:GNOME", environment.desktop)
+    }
+
+    /**
+     * Variavel ausente e variavel em branco sao a mesma resposta -- "nao
+     * informado". Guardar string vazia faria um campo sem medida parecer medido.
+     */
+    @Test
+    fun `graphics environment reports missing and blank variables as not informed`() {
+        val absent = linuxGraphicsEnvironment { null }
+        assertNull(absent.sessionType)
+        assertNull(absent.desktop)
+
+        val blank = linuxGraphicsEnvironment { "   " }
+        assertNull(blank.sessionType)
+        assertNull(blank.desktop)
+    }
+
+    /**
+     * A leitura do ambiente nao pode derrubar o arranque: o gestor de seguranca
+     * de um ambiente restrito lanca em `getenv`, e o registro existe para
+     * explicar o app, nao para impedi-lo de subir.
+     */
+    @Test
+    fun `graphics environment survives a lookup that throws`() {
+        val environment = linuxGraphicsEnvironment { throw SecurityException("bloqueado") }
+
+        assertNull(environment.sessionType)
+        assertNull(environment.desktop)
     }
 
     private fun withTempFile(block: (File) -> Unit) {
