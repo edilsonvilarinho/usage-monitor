@@ -2179,6 +2179,71 @@ class ComponentTest {
     }
 
     /**
+     * Issue #125: o caminho que não existia. Até esta passada o diálogo só abria
+     * ao **ligar** uma fonte sem chave; cadastrada uma vez, ela era definitiva
+     * pela interface. O lápis abre o mesmo diálogo com a fonte já configurada.
+     */
+    @Test
+    fun `SettingsDialogContent opens the key dialog from the pencil of a configured source`() = runDesktopComposeUiTest {
+        var savedKey: String? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.MINIMAX),
+                    configuredApiKeys = setOf(ApiSource.MINIMAX),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeySave = { api, key ->
+                        savedKey = "$api:$key"
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
+        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
+        // O campo nunca vem pré-preenchido com a chave guardada: para trocar,
+        // digita-se a nova.
+        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-rotated")
+        onNodeWithText("Salvar").performClick()
+
+        assertEquals("MINIMAX:minimax-rotated", savedKey)
+    }
+
+    /** Fonte sem chave local não ganha lápis: não há o que gerenciar. */
+    @Test
+    fun `SettingsDialogContent omits the pencil for sources without a local key`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.ANTHROPIC)).assertCountEquals(0)
+        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.OPENCODE)).assertCountEquals(0)
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().assertExists()
+    }
+
+    /**
      * Issue #70: o interruptor que esconde a moldura da janela mora ao lado de
      * "manter sempre visível" — as duas são propriedades da moldura.
      */

@@ -514,6 +514,11 @@ private fun MonitoredApisTab(
         ApiSelector(
             enabledApis = enabledApis,
             configuredApiKeys = configuredApiKeys,
+            // `requiresApiKey` continua sendo o dono da resposta, e não um
+            // literal novo: o conjunto das fontes que dependem de chave já tem
+            // dois donos — este e o filtro de arranque —, e um terceiro seria
+            // onde a fonte seguinte ficaria esquecida.
+            editableApiKeys = API_KEY_DEPENDENT_SOURCES,
             language = currentLanguage,
             onToggle = { api, checked ->
                 if (checked && api.requiresApiKey() && api !in configuredApiKeys) {
@@ -521,7 +526,11 @@ private fun MonitoredApisTab(
                 } else {
                     onApiToggle(api, checked)
                 }
-            }
+            },
+            // Pelo lápis o diálogo abre com a fonte já configurada, que é o
+            // caminho que não existia: até aqui a chave só era pedida ao
+            // **ligar** uma fonte sem chave, e depois disso era definitiva.
+            onEditApiKey = { api -> pendingApiKeySource = api }
         )
     }
 
@@ -540,6 +549,16 @@ private fun MonitoredApisTab(
         )
     }
 }
+
+/**
+ * Fontes que dependem de chave local, derivadas de [requiresApiKey].
+ *
+ * Lista derivada e não literal: `requiresApiKey` continua sendo o único ponto
+ * que responde à pergunta nesta tela, e o `filter` garante que uma fonte nova
+ * entre nos dois lugares de uma vez.
+ */
+private val API_KEY_DEPENDENT_SOURCES: Set<ApiSource> =
+    ApiSource.entries.filter { source -> source.requiresApiKey() }.toSet()
 
 private fun ApiSource.requiresApiKey(): Boolean {
     return this == ApiSource.MINIMAX ||

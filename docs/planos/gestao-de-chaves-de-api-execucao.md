@@ -103,7 +103,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C04 | `LocalApiKeyDataSource.clear(source)` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 8 testes, 0 falhas |
 | C05 | `toggleable` movido da linha para o `AppSwitch` + `apiSelectorSwitchTestTag` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 294 testes, 0 falhas |
 | C06 | `onEditApiKey` + `AppIconButton` de lápis em `ApiCheckboxRow` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 296 testes, 0 falhas |
-| C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ⏳ Pendente | — |
+| C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 298 testes, 0 falhas |
 | C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ⏳ Pendente | — |
 | C09 | `onApiKeyRemove` fiado em `Main.kt` | ⏳ Pendente | — |
 | C10 | Troca de chave pelo lápis com a fonte já ligada | ⏳ Pendente | — |
