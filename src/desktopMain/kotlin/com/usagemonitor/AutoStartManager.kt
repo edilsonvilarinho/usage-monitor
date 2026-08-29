@@ -281,6 +281,100 @@ object AutoStartManager {
     }
 
     /**
+     * Estado da entrada de autostart do Linux, em **dois booleanos**.
+     *
+     * Nunca o caminho: ele carrega o nome do usuario, e este e o mesmo arquivo
+     * que o relatorio de bug empacota para uma issue publica. Booleano responde
+     * a mesma pergunta sem carregar identidade.
+     */
+    internal data class LinuxAutostartEntryState(
+        val present: Boolean,
+        val valid: Boolean
+    )
+
+    /**
+     * Le a entrada de autostart e diz se ela **funcionaria**.
+     *
+     * `present` e o que [isAutoStartEnabled] ja respondia -- o arquivo existe --,
+     * e foi por essa ser a unica pergunta que o defeito do `Path=` entre aspas
+     * passou despercebido: o interruptor ficava ligado com uma entrada que o
+     * spawn recusava no `chdir`. `valid` e a pergunta que faltava.
+     *
+     * Leitor e teste de execucao **injetados** porque a suite roda no Windows:
+     * ali nao existe `~/.config/autostart` nem bit de execucao.
+     */
+    internal fun inspectLinuxAutostartEntry(
+        readEntry: () -> String? = { readFileOrNull(linuxAutostartFile()) },
+        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } }
+    ): LinuxAutostartEntryState {
+        val entry = runCatching { readEntry() }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: return LinuxAutostartEntryState(present = false, valid = false)
+
+        val program = desktopEntryValue(entry, "Exec")?.let(::firstDesktopExecArgument)
+        val workingDirectory = desktopEntryValue(entry, "Path")
+
+        // As duas condicoes cobrem os dois modos de falha silenciosa ja vistos:
+        // o executavel podado junto com a arvore versionada, e o diretorio de
+        // trabalho entre aspas.
+        val valid = program != null &&
+            runCatching { isExecutable(program) }.getOrDefault(false) &&
+            workingDirectory != null &&
+            !workingDirectory.startsWith("\"")
+
+        return LinuxAutostartEntryState(present = true, valid = valid)
+    }
+
+    /** Valor cru de uma chave do grupo `[Desktop Entry]`, sem interpretar nada. */
+    private fun desktopEntryValue(entry: String, key: String): String? {
+        return entry.lineSequence()
+            .map(String::trim)
+            .firstNotNullOfOrNull { line ->
+                line.removePrefix("$key=")
+                    .takeIf { it != line }
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+            }
+    }
+
+    /**
+     * Primeiro argumento do `Exec=`, que e o programa.
+     *
+     * Aqui as aspas **sao** da especificacao e precisam ser desfeitas: no `Exec`
+     * elas delimitam o argumento e o leitor as remove antes do spawn. E o oposto
+     * exato do `Path=`, lido verbatim -- e a razao de as duas chaves nao se
+     * escreverem do mesmo jeito.
+     */
+    private fun firstDesktopExecArgument(exec: String): String? {
+        if (!exec.startsWith("\"")) {
+            return exec.substringBefore(' ').takeIf { it.isNotBlank() }
+        }
+
+        val program = StringBuilder()
+        var index = 1
+        while (index < exec.length) {
+            val character = exec[index]
+            when {
+                character == '\\' && index + 1 < exec.length -> {
+                    program.append(exec[index + 1])
+                    index += 2
+                }
+
+                character == '"' -> return program.toString().takeIf { it.isNotBlank() }
+
+                else -> {
+                    program.append(character)
+                    index += 1
+                }
+            }
+        }
+
+        // Aspas sem fechamento: entrada corrompida, e nao um caminho.
+        return null
+    }
+
+    /**
      * As duas chaves nao se escrevem do mesmo jeito, e a simetria custou o
      * arranque inteiro no Linux.
      *

@@ -325,6 +325,81 @@ class AutoStartManagerTest {
         )
     }
 
+    // --- Linux: estado da entrada de autostart --------------------------------
+
+    /**
+     * `present` sozinho e o que o interruptor ja perguntava, e foi por isso que o
+     * defeito do `Path=` passou: o arquivo existia e a entrada nao subia o app.
+     */
+    @Test
+    fun `a well formed linux entry is present and valid`() {
+        val state = AutoStartManager.inspectLinuxAutostartEntry(
+            readEntry = {
+                AutoStartManager.buildLinuxDesktopEntry(stableLauncher, "/home/edils/.local/bin")
+            },
+            isExecutable = { path -> path == stableLauncher }
+        )
+
+        assertTrue(state.present)
+        assertTrue(state.valid)
+    }
+
+    /** A entrada que as versoes anteriores escreviam: `Path` entre aspas. */
+    @Test
+    fun `a linux entry with a quoted working directory is present but not valid`() {
+        val legacyEntry = """
+            [Desktop Entry]
+            Type=Application
+            Name=Usage Monitor
+            Exec="$stableLauncher" --autostart
+            Path="/home/edils/.local/bin"
+            Terminal=false
+        """.trimIndent()
+
+        val state = AutoStartManager.inspectLinuxAutostartEntry(
+            readEntry = { legacyEntry },
+            isExecutable = { path -> path == stableLauncher }
+        )
+
+        assertTrue(state.present)
+        assertFalse(state.valid)
+    }
+
+    /**
+     * A arvore versionada e podada dois ciclos depois da atualizacao, e a entrada
+     * passa a nomear um caminho que nao existe -- sem erro na tela.
+     */
+    @Test
+    fun `a linux entry pointing at a pruned executable is present but not valid`() {
+        val state = AutoStartManager.inspectLinuxAutostartEntry(
+            readEntry = {
+                AutoStartManager.buildLinuxDesktopEntry(versionedExecutable, "$linuxRoot/versions/39.0.0")
+            },
+            isExecutable = { false }
+        )
+
+        assertTrue(state.present)
+        assertFalse(state.valid)
+    }
+
+    /** Arquivo ausente, em branco ou ilegivel: nao ha entrada para julgar. */
+    @Test
+    fun `a missing linux entry is neither present nor valid`() {
+        listOf<() -> String?>(
+            { null },
+            { "   " },
+            { throw java.io.IOException("ilegível") }
+        ).forEach { reader ->
+            val state = AutoStartManager.inspectLinuxAutostartEntry(
+                readEntry = reader,
+                isExecutable = { true }
+            )
+
+            assertFalse(state.present)
+            assertFalse(state.valid)
+        }
+    }
+
     private fun createTempDir(): File {
         return kotlin.io.path.createTempDirectory("autostart-manager-test").toFile()
     }
