@@ -33,6 +33,11 @@ OpenCode Go), abrindo o `ApiKeyDialog` que já existe. É o mesmo padrão da aba
 `onEditApiKey` nulo não desenha nada, e um lápis que abre um diálogo vazio seria pior que ícone
 nenhum.
 
+**O ícone vem antes do interruptor**, e não depois: assim o interruptor continua sendo o último
+elemento das sete linhas e fica no mesmo x, com ou sem lápis. Com ele por último, as três linhas com
+chave empurrariam o interruptor para a esquerda e a coluna quebraria. É também a ordem que o
+protótipo desenha na aba Contas (`§12d`), a outra linha do app com switch e lápis juntos.
+
 ### O campo nunca é pré-preenchido com a chave guardada
 
 A linha já diz "Chave configurada". Trazer o segredo para dentro da composição não ajuda a trocá-la
@@ -97,7 +102,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C03 | `ApiKeySettings.withoutKey(source)` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 6 testes, 0 falhas |
 | C04 | `LocalApiKeyDataSource.clear(source)` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 8 testes, 0 falhas |
 | C05 | `toggleable` movido da linha para o `AppSwitch` + `apiSelectorSwitchTestTag` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 294 testes, 0 falhas |
-| C06 | `onEditApiKey` + `AppIconButton` de lápis em `ApiCheckboxRow` | ⏳ Pendente | — |
+| C06 | `onEditApiKey` + `AppIconButton` de lápis em `ApiCheckboxRow` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 296 testes, 0 falhas |
 | C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ⏳ Pendente | — |
 | C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ⏳ Pendente | — |
 | C09 | `onApiKeyRemove` fiado em `Main.kt` | ⏳ Pendente | — |

@@ -27,6 +27,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -67,6 +68,7 @@ import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
 import com.usagemonitor.presentation.ui.components.observedActivityTrackTag
 import com.usagemonitor.presentation.ui.components.observedActivityValueTag
 import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
+import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
 import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
@@ -1756,6 +1758,54 @@ class ComponentTest {
 
         onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).assertIsOff().performClick()
         assertEquals(true, toggled)
+    }
+
+    /**
+     * Issue #125: fonte sem chave local não tem o que gerenciar, e um lápis que
+     * abrisse um diálogo vazio seria pior que ícone nenhum.
+     */
+    @Test
+    fun `ApiCheckboxRow omits the edit icon when there is no key to manage`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiCheckboxRow(
+                    api = ApiSource.ANTHROPIC,
+                    isChecked = true,
+                    onCheckedChange = {}
+                )
+            }
+        }
+
+        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.ANTHROPIC)).assertCountEquals(0)
+    }
+
+    /**
+     * O ponto que decide o desenho da linha: com o `toggleable` ainda na linha
+     * inteira, `mergeDescendants` mesclaria este `contentDescription` no nó do
+     * pai e o clique alternaria o interruptor em vez de abrir o diálogo.
+     */
+    @Test
+    fun `ApiCheckboxRow edit icon opens the key dialog without toggling`() = runDesktopComposeUiTest {
+        var edited = false
+        var toggled = false
+
+        setContent {
+            AppTheme(isDark = true) {
+                ApiCheckboxRow(
+                    api = ApiSource.MINIMAX,
+                    isChecked = true,
+                    hasConfiguredApiKey = true,
+                    onCheckedChange = { toggled = true },
+                    onEditApiKey = { edited = true }
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Gerenciar chave").performClick()
+
+        assertEquals(true, edited)
+        assertEquals(false, toggled)
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).assertIsOn()
     }
 
     // ── ThemeToggle ───────────────────────────────────────────────────────
