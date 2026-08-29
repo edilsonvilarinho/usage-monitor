@@ -9,10 +9,15 @@ interface AppUpdateRepository {
     /**
      * Notas da release de [version], já filtradas para o que o usuário percebe.
      *
-     * Sucesso com `null` é **release sem nada a mostrar** e sucesso com lista
-     * vazia não existe: os dois casos colapsam em `null`, e quem chama trata um
-     * caso só. Falha é falha de rede, e ela importa — quem falha tenta de novo
-     * na abertura seguinte, em vez de marcar a versão como já vista.
+     * Sucesso com `null` é **nada a mostrar**, e cobre dois casos que dão na
+     * mesma para quem chama: release cujos commits são todos internos, e release
+     * que **não existe** — a tag ainda não foi publicada. Sucesso com lista
+     * vazia não existe.
+     *
+     * Falha é falha de rede, e a distinção importa: quem falha tenta de novo na
+     * abertura seguinte, em vez de marcar a versão como já vista. Tag inexistente
+     * não é falha justamente por isso — a resposta é definitiva e retentar não a
+     * mudaria, então retentar a cada abertura seria requisição perpétua.
      */
     suspend fun getReleaseNotes(version: String, previousVersion: String?): Result<ReleaseNotes?>
 }

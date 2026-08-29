@@ -68,7 +68,9 @@ class AppUpdateRepositoryImpl(
                 // remove ao ler; aqui o caminho é o inverso.
                 tag = "v$version",
                 feedUrlOverride = envVarReader()
-            )
+            // Tag inexistente e release sem nada a mostrar dão no mesmo para quem
+            // chama: não há novidade, e insistir não mudaria a resposta.
+            ) ?: return@runCatching null
 
             val items = parseReleaseNoteItems(release.body)
             if (items.isEmpty()) {
