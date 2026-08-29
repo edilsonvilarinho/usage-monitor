@@ -112,6 +112,16 @@ usuário.
   com as falhas engolidas. São dois casos diferentes: aquelas são frequentes, de baixo valor e nunca
   revisadas; esta é o evento único que motiva o relatório inteiro, e o usuário lê o pacote antes de
   publicá-lo.
+- **`appMainWindow` é `@Volatile` de topo, e não `mainWindowRef`.** Aquele é estado de composição; o
+  handler de crash roda fora dela, possivelmente com a composição já morta. Quem escreve é a thread da
+  UI e quem lê é a thread que caiu.
+- **A leitura do marcador não apaga o marcador.** Apagar na leitura perderia a queda se o app fosse
+  fechado antes de a tela aparecer — que é exatamente o que acontece quando ele volta quebrado. Quem
+  apaga é o B20, depois de ter oferecido o relatório.
+- **O B15 instala o handler e entrega `readPendingCrashMarker()`; o ponto de chamada dela é o B20.**
+  Um `val` que ninguém lê é aviso do compilador, não funcionalidade, e o consumidor da leitura é o
+  diálogo, que só existe no B17. Ajuste declarado à ordem do plano, sem mudar o conteúdo de nenhuma
+  das duas atividades.
 - **A captura é dos limites da janela, nunca da tela.** O recorte é a diferença entre um diagnóstico e
   um vazamento: a tela inteira traria o que mais estivesse aberto — outra janela, um e-mail, um
   terminal com uma credencial na linha de comando — e o pacote vira issue pública. O que o `Robot` lê
@@ -144,7 +154,7 @@ usuário.
 | B12 | `GenerateBugReportUseCase` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.GenerateBugReportUseCaseTest"` → `tests="2" failures="0" errors="0"` |
 | B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="4" failures="0" errors="0"` |
 | B14 | Captura best-effort da janela via capturer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "…CrashHandlerTest" --tests "…WindowScreenshotCapturerTest"` → `tests="6"` e `tests="2"`, `failures="0"` nos dois |
-| B15 | Registro do handler antes de `application { }` e leitura do marcador no arranque | ⏳ Pendente | — | — |
+| B15 | Registro do handler antes de `application { }`; `readPendingCrashMarker()` disponível | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="10" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
 | B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ⏳ Pendente | — | — |
 | B17 | `BugReportDialog` stateless | ⏳ Pendente | — | — |
 | B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ⏳ Pendente | — | — |

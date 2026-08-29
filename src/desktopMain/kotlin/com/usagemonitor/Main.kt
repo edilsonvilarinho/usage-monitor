@@ -273,8 +273,27 @@ private fun loadWindowIcon() = runCatching {
  */
 fun main(args: Array<String>) {
     val breadcrumbs = LocalBreadcrumbRecorder()
+
+    // Registrado ANTES da janela: uma exceção que derrube uma thread durante a
+    // construção dos recursos -- que é onde o app some sem deixar nada -- só tem
+    // handler se ele já estiver de pé aqui.
+    CrashHandler(
+        breadcrumbs = breadcrumbs,
+        screenshots = RobotWindowScreenshotCapturer { appMainWindow }
+    ).install()
+
     runUsageMonitor(args, breadcrumbs)
 }
+
+/**
+ * A janela principal vista de **fora** da composição.
+ *
+ * `mainWindowRef` é estado de composição e o handler de crash roda fora dela,
+ * possivelmente com a composição já morta. `@Volatile` porque quem escreve é a
+ * thread da UI e quem lê é a thread que caiu.
+ */
+@Volatile
+private var appMainWindow: java.awt.Window? = null
 
 /**
  * Passo de navegacao: uma tela ou modal que o usuario abriu.
@@ -1380,6 +1399,9 @@ private fun runUsageMonitor(
     ) {
         LaunchedEffect(window) {
             mainWindowRef = window
+            // A mesma janela, também fora da composição: é dela que a captura em
+            // caso de queda tira os limites do recorte.
+            appMainWindow = window
         }
         ApplyWindowMinimumSize(
             window = window,

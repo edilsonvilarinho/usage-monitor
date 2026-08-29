@@ -156,6 +156,61 @@ class CrashHandlerTest {
         }
     }
 
+    @Test
+    fun `the marker written by a crash is readable at the next startup`() {
+        withTempFile { marker ->
+            CrashHandler(
+                breadcrumbs = CapturingRecorder(),
+                markerFile = marker,
+                nowMillis = { 1_700_000_000_000L }
+            ).uncaughtException(Thread.currentThread(), thrown())
+
+            val read = readPendingCrashMarker(markerFile = marker)
+
+            assertEquals("IllegalStateException", read?.exception)
+            assertEquals("índice indisponível", read?.message)
+            assertEquals("2023-11-14T22:13:20Z", read?.ts)
+        }
+    }
+
+    @Test
+    fun `no marker means no pending crash`() {
+        withTempFile { marker ->
+            assertEquals(null, readPendingCrashMarker(markerFile = marker))
+        }
+    }
+
+    /**
+     * Arquivo truncado por um desligamento abrupto é o caso em que esta leitura
+     * mais precisa funcionar: devolve nulo, não lança.
+     */
+    @Test
+    fun `an unreadable marker is treated as no crash`() {
+        withTempFile { marker ->
+            marker.parentFile?.mkdirs()
+            marker.writeText("{\"ts\":\"2023-11-14T22")
+
+            assertEquals(null, readPendingCrashMarker(markerFile = marker))
+        }
+    }
+
+    /**
+     * A leitura **não apaga**. Apagar aqui perderia a queda se o app fosse
+     * fechado antes de a tela aparecer — que é exatamente o que acontece quando
+     * ele volta quebrado.
+     */
+    @Test
+    fun `reading the marker leaves it on disk`() {
+        withTempFile { marker ->
+            CrashHandler(breadcrumbs = CapturingRecorder(), markerFile = marker)
+                .uncaughtException(Thread.currentThread(), thrown())
+
+            readPendingCrashMarker(markerFile = marker)
+
+            assertTrue(marker.exists())
+        }
+    }
+
     private fun thrown(): Throwable {
         return runCatching { throw IllegalStateException("índice indisponível") }
             .exceptionOrNull()!!

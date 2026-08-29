@@ -27,6 +27,28 @@ internal data class PendingCrashMarker(
 )
 
 /**
+ * Lê o marcador deixado pela sessão anterior, se houver.
+ *
+ * **Não apaga nada.** Quem apaga é o arranque, depois de ter oferecido o
+ * relatório — apagar na leitura perderia a queda se o app fosse fechado antes de
+ * a tela aparecer, que é justamente o que acontece quando ele volta quebrado.
+ *
+ * Marcador ilegível devolve `null` e não lança: um arquivo truncado por um
+ * desligamento abrupto é o caso em que este código mais precisa funcionar.
+ */
+internal fun readPendingCrashMarker(
+    markerFile: File = CrashHandler.defaultMarkerFile(),
+    json: Json = Json { ignoreUnknownKeys = true }
+): PendingCrashMarker? {
+    return runCatching {
+        if (!markerFile.exists()) {
+            return null
+        }
+        json.decodeFromString<PendingCrashMarker>(markerFile.readText())
+    }.getOrNull()
+}
+
+/**
  * Handler de exceção não tratada.
  *
  * Ao disparar faz três coisas, todas dentro de `runCatching`: anota um passo
