@@ -211,6 +211,31 @@ declarada à regra de não criar valor novo em enum existente, porque há **um**
   (`waitForIdle`). `AppUpdateUiState` é `sealed interface`, não enum: valor novo ali é erro de
   compilação nos `when`, e portanto visível.
 
+**Novidades da versão** (`ReleaseNotes.kt` + `ReleaseNotesController.kt`; issues #74 e #127): a janela
+que diz o que mudou depois de uma troca de versão. **O gatilho é `CURRENT_APP_VERSION` diferente da
+marca `releaseNotesSeenVersion`, nunca o recibo do instalador.**
+- **O recibo perde a corrida no Linux, sempre.** No Windows o NSIS o grava **antes** de relançar o
+  app; no Linux o `linux-updater.sh` só o grava **depois do ACK**, que é escrito pelo app novo já em
+  execução — quando ele lê o arquivo, ele ainda descreve a atualização anterior. A ordem do script é a
+  correta: antes do ACK ainda pode haver rollback. Com o recibo como condição, a janela nunca aparecia
+  no Linux, em instalação manual (`.exe` sem `/UPDATE`, `.sh`, `.deb`, `.rpm`) nem no macOS, que não
+  tem instalador automático e portanto nunca teve recibo.
+- **Marca ausente não é uma situação só.** Sem recibo no disco é instalação nova e fica em silêncio —
+  "novidades" para quem não tem versão anterior não descreve mudança nenhuma. **Com** recibo é máquina
+  que já atualizou alguma vez, e abre: sem esse ramo, quem foi atingido pela #127 (e que por definição
+  nunca chegou a marcar nada) só veria a janela uma versão depois de a correção sair.
+- **Retrocesso marca em silêncio**, e não é caso hipotético: no `health-timeout` do updater do Linux o
+  app novo chega a abrir a janela e a gravar a marca antes de o script desistir e restaurar a versão
+  anterior. É esse ramo que reescreve a marca para baixo; sem ele as novidades daquela versão ficariam
+  perdidas para sempre. Ele cobre também "mesma versão escrita de outro jeito" (`38.0.2` × `38.0.02`),
+  que a igualdade textual não pega.
+- **`MARK_SEEN_ONLY` não vai à rede.** Pedir ao GitHub a release de uma versão que não vamos anunciar é
+  requisição gasta por nada — e é o contador de chamadas, não a janela ausente, que o teste afirma.
+- A ordenação de versões tem **um dono**, `domain/entity/AppVersionComparison.kt`, e expõe o **sinal**:
+  é ele que separa atualização de retrocesso, e retrocesso não é "não atualizou".
+- O recibo continua vivo para outras duas coisas: a linha "Última atualização" das Configurações e a
+  poda do artefato aplicado (`shouldDiscardUpdateArtifacts`).
+
 ### Injeção de dependências
 
 Manual, em `Main.kt` (desktopMain). Sem framework.

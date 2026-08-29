@@ -8,7 +8,8 @@ import kotlinx.datetime.Instant
  * Existe porque a atualização automática é **silenciosa por construção**: o app
  * fecha, o instalador roda sem tela e o app volta com outro número no rodapé.
  * Sem esta janela, a única pista de que algo mudou é uma linha em
- * Configurações → Geral, que ninguém abre.
+ * Configurações → Geral, que ninguém abre. Vale igualmente para a instalação
+ * manual, que também troca o binário sem dizer o que mudou.
  *
  * [items] pode ser vazio — release só de `chore`/`docs` não tem nada a dizer ao
  * usuário —, e nesse caso **não há janela**. Lista vazia numa tela de novidades
@@ -25,30 +26,104 @@ data class ReleaseNotes(
 )
 
 /**
- * Esta abertura é a primeira depois de uma atualização que deu certo?
+ * O que fazer nesta abertura a respeito das novidades.
  *
- * As três condições são independentes e nenhuma é dispensável:
- *
- * - **Sucesso.** Recibo de falha descreve uma atualização que não aconteceu.
- * - **Recibo da versão em execução.** Recibo da 39 com o app em 37 é prova de
- *   que a troca não se completou, e anunciar as novidades da 39 ali seria mentir
- *   sobre o binário que está rodando.
- * - **Ainda não vista.** O recibo é sobrescrito só na atualização seguinte, ou
- *   seja, sobrevive a todas as aberturas até lá; sem esta marca a janela abriria
- *   toda vez.
+ * Enum próprio porque os três desfechos não são dois: "não abrir" cobre duas
+ * situações que exigem escritas diferentes — a que precisa gravar a marca e a
+ * que não pode gravá-la.
  */
-fun shouldShowReleaseNotes(
+enum class ReleaseNotesDecision {
+    /** Nada a fazer: esta versão já foi anunciada. */
+    SKIP,
+
+    /**
+     * Marcar a versão como vista **sem** abrir a janela e **sem** ir à rede.
+     * Instalação nova e retrocesso caem aqui.
+     */
+    MARK_SEEN_ONLY,
+
+    /** Buscar as notas e abrir a janela. */
+    SHOW
+}
+
+/**
+ * A versão em execução mudou desde a última que o usuário viu?
+ *
+ * **O recibo do instalador não decide nada aqui**, e é por isso que ele entra
+ * como um booleano de existência em vez de entidade. Ele era a condição
+ * principal, e isso escondia a janela em quase todo lugar (issue #127):
+ *
+ * - no **Linux** o `linux-updater.sh` só grava o recibo **depois** do ACK, que é
+ *   escrito pelo app novo já em execução — quando este código roda, o arquivo
+ *   ainda descreve a atualização anterior. A ordem lá está certa: antes do ACK
+ *   ainda pode haver rollback. Quem perde a corrida é o leitor, sempre;
+ * - **instalação manual** (`Setup.exe` sem `/UPDATE`, `.sh`, `.deb`, `.rpm`) não
+ *   escreve recibo nenhum;
+ * - no **macOS** não existe instalador automático, então nunca houve recibo.
+ *
+ * Os ramos, na ordem em que são avaliados:
+ *
+ * - **Sem marca e sem recibo**: instalação nova. Marca em silêncio — "novidades"
+ *   para quem não tem versão anterior não descreve mudança nenhuma.
+ * - **Sem marca mas com recibo**: a máquina já atualizou alguma vez, então não é
+ *   instalação nova. Abre. Sem este ramo, quem foi atingido pela #127 — que por
+ *   definição nunca chegou a marcar nada — só veria a janela uma versão depois
+ *   de a correção ser publicada.
+ * - **Marca igual à versão em execução**: nada a fazer. Igualdade textual,
+ *   exata e barata.
+ * - **Versão em execução mais nova**: abre.
+ * - **Resto**: marca em silêncio. Cobre o retrocesso — anunciar a 38.0.1 vindo
+ *   da 38.0.2 seria falso, e é este ramo que reconcilia a marca depois de um
+ *   `health-timeout` do updater do Linux, em que o app novo chega a abrir a
+ *   janela antes de o script desistir e restaurar a versão anterior. Cobre
+ *   também "mesma versão escrita de outro jeito" (`38.0.2` × `38.0.02`), que a
+ *   igualdade textual não pega: a marca é reescrita na forma canônica e a
+ *   abertura seguinte resolve em [SKIP] sem escrita nenhuma.
+ */
+fun releaseNotesDecision(
+    currentVersion: String,
+    seenVersion: String?,
+    hasUpdateReceipt: Boolean
+): ReleaseNotesDecision {
+    if (seenVersion == null) {
+        return if (hasUpdateReceipt) ReleaseNotesDecision.SHOW else ReleaseNotesDecision.MARK_SEEN_ONLY
+    }
+    if (seenVersion == currentVersion) {
+        return ReleaseNotesDecision.SKIP
+    }
+    return if (compareAppVersions(currentVersion, seenVersion) > 0) {
+        ReleaseNotesDecision.SHOW
+    } else {
+        ReleaseNotesDecision.MARK_SEEN_ONLY
+    }
+}
+
+/**
+ * De onde se veio, para o subtítulo da janela.
+ *
+ * O recibo é a fonte **exata** quando ele descreve a atualização que trouxe o
+ * binário em execução — é o caminho automático do Windows, onde o instalador lê
+ * a versão anterior do registro antes de sobrescrevê-la.
+ *
+ * Fora disso vale a marca, que é a última versão que o usuário viu e portanto a
+ * versão de onde ele veio. É o que acontece no Linux, onde o recibo presente na
+ * primeira abertura descreve a atualização **anterior** e a guarda de versão o
+ * exclui sozinha, e em toda instalação manual, onde não há recibo.
+ *
+ * O `?:` e não um `if` sobre o recibo inteiro: [AppUpdateReceipt.previousVersion]
+ * é anulável — o instalador nem sempre consegue lê-la —, e um recibo válido com
+ * a versão anterior ilegível descartaria uma marca conhecida, apagando o
+ * subtítulo em vez de completá-lo.
+ */
+fun releaseNotesPreviousVersion(
     receipt: AppUpdateReceipt?,
     currentVersion: String,
     seenVersion: String?
-): Boolean {
-    if (receipt == null || receipt.status != AppUpdateReceiptStatus.SUCCESS) {
-        return false
-    }
-    if (receipt.version != currentVersion) {
-        return false
-    }
-    return seenVersion != currentVersion
+): String? {
+    val fromReceipt = receipt
+        ?.takeIf { it.status == AppUpdateReceiptStatus.SUCCESS && it.version == currentVersion }
+        ?.previousVersion
+    return fromReceipt ?: seenVersion
 }
 
 /**

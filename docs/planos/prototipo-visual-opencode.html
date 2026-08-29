@@ -1021,7 +1021,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 
 <!-- ═══════════════════════════════ NOVIDADES ════════════════════════ -->
 <h2 id="novidades">4d · Novidades da versão</h2>
-<p class="lede">Diálogo da <b>primeira abertura depois de uma atualização que deu certo</b> (issue #74). A atualização automática é silenciosa por construção: o app fecha, o instalador roda sem tela e o app volta com outro número no rodapé. Sem esta janela, a única pista de que algo mudou é uma linha em Configurações → Geral, que ninguém abre.</p>
+<p class="lede">Diálogo da <b>primeira abertura depois de uma mudança de versão</b> — automática ou manual, nas três plataformas (issues #74 e #127). A atualização automática é silenciosa por construção: o app fecha, o instalador roda sem tela e o app volta com outro número no rodapé. A instalação manual também troca o binário sem dizer o que mudou. Sem esta janela, a única pista é uma linha em Configurações → Geral, que ninguém abre.</p>
 
 <div class="panel"><div class="pbody">
   <div class="cap">560 × 520dp, <code>undecorated</code> com a moldura de diálogo do §14</div>
@@ -1047,7 +1047,11 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 
 <p class="note"><b>Sem itens não há janela</b>, e não uma janela vazia: lista vazia numa tela de novidades afirma que a versão não trouxe nada. E <b>fechar é a primária</b> — a tela informa, não propõe trabalho; "Ver no GitHub" leva para fora do app.</p>
 
-<p class="note"><b>Ela abre uma vez.</b> O recibo da atualização só é sobrescrito na atualização seguinte, então sozinho ele não distingue a primeira abertura das demais: quem marca é a preferência <code>releaseNotesSeenVersion</code>, gravada <b>ao abrir</b>. Release sem nada a mostrar também marca — retentar a cada abertura seria requisição perpétua por uma resposta que não muda. Falha de rede <b>não</b> marca, e a abertura seguinte tenta de novo.</p>
+<p class="note"><b>Ela abre uma vez.</b> Quem decide é a preferência <code>releaseNotesSeenVersion</code>, gravada <b>ao abrir</b>: a janela sobe quando a versão em execução difere dela. Release sem nada a mostrar também marca — retentar a cada abertura seria requisição perpétua por uma resposta que não muda. Falha de rede <b>não</b> marca, e a abertura seguinte tenta de novo.</p>
+
+<p class="note"><b>O recibo do instalador não é o gatilho</b>, e chegou a ser (issue #127). No Windows o instalador o grava <b>antes</b> de relançar o app; no Linux o script só o grava <b>depois do ACK</b>, que é escrito pelo app novo já em execução — quando ele lê o arquivo, ele ainda descreve a atualização anterior. Com o recibo como condição, a janela não aparecia no Linux, em instalação manual nem no macOS, que não tem instalador automático. Ele continua dizendo <span class="v sm">Atualizado de 37.0.0</span> quando descreve a troca que trouxe o binário em execução; fora disso quem responde é a própria marca.</p>
+
+<p class="note"><b>Dois silêncios, e os dois gravam a marca.</b> <b>Instalação nova</b> — sem marca e sem recibo — não abre janela nenhuma: "novidades" para quem não tem versão anterior não descreve mudança. <b>Retrocesso</b> também não abre: anunciar a 38.0.1 vindo da 38.0.2 seria falso, e é esse ramo que reconcilia a marca depois de um rollback do updater. Nos dois casos não há requisição — pedir a release de uma versão que não vamos anunciar é rede gasta por nada.</p>
 
 <!-- ═══════════════════════════════ HISTÓRICO ═════════════════════════ -->
 <h2 id="historico">5 · Histórico</h2>
