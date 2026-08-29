@@ -280,6 +280,19 @@ object AutoStartManager {
         return command.contains(normalizePosixPath(prefix) + "/")
     }
 
+    /**
+     * As duas chaves nao se escrevem do mesmo jeito, e a simetria custou o
+     * arranque inteiro no Linux.
+     *
+     * A Desktop Entry Specification define regras de aspas **apenas para a chave
+     * `Exec`** (secao "The Exec key"): ali as aspas separam os argumentos e sao
+     * removidas pelo leitor. `Path` e do tipo `string` e e lida **verbatim** --
+     * a GLib guarda o valor em `info->path` e o passa como `working_directory`
+     * do `g_spawn`, e o KIO o passa para `QProcess::setWorkingDirectory`. Um
+     * diretorio cujo nome literal comeca com aspas nao existe, o spawn falha no
+     * `chdir` e nada aparece na tela: `isAutoStartEnabled()` so testa se o
+     * arquivo existe, entao o interruptor continua ligado (issue #120).
+     */
     internal fun buildLinuxDesktopEntry(executablePath: String, parentDir: String): String {
         return buildString {
             appendLine("[Desktop Entry]")
@@ -287,7 +300,7 @@ object AutoStartManager {
             appendLine("Version=1.0")
             appendLine("Name=$APP_DISPLAY_NAME")
             appendLine("Exec=${quoteDesktopValue(executablePath)} ${StartupOrigin.AUTO_START_ARGUMENT}")
-            appendLine("Path=${quoteDesktopValue(parentDir)}")
+            appendLine("Path=$parentDir")
             appendLine("Terminal=false")
             appendLine("X-GNOME-Autostart-enabled=true")
         }
