@@ -267,6 +267,10 @@ fun main(args: Array<String>) = application {
     val startupDiagnostics = remember { StartupDiagnostics() }
     val startupOrigin = remember { StartupOrigin.from(args) }
 
+    // Resolvido uma vez e reusado pelos tres pontos que gravam: a resolucao le a
+    // entrada de autostart do disco, e a resposta nao muda dentro do processo.
+    val startupMachineContext = remember { StartupMachineContext.current() }
+
     val focusRequests = remember { FocusRequestChannel() }
 
     // Token do health check da atualizacao Linux, quando este processo foi
@@ -284,12 +288,20 @@ fun main(args: Array<String>) = application {
         // produzir nada -- indistinguivel de "o app nao abre". O pedido de foco
         // fica no disco e a instancia viva o atende.
         focusRequests.request()
-        startupDiagnostics.record(startupOrigin, StartupOutcome.SECOND_INSTANCE_EXIT)
+        startupDiagnostics.record(
+            startupOrigin,
+            StartupOutcome.SECOND_INSTANCE_EXIT,
+            machineContext = startupMachineContext
+        )
         exitApplication()
         return@application
     }
     LaunchedEffect(startupDiagnostics, startupOrigin) {
-        startupDiagnostics.record(startupOrigin, StartupOutcome.STARTED)
+        startupDiagnostics.record(
+            startupOrigin,
+            StartupOutcome.STARTED,
+            machineContext = startupMachineContext
+        )
     }
 
     val httpClient = remember {
@@ -1251,7 +1263,11 @@ fun main(args: Array<String>) = application {
             if (focusRequested) {
                 restoreMainWindow()
                 withContext(Dispatchers.IO) {
-                    startupDiagnostics.record(startupOrigin, StartupOutcome.FOCUS_REQUEST_SERVED)
+                    startupDiagnostics.record(
+                        startupOrigin,
+                        StartupOutcome.FOCUS_REQUEST_SERVED,
+                        machineContext = startupMachineContext
+                    )
                 }
             }
         }
@@ -1344,6 +1360,27 @@ fun main(args: Array<String>) = application {
     ) {
         LaunchedEffect(window) {
             mainWindowRef = window
+
+            // Segundo registro do mesmo arranque. `started` e gravado antes de
+            // existir janela e nao consegue responder o que o sistema fez com o
+            // pedido de "sempre visivel" (issue #120).
+            //
+            // O efetivo e lido **de volta da AWT**, nao da preferencia: a
+            // diferenca entre os dois separa "o app nao pediu" de "o pedido foi
+            // engolido". As duas leituras ficam na thread da interface -- so a
+            // escrita no arquivo vai para a IO.
+            val alwaysOnTopRequested = alwaysOnTopEnabled
+            val alwaysOnTopEffective = runCatching { window.isAlwaysOnTop }.getOrNull()
+            withContext(Dispatchers.IO) {
+                startupDiagnostics.record(
+                    startupOrigin,
+                    StartupOutcome.WINDOW_SHOWN,
+                    machineContext = startupMachineContext.copy(
+                        alwaysOnTopRequested = alwaysOnTopRequested,
+                        alwaysOnTopEffective = alwaysOnTopEffective
+                    )
+                )
+            }
         }
         ApplyWindowMinimumSize(
             window = window,

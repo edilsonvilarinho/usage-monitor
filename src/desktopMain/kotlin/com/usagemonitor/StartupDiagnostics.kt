@@ -41,14 +41,77 @@ internal enum class StartupOutcome {
      * nao ha como separar "o pedido nunca foi lido" de "foi lido e a janela nao
      * veio para a frente" -- que sao defeitos em lugares diferentes.
      */
-    FOCUS_REQUEST_SERVED;
+    FOCUS_REQUEST_SERVED,
+
+    /**
+     * A janela principal foi mapeada e ja pode ser lida de volta.
+     *
+     * `STARTED` e gravado antes de existir janela, e por isso nao consegue
+     * responder o que o sistema fez com o pedido de "sempre visivel" -- ele so
+     * pode ser lido depois do mapeamento (issue #120). Separar o segundo
+     * registro por desfecho, e nao por campo, e o que permite achar as duas
+     * linhas do mesmo arranque e comparar o que foi pedido com o que ficou.
+     *
+     * Valor novo em enum existente e **excecao declarada** a regra do
+     * `CLAUDE.md`, pelo mesmo motivo de `FOCUS_REQUEST_SERVED`: ha um `when`
+     * exaustivo sobre `wireValue`, e o erro de compilacao garante que o valor de
+     * fio existe.
+     */
+    WINDOW_SHOWN;
 
     val wireValue: String
         get() = when (this) {
             STARTED -> "started"
             SECOND_INSTANCE_EXIT -> "second-instance-exit"
             FOCUS_REQUEST_SERVED -> "focus-request-served"
+            WINDOW_SHOWN -> "window-shown"
         }
+}
+
+/**
+ * Ambiente grafico em que o processo subiu, lido das variaveis XDG.
+ *
+ * Existe para separar as hipoteses do "sempre visivel" ignorado (issue #120):
+ * uma sessao X11, uma sessao Wayland e uma janela XWayland dentro do Wayland
+ * respondem de forma diferente a `_NET_WM_STATE_ABOVE`, e o compositor que
+ * decide (KWin, Mutter) muda com o desktop. Sem saber em qual combinacao o app
+ * subiu, a medicao na maquina real nao e interpretavel.
+ */
+internal data class LinuxGraphicsEnvironment(
+    val sessionType: String?,
+    val desktop: String?
+)
+
+/**
+ * Funcao pura com o ambiente **injetado** porque a suite roda no Windows, onde
+ * `XDG_SESSION_TYPE` nao existe: ler `System.getenv` la dentro tornaria a
+ * leitura nao testavel.
+ *
+ * O tipo de sessao e normalizado para minusculas -- `X11` e `x11` sao a mesma
+ * resposta, e duas grafias no arquivo dariam duas linhas para o mesmo caso. O
+ * `XDG_CURRENT_DESKTOP` vai **verbatim**: ele e uma lista separada por dois
+ * pontos (`ubuntu:GNOME`), e recortar so o primeiro item perderia justamente o
+ * que distingue uma sessao derivada da original.
+ */
+internal fun linuxGraphicsEnvironment(
+    environment: (String) -> String? = System::getenv
+): LinuxGraphicsEnvironment {
+    return LinuxGraphicsEnvironment(
+        sessionType = readEnvValue(environment, "XDG_SESSION_TYPE")?.lowercase(),
+        desktop = readEnvValue(environment, "XDG_CURRENT_DESKTOP")
+    )
+}
+
+/**
+ * Variavel ausente e variavel presente em branco sao a mesma resposta: "nao
+ * informado". Guardar `""` no arquivo faria um campo vazio parecer um valor
+ * medido.
+ */
+private fun readEnvValue(environment: (String) -> String?, name: String): String? {
+    return runCatching { environment(name) }
+        .getOrNull()
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
 }
 
 @Serializable
@@ -63,8 +126,88 @@ internal data class StartupDiagnosticsEntry(
     // para a analise, porque a JVM nao expoe o instante de boot de forma portatil
     // e um processo externo so para medi-lo custaria mais do que informa.
     val processStartedAt: String? = null,
-    val startupLatencyMillis: Long? = null
+    val startupLatencyMillis: Long? = null,
+    // Contexto da maquina. Campo novo com default e retrocompativel -- as linhas
+    // ja gravadas continuam desserializando --, ao contrario de valor novo em
+    // enum. `null` significa "nao medido", nunca "medido e falso": nesta versao
+    // so o Linux mede o ambiente grafico e a entrada de autostart, e num arquivo
+    // do Windows um `false` afirmaria uma medida que ninguem fez.
+    val osName: String? = null,
+    val osVersion: String? = null,
+    val sessionType: String? = null,
+    val desktop: String? = null,
+    val alwaysOnTopSupported: Boolean? = null,
+    val autostartEntryPresent: Boolean? = null,
+    val autostartEntryValid: Boolean? = null,
+    val alwaysOnTopRequested: Boolean? = null,
+    val alwaysOnTopEffective: Boolean? = null
 )
+
+/**
+ * Contexto da maquina no instante do arranque, resolvido uma vez e reusado
+ * pelos tres pontos que gravam.
+ *
+ * Objeto proprio em vez de sete parametros em [StartupDiagnostics.record]: os
+ * sete sao a mesma medida e viajam juntos, e a resolucao deles toca disco
+ * (le a entrada de autostart) -- fazer isso a cada chamada repetiria I/O que a
+ * resposta nao muda.
+ */
+internal data class StartupMachineContext(
+    val osName: String? = null,
+    val osVersion: String? = null,
+    val sessionType: String? = null,
+    val desktop: String? = null,
+    val alwaysOnTopSupported: Boolean? = null,
+    val autostartEntryPresent: Boolean? = null,
+    val autostartEntryValid: Boolean? = null,
+    // So a linha `window-shown` os preenche: nas outras tres a janela ainda nao
+    // existe, e um `false` ali seria leitura de um objeto que nao ha.
+    // `Requested` e a preferencia que o app pediu; `Effective` e o que a AWT
+    // devolve depois de criada a janela. A diferenca entre os dois separa "o app
+    // nao pediu" de "o pedido foi engolido" -- e se os dois vierem `true` com a
+    // janela ainda atras, quem recusa e o compositor.
+    val alwaysOnTopRequested: Boolean? = null,
+    val alwaysOnTopEffective: Boolean? = null
+) {
+    internal companion object {
+        /**
+         * Nada medido. E o default de [StartupDiagnostics.record] para a suite
+         * nao tocar disco nem AWT ao exercitar o formato do arquivo -- quem mede
+         * de verdade e o `main()`, que passa [current] explicitamente.
+         */
+        val EMPTY = StartupMachineContext()
+
+        fun current(): StartupMachineContext {
+            val isLinux = AutoStartManager.currentPlatform() == AutoStartManager.Platform.LINUX
+
+            // So o Linux mede ambiente grafico e entrada de autostart. Nas outras
+            // plataformas o campo fica `null` = "nao medido"; `false` ali
+            // afirmaria uma medida que ninguem fez.
+            val graphics = if (isLinux) linuxGraphicsEnvironment() else null
+            val autostartEntry = if (isLinux) {
+                runCatching { AutoStartManager.inspectLinuxAutostartEntry() }.getOrNull()
+            } else {
+                null
+            }
+
+            return StartupMachineContext(
+                osName = System.getProperty("os.name"),
+                osVersion = System.getProperty("os.version"),
+                sessionType = graphics?.sessionType,
+                desktop = graphics?.desktop,
+                // A pergunta e do toolkit e nao da janela: ela responde se o
+                // ambiente **aceita** o pedido, e separa "o app nao pediu" de "o
+                // sistema nao suporta". A janela em si so pode ser lida depois de
+                // mapeada, e isso e o segundo registro.
+                alwaysOnTopSupported = runCatching {
+                    java.awt.Toolkit.getDefaultToolkit().isAlwaysOnTopSupported
+                }.getOrNull(),
+                autostartEntryPresent = autostartEntry?.present,
+                autostartEntryValid = autostartEntry?.valid
+            )
+        }
+    }
+}
 
 /**
  * Uma linha por arranque em `~/.usage-monitor/diagnostics/startup.jsonl`.
@@ -91,7 +234,8 @@ internal class StartupDiagnostics(
         version: String = CURRENT_APP_VERSION,
         pid: Long = ProcessHandle.current().pid(),
         processStartedAtMillis: Long? = currentProcessStartMillis(),
-        nowMillis: Long = Clock.System.now().toEpochMilliseconds()
+        nowMillis: Long = Clock.System.now().toEpochMilliseconds(),
+        machineContext: StartupMachineContext = StartupMachineContext.EMPTY
     ) {
         val entry = StartupDiagnosticsEntry(
             ts = isoOf(nowMillis),
@@ -100,7 +244,16 @@ internal class StartupDiagnostics(
             origin = origin.wireValue,
             outcome = outcome.wireValue,
             processStartedAt = processStartedAtMillis?.let(::isoOf),
-            startupLatencyMillis = processStartedAtMillis?.let { nowMillis - it }
+            startupLatencyMillis = processStartedAtMillis?.let { nowMillis - it },
+            osName = machineContext.osName,
+            osVersion = machineContext.osVersion,
+            sessionType = machineContext.sessionType,
+            desktop = machineContext.desktop,
+            alwaysOnTopSupported = machineContext.alwaysOnTopSupported,
+            autostartEntryPresent = machineContext.autostartEntryPresent,
+            autostartEntryValid = machineContext.autostartEntryValid,
+            alwaysOnTopRequested = machineContext.alwaysOnTopRequested,
+            alwaysOnTopEffective = machineContext.alwaysOnTopEffective
         )
 
         // Falha aqui nao pode derrubar o arranque: o registro existe para explicar

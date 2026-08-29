@@ -60,8 +60,13 @@ object AutoStartManager {
         }
 
         val currentCommand = readAutoStartCommand()
+        // Os dois motivos do Linux so valem no Linux: `inspectLinuxAutostartEntry`
+        // le `~/.config/autostart`, e no Windows e no macOS a resposta dela nao
+        // significa nada.
+        val isLinux = currentPlatform() == Platform.LINUX
         val needsMigration = autoStartCommandNeedsMigration(currentCommand) ||
-            (currentPlatform() == Platform.LINUX && linuxEntryPointsIntoVersionedTree(currentCommand))
+            (isLinux && linuxEntryPointsIntoVersionedTree(currentCommand)) ||
+            (isLinux && linuxAutoStartNeedsRepair(currentCommand))
         if (!needsMigration) {
             return true
         }
@@ -87,6 +92,37 @@ object AutoStartManager {
             stableLauncherPath = resolveLinuxStableLauncherPath(),
             versionsPrefix = resolveLinuxInstallRoot()?.let { root -> "$root/versions/" }
         )
+    }
+
+    /**
+     * Se a entrada existente esta **quebrada**: ela existe, o usuario a pediu, e
+     * como esta escrita o spawn a recusa.
+     *
+     * Terceiro motivo de migracao, com a mesma forma dos dois anteriores. Nao ha
+     * "reescrever o arquivo de quem nao pediu" aqui: [ensureAutoStartCommandCurrent]
+     * ja retornou cedo quando [isAutoStartEnabled] e falso, entao esta condicao so
+     * ve entrada que **existe** -- a regra "entrada ausente nao migra, senao
+     * ligaria a inicializacao de quem a desligou" segue intacta.
+     *
+     * Sem ela a correcao do `Path=` nao alcancaria ninguem que ja esteja afetado,
+     * inclusive quem abriu a issue #120, que esta com o interruptor ligado e sem
+     * autostart. Correcao que nao chega a quem reportou o defeito nao e correcao.
+     *
+     * O texto vem de [readAutoStartCommand], que no Linux ja e o conteudo do
+     * proprio `.desktop`: uma segunda leitura do mesmo arquivo seria um segundo
+     * dono da mesma resposta. Se a reescrita nao conseguir resolver executavel,
+     * `setLinuxAutoStart` devolve `false` e **deixa o arquivo como esta** -- a
+     * condicao nova nao destroi entrada nenhuma.
+     */
+    internal fun linuxAutoStartNeedsRepair(
+        currentCommand: String?,
+        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } }
+    ): Boolean {
+        val state = inspectLinuxAutostartEntry(
+            readEntry = { currentCommand },
+            isExecutable = isExecutable
+        )
+        return state.present && !state.valid
     }
 
     private fun readAutoStartCommand(): String? {
@@ -140,7 +176,12 @@ object AutoStartManager {
         return !argument.containsMatchIn(command)
     }
 
-    private fun currentPlatform(): Platform {
+    /**
+     * Interna e nao privada porque o registro de arranque decide por ela o que
+     * medir: ambiente grafico e entrada de autostart so existem no Linux. Uma
+     * segunda leitura de `os.name` seria um segundo dono da mesma decisao.
+     */
+    internal fun currentPlatform(): Platform {
         val osName = System.getProperty("os.name").lowercase()
         return when {
             osName.contains("win") -> Platform.WINDOWS
@@ -280,6 +321,113 @@ object AutoStartManager {
         return command.contains(normalizePosixPath(prefix) + "/")
     }
 
+    /**
+     * Estado da entrada de autostart do Linux, em **dois booleanos**.
+     *
+     * Nunca o caminho: ele carrega o nome do usuario, e este e o mesmo arquivo
+     * que o relatorio de bug empacota para uma issue publica. Booleano responde
+     * a mesma pergunta sem carregar identidade.
+     */
+    internal data class LinuxAutostartEntryState(
+        val present: Boolean,
+        val valid: Boolean
+    )
+
+    /**
+     * Le a entrada de autostart e diz se ela **funcionaria**.
+     *
+     * `present` e o que [isAutoStartEnabled] ja respondia -- o arquivo existe --,
+     * e foi por essa ser a unica pergunta que o defeito do `Path=` entre aspas
+     * passou despercebido: o interruptor ficava ligado com uma entrada que o
+     * spawn recusava no `chdir`. `valid` e a pergunta que faltava.
+     *
+     * Leitor e teste de execucao **injetados** porque a suite roda no Windows:
+     * ali nao existe `~/.config/autostart` nem bit de execucao.
+     */
+    internal fun inspectLinuxAutostartEntry(
+        readEntry: () -> String? = { readFileOrNull(linuxAutostartFile()) },
+        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } }
+    ): LinuxAutostartEntryState {
+        val entry = runCatching { readEntry() }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: return LinuxAutostartEntryState(present = false, valid = false)
+
+        val program = desktopEntryValue(entry, "Exec")?.let(::firstDesktopExecArgument)
+        val workingDirectory = desktopEntryValue(entry, "Path")
+
+        // As duas condicoes cobrem os dois modos de falha silenciosa ja vistos:
+        // o executavel podado junto com a arvore versionada, e o diretorio de
+        // trabalho entre aspas.
+        val valid = program != null &&
+            runCatching { isExecutable(program) }.getOrDefault(false) &&
+            workingDirectory != null &&
+            !workingDirectory.startsWith("\"")
+
+        return LinuxAutostartEntryState(present = true, valid = valid)
+    }
+
+    /** Valor cru de uma chave do grupo `[Desktop Entry]`, sem interpretar nada. */
+    private fun desktopEntryValue(entry: String, key: String): String? {
+        return entry.lineSequence()
+            .map(String::trim)
+            .firstNotNullOfOrNull { line ->
+                line.removePrefix("$key=")
+                    .takeIf { it != line }
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+            }
+    }
+
+    /**
+     * Primeiro argumento do `Exec=`, que e o programa.
+     *
+     * Aqui as aspas **sao** da especificacao e precisam ser desfeitas: no `Exec`
+     * elas delimitam o argumento e o leitor as remove antes do spawn. E o oposto
+     * exato do `Path=`, lido verbatim -- e a razao de as duas chaves nao se
+     * escreverem do mesmo jeito.
+     */
+    private fun firstDesktopExecArgument(exec: String): String? {
+        if (!exec.startsWith("\"")) {
+            return exec.substringBefore(' ').takeIf { it.isNotBlank() }
+        }
+
+        val program = StringBuilder()
+        var index = 1
+        while (index < exec.length) {
+            val character = exec[index]
+            when {
+                character == '\\' && index + 1 < exec.length -> {
+                    program.append(exec[index + 1])
+                    index += 2
+                }
+
+                character == '"' -> return program.toString().takeIf { it.isNotBlank() }
+
+                else -> {
+                    program.append(character)
+                    index += 1
+                }
+            }
+        }
+
+        // Aspas sem fechamento: entrada corrompida, e nao um caminho.
+        return null
+    }
+
+    /**
+     * As duas chaves nao se escrevem do mesmo jeito, e a simetria custou o
+     * arranque inteiro no Linux.
+     *
+     * A Desktop Entry Specification define regras de aspas **apenas para a chave
+     * `Exec`** (secao "The Exec key"): ali as aspas separam os argumentos e sao
+     * removidas pelo leitor. `Path` e do tipo `string` e e lida **verbatim** --
+     * a GLib guarda o valor em `info->path` e o passa como `working_directory`
+     * do `g_spawn`, e o KIO o passa para `QProcess::setWorkingDirectory`. Um
+     * diretorio cujo nome literal comeca com aspas nao existe, o spawn falha no
+     * `chdir` e nada aparece na tela: `isAutoStartEnabled()` so testa se o
+     * arquivo existe, entao o interruptor continua ligado (issue #120).
+     */
     internal fun buildLinuxDesktopEntry(executablePath: String, parentDir: String): String {
         return buildString {
             appendLine("[Desktop Entry]")
@@ -287,7 +435,7 @@ object AutoStartManager {
             appendLine("Version=1.0")
             appendLine("Name=$APP_DISPLAY_NAME")
             appendLine("Exec=${quoteDesktopValue(executablePath)} ${StartupOrigin.AUTO_START_ARGUMENT}")
-            appendLine("Path=${quoteDesktopValue(parentDir)}")
+            appendLine("Path=$parentDir")
             appendLine("Terminal=false")
             appendLine("X-GNOME-Autostart-enabled=true")
         }
