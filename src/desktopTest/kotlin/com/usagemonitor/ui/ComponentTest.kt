@@ -2339,6 +2339,46 @@ class ComponentTest {
     }
 
     /**
+     * Issue #125: trocar a chave de uma fonte já ligada não mexe no interruptor.
+     * Reafirmá-lo regravaria a preferência, dispararia uma segunda coleta e
+     * trocaria o aviso de "chave de API salva" pelo de "APIs monitoradas".
+     */
+    @Test
+    fun `SettingsDialogContent rotates a key without re-enabling the source`() = runDesktopComposeUiTest {
+        var savedKey: String? = null
+        var toggleCalls = 0
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.MINIMAX),
+                    configuredApiKeys = setOf(ApiSource.MINIMAX),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> toggleCalls += 1 },
+                    onApiKeySave = { api, key ->
+                        savedKey = "$api:$key"
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
+        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-rotated")
+        onNodeWithText("Salvar").performClick()
+
+        assertEquals("MINIMAX:minimax-rotated", savedKey)
+        assertEquals(0, toggleCalls)
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performScrollTo().assertIsOn()
+    }
+
+    /**
      * Issue #70: o interruptor que esconde a moldura da janela mora ao lado de
      * "manter sempre visível" — as duas são propriedades da moldura.
      */

@@ -63,6 +63,17 @@ remover.
 `onApiKeyRemove` devolve `Boolean` e espelha `onApiKeySave`: o diálogo só fecha quando a camada de
 dados confirma. Remoção recusada mantém a tela aberta, com o aviso de falha vindo do toast.
 
+### Trocar a chave não reafirma o interruptor
+
+O caminho de salvar chamava `onApiToggle(source, true)` incondicionalmente, porque até aqui ele só
+existia para o caso de **ligar** uma fonte desligada. Pelo lápis, com a fonte já ligada, isso
+regravaria o mesmo conjunto em `enabledApis`, dispararia uma segunda coleta e — o efeito visível —
+trocaria o aviso de "chave de API salva" pelo de "APIs monitoradas", que não é o que o usuário fez.
+
+A correção mora em `SettingsDialogContent`, não em `Main.kt` como o plano supunha: quem sabe se a
+fonte já está ligada é a tela, que recebe `enabledApis`; o handler do `Main.kt` só executa a ordem
+que ela dá.
+
 ### A remoção não tem teste unitário próprio, e isso é deliberado
 
 `onApiKeyRemove` é uma lambda de fiação dentro de `main()`, exatamente como `onApiKeySave` logo
@@ -128,6 +139,6 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 298 testes, 0 falhas |
 | C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 301 testes, 0 falhas |
 | C09 | `onApiKeyRemove` fiado em `Main.kt` | ✅ Concluída | `gradlew.bat desktopJar` → `BUILD SUCCESSFUL`; `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 0 falhas. `allTests` fica para a auditoria final, que roda as três branches em série |
-| C10 | Troca de chave pelo lápis com a fonte já ligada | ⏳ Pendente | — |
+| C10 | Troca de chave pelo lápis com a fonte já ligada | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 302 testes, 0 falhas |
 | C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ⏳ Pendente | — |
 | C12 | `allTests` verde + QA manual | ⏳ Pendente | — |

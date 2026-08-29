@@ -550,7 +550,15 @@ private fun MonitoredApisTab(
             language = currentLanguage,
             onSave = { apiKey ->
                 if (onApiKeySave(source, apiKey)) {
-                    onApiToggle(source, true)
+                    // Fonte já ligada não é religada. Reafirmar o mesmo conjunto
+                    // regravaria a preferência, dispararia uma segunda coleta e
+                    // trocaria o aviso de "chave de API salva" pelo de "APIs
+                    // monitoradas" — que não é o que quem trocou a chave fez.
+                    // Ligar continua acontecendo no caminho original, o de
+                    // configurar uma fonte que estava desligada.
+                    if (source !in enabledApis) {
+                        onApiToggle(source, true)
+                    }
                     pendingApiKeySource = null
                 }
             },
