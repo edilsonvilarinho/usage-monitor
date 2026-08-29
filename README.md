@@ -1,582 +1,269 @@
 # Usage Monitor
 
-![Tour da aplicacao](img/tour.gif)
+**One desktop panel for the usage, quotas and cost of every AI coding tool you pay for.**
 
-Desktop app em Kotlin Multiplatform + Compose Desktop para acompanhar consumo, saldo e quotas de ferramentas/APIs de IA em um unico painel.
+[![CI](https://img.shields.io/github/actions/workflow/status/edilsonvilarinho/usage-monitor/ci.yml?branch=main&label=CI)](https://github.com/edilsonvilarinho/usage-monitor/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/edilsonvilarinho/usage-monitor?sort=semver&display_name=tag)](https://github.com/edilsonvilarinho/usage-monitor/releases/latest)
+![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?logo=kotlin&logoColor=white)
+[![License: MIT](https://img.shields.io/github/license/edilsonvilarinho/usage-monitor)](LICENSE)
 
-Hoje o projeto monitora integracoes remotas e locais, persiste historico em SQLite, oferece refresh automatico a cada 10 minutos, suporta reorder/minimizacao de cards, tema claro/escuro, idioma PT/EN, auto-start em Windows/Linux/macOS e verificacao de updates via GitHub Releases.
+English · [Português (Brasil)](README.pt-BR.md)
 
-## Visao geral
+![Usage Monitor tour](img/tour.gif)
 
-- Dashboard unico para varias fontes de uso.
-- Refresh automatico a cada 10 minutos.
-- Refresh manual global ou por integracao.
-- Estado parcial: se uma fonte falhar, as outras continuam a aparecer.
-- Historico local com tendencia, consumo medio e forecast.
-- Sessoes CLI do Claude Code por conta, com custo estimado, veredito de saude da
-  sessao e atualizacao ao vivo.
-- Creditos de uso da Anthropic (`extra_usage`) como terceira cota do card, na
-  moeda real da conta.
-- Integracao opcional com servidor de time self-hosted para ver o consumo
-  agregado da mesma conta em varias maquinas.
-- Janela de 5h ancorada no reset de quota da conta, tanto nos cards quanto nos
-  filtros de sessao.
-- Reordenacao e minimizacao de cards com persistencia local.
-- Auto-start em Windows (registro `Run`), Linux (`.desktop` em autostart) e macOS (LaunchAgent).
-- Verificacao de novas releases com banner manual e link para a pagina publicada no GitHub Releases.
-- Sinalizador semaforo de risco de overage nos cards de uso.
-- Aba Resumo nas Sessoes CLI: consumo da janela por projeto, por modelo e por
-  branch, com ranking por custo e economia agregada do cache.
-- Ritmo de queima em USD/h e tokens/h da janela corrente, com projecao de
-  fechamento, e grade de atividade dia da semana x hora (BRT).
-- Ranking das ferramentas mais chamadas na janela (Read, Bash, Edit...), por
-  contagem de chamadas.
-- Tendencia diaria do time nos ultimos 30 dias, uma faixa por integrante e todas
-  na mesma escala (exige servidor 0.6.0+).
-- Tempo ativo por sessao, projeto, branch e integrante do time, descartando as
-  pausas maiores que cinco minutos entre turnos. No time exige servidor 0.7.0+;
-  contra servidor anterior a coluna aparece como `-`.
-- Exportacao de sessoes e do resumo em CSV ou JSON, seguindo a aba aberta e a
-  janela escolhida.
-- Relatorio PDF do recorte que esta na tela, nas Sessoes CLI e no modal do time:
-  totais, projetos, branches, modelos, ferramentas, grade de atividade e a lista
-  de sessoes, com o tempo ativo em cada eixo que o admite.
-- Orcamento mensal em USD com barra de consumo e projecao de fechamento. Os
-  creditos de uso da Anthropic aparecem a parte, na moeda real da conta.
-- Comparativo com o periodo anterior de mesma duracao no Historico.
-- Icone na bandeja do sistema com ponto de risco e notificacao nativa quando uma
-  cota cruza um limiar (75/90/100 por padrao) ou uma sessao CLI satura. Limiares,
-  alerta de sessao e periodo de silencio configuraveis em Configuracoes > Alertas.
-- Contagem regressiva de refresh persiste entre reinicios da app e avisa antes de um refresh manual.
-- Modais de Historico e Configuracoes voltam ao topo automaticamente ao reabrir, mesmo se ficaram atras de outra janela.
-- Scrollbar com contraste ajustado para o tema escuro.
-- Modal de Configuracoes com navegacao lateral (Geral, Alertas, APIs, Contas,
-  Time), uma secao por vez em vez de uma coluna unica de cartoes empilhados.
-- Opacidade da janela principal ajustavel entre 50% e 100% nas Configuracoes, com persistencia local.
-- Tamanho da interface ajustavel entre 80% e 150% nas Configuracoes (padrao 115%), valendo para todas
-  as janelas. Mudar a escala redimensiona a janela principal na mesma razao, para caber o mesmo
-  conteudo.
+Usage Monitor watches seven sources at once — Claude Code, Codex, MiniMax, DeepSeek, OpenCode Zen
+Free, OpenCode Go and Kilo Free — and shows quota, balance and reset time for each one on a single
+screen. It also reads your **local Claude Code transcripts** to break down cost per session, project,
+branch and model, keeps history in SQLite for trends and forecasts, and can push aggregated usage to
+a team server you host yourself.
+
+It is a desktop app for Windows, Linux and macOS. It reads credentials you already have; it never
+sends prompt or response content anywhere.
+
+## Features
+
+- **Unified dashboard** — one card per source, auto-refresh every 10 minutes, manual refresh per
+  integration, reorderable and collapsible cards. If one source fails the others keep working.
+- **Claude Code session costs** — one row per session, read from local transcripts, with estimated
+  cost, a session health verdict and live updates.
+- **Usage breakdown** — the same window sliced by project, model, branch and tool, with burn rate in
+  USD/h and tokens/h, a weekday × hour activity grid, and active time that discards gaps longer than
+  five minutes.
+- **History and forecast** — local SQLite history with trend, hourly average, projected exhaustion,
+  previous-period comparison and a monthly USD budget.
+- **Alerts** — tray icon with a risk dot, plus native notifications when a quota crosses 75/90/100%
+  or a session saturates. Thresholds and quiet hours are configurable.
+- **Export** — CSV and JSON of sessions and summaries, and a PDF report of whatever is on screen.
+- **Team view (optional)** — a self-hosted server aggregates the same account across machines, with a
+  30-day per-member trend and a live presence list.
+- **Desktop behaviour** — auto-start on all three platforms, light and dark themes, English and
+  Portuguese, UI scale from 80% to 150%, adjustable window opacity, and self-update on Windows and
+  Linux.
+
+## Supported integrations
+
+| Integration | Type | Data source | Local requirement |
+|---|---|---|---|
+| Anthropic | Remote | `GET /api/oauth/usage` | `~/.claude/.credentials.json` |
+| Codex | Remote | `GET /backend-api/wham/usage` | `~/.codex/auth.json` and `~/.codex/cap_sid` |
+| MiniMax | Remote | `GET /v1/token_plan/remains` | API key, entered in **Settings > APIs** |
+| DeepSeek | Remote | `GET /user/balance` | API key, entered in **Settings > APIs** |
+| OpenCode Zen Free | Local | reads `~/.local/share/opencode/opencode.db` | an existing OpenCode database |
+| OpenCode Go | Remote | `GET /zen/go/v1/usage` | API key, entered in **Settings > APIs** |
+| Kilo Free | Local | reads `~/.local/share/kilo/kilo.db` | an existing Kilo database |
+
+Full endpoints, credential paths and per-integration limits:
+[`docs/integrations.md`](docs/integrations.md).
 
 ## Screenshots
 
-As imagens abaixo sao renderizadas offscreen a partir dos proprios componentes da
-app, com dados sinteticos. Nenhuma conta, maquina ou chave real aparece nelas.
-Para regerar depois de mudar a UI:
-
-```bat
-gradlew.bat generateScreenshots
-gradlew.bat generateTourGif
-```
-
-O GIF do topo passeia por dashboard, historico, sessoes CLI, detalhe da sessao,
-visao do time e configuracoes, na mesma ordem em que a app abre cada uma.
-
-### Dashboard com varias contas
-
-Um card por conta/integracao. O card Anthropic mostra as tres cotas — sessao 5h,
-semanal e creditos de uso — com o semaforo de risco no canto da cota em perigo.
-
 ![Dashboard](img/dashboard.png)
 
-### Historico e previsao
+One card per account or integration. The Anthropic card shows all three quotas — 5-hour session,
+weekly, and usage credits — with a risk indicator on whichever one is in danger.
 
-Consumo ao longo do intervalo, com os reinicios de janela marcados, media por
-hora e previsao de esgotamento.
+![Claude Code sessions](img/cli-sessions.png)
 
-![Historico](img/history.png)
+One row per Claude Code session, with a health verdict, estimated cost and window filters. The header
+counts how many sessions are saturated or need attention.
 
-### Sessoes CLI do Claude Code
+![Team usage](img/team-usage.png)
 
-Uma linha por sessao, com veredito de saude, custo estimado e filtros de janela.
-O cabecalho conta quantas sessoes estao saturadas ou em atencao.
+Usage aggregated per team member: alias, machine, tokens, cost and share of the team. Each member
+expands to their own sessions.
 
-![Sessoes CLI](img/cli-sessions.png)
+<details>
+<summary>More screens</summary>
 
-### Resumo por eixo
+**History and forecast** — consumption over the range, with window resets marked, hourly average and
+projected exhaustion.
 
-O consumo da mesma janela recortado por projeto, modelo, branch e ferramenta, com
-o ritmo de queima e a grade de atividade por hora. As tres listas descrevem os
-mesmos turnos: somar baldes de listas diferentes contaria o mesmo gasto tres vezes.
+![History](img/history.png)
 
-![Resumo por eixo](img/cli-breakdown.png)
+**Usage breakdown** — the same window sliced by project, model, branch and tool, with burn rate and
+the activity grid. The lists describe the same turns, so adding buckets from different lists would
+count the same spend three times.
 
-### Detalhe da sessao
+![Usage breakdown](img/cli-breakdown.png)
 
-Recomendacao de `/compact`, crescimento do contexto turno a turno e, no bloco
-Avancado, composicao dos tokens, distribuicao do custo e economia do cache.
+**Session detail** — a `/compact` recommendation, context growth turn by turn and, under Advanced,
+token composition, cost distribution and cache savings.
 
-![Detalhe da sessao CLI](img/cli-session-detail.png)
+![Session detail](img/cli-session-detail.png)
 
-### Sessoes do time
+**Team trend** — what each member spent per day, one bar per day and one colour per person, all on a
+single scale.
 
-Consumo agregado da conta por integrante: apelido, maquina, tokens, custo e
-fatia do time. Cada integrante expande para as sessoes dele.
+![Team trend](img/team-trend.png)
 
-![Sessoes do time](img/team-usage.png)
+**Live presence** — who has the app open and who is actually running Claude Code right now, as two
+separate states.
 
-### Tendencia do time
+![Team presence](img/presence.png)
 
-Quanto cada integrante gastou por dia, uma barra por dia e uma cor por pessoa.
-Todas na mesma escala: normalizar cada um pelo proprio pico faria quem gasta
-centavos parecer igual a quem gasta dezenas de dolares.
+Administrators see the same screen across every account:
 
-![Tendencia do time](img/team-trend.png)
+![Presence across accounts](img/presence-accounts.png)
 
-### Configuracoes
+**Settings**, with side navigation instead of one long column of cards.
 
-![Configuracoes](img/settings.png)
+![Settings](img/settings.png)
 
-### Integracao com time
+**Themes** — every screen is drawn in both, from the same tokens.
 
-Servidor, chave, apelido e quais contas Anthropic participam.
+![Themes](img/theme-presets.png)
 
-![Integracao com time](img/settings-team.png)
+![Light theme](img/presence-light.png)
 
-## Integracoes suportadas
+</details>
 
-| Integracao | Tipo | Origem dos dados | Requisito local |
+Screenshots are rendered offscreen from the app's own components with synthetic data. No real
+account, machine or key appears in them.
+
+## Installation
+
+**[Download the latest release →](https://github.com/edilsonvilarinho/usage-monitor/releases/latest)**
+
+| Platform | Artifact | Install | Self-updating |
 |---|---|---|---|
-| Anthropic | Remota | `GET https://api.anthropic.com/api/oauth/usage` | `~/.claude/.credentials.json` |
-| Codex | Remota | `GET https://chatgpt.com/backend-api/wham/usage` | `~/.codex/auth.json` e `~/.codex/cap_sid` |
-| MiniMax | Remota | `GET https://www.minimax.io/v1/token_plan/remains` | Chave informada em **Configurações > APIs** |
-| DeepSeek | Remota | `GET https://api.deepseek.com/user/balance` | Chave informada em **Configurações > APIs** |
-| OpenCode Zen Free | Local | leitura de `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
-| OpenCode Go | Remota | `GET https://opencode.ai/zen/go/v1/usage` | Chave informada em **Configurações > APIs** |
-| Kilo Free | Local | leitura de `~/.local/share/kilo/kilo.db` | base local do Kilo existente |
-
-### Anthropic
-
-- Descobre o perfil padrão `~/.claude`, o `CLAUDE_CONFIG_DIR` herdado no início da aplicação e diretórios `~/.claude-*` que contenham configuração Anthropic.
-- Perfis adicionais também podem ser cadastrados manualmente em **Configurações > Contas Anthropic**. A aplicação apenas monitora: não executa login/logout e não remove arquivos de credenciais.
-- O perfil padrão usa `~/.claude/.credentials.json` para o token e `~/.claude.json` para a identidade. Perfis personalizados usam `<CLAUDE_CONFIG_DIR>/.credentials.json` e `<CLAUDE_CONFIG_DIR>/.claude.json`.
-- Novos perfis detectados ficam desabilitados até confirmação do usuário. Perfis habilitados aparecem simultaneamente, com um card por conta/workspace; caminhos duplicados e identidades duplicadas não geram coleta duplicada.
-- Se o token estiver perto de expirar, `LocalCredentialDataSource` tenta refresh em `https://platform.claude.com/v1/oauth/token`, com gravação atômica e proteção contra alteração concorrente do arquivo. O corpo leva `client_id` e `scope` além de `grant_type`/`refresh_token` — sem `client_id` o endpoint recusa com `400 Invalid request format`. A regravação preserva os nós que o app não conhece (`mcpOAuth`, `refreshTokenExpiresAt`).
-- No Windows, uma variável definida apenas com `$env:CLAUDE_CONFIG_DIR` afeta o PowerShell atual e seus processos filhos. O Usage Monitor usa os perfis cadastrados e não depende de ser aberto pelo mesmo terminal.
-- A app trabalha com as janelas `five_hour` e `seven_day`.
-- Headers obrigatorios:
-  - `Authorization: Bearer <accessToken>`
-  - `anthropic-beta: oauth-2025-04-20`
-  - `User-Agent: claude-code/1.0.0`
-
-### Codex
-
-- Usa bearer token de `~/.codex/auth.json` em `tokens.access_token`.
-- Usa tambem o cookie `cap_sid` lido de `~/.codex/cap_sid`.
-- Quando o payload traz `primary_window` + `secondary_window`, o monitor usa a própria resposta como fonte oficial de `5h` e `7d`.
-- A app só aceita e grava snapshots do Codex que contenham as duas cotas. Se a coleta vier incompleta, mantém a última leitura válida em cache e sinaliza a fonte como instável.
-
-### MiniMax
-
-- Ao habilitar em **Configurações > APIs**, solicita a chave em campo mascarado e só ativa a integração depois do salvamento.
-- A chave fica em `~/.usage-monitor/api-keys.json`, com escrita atômica e acesso restrito ao usuário.
-- A app filtra quotas do modelo `MiniMax-M*`.
-- Nunca hardcode a chave.
-
-### DeepSeek
-
-- Ao habilitar em **Configurações > APIs**, solicita a chave em campo mascarado e só ativa a integração depois do salvamento.
-- A chave fica em `~/.usage-monitor/api-keys.json`, com escrita atômica e acesso restrito ao usuário.
-- O dashboard mostra saldo pago e, quando existir, saldo concedido.
-- Os valores sao tratados em USD.
-
-### OpenCode Zen Free
-
-- Nao chama API HTTP.
-- Le atividade observada da base local `~/.local/share/opencode/opencode.db`.
-- Conta mensagens `assistant` do provider `opencode`.
-- Agrupa uso nas janelas de 5h e 7d.
-- Monitora modelos free como `*-free` e `big-pickle`.
-
-### OpenCode Go
-
-- Integracao **separada** do OpenCode Zen Free: aquela le a base local, esta consulta a assinatura paga por HTTP. Uma maquina pode ter uma das duas sem a outra, e as duas aparecem como linhas distintas em **Configurações > APIs**.
-- Ao habilitar, solicita a chave em campo mascarado e so ativa a integracao depois do salvamento. E a **mesma chave da API do OpenCode** usada em `chat/completions` do Zen.
-- A chave fica em `~/.usage-monitor/api-keys.json`, com escrita atomica e acesso restrito ao usuario.
-- O dashboard mostra tres janelas em **percentual**: 5h deslizante, semanal e mensal, cada uma com o horario de reinicio.
-- A API **nao devolve valor em dinheiro** — nem gasto, nem limite. Nao ha linha de saldo neste card, e nenhum numero de tokens e estimado a partir do percentual.
-- Chave valida numa conta **sem o plano Go** responde `403` e vira um aviso proprio: assine o plano ou desative a integracao. Nao e erro de credencial e nao pede novo login.
-- O endpoint esta em producao mas **nao e documentado publicamente** pelo OpenCode e nao declara versao.
-- O **saldo pago do Zen** nao e lido: nao existe endpoint para ele (issue upstream `anomalyco/opencode#10448`, em aberto).
-
-### Kilo Free
-
-- Nao chama API HTTP.
-- Le atividade observada da base local `~/.local/share/kilo/kilo.db`.
-- Conta mensagens `assistant` do provider `kilo`.
-- Agrupa uso nas janelas de 5h e 7d.
-- Monitora modelos free como `kilo-auto/free`, `*/free` e `*:free`.
-
-## Requisitos
-
-- Windows, Linux ou macOS para o fluxo principal da app desktop.
-- JDK 17.
-- Credenciais validas apenas para as integracoes que voce quiser habilitar.
-
-### Chaves das integrações remotas
-
-MiniMax e DeepSeek solicitam a API key em **Configurações > APIs** no momento da
-ativação. O campo é mascarado por padrão. As chaves são gravadas em
-`~/.usage-monitor/api-keys.json`, fora das preferências comuns, com escrita atômica
-e acesso restrito ao usuário. Variáveis de ambiente não são lidas pela aplicação.
-
-### Ficheiros locais esperados
-
-- Anthropic padrão: `~/.claude/.credentials.json` + `~/.claude.json`
-- Anthropic no macOS: o Claude Code guarda o token na entrada `Claude Code-credentials` do Keychain; o ficheiro so existe como fallback. A app le o ficheiro quando ele existe e cai no Keychain caso contrario.
-- Anthropic personalizado: `<CLAUDE_CONFIG_DIR>/.credentials.json` + `<CLAUDE_CONFIG_DIR>/.claude.json`
-- Codex token: `~/.codex/auth.json`
-- Codex cookie: `~/.codex/cap_sid`
-- Chaves MiniMax/DeepSeek: `~/.usage-monitor/api-keys.json`
-- OpenCode: `~/.local/share/opencode/opencode.db`
-- Kilo: `~/.local/share/kilo/kilo.db`
-
-## Como rodar
-
-Todos os comandos abaixo usam `gradlew.bat` no PowerShell:
-
-```bat
-gradlew.bat run
-gradlew.bat desktopJar
-gradlew.bat build
-gradlew.bat allTests
-gradlew.bat desktopTest
-gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"
-gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*"
-gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"
-gradlew.bat createDistributable
-gradlew.bat packageInstaller
-gradlew.bat generateScreenshots
-gradlew.bat clean
-```
-
-Observacoes:
-
-- A task raiz `test` nao existe neste projeto KMP.
-- Use `allTests`, `desktopTest` ou `build`.
-
-## Como a app se comporta
-
-### Dashboard
-
-- Mostra um card por integracao habilitada.
-- Permite refresh individual sem recarregar tudo.
-- Persiste ordem dos cards e estado minimizado.
-- Exibe banners persistentes para problemas de configuracao e updates disponiveis.
-- Se pelo menos uma integracao responder, a UI permanece em sucesso parcial e lista os erros restantes.
-
-### Historico
-
-- Cada integracao pode abrir uma tela dedicada de historico.
-- Intervalos disponiveis: `24h`, `7 dias`, `30 dias` e `Total`.
-- O repositorio de historico calcula consumo acumulado, media por hora e forecast de esgotamento.
-- O historico local fica em `~/.usage-monitor/usage-history.db`.
-- Novos snapshots nao sao mais podados automaticamente; o filtro `Total` usa todo o historico ainda existente no banco local.
-
-### Sessoes CLI
-
-Cada card Anthropic abre a tela de **Sessoes CLI** daquela conta: uma linha por
-sessao do Claude Code, lida dos transcripts locais em `~/.claude/projects`.
-
-- Nao chama API. O indice fica em `~/.usage-monitor/usage-history.db`, alimentado
-  por varredura incremental dos `.jsonl`.
-- Filtros `5h` / `7 dias` / `30 dias` / `Total`. O recorte incide sobre os
-  **turnos**: uma sessao antiga com atividade recente aparece com os numeros
-  dessa atividade, nao com o total historico.
-- A janela de 5h ancora no reset de quota da conta — a mesma que o card do
-  dashboard mede — e nao nas ultimas cinco horas corridas.
-- Atualizacao ao vivo a cada 5 segundos com a janela aberta.
-- **Saude da sessao** na propria lista: `Saudavel`, `Atencao` ou `Saturada`,
-  derivada do contexto vivo contra a janela do modelo. O cabecalho totaliza
-  quantas pedem atencao. Sessao cujo modelo nao tem janela conhecida fica sem
-  veredito em vez de receber um chute.
-- O detalhe mostra o crescimento do contexto por turno e, no bloco Avancado, a
-  composicao dos tokens, a distribuicao do custo e a economia gerada pelo cache.
-- Custo estimado a preco de tabela (`ModelPricingTable`), nao e fatura.
-
-### Integracao com time
-
-Recurso **opcional**, desligado por default. Serve o caso em que a mesma conta Anthropic e usada por varios desenvolvedores em maquinas diferentes e a empresa quer ver o consumo agregado.
-
-- Um servidor Node.js self-hosted (codigo em [`server/`](server/README.md)) recebe os turnos indexados de cada maquina e devolve a visao do time. A empresa opera esse servidor; nao ha servico gerenciado.
-- Deploy pelo Dokploy com `Dockerfile.dokploy` na raiz (contexto `.`), compose em `docker/docker-compose.yml`. Passo a passo em [`server/README.md`](server/README.md).
-- Em **Configuracoes -> Integracao com time**: ligar, informar servidor e chave, definir o apelido e marcar quais contas Anthropic participam.
-- O card de cada conta marcada ganha um botao que abre **Sessoes do time**: uma linha por integrante (apelido, maquina, tokens, custo, fatia do time), expansivel para as sessoes daquele integrante.
-- Mesmos filtros `5h` / `7 dias` / `30 dias` / `Total` da tela de Sessoes CLI, com a janela de 5h ancorada no mesmo reset de quota — os numeros do time fecham com os locais.
-- Mesma cadencia de tempo real: leitura a cada 5s com a janela aberta; envio a cada 30s, independente da janela estar aberta.
-- Cada envio reindexa os transcripts antes de sair, entao uma sessao nova aparece para os colegas em cerca de 35s no pior caso, mesmo com todas as janelas fechadas. Abrir a janela de Sessoes do time antecipa um envio na hora.
-- O card ganha tambem um botao **Conectados agora**, que abre a lista de presenca em tempo real do time. Ela separa dois estados: **conectado** (o Usage Monitor esta aberto naquela maquina, confirmado por uma batida a cada 30s) e **trabalhando agora** (houve turno do Claude Code nos ultimos 5 minutos). Quem administra o servidor ve a mesma tela para todas as contas pelo botao da barra inferior.
-- A presenca exige servidor **0.4.0 ou mais novo**. Contra um servidor anterior a app nao quebra: ela cai sozinha num envio so com o membro, que carimba o mesmo campo — a tela funciona igual, so sem a correcao de relogio.
-- **Nao trafega conteudo de prompt nem de resposta.** So metadados de uso: id de sessao, id de mensagem, timestamp, modelo, contagem de tokens, diretorio do projeto, branch e nome da maquina.
-- A chave do servidor fica em `~/.usage-monitor/team.json`, com permissao restrita ao dono — nao vai para as preferencias do registro.
-
-### Update da app
-
-- A app consulta a release mais recente em `edilsonvilarinho/usage-monitor`.
-- Quando existe versao mais nova, a UI mostra um banner com a versao disponivel.
-- O banner oferece acao para abrir a pagina da release publicada no GitHub.
-- A verificacao roda na inicializacao, a cada 10 minutos e tambem no refresh manual.
-
-#### Atualizacao automatica (opcional)
-
-Desmarcada por padrao, em Configuracoes -> Geral. Ligada, a app baixa o
-`UsageMonitor-Setup-<versao>.exe` em segundo plano, confere o SHA-256 publicado pela API do GitHub e
-mostra "pronta para instalar". A troca acontece quando a app fecha, ou na hora pelo botao
-"Reiniciar e atualizar agora". O resultado da ultima tentativa fica em
-`~/.usage-monitor/update-receipt.properties`.
-
-O interruptor aparece **desabilitado, com o motivo**, quando a atualizacao nao se aplica:
-
-| Caso | Por que |
-|---|---|
-| macOS | O DMG nao tem Developer ID, e remontar o bundle sob quarentena do Gatekeeper nao fecha de forma confiavel. |
-| Windows fora do `UsageMonitor-Setup` | MSI, copia manual da pasta ou `gradlew run`. Aplicar o instalador NSIS por cima criaria uma instalacao paralela. A deteccao exige o `Uninstall.exe` no diretorio registrado. |
-| Linux fora da instalacao user-space | `.deb`, `.rpm`, copia manual da pasta ou `gradlew run`. Aqueles arquivos pertencem ao gerenciador de pacotes, e escrever por cima deles produz uma arvore que o proximo `apt upgrade` desfaz. |
-| Linux ARM64 | Nao ha `.tar.gz` ARM64 publicado. E outra coisa que "plataforma sem suporte": a plataforma serve, o pacote e que nao existe. |
-
-Duas coisas que valem saber antes de ligar:
-
-- **O download tem ~120 MB por versao.** Nao ha atualizacao delta, e nenhum artefato publicado e
-  menor. E o motivo de o interruptor vir desmarcado.
-- **O `Setup.exe` nao e assinado.** SmartScreen ou antivirus podem barra-lo. Falha ali cai no banner
-  de baixar manualmente, que e o comportamento de sempre.
-
-Releases anteriores a 38.0.0 nao sao alvo valido: o instalador delas nao entende o modo silencioso de
-atualizacao, e receber esse parametro o deixaria pendurado num dialogo invisivel.
-
-##### No Linux
-
-Vale so para a instalacao **user-space**, feita pelo `install-usage-monitor_<versao>_linux_x64.sh`
-publicado junto da release. Ela vive inteira dentro do `$HOME` e nao usa `sudo`:
-
-```
-<XDG_DATA_HOME>/usage-monitor/.usage-monitor-managed   marcador que autoriza a escrita
-<XDG_DATA_HOME>/usage-monitor/versions/<versao>/       uma arvore por versao retida
-<XDG_DATA_HOME>/usage-monitor/current                  arquivo de texto com a versao ativa
-~/.local/bin/usage-monitor                             launcher estavel, le `current` e faz exec
-~/.local/share/applications/usage-monitor.desktop      entrada de menu
-```
-
-Ligada, a app baixa o `.tar.gz`, confere o SHA-256 da API do GitHub e extrai para
-`updates/<versao>.staging`. Ao fechar, um script promove o staging para `versions/<versao>` por
-`rename`, troca `current`, relanca a app e **espera a confirmacao dela**. Sem confirmacao em 60 s,
-ele restaura `current`, relanca a versao anterior e grava o motivo no recibo. Duas versoes ficam em
-disco: a atual e uma anterior, para o rollback do ciclo seguinte.
-
-- **~125 MB por versao**, e ~600 MB em disco com as duas retidas.
-- **Uma instalacao `.deb`/`.rpm` existente exige migracao manual.** O instalador user-space detecta e
-  **para**, sem tocar em `/opt`, `/usr` ou arquivos do gerenciador de pacotes.
-- **O tarball nao e assinado.** A integridade vem do `digest` que a API do GitHub publica, por TLS —
-  o mesmo portao do Windows.
-- O log de cada troca fica em `~/.usage-monitor/diagnostics/linux-update.log`.
-
-Fora do escopo: musl/Alpine, ARM64, Flatpak e AppImage. Nesses casos o interruptor aparece
-desabilitado com o motivo, e o caminho continua sendo baixar a release e instalar a mao.
-
-### Preferencias persistidas
-
-Store local:
-
-- `PreferencesSettings(Preferences.userRoot().node("com.usagemonitor"))`
-
-Chaves persistidas:
-
-- `enabledApis`
-- `isDark`
-- `language`
-- `autoStart`
-- `cardOrder`
-- `minimizedCards`
-- `windowOpacityPercent`
-- `uiScalePercent` (escala da interface)
-- `teamUsageWindow*` (geometria da janela de Sessoes do time)
-- `teamPresenceWindow*` (geometria da janela de Conectados agora)
-
-A configuracao da integracao com time **nao** entra aqui: vive em `~/.usage-monitor/team.json`, porque a chave do servidor e um segredo e as preferencias sao gravadas em claro no registro do Windows.
-
-## Arquitetura
-
-O projeto segue arquitetura em tres camadas com dependencia unidirecional:
-
-`presentation -> domain <- data`
-
-### Source sets
-
-| Source set | Papel |
-|---|---|
-| `commonMain` | domain, data, presentation e UI partilhados |
-| `desktopMain` | bootstrap desktop, datasources locais, SQLite, auto-start e update installer |
-| `commonTest` | testes de domain, mappers, historico e ViewModels |
-| `desktopTest` | testes de componentes Compose Desktop e datasources JVM |
-| `src/installer` | scripts, idiomas e assets do instalador NSIS |
-
-### Regras importantes
-
-- `domain` nao pode importar Compose, Ktor ou infra.
-- Entidades e contratos do dominio nao conhecem HTTP, JSON, ficheiros locais ou UI.
-- Datasources que leem ficheiros do utilizador ficam em `desktopMain`.
-- `DashboardViewModel` usa `SupervisorJob`.
-- O polling roda em ciclo de 600 segundos.
-- `viewModel.onDestroy()` precisa ser chamado ao fechar a janela.
-- `Main.kt` fecha `DashboardViewModel`, `HistoryViewModel` e `HttpClient` no encerramento e no shutdown hook.
-
-### Bootstrap e DI
-
-O grafo e montado manualmente em `src/desktopMain/kotlin/com/usagemonitor/Main.kt`:
-
-`HttpClient(OkHttp)` -> data sources locais/remotos -> repositories -> use cases -> `DashboardViewModel` / `HistoryViewModel` -> telas Compose
-
-Dependencias principais do bootstrap:
-
-- `LocalCredentialDataSource`
-- `LocalCodexAuthDataSource`
-- `LocalOpenCodeUsageDataSource`
-- `LocalKiloUsageDataSource`
-- `LocalUsageHistoryDataSource`
-- `RemoteApiDataSource`
-- `AnthropicRepositoryImpl`
-- `MiniMaxRepositoryImpl`
-- `CodexRepositoryImpl`
-- `DeepSeekRepositoryImpl`
-- `OpenCodeRepositoryImpl`
-- `OpenCodeGoRepositoryImpl`
-- `KiloRepositoryImpl`
-- `UsageHistoryRepositoryImpl`
-- `AppUpdateRepositoryImpl`
-- `DesktopAppUpdateInstaller`
-
-## Stack
-
-- Kotlin Multiplatform
-- Compose Multiplatform Desktop
-- Ktor + OkHttp
-- Kotlinx Serialization
-- Kotlin Coroutines
-- Kotlinx Datetime
-- Multiplatform Settings
-- SQLite JDBC
-- NSIS
-
-## Build e distribuicao
-
-- `desktopJar` gera o JAR executavel.
-- `createDistributable` gera a distribuicao desktop em `build/compose/binaries/main/app/Usage Monitor`.
-- O projeto configura `TargetFormat.Exe`, `TargetFormat.Deb`, `TargetFormat.Rpm` e `TargetFormat.Dmg`.
-- `packageInstaller` empacota o instalador NSIS quando o NSIS estiver instalado.
-- `build-with-icon.ps1` e um fluxo auxiliar Windows para gerar distributable, aplicar icone com `rcedit` e chamar o NSIS manualmente.
-- `packageDmg` so roda em macOS: o jpackage nao faz cross-compile.
-- A versao da app vem de `build.gradle.kts` e e propagada para `CURRENT_APP_VERSION`.
-- Tags `v*` disparam `.github/workflows/release-linux.yml`, que publica artefatos Linux, Windows e macOS no GitHub Release. O job `verify` roda `allTests` em paralelo com os builds e `publish-release` depende dele: suite vermelha nao publica release.
-- `.github/workflows/ci.yml` roda `allTests` em push para `main` e em pull request; `.github/workflows/ci-server.yml` roda `typecheck` e `vitest` do `server/` quando `server/**` muda.
-
-### Instalacao no Windows
-
-O unico instalador de Windows e o `UsageMonitor-Setup-X.Y.Z.exe`. Ate a v37 o release publicava
-tambem um `Usage Monitor-X.Y.Z.msi`, e os dois gravavam no **mesmo** `%LOCALAPPDATA%\Usage Monitor`.
-O `.msi` saiu de circulacao por dois motivos: quem instalava por ele ficava permanentemente fora da
-atualizacao automatica, e ele estava em `perUserInstall`, que e justamente o modo que nao serve para
-deploy por maquina via Intune ou GPO.
-
-**Quem esta numa instalacao MSI nao precisa fazer nada.** Basta baixar o `UsageMonitor-Setup` e
-executar: o instalador encontra o produto MSI anterior pelo UpgradeCode, o remove em silencio e so
-entao grava a versao nova. Os dados ficam em `~/.usage-monitor/` e nas preferencias do registro, fora
-do diretorio de instalacao, e sobrevivem a migracao.
-
-Se a remocao automatica falhar, o instalador diz que falhou e para, em vez de produzir uma instalacao
-dupla. Nesse caso a limpeza manual e:
-
-1. Feche o Usage Monitor.
-2. Desinstale o MSI em "Aplicativos e recursos" — a entrada cujo desinstalador e `MsiExec.exe` — ou
-   por `msiexec /x {ProductCode}`.
-3. Apague a chave orfa do instalador anterior, se existir:
+| Windows | `UsageMonitor-Setup-X.Y.Z.exe` | run it — per-user, no admin rights | **Yes** |
+| Linux | `install-usage-monitor_X.Y.Z_linux_x64.sh` | `sh ./install-usage-monitor_X.Y.Z_linux_x64.sh`, no `sudo` | **Yes** |
+| Linux | `usage-monitor_X.Y.Z_amd64.deb` | `sudo apt install ./usage-monitor_X.Y.Z_amd64.deb` | No |
+| Linux | `usage-monitor-X.Y.Z.x86_64.rpm` | `sudo dnf install ./usage-monitor-X.Y.Z.x86_64.rpm` | No |
+| macOS (Apple silicon) | `usage-monitor_X.Y.Z_macos_arm64.dmg` | open, drag to Applications | No |
+| macOS (Intel) | `usage-monitor_X.Y.Z_macos_x64.dmg` | open, drag to Applications | No |
+
+The `.exe` and the `.sh` are the only paths that can update themselves. Prefer them.
+
+<details>
+<summary>Windows — migrating from the old MSI</summary>
+
+Until v37 the release also published a `Usage Monitor-X.Y.Z.msi`, and both installers wrote to the
+same `%LOCALAPPDATA%\Usage Monitor`. The MSI was dropped because anyone installed through it was
+permanently locked out of auto-update.
+
+**If you are on an MSI install, you do not need to do anything.** Download `UsageMonitor-Setup` and
+run it: it finds the previous MSI product by its UpgradeCode, removes it silently, and only then
+writes the new version. Your data lives in `~/.usage-monitor/` and in the registry preferences,
+outside the install directory, and survives the migration.
+
+If the automatic removal fails, the installer says so and stops rather than producing a double
+install. Manual cleanup:
+
+1. Close Usage Monitor.
+2. Uninstall the MSI from *Apps & features* — the entry whose uninstaller is `MsiExec.exe` — or run
+   `msiexec /x {ProductCode}`.
+3. Delete the orphaned uninstall key, if it is still there:
    `reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Usage Monitor" /f`
-4. Confira que `%LOCALAPPDATA%\Usage Monitor` sumiu; se sobrou, apague.
-5. Instale o `UsageMonitor-Setup-X.Y.Z.exe`.
-6. Reconfira "Iniciar com o Windows" nas Configuracoes.
+4. Check that `%LOCALAPPDATA%\Usage Monitor` is gone; delete it if not.
+5. Install `UsageMonitor-Setup-X.Y.Z.exe`.
+6. Re-check *Start with Windows* in Settings.
 
-### Instalacao no Linux
+</details>
 
-Tres formatos, e so um deles se atualiza sozinho:
+<details>
+<summary>Linux — what the user-space installer does</summary>
 
-| Formato | Instalacao | Atualizacao automatica |
-|---|---|---|
-| `install-usage-monitor_X.Y.Z_linux_x64.sh` | `sh ./install-usage-monitor_X.Y.Z_linux_x64.sh`, sem `sudo` | **Sim** |
-| `usage-monitor_X.Y.Z_amd64.deb` | `sudo apt install ./usage-monitor_X.Y.Z_amd64.deb` | Nao — interruptor desabilitado com o motivo |
-| `usage-monitor-X.Y.Z.x86_64.rpm` | `sudo dnf install ./usage-monitor-X.Y.Z.x86_64.rpm` | Nao — idem |
+The `.sh` installer downloads the release tarball (or uses a local copy sitting next to it),
+**always verifies the SHA-256**, and builds the whole tree inside `$HOME`:
 
-O instalador user-space baixa o `.tar.gz` da release (ou usa o arquivo local, se ele estiver ao lado),
-**confere o SHA-256 sempre** e monta a arvore dentro do `$HOME`. Ele recusa a instalacao quando
-encontra um pacote `.deb`/`.rpm` ja instalado, ou um `/opt/usage-monitor`: remova aquele antes.
-
-Se `~/.local/bin` nao estiver no `PATH`, o instalador avisa; o executavel continua acessivel pelo
-caminho completo e pela entrada de menu.
-
-### Instalacao no macOS
-
-Os DMGs (`usage-monitor_X.Y.Z_macos_arm64.dmg` e `..._x64.dmg`) sao publicados **sem assinatura Apple**. Na primeira abertura o Gatekeeper bloqueia. Duas saidas:
-
-- Clique com o botao direito no app dentro de `/Applications` e escolha **Abrir**, confirmando o aviso.
-- Ou remova a quarentena: `xattr -dr com.apple.quarantine "/Applications/Usage Monitor.app"`.
-
-O auto-start no macOS grava `~/Library/LaunchAgents/com.usagemonitor.app.plist` e carrega o agente com `launchctl`.
-
-## Testes
-
-- `commonTest` cobre domain, mappers, historico, forecast e ViewModels.
-- `desktopTest` cobre datasources SQLite, componentes Compose e fluxo de update desktop.
-- A suite agregada esperada do projeto e `gradlew.bat allTests`.
-
-## Instalador NSIS
-
-Licoes importantes ja validadas neste projeto:
-
-- Use `SetCompressor zlib` no topo do `.nsi`.
-- Evite launch bloqueante com `ExecWait` no fluxo de sucesso.
-
-Sintomas conhecidos:
-
-- Freeze em 99% costuma indicar problema de compressao LZMA.
-- Freeze na tela final costuma indicar processo bloqueante.
-
-## Regras de codigo
-
-- Nomes em ingles, comentarios em portugues.
-- Evitar nested scope functions como `let`, `apply` e `run`; preferir fluxo explicito.
-- Componentes de UI devem ser stateless: dados por parametros, eventos por lambdas.
-- `DashboardScreen` e o principal ponto stateful da UI.
-- Preserve o comportamento de sucesso parcial do `UiState`.
-- Nao hardcode segredos.
-
-## Ficheiros relevantes
-
-- `AGENTS.md`: regras operacionais do repositorio.
-- `build.gradle.kts`: build, versao, distribuicao e tarefas do instalador.
-- `src/desktopMain/kotlin/com/usagemonitor/Main.kt`: bootstrap, preferencias e composicao principal.
-- `src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt`: polling, refresh, snapshots e update flow.
-- `src/commonMain/kotlin/com/usagemonitor/data/repository/UsageHistoryRepositoryImpl.kt`: agregacao historica e forecast.
-- `src/commonMain/kotlin/com/usagemonitor/data/datasource/RemoteApiDataSource.kt`: chamadas HTTP remotas.
-- `src/desktopMain/kotlin/com/usagemonitor/data/datasource/LocalObservedModelUsageReader.kt`: leitura das bases locais de OpenCode e Kilo.
-- `src/installer/UsageMonitor.nsi`: script do instalador NSIS.
-- `src/desktopMain/kotlin/com/usagemonitor/data/datasource/AnthropicCredentialStore.kt`: origem das credenciais Anthropic (ficheiro ou Keychain no macOS).
-- `.github/workflows/release-linux.yml`: pipeline de release (Linux, Windows e macOS).
-- `.github/workflows/ci.yml`: testes Kotlin (`allTests`) em push e pull request.
-- `.github/workflows/ci-server.yml`: typecheck e testes do servidor de time.
-
-## Convencao de commit
-
-Antes de commitar:
-
-```bash
-git config user.name "codex"
-git config user.email "codex@openai.com"
+```
+<XDG_DATA_HOME>/usage-monitor/versions/<version>/   one tree per retained version
+<XDG_DATA_HOME>/usage-monitor/current               text file naming the active version
+~/.local/bin/usage-monitor                          stable launcher
+~/.local/share/applications/usage-monitor.desktop   menu entry
 ```
 
-Depois de commitar, restaurar:
+It **refuses to run** when it finds an existing `.deb`/`.rpm` install or an `/opt/usage-monitor` —
+remove those first. If `~/.local/bin` is not on your `PATH` it warns you; the app is still reachable
+by full path and from the menu entry.
 
-```bash
-git config user.name "edilsonvilarinho"
-git config user.email "edilson.vilarinho.messias@gmail.com"
-```
+Roughly 125 MB per version, and about 600 MB on disk once two versions are retained for rollback.
+Not supported: musl/Alpine, ARM64, Flatpak and AppImage.
 
-Regra obrigatoria:
+</details>
 
-- Nunca rodar `git commit` ou `git push` sem pedido explicito do utilizador.
+<details>
+<summary>macOS — Gatekeeper on first launch</summary>
+
+The DMGs are published **without an Apple signature**, so Gatekeeper blocks the first launch. Two
+ways around it:
+
+- Right-click the app inside `/Applications` and choose **Open**, then confirm.
+- Or clear the quarantine flag:
+  `xattr -dr com.apple.quarantine "/Applications/Usage Monitor.app"`
+
+Auto-start on macOS writes `~/Library/LaunchAgents/com.usagemonitor.app.plist` and loads the agent
+with `launchctl`.
+
+</details>
+
+## First run
+
+- **Claude Code and Codex need no setup.** Usage Monitor finds `~/.claude/.credentials.json` and
+  `~/.codex/auth.json` on its own. Newly detected Anthropic profiles stay disabled until you confirm
+  them, so nothing is collected behind your back.
+- **MiniMax, DeepSeek and OpenCode Go need an API key**, entered in **Settings > APIs**. Keys are
+  stored in `~/.usage-monitor/api-keys.json` with an atomic write and owner-only permissions.
+  Environment variables are never read.
+- **OpenCode Zen Free and Kilo Free need nothing** — they read the local databases those tools
+  already keep.
+- History, the session index and diagnostics live in `~/.usage-monitor/`.
+- The dashboard refreshes every 10 minutes. Closing the window quits the app; there is no
+  minimise-to-tray.
+
+Endpoints, credential paths and per-integration limits: [`docs/integrations.md`](docs/integrations.md).
+
+## Team view (optional)
+
+Off by default. It covers the case where several developers share one Anthropic account across
+different machines and the company wants to see aggregated usage.
+
+Your company runs the server — there is no managed service. Each machine pushes its indexed turns
+every 30 seconds and the server returns the aggregated view, per member and per account, with a
+30-day trend and a live presence list. Setup, API contract and deployment: [`server/README.md`](server/README.md).
+
+![Team integration settings](img/settings-team.png)
+
+## Privacy
+
+- Credential files are **read only**. Usage Monitor never runs a login or logout flow and never
+  deletes them.
+- **No prompt or response content is ever transmitted.** The team integration sends usage metadata
+  only: session id, message id, timestamp, model, token counts, project directory, branch and machine
+  name.
+- Network traffic goes to the vendor APIs listed in [`docs/integrations.md`](docs/integrations.md)
+  and, if you configure it, to **your own** team server. Nowhere else.
+- The team key lives in `~/.usage-monitor/team.json` with owner-only permissions, deliberately kept
+  out of the preference store, which is written in the clear.
+
+## Requirements
+
+Windows, Linux (x86_64) or macOS. The installers bundle their own Java runtime — nothing else to
+install. A JDK is only needed to build from source.
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [`docs/integrations.md`](docs/integrations.md) | every source: endpoints, credentials, known limits |
+| [`docs/architecture.md`](docs/architecture.md) | layers, source sets, dependency injection, storage |
+| [`docs/build-and-release.md`](docs/build-and-release.md) | building, packaging, CI and auto-update |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | how to set up, test and submit a change |
+| [`SECURITY.md`](SECURITY.md) | reporting a vulnerability, and how credentials are handled |
+| [`server/README.md`](server/README.md) | the optional team server: API contract and deployment |
+| [`CHANGELOG.md`](CHANGELOG.md) | release history |
+
+Internal working notes, in Portuguese: [`docs/design-system/`](docs/design-system/readme.md) (visual
+source of truth) and [`docs/planos/`](docs/planos/) (execution plans and decision records).
+
+## Contributing
+
+Issues and pull requests are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) — it covers the
+build, the test suite and the code conventions. For anything security-related, read
+[`SECURITY.md`](SECURITY.md) first.
+
+## License
+
+[MIT](LICENSE) © 2026 Edilson Vilarinho
