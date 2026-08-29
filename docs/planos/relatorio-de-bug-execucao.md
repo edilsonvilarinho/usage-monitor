@@ -72,8 +72,8 @@ usuário.
 
 | # | Micro-atividade | Situação | Commit | Verificação |
 |---|---|---|---|---|
-| B01 | Plano `docs/planos/relatorio-de-bug-execucao.md` com a tabela de pontos de situação | ✅ Concluída | (este commit) | `gh issue view 123` lido; `SettingsDialogContent.kt:386-494` lido — `GeneralSettingsTab` sem nenhum `AppButton`, confirmando a resposta 1 |
-| B02 | Comentário vivo criado na issue #123 com a tabela | ⏳ Pendente | — | — |
+| B01 | Plano `docs/planos/relatorio-de-bug-execucao.md` com a tabela de pontos de situação | ✅ Concluída | `2a0ad62` | `gh issue view 123` lido; `SettingsDialogContent.kt:386-494` lido — `GeneralSettingsTab` sem nenhum `AppButton`, confirmando a resposta 1 |
+| B02 | Comentário vivo criado na issue #123 com a tabela | ✅ Concluída | (este commit) | `gh issue comment 123 --body-file status-123.md` → `issues/123#issuecomment-5462958514` |
 | B03 | `BreadcrumbCategory` + `Breadcrumb` (domain) | ⏳ Pendente | — | — |
 | B04 | `BugReportMachineInfo` — OS, versão, arquitetura, JVM, versão do app, idioma, escala de UI, resolução, fuso | ⏳ Pendente | — | — |
 | B05 | `BugReportEnvelope` + `toJson()` | ⏳ Pendente | — | — |
