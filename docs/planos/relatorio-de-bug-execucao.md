@@ -75,8 +75,8 @@ usuário.
 | B01 | Plano `docs/planos/relatorio-de-bug-execucao.md` com a tabela de pontos de situação | ✅ Concluída | `2a0ad62` | `gh issue view 123` lido; `SettingsDialogContent.kt:386-494` lido — `GeneralSettingsTab` sem nenhum `AppButton`, confirmando a resposta 1 |
 | B02 | Comentário vivo criado na issue #123 com a tabela | ✅ Concluída | `20e588d` | `gh issue comment 123 --body-file status-123.md` → `issues/123#issuecomment-5462958514` |
 | B03 | `BreadcrumbCategory` + `Breadcrumb` (domain) | ✅ Concluída | `ba721bf` | `desktopTest --tests "com.usagemonitor.domain.BreadcrumbTest"` → `tests="6" failures="0" errors="0"`, BUILD SUCCESSFUL em 34s |
-| B04 | `BugReportMachineInfo` — OS, versão, arquitetura, JVM, versão do app, idioma, escala de UI, resolução, fuso | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.BugReportMachineInfoTest"` → `tests="3" failures="0" errors="0"`, BUILD SUCCESSFUL em 33s |
-| B05 | `BugReportEnvelope` + `toJson()` | ⏳ Pendente | — | — |
+| B04 | `BugReportMachineInfo` — OS, versão, arquitetura, JVM, versão do app, idioma, escala de UI, resolução, fuso | ✅ Concluída | `24e30b0` | `desktopTest --tests "com.usagemonitor.domain.BugReportMachineInfoTest"` → `tests="3" failures="0" errors="0"`, BUILD SUCCESSFUL em 33s |
+| B05 | `BugReportEnvelope` + `toJson()` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.BugReportEnvelopeJsonTest"` → `tests="5" failures="0" errors="0"`, BUILD SUCCESSFUL em 29s |
 | B06 | `toGithubIssueBody()` com truncagem (30 breadcrumbs, 6.000 chars) | ⏳ Pendente | — | — |
 | B07 | `BreadcrumbRecorder` (interface no domain) + implementação nula | ⏳ Pendente | — | — |
 | B08 | `LocalBreadcrumbRecorder` — jsonl, lock, trim 200/100, `restrictToOwnerReadWrite` | ⏳ Pendente | — | — |
