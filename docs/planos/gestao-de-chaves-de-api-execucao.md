@@ -63,6 +63,14 @@ há o botão dedicado.
 boot seguinte. Deixá-la ligada faria a coleta falhar com 401 a cada 10 minutos até o próximo
 reinício.
 
+### O conjunto do lápis é derivado, e o nome tem de dizer isso
+
+A primeira versão chamou o val desta tela de `API_KEY_DEPENDENT_SOURCES`, que é **o mesmo nome** do
+literal em `Main.kt:193`. Dois símbolos com o mesmo nome no mesmo repositório fazem quem lê os dois
+concluir que são a constante duplicada que o `CLAUDE.md` diz não existir — quando um é literal e o
+outro é a projeção de `requiresApiKey()` em `Set`. Renomeado para `EDITABLE_API_KEY_SOURCES`, com o
+KDoc dizendo de onde a resposta sai. O número de donos do conjunto continua sendo dois.
+
 ### "Remover chave" é `GHOST` e vive no rodapé do diálogo
 
 `PRIMARY` é uma por tela, e no `ApiKeyDialog` ela é o "Salvar" — o que o diálogo propõe. Remover fica
@@ -162,6 +170,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C10 | Troca de chave pelo lápis com a fonte já ligada | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 302 testes, 0 falhas |
 | C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ✅ Concluída | Inspeção da seção `#cfg-apis`: lápis nas três linhas com chave, "Remover chave" no rodapé do diálogo, campo esvaziado, duas notas novas |
 | F1 | Nome da fonte no `contentDescription` do lápis (achado da auditoria) | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 303 testes, 0 falhas |
+| F2 | `EDITABLE_API_KEY_SOURCES` — fim da colisão de nome com o `Main.kt` (achado da auditoria) | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 303 testes, 0 falhas |
 | C12 | `allTests` verde + QA manual | 🚧 Entregue à auditoria | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.presentation.*"` → `BUILD SUCCESSFUL`, 88 classes, 1013 testes, 0 falhas. `allTests` e o QA manual **não** foram executados aqui — ver abaixo |
 
 ### O que C12 não fechou, e por quê

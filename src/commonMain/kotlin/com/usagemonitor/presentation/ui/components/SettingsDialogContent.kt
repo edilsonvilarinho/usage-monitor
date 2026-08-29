@@ -527,7 +527,7 @@ private fun MonitoredApisTab(
             // literal novo: o conjunto das fontes que dependem de chave já tem
             // dois donos — este e o filtro de arranque —, e um terceiro seria
             // onde a fonte seguinte ficaria esquecida.
-            editableApiKeys = API_KEY_DEPENDENT_SOURCES,
+            editableApiKeys = EDITABLE_API_KEY_SOURCES,
             language = currentLanguage,
             onToggle = { api, checked ->
                 if (checked && api.requiresApiKey() && api !in configuredApiKeys) {
@@ -579,13 +579,16 @@ private fun MonitoredApisTab(
 }
 
 /**
- * Fontes que dependem de chave local, derivadas de [requiresApiKey].
+ * Fontes cuja linha desta tela ganha o lápis de gerenciar chave.
  *
- * Lista derivada e não literal: `requiresApiKey` continua sendo o único ponto
- * que responde à pergunta nesta tela, e o `filter` garante que uma fonte nova
- * entre nos dois lugares de uma vez.
+ * **Não é um segundo dono do conjunto**, e o nome diz isso: a resposta continua
+ * saindo de [requiresApiKey], e este val é só a projeção dela em `Set` para o
+ * [ApiSelector]. O nome `API_KEY_DEPENDENT_SOURCES` está tomado pelo literal do
+ * `Main.kt`, que é o filtro de arranque; dois símbolos com o mesmo nome fariam
+ * quem lê os dois concluir que são a mesma constante duplicada, quando um é
+ * literal e o outro é derivado.
  */
-private val API_KEY_DEPENDENT_SOURCES: Set<ApiSource> =
+private val EDITABLE_API_KEY_SOURCES: Set<ApiSource> =
     ApiSource.entries.filter { source -> source.requiresApiKey() }.toSet()
 
 private fun ApiSource.requiresApiKey(): Boolean {
