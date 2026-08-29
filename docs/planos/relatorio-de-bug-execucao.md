@@ -204,7 +204,18 @@ usuário.
 | B19 | "Abrir issue no GitHub" — URL montada e navegador aberto | ✅ Concluída | (este commit) | `desktopTest --tests "…BugReportIssueOpenerTest" --tests "…DesktopAppUpdateReleaseOpenerTest"` → `tests="6"` e `tests="4"`, `failures="0"` nos dois |
 | B20 | Fluxo do marcador + fiação do diálogo no `Main.kt` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="13" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
 | B21 | Protótipo: `§12 #cfg-geral` ganha a seção e nasce `§12f #cfg-bug` | ✅ Concluída | (este commit) | Inspeção do HTML: `grep -c 'id="cfg-bug"'` → 1; entrada no `nav.index`; `.banner.ok` e `.field.area` acrescentados ao CSS |
-| B22 | `allTests` verde + QA manual: crash proposital, dark/light, PT/EN | ⏳ Pendente | — | — |
+| B22 | `allTests` verde + QA manual: crash proposital, dark/light, PT/EN | 🚧 Bloqueada — fora do alcance deste agente | — | Passadas com filtro, todas verdes: `--tests "com.usagemonitor.ui.*"` → 309 testes; `--tests "com.usagemonitor.presentation.*"` → 384; `--tests "…domain.*" + "…data.*" + "…update.*"` → 80 classes / 725 testes, nenhuma com `failures>0`. A `allTests` completa é da auditoria, rodada em série; o QA manual exige sessão gráfica interativa |
+
+## O que fica para a auditoria
+
+- **`gradlew.bat allTests`** na worktree. As passadas com filtro cobriram os cinco pacotes tocados e
+  estão todas verdes, mas quem fecha a branch é a suíte inteira rodada em série — com três worktrees
+  vivas ao mesmo tempo, a suíte completa não é responsabilidade do agente.
+- **QA manual**, que exige sessão gráfica interativa: crash proposital para conferir que o arranque
+  seguinte oferece o relatório com a trilha e a captura, e a conferência do diálogo em tema claro e
+  escuro e em PT/EN.
+- **Candidato a issue própria:** `refreshRiskSummaries` continua engolindo a falha de leitura do
+  histórico em silêncio, pelo motivo registrado acima.
 
 ## Verificação
 
