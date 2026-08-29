@@ -111,6 +111,51 @@ class CrashHandlerTest {
         }
     }
 
+    /**
+     * A captura é *best-effort* e passa por um capturer injetado justamente
+     * porque `java.awt.Robot` não roda em CI headless.
+     */
+    @Test
+    fun `a captured window is written next to the marker`() {
+        withTempFile { marker ->
+            val png = byteArrayOf(1, 2, 3)
+            val screenshot = File(marker.parentFile, "pending-crash.png")
+            val handler = CrashHandler(
+                breadcrumbs = CapturingRecorder(),
+                markerFile = marker,
+                screenshots = { png },
+                screenshotFile = screenshot
+            )
+
+            handler.uncaughtException(Thread.currentThread(), thrown())
+
+            assertTrue(screenshot.exists())
+            assertEquals(png.toList(), screenshot.readBytes().toList())
+        }
+    }
+
+    /**
+     * Sem captura, a imagem de uma queda anterior não pode sobrar: ela mostraria
+     * uma tela que não é a do defeito que está sendo reportado.
+     */
+    @Test
+    fun `a stale screenshot from an earlier crash is removed`() {
+        withTempFile { marker ->
+            marker.parentFile?.mkdirs()
+            val screenshot = File(marker.parentFile, "pending-crash.png")
+            screenshot.writeBytes(byteArrayOf(9, 9))
+
+            CrashHandler(
+                breadcrumbs = CapturingRecorder(),
+                markerFile = marker,
+                screenshots = { null },
+                screenshotFile = screenshot
+            ).uncaughtException(Thread.currentThread(), thrown())
+
+            assertTrue(!screenshot.exists())
+        }
+    }
+
     private fun thrown(): Throwable {
         return runCatching { throw IllegalStateException("índice indisponível") }
             .exceptionOrNull()!!

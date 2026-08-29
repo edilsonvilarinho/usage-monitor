@@ -49,6 +49,12 @@ internal data class PendingCrashMarker(
 class CrashHandler(
     private val breadcrumbs: BreadcrumbRecorder,
     private val markerFile: File = defaultMarkerFile(),
+    /**
+     * Captura da janela, *best-effort*. Default que não captura: quem não passa
+     * um capturer não tem tela, e é assim que o teste roda em CI headless.
+     */
+    private val screenshots: WindowScreenshotCapturer = NoWindowScreenshotCapturer,
+    private val screenshotFile: File = defaultScreenshotFile(),
     private val json: Json = Json { encodeDefaults = true; ignoreUnknownKeys = true },
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() }
 ) : Thread.UncaughtExceptionHandler {
@@ -99,6 +105,23 @@ class CrashHandler(
             restrictToOwnerReadWrite(markerFile.toPath())
         }
 
+        // A captura vem DEPOIS do marcador: ela é a parte mais cara e a mais
+        // provável de falhar, e o marcador sozinho já entrega o relatório. Na
+        // ordem inversa, uma captura que travasse levaria junto o registro da
+        // queda.
+        runCatching {
+            val png = screenshots.capture()
+            if (png != null) {
+                screenshotFile.parentFile?.mkdirs()
+                screenshotFile.writeBytes(png)
+                restrictToOwnerReadWrite(screenshotFile.toPath())
+            } else if (screenshotFile.exists()) {
+                // Imagem de uma queda anterior não pode ser oferecida como sendo
+                // desta: ela mostraria uma tela que não é a do defeito.
+                screenshotFile.delete()
+            }
+        }
+
         // Por último: o handler anterior é quem pode encerrar o processo, e o que
         // vier depois dele não roda.
         previousHandler?.uncaughtException(thread, error)
@@ -115,10 +138,19 @@ class CrashHandler(
         const val STACK_TOP_FRAMES = 5
 
         fun defaultMarkerFile(): File {
+            return diagnosticsFile("pending-crash.json")
+        }
+
+        /** Ao lado do marcador, e com o mesmo nome: os dois descrevem uma queda só. */
+        fun defaultScreenshotFile(): File {
+            return diagnosticsFile("pending-crash.png")
+        }
+
+        private fun diagnosticsFile(name: String): File {
             val homeDir = System.getProperty("user.home")
                 ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
 
-            return File(homeDir, ".usage-monitor/diagnostics/pending-crash.json")
+            return File(homeDir, ".usage-monitor/diagnostics/$name")
         }
     }
 }

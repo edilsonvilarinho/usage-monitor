@@ -112,6 +112,16 @@ usuário.
   com as falhas engolidas. São dois casos diferentes: aquelas são frequentes, de baixo valor e nunca
   revisadas; esta é o evento único que motiva o relatório inteiro, e o usuário lê o pacote antes de
   publicá-lo.
+- **A captura é dos limites da janela, nunca da tela.** O recorte é a diferença entre um diagnóstico e
+  um vazamento: a tela inteira traria o que mais estivesse aberto — outra janela, um e-mail, um
+  terminal com uma credencial na linha de comando — e o pacote vira issue pública. O que o `Robot` lê
+  é o conteúdo do monitor naquele retângulo, então janela sobreposta aparece; não há como pedir ao
+  compositor o conteúdo próprio da janela sem passar pelo pipeline do Swing, que não descreve o que o
+  Skia do Compose desenhou. Está escrito no arquivo.
+- **A captura roda depois do marcador**, dentro do handler: ela é a parte mais cara e a mais provável
+  de falhar, e o marcador sozinho já entrega o relatório. Na ordem inversa, uma captura travada
+  levaria junto o registro da queda. Sem captura, a imagem de uma queda anterior é **apagada** — ela
+  mostraria uma tela que não é a do defeito sendo reportado.
 - **Nenhuma animação infinita** no diálogo — trava o `waitForIdle` dos testes de componente.
 - **Sem hostname e sem usuário do sistema.** O pacote vira o corpo de uma issue pública, e as duas
   informações identificam a pessoa sem ajudar a diagnosticar o app.
@@ -133,7 +143,7 @@ usuário.
 | B11 | Pontos de chamada nos `catch` que hoje falham em silêncio | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 384 testes, nenhuma `failures>0` (382 antes, +2 da deduplicação do semáforo) |
 | B12 | `GenerateBugReportUseCase` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.GenerateBugReportUseCaseTest"` → `tests="2" failures="0" errors="0"` |
 | B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="4" failures="0" errors="0"` |
-| B14 | Captura best-effort da janela via capturer injetável | ⏳ Pendente | — | — |
+| B14 | Captura best-effort da janela via capturer injetável | ✅ Concluída | (este commit) | `desktopTest --tests "…CrashHandlerTest" --tests "…WindowScreenshotCapturerTest"` → `tests="6"` e `tests="2"`, `failures="0"` nos dois |
 | B15 | Registro do handler antes de `application { }` e leitura do marcador no arranque | ⏳ Pendente | — | — |
 | B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ⏳ Pendente | — | — |
 | B17 | `BugReportDialog` stateless | ⏳ Pendente | — | — |
