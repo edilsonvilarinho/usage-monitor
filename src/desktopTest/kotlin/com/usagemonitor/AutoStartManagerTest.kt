@@ -400,6 +400,70 @@ class AutoStartManagerTest {
         }
     }
 
+    // --- Linux: entrada quebrada como terceiro motivo de migracao -------------
+
+    /**
+     * Reescrever uma entrada que ja funciona seria trabalho sem mudanca, e a cada
+     * arranque.
+     */
+    @Test
+    fun `a working linux entry is not repaired`() {
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsRepair(
+                currentCommand = AutoStartManager.buildLinuxDesktopEntry(
+                    stableLauncher,
+                    "/home/edils/.local/bin"
+                ),
+                isExecutable = { path -> path == stableLauncher }
+            )
+        )
+    }
+
+    /**
+     * O caso da issue #120: a entrada existe, o interruptor esta ligado, e o
+     * `Path=` entre aspas nomeia um diretorio que nao existe -- o spawn falha no
+     * `chdir` e nada aparece na tela. Sem este motivo de migracao a correcao do
+     * `Path=` nao alcancaria ninguem que ja esteja afetado.
+     */
+    @Test
+    fun `a linux entry with a quoted working directory is repaired`() {
+        val legacyEntry = """
+            [Desktop Entry]
+            Type=Application
+            Name=Usage Monitor
+            Exec="$stableLauncher" --autostart
+            Path="/home/edils/.local/bin"
+            Terminal=false
+        """.trimIndent()
+
+        assertTrue(
+            AutoStartManager.linuxAutoStartNeedsRepair(
+                currentCommand = legacyEntry,
+                isExecutable = { path -> path == stableLauncher }
+            )
+        )
+    }
+
+    /**
+     * Entrada ausente nao migra, e a regra continua intacta com o motivo novo:
+     * reescrever aqui ligaria a inicializacao de quem a desligou.
+     */
+    @Test
+    fun `a missing linux entry is never repaired`() {
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsRepair(
+                currentCommand = null,
+                isExecutable = { true }
+            )
+        )
+        assertFalse(
+            AutoStartManager.linuxAutoStartNeedsRepair(
+                currentCommand = "   ",
+                isExecutable = { true }
+            )
+        )
+    }
+
     private fun createTempDir(): File {
         return kotlin.io.path.createTempDirectory("autostart-manager-test").toFile()
     }

@@ -60,8 +60,13 @@ object AutoStartManager {
         }
 
         val currentCommand = readAutoStartCommand()
+        // Os dois motivos do Linux so valem no Linux: `inspectLinuxAutostartEntry`
+        // le `~/.config/autostart`, e no Windows e no macOS a resposta dela nao
+        // significa nada.
+        val isLinux = currentPlatform() == Platform.LINUX
         val needsMigration = autoStartCommandNeedsMigration(currentCommand) ||
-            (currentPlatform() == Platform.LINUX && linuxEntryPointsIntoVersionedTree(currentCommand))
+            (isLinux && linuxEntryPointsIntoVersionedTree(currentCommand)) ||
+            (isLinux && linuxAutoStartNeedsRepair(currentCommand))
         if (!needsMigration) {
             return true
         }
@@ -87,6 +92,37 @@ object AutoStartManager {
             stableLauncherPath = resolveLinuxStableLauncherPath(),
             versionsPrefix = resolveLinuxInstallRoot()?.let { root -> "$root/versions/" }
         )
+    }
+
+    /**
+     * Se a entrada existente esta **quebrada**: ela existe, o usuario a pediu, e
+     * como esta escrita o spawn a recusa.
+     *
+     * Terceiro motivo de migracao, com a mesma forma dos dois anteriores. Nao ha
+     * "reescrever o arquivo de quem nao pediu" aqui: [ensureAutoStartCommandCurrent]
+     * ja retornou cedo quando [isAutoStartEnabled] e falso, entao esta condicao so
+     * ve entrada que **existe** -- a regra "entrada ausente nao migra, senao
+     * ligaria a inicializacao de quem a desligou" segue intacta.
+     *
+     * Sem ela a correcao do `Path=` nao alcancaria ninguem que ja esteja afetado,
+     * inclusive quem abriu a issue #120, que esta com o interruptor ligado e sem
+     * autostart. Correcao que nao chega a quem reportou o defeito nao e correcao.
+     *
+     * O texto vem de [readAutoStartCommand], que no Linux ja e o conteudo do
+     * proprio `.desktop`: uma segunda leitura do mesmo arquivo seria um segundo
+     * dono da mesma resposta. Se a reescrita nao conseguir resolver executavel,
+     * `setLinuxAutoStart` devolve `false` e **deixa o arquivo como esta** -- a
+     * condicao nova nao destroi entrada nenhuma.
+     */
+    internal fun linuxAutoStartNeedsRepair(
+        currentCommand: String?,
+        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } }
+    ): Boolean {
+        val state = inspectLinuxAutostartEntry(
+            readEntry = { currentCommand },
+            isExecutable = isExecutable
+        )
+        return state.present && !state.valid
     }
 
     private fun readAutoStartCommand(): String? {
