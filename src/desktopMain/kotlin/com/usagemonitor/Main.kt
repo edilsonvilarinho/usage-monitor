@@ -110,6 +110,7 @@ import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.domain.usecase.RemoveAdminTeamMemberUseCase
 import com.usagemonitor.domain.usecase.RemoveAdminTeamSessionUseCase
+import com.usagemonitor.domain.usecase.GenerateBugReportUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
@@ -117,6 +118,8 @@ import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import com.usagemonitor.presentation.ui.DesktopDialogFrame
+import com.usagemonitor.presentation.ui.BugReportHost
+import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
@@ -1089,6 +1092,26 @@ private fun runUsageMonitor(
     var monthlyBudgetMicros by remember { mutableStateOf(readPersistedBudgetMicros(settings)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
+
+    // A queda da sessão anterior é lida **e consumida** uma vez por arranque: este
+    // é o mesmo arranque que abre o relatório, então ela foi oferecida. Sem o
+    // consumo, o app ofereceria a mesma queda para sempre.
+    val pendingCrash = remember { consumePendingCrash() }
+    var isBugReportOpen by remember { mutableStateOf(pendingCrash != null) }
+    val generateBugReport = remember(breadcrumbs) {
+        GenerateBugReportUseCase(
+            breadcrumbs = breadcrumbs,
+            // Função, e não valor: idioma e escala mudam nas Configurações
+            // enquanto o app roda, e congelá-los aqui faria o relatório descrever
+            // um estado que já não é o do momento da falha.
+            machineInfo = { desktopBugReportMachineInfo(language, uiScalePercent) },
+            // O corte do arquivo tem um dono só, e é o registro de arranque.
+            breadcrumbLimit = StartupDiagnostics.MAX_LINES
+        )
+    }
+    val bugReportWriter = remember { DesktopBugReportWriter(parentWindow = { mainWindowRef }) }
+    val bugReportIssueOpener = remember { BugReportIssueOpener() }
+    val bugReportCapturer = remember { RobotWindowScreenshotCapturer { mainWindowRef } }
     var historyDialogSource by remember { mutableStateOf<ApiSource?>(null) }
     var historyOpenGeneration by remember { mutableStateOf(0) }
     var isCliSessionsOpen by remember { mutableStateOf(false) }
@@ -1585,6 +1608,28 @@ private fun runUsageMonitor(
                     showFooter = !cardsOnlyMode
                 )
             }
+
+            // Dentro da janela principal, e não da janela de Configurações: é ela
+            // que a captura enquadra, e é ela que existe no arranque depois de uma
+            // queda -- quando as Configurações nem foram abertas.
+            if (isBugReportOpen) {
+                BugReportHost(
+                    generateBugReport = generateBugReport,
+                    writer = bugReportWriter,
+                    issueOpener = bugReportIssueOpener,
+                    screenshots = bugReportCapturer,
+                    language = language,
+                    crashPrefill = pendingCrash?.let { crash ->
+                        crashPrefillDescription(
+                            exception = crash.marker.exception,
+                            thread = crash.marker.thread,
+                            isPt = language == AppLanguage.PT
+                        )
+                    },
+                    crashScreenshotPng = pendingCrash?.screenshotPng,
+                    onDismiss = { isBugReportOpen = false }
+                )
+            }
         }
     }
 
@@ -1851,6 +1896,14 @@ private fun runUsageMonitor(
                             // Aviso e gravação não saem daqui pelo mesmo motivo da
                             // opacidade: quem persiste é o coletor com debounce.
                             uiScalePercent = clampUiScalePercent(percent)
+                        },
+                        onReportBug = {
+                            // As Configurações fecham: o formulário mora na janela
+                            // principal, e a janela de Configurações ficaria por
+                            // cima dele -- e dentro da captura.
+                            isSettingsDialogOpen = false
+                            isBugReportOpen = true
+                            breadcrumbs.recordScreenOpened("relatório de bug")
                         },
                         onThemeChange = { selectedPreset ->
                             themePreset = selectedPreset

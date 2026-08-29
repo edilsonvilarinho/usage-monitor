@@ -49,6 +49,44 @@ internal fun readPendingCrashMarker(
 }
 
 /**
+ * A queda da sessão anterior e, quando houve, a imagem dela.
+ *
+ * A imagem vem em memória e não como caminho: os dois arquivos são apagados no
+ * mesmo instante em que são lidos, e um caminho para arquivo já apagado não
+ * serve para nada.
+ */
+internal class PendingCrashReport(
+    val marker: PendingCrashMarker,
+    val screenshotPng: ByteArray?
+)
+
+/**
+ * Lê a queda pendente **e apaga o rastro dela**.
+ *
+ * Apagar aqui, e não na leitura pura de [readPendingCrashMarker], é o que fecha o
+ * ciclo: o arranque que leu o marcador é o mesmo que abre o relatório, então a
+ * queda foi oferecida. Sem a remoção, o app ofereceria a mesma queda em todo
+ * arranque para sempre.
+ */
+internal fun consumePendingCrash(
+    markerFile: File = CrashHandler.defaultMarkerFile(),
+    screenshotFile: File = CrashHandler.defaultScreenshotFile(),
+    json: Json = Json { ignoreUnknownKeys = true }
+): PendingCrashReport? {
+    val marker = readPendingCrashMarker(markerFile = markerFile, json = json) ?: return null
+    val png = runCatching {
+        if (screenshotFile.exists()) screenshotFile.readBytes() else null
+    }.getOrNull()
+
+    // Falha ao apagar não pode derrubar o arranque; o pior caso é a mesma queda
+    // ser oferecida de novo, que é melhor que não subir.
+    runCatching { markerFile.delete() }
+    runCatching { if (screenshotFile.exists()) screenshotFile.delete() }
+
+    return PendingCrashReport(marker = marker, screenshotPng = png)
+}
+
+/**
  * Handler de exceção não tratada.
  *
  * Ao disparar faz três coisas, todas dentro de `runCatching`: anota um passo

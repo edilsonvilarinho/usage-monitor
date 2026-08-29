@@ -159,6 +159,21 @@ usuário.
   para outro lugar.
 - **A truncagem do corpo acontece antes do percent-encoding**, e é por isso que ela mora no domain:
   cortar depois partiria uma sequência `%C3%A7` no meio e produziria um caractere quebrado.
+- **`BugReportHost` mora fora do `main()`.** O formulário tem seis pedaços de estado e duas ações
+  suspensas; todos dentro daquele composable seriam mais cem linhas no método que já estourou o backend
+  da JVM. `main()` fica com dois `remember` e uma chamada. O host vive em `desktopMain` porque conhece
+  writer, capturer e abridor de navegador — três coisas que o `commonMain` não pode importar.
+- **A captura do caminho manual acontece na abertura do formulário, não no clique de salvar.** No clique
+  o diálogo já está pintado, e o `Robot` — que lê o conteúdo do monitor — devolveria uma imagem do
+  próprio formulário por cima do app. Dentro do `remember` a composição ainda não virou frame. Pela
+  mesma razão, "Reportar um bug" **fecha as Configurações**: aquela janela ficaria por cima do
+  formulário e dentro da captura.
+- **A imagem da queda tem prioridade sobre a captura de agora**: ela mostra a tela do defeito, e a de
+  agora mostraria o app funcionando.
+- **A prévia só lê a trilha quando está aberta.** Recalcular o corpo da issue a cada tecla com a prévia
+  fechada seria I/O sem ninguém para ver o resultado.
+- **Trocar a descrição apaga o resultado anterior.** "Arquivo salvo" descrevia outro texto, e mantê-lo
+  na tela faria a mensagem parecer valer para o que está sendo digitado agora.
 - **Nenhuma animação infinita** no diálogo — trava o `waitForIdle` dos testes de componente. A prévia
   entra e sai da composição, sem transição: animação finita não acrescenta nada a um bloco de texto.
 - **Sem hostname e sem usuário do sistema.** O pacote vira o corpo de uma issue pública, e as duas
@@ -187,7 +202,7 @@ usuário.
 | B17 | `BugReportDialog` stateless + primitiva `AppTextArea` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.BugReportDialogTest"` → `tests="12" failures="0" errors="0"` |
 | B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.*"` → 309 testes, nenhuma `failures>0` (inclui os 3 do `DiagnosticsSettingsSectionTest`) |
 | B19 | "Abrir issue no GitHub" — URL montada e navegador aberto | ✅ Concluída | (este commit) | `desktopTest --tests "…BugReportIssueOpenerTest" --tests "…DesktopAppUpdateReleaseOpenerTest"` → `tests="6"` e `tests="4"`, `failures="0"` nos dois |
-| B20 | Fluxo do marcador: arranque seguinte oferece o relatório e apaga o marcador | ⏳ Pendente | — | — |
+| B20 | Fluxo do marcador + fiação do diálogo no `Main.kt` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="13" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
 | B21 | `prototipo-visual-opencode.html` — `§12 #cfg-geral` ganha a seção nova | ⏳ Pendente | — | — |
 | B22 | `allTests` verde + QA manual: crash proposital, dark/light, PT/EN | ⏳ Pendente | — | — |
 

@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.domain.entity.Breadcrumb
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.presentation.ui.crashPrefillDescription
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -209,6 +210,71 @@ class CrashHandlerTest {
 
             assertTrue(marker.exists())
         }
+    }
+
+    /**
+     * O arranque que lê o marcador é o que abre o relatório: a queda foi
+     * oferecida, então o rastro sai. Sem isto o app ofereceria a mesma queda em
+     * todo arranque para sempre.
+     */
+    @Test
+    fun `consuming the crash returns it once and clears both files`() {
+        withTempFile { marker ->
+            val screenshot = File(marker.parentFile, "pending-crash.png")
+            CrashHandler(
+                breadcrumbs = CapturingRecorder(),
+                markerFile = marker,
+                screenshots = { byteArrayOf(4, 2) },
+                screenshotFile = screenshot
+            ).uncaughtException(Thread.currentThread(), thrown())
+
+            val first = consumePendingCrash(markerFile = marker, screenshotFile = screenshot)
+
+            assertEquals("IllegalStateException", first?.marker?.exception)
+            assertEquals(listOf<Byte>(4, 2), first?.screenshotPng?.toList())
+            assertTrue(!marker.exists())
+            assertTrue(!screenshot.exists())
+            // O segundo arranque já não tem o que oferecer.
+            assertEquals(null, consumePendingCrash(markerFile = marker, screenshotFile = screenshot))
+        }
+    }
+
+    @Test
+    fun `a crash without a screenshot is still consumable`() {
+        withTempFile { marker ->
+            val screenshot = File(marker.parentFile, "pending-crash.png")
+            CrashHandler(
+                breadcrumbs = CapturingRecorder(),
+                markerFile = marker,
+                screenshots = { null },
+                screenshotFile = screenshot
+            ).uncaughtException(Thread.currentThread(), thrown())
+
+            val consumed = consumePendingCrash(markerFile = marker, screenshotFile = screenshot)
+
+            assertEquals("IllegalStateException", consumed?.marker?.exception)
+            assertEquals(null, consumed?.screenshotPng)
+        }
+    }
+
+    /**
+     * A primeira linha é o que o usuário reconhece — e é ela que vira o título da
+     * issue. A segunda é o que a máquina sabe.
+     */
+    @Test
+    fun `the crash prefill opens with the sentence the user recognizes`() {
+        val prefill = crashPrefillDescription(
+            exception = "IllegalStateException",
+            thread = "main",
+            isPt = true
+        )
+
+        assertTrue(prefill.startsWith("O app fechou inesperadamente."), prefill)
+        assertTrue(prefill.contains("IllegalStateException na thread main"), prefill)
+        assertEquals(
+            "Relatório de bug: O app fechou inesperadamente.",
+            bugReportIssueTitle(prefill)
+        )
     }
 
     private fun thrown(): Throwable {
