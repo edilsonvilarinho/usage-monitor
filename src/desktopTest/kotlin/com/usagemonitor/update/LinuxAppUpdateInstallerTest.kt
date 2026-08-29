@@ -133,10 +133,16 @@ class LinuxAppUpdateInstallerTest {
     /**
      * Enquanto o sentinela estiver de pé, nenhuma release é alvo aceito. Baixá-lo
      * antes de o binário emitir o ACK faria o script desfazer atualizações boas.
+     *
+     * `minTargetVersion` é injetado como o sentinela histórico (`999.0.0`), e não
+     * deixado no default: desde a A14 (issue #121) o default de produção é
+     * `38.0.1` — a versão cujo binário provou emitir o ACK numa Bazzite real —, e
+     * este teste prova a propriedade do **mecanismo do sentinela**, não o valor
+     * corrente do piso.
      */
     @Test
     fun `no release is a target while the sentinel stands`() {
-        val subject = installer()
+        val subject = installer(minTargetVersion = "999.0.0")
 
         assertFalse(subject.isTargetUpdatable("39.0.0"))
         assertFalse(subject.isTargetUpdatable("998.9.9"))
@@ -146,7 +152,7 @@ class LinuxAppUpdateInstallerTest {
 
     @Test
     fun `preparing a target below the floor fails`() = runBlocking {
-        val result = installer().prepare(updateWith(everyArtifact()))
+        val result = installer(minTargetVersion = "999.0.0").prepare(updateWith(everyArtifact()))
 
         assertTrue(result.isFailure)
         assertTrue(
