@@ -73,16 +73,38 @@ cromo é PT/EN.
 
 ### Quando abre, e quando marca
 
-`shouldShowReleaseNotes(receipt, currentVersion, seenVersion)`, também pura, exige as três: recibo de
-**sucesso**, `receipt.version == currentVersion` e versão **ainda não vista**.
+> A regra desta seção foi **substituída** na B03. O gatilho original — recibo de sucesso do instalador
+> — está descrito na seção "Correção do gatilho (issue #127)", mais abaixo, junto do motivo de ter
+> saído. O que continua valendo é a tabela dos desfechos da **busca**, no fim desta seção.
 
-A terceira não é redundante. O recibo só é sobrescrito na atualização **seguinte**, ou seja,
-sobrevive a todas as aberturas até lá; sem a marca a janela abriria toda vez. A marca é a preferência
-`releaseNotesSeenVersion` (`ReleaseNotesPreferences.kt`) — guarda a **versão** e não um booleano,
-porque um booleano precisaria ser limpo por quem escreve o recibo, que é o instalador NSIS, e ele não
-conhece as preferências do app.
+`releaseNotesDecision(currentVersion, seenVersion, hasUpdateReceipt)`, pura, devolve um de três
+valores. **O recibo não decide**: ele entra como booleano de existência, só para separar instalação
+nova de marca ausente por defeito.
 
-Os três desfechos da busca são tratados separadamente, e é aí que está a decisão:
+| Situação | Decisão | Por quê |
+|---|---|---|
+| Sem marca e sem recibo | `MARK_SEEN_ONLY` | Instalação nova. "Novidades" para quem não tem versão anterior não descreve mudança nenhuma |
+| Sem marca, com recibo no disco | `SHOW` | A máquina já atualizou alguma vez. É o estado de quem foi atingido pela #127 — sem este ramo a correção só apareceria uma versão depois de publicada |
+| Marca igual à versão em execução | `SKIP` | Igualdade textual, exata e barata |
+| Versão em execução mais nova que a marca | `SHOW` | O caso normal |
+| Resto | `MARK_SEEN_ONLY` | Retrocesso, e "mesma versão escrita de outro jeito" (`38.0.2` × `38.0.02`), que a igualdade textual não pega — a marca é reescrita na forma canônica e a abertura seguinte cai em `SKIP` |
+
+A marca é a preferência `releaseNotesSeenVersion` (`ReleaseNotesPreferences.kt`) — guarda a **versão**
+e não um booleano, porque um booleano teria de ser limpo por alguém a cada troca de versão, e o único
+candidato seria o instalador, que não conhece as preferências do app.
+
+`MARK_SEEN_ONLY` **não vai à rede**: pedir ao GitHub a release de uma versão que não vamos anunciar é
+requisição gasta por nada.
+
+O subtítulo tem fonte própria, `releaseNotesPreviousVersion`: o recibo quando ele descreve a
+atualização que trouxe o binário em execução — caminho automático do Windows, onde o instalador leu a
+versão anterior do registro —, e a marca em todo o resto. O `?:` sobre `previousVersion`, e não um
+`if` sobre o recibo inteiro, porque o campo é anulável e descartar a marca ali apagaria o subtítulo
+em vez de completá-lo.
+
+Os três desfechos da **busca** continuam tratados separadamente, e são coisa diferente da decisão
+acima. **Tag inexistente entra no segundo**, não no terceiro (B04): a resposta é definitiva e
+retentar não a mudaria.
 
 | Desfecho | Janela | Marca |
 |---|---|---|
@@ -126,26 +148,123 @@ O `main()` ganha **duas** chamadas e nenhum estado novo — `rememberReleaseNote
 Seção `4d · Novidades da versão` em `prototipo-visual-opencode.html`, com o link em `nav.index`, no
 mesmo commit da mudança.
 
+## Correção do gatilho (issue #127)
+
+A janela **não subiu** numa Bazzite depois da atualização automática para a v38.0.1. Não foi falha de
+rede nem release vazia: a `v38.0.1` tem três itens `fix` no corpo. O defeito era do gatilho, e
+escondia a janela em quase todo lugar.
+
+### O recibo perde a corrida no Linux, sempre
+
+O recibo é lido **uma vez**, no `remember` de `rememberAutoUpdateController`. As duas plataformas o
+escrevem em ordens opostas:
+
+| Plataforma | Onde | Quando |
+|---|---|---|
+| Windows | `UsageMonitor.nsi`, fim da `Section` | **antes** de relançar o app — o comentário no `.nsi` já dizia "Escrito depois disto, o recibo perderia a corrida" |
+| Linux | `linux-updater.sh`, `write_receipt success ""` | **depois** do ACK, que é escrito pelo app novo já em execução |
+
+No Linux, portanto, quando o app novo compõe o `main()` o arquivo ainda descreve a atualização
+anterior — ou não existe. **A ordem do script está certa e não foi tocada**: antes do ACK ainda pode
+haver rollback, e é o mesmo ponto que o dispara. Escrever o sucesso antes seria afirmar o que ainda
+não se sabe.
+
+### E não existia recibo nenhum fora da atualização automática
+
+Instalação manual — `Setup.exe` sem `/UPDATE`, `.sh`, `.deb`, `.rpm` — não escreve recibo. No macOS
+não existe instalador automático, então a janela **nunca apareceu**, em versão nenhuma.
+
+### O que mudou
+
+O gatilho passou a ser a marca: versão em execução diferente de `releaseNotesSeenVersion`. O recibo
+continua sendo lido e continua alimentando a linha "Última atualização" das Configurações
+(`lastUpdateReceiptLine`) e a poda do artefato aplicado (`shouldDiscardUpdateArtifacts`) — só deixou
+de ser condição da janela.
+
+Duas escolhas travadas com o autor do repositório antes de escrever código:
+
+| Pergunta | Escolha |
+|---|---|
+| Instalação nova (marca ausente, sem recibo) | **Não abre**, marca em silêncio |
+| Marca ausente **com** recibo no disco | **Abre** — a máquina já atualizou alguma vez, e sem este ramo quem foi atingido pela #127 só veria a janela uma versão depois de a correção sair |
+
+O retrocesso também marca em silêncio, e não é caso hipotético: no `health-timeout` do
+`linux-updater.sh` o app novo chega a abrir a janela e a gravar a marca antes de o script desistir e
+restaurar a versão anterior. Sem reescrever a marca para baixo, as novidades daquela versão ficariam
+perdidas para sempre.
+
 ## Comandos de verificação
 
 ```bat
-gradlew.bat desktopTest --rerun
+gradlew.bat allTests
 ```
 
-Diálogo em execução — forja o recibo, limpa a marca e sobe o app. **Precisa do app instalado
-fechado**, senão o `SingleInstanceGuard` derruba o processo de desenvolvimento antes do `main()`, e o
-`gradlew run` termina em segundos com `BUILD SUCCESSFUL` sem ter composto nada:
+Diálogo em execução. **Precisa do app instalado fechado**, senão o `SingleInstanceGuard` derruba o
+processo de desenvolvimento antes do `main()`, e o `gradlew run` termina em segundos com
+`BUILD SUCCESSFUL` sem ter composto nada. A tag da versão em `build.gradle.kts` precisa existir no
+GitHub — a `v38.0.2` tem um `feat` e serve de fixture sem publicar release nenhuma:
+
+```bash
+gh release view v38.0.2 --json body -q .body
+```
+
+**Forjar recibo deixou de ser necessário**, e passou a ser enganoso: ele não é mais o gatilho.
+
+### Windows
+
+Preferência em `HKCU\Software\JavaSoft\Prefs\com.usagemonitor`. As Java Preferences escapam
+maiúsculas com barra, então `releaseNotesSeenVersion` vira `release/Notes/Seen/Version`. Guardar
+marca e recibo antes; restaurar ao fim.
 
 ```powershell
+$k = 'HKCU:\Software\JavaSoft\Prefs\com.usagemonitor'
+$n = 'release/Notes/Seen/Version'
 $r = "$env:USERPROFILE\.usage-monitor\update-receipt.properties"
-Set-Content -Path $r -Encoding ASCII -Value @('version=37.0.0','previousVersion=36.0.0','status=success','reason=')
-# As Java Preferences escapam maiúsculas com barra: releaseNotesSeenVersion vira release/Notes/Seen/Version
-Remove-ItemProperty -Path 'HKCU:\Software\JavaSoft\Prefs\com.usagemonitor' -Name 'release/Notes/Seen/Version'
-.\gradlew.bat run
+$backupMark    = (Get-ItemProperty -Path $k -Name $n -ErrorAction SilentlyContinue).$n
+$backupReceipt = if (Test-Path $r) { Get-Content $r } else { $null }
 ```
 
-A tag `v37.0.0` existe de verdade e tem 6 commits `feat`/`fix` mais 1 `chore`, então serve de fixture
-sem precisar publicar release nenhuma. Restaurar o recibo e a marca ao fim.
+| # | Cenário | Passos | Esperado |
+|---|---|---|---|
+| W1 | A prova da #127 | apagar o recibo, marca em `38.0.1`, `gradlew.bat run` | janela abre, subtítulo `Atualizado de 38.0.1` (vindo da **marca**); ao fechar, marca em `38.0.2` |
+| W2 | Não reabre | rodar de novo | sem janela |
+| W3 | Instalação nova | remover marca **e** recibo, `USAGE_MONITOR_UPDATE_FEED_URL` para endereço morto, rodar | sem janela e marca em `38.0.2`. A marca presente **é** a prova de que não houve busca: com o feed morto, qualquer requisição falharia e a marca não seria gravada |
+| W4 | Marca ausente com recibo | remover a marca, deixar um recibo qualquer no disco, rodar | janela abre |
+| W5 | Retrocesso | marca em `99.0.0`, rodar | sem janela, marca reescrita para `38.0.2` |
+| W6 | O recibo ainda manda no subtítulo | recibo `version=38.0.2 previousVersion=36.0.0 status=success`, marca em `38.0.1` | subtítulo `Atualizado de 36.0.0`, e Configurações → Geral continua com a linha "Última atualização" |
+
+Limpar `USAGE_MONITOR_UPDATE_FEED_URL` depois do W3 — a UI mostra aviso enquanto ela estiver ativa.
+
+### Linux
+
+Preferência em `~/.java/.userPrefs/com/usagemonitor/prefs.xml`, com a chave **literal**. **Fechar o
+app antes de editar**: a JVM mantém as preferências em memória e o flush de saída sobrescreveria a
+edição. **Nunca apagar o diretório do nó** para simular instalação nova — ele carrega tema, escala,
+opacidade e o interruptor de atualização automática; remover só a entrada.
+
+```bash
+pkill -f 'Usage Monitor'; sleep 2
+P=~/.java/.userPrefs/com/usagemonitor/prefs.xml
+cp "$P" "$P.bak"
+```
+
+Repetir W1, W3 e W5 com o launcher `~/.local/bin/usage-monitor`, editando a entrada com `sed`. E
+então o que fecha o risco 4:
+
+**L4 — ciclo real.** Numa instalação `.sh` gerenciada, com a atualização automática ligada e uma
+release-alvo publicada, deixar o updater rodar de verdade. No instante em que a janela aparecer, e
+**antes de fechá-la**, noutro terminal:
+
+```bash
+cat ~/.usage-monitor/update-receipt.properties
+tail -5 ~/.usage-monitor/diagnostics/linux-update.log
+```
+
+A evidência que vale registrar: o recibo ainda descreve a versão **anterior** (ou não existe) e o log
+ainda **não** tem a linha `OK promoted` — ou seja, a janela abriu no exato estado em que o gatilho
+antigo a suprimia. Segundos depois, com o ACK entregue, o recibo vira `status=success` e
+Configurações → Geral passa a mostrar "Última atualização". Restaurar com `mv "$P.bak" "$P"`, com o
+app fechado.
 
 ## Pontos de situação
 
@@ -154,6 +273,9 @@ e o resultado, não a intenção.
 
 | # | Data | Commit | Atividade | Estado | Evidência |
 |---|---|---|---|---|---|
+| B04 | 2026-08-29 | `fix(update): treat a missing release tag as no notes` | 404 da rota de tag vira `Result.success(null)` em vez de falha. Efeito colateral da B03: como o gatilho passou a ser toda troca de versão, uma build cujo `version` já subiu mas cuja tag ainda não foi publicada perguntava por uma release inexistente — e falha, por desenho, **não** marca, então a requisição se repetiria em toda abertura por uma resposta que não vai mudar | concluída | `gradlew.bat allTests`: **154 classes / 1632 testes / 0 falhas** (base da B03: 154/1630). Os dois casos novos são de naturezas diferentes de propósito: um no repositório com fake, outro **no data source com `MockEngine` real** — os demais casos daquele arquivo sobrescrevem `fetchGitHubReleaseByTag` e não executam uma linha de HTTP (issue #94), e a tradução do 404 acontece exatamente ali. O de baixo afirma também que 503 **continua** erro: disponibilidade passando por "release sem novidades" marcaria a versão como vista sem ninguém ver nada |
+| B03 | 2026-08-29 | `fix(update): open the release notes on any version change` | O gatilho passa a ser a marca, e o recibo sai da decisão (issue #127). Enum `ReleaseNotesDecision`, `releaseNotesDecision`, `releaseNotesPreviousVersion`, controlador, os três blocos de KDoc que descreviam o gatilho antigo, a seção "Correção do gatilho" acima e o §4d do protótipo | concluída | `gradlew.bat allTests`: **154 classes / 1630 testes / 0 falhas** (base da B02: 153/1612). Os seis casos que exercitavam `shouldShowReleaseNotes` foram reescritos e a classe nova `ReleaseNotesControllerTest` cobre a costura, que é onde o defeito estava — as funções puras estavam certas para o contrato que descreviam, e o que estava errado era o sinal que o controlador lia. Os casos silenciosos afirmam **zero chamadas** ao repositório, e não só janela ausente: é o contador que prova que `MARK_SEEN_ONLY` não gasta requisição. **Verificado em execução no Windows, os seis cenários, com captura de tela em cada um** e a release **real** `v38.0.2` (1 `feat` + 1 `chore`): W1 — sem recibo nenhum no disco e marca em `38.0.1`, a janela abriu com o item `ship linux auto update after real bazzite acceptance` e subtítulo `Atualizado de 38.0.1 · 29/08/2026`, vindo da **marca**; é exatamente o estado que o gatilho antigo suprimia. W2 — sem janela. W3 — marca e recibo removidos: **sem janela** e marca gravada em `38.0.2`; como a `v38.0.2` tem item, janela ausente **com** marca gravada prova que não houve busca. W4 — marca removida e recibo **velho** (`version=38.0.0`) no disco: a janela abriu, e **sem** "Atualizado de", porque o recibo é de outra versão e a marca estava ausente. W5 — marca em `99.0.0`: sem janela, marca reescrita para `38.0.2`. W6 — recibo `version=38.0.2 previousVersion=36.0.0` com marca em `38.0.1`: subtítulo `Atualizado de 36.0.0`, o recibo vencendo a marca. Estado do disco e do registro restaurado ao fim |
+| B02 | 2026-08-29 | `refactor(update): move version comparison into the domain` | `compareAppVersions`/`isVersionNewer` saem de `data/repository/AppUpdateRepositoryImpl.kt` para `domain/entity/AppVersionComparison.kt`, com o **sinal** exposto. Preparação da B03: o ramo de retrocesso da decisão precisa distinguir "mais antiga" de "igual", e o domain não pode importar de `data` | concluída | `gradlew.bat allTests`: **153 classes / 1612 testes / 0 falhas** (base do `main`: 152/1607). Movimento puro — os cinco chamadores só trocam o import, e o teste do sufixo `-beta` migrou de `AppUpdateRepositoryImplTest` para a classe nova, que soma 6 casos |
 | B01 | 2026-08-24 | `feat(update): show what changed after an automatic update` | A funcionalidade inteira, mais este plano | concluída | `gradlew.bat desktopTest --rerun`: **119 classes / 1266 testes / 0 falhas** (base do `main` era 115/1234; as quatro classes novas somam 32 casos). **Verificado em execução três vezes**, com recibo forjado `status=success version=37.0.0` e a release **real** `v37.0.0`, que tem 6 commits `feat`/`fix` e 1 `chore`: a janela abriu com os **6** itens, sem prefixo e sem hash, e o `chore(release): bump version` ficou de fora; a preferência foi gravada (`release/Notes/Seen/Version = 37.0.0` no registro, que é como as Java Preferences escapam maiúsculas); e na passada seguinte, com a marca presente, **a janela não reabriu**. **Dois defeitos de layout só apareceram em execução e foram corrigidos:** (1) o título vinha duas vezes — na barra da moldura e no cabeçalho —, e o cabeçalho passou a dizer só "Novidades"; (2) a superfície da lista esticava até o rodapé e deixava uma caixa vazia sob 6 itens, e ao encolhê-la os botões subiram para o meio da janela. A correção separa as duas coisas: o `Box` estica, a superfície dentro dele cresce até onde a lista vai, e os botões ficam ancorados no rodapé. Nenhum dos dois aparece em teste de componente, que mede uma cena de altura fixa |
 
 ## Riscos aceitos, registrados por escrito
@@ -161,6 +283,8 @@ e o resultado, não a intenção.
 | # | Risco | Estado |
 |---|---|---|
 | 1 | Os itens são texto de commit em inglês: a tela mostra frases como `stop killing every JVM on the machine`. Foi a opção escolhida contra notas curadas à mão, que criariam trabalho manual a cada release | aceito por decisão |
-| 2 | Uma requisição a mais ao GitHub por atualização aplicada — uma só, na primeira abertura, e nunca repetida em caso de sucesso ou de release sem itens | aceito |
+| 2 | Uma requisição a mais ao GitHub por **troca de versão** — uma só, na primeira abertura, e nunca repetida em caso de sucesso ou de release sem itens. Desde a B03 isso inclui a instalação manual e quem deixou "Atualização automática" desligada. **Sem portão pelo interruptor, de propósito**: quem atualizou merece saber o que mudou, e `CheckForAppUpdateUseCase` já consulta o feed de releases independentemente do interruptor — não há relação de rede nova | aceito por decisão |
 | 3 | Release publicada com o corpo editado à mão passa pelo filtro sem nenhum controle de tamanho: uma nota longa rola dentro do diálogo, mas não há teto de itens | aceito |
-| 4 | A janela nunca foi exercitada depois de uma atualização **real** — a verificação usa recibo forjado sobre a release v37.0.0, que existe de verdade. O caminho real fecha junto do próximo smoke test empacotado | aberto |
+| 4 | A janela nunca foi exercitada depois de uma atualização **real** no Linux. Os seis cenários do Windows foram verificados em execução na B03, mas o ciclo completo do updater do Linux — o cenário em que o defeito da #127 vivia — depende de máquina Linux e da release seguinte. Roteiro L4 em "Comandos de verificação" | aberto |
+| 5 | Quem instalou manualmente e **nunca** usou atualização automática não tem marca nem recibo: fica com silêncio na primeira execução da versão que traz a B03, e passa a ver a janela a partir da seguinte. Foi o preço aceito para não abrir "Novidades" a quem acabou de instalar o app | aceito por decisão |
+| 6 | No Linux as preferências vivem em `~/.java/.userPrefs/`, fora de `~/.usage-monitor/` e da árvore XDG gerenciada. Se o `FileSystemPreferences` não conseguir gravar, a marca vira no-op silencioso e a janela reabre **uma vez por arranque** — antes o recibo limitava o dano. Uma vez por arranque e não em laço: o `LaunchedEffect` não se repete dentro da mesma composição | aceito |

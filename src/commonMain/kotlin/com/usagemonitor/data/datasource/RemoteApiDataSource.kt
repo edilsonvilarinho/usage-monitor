@@ -15,6 +15,7 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.datetime.Clock
@@ -229,11 +230,19 @@ open class RemoteApiDataSource(
      * Ver `USAGE_MONITOR_UPDATE_FEED_URL` em `AppUpdateRepositoryImpl`.
      */
     /**
-     * A release de uma tag específica.
+     * A release de uma tag específica, ou `null` quando ela **não existe**.
      *
      * Existe separada de [fetchLatestGitHubRelease] porque as novidades são as
      * da versão **em execução**, não as da última publicada: quem atualizou
      * 37 → 39 enquanto a 40 já saiu leria as notas erradas.
+     *
+     * **404 é resposta, não erro.** Toda troca de versão consulta esta rota, e
+     * uma build cuja tag ainda não foi publicada — o intervalo entre subir
+     * `version` no `build.gradle.kts` e criar a tag — perguntaria por uma release
+     * que não existe. Como falha de rede não marca a versão como vista, de
+     * propósito, isso viraria uma requisição repetida em toda abertura por uma
+     * resposta que não vai mudar. Só o 404 cai aqui: 401, 403 e 5xx continuam
+     * falha, senão um problema de acesso passaria por "release sem novidades".
      *
      * Com [feedUrlOverride] definido a URL é usada tal como veio — o servidor de
      * teste do smoke test serve uma release só, e montar um caminho de tag em
@@ -244,20 +253,21 @@ open class RemoteApiDataSource(
         repository: String,
         tag: String,
         feedUrlOverride: String? = null
-    ): GitHubReleaseDto {
+    ): GitHubReleaseDto? {
         val url = feedUrlOverride?.takeIf { it.isNotBlank() }
             ?: "https://api.github.com/repos/$owner/$repository/releases/tags/$tag"
-        val response = requireSuccess(
-            response = httpClient.get(url) {
-                header("Accept", "application/vnd.github+json")
-                header("User-Agent", USAGE_MONITOR_USER_AGENT)
-                header("X-GitHub-Api-Version", GITHUB_API_VERSION)
-                contentType(ContentType.Application.Json)
-            },
-            sourceName = "GitHub release"
-        )
+        val rawResponse = httpClient.get(url) {
+            header("Accept", "application/vnd.github+json")
+            header("User-Agent", USAGE_MONITOR_USER_AGENT)
+            header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+            contentType(ContentType.Application.Json)
+        }
 
-        return response.body()
+        if (rawResponse.status == HttpStatusCode.NotFound) {
+            return null
+        }
+
+        return requireSuccess(response = rawResponse, sourceName = "GitHub release").body()
     }
 
     open suspend fun fetchLatestGitHubRelease(

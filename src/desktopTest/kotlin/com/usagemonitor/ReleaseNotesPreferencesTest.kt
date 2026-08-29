@@ -10,8 +10,9 @@ import kotlin.test.assertNull
 class ReleaseNotesPreferencesTest {
 
     /**
-     * Sem marca nenhuma, a janela precisa poder abrir: quem instalou o app
-     * agora e atualizou em seguida nunca viu novidade nenhuma.
+     * Marca ausente é "não sei", e quem a interpreta é `releaseNotesDecision`:
+     * sem recibo no disco vira instalação nova, com recibo vira máquina que já
+     * atualizou. O leitor não decide nada disso — devolve `null` e pronto.
      */
     @Test
     fun `no version was seen when the preference was never written`() {

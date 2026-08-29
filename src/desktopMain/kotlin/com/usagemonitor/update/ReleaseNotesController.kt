@@ -10,7 +10,9 @@ import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.CURRENT_APP_VERSION
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.ReleaseNotes
-import com.usagemonitor.domain.entity.shouldShowReleaseNotes
+import com.usagemonitor.domain.entity.ReleaseNotesDecision
+import com.usagemonitor.domain.entity.releaseNotesDecision
+import com.usagemonitor.domain.entity.releaseNotesPreviousVersion
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.persistReleaseNotesSeenVersion
 import com.usagemonitor.readPersistedReleaseNotesSeenVersion
@@ -33,20 +35,54 @@ internal class ReleaseNotesController(
 internal fun rememberReleaseNotesController(
     settings: PreferencesSettings,
     getReleaseNotes: GetReleaseNotesUseCase,
+    /**
+     * Recibo do instalador. Serve a **duas** coisas e a nenhuma terceira: dizer
+     * de onde se veio, no subtítulo, e provar que esta máquina já atualizou
+     * alguma vez, o que separa instalação nova de marca ausente por defeito.
+     *
+     * **Não decide o conteúdo da janela.** Ele foi a condição principal e era
+     * por isso que a janela não aparecia no Linux, em instalação manual nem no
+     * macOS (issue #127) — quem remover este parâmetro como resto do gatilho
+     * antigo tira o subtítulo exato do caminho automático do Windows.
+     */
     receipt: AppUpdateReceipt?,
     currentVersion: String = CURRENT_APP_VERSION
 ): ReleaseNotesController {
     var notes by remember(currentVersion) { mutableStateOf<ReleaseNotes?>(null) }
 
+    // O recibo continua na chave do efeito porque ele ainda entra na decisão
+    // pela sua existência e no subtítulo pelo seu conteúdo — não porque ele
+    // decida se há novidade a mostrar.
     LaunchedEffect(receipt, currentVersion) {
-        if (!shouldShowReleaseNotes(receipt, currentVersion, readPersistedReleaseNotesSeenVersion(settings))) {
+        val seenVersion = readPersistedReleaseNotesSeenVersion(settings)
+        // `when` como expressão: valor novo no enum tem de virar erro de
+        // compilação aqui, que é o único ponto que trata os três desfechos.
+        val shouldFetch = when (releaseNotesDecision(currentVersion, seenVersion, receipt != null)) {
+            ReleaseNotesDecision.SKIP -> false
+
+            // Silêncio COM marca, e sem requisição: pedir ao GitHub a release de
+            // uma versão que não vamos anunciar é rede gasta por nada, e sem
+            // gravar a marca a abertura seguinte refaria a mesma conta para
+            // sempre.
+            ReleaseNotesDecision.MARK_SEEN_ONLY -> {
+                persistReleaseNotesSeenVersion(settings, currentVersion)
+                false
+            }
+
+            ReleaseNotesDecision.SHOW -> true
+        }
+
+        if (!shouldFetch) {
             return@LaunchedEffect
         }
 
-        val result = getReleaseNotes(currentVersion, receipt?.previousVersion)
+        val result = getReleaseNotes(
+            currentVersion,
+            releaseNotesPreviousVersion(receipt, currentVersion, seenVersion)
+        )
 
-        // Os três desfechos não são o mesmo, e é por isso que a marca não é
-        // gravada num lugar só:
+        // Os três desfechos da BUSCA não são o mesmo, e é por isso que a marca
+        // não é gravada num lugar só:
         //
         // - notas com itens: a janela abre, e a versão é marcada AO ABRIR. Marcar
         //   ao fechar perderia a marca num encerramento anormal, e a janela

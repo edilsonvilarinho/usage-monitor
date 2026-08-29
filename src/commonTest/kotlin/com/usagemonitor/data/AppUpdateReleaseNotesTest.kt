@@ -5,10 +5,16 @@ import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandler
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -94,6 +100,20 @@ class AppUpdateReleaseNotesTest {
     }
 
     @Test
+    fun `a tag that does not exist is an answer, not a failure`() = runTest {
+        // O intervalo entre subir a versão no build.gradle.kts e criar a tag.
+        // Como falha não marca a versão como vista, tratar isto como erro daria
+        // uma requisição por abertura, para sempre, por uma resposta que não vai
+        // mudar.
+        val repo = AppUpdateRepositoryImpl(missingTagRemote())
+
+        val result = repo.getReleaseNotes(version = "99.0.0", previousVersion = null)
+
+        assertTrue(result.isSuccess)
+        assertNull(result.getOrNull())
+    }
+
+    @Test
     fun `the feed override reaches the data source`() = runTest {
         // O smoke test da atualização serve uma release só, e o override
         // substitui a URL inteira em vez de virar um caminho de tag.
@@ -104,7 +124,7 @@ class AppUpdateReleaseNotesTest {
                 repository: String,
                 tag: String,
                 feedUrlOverride: String?
-            ): GitHubReleaseDto {
+            ): GitHubReleaseDto? {
                 seenOverride = feedUrlOverride
                 return release(body = "- feat: algo (`abcdef1`)")
             }
@@ -114,6 +134,42 @@ class AppUpdateReleaseNotesTest {
             .getReleaseNotes(version = "39.0.0", previousVersion = null)
 
         assertEquals("https://example.invalid/release.json", seenOverride)
+    }
+
+    /**
+     * O data source de verdade, sem fake por cima.
+     *
+     * Os demais casos deste arquivo sobrescrevem `fetchGitHubReleaseByTag` e por
+     * isso não executam uma linha de HTTP — é a armadilha registrada na issue
+     * #94. A tradução de 404 acontece exatamente ali, então ela precisa de um
+     * teste que passe pelo `HttpClient`.
+     */
+    @Test
+    fun `the data source turns a 404 into null and keeps other statuses failing`() = runTest {
+        val notFound = RemoteApiDataSource(
+            jsonHttpClient { respond("Not Found", HttpStatusCode.NotFound) }
+        )
+
+        assertNull(notFound.fetchGitHubReleaseByTag("owner", "repo", "v99.0.0"))
+
+        val unavailable = RemoteApiDataSource(
+            jsonHttpClient { respond("upstream down", HttpStatusCode.ServiceUnavailable) }
+        )
+
+        // 5xx continua erro: um problema de disponibilidade passando por
+        // "release sem novidades" marcaria a versão como vista sem ninguém ver
+        // nada.
+        assertFailsWith<IllegalStateException> {
+            unavailable.fetchGitHubReleaseByTag("owner", "repo", "v39.0.0")
+        }
+    }
+
+    private fun jsonHttpClient(handler: MockRequestHandler): HttpClient {
+        return HttpClient(MockEngine(handler)) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
     }
 
     private fun release(
@@ -136,7 +192,7 @@ class AppUpdateReleaseNotesTest {
                 repository: String,
                 tag: String,
                 feedUrlOverride: String?
-            ): GitHubReleaseDto {
+            ): GitHubReleaseDto? {
                 onTag(tag)
                 return release
             }
@@ -150,9 +206,21 @@ class AppUpdateReleaseNotesTest {
                 repository: String,
                 tag: String,
                 feedUrlOverride: String?
-            ): GitHubReleaseDto {
-                throw IllegalStateException("GitHub release request failed with HTTP 404.")
+            ): GitHubReleaseDto? {
+                throw IllegalStateException("GitHub release HTTP 503: service unavailable")
             }
+        }
+    }
+
+    /** Tag inexistente: o data source devolve `null` em vez de lançar. */
+    private fun missingTagRemote(): RemoteApiDataSource {
+        return object : RemoteApiDataSource(noopHttpClient()) {
+            override suspend fun fetchGitHubReleaseByTag(
+                owner: String,
+                repository: String,
+                tag: String,
+                feedUrlOverride: String?
+            ): GitHubReleaseDto? = null
         }
     }
 

@@ -1,6 +1,6 @@
 package com.usagemonitor.update
 
-import com.usagemonitor.data.repository.isVersionNewer
+import com.usagemonitor.domain.entity.isVersionNewer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

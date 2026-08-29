@@ -1,11 +1,11 @@
 package com.usagemonitor.update
 
-import com.usagemonitor.data.repository.isVersionNewer
 import com.usagemonitor.domain.entity.AppUpdateArchitecture
 import com.usagemonitor.domain.entity.AppUpdateArtifact
 import com.usagemonitor.domain.entity.AppUpdateArtifactKind
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.AppUpdatePlatform
+import com.usagemonitor.domain.entity.isVersionNewer
 import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdatePreparation
 import com.usagemonitor.domain.repository.AppUpdateSupport

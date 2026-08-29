@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.AppUpdateArtifactKind
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.ReleaseNotes
+import com.usagemonitor.domain.entity.isVersionNewer
 import com.usagemonitor.domain.entity.parseReleaseNoteItems
 import com.usagemonitor.domain.repository.AppUpdateRepository
 import kotlinx.datetime.Instant
@@ -67,7 +68,9 @@ class AppUpdateRepositoryImpl(
                 // remove ao ler; aqui o caminho é o inverso.
                 tag = "v$version",
                 feedUrlOverride = envVarReader()
-            )
+            // Tag inexistente e release sem nada a mostrar dão no mesmo para quem
+            // chama: não há novidade, e insistir não mudaria a resposta.
+            ) ?: return@runCatching null
 
             val items = parseReleaseNoteItems(release.body)
             if (items.isEmpty()) {
@@ -162,38 +165,3 @@ private fun normalizedSha256(digest: String?): String? {
     return trimmed.removePrefix(SHA256_DIGEST_PREFIX).takeIf { it.isNotBlank() }
 }
 
-internal fun isVersionNewer(candidateVersion: String, currentVersion: String): Boolean {
-    return compareVersions(candidateVersion, currentVersion) > 0
-}
-
-private fun compareVersions(left: String, right: String): Int {
-    val leftParts = versionParts(left)
-    val rightParts = versionParts(right)
-    val maxSize = maxOf(leftParts.size, rightParts.size)
-
-    for (index in 0 until maxSize) {
-        val leftPart = leftParts.getOrElse(index) { 0 }
-        val rightPart = rightParts.getOrElse(index) { 0 }
-
-        if (leftPart != rightPart) {
-            return leftPart.compareTo(rightPart)
-        }
-    }
-
-    return 0
-}
-
-private fun versionParts(version: String): List<Int> {
-    val normalizedVersion = version
-        .trim()
-        .removePrefix("v")
-        .substringBefore("-")
-
-    if (normalizedVersion.isBlank()) {
-        return listOf(0)
-    }
-
-    return normalizedVersion.split(".").map { token ->
-        token.filter(Char::isDigit).toIntOrNull() ?: 0
-    }
-}

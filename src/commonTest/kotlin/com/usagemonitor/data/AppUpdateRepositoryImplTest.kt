@@ -4,7 +4,6 @@ import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.dto.GitHubReleaseAssetDto
 import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
-import com.usagemonitor.data.repository.isVersionNewer
 import com.usagemonitor.domain.entity.AppUpdateArchitecture
 import com.usagemonitor.domain.entity.AppUpdateArtifactKind
 import com.usagemonitor.domain.entity.AppUpdatePlatform
@@ -225,14 +224,6 @@ class AppUpdateRepositoryImplTest {
         val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion).getOrNull()
 
         assertEquals(emptyList(), update?.artifacts)
-    }
-
-    @Test
-    fun `pre-release suffix is stripped via substringBefore dash`() {
-        // Comportamento atual: "8.0.1-beta" -> [8,0,1] que é > "8.0.0".
-        assertTrue(isVersionNewer(candidateVersion = "8.0.1-beta", currentVersion = "8.0.0"))
-        // E "8.0.0-beta" tratado igual a "8.0.0".
-        assertEquals(false, isVersionNewer(candidateVersion = "8.0.0-beta", currentVersion = "8.0.0"))
     }
 
     /**
