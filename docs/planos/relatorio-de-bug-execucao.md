@@ -99,6 +99,19 @@ usuário.
 - **Passo de navegação não carrega identidade.** O apelido do perfil é digitado pelo usuário e
   costuma ser o e-mail da conta; a `accountKey` é identificador de conta. Nenhum dos dois entra na
   trilha — o nome da tela responde à pergunta "onde ele estava" sem responder "quem ele é".
+- **O que o `CrashHandler` não cobre está escrito no próprio arquivo.** `setDefaultUncaughtExceptionHandler`
+  pega o que derruba uma thread comum. **Não** pega exceção lançada dentro do laço de eventos da AWT —
+  o `EventDispatchThread` a captura e a imprime por conta própria — nem falha dentro de coroutine com
+  `SupervisorJob`, que vai para o `CoroutineExceptionHandler` do escopo. Preferir o registro escrito a
+  descobrir isso depois; ampliar a cobertura depende do `sun.awt.exception.handler`, que é API interna
+  e depreciada, e de um handler por escopo de coroutine — outro escopo, outra issue.
+- **O handler repassa a exceção para o anterior, e por último.** Sem o repasse, uma queda que hoje
+  aparece no console passaria a não aparecer em lugar nenhum: o app teria trocado um diagnóstico por
+  outro em vez de somar os dois. Por último porque é o handler anterior quem pode encerrar o processo.
+- **A mensagem da exceção entra no marcador de crash**, ao contrário do que `breadcrumbReasonOf` faz
+  com as falhas engolidas. São dois casos diferentes: aquelas são frequentes, de baixo valor e nunca
+  revisadas; esta é o evento único que motiva o relatório inteiro, e o usuário lê o pacote antes de
+  publicá-lo.
 - **Nenhuma animação infinita** no diálogo — trava o `waitForIdle` dos testes de componente.
 - **Sem hostname e sem usuário do sistema.** O pacote vira o corpo de uma issue pública, e as duas
   informações identificam a pessoa sem ajudar a diagnosticar o app.
@@ -119,7 +132,7 @@ usuário.
 | B10 | Pontos de chamada de use case (pedido do usuário e falha) | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 32 classes, 382 testes, nenhuma `failures>0` (inclui os 4 do `DashboardViewModelBreadcrumbTest`) |
 | B11 | Pontos de chamada nos `catch` que hoje falham em silêncio | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.presentation.*"` → 384 testes, nenhuma `failures>0` (382 antes, +2 da deduplicação do semáforo) |
 | B12 | `GenerateBugReportUseCase` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.GenerateBugReportUseCaseTest"` → `tests="2" failures="0" errors="0"` |
-| B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ⏳ Pendente | — | — |
+| B13 | `CrashHandler` — handler, breadcrumb `CRASH`, marcador `pending-crash.json` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="4" failures="0" errors="0"` |
 | B14 | Captura best-effort da janela via capturer injetável | ⏳ Pendente | — | — |
 | B15 | Registro do handler antes de `application { }` e leitura do marcador no arranque | ⏳ Pendente | — | — |
 | B16 | `DesktopBugReportWriter` — diálogo de salvar, writer injetável | ⏳ Pendente | — | — |
