@@ -63,6 +63,13 @@ remover.
 `onApiKeyRemove` devolve `Boolean` e espelha `onApiKeySave`: o diálogo só fecha quando a camada de
 dados confirma. Remoção recusada mantém a tela aberta, com o aviso de falha vindo do toast.
 
+### O campo do diálogo no protótipo estava pré-preenchido
+
+`§12c` desenhava o `input` com `value="sk-minimax-exemplo-nao-use"`, o que contradiz a decisão de
+nunca trazer o segredo guardado para dentro da composição. Divergência entre a decisão registrada e
+o protótipo se resolve corrigindo o protótipo, no mesmo commit: o campo ficou vazio, com
+`placeholder="Cole a chave nova"`.
+
 ### Trocar a chave não reafirma o interruptor
 
 O caminho de salvar chamava `onApiToggle(source, true)` incondicionalmente, porque até aqui ele só
@@ -140,5 +147,5 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 301 testes, 0 falhas |
 | C09 | `onApiKeyRemove` fiado em `Main.kt` | ✅ Concluída | `gradlew.bat desktopJar` → `BUILD SUCCESSFUL`; `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 0 falhas. `allTests` fica para a auditoria final, que roda as três branches em série |
 | C10 | Troca de chave pelo lápis com a fonte já ligada | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 302 testes, 0 falhas |
-| C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ⏳ Pendente | — |
+| C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ✅ Concluída | Inspeção da seção `#cfg-apis`: lápis nas três linhas com chave, "Remover chave" no rodapé do diálogo, campo esvaziado, duas notas novas |
 | C12 | `allTests` verde + QA manual | ⏳ Pendente | — |

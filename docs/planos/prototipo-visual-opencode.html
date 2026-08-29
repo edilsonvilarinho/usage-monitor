@@ -1620,14 +1620,24 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="body"><div class="panel"><div class="phead"><span class="ptitle">APIs monitoradas</span></div><div class="pbody flush">
     <div class="row"><span class="srcmark" style="background:var(--anthropic)"></span><span class="v sm" style="flex:1">Anthropic</span><span class="st ok">Credencial válida</span><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--codex)"></span><span class="v sm" style="flex:1">Codex</span><span class="st warn">Fonte instável</span><span class="sw on"></span></div>
-    <div class="row"><span class="srcmark" style="background:var(--deepseek)"></span><span class="v sm" style="flex:1">DeepSeek</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
-    <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--deepseek)"></span><span class="v sm" style="flex:1">DeepSeek</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Zen Free</span><span class="st off">Desativada</span><span class="sw"></span></div>
-    <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Go</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Go</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo Free</span><span class="st off">Desativada</span><span class="sw"></span></div>
   </div></div></div>
 </div>
 <p class="note"><b>Ativação de MiniMax, DeepSeek e OpenCode Go.</b> Ao ligar uma dessas integrações sem chave cadastrada, o interruptor não é persistido imediatamente: abre-se o diálogo abaixo. A chave é mascarada por padrão, pode ser revelada pelo olho e só habilita a integração depois de <b>Salvar</b>. Ela fica em armazenamento local protegido; variáveis de ambiente não são lidas.</p>
+<p class="note"><b>O lápis gerencia a chave já cadastrada</b> (issue #125). Ele só aparece nas três linhas que
+dependem de chave e abre o <b>mesmo</b> diálogo, agora com <b>Remover chave</b>. O campo <b>nunca</b> vem
+pré-preenchido com o segredo guardado: a linha já diz "Chave configurada", e trazer a chave para dentro da tela não
+ajuda a trocá-la. Para trocar, digita-se a nova; para apagar, há o botão dedicado. Trocar a chave de uma fonte já
+ligada <b>não mexe no interruptor</b> — remover, sim: apagar a chave desliga a fonte, senão a coleta falharia com 401
+a cada tique até o próximo reinício.</p>
+<p class="note"><b>O lápis vem antes do interruptor</b>, e não depois: assim o interruptor continua sendo o último
+elemento das sete linhas e fica no mesmo x, com ou sem ícone. É a mesma ordem da aba Contas. E <b>Remover chave</b> é
+<code>ghost</code>, não destrutivo em vermelho: primário é um por tela e continua sendo o <b>Salvar</b>, que é o que o
+diálogo propõe.</p>
 <p class="note"><b>As duas linhas do OpenCode não são a mesma integração.</b> <code>OpenCode Zen Free</code> é lida do
 SQLite local e por isso não pede chave — ligar a linha grava direto, sem diálogo. <code>OpenCode Go</code> é a
 assinatura paga e usa a chave da API do OpenCode, <b>a mesma do <code>chat/completions</code> do Zen</b>. As duas
@@ -1638,8 +1648,8 @@ direita só existe na que depende de chave.</p>
   <div class="body"><div class="panel">
     <div class="phead"><span class="ptitle">Chave da API</span></div>
     <div class="pbody">
-      <div class="stack"><span class="k">Informe a API key para habilitar esta integração. A chave será armazenada localmente com acesso restrito.</span><div class="hstack"><input class="field" type="password" value="sk-minimax-exemplo-nao-use" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div></div>
-      <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Cancelar</button><button class="btn" type="button">Salvar</button></div>
+      <div class="stack"><span class="k">Informe a API key para habilitar esta integração. A chave será armazenada localmente com acesso restrito.</span><div class="hstack"><input class="field" type="password" value="" placeholder="Cole a chave nova" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div></div>
+      <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Remover chave</button><button class="btn ghost" type="button">Cancelar</button><button class="btn" type="button">Salvar</button></div>
     </div>
   </div></div>
 </div>
