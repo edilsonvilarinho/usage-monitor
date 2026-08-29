@@ -136,7 +136,11 @@ internal fun accentColorFor(
         ApiSource.MINIMAX -> accents.minimax
         ApiSource.CODEX -> accents.codex
         ApiSource.DEEPSEEK -> accents.deepseek
-        ApiSource.OPENCODE -> accents.opencode
+        // Go e Zen Free são planos da mesma integração e dividem o acento: o
+        // sistema visual fixa seis identidades de fonte e diz que elas não mudam.
+        // O que separa os dois cards é o título, e a regra "cor nunca informa
+        // sozinha" já garante que isso basta.
+        ApiSource.OPENCODE, ApiSource.OPENCODE_GO -> accents.opencode
         ApiSource.KILO -> accents.kilo
     }
 }

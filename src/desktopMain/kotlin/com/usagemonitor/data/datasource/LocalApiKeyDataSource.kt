@@ -8,15 +8,24 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** Chaves das integrações remotas que não possuem login local. */
+/**
+ * Chaves das integrações remotas que não possuem login local.
+ *
+ * [openCodeGo] guarda a chave da API do OpenCode — a mesma do `chat/completions`
+ * do Zen —, usada pela assinatura Go. O nome do campo diz o consumidor e não a
+ * origem porque é ele que aparece no JSON, e hoje só o Go a lê: o plano gratuito
+ * do Zen vem do SQLite local, sem credencial.
+ */
 data class ApiKeySettings(
     val minimax: String = "",
-    val deepSeek: String = ""
+    val deepSeek: String = "",
+    val openCodeGo: String = ""
 ) {
     fun forSource(source: ApiSource): String? {
         return when (source) {
             ApiSource.MINIMAX -> minimax
             ApiSource.DEEPSEEK -> deepSeek
+            ApiSource.OPENCODE_GO -> openCodeGo
             else -> null
         }?.takeIf { value -> value.isNotBlank() }
     }
@@ -25,6 +34,7 @@ data class ApiKeySettings(
         return when (source) {
             ApiSource.MINIMAX -> copy(minimax = value)
             ApiSource.DEEPSEEK -> copy(deepSeek = value)
+            ApiSource.OPENCODE_GO -> copy(openCodeGo = value)
             else -> this
         }
     }
@@ -33,6 +43,7 @@ data class ApiKeySettings(
         return buildSet {
             if (minimax.isNotBlank()) add(ApiSource.MINIMAX)
             if (deepSeek.isNotBlank()) add(ApiSource.DEEPSEEK)
+            if (openCodeGo.isNotBlank()) add(ApiSource.OPENCODE_GO)
         }
     }
 }
@@ -40,11 +51,12 @@ data class ApiKeySettings(
 @Serializable
 private data class ApiKeySettingsDto(
     val minimax: String = "",
-    val deepSeek: String = ""
+    val deepSeek: String = "",
+    val openCodeGo: String = ""
 )
 
 /**
- * Persiste as chaves de MiniMax e DeepSeek fora das preferências do Windows.
+ * Persiste as chaves de MiniMax, DeepSeek e OpenCode fora das preferências do Windows.
  *
  * O arquivo usa o mesmo contrato de segurança de `team.json`: escrita atômica
  * e acesso restrito ao usuário dono. Esta é a única origem das chaves no desktop.
@@ -59,8 +71,12 @@ internal class LocalApiKeyDataSource(
     }
 
     fun save(source: ApiSource, apiKey: String) {
-        require(source == ApiSource.MINIMAX || source == ApiSource.DEEPSEEK) {
-            "Apenas MiniMax e DeepSeek possuem chave de API local."
+        require(
+            source == ApiSource.MINIMAX ||
+                source == ApiSource.DEEPSEEK ||
+                source == ApiSource.OPENCODE_GO
+        ) {
+            "Apenas MiniMax, DeepSeek e OpenCode Go possuem chave de API local."
         }
         require(apiKey.isNotBlank()) { "A chave de API não pode ficar vazia." }
         write(load().withKey(source, apiKey.trim()))
@@ -79,7 +95,7 @@ internal class LocalApiKeyDataSource(
         parentDir.mkdirs()
         val content = json.encodeToString(
             ApiKeySettingsDto.serializer(),
-            ApiKeySettingsDto(settings.minimax, settings.deepSeek)
+            ApiKeySettingsDto(settings.minimax, settings.deepSeek, settings.openCodeGo)
         )
         val tempFile = Files.createTempFile(parentDir.toPath(), settingsFile.name, ".tmp").toFile()
         try {
@@ -106,7 +122,7 @@ internal class LocalApiKeyDataSource(
     }
 
     private fun ApiKeySettingsDto.toDomain(): ApiKeySettings {
-        return ApiKeySettings(minimax = minimax, deepSeek = deepSeek)
+        return ApiKeySettings(minimax = minimax, deepSeek = deepSeek, openCodeGo = openCodeGo)
     }
 
     private companion object {

@@ -16,8 +16,22 @@ enum class AppTheme { DARK, LIGHT }
 /** Idioma da interface. */
 enum class AppLanguage { PT, EN }
 
-/** Identificador de cada API suportada. */
-enum class ApiSource { ANTHROPIC, MINIMAX, CODEX, DEEPSEEK, OPENCODE, KILO }
+/**
+ * Identificador de cada API suportada.
+ *
+ * A ordem aqui é a ordem padrão dos cards no dashboard e das linhas em
+ * Configurações → APIs; nada persiste o ordinal (as preferências gravam
+ * [ApiSource.name]), então inserir um valor no meio não invalida nenhuma
+ * gravação anterior.
+ *
+ * [OPENCODE_GO] é a assinatura paga do OpenCode e fica **ao lado** de
+ * [OPENCODE], que é o plano gratuito do Zen. São duas fontes e não uma: a
+ * gratuita é lida do SQLite local em requisições observadas, a paga vem de
+ * `GET /zen/go/v1/usage` em percentual de três janelas. Reaproveitar
+ * [OPENCODE] faria `isObservedActivitySource()` desviar o card inteiro para o
+ * resumo sem barras, e uma máquina pode ter uma das duas sem a outra.
+ */
+enum class ApiSource { ANTHROPIC, MINIMAX, CODEX, DEEPSEEK, OPENCODE, OPENCODE_GO, KILO }
 
 /**
  * Faixa de opacidade da janela principal, em pontos percentuais (100 = totalmente opaco).

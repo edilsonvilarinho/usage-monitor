@@ -45,6 +45,7 @@ import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.OpenCodeGoQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
@@ -687,6 +688,63 @@ class ComponentTest {
         onNodeWithText("Saldo").assertIsDisplayed()
         onNodeWithText("\$3.85").assertIsDisplayed()
         onNodeWithText("Saldo não expira").assertIsDisplayed()
+    }
+
+    /**
+     * Issue #124: o card do plano Go é o card de cotas normal — três barras de
+     * percentual —, e não o resumo de atividade observada do Zen gratuito. É o que
+     * `isObservedActivitySource()` decide, e a diferença é visível: aquele resumo
+     * não desenha percentual nenhum.
+     */
+    @Test
+    fun `ApiUsageCard renders OpenCode Go as percentage quotas`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.OPENCODE_GO,
+                    apiName = "OpenCode Go",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = OpenCodeGoQuotaLabels.ROLLING,
+                            used = 12L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-08-29T18:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = OpenCodeGoQuotaLabels.WEEKLY,
+                            used = 51L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-08-31T00:00:00Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = OpenCodeGoQuotaLabels.MONTHLY,
+                            used = 47L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-09-05T18:47:55Z"),
+                            periodType = PeriodType.MONTHLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        // Os títulos saem de `expandedQuotaTitle`, derivados do `periodType`; o
+        // rótulo da cota é a chave da série histórica e não aparece no card.
+        onNodeWithText("OpenCode Go").assertIsDisplayed()
+        onNodeWithText("Sessão 5h").assertIsDisplayed()
+        onNodeWithText("Semanal").assertIsDisplayed()
+        onNodeWithText("Mensal").assertIsDisplayed()
+        onNodeWithText("51%").assertIsDisplayed()
     }
 
     @Test
@@ -1991,6 +2049,82 @@ class ComponentTest {
     }
 
     /**
+     * Issue #124: a assinatura Go é a terceira fonte que depende de chave local, e
+     * o caminho é o mesmo do MiniMax — ligar sem chave abre o diálogo em vez de
+     * persistir um interruptor que só produziria erro na próxima coleta.
+     */
+    @Test
+    fun `SettingsDialogContent requests an API key before enabling OpenCode Go`() = runDesktopComposeUiTest {
+        var toggledApi: ApiSource? = null
+        var savedKey: String? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { api, checked ->
+                        if (checked) toggledApi = api
+                    },
+                    onApiKeySave = { api, key ->
+                        savedKey = "$api:$key"
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorRowTestTag(ApiSource.OPENCODE_GO)).performScrollTo().performClick()
+        onNodeWithText("Configurar OpenCode Go").assertIsDisplayed()
+        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("opencode-secret")
+        onNodeWithText("Salvar").performClick()
+
+        assertEquals("OPENCODE_GO:opencode-secret", savedKey)
+        assertEquals(ApiSource.OPENCODE_GO, toggledApi)
+    }
+
+    /**
+     * O plano gratuito do Zen não tem chave: ligar a linha dele grava direto, sem
+     * diálogo. É o que separa as duas fontes de OpenCode na mesma lista.
+     */
+    @Test
+    fun `SettingsDialogContent toggles the free OpenCode source without asking for a key`() = runDesktopComposeUiTest {
+        var toggledApi: ApiSource? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { api, checked ->
+                        if (checked) toggledApi = api
+                    },
+                    onApiKeySave = { _, _ -> true },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorRowTestTag(ApiSource.OPENCODE)).performScrollTo().performClick()
+
+        assertEquals(ApiSource.OPENCODE, toggledApi)
+        onAllNodesWithText("Configurar OpenCode Zen Free").assertCountEquals(0)
+    }
+
+    /**
      * Issue #70: o interruptor que esconde a moldura da janela mora ao lado de
      * "manter sempre visível" — as duas são propriedades da moldura.
      */
@@ -2064,6 +2198,7 @@ class ComponentTest {
         onNodeWithTag(settingsTabTestTag(SettingsTab.APIS)).performClick()
         onNodeWithText("Monitored APIs").assertIsDisplayed()
         onNodeWithText("OpenCode Zen Free").performScrollTo().assertIsDisplayed()
+        onNodeWithText("OpenCode Go").performScrollTo().assertIsDisplayed()
         onNodeWithText("Kilo Free").performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(settingsTabTestTag(SettingsTab.ACCOUNTS)).performClick()

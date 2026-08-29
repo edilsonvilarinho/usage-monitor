@@ -16,6 +16,7 @@ import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdatePreparation
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.repository.KiloRepository
+import com.usagemonitor.domain.repository.OpenCodeGoRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
@@ -23,6 +24,7 @@ import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.GetOpenCodeGoUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
@@ -69,6 +71,23 @@ class DashboardViewModel(
         object : OpenCodeRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
                 return Result.failure(IllegalStateException("OpenCode local database is unavailable"))
+            }
+        }
+    ),
+    /**
+     * Default que falha pelo mesmo motivo de [getOpenCodeUsage]: a fonte é
+     * opt-in e uma build sem o repositório ligado tem de dizer o que falta, não
+     * ficar em carga eterna. A mensagem é a de chave ausente porque é essa a
+     * condição verdadeira de quem não configurou nada.
+     */
+    private val getOpenCodeGoUsage: GetOpenCodeGoUsageUseCase = GetOpenCodeGoUsageUseCase(
+        object : OpenCodeGoRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(
+                    IllegalStateException(
+                        "Chave da API OpenCode não configurada. Abra Configurações > APIs e informe a chave."
+                    )
+                )
             }
         }
     ),
@@ -613,6 +632,7 @@ class DashboardViewModel(
             ApiSource.CODEX -> getCodexUsage()
             ApiSource.DEEPSEEK -> getDeepSeekUsage()
             ApiSource.OPENCODE -> getOpenCodeUsage()
+            ApiSource.OPENCODE_GO -> getOpenCodeGoUsage()
             ApiSource.KILO -> getKiloUsage()
         }
     }

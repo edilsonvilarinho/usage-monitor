@@ -8,6 +8,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class LocalApiKeyDataSourceTest {
@@ -25,12 +26,41 @@ class LocalApiKeyDataSourceTest {
 
         dataSource.save(ApiSource.MINIMAX, " minimax-secret ")
         dataSource.save(ApiSource.DEEPSEEK, "deepseek-secret")
+        dataSource.save(ApiSource.OPENCODE_GO, "opencode-secret")
 
         val loaded = LocalApiKeyDataSource(settingsFile).load()
         assertEquals("minimax-secret", loaded.minimax)
         assertEquals("deepseek-secret", loaded.deepSeek)
+        assertEquals("opencode-secret", loaded.openCodeGo)
         assertEquals("deepseek-secret", loaded.forSource(ApiSource.DEEPSEEK))
+        assertEquals("opencode-secret", loaded.forSource(ApiSource.OPENCODE_GO))
         assertNull(loaded.forSource(ApiSource.ANTHROPIC))
+        assertEquals(
+            setOf(ApiSource.MINIMAX, ApiSource.DEEPSEEK, ApiSource.OPENCODE_GO),
+            loaded.configuredSources()
+        )
+    }
+
+    /**
+     * A chave do Go não pode vazar para o plano gratuito do Zen: ele é lido do
+     * SQLite local e nunca faz requisição autenticada.
+     */
+    @Test
+    fun `does not expose the go key to the free opencode source`() {
+        LocalApiKeyDataSource(settingsFile).save(ApiSource.OPENCODE_GO, "opencode-secret")
+
+        val loaded = LocalApiKeyDataSource(settingsFile).load()
+
+        assertNull(loaded.forSource(ApiSource.OPENCODE))
+    }
+
+    @Test
+    fun `refuses a source that has no local api key`() {
+        val dataSource = LocalApiKeyDataSource(settingsFile)
+
+        assertFailsWith<IllegalArgumentException> {
+            dataSource.save(ApiSource.OPENCODE, "should-not-persist")
+        }
     }
 
     @Test

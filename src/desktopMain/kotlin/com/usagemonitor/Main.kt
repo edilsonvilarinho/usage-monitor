@@ -52,6 +52,7 @@ import com.usagemonitor.data.repository.DashboardCacheRepositoryImpl
 import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
 import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
+import com.usagemonitor.data.repository.OpenCodeGoRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
 import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
@@ -81,6 +82,7 @@ import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
+import com.usagemonitor.domain.usecase.GetOpenCodeGoUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
@@ -180,6 +182,19 @@ import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
+
+/**
+ * Fontes cuja coleta exige uma chave em `~/.usage-monitor/api-keys.json`.
+ *
+ * Existe como constante e não como literal repetido no filtro de arranque porque
+ * a mesma pergunta é feita nas Configurações (`requiresApiKey`) e no
+ * `LocalApiKeyDataSource`: três donos do mesmo conjunto já seria demais.
+ */
+private val API_KEY_DEPENDENT_SOURCES = setOf(
+    ApiSource.MINIMAX,
+    ApiSource.DEEPSEEK,
+    ApiSource.OPENCODE_GO
+)
 private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 /** Piso horizontal do Dashboard; abaixo disso os cards já operam em coluna única. */
 private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
@@ -311,7 +326,9 @@ fun main(args: Array<String>) = application {
         readApiSourceCollection(settings, ENABLED_APIS_KEY)
             .toSet()
             .filter { source ->
-                source != ApiSource.MINIMAX && source != ApiSource.DEEPSEEK ||
+                // Fonte que depende de chave não pode voltar habilitada sem ela:
+                // o card abriria em erro de configuração a cada arranque.
+                source !in API_KEY_DEPENDENT_SOURCES ||
                     currentApiKeySettings.forSource(source) != null
             }
             .toSet()
@@ -452,6 +469,14 @@ fun main(args: Array<String>) = application {
     val openCodeRepository = remember(openCodeUsageDataSource) {
         OpenCodeRepositoryImpl(openCodeUsageDataSource)
     }
+    // A assinatura Go é outra fonte: HTTP com chave, cotas em percentual. O plano
+    // gratuito do Zen acima continua vindo do SQLite local, sem credencial.
+    val openCodeGoRepository = remember(remoteApiDataSource) {
+        OpenCodeGoRepositoryImpl(
+            apiDataSource = remoteApiDataSource,
+            apiKeyReader = { apiKeySettings.value.forSource(ApiSource.OPENCODE_GO) }
+        )
+    }
     val kiloRepository = remember(kiloUsageDataSource) {
         KiloRepositoryImpl(kiloUsageDataSource)
     }
@@ -512,7 +537,7 @@ fun main(args: Array<String>) = application {
     // precisam dela e nenhum dos dois vive dentro do `Window`.
     var mainWindowRef by remember { mutableStateOf<java.awt.Window?>(null) }
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, openCodeGoRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
@@ -520,6 +545,7 @@ fun main(args: Array<String>) = application {
             getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepository),
             getKiloUsage = GetKiloUsageUseCase(kiloRepository),
             getOpenCodeUsage = GetOpenCodeUsageUseCase(openCodeRepository),
+            getOpenCodeGoUsage = GetOpenCodeGoUsageUseCase(openCodeGoRepository),
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
             getUsageHistory = getUsageHistory,

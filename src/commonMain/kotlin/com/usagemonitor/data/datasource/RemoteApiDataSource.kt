@@ -6,6 +6,7 @@ import com.usagemonitor.data.dto.DeepSeekBalanceResponse
 import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
+import com.usagemonitor.data.dto.OpenCodeGoUsageResponse
 import com.usagemonitor.data.mapper.resolveExtraCredits
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -196,6 +197,27 @@ open class RemoteApiDataSource(
                 contentType(ContentType.Application.Json)
             },
             sourceName = "DeepSeek"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * Uso da assinatura OpenCode Go.
+     *
+     * O endpoint existe em produção mas **não está documentado publicamente** e
+     * não declara versão — o mesmo risco já aceito no `usage` da Anthropic. Por
+     * isso os campos do DTO são todos opcionais e o corpo de erro chega inteiro
+     * na mensagem via [requireSuccess]: é dele que o repositório distingue o 403
+     * de "não tem assinatura Go" do 401 de chave inválida.
+     */
+    open suspend fun fetchOpenCodeGoUsage(apiKey: String): OpenCodeGoUsageResponse {
+        val response = requireSuccess(
+            response = httpClient.get("https://opencode.ai/zen/go/v1/usage") {
+                header("Authorization", "Bearer $apiKey")
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "OpenCode Go"
         )
 
         return response.body()

@@ -141,6 +141,7 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 | MiniMax | Remota | `GET https://www.minimax.io/v1/token_plan/remains` | Chave informada em **Configurações > APIs** |
 | DeepSeek | Remota | `GET https://api.deepseek.com/user/balance` | Chave informada em **Configurações > APIs** |
 | OpenCode Zen Free | Local | leitura de `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
+| OpenCode Go | Remota | `GET https://opencode.ai/zen/go/v1/usage` | Chave informada em **Configurações > APIs** |
 | Kilo Free | Local | leitura de `~/.local/share/kilo/kilo.db` | base local do Kilo existente |
 
 ### Anthropic
@@ -185,6 +186,17 @@ Servidor, chave, apelido e quais contas Anthropic participam.
 - Conta mensagens `assistant` do provider `opencode`.
 - Agrupa uso nas janelas de 5h e 7d.
 - Monitora modelos free como `*-free` e `big-pickle`.
+
+### OpenCode Go
+
+- Integracao **separada** do OpenCode Zen Free: aquela le a base local, esta consulta a assinatura paga por HTTP. Uma maquina pode ter uma das duas sem a outra, e as duas aparecem como linhas distintas em **Configurações > APIs**.
+- Ao habilitar, solicita a chave em campo mascarado e so ativa a integracao depois do salvamento. E a **mesma chave da API do OpenCode** usada em `chat/completions` do Zen.
+- A chave fica em `~/.usage-monitor/api-keys.json`, com escrita atomica e acesso restrito ao usuario.
+- O dashboard mostra tres janelas em **percentual**: 5h deslizante, semanal e mensal, cada uma com o horario de reinicio.
+- A API **nao devolve valor em dinheiro** — nem gasto, nem limite. Nao ha linha de saldo neste card, e nenhum numero de tokens e estimado a partir do percentual.
+- Chave valida numa conta **sem o plano Go** responde `403` e vira um aviso proprio: assine o plano ou desative a integracao. Nao e erro de credencial e nao pede novo login.
+- O endpoint esta em producao mas **nao e documentado publicamente** pelo OpenCode e nao declara versao.
+- O **saldo pago do Zen** nao e lido: nao existe endpoint para ele (issue upstream `anomalyco/opencode#10448`, em aberto).
 
 ### Kilo Free
 
@@ -426,6 +438,7 @@ Dependencias principais do bootstrap:
 - `CodexRepositoryImpl`
 - `DeepSeekRepositoryImpl`
 - `OpenCodeRepositoryImpl`
+- `OpenCodeGoRepositoryImpl`
 - `KiloRepositoryImpl`
 - `UsageHistoryRepositoryImpl`
 - `AppUpdateRepositoryImpl`

@@ -30,7 +30,7 @@ const val API_SELECTOR_ROW_TEST_TAG_PREFIX = "apiSelectorRow_"
 fun apiSelectorRowTestTag(api: ApiSource): String = "$API_SELECTOR_ROW_TEST_TAG_PREFIX${api.name}"
 
 /**
- * As seis integrações, uma por linha, com o interruptor à direita.
+ * As integrações, uma por linha, com o interruptor à direita.
  *
  * STATELESS: não armazena estado. Recebe `enabledApis` do ViewModel e emite
  * eventos via `onToggle`.
@@ -87,7 +87,11 @@ fun ApiCheckboxRow(
     modifier: Modifier = Modifier,
     showDivider: Boolean = false
 ) {
-    val badgeLabel = if (api == ApiSource.MINIMAX || api == ApiSource.DEEPSEEK) {
+    val badgeLabel = if (
+        api == ApiSource.MINIMAX ||
+        api == ApiSource.DEEPSEEK ||
+        api == ApiSource.OPENCODE_GO
+    ) {
         if (hasConfiguredApiKey) {
             if (language == AppLanguage.PT) "Chave configurada" else "Key configured"
         } else {

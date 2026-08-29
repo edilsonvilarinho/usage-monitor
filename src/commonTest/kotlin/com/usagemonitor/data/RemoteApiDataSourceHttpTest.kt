@@ -216,6 +216,64 @@ class RemoteApiDataSourceHttpTest {
         assertEquals("""DeepSeek HTTP 403: {"error":"blocked"}""", error.message)
     }
 
+    /** Corpo idêntico ao da chamada real registrada na issue #124. */
+    @Test
+    fun `fetchOpenCodeGoUsage parses the three windows`() = runTest {
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel(
+                        """
+                        {
+                          "usage": {
+                            "rolling": { "status": "ok", "percent": 0,  "resetsAt": "2026-08-29T10:28:33.651Z" },
+                            "weekly":  { "status": "ok", "percent": 51, "resetsAt": "2026-08-31T00:00:00.651Z" },
+                            "monthly": { "status": "ok", "percent": 47, "resetsAt": "2026-09-05T18:47:55.651Z" }
+                          }
+                        }
+                        """.trimIndent()
+                    ),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        )
+
+        val response = dataSource.fetchOpenCodeGoUsage("api-key")
+
+        assertEquals(51.0, response.usage.weekly?.percent)
+        assertEquals("2026-09-05T18:47:55.651Z", response.usage.monthly?.resetsAt)
+        assertEquals("ok", response.usage.rolling?.status)
+    }
+
+    /**
+     * O corpo do 403 chega inteiro na mensagem: é dele que o repositório
+     * distingue "conta sem plano Go" de uma falha comum.
+     */
+    @Test
+    fun `fetchOpenCodeGoUsage surfaces the entitlement body on 403`() = runTest {
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel(
+                        """{"type":"error","error":{"type":"EntitlementError","message":"OpenCode Go subscription required."}}"""
+                    ),
+                    status = HttpStatusCode.Forbidden,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        )
+
+        val error = assertFailsWith<IllegalStateException> {
+            dataSource.fetchOpenCodeGoUsage("api-key")
+        }
+
+        assertEquals(
+            """OpenCode Go HTTP 403: {"type":"error","error":{"type":"EntitlementError","message":"OpenCode Go subscription required."}}""",
+            error.message
+        )
+    }
+
     @Test
     fun `fetchLatestGitHubRelease parses successful response`() = runTest {
         val dataSource = RemoteApiDataSource(

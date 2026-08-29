@@ -143,6 +143,24 @@ const CARDS = [
     ]
   },
   {
+    // Plano pago do OpenCode: percentual de tres janelas vindo de
+    // GET /zen/go/v1/usage. Divide o acento --oc com o Zen gratuito acima --
+    // sao planos do mesmo produto, e quem separa os cards e o titulo.
+    id: 'opencode-go',
+    source: 'opencode',
+    title: 'OpenCode Go',
+    subtitle: 'assinatura · chave da API',
+    level: 'ok',
+    status: 'Normal',
+    tooltip: 'Projeção de uso · Cota Semanal · Status Normal · No ritmo atual, a cota deve resetar antes de esgotar.',
+    nav: 1,
+    quotas: [
+      { label: 'Sessão 5h', value: '0%', percent: 0, level: 'ok', reset: 'Reinício: Sáb 07h28 BRT' },
+      { label: 'Semanal', value: '51%', percent: 51, level: 'ok', reset: 'Reinício: Dom 30/08 21h00 BRT' },
+      { label: 'Mensal', value: '47%', percent: 47, level: 'ok', reset: 'Reinício: Sáb 05/09 15h47 BRT' }
+    ]
+  },
+  {
     id: 'minimax',
     source: 'minimax',
     title: 'MiniMax',
