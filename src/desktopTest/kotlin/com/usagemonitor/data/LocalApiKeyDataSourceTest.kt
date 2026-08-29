@@ -63,6 +63,35 @@ class LocalApiKeyDataSourceTest {
         }
     }
 
+    /**
+     * Issue #125: apagar uma chave não pode apagar as outras duas — o arquivo é
+     * um só e as três fontes convivem nele.
+     */
+    @Test
+    fun `withoutKey clears only the requested source`() {
+        val settings = ApiKeySettings(
+            minimax = "minimax-secret",
+            deepSeek = "deepseek-secret",
+            openCodeGo = "opencode-secret"
+        )
+
+        val cleared = settings.withoutKey(ApiSource.DEEPSEEK)
+
+        assertEquals("", cleared.deepSeek)
+        assertNull(cleared.forSource(ApiSource.DEEPSEEK))
+        assertEquals("minimax-secret", cleared.minimax)
+        assertEquals("opencode-secret", cleared.openCodeGo)
+        assertEquals(setOf(ApiSource.MINIMAX, ApiSource.OPENCODE_GO), cleared.configuredSources())
+    }
+
+    /** Fonte sem chave local não tem o que apagar: devolve o mesmo objeto. */
+    @Test
+    fun `withoutKey ignores a source that has no local api key`() {
+        val settings = ApiKeySettings(minimax = "minimax-secret")
+
+        assertEquals(settings, settings.withoutKey(ApiSource.ANTHROPIC))
+    }
+
     @Test
     fun `does not read environment when local file is absent`() {
         val loaded = LocalApiKeyDataSource(settingsFile).load()

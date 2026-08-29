@@ -39,6 +39,23 @@ data class ApiKeySettings(
         }
     }
 
+    /**
+     * Irmã de [withKey]: apaga a chave de uma fonte, mantendo as outras.
+     *
+     * Existe como função própria, e não como `withKey(source, "")`, porque a
+     * string vazia é justamente o que [withKey] recebe quando alguém erra —
+     * o nome diz a intenção, e `forSource`/`configuredSources` já tratam
+     * branco como "sem chave", então o campo vazio é a representação certa.
+     */
+    fun withoutKey(source: ApiSource): ApiKeySettings {
+        return when (source) {
+            ApiSource.MINIMAX -> copy(minimax = "")
+            ApiSource.DEEPSEEK -> copy(deepSeek = "")
+            ApiSource.OPENCODE_GO -> copy(openCodeGo = "")
+            else -> this
+        }
+    }
+
     fun configuredSources(): Set<ApiSource> {
         return buildSet {
             if (minimax.isNotBlank()) add(ApiSource.MINIMAX)
