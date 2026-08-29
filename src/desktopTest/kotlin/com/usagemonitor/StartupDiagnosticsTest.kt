@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -83,6 +85,58 @@ class StartupDiagnosticsTest {
         assertEquals(StartupOrigin.AUTOSTART, StartupOrigin.from(arrayOf("--other", " --autostart ")))
         assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(emptyArray()))
         assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(arrayOf("--autostart-ish")))
+    }
+
+    // --- Contexto da maquina no registro --------------------------------------
+
+    /**
+     * Campo novo com default e retrocompativel: uma linha ja gravada, sem
+     * nenhum deles, continua desserializando. Valor novo de enum nao seria.
+     */
+    @Test
+    fun `a line written before the machine context still deserializes`() {
+        val legacyLine = """
+            {"ts":"2026-08-25T11:00:00Z","pid":42,"version":"37.0.0","origin":"autostart","outcome":"started"}
+        """.trimIndent()
+
+        val entry = Json { ignoreUnknownKeys = true }
+            .decodeFromString<StartupDiagnosticsEntry>(legacyLine)
+
+        assertEquals("autostart", entry.origin)
+        assertNull(entry.sessionType)
+        assertNull(entry.alwaysOnTopSupported)
+        assertNull(entry.autostartEntryValid)
+    }
+
+    /**
+     * `null` e "nao medido", nunca "medido e falso": nesta versao so o Linux mede
+     * o ambiente grafico e a entrada de autostart, e num arquivo do Windows um
+     * `false` afirmaria uma medida que ninguem fez.
+     */
+    @Test
+    fun `the machine context is written when it was measured`() {
+        val line = Json { encodeDefaults = true }.encodeToString(
+            StartupDiagnosticsEntry(
+                ts = "2026-08-29T11:00:00Z",
+                pid = 42,
+                version = "38.0.2",
+                origin = "autostart",
+                outcome = "started",
+                osName = "Linux",
+                osVersion = "6.16.3-200.bazzite.fc42.x86_64",
+                sessionType = "wayland",
+                desktop = "KDE",
+                alwaysOnTopSupported = true,
+                autostartEntryPresent = true,
+                autostartEntryValid = false
+            )
+        )
+
+        assertTrue(line.contains("\"sessionType\":\"wayland\""), line)
+        assertTrue(line.contains("\"desktop\":\"KDE\""), line)
+        assertTrue(line.contains("\"alwaysOnTopSupported\":true"), line)
+        assertTrue(line.contains("\"autostartEntryPresent\":true"), line)
+        assertTrue(line.contains("\"autostartEntryValid\":false"), line)
     }
 
     // --- Ambiente grafico do Linux -------------------------------------------

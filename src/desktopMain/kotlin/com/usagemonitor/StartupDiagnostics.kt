@@ -109,7 +109,19 @@ internal data class StartupDiagnosticsEntry(
     // para a analise, porque a JVM nao expoe o instante de boot de forma portatil
     // e um processo externo so para medi-lo custaria mais do que informa.
     val processStartedAt: String? = null,
-    val startupLatencyMillis: Long? = null
+    val startupLatencyMillis: Long? = null,
+    // Contexto da maquina. Campo novo com default e retrocompativel -- as linhas
+    // ja gravadas continuam desserializando --, ao contrario de valor novo em
+    // enum. `null` significa "nao medido", nunca "medido e falso": nesta versao
+    // so o Linux mede o ambiente grafico e a entrada de autostart, e num arquivo
+    // do Windows um `false` afirmaria uma medida que ninguem fez.
+    val osName: String? = null,
+    val osVersion: String? = null,
+    val sessionType: String? = null,
+    val desktop: String? = null,
+    val alwaysOnTopSupported: Boolean? = null,
+    val autostartEntryPresent: Boolean? = null,
+    val autostartEntryValid: Boolean? = null
 )
 
 /**
