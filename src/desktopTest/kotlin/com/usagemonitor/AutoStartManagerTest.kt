@@ -127,6 +127,29 @@ class AutoStartManagerTest {
         assertTrue(entry.contains("""Exec="/opt/usage-monitor/usage-monitor" --autostart"""), entry)
     }
 
+    /**
+     * A Desktop Entry Specification define regras de aspas **apenas para a chave
+     * `Exec`** (secao "The Exec key"). `Path` e do tipo `string` e e lido
+     * verbatim: a GLib o guarda em `info->path` e o passa como
+     * `working_directory` do `g_spawn`; o KIO o passa para
+     * `QProcess::setWorkingDirectory`. Um diretorio cujo nome literal comeca com
+     * aspas nao existe, o spawn falha no `chdir` e **nada aparece na tela** --
+     * `isAutoStartEnabled()` so testa se o arquivo existe.
+     *
+     * O teste que existia afirmava o `Exec=` e nunca o `Path=`: foi por ali que
+     * o defeito passou.
+     */
+    @Test
+    fun `linux desktop entry writes the working directory verbatim`() {
+        val entry = AutoStartManager.buildLinuxDesktopEntry(
+            "/home/edils/.local/bin/usage-monitor",
+            "/home/edils/.local/bin"
+        )
+
+        assertTrue(entry.contains("\nPath=/home/edils/.local/bin\n"), entry)
+        assertFalse(entry.contains("Path=\""), entry)
+    }
+
     @Test
     fun `launch agent plist carries the origin argument as its own program argument`() {
         val plist = AutoStartManager.buildLaunchAgentPlist("/Applications/Usage Monitor.app/Contents/MacOS/Usage Monitor")
