@@ -63,6 +63,15 @@ remover.
 `onApiKeyRemove` devolve `Boolean` e espelha `onApiKeySave`: o diálogo só fecha quando a camada de
 dados confirma. Remoção recusada mantém a tela aberta, com o aviso de falha vindo do toast.
 
+### A remoção não tem teste unitário próprio, e isso é deliberado
+
+`onApiKeyRemove` é uma lambda de fiação dentro de `main()`, exatamente como `onApiKeySave` logo
+acima dela, que também não tem teste. Extraí-la para função testável exigiria passar seis capturas
+(`apiKeyDataSource`, `apiKeySettings`, `enabledApis`, `settings`, `viewModel`, `showSettingsToast`)
+e abriria um desenho divergente do vizinho para a mesma coisa. O que a lambda decide está coberto
+pelas duas pontas: `LocalApiKeyDataSourceTest` prova a gravação, e o teste de componente prova o
+contrato do `Boolean` — fecha no `true`, mantém aberto no `false`.
+
 ### Sem valor novo em `SettingsField`
 
 A remoção reusa `SettingsField.API_KEY`: é a mesma coisa sendo gravada, e um valor novo obrigaria
@@ -118,7 +127,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C06 | `onEditApiKey` + `AppIconButton` de lápis em `ApiCheckboxRow` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 296 testes, 0 falhas |
 | C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 298 testes, 0 falhas |
 | C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 301 testes, 0 falhas |
-| C09 | `onApiKeyRemove` fiado em `Main.kt` | ⏳ Pendente | — |
+| C09 | `onApiKeyRemove` fiado em `Main.kt` | ✅ Concluída | `gradlew.bat desktopJar` → `BUILD SUCCESSFUL`; `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` → `BUILD SUCCESSFUL`, 0 falhas. `allTests` fica para a auditoria final, que roda as três branches em série |
 | C10 | Troca de chave pelo lápis com a fonte já ligada | ⏳ Pendente | — |
 | C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ⏳ Pendente | — |
 | C12 | `allTests` verde + QA manual | ⏳ Pendente | — |

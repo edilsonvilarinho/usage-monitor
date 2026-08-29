@@ -1872,6 +1872,35 @@ fun main(args: Array<String>) = application {
                                 }
                             )
                         },
+                        onApiKeyRemove = { api ->
+                            runCatching {
+                                apiKeyDataSource.clear(api)
+                                apiKeySettings.value = apiKeySettings.value.withoutKey(api)
+                                // Apagar a chave desliga a fonte, e as duas
+                                // gravações andam juntas: deixá-la ligada faria a
+                                // coleta falhar com 401 a cada tique até o
+                                // próximo reinício, que é quando o filtro de
+                                // arranque `API_KEY_DEPENDENT_SOURCES` a
+                                // removeria de qualquer forma.
+                                val updatedApis = enabledApis.value - api
+                                enabledApis.value = updatedApis
+                                writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
+                                viewModel.refresh(api)
+                            }.fold(
+                                onSuccess = {
+                                    // Reusa `API_KEY`: é a mesma coisa sendo
+                                    // gravada, e um valor novo em `SettingsField`
+                                    // obrigaria ramo em cada `when` de mensagem
+                                    // sem dizer nada que a tela já não mostre.
+                                    showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
+                                    true
+                                },
+                                onFailure = {
+                                    showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
+                                    false
+                                }
+                            )
+                        },
                         anthropicProfiles = profileUiModels,
                         onAnthropicProfileToggle = { profileId, checked ->
                             profileRegistry.setEnabled(profileId, checked)
