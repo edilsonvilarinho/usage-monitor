@@ -50,6 +50,19 @@ há o botão dedicado.
 boot seguinte. Deixá-la ligada faria a coleta falhar com 401 a cada 10 minutos até o próximo
 reinício.
 
+### "Remover chave" é `GHOST` e vive no rodapé do diálogo
+
+`PRIMARY` é uma por tela, e no `ApiKeyDialog` ela é o "Salvar" — o que o diálogo propõe. Remover fica
+`GHOST` e não `DANGER`: o realce forte disputaria com o "Salvar" numa fileira de três botões.
+
+Os dois botões secundários moram no mesmo slot `dismissButton` do `AlertDialog`, que é o que os
+mantém na fileira do rodapé à esquerda do `PRIMARY`. Sem chave guardada o botão **não é desenhado** —
+o mesmo diálogo abre no caminho de ligar uma fonte nunca configurada, e ali não haveria o que
+remover.
+
+`onApiKeyRemove` devolve `Boolean` e espelha `onApiKeySave`: o diálogo só fecha quando a camada de
+dados confirma. Remoção recusada mantém a tela aberta, com o aviso de falha vindo do toast.
+
 ### Sem valor novo em `SettingsField`
 
 A remoção reusa `SettingsField.API_KEY`: é a mesma coisa sendo gravada, e um valor novo obrigaria
@@ -104,7 +117,7 @@ de verificação carrega o comando que rodou e o **resultado real**, nunca a int
 | C05 | `toggleable` movido da linha para o `AppSwitch` + `apiSelectorSwitchTestTag` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 294 testes, 0 falhas |
 | C06 | `onEditApiKey` + `AppIconButton` de lápis em `ApiCheckboxRow` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 296 testes, 0 falhas |
 | C07 | `MonitoredApisTab` abre o diálogo pelo lápis | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 298 testes, 0 falhas |
-| C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ⏳ Pendente | — |
+| C08 | Botão "Remover chave" (`GHOST`) no `ApiKeyDialog` | ✅ Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` → `BUILD SUCCESSFUL`, 301 testes, 0 falhas |
 | C09 | `onApiKeyRemove` fiado em `Main.kt` | ⏳ Pendente | — |
 | C10 | Troca de chave pelo lápis com a fonte já ligada | ⏳ Pendente | — |
 | C11 | Protótipo `§12c #cfg-apis` com o ícone de edição | ⏳ Pendente | — |

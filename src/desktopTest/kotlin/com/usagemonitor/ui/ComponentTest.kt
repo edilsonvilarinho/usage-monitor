@@ -71,6 +71,7 @@ import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
 import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
 import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
+import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_REMOVE_TEST_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -2241,6 +2242,100 @@ class ComponentTest {
         onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.ANTHROPIC)).assertCountEquals(0)
         onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.OPENCODE)).assertCountEquals(0)
         onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().assertExists()
+    }
+
+    /**
+     * Issue #125: apagar a chave era impossível pela interface. O botão fica no
+     * mesmo diálogo, como `GHOST` — `PRIMARY` é uma por tela e continua sendo o
+     * "Salvar", que é o que o diálogo propõe.
+     */
+    @Test
+    fun `SettingsDialogContent removes a stored key from the dialog`() = runDesktopComposeUiTest {
+        var removed: ApiSource? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.DEEPSEEK),
+                    configuredApiKeys = setOf(ApiSource.DEEPSEEK),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeyRemove = { api ->
+                        removed = api
+                        true
+                    },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().performClick()
+        onNodeWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).performClick()
+
+        assertEquals(ApiSource.DEEPSEEK, removed)
+        // Gravação confirmada fecha o diálogo.
+        onAllNodesWithText("Configurar DeepSeek").assertCountEquals(0)
+    }
+
+    /**
+     * Ligar uma fonte que nunca foi configurada abre o mesmo diálogo, e ali um
+     * botão de remover não teria o que remover.
+     */
+    @Test
+    fun `SettingsDialogContent hides the remove button when there is no stored key`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeySave = { _, _ -> true },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
+        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
+        onAllNodesWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).assertCountEquals(0)
+    }
+
+    /** Remoção recusada pela camada de dados mantém o diálogo aberto. */
+    @Test
+    fun `SettingsDialogContent keeps the dialog open when removal fails`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.DEEPSEEK),
+                    configuredApiKeys = setOf(ApiSource.DEEPSEEK),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    onApiKeyRemove = { false },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().performClick()
+        onNodeWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).performClick()
+
+        onNodeWithText("Configurar DeepSeek").assertIsDisplayed()
     }
 
     /**

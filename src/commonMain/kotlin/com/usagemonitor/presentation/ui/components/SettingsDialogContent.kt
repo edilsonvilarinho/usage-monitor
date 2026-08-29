@@ -76,6 +76,7 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val API_KEY_DIALOG_FIELD_TEST_TAG = "apiKeyDialogField"
+const val API_KEY_DIALOG_REMOVE_TEST_TAG = "apiKeyDialogRemove"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 
 /** Mesma razão da tag de opacidade: "115%" também é rótulo de chip no cartão de alertas. */
@@ -166,6 +167,12 @@ fun SettingsDialogContent(
     onMonthlyBudgetCommit: (String) -> Unit = {},
     onApiToggle: (ApiSource, Boolean) -> Unit,
     onApiKeySave: (ApiSource, String) -> Boolean = { _, _ -> false },
+    /**
+     * Apaga a chave da fonte e devolve se a gravação foi feita. Espelha
+     * `onApiKeySave`: o diálogo só fecha quando a camada de dados confirma, e um
+     * `false` mantém a tela aberta com o aviso de falha.
+     */
+    onApiKeyRemove: (ApiSource) -> Boolean = { false },
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
     onAnthropicProfileRename: (String, String) -> Unit = { _, _ -> },
@@ -294,7 +301,8 @@ fun SettingsDialogContent(
                         enabledApis = enabledApis,
                         configuredApiKeys = configuredApiKeys,
                         onApiToggle = onApiToggle,
-                        onApiKeySave = onApiKeySave
+                        onApiKeySave = onApiKeySave,
+                        onApiKeyRemove = onApiKeyRemove
                     )
 
                     SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
@@ -500,7 +508,8 @@ private fun MonitoredApisTab(
     enabledApis: Set<ApiSource>,
     configuredApiKeys: Set<ApiSource>,
     onApiToggle: (ApiSource, Boolean) -> Unit,
-    onApiKeySave: (ApiSource, String) -> Boolean
+    onApiKeySave: (ApiSource, String) -> Boolean,
+    onApiKeyRemove: (ApiSource) -> Boolean
 ) {
     var pendingApiKeySource by remember { mutableStateOf<ApiSource?>(null) }
 
@@ -545,6 +554,17 @@ private fun MonitoredApisTab(
                     pendingApiKeySource = null
                 }
             },
+            // Sem chave guardada não há o que remover: o diálogo também abre no
+            // caminho de ligar uma fonte que nunca foi configurada.
+            onRemove = if (source in configuredApiKeys) {
+                {
+                    if (onApiKeyRemove(source)) {
+                        pendingApiKeySource = null
+                    }
+                }
+            } else {
+                null
+            },
             onDismiss = { pendingApiKeySource = null }
         )
     }
@@ -571,6 +591,12 @@ private fun ApiKeyDialog(
     source: ApiSource,
     language: AppLanguage,
     onSave: (String) -> Unit,
+    /**
+     * Apaga a chave guardada. `null` quando não há nenhuma — o diálogo também
+     * abre no caminho de **ligar** uma fonte que nunca foi configurada, e ali um
+     * botão de remover não teria o que remover.
+     */
+    onRemove: (() -> Unit)?,
     onDismiss: () -> Unit
 ) {
     val isPt = language == AppLanguage.PT
@@ -662,11 +688,25 @@ private fun ApiKeyDialog(
             )
         },
         dismissButton = {
-            AppButton(
-                label = if (isPt) "Cancelar" else "Cancel",
-                tone = AppButtonTone.GHOST,
-                onClick = onDismiss
-            )
+            // As duas ações secundárias moram no mesmo slot para o `AlertDialog`
+            // as manter na fileira do rodapé, à esquerda do `PRIMARY`. Remover é
+            // `GHOST` e não `DANGER`: `PRIMARY` é uma por tela e o realce forte
+            // aqui é do "Salvar", que é o que o diálogo propõe.
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                if (onRemove != null) {
+                    AppButton(
+                        label = if (isPt) "Remover chave" else "Remove key",
+                        tone = AppButtonTone.GHOST,
+                        onClick = onRemove,
+                        modifier = Modifier.testTag(API_KEY_DIALOG_REMOVE_TEST_TAG)
+                    )
+                }
+                AppButton(
+                    label = if (isPt) "Cancelar" else "Cancel",
+                    tone = AppButtonTone.GHOST,
+                    onClick = onDismiss
+                )
+            }
         }
     )
 }
