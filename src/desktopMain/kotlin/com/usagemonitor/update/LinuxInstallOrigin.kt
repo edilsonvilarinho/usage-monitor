@@ -1,5 +1,7 @@
 package com.usagemonitor.update
 
+import java.io.File
+
 /**
  * De onde veio esta instalação no Linux.
  *
@@ -39,7 +41,16 @@ object LinuxInstallOriginResolver {
         val layout = resolveLinuxInstallLayout()
         return resolve(
             isLinux = System.getProperty("os.name").orEmpty().lowercase().contains("linux"),
-            rootPath = layout?.rootPath,
+            // Canonicalizado, e não o `rootPath` cru: em distros ostree (Bazzite,
+            // Silverblue) `$HOME` é `/home/<user>`, mas `/home` é symlink para
+            // `/var/home`, e tanto `jpackage.app-path` quanto `ProcessHandle`
+            // devolvem o caminho já resolvido pelo kernel (`/var/home/...`).
+            // Comparar a raiz crua contra esses dois faria toda instalação
+            // MANAGED_XDG legítima nessas distros cair em UNMANAGED — medido ao
+            // vivo numa Bazzite real, issue #118. `resolve` continua puro/textual
+            // de propósito (é ele que o teste exercita sem tocar disco); só este
+            // ponto de entrada, que já lê o processo real, canonicaliza.
+            rootPath = layout?.rootPath?.let(::canonicalizeLinuxPath),
             executableCandidates = listOfNotNull(
                 System.getProperty("jpackage.app-path"),
                 ProcessHandle.current().info().command().orElse(null)
@@ -47,6 +58,16 @@ object LinuxInstallOriginResolver {
             hasMarker = layout?.hasMarker() ?: false
         )
     }
+
+    /**
+     * `File.canonicalPath`, com o caminho original como fallback.
+     *
+     * Falha (permissão, raiz ainda inexistente na primeira execução) não pode
+     * derrubar a detecção — devolve o texto de entrada, que é o que o código já
+     * fazia antes desta correção.
+     */
+    private fun canonicalizeLinuxPath(path: String): String =
+        runCatching { File(path).canonicalPath }.getOrDefault(path)
 
     /**
      * Função pura, para o teste não depender do disco nem do processo real.
