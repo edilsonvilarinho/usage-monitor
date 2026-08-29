@@ -51,6 +51,52 @@ internal enum class StartupOutcome {
         }
 }
 
+/**
+ * Ambiente grafico em que o processo subiu, lido das variaveis XDG.
+ *
+ * Existe para separar as hipoteses do "sempre visivel" ignorado (issue #120):
+ * uma sessao X11, uma sessao Wayland e uma janela XWayland dentro do Wayland
+ * respondem de forma diferente a `_NET_WM_STATE_ABOVE`, e o compositor que
+ * decide (KWin, Mutter) muda com o desktop. Sem saber em qual combinacao o app
+ * subiu, a medicao na maquina real nao e interpretavel.
+ */
+internal data class LinuxGraphicsEnvironment(
+    val sessionType: String?,
+    val desktop: String?
+)
+
+/**
+ * Funcao pura com o ambiente **injetado** porque a suite roda no Windows, onde
+ * `XDG_SESSION_TYPE` nao existe: ler `System.getenv` la dentro tornaria a
+ * leitura nao testavel.
+ *
+ * O tipo de sessao e normalizado para minusculas -- `X11` e `x11` sao a mesma
+ * resposta, e duas grafias no arquivo dariam duas linhas para o mesmo caso. O
+ * `XDG_CURRENT_DESKTOP` vai **verbatim**: ele e uma lista separada por dois
+ * pontos (`ubuntu:GNOME`), e recortar so o primeiro item perderia justamente o
+ * que distingue uma sessao derivada da original.
+ */
+internal fun linuxGraphicsEnvironment(
+    environment: (String) -> String? = System::getenv
+): LinuxGraphicsEnvironment {
+    return LinuxGraphicsEnvironment(
+        sessionType = readEnvValue(environment, "XDG_SESSION_TYPE")?.lowercase(),
+        desktop = readEnvValue(environment, "XDG_CURRENT_DESKTOP")
+    )
+}
+
+/**
+ * Variavel ausente e variavel presente em branco sao a mesma resposta: "nao
+ * informado". Guardar `""` no arquivo faria um campo vazio parecer um valor
+ * medido.
+ */
+private fun readEnvValue(environment: (String) -> String?, name: String): String? {
+    return runCatching { environment(name) }
+        .getOrNull()
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+}
+
 @Serializable
 internal data class StartupDiagnosticsEntry(
     val ts: String,

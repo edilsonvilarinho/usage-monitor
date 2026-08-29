@@ -3,6 +3,7 @@ package com.usagemonitor
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class StartupDiagnosticsTest {
@@ -82,6 +83,57 @@ class StartupDiagnosticsTest {
         assertEquals(StartupOrigin.AUTOSTART, StartupOrigin.from(arrayOf("--other", " --autostart ")))
         assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(emptyArray()))
         assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(arrayOf("--autostart-ish")))
+    }
+
+    // --- Ambiente grafico do Linux -------------------------------------------
+
+    /**
+     * O tipo de sessao e normalizado para minusculas: `X11` e `x11` sao a mesma
+     * resposta, e duas grafias no arquivo dariam duas linhas para o mesmo caso.
+     * O `XDG_CURRENT_DESKTOP` vai verbatim porque e uma lista separada por dois
+     * pontos, e recortar so o primeiro item perderia o que distingue uma sessao
+     * derivada da original.
+     */
+    @Test
+    fun `graphics environment normalizes the session type and keeps the desktop list intact`() {
+        val environment = linuxGraphicsEnvironment { name ->
+            when (name) {
+                "XDG_SESSION_TYPE" -> "Wayland"
+                "XDG_CURRENT_DESKTOP" -> "ubuntu:GNOME"
+                else -> null
+            }
+        }
+
+        assertEquals("wayland", environment.sessionType)
+        assertEquals("ubuntu:GNOME", environment.desktop)
+    }
+
+    /**
+     * Variavel ausente e variavel em branco sao a mesma resposta -- "nao
+     * informado". Guardar string vazia faria um campo sem medida parecer medido.
+     */
+    @Test
+    fun `graphics environment reports missing and blank variables as not informed`() {
+        val absent = linuxGraphicsEnvironment { null }
+        assertNull(absent.sessionType)
+        assertNull(absent.desktop)
+
+        val blank = linuxGraphicsEnvironment { "   " }
+        assertNull(blank.sessionType)
+        assertNull(blank.desktop)
+    }
+
+    /**
+     * A leitura do ambiente nao pode derrubar o arranque: o gestor de seguranca
+     * de um ambiente restrito lanca em `getenv`, e o registro existe para
+     * explicar o app, nao para impedi-lo de subir.
+     */
+    @Test
+    fun `graphics environment survives a lookup that throws`() {
+        val environment = linuxGraphicsEnvironment { throw SecurityException("bloqueado") }
+
+        assertNull(environment.sessionType)
+        assertNull(environment.desktop)
     }
 
     private fun withTempFile(block: (File) -> Unit) {
