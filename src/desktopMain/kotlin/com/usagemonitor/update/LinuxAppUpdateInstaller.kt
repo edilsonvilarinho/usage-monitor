@@ -22,9 +22,9 @@ import java.io.File
  *
  * **Este gate não é precaução, é requisito**, e pela mesma razão do gate do
  * Windows, com outro mecanismo: a versão promovida é quem confirma que subiu, e
- * um binário anterior a este código **ignora o argumento privado** —
- * `StartupOrigin.from` descarta o que não conhece. Ele sobe normalmente, nunca
- * confirma, e o script então desfaz uma atualização que deu certo.
+ * um binário anterior a este código **nunca lê** `USAGE_MONITOR_UPDATE_ACK`.
+ * Ele sobe normalmente, nunca confirma, e o script então desfaz uma
+ * atualização que deu certo.
  *
  * Quem decide é a **versão baixada**, não a instalada.
  *
@@ -49,7 +49,7 @@ internal fun defaultLinuxUpdateLogFile(): File {
 
 /**
  * Token do health check: PID mais o instante, no alfabeto que
- * [parseUpdateAckToken] aceita.
+ * [isValidUpdateAckToken] aceita.
  *
  * Não precisa ser imprevisível — não é segredo, e quem o lê é o script que o
  * gerou. Precisa ser **diferente a cada tentativa**, e é isso que faz um ACK
@@ -195,6 +195,7 @@ internal class LinuxAppUpdateInstaller(
                 ?: throw IllegalStateException("The stable launcher path could not be resolved.")
 
             val script = scriptMaterializer(layout.updatesDirectory)
+            val logFile = logFileProvider()
 
             // O PID vai junto para o script poder ESPERAR este processo sair, em
             // vez de matá-lo: um `kill` durante a escrita do SQLite é pior que
@@ -209,10 +210,14 @@ internal class LinuxAppUpdateInstaller(
                     ackToken = ackTokenProvider(),
                     launcherPath = launcherPath,
                     ackFilePath = ackFileProvider().absolutePath,
-                    receiptFilePath = receiptFileProvider().absolutePath
+                    receiptFilePath = receiptFileProvider().absolutePath,
+                    // Mesmo arquivo do `outputFile` abaixo: o processo relançado
+                    // (passo 6/9 do script) escreve nele também, em vez de
+                    // `/dev/null` — ver o comentário em `linuxUpdaterCommand`.
+                    logFilePath = logFile.absolutePath
                 ),
                 layout.updatesDirectory,
-                logFileProvider()
+                logFile
             )
             Unit
         }

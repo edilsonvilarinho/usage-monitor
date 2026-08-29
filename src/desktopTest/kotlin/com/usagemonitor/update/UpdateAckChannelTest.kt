@@ -58,57 +58,52 @@ class UpdateAckChannelTest {
     }
 
     /**
-     * O token vem de `argv` e vira conteúdo de arquivo e comparação de igualdade
-     * do outro lado: quebra de linha e espaço não podem chegar lá.
+     * O token vem do ambiente e vira conteúdo de arquivo e comparação de
+     * igualdade do outro lado: quebra de linha e espaço não podem chegar lá.
      */
     @Test
     fun `only a restricted alphabet is a token`() {
-        assertEquals("1234-1756000000", parseUpdateAckToken("--update-ack=1234-1756000000"))
-        assertEquals("abc_DEF-09", parseUpdateAckToken("--update-ack=abc_DEF-09"))
+        assertTrue(isValidUpdateAckToken("1234-1756000000"))
+        assertTrue(isValidUpdateAckToken("abc_DEF-09"))
 
-        assertNull(parseUpdateAckToken("--update-ack="))
-        assertNull(parseUpdateAckToken("--update-ack=com espaco"))
-        assertNull(parseUpdateAckToken("--update-ack=com\nquebra"))
-        assertNull(parseUpdateAckToken("--update-ack=../../etc/passwd"))
-        assertNull(parseUpdateAckToken("--update-ack=" + "a".repeat(65)))
-        assertNull(parseUpdateAckToken("--autostart"))
-        assertNull(parseUpdateAckToken("--update-ack-outro=x"))
+        assertFalse(isValidUpdateAckToken(""))
+        assertFalse(isValidUpdateAckToken("com espaco"))
+        assertFalse(isValidUpdateAckToken("com\nquebra"))
+        assertFalse(isValidUpdateAckToken("../../etc/passwd"))
+        assertFalse(isValidUpdateAckToken("a".repeat(65)))
     }
 
     @Test
-    fun `a token rejected by the parser is never written`() {
+    fun `a token rejected by the validator is never written`() {
         assertFalse(channel.acknowledge("com espaco"))
         assertFalse(ackFile.exists())
     }
 
+    /**
+     * Argumento não é mais o caminho: um `--update-ack=X` na linha de comando
+     * vazava, no launcher nativo do jpackage, como opção da própria JVM em vez
+     * de argumento do app — "Unrecognized option", e a JVM nem chegava a
+     * subir (medido ao vivo numa Bazzite real, issue #118). Variável de
+     * ambiente não passa por parser de argv de nenhuma camada.
+     */
     @Test
-    fun `the token is picked from anywhere in the command line`() {
+    fun `the token is read from the environment, not from argv`() {
         assertEquals(
             "1234-1756000000",
-            updateAckTokenFrom(arrayOf("--autostart", "--update-ack=1234-1756000000"))
+            updateAckTokenFromEnv { name -> "1234-1756000000".takeIf { name == UPDATE_ACK_ENV_VAR } }
         )
-        assertNull(updateAckTokenFrom(arrayOf("--autostart")))
-        assertNull(updateAckTokenFrom(emptyArray()))
+        assertNull(updateAckTokenFromEnv { null })
+        assertNull(updateAckTokenFromEnv { name -> "com espaco".takeIf { name == UPDATE_ACK_ENV_VAR } })
     }
 
     /**
-     * `StartupOrigin.from` ignora argumento que não conhece, e é isso que faz o
-     * piso de versão-alvo ser requisito: uma versão anterior a este código sobe
-     * normalmente com o argumento e **nunca confirma**, e o script desfaria uma
-     * atualização que deu certo.
-     *
-     * O health check também não é uma terceira origem: a versão promovida pode
-     * subir num arranque manual ou num autostart, e o token não decide isso.
+     * O health check não é uma terceira origem: a versão promovida pode subir
+     * num arranque manual ou num autostart, e o ACK não decide isso. Ele nem
+     * aparece em `argv` — só o `--autostart` de sempre chega lá.
      */
     @Test
-    fun `the private argument does not change the startup origin`() {
-        assertEquals(
-            StartupOrigin.MANUAL,
-            StartupOrigin.from(arrayOf("--update-ack=1234-1756000000"))
-        )
-        assertEquals(
-            StartupOrigin.AUTOSTART,
-            StartupOrigin.from(arrayOf("--update-ack=1234-1756000000", "--autostart"))
-        )
+    fun `the ack channel does not change the startup origin`() {
+        assertEquals(StartupOrigin.MANUAL, StartupOrigin.from(emptyArray()))
+        assertEquals(StartupOrigin.AUTOSTART, StartupOrigin.from(arrayOf("--autostart")))
     }
 }
