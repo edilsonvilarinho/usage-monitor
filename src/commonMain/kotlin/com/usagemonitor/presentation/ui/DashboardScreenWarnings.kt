@@ -43,6 +43,7 @@ internal fun warningActionFor(
         ApiSource.CODEX -> null
         ApiSource.DEEPSEEK -> null
         ApiSource.OPENCODE -> null
+        ApiSource.OPENCODE_GO -> null
         ApiSource.KILO -> null
     }
 }
@@ -195,6 +196,45 @@ internal fun warningFor(
                 target = error.target,
                 title = "OpenCode Zen Free is unavailable",
                 description = "The local OpenCode database was not found. Open OpenCode at least once on this machine to create `~/.local/share/opencode/opencode.db`.",
+                actionLabel = null
+            )
+        }
+    }
+
+    if (error.isOpenCodeGoApiKeyIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                target = error.target,
+                title = "OpenCode Go precisa de uma API key",
+                description = "Abra Configurações > APIs, informe a chave da API do OpenCode (a mesma usada pelo Zen) e tente atualizar novamente.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                target = error.target,
+                title = "OpenCode Go needs an API key",
+                description = "Open Settings > APIs, enter the OpenCode API key (the same one Zen uses), and try refreshing again.",
+                actionLabel = null
+            )
+        }
+    }
+
+    // Chave válida numa conta sem o plano Go: nada há para corrigir na credencial,
+    // então o banner não oferece "Tentar novamente" — repetir a chamada devolveria
+    // o mesmo 403.
+    if (error.isOpenCodeGoSubscriptionIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                target = error.target,
+                title = "OpenCode Go sem assinatura ativa",
+                description = "A chave informada é válida, mas a conta não tem o plano Go. Assine o plano Go em opencode.ai ou desative esta integração em Configurações > APIs. O saldo pago do Zen não é exposto por API e não é lido aqui.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                target = error.target,
+                title = "OpenCode Go has no active subscription",
+                description = "The key is valid, but the account has no Go plan. Subscribe to Go at opencode.ai or disable this integration under Settings > APIs. The paid Zen balance is not exposed by any API and is not read here.",
                 actionLabel = null
             )
         }

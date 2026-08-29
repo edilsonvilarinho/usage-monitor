@@ -17,6 +17,7 @@ const APIS = [
   { nome: 'MiniMax', source: 'minimax', origem: 'GET minimax.io/v1/token_plan/remains', req: 'MINIMAX_API_KEY', on: true },
   { nome: 'DeepSeek', source: 'deepseek', origem: 'GET api.deepseek.com/user/balance', req: 'DEEPSEEK_API_KEY', on: true },
   { nome: 'OpenCode Zen Free', source: 'opencode', origem: 'leitura local de opencode.db', req: 'base local do OpenCode', on: true },
+  { nome: 'OpenCode Go', source: 'opencode', origem: 'GET opencode.ai/zen/go/v1/usage', req: 'chave da API do OpenCode', on: true },
   { nome: 'Kilo Free', source: 'kilo', origem: 'leitura local de kilo.db', req: 'base local do Kilo', on: false }
 ];
 

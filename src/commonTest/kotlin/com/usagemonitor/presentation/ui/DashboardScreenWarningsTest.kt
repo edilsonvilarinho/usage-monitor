@@ -124,6 +124,61 @@ class DashboardScreenWarningsTest {
         assertNull(warningActionFor(warning = warning) { })
     }
 
+    // ── OpenCode Go (issue #124) ─────────────────────────────────────────
+
+    @Test
+    fun `missing opencode key asks for the key without offering a retry`() {
+        val warning = warningFor(
+            error = UiApiError(
+                source = ApiSource.OPENCODE_GO,
+                message = "Chave da API OpenCode não configurada. Abra Configurações > APIs e informe a chave."
+            ),
+            language = AppLanguage.PT
+        )
+
+        assertNotNull(warning)
+        assertEquals("OpenCode Go precisa de uma API key", warning.title)
+        assertNull(warning.actionLabel)
+    }
+
+    /**
+     * Chave válida sem plano Go não é defeito de credencial: o banner precisa
+     * mandar assinar ou desligar, e nunca revalidar a chave.
+     */
+    @Test
+    fun `account without the go plan gets its own warning`() {
+        val error = UiApiError(
+            source = ApiSource.OPENCODE_GO,
+            message = "OpenCode Go sem assinatura ativa para esta chave. Assine o plano Go ou desative esta integração."
+        )
+
+        assertTrue(error.isOpenCodeGoSubscriptionIssue)
+        assertTrue(error.isConfigurationIssue)
+
+        val warning = warningFor(error = error, language = AppLanguage.PT)
+        assertNotNull(warning)
+        assertEquals("OpenCode Go sem assinatura ativa", warning.title)
+        assertNull(warning.actionLabel)
+    }
+
+    /**
+     * A ordem de `warningFor` importa: 429 é testado antes de qualquer falha de
+     * configuração, então um limite de requisições continua no banner de "aguarde".
+     */
+    @Test
+    fun `rate limited opencode go stays on the wait banner`() {
+        val warning = warningFor(
+            error = UiApiError(
+                source = ApiSource.OPENCODE_GO,
+                message = "OpenCode Go HTTP 429: Too Many Requests"
+            ),
+            language = AppLanguage.PT
+        )
+
+        assertNotNull(warning)
+        assertTrue(warning.title.endsWith("temporariamente limitado"), warning.title)
+    }
+
     private fun anthropicError(
         message: String,
         profileId: String,

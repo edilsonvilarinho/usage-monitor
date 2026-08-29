@@ -23,7 +23,9 @@
   --info:      #4C8DFF;
 
   /* integration identity — AA 4.5:1 on both surfaces, hue preserved across
-     themes, >=20 degrees apart from each other. These do not change. */
+     themes, >=20 degrees apart from each other. These do not change.
+     Six accents cover seven sources: --oc is the OpenCode vendor, worn by both
+     the free Zen card and the paid Go card. */
   --anthropic: #4F8CFF;
   --codex:     #27BFA3;
   --deepseek:  #C084FC;

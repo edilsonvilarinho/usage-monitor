@@ -46,6 +46,7 @@ internal fun sourceLabelFromKey(source: ApiSource): String {
         ApiSource.CODEX -> "Codex"
         ApiSource.DEEPSEEK -> "DeepSeek"
         ApiSource.OPENCODE -> "OpenCode Zen Free"
+        ApiSource.OPENCODE_GO -> "OpenCode Go"
         ApiSource.KILO -> "Kilo Free"
     }
 }

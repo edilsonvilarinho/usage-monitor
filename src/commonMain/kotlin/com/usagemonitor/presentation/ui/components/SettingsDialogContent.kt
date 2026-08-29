@@ -542,7 +542,9 @@ private fun MonitoredApisTab(
 }
 
 private fun ApiSource.requiresApiKey(): Boolean {
-    return this == ApiSource.MINIMAX || this == ApiSource.DEEPSEEK
+    return this == ApiSource.MINIMAX ||
+        this == ApiSource.DEEPSEEK ||
+        this == ApiSource.OPENCODE_GO
 }
 
 @Composable

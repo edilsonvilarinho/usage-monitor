@@ -4,7 +4,7 @@ Visual system for **Usage Monitor**, a Kotlin Multiplatform + Compose Desktop ap
 tracks consumption, balance and quotas of AI tools and APIs in one panel.
 
 The product monitors remote and local integrations (Anthropic, Codex, MiniMax, DeepSeek,
-OpenCode Zen Free, Kilo Free), keeps history in SQLite, auto-refreshes every 10 minutes,
+OpenCode Zen Free, OpenCode Go, Kilo Free), keeps history in SQLite, auto-refreshes every 10 minutes,
 supports card reorder/minimize, light/dark theme, PT/EN, auto-start on Windows/Linux/macOS,
 and update checks through GitHub Releases. Optional self-hosted team server aggregates the
 same Anthropic account across machines.
@@ -73,6 +73,13 @@ No accent glow on top of surfaces, no tinted cards, no colored card backgrounds.
 across themes, ≥20° apart). What changed from the old UI is the **area**: from whole-card fill
 to a 2px marker, a chart line, and value text. `--oc` is the color of the monitored OpenCode
 integration — never the app's brand color.
+
+**Six accents, seven sources.** The accent is the identity of the *vendor*, not of one card:
+OpenCode Zen Free (read from the local SQLite) and OpenCode Go (the paid subscription, read over
+HTTP) are two sources that both wear `--oc`. Adding a seventh hue would have to clear AA on both
+surfaces and stay ≥20° from the other six — a real cost, paid to distinguish two plans of the same
+product. What separates the two cards is the title, and "colour never informs alone" already
+guarantees that is enough.
 
 **Type.** Two families. **IBM Plex Mono** for titles, labels, numbers, tables and window chrome
 (tabular alignment); **IBM Plex Sans** for explanatory prose only. Weights 400/500/600. Six sizes:

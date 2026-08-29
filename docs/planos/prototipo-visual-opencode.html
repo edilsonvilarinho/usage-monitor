@@ -798,6 +798,60 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <div class="panel">
     <div class="phead">
       <span class="srcmark" style="background:var(--oc)"></span>
+      <span class="ptitle">OpenCode Go</span>
+      <span class="sp"></span>
+      <span class="st ok" title="Projeção de uso · Cota Semanal · Status Normal · No ritmo atual, a cota deve resetar antes de esgotar.">Normal</span>
+      <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
+      <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
+    </div>
+    <div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:3px;flex:1">
+        <div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">0%</span></div>
+        <div class="track ok"><i style="width:0%"></i></div>
+        <span class="k dim">Reinício: Sáb 07h28 BRT</span>
+      </div></div>
+      <div class="row"><div class="stack" style="gap:3px;flex:1">
+        <div class="hstack"><span class="k">Semanal</span><span class="sp"></span><span class="v">51%</span></div>
+        <div class="track ok"><i style="width:51%"></i></div>
+        <span class="k dim">Reinício: Dom 30/08 21h00 BRT</span>
+      </div></div>
+      <div class="row"><div class="stack" style="gap:3px;flex:1">
+        <div class="hstack"><span class="k">Mensal</span><span class="sp"></span><span class="v">47%</span></div>
+        <div class="track ok"><i style="width:47%"></i></div>
+        <span class="k dim">Reinício: Sáb 05/09 15h47 BRT</span>
+      </div></div>
+    </div>
+    <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
+  </div>
+  <div class="panel">
+    <div class="phead">
+      <span class="srcmark" style="background:var(--oc)"></span>
+      <span class="ptitle">OpenCode Go</span>
+      <span class="sp"></span>
+      <span class="st off">Sem assinatura</span>
+      <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
+      <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
+    </div>
+    <div class="pbody">
+      <div class="banner warn"><span class="bar"></span><span class="bd"><b>OpenCode Go sem assinatura ativa</b><br>A chave informada é válida, mas a conta não tem o plano Go. Assine o plano Go em opencode.ai ou desative esta integração em Configurações &gt; APIs. O saldo pago do Zen não é exposto por API e não é lido aqui.</span></div>
+    </div>
+  </div>
+</div>
+<p class="note"><b>OpenCode Go é uma segunda fonte, não uma cota a mais do card gratuito.</b> Ele vem de
+<code>GET /zen/go/v1/usage</code> com a chave da API do OpenCode e devolve <b>percentual</b> de três janelas —
+5h deslizante, semanal e mensal —, exatamente a forma da Anthropic; o Zen gratuito abaixo vem do SQLite local
+em requisições observadas. Uma máquina pode ter uma das duas sem a outra, e os dois cards <b>dividem o acento
+<code>--oc</code></b>: as seis identidades de fonte deste sistema não mudam, e quem separa os cards é o título.
+<b>A API não devolve valor em dinheiro</b> — nem gasto, nem limite —, então não há linha de saldo e nenhum
+número de tokens é estimado a partir do percentual. <b>Chave válida sem plano Go não é erro de credencial:</b>
+é o estado normal de quem só usa o Zen pago, e o banner manda assinar ou desligar em vez de pedir novo login —
+por isso ele não oferece "Tentar novamente", que devolveria o mesmo 403. <b>O saldo pago do Zen continua sem
+API</b> (issue upstream #10448, aberta; <code>/zen/v1/balance</code> responde 404 hoje) e não aparece em lugar
+nenhum da interface.</p>
+<div class="g2">
+  <div class="panel">
+    <div class="phead">
+      <span class="srcmark" style="background:var(--oc)"></span>
       <span class="ptitle">OpenCode Zen Free</span>
       <span class="sp"></span>
       <span class="st ok">Atividade observada</span>
@@ -1568,11 +1622,17 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="row"><span class="srcmark" style="background:var(--codex)"></span><span class="v sm" style="flex:1">Codex</span><span class="st warn">Fonte instável</span><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--deepseek)"></span><span class="v sm" style="flex:1">DeepSeek</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
-    <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode</span><span class="st off">Desativada</span><span class="sw"></span></div>
-    <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Zen Free</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Go</span><span class="st ok">Chave configurada</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo Free</span><span class="st off">Desativada</span><span class="sw"></span></div>
   </div></div></div>
 </div>
-<p class="note"><b>Ativação de MiniMax e DeepSeek.</b> Ao ligar uma dessas integrações sem chave cadastrada, o interruptor não é persistido imediatamente: abre-se o diálogo abaixo. A chave é mascarada por padrão, pode ser revelada pelo olho e só habilita a integração depois de <b>Salvar</b>. Ela fica em armazenamento local protegido; variáveis de ambiente não são lidas.</p>
+<p class="note"><b>Ativação de MiniMax, DeepSeek e OpenCode Go.</b> Ao ligar uma dessas integrações sem chave cadastrada, o interruptor não é persistido imediatamente: abre-se o diálogo abaixo. A chave é mascarada por padrão, pode ser revelada pelo olho e só habilita a integração depois de <b>Salvar</b>. Ela fica em armazenamento local protegido; variáveis de ambiente não são lidas.</p>
+<p class="note"><b>As duas linhas do OpenCode não são a mesma integração.</b> <code>OpenCode Zen Free</code> é lida do
+SQLite local e por isso não pede chave — ligar a linha grava direto, sem diálogo. <code>OpenCode Go</code> é a
+assinatura paga e usa a chave da API do OpenCode, <b>a mesma do <code>chat/completions</code> do Zen</b>. As duas
+carregam o acento <code>--oc</code> porque são planos do mesmo produto; o que as distingue é o nome, e o selo à
+direita só existe na que depende de chave.</p>
 <div class="win small" style="max-width:560px;margin:0 auto 28px">
   <div class="titlebar"><span class="brand">◉</span><span>Configurar MiniMax</span><span class="sp"></span><span class="x">×</span></div>
   <div class="body"><div class="panel">

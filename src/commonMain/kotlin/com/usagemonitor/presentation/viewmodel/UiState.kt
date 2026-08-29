@@ -81,6 +81,12 @@ data class UiApiError(
     val isOpenCodeLocalIssue: Boolean
         get() = source == ApiSource.OPENCODE && isOpenCodeLocalMessage(message)
 
+    val isOpenCodeGoApiKeyIssue: Boolean
+        get() = source == ApiSource.OPENCODE_GO && isOpenCodeGoApiKeyMessage(message)
+
+    val isOpenCodeGoSubscriptionIssue: Boolean
+        get() = source == ApiSource.OPENCODE_GO && isOpenCodeGoSubscriptionMessage(message)
+
     val isKiloLocalIssue: Boolean
         get() = source == ApiSource.KILO && isKiloLocalMessage(message)
 
@@ -95,6 +101,8 @@ data class UiApiError(
             isMiniMaxApiKeyIssue ||
             isMiniMaxInactivePlanIssue ||
             isOpenCodeLocalIssue ||
+            isOpenCodeGoApiKeyIssue ||
+            isOpenCodeGoSubscriptionIssue ||
             isKiloLocalIssue
 }
 
@@ -150,6 +158,19 @@ private val OPENCODE_LOCAL_MARKERS = listOf(
     "OpenCode local database not found",
     "OpenCode local database is unavailable"
 )
+// A chave do OpenCode Go é o mesmo segredo do `chat/completions` do Zen, então o
+// texto fala de "chave da API OpenCode" e não "chave do Go".
+private const val OPENCODE_GO_API_KEY_MISSING_MARKER = "Chave da API OpenCode não configurada"
+private const val OPENCODE_GO_API_KEY_MISSING_MARKER_EN = "OpenCode API key not configured"
+
+// Chave válida sem assinatura Go é estado normal de quem só usa o Zen pago — vira
+// banner de configuração, nunca o pedido de revisar a credencial.
+private val OPENCODE_GO_SUBSCRIPTION_MARKERS = listOf(
+    "OpenCode Go sem assinatura ativa",
+    "OpenCode Go subscription required",
+    "EntitlementError"
+)
+
 private val KILO_LOCAL_MARKERS = listOf(
     "Kilo local database not found",
     "Kilo local database is unavailable"
@@ -183,6 +204,15 @@ private fun isMiniMaxInactivePlanMessage(message: String): Boolean {
 
 private fun isOpenCodeLocalMessage(message: String): Boolean {
     return OPENCODE_LOCAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isOpenCodeGoApiKeyMessage(message: String): Boolean {
+    return message.contains(OPENCODE_GO_API_KEY_MISSING_MARKER, ignoreCase = true) ||
+        message.contains(OPENCODE_GO_API_KEY_MISSING_MARKER_EN, ignoreCase = true)
+}
+
+private fun isOpenCodeGoSubscriptionMessage(message: String): Boolean {
+    return OPENCODE_GO_SUBSCRIPTION_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }
 
 private fun isKiloLocalMessage(message: String): Boolean {
