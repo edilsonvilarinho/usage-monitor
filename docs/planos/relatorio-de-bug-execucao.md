@@ -203,7 +203,7 @@ usuário.
 | B18 | Seção "Diagnóstico" na aba Geral com o botão `PRIMARY` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.ui.*"` → 309 testes, nenhuma `failures>0` (inclui os 3 do `DiagnosticsSettingsSectionTest`) |
 | B19 | "Abrir issue no GitHub" — URL montada e navegador aberto | ✅ Concluída | (este commit) | `desktopTest --tests "…BugReportIssueOpenerTest" --tests "…DesktopAppUpdateReleaseOpenerTest"` → `tests="6"` e `tests="4"`, `failures="0"` nos dois |
 | B20 | Fluxo do marcador + fiação do diálogo no `Main.kt` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.CrashHandlerTest"` → `tests="13" failures="0" errors="0"`; `compileKotlinDesktop` → BUILD SUCCESSFUL |
-| B21 | `prototipo-visual-opencode.html` — `§12 #cfg-geral` ganha a seção nova | ⏳ Pendente | — | — |
+| B21 | Protótipo: `§12 #cfg-geral` ganha a seção e nasce `§12f #cfg-bug` | ✅ Concluída | (este commit) | Inspeção do HTML: `grep -c 'id="cfg-bug"'` → 1; entrada no `nav.index`; `.banner.ok` e `.field.area` acrescentados ao CSS |
 | B22 | `allTests` verde + QA manual: crash proposital, dark/light, PT/EN | ⏳ Pendente | — | — |
 
 ## Verificação
