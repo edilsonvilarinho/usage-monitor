@@ -77,8 +77,8 @@ usuário.
 | B03 | `BreadcrumbCategory` + `Breadcrumb` (domain) | ✅ Concluída | `ba721bf` | `desktopTest --tests "com.usagemonitor.domain.BreadcrumbTest"` → `tests="6" failures="0" errors="0"`, BUILD SUCCESSFUL em 34s |
 | B04 | `BugReportMachineInfo` — OS, versão, arquitetura, JVM, versão do app, idioma, escala de UI, resolução, fuso | ✅ Concluída | `24e30b0` | `desktopTest --tests "com.usagemonitor.domain.BugReportMachineInfoTest"` → `tests="3" failures="0" errors="0"`, BUILD SUCCESSFUL em 33s |
 | B05 | `BugReportEnvelope` + `toJson()` | ✅ Concluída | `3aa760e` | `desktopTest --tests "com.usagemonitor.domain.BugReportEnvelopeJsonTest"` → `tests="5" failures="0" errors="0"`, BUILD SUCCESSFUL em 29s |
-| B06 | `toGithubIssueBody()` com truncagem (30 breadcrumbs, 6.000 chars) | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.BugReportIssueBodyTest"` → `tests="7" failures="0" errors="0"`, BUILD SUCCESSFUL em 1m 7s |
-| B07 | `BreadcrumbRecorder` (interface no domain) + implementação nula | ⏳ Pendente | — | — |
+| B06 | `toGithubIssueBody()` com truncagem (30 breadcrumbs, 6.000 chars) | ✅ Concluída | `89f1ddf` | `desktopTest --tests "com.usagemonitor.domain.BugReportIssueBodyTest"` → `tests="7" failures="0" errors="0"`, BUILD SUCCESSFUL em 1m 7s |
+| B07 | `BreadcrumbRecorder` (interface no domain) + implementação nula | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.domain.BreadcrumbRecorderTest"` → `tests="1" failures="0" errors="0"`, BUILD SUCCESSFUL em 39s |
 | B08 | `LocalBreadcrumbRecorder` — jsonl, lock, trim 200/100, `restrictToOwnerReadWrite` | ⏳ Pendente | — | — |
 | B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ⏳ Pendente | — | — |
 | B10 | Pontos de chamada de use case (início e resultado) | ⏳ Pendente | — | — |
