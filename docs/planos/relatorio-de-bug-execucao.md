@@ -64,6 +64,16 @@ usuário.
 - **Nenhuma composable nova em `main()`** — o método já estourou o backend JVM uma vez. O handler de
   crash é registrado **antes** do `application { }`, e a leitura do marcador é função de topo chamada
   de dentro de um `remember`.
+  - Para isso o ponto de entrada virou **corpo de bloco**: `main()` cria a trilha e chama
+    `runUsageMonitor(args, breadcrumbs)`, que é a mesma função gigante de antes com outro nome. Não
+    reparte nada, não cria composable, e é a única forma de existir código **antes** do
+    `application { }` com a forma de expressão que o arquivo usava.
+  - Os passos de navegação entram como **uma linha dentro de lambdas que já existem** (`onOpenSettings`,
+    `onOpenCliSessions`, …). Nenhum `LaunchedEffect` novo: o de #120 já registrou que o jeito de não
+    crescer `main()` é usar os que já estão lá.
+- **Passo de navegação não carrega identidade.** O apelido do perfil é digitado pelo usuário e
+  costuma ser o e-mail da conta; a `accountKey` é identificador de conta. Nenhum dos dois entra na
+  trilha — o nome da tela responde à pergunta "onde ele estava" sem responder "quem ele é".
 - **Nenhuma animação infinita** no diálogo — trava o `waitForIdle` dos testes de componente.
 - **Sem hostname e sem usuário do sistema.** O pacote vira o corpo de uma issue pública, e as duas
   informações identificam a pessoa sem ajudar a diagnosticar o app.
@@ -79,8 +89,8 @@ usuário.
 | B05 | `BugReportEnvelope` + `toJson()` | ✅ Concluída | `3aa760e` | `desktopTest --tests "com.usagemonitor.domain.BugReportEnvelopeJsonTest"` → `tests="5" failures="0" errors="0"`, BUILD SUCCESSFUL em 29s |
 | B06 | `toGithubIssueBody()` com truncagem (30 breadcrumbs, 6.000 chars) | ✅ Concluída | `89f1ddf` | `desktopTest --tests "com.usagemonitor.domain.BugReportIssueBodyTest"` → `tests="7" failures="0" errors="0"`, BUILD SUCCESSFUL em 1m 7s |
 | B07 | `BreadcrumbRecorder` (interface no domain) + implementação nula | ✅ Concluída | `b4d5516` | `desktopTest --tests "com.usagemonitor.domain.BreadcrumbRecorderTest"` → `tests="1" failures="0" errors="0"`, BUILD SUCCESSFUL em 39s |
-| B08 | `LocalBreadcrumbRecorder` — jsonl, lock, trim 200/100, `restrictToOwnerReadWrite` | ✅ Concluída | (este commit) | `desktopTest --tests "com.usagemonitor.data.LocalBreadcrumbRecorderTest"` → `tests="7" failures="0" errors="0"` |
-| B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ⏳ Pendente | — | — |
+| B08 | `LocalBreadcrumbRecorder` — jsonl, lock, trim 200/100, `restrictToOwnerReadWrite` | ✅ Concluída | `887b7a3` | `desktopTest --tests "com.usagemonitor.data.LocalBreadcrumbRecorderTest"` → `tests="7" failures="0" errors="0"` |
+| B09 | Pontos de chamada de navegação (abertura de cada tela/modal) | ✅ Concluída | (este commit) | `gradlew.bat compileKotlinDesktop` → BUILD SUCCESSFUL. **Nenhum teste da suíte exercita `main()`**; quem fecha isto é a `allTests` da auditoria |
 | B10 | Pontos de chamada de use case (início e resultado) | ⏳ Pendente | — | — |
 | B11 | Pontos de chamada nos `catch` que hoje falham em silêncio | ⏳ Pendente | — | — |
 | B12 | `GenerateBugReportUseCase` | ⏳ Pendente | — | — |

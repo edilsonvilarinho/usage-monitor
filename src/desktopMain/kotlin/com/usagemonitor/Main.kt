@@ -44,6 +44,9 @@ import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
+import com.usagemonitor.data.diagnostics.LocalBreadcrumbRecorder
+import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
@@ -259,7 +262,35 @@ private fun loadWindowIcon() = runCatching {
 }.getOrNull()
 
 @OptIn(kotlinx.coroutines.FlowPreview::class)
-fun main(args: Array<String>) = application {
+/**
+ * Ponto de entrada.
+ *
+ * Corpo de bloco, e nao expressao: a trilha de eventos precisa nascer **antes**
+ * da janela, porque quem a consome primeiro e o handler de excecao nao tratada,
+ * que roda fora de qualquer composicao. O corpo gigante continua em uma funcao
+ * so -- [runUsageMonitor] --, entao isto nao reparte `main()` nem cria
+ * composable nova.
+ */
+fun main(args: Array<String>) {
+    val breadcrumbs = LocalBreadcrumbRecorder()
+    runUsageMonitor(args, breadcrumbs)
+}
+
+/**
+ * Passo de navegacao: uma tela ou modal que o usuario abriu.
+ *
+ * Funcao de topo e nao literal repetido em cada lambda: o texto do passo e o que
+ * o leitor do relatorio vai reconhecer, e oito formas de escrever a mesma frase
+ * dariam oito trilhas diferentes para o mesmo app.
+ */
+private fun BreadcrumbRecorder.recordScreenOpened(screen: String) {
+    record(BreadcrumbCategory.NAVIGATION, "abriu $screen")
+}
+
+private fun runUsageMonitor(
+    args: Array<String>,
+    breadcrumbs: BreadcrumbRecorder
+) = application {
 
     // Forma de expressao de proposito: ela expoe `args` ao corpo sem reindentar
     // as mil linhas que vem abaixo, e mantem a regra de nao criar composable nova
@@ -1282,6 +1313,7 @@ fun main(args: Array<String>) = application {
                 Item(
                     text = if (language == AppLanguage.PT) "Configurações" else "Settings",
                     onClick = {
+                        breadcrumbs.recordScreenOpened("Configurações (bandeja)")
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
                     }
@@ -1409,11 +1441,15 @@ fun main(args: Array<String>) = application {
                         writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
                     },
                     onOpenHistory = { source, accountKey ->
+                        // O nome da fonte entra; a chave da conta não. Ela é
+                        // identidade, e o pacote vira issue pública.
+                        breadcrumbs.recordScreenOpened("histórico de ${source.name}")
                         historyDialogSource = source
                         historyOpenGeneration++
                         historyViewModel.openForSource(source, accountKey)
                     },
                     onOpenSettings = {
+                        breadcrumbs.recordScreenOpened("Configurações")
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
                     },
@@ -1422,6 +1458,7 @@ fun main(args: Array<String>) = application {
                     // não exige participar de nenhum time.
                     onOpenAdminOverview = if (teamSettings.isAdminMode) {
                         {
+                            breadcrumbs.recordScreenOpened("visão global do time (admin)")
                             teamUsageAccountLabel = null
                             teamUsageProfileId = null
                             teamUsageIsAdminOverview = true
@@ -1437,6 +1474,7 @@ fun main(args: Array<String>) = application {
                     // já é escopado na conta dele.
                     onOpenTeamPresenceOverview = if (teamSettings.isAdminMode) {
                         {
+                            breadcrumbs.recordScreenOpened("presença global do time (admin)")
                             teamPresenceAccountLabel = null
                             teamPresenceIsAdminOverview = true
                             isTeamPresenceOpen = true
@@ -1447,6 +1485,9 @@ fun main(args: Array<String>) = application {
                         null
                     },
                     onOpenCliSessions = { target ->
+                        // Sem o apelido do perfil: ele é digitado pelo usuário e
+                        // costuma ser o e-mail da conta.
+                        breadcrumbs.recordScreenOpened("sessões CLI da máquina")
                         val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
                         val label = profileRecords
                             .firstOrNull { record -> record.id == profileId }
@@ -1469,6 +1510,7 @@ fun main(args: Array<String>) = application {
                         // consultar o servidor com uma chave inventada.
                         val accountKey = accountContext?.key?.providerAccountId
                         if (accountKey != null) {
+                            breadcrumbs.recordScreenOpened("uso do time")
                             teamUsageAccountLabel = accountContext.displayLabel
                             teamUsageProfileId = profileId
                             teamUsageIsAdminOverview = false
@@ -1490,6 +1532,7 @@ fun main(args: Array<String>) = application {
                         val accountContext = profileResolution.inspections[profileId]?.accountContext
                         val accountKey = accountContext?.key?.providerAccountId
                         if (accountKey != null) {
+                            breadcrumbs.recordScreenOpened("presença do time")
                             teamPresenceAccountLabel = accountContext.displayLabel
                             teamPresenceIsAdminOverview = false
                             isTeamPresenceOpen = true
@@ -2041,6 +2084,7 @@ fun main(args: Array<String>) = application {
                             }
                         },
                         onTeamOpenKeysManager = {
+                            breadcrumbs.recordScreenOpened("chaves das contas (admin)")
                             isTeamKeysOpen = true
                             teamKeysViewModel.open()
                         },
