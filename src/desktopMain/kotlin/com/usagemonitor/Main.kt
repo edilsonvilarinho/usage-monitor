@@ -201,7 +201,11 @@ private val API_KEY_DEPENDENT_SOURCES = setOf(
     ApiSource.DEEPSEEK,
     ApiSource.OPENCODE_GO
 )
-private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+// internal (não private): o reparo do ícone de menu (issue #133,
+// `com.usagemonitor.update.ensureLinuxMenuIconCurrent`) reusa o mesmo
+// recurso do ícone da janela -- um segundo literal para o mesmo caminho
+// seria um segundo dono da mesma resposta.
+internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 /** Piso horizontal do Dashboard; abaixo disso os cards já operam em coluna única. */
 private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
 
