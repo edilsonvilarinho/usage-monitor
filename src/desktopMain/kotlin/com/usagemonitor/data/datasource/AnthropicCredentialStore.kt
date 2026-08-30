@@ -45,6 +45,7 @@ internal class FileCredentialStore(
         val tempFile = File(parentDir, "${credentialsFile.name}.tmp")
         try {
             Files.writeString(tempFile.toPath(), content)
+            restrictToOwnerReadWrite(tempFile.toPath())
             try {
                 Files.move(
                     tempFile.toPath(),

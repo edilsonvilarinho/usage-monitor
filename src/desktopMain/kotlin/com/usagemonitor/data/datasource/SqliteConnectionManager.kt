@@ -37,7 +37,19 @@ internal class SqliteConnectionManager(
             .also { openedConnection ->
                 onOpen(openedConnection)
                 connection = openedConnection
-                restrictToOwnerReadWrite(databaseFile.toPath())
+                restrictDatabaseFiles()
             }
+    }
+
+    /**
+     * Restringe o `.db` principal e os sidecars `-wal`/`-shm` do modo WAL
+     * (ligado em `LocalCliSessionDataSource`). O `onOpen` já escreveu dados reais
+     * neles antes deste ponto — sem isso, os sidecars ficavam com a permissão
+     * padrão do SO indefinidamente, mesmo com o `.db` principal restrito.
+     */
+    private fun restrictDatabaseFiles() {
+        restrictToOwnerReadWrite(databaseFile.toPath())
+        restrictToOwnerReadWrite(File("${databaseFile.absolutePath}-wal").toPath())
+        restrictToOwnerReadWrite(File("${databaseFile.absolutePath}-shm").toPath())
     }
 }
