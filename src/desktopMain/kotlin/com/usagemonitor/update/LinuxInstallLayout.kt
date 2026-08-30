@@ -55,6 +55,21 @@ internal const val LINUX_APP_LAUNCHER_RELATIVE_PATH = "bin/Usage Monitor"
 internal const val LINUX_STABLE_LAUNCHER_RELATIVE_PATH = ".local/bin/usage-monitor"
 
 /**
+ * Cópia estável do ícone, dentro da raiz de dados — ao lado de `current` e do
+ * marcador, não em `~/.local/bin` como o launcher: é um dado do app, não um
+ * executável.
+ *
+ * Existe porque o `Icon=` da entrada de menu que o instalador `.sh` escreve
+ * aponta para dentro de `versions/<versão>/`, que o `linux-updater.sh` poda
+ * assim que deixa de ser a versão atual ou a imediatamente anterior — o mesmo
+ * defeito do `Path=` do autostart corrigido na #120, agora na entrada de menu
+ * (issue #133). [com.usagemonitor.update.ensureLinuxMenuIconCurrent] mantém
+ * este arquivo e a entrada de menu sincronizados a cada abertura do app, sem
+ * nunca ler da árvore versionada.
+ */
+internal const val LINUX_MENU_ICON_FILE_NAME = "icon.png"
+
+/**
  * Onde vive uma instalação Linux gerenciada.
  *
  * **Os caminhos são texto com `/`, não `File(parent, child)`.** O separador do
@@ -74,11 +89,13 @@ internal class LinuxInstallLayout(val rootPath: String) {
     val currentPath: String = "$rootPath/$LINUX_CURRENT_FILE_NAME"
     val versionsPath: String = "$rootPath/$LINUX_VERSIONS_DIRECTORY_NAME"
     val updatesPath: String = "$rootPath/$LINUX_UPDATES_DIRECTORY_NAME"
+    val iconPath: String = "$rootPath/$LINUX_MENU_ICON_FILE_NAME"
 
     val markerFile: File get() = File(markerPath)
     val currentFile: File get() = File(currentPath)
     val versionsDirectory: File get() = File(versionsPath)
     val updatesDirectory: File get() = File(updatesPath)
+    val iconFile: File get() = File(iconPath)
 
     /** `versions/<versão>` — a árvore instalada, uma por versão retida. */
     fun versionPath(version: String): String = "$versionsPath/$version"
@@ -186,6 +203,23 @@ internal fun resolveLinuxStableLauncherPath(
 ): String? {
     val home = userHome?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     return "${home.trimEnd('/')}/$LINUX_STABLE_LAUNCHER_RELATIVE_PATH"
+}
+
+/** Onde o `xdg-desktop-menu`/instalador `.sh` escreve a entrada de menu. */
+private const val LINUX_MENU_DESKTOP_RELATIVE_PATH = ".local/share/applications/usage-monitor.desktop"
+
+/**
+ * Caminho da entrada de **menu** — diferente da entrada de **autostart** que
+ * [com.usagemonitor.AutoStartManager] já resolve (`~/.config/autostart/`).
+ * Sai de `user.home`, mesmo raciocínio de [resolveLinuxStableLauncherPath]: a
+ * localização de `~/.local/share/applications` não depende de `XDG_DATA_HOME`
+ * escolhido para os dados do app.
+ */
+internal fun resolveLinuxMenuDesktopFilePath(
+    userHome: String? = System.getProperty("user.home")
+): String? {
+    val home = userHome?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return "${home.trimEnd('/')}/$LINUX_MENU_DESKTOP_RELATIVE_PATH"
 }
 
 /**
