@@ -154,6 +154,7 @@ import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
+import com.usagemonitor.update.ensureLinuxMenuIconCurrent
 import com.usagemonitor.update.isEnabled
 import com.usagemonitor.update.UpdateAckChannel
 import com.usagemonitor.update.rememberAutoUpdateController
@@ -1030,6 +1031,14 @@ private fun runUsageMonitor(
             withContext(Dispatchers.IO) {
                 AutoStartManager.ensureAutoStartCommandCurrent()
             }
+        }
+        // Mesmo motivo do reparo do autostart acima, para a entrada de MENU
+        // (issue #133): fora do `if` porque a checagem é sobre autostart, e
+        // esta é sobre Linux -- `ensureLinuxMenuIconCurrent()` já se protege
+        // sozinha via `LinuxInstallOriginResolver` e é barata nas outras
+        // plataformas.
+        withContext(Dispatchers.IO) {
+            ensureLinuxMenuIconCurrent()
         }
     }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
