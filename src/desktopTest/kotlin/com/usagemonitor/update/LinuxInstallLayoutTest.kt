@@ -87,6 +87,7 @@ class LinuxInstallLayoutTest {
         assertEquals("/home/edils/.local/share/usage-monitor/current", layout.currentPath)
         assertEquals("/home/edils/.local/share/usage-monitor/versions", layout.versionsPath)
         assertEquals("/home/edils/.local/share/usage-monitor/updates", layout.updatesPath)
+        assertEquals("/home/edils/.local/share/usage-monitor/icon.png", layout.iconPath)
         assertEquals(
             "/home/edils/.local/share/usage-monitor/versions/39.0.0",
             layout.versionPath("39.0.0")
@@ -185,6 +186,15 @@ class LinuxInstallLayoutTest {
         // XDG_DATA_HOME apontado para outro disco não muda onde ficam os
         // executáveis do usuário: são convenções independentes.
         assertNull(resolveLinuxStableLauncherPath(userHome = null))
+    }
+
+    @Test
+    fun `the menu desktop entry lives under home applications, not under XDG_DATA_HOME`() {
+        assertEquals(
+            "/home/edils/.local/share/applications/usage-monitor.desktop",
+            resolveLinuxMenuDesktopFilePath(userHome = "/home/edils")
+        )
+        assertNull(resolveLinuxMenuDesktopFilePath(userHome = null))
     }
 
     @Test

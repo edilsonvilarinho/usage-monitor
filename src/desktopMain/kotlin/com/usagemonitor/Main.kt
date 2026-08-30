@@ -154,6 +154,7 @@ import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
+import com.usagemonitor.update.ensureLinuxMenuIconCurrent
 import com.usagemonitor.update.isEnabled
 import com.usagemonitor.update.UpdateAckChannel
 import com.usagemonitor.update.rememberAutoUpdateController
@@ -201,7 +202,11 @@ private val API_KEY_DEPENDENT_SOURCES = setOf(
     ApiSource.DEEPSEEK,
     ApiSource.OPENCODE_GO
 )
-private const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
+// internal (não private): o reparo do ícone de menu (issue #133,
+// `com.usagemonitor.update.ensureLinuxMenuIconCurrent`) reusa o mesmo
+// recurso do ícone da janela -- um segundo literal para o mesmo caminho
+// seria um segundo dono da mesma resposta.
+internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 /** Piso horizontal do Dashboard; abaixo disso os cards já operam em coluna única. */
 private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
 
@@ -1026,6 +1031,14 @@ private fun runUsageMonitor(
             withContext(Dispatchers.IO) {
                 AutoStartManager.ensureAutoStartCommandCurrent()
             }
+        }
+        // Mesmo motivo do reparo do autostart acima, para a entrada de MENU
+        // (issue #133): fora do `if` porque a checagem é sobre autostart, e
+        // esta é sobre Linux -- `ensureLinuxMenuIconCurrent()` já se protege
+        // sozinha via `LinuxInstallOriginResolver` e é barata nas outras
+        // plataformas.
+        withContext(Dispatchers.IO) {
+            ensureLinuxMenuIconCurrent()
         }
     }
     var alwaysOnTopEnabled by remember { mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false)) }
