@@ -45,7 +45,7 @@ SetCompressor zlib
 ; General
 ; -----------------------------------------------
 !ifndef PRODUCT_VERSION
-!define PRODUCT_VERSION "38.0.2"
+!define PRODUCT_VERSION "38.1.0"
 !endif
 
 ; Payload e destino parametrizaveis. Os defaults sao exatamente os caminhos que o
