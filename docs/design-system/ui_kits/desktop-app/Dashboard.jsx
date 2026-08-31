@@ -161,6 +161,21 @@ const CARDS = [
     ]
   },
   {
+    // Saldo pré-pago do OpenRouter: GET /api/v1/credits, sem reset. Acento
+    // proprio (--openrouter) porque a empresa nao e a mesma de nenhuma outra
+    // fonte monitorada -- diferente do --oc dividido acima.
+    id: 'openrouter',
+    source: 'openrouter',
+    title: 'OpenRouter',
+    level: 'ok',
+    status: 'Normal',
+    tooltip: 'Projeção de uso · Cota Saldo · Status Normal · No ritmo atual, os créditos devem acabar em Sex 20/11 09h12 BRT.',
+    nav: 1,
+    quotas: [
+      { label: 'Saldo', value: 'US$ 5,00', percent: 100, level: 'ok', reset: 'Saldo não expira' }
+    ]
+  },
+  {
     id: 'minimax',
     source: 'minimax',
     title: 'MiniMax',

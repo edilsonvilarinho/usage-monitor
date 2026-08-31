@@ -7,6 +7,7 @@ const SOURCES = {
   minimax: 'var(--minimax)',
   opencode: 'var(--oc)',
   kilo: 'var(--kilo)',
+  openrouter: 'var(--openrouter)',
   neutral: 'var(--muted)'
 };
 

@@ -62,6 +62,7 @@ design system — e é atualizado **no mesmo commit** de cada atividade que desc
 | A04 | `OpenRouterMapperTest` (4), `OpenRouterRepositoryImplTest` (4), `RemoteApiDataSourceHttpTest` (+2, 14 no total), `LocalApiKeyDataSourceTest` (8, com OpenRouter no round-trip e no `withoutKey`) | `gradlew.bat desktopTest --tests "com.usagemonitor.data.OpenRouter*" --tests "com.usagemonitor.data.RemoteApiDataSourceHttpTest" --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` | `BUILD SUCCESSFUL`, 30 testes, 0 falhas |
 | A05 | Card do saldo OpenRouter (mesmo desenho do DeepSeek), rótulo acessível do lápis de chave na aba APIs (`Gerenciar chave — OpenRouter`) | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ComponentTest"` | `BUILD SUCCESSFUL`, 88 testes, 0 falhas |
 | A06 | Suíte completa | `gradlew.bat allTests` | `BUILD SUCCESSFUL` em 2m03s, **1650 testes, 0 falhas, 0 erros** |
+| A07 | Protótipo (paleta ×3, legenda, card do saldo, linha em Configurações → APIs, nota, contador "5 fontes"), `design-system/readme.md` ("seis acentos, sete fontes" → "sete acentos, oito fontes"), primitiva `AppSourceMark` (`.jsx`/`.d.ts`/`.prompt.md`/demo), `Dashboard.jsx`/`Settings.jsx` | revisão visual (sem verificação automatizada — HTML/JSX de referência, não compilado) | Consistente nos três documentos |
 
 _(demais linhas entram conforme cada atividade fecha)_
 
