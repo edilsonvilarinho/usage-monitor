@@ -693,6 +693,42 @@ class ComponentTest {
         onNodeWithText("Saldo não expira").assertIsDisplayed()
     }
 
+    /** Mesmo desenho de saldo pré-pago do DeepSeek — fonte e acento diferentes. */
+    @Test
+    fun `ApiUsageCard renders OpenRouter balance`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.OPENROUTER,
+                    apiName = "OpenRouter",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Saldo",
+                            used = 0L,
+                            total = 500L,
+                            periodEndAt = Instant.parse("2026-04-28T15:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.CURRENCY_USD,
+                            rawUsed = 500L,
+                            rawTotal = 500L
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("OpenRouter").assertIsDisplayed()
+        onNodeWithText("Saldo").assertIsDisplayed()
+        onNodeWithText("\$5.00").assertIsDisplayed()
+        onNodeWithText("Saldo não expira").assertIsDisplayed()
+    }
+
     /**
      * Issue #124: o card do plano Go é o card de cotas normal — três barras de
      * percentual —, e não o resumo de atividade observada do Zen gratuito. É o que
@@ -1837,6 +1873,7 @@ class ComponentTest {
         onNodeWithContentDescription("Gerenciar chave — MiniMax").assertExists()
         onNodeWithContentDescription("Gerenciar chave — DeepSeek").assertExists()
         onNodeWithContentDescription("Gerenciar chave — OpenCode Go").assertExists()
+        onNodeWithContentDescription("Gerenciar chave — OpenRouter").assertExists()
     }
 
     // ── ThemeToggle ───────────────────────────────────────────────────────
