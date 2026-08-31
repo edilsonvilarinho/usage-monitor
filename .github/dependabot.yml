@@ -1,0 +1,26 @@
+version: 2
+
+# Sem isto, CVE em dependencia (Ktor, PDFBox, Express, etc.) nao gera aviso
+# nenhum -- e so seria descoberto lendo changelog manualmente. Um update por
+# ecossistema, porque cada um tem ciclo de release proprio e um PR que
+# misturasse Gradle e npm teria de ser revertido em duas partes se um dos
+# dois quebrar.
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "npm"
+    directory: "/server"
+    schedule:
+      interval: "weekly"
+
+  # As proprias Actions do CI/release sao dependencia: uma tag como @v4 pode
+  # ser movida para um commit novo sem o repositorio saber. O Dependabot abre
+  # PR quando a versao muda -- nao substitui o pin por SHA (que so um push
+  # manual atualiza), mas avisa que existe versao nova para revisar e pinar.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
