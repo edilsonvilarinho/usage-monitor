@@ -45,6 +45,7 @@ internal fun warningActionFor(
         ApiSource.OPENCODE -> null
         ApiSource.OPENCODE_GO -> null
         ApiSource.KILO -> null
+        ApiSource.OPENROUTER -> null
     }
 }
 

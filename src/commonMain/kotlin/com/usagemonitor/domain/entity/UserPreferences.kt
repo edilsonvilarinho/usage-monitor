@@ -31,7 +31,7 @@ enum class AppLanguage { PT, EN }
  * [OPENCODE] faria `isObservedActivitySource()` desviar o card inteiro para o
  * resumo sem barras, e uma máquina pode ter uma das duas sem a outra.
  */
-enum class ApiSource { ANTHROPIC, MINIMAX, CODEX, DEEPSEEK, OPENCODE, OPENCODE_GO, KILO }
+enum class ApiSource { ANTHROPIC, MINIMAX, CODEX, DEEPSEEK, OPENCODE, OPENCODE_GO, KILO, OPENROUTER }
 
 /**
  * Faixa de opacidade da janela principal, em pontos percentuais (100 = totalmente opaco).

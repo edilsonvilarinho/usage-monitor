@@ -48,5 +48,6 @@ internal fun sourceLabelFromKey(source: ApiSource): String {
         ApiSource.OPENCODE -> "OpenCode Zen Free"
         ApiSource.OPENCODE_GO -> "OpenCode Go"
         ApiSource.KILO -> "Kilo Free"
+        ApiSource.OPENROUTER -> "OpenRouter"
     }
 }

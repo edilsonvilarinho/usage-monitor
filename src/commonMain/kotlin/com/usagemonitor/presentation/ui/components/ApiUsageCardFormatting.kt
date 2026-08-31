@@ -142,6 +142,7 @@ internal fun accentColorFor(
         // sozinha" já garante que isso basta.
         ApiSource.OPENCODE, ApiSource.OPENCODE_GO -> accents.opencode
         ApiSource.KILO -> accents.kilo
+        ApiSource.OPENROUTER -> accents.openrouter
     }
 }
 

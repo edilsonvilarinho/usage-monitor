@@ -56,7 +56,16 @@ data class AppAccents(
     val codex: Color,
     val deepseek: Color,
     val opencode: Color,
-    val kilo: Color
+    val kilo: Color,
+    /**
+     * Identidade própria — OpenRouter não é o mesmo fornecedor de nenhuma das
+     * outras seis, então reusar um acento existente associaria visualmente
+     * duas empresas sem relação (diferente de [opencode], dividido de
+     * propósito entre Zen Free e Go). Matiz ~335° preenche o único vão vazio
+     * da roda entre [deepseek] (270°) e [minimax] (24°) — validado em
+     * `AppAccentsContrastTest` como as demais.
+     */
+    val openrouter: Color
 ) {
     companion object {
         /** Acentos do tema em vigor. Ler daqui, nunca das constantes cruas. */
@@ -87,7 +96,8 @@ val darkAppAccents = AppAccents(
     codex      = Color(0xFF27BFA3),
     deepseek   = Color(0xFFC084FC),
     opencode   = Color(0xFF7BD389),
-    kilo       = Color(0xFFE6D84E)
+    kilo       = Color(0xFFE6D84E),
+    openrouter = Color(0xFFFF6FA8)
 )
 
 /**
@@ -111,7 +121,8 @@ val lightAppAccents = AppAccents(
     codex      = Color(0xFF00695C),
     deepseek   = Color(0xFF7B3FC4),
     opencode   = Color(0xFF2E7D32),
-    kilo       = Color(0xFF5F5500)
+    kilo       = Color(0xFF5F5500),
+    openrouter = Color(0xFFB23368)
 )
 
 /**
