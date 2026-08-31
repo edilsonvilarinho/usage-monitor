@@ -12,9 +12,9 @@ English · [Português (Brasil)](README.pt-BR.md)
 
 ![Usage Monitor tour](img/tour.gif)
 
-Usage Monitor watches seven sources at once — Claude Code, Codex, MiniMax, DeepSeek, OpenCode Zen
-Free, OpenCode Go and Kilo Free — and shows quota, balance and reset time for each one on a single
-screen. It also reads your **local Claude Code transcripts** to break down cost per session, project,
+Usage Monitor watches eight sources at once — Claude Code, Codex, MiniMax, DeepSeek, OpenCode Zen
+Free, OpenCode Go, Kilo Free and OpenRouter — and shows quota, balance and reset time for each one on
+a single screen. It also reads your **local Claude Code transcripts** to break down cost per session, project,
 branch and model, keeps history in SQLite for trends and forecasts, and can push aggregated usage to
 a team server you host yourself.
 
@@ -52,6 +52,7 @@ sends prompt or response content anywhere.
 | OpenCode Zen Free | Local | reads `~/.local/share/opencode/opencode.db` | an existing OpenCode database |
 | OpenCode Go | Remote | `GET /zen/go/v1/usage` | API key, entered in **Settings > APIs** |
 | Kilo Free | Local | reads `~/.local/share/kilo/kilo.db` | an existing Kilo database |
+| OpenRouter | Remote | `GET /api/v1/credits` | API key, entered in **Settings > APIs** |
 
 Full endpoints, credential paths and per-integration limits:
 [`docs/integrations.md`](docs/integrations.md).
@@ -204,7 +205,7 @@ with `launchctl`.
 - **Claude Code and Codex need no setup.** Usage Monitor finds `~/.claude/.credentials.json` and
   `~/.codex/auth.json` on its own. Newly detected Anthropic profiles stay disabled until you confirm
   them, so nothing is collected behind your back.
-- **MiniMax, DeepSeek and OpenCode Go need an API key**, entered in **Settings > APIs**. Keys are
+- **MiniMax, DeepSeek, OpenCode Go and OpenRouter need an API key**, entered in **Settings > APIs**. Keys are
   stored in `~/.usage-monitor/api-keys.json` with an atomic write and owner-only permissions.
   Environment variables are never read.
 - **OpenCode Zen Free and Kilo Free need nothing** — they read the local databases those tools

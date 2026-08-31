@@ -12,6 +12,7 @@ For the short version, see the table in the [README](../README.md#supported-inte
 | OpenCode Zen Free | Local | reads `~/.local/share/opencode/opencode.db` | an existing local OpenCode database |
 | OpenCode Go | Remote | `GET https://opencode.ai/zen/go/v1/usage` | API key entered in **Settings > APIs** |
 | Kilo Free | Local | reads `~/.local/share/kilo/kilo.db` | an existing local Kilo database |
+| OpenRouter | Remote | `GET https://openrouter.ai/api/v1/credits` | API key entered in **Settings > APIs** |
 
 Usage Monitor **only reads** these files. It never runs a login or logout flow, and it never deletes
 a credential file.
@@ -25,7 +26,7 @@ a credential file.
 | macOS Keychain, entry `Claude Code-credentials` | Anthropic on macOS, when the file is absent |
 | `~/.codex/auth.json` | Codex bearer token, at `tokens.access_token` |
 | `~/.codex/cap_sid` | Codex session cookie |
-| `~/.usage-monitor/api-keys.json` | MiniMax, DeepSeek and OpenCode Go keys — atomic write, owner-only permissions |
+| `~/.usage-monitor/api-keys.json` | MiniMax, DeepSeek, OpenCode Go and OpenRouter keys — atomic write, owner-only permissions |
 | `~/.local/share/opencode/opencode.db` | OpenCode local activity |
 | `~/.local/share/kilo/kilo.db` | Kilo local activity |
 
@@ -115,3 +116,17 @@ as distinct rows in **Settings > APIs**.
 - Makes no HTTP call. Reads observed activity from the local `~/.local/share/kilo/kilo.db`.
 - Counts `assistant` messages from the `kilo` provider, grouped into 5h and 7d windows.
 - Watches free models such as `kilo-auto/free`, `*/free` and `*:free`.
+
+## OpenRouter
+
+- Same masked-key flow as MiniMax and DeepSeek. The key is the same one used for
+  `chat/completions` against OpenRouter's models.
+- Reads `GET /api/v1/credits`, which accepts the regular inference key — no separate
+  "Provisioning API Key" is required. The dashboard shows the balance as `total_credits -
+  total_usage`, matching the "Total Available" figure on OpenRouter's own Credits page.
+- Deliberately **does not** use `GET /api/v1/key`: its `limit`/`limit_remaining` fields describe an
+  optional per-key spending cap, not the account balance — they stay `null` even on a funded
+  account with no cap configured.
+- A prepaid balance does not reset, so it is **not** measured against the time-to-reset ruler used
+  by windowed quotas. It uses an absolute runway instead, same as DeepSeek: critical under 7 days,
+  warning under 14.

@@ -15,9 +15,9 @@
 
 ![Tour da aplicação](img/tour.gif)
 
-O Usage Monitor acompanha sete fontes ao mesmo tempo — Claude Code, Codex, MiniMax, DeepSeek,
-OpenCode Zen Free, OpenCode Go e Kilo Free — e mostra cota, saldo e horário de reinício de cada uma
-numa tela só. Ele também lê os **transcripts locais do Claude Code** para abrir o custo por sessão,
+O Usage Monitor acompanha oito fontes ao mesmo tempo — Claude Code, Codex, MiniMax, DeepSeek,
+OpenCode Zen Free, OpenCode Go, Kilo Free e OpenRouter — e mostra cota, saldo e horário de reinício
+de cada uma numa tela só. Ele também lê os **transcripts locais do Claude Code** para abrir o custo por sessão,
 projeto, branch e modelo, guarda histórico em SQLite para tendência e previsão, e pode enviar o
 consumo agregado para um servidor de time que você mesmo hospeda.
 
@@ -55,6 +55,7 @@ envia conteúdo de prompt ou de resposta para lugar nenhum.
 | OpenCode Zen Free | Local | lê `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
 | OpenCode Go | Remota | `GET /zen/go/v1/usage` | chave informada em **Configurações > APIs** |
 | Kilo Free | Local | lê `~/.local/share/kilo/kilo.db` | base local do Kilo existente |
+| OpenRouter | Remota | `GET /api/v1/credits` | chave informada em **Configurações > APIs** |
 
 Endpoints completos, caminhos de credencial e limites de cada integração:
 [`docs/integrations.md`](docs/integrations.md) (em inglês).
@@ -208,7 +209,7 @@ com `launchctl`.
 - **Claude Code e Codex não precisam de configuração.** O Usage Monitor encontra sozinho
   `~/.claude/.credentials.json` e `~/.codex/auth.json`. Perfis Anthropic recém-detectados ficam
   desabilitados até você confirmar, então nada é coletado sem que você saiba.
-- **MiniMax, DeepSeek e OpenCode Go precisam de chave de API**, informada em **Configurações > APIs**.
+- **MiniMax, DeepSeek, OpenCode Go e OpenRouter precisam de chave de API**, informada em **Configurações > APIs**.
   As chaves ficam em `~/.usage-monitor/api-keys.json`, com escrita atômica e acesso restrito ao
   usuário. Variáveis de ambiente nunca são lidas.
 - **OpenCode Zen Free e Kilo Free não precisam de nada** — leem as bases locais que essas ferramentas
