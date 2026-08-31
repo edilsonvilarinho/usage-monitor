@@ -29,16 +29,19 @@ class LocalApiKeyDataSourceTest {
         dataSource.save(ApiSource.MINIMAX, " minimax-secret ")
         dataSource.save(ApiSource.DEEPSEEK, "deepseek-secret")
         dataSource.save(ApiSource.OPENCODE_GO, "opencode-secret")
+        dataSource.save(ApiSource.OPENROUTER, "openrouter-secret")
 
         val loaded = LocalApiKeyDataSource(settingsFile).load()
         assertEquals("minimax-secret", loaded.minimax)
         assertEquals("deepseek-secret", loaded.deepSeek)
         assertEquals("opencode-secret", loaded.openCodeGo)
+        assertEquals("openrouter-secret", loaded.openRouter)
         assertEquals("deepseek-secret", loaded.forSource(ApiSource.DEEPSEEK))
         assertEquals("opencode-secret", loaded.forSource(ApiSource.OPENCODE_GO))
+        assertEquals("openrouter-secret", loaded.forSource(ApiSource.OPENROUTER))
         assertNull(loaded.forSource(ApiSource.ANTHROPIC))
         assertEquals(
-            setOf(ApiSource.MINIMAX, ApiSource.DEEPSEEK, ApiSource.OPENCODE_GO),
+            setOf(ApiSource.MINIMAX, ApiSource.DEEPSEEK, ApiSource.OPENCODE_GO, ApiSource.OPENROUTER),
             loaded.configuredSources()
         )
     }
@@ -74,7 +77,8 @@ class LocalApiKeyDataSourceTest {
         val settings = ApiKeySettings(
             minimax = "minimax-secret",
             deepSeek = "deepseek-secret",
-            openCodeGo = "opencode-secret"
+            openCodeGo = "opencode-secret",
+            openRouter = "openrouter-secret"
         )
 
         val cleared = settings.withoutKey(ApiSource.DEEPSEEK)
@@ -83,7 +87,11 @@ class LocalApiKeyDataSourceTest {
         assertNull(cleared.forSource(ApiSource.DEEPSEEK))
         assertEquals("minimax-secret", cleared.minimax)
         assertEquals("opencode-secret", cleared.openCodeGo)
-        assertEquals(setOf(ApiSource.MINIMAX, ApiSource.OPENCODE_GO), cleared.configuredSources())
+        assertEquals("openrouter-secret", cleared.openRouter)
+        assertEquals(
+            setOf(ApiSource.MINIMAX, ApiSource.OPENCODE_GO, ApiSource.OPENROUTER),
+            cleared.configuredSources()
+        )
     }
 
     /** Fonte sem chave local não tem o que apagar: devolve o mesmo objeto. */

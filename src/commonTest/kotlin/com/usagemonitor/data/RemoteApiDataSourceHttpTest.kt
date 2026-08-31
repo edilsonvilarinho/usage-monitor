@@ -216,6 +216,49 @@ class RemoteApiDataSourceHttpTest {
         assertEquals("""DeepSeek HTTP 403: {"error":"blocked"}""", error.message)
     }
 
+    /** Corpo idêntico ao da chamada real registrada na issue #138 (conta com $5). */
+    @Test
+    fun `fetchOpenRouterCredits parses successful response`() = runTest {
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel(
+                        """{"data":{"total_credits":5,"total_usage":0}}"""
+                    ),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        )
+
+        val response = dataSource.fetchOpenRouterCredits("api-key")
+
+        assertEquals(5.0, response.data.totalCredits)
+        assertEquals(0.0, response.data.totalUsage)
+    }
+
+    @Test
+    fun `fetchOpenRouterCredits throws readable error on non-2xx`() = runTest {
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel("""{"error":{"message":"No auth credentials found"}}"""),
+                    status = HttpStatusCode.Unauthorized,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        )
+
+        val error = assertFailsWith<IllegalStateException> {
+            dataSource.fetchOpenRouterCredits("api-key")
+        }
+
+        assertEquals(
+            """OpenRouter HTTP 401: {"error":{"message":"No auth credentials found"}}""",
+            error.message
+        )
+    }
+
     /** Corpo idêntico ao da chamada real registrada na issue #124. */
     @Test
     fun `fetchOpenCodeGoUsage parses the three windows`() = runTest {
