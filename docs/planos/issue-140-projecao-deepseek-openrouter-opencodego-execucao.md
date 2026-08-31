@@ -68,7 +68,7 @@ tinha equivalente pras duas fontes novas.
 |---|---|---|---|
 | A01 — DeepSeekHistoryCard sempre mostra previsão | Concluída | `feeda7a` (branch `fix/issue-140-usage-forecast-visibility`) | feito |
 | A02 — Teste E2E forecast OpenRouter | Concluída | `0d115ef` (branch `fix/issue-140-usage-forecast-visibility`) | feito |
-| A03 — Teste E2E forecast OpenCode Go | Concluída | (definido no push) | pendente |
+| A03 — Teste E2E forecast OpenCode Go | Concluída | `4cd0544` (branch `fix/issue-140-usage-forecast-visibility`) | feito |
 
 ## Fora de escopo
 
