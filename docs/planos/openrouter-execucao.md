@@ -57,6 +57,7 @@ design system — e é atualizado **no mesmo commit** de cada atividade que desc
 |---|---|---|---|
 | A00 | Levantamento e decisão (issue #138) | testes reais contra `/api/v1/credits` e `/api/v1/key`, dois estados de conta (`$0` e `$5`) | Viabilidade confirmada, todos os pontos em aberto fechados |
 | A01 | Enum `ApiSource.OPENROUTER`, `OpenRouterRepository`/`GetOpenRouterUsageUseCase` (domain, com default que falha — mesmo padrão do `OPENCODE_GO`), rótulo, acento (`#FF6FA8`/`#B23368`) e os cinco `when` exaustivos (`displayName`, `sourceLabelFromKey`, `warningActionFor`, `accentColorFor`, `fetchTarget`) | `gradlew.bat compileKotlinDesktop` | `BUILD SUCCESSFUL`. Nenhum call site de `DashboardViewModel(...)` quebrou — todos param no último argumento posicional obrigatório (`recordUsageSnapshot`) e nomeiam o resto |
+| A02 | DTO (`OpenRouterCreditsDto`/`Response`), mapper (`OpenRouterMapper`, mesmo padrão do `DeepSeekMapper`: `used=0`, `total=total_credits-total_usage`, `hasKnownResetAt=false`), `RemoteApiDataSource.fetchOpenRouterCredits` e `OpenRouterRepositoryImpl` | `gradlew.bat compileKotlinDesktop` | `BUILD SUCCESSFUL` |
 
 _(demais linhas entram conforme cada atividade fecha)_
 

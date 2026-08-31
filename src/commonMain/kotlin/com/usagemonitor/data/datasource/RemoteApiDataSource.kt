@@ -7,6 +7,7 @@ import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import com.usagemonitor.data.dto.OpenCodeGoUsageResponse
+import com.usagemonitor.data.dto.OpenRouterCreditsResponse
 import com.usagemonitor.data.mapper.resolveExtraCredits
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -212,6 +213,23 @@ open class RemoteApiDataSource(
      * na mensagem via [requireSuccess]: é dele que o repositório distingue o 403
      * de "não tem assinatura Go" do 401 de chave inválida.
      */
+    /**
+     * Saldo pré-pago do OpenRouter. `GET /api/v1/credits` — chave normal de
+     * inferência, sem "Provisioning API Key" separada (testado contra a API
+     * real na issue #138, com conta em `$0` e em `$5`).
+     */
+    open suspend fun fetchOpenRouterCredits(apiKey: String): OpenRouterCreditsResponse {
+        val response = requireSuccess(
+            response = httpClient.get("https://openrouter.ai/api/v1/credits") {
+                header("Authorization", "Bearer $apiKey")
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "OpenRouter"
+        )
+
+        return response.body()
+    }
+
     open suspend fun fetchOpenCodeGoUsage(apiKey: String): OpenCodeGoUsageResponse {
         val response = requireSuccess(
             response = httpClient.get("https://opencode.ai/zen/go/v1/usage") {
