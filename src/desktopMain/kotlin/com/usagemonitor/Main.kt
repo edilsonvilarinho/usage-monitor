@@ -57,6 +57,7 @@ import com.usagemonitor.data.repository.KiloRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeGoRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
+import com.usagemonitor.data.repository.OpenRouterRepositoryImpl
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
 import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
@@ -87,6 +88,7 @@ import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeGoUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
+import com.usagemonitor.domain.usecase.GetOpenRouterUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
@@ -200,7 +202,8 @@ private val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 private val API_KEY_DEPENDENT_SOURCES = setOf(
     ApiSource.MINIMAX,
     ApiSource.DEEPSEEK,
-    ApiSource.OPENCODE_GO
+    ApiSource.OPENCODE_GO,
+    ApiSource.OPENROUTER
 )
 // internal (não private): o reparo do ícone de menu (issue #133,
 // `com.usagemonitor.update.ensureLinuxMenuIconCurrent`) reusa o mesmo
@@ -547,6 +550,13 @@ private fun runUsageMonitor(
             apiKeyReader = { apiKeySettings.value.forSource(ApiSource.OPENCODE_GO) }
         )
     }
+    // Saldo pré-pago do OpenRouter — HTTP com chave, mesmo desenho de DeepSeek.
+    val openRouterRepository = remember(remoteApiDataSource) {
+        OpenRouterRepositoryImpl(
+            apiDataSource = remoteApiDataSource,
+            apiKeyReader = { apiKeySettings.value.forSource(ApiSource.OPENROUTER) }
+        )
+    }
     val kiloRepository = remember(kiloUsageDataSource) {
         KiloRepositoryImpl(kiloUsageDataSource)
     }
@@ -607,7 +617,7 @@ private fun runUsageMonitor(
     // precisam dela e nenhum dos dois vive dentro do `Window`.
     var mainWindowRef by remember { mutableStateOf<java.awt.Window?>(null) }
     val isAppVisible = remember { MutableStateFlow(true) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, openCodeGoRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, openCodeGoRepository, openRouterRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
@@ -616,6 +626,7 @@ private fun runUsageMonitor(
             getKiloUsage = GetKiloUsageUseCase(kiloRepository),
             getOpenCodeUsage = GetOpenCodeUsageUseCase(openCodeRepository),
             getOpenCodeGoUsage = GetOpenCodeGoUsageUseCase(openCodeGoRepository),
+            getOpenRouterUsage = GetOpenRouterUsageUseCase(openRouterRepository),
             enabledApis = enabledApis,
             recordUsageSnapshot = recordUsageSnapshot,
             getUsageHistory = getUsageHistory,

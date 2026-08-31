@@ -9,6 +9,7 @@ fun ApiSource.displayName(language: AppLanguage = AppLanguage.PT): String {
         ApiSource.OPENCODE -> "OpenCode Zen Free"
         ApiSource.OPENCODE_GO -> "OpenCode Go"
         ApiSource.KILO -> if (language == AppLanguage.PT) "Kilo Free" else "Kilo Free"
+        ApiSource.OPENROUTER -> "OpenRouter"
     }
 }
 

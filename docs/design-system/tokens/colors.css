@@ -24,14 +24,16 @@
 
   /* integration identity — AA 4.5:1 on both surfaces, hue preserved across
      themes, >=20 degrees apart from each other. These do not change.
-     Six accents cover seven sources: --oc is the OpenCode vendor, worn by both
-     the free Zen card and the paid Go card. */
-  --anthropic: #4F8CFF;
-  --codex:     #27BFA3;
-  --deepseek:  #C084FC;
-  --minimax:   #FF8A3D;
-  --oc:        #7BD389;
-  --kilo:      #E6D84E;
+     Seven accents cover eight sources: --oc is the OpenCode vendor, worn by
+     both the free Zen card and the paid Go card. --openrouter is its own
+     identity — OpenRouter is not the vendor of any other source here. */
+  --anthropic:  #4F8CFF;
+  --codex:      #27BFA3;
+  --deepseek:   #C084FC;
+  --minimax:    #FF8A3D;
+  --oc:         #7BD389;
+  --kilo:       #E6D84E;
+  --openrouter: #FF6FA8;
 
   /* token/cost composition series (charts, stacked bars, legends) */
   --input:     #4C8DFF;
@@ -55,12 +57,13 @@
     --crit:    #B3261E;
     --info:    #1565C0;
 
-    --anthropic: #1565C0;
-    --codex:     #00695C;
-    --deepseek:  #7B3FC4;
-    --minimax:   #9A4A00;
-    --oc:        #2E7D32;
-    --kilo:      #5F5500;
+    --anthropic:  #1565C0;
+    --codex:      #00695C;
+    --deepseek:   #7B3FC4;
+    --minimax:    #9A4A00;
+    --oc:         #2E7D32;
+    --kilo:       #5F5500;
+    --openrouter: #B23368;
 
     --input:   #1565C0;
     --output:  #6A3FB5;
@@ -83,12 +86,13 @@
   --crit:    #B3261E;
   --info:    #1565C0;
 
-  --anthropic: #1565C0;
-  --codex:     #00695C;
-  --deepseek:  #7B3FC4;
-  --minimax:   #9A4A00;
-  --oc:        #2E7D32;
-  --kilo:      #5F5500;
+  --anthropic:  #1565C0;
+  --codex:      #00695C;
+  --deepseek:   #7B3FC4;
+  --minimax:    #9A4A00;
+  --oc:         #2E7D32;
+  --kilo:       #5F5500;
+  --openrouter: #B23368;
 
   --input:   #1565C0;
   --output:  #6A3FB5;
@@ -110,12 +114,13 @@
   --crit:    #E86A6A;
   --info:    #4C8DFF;
 
-  --anthropic: #4F8CFF;
-  --codex:     #27BFA3;
-  --deepseek:  #C084FC;
-  --minimax:   #FF8A3D;
-  --oc:        #7BD389;
-  --kilo:      #E6D84E;
+  --anthropic:  #4F8CFF;
+  --codex:      #27BFA3;
+  --deepseek:   #C084FC;
+  --minimax:    #FF8A3D;
+  --oc:         #7BD389;
+  --kilo:       #E6D84E;
+  --openrouter: #FF6FA8;
 
   --input:   #4C8DFF;
   --output:  #B07CFF;

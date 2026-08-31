@@ -19,13 +19,15 @@ import java.nio.file.StandardCopyOption
 data class ApiKeySettings(
     val minimax: String = "",
     val deepSeek: String = "",
-    val openCodeGo: String = ""
+    val openCodeGo: String = "",
+    val openRouter: String = ""
 ) {
     fun forSource(source: ApiSource): String? {
         return when (source) {
             ApiSource.MINIMAX -> minimax
             ApiSource.DEEPSEEK -> deepSeek
             ApiSource.OPENCODE_GO -> openCodeGo
+            ApiSource.OPENROUTER -> openRouter
             else -> null
         }?.takeIf { value -> value.isNotBlank() }
     }
@@ -35,6 +37,7 @@ data class ApiKeySettings(
             ApiSource.MINIMAX -> copy(minimax = value)
             ApiSource.DEEPSEEK -> copy(deepSeek = value)
             ApiSource.OPENCODE_GO -> copy(openCodeGo = value)
+            ApiSource.OPENROUTER -> copy(openRouter = value)
             else -> this
         }
     }
@@ -52,6 +55,7 @@ data class ApiKeySettings(
             ApiSource.MINIMAX -> copy(minimax = "")
             ApiSource.DEEPSEEK -> copy(deepSeek = "")
             ApiSource.OPENCODE_GO -> copy(openCodeGo = "")
+            ApiSource.OPENROUTER -> copy(openRouter = "")
             else -> this
         }
     }
@@ -61,6 +65,7 @@ data class ApiKeySettings(
             if (minimax.isNotBlank()) add(ApiSource.MINIMAX)
             if (deepSeek.isNotBlank()) add(ApiSource.DEEPSEEK)
             if (openCodeGo.isNotBlank()) add(ApiSource.OPENCODE_GO)
+            if (openRouter.isNotBlank()) add(ApiSource.OPENROUTER)
         }
     }
 }
@@ -69,7 +74,8 @@ data class ApiKeySettings(
 private data class ApiKeySettingsDto(
     val minimax: String = "",
     val deepSeek: String = "",
-    val openCodeGo: String = ""
+    val openCodeGo: String = "",
+    val openRouter: String = ""
 )
 
 /**
@@ -116,9 +122,10 @@ internal class LocalApiKeyDataSource(
         require(
             source == ApiSource.MINIMAX ||
                 source == ApiSource.DEEPSEEK ||
-                source == ApiSource.OPENCODE_GO
+                source == ApiSource.OPENCODE_GO ||
+                source == ApiSource.OPENROUTER
         ) {
-            "Apenas MiniMax, DeepSeek e OpenCode Go possuem chave de API local."
+            "Apenas MiniMax, DeepSeek, OpenCode Go e OpenRouter possuem chave de API local."
         }
     }
 
@@ -135,7 +142,7 @@ internal class LocalApiKeyDataSource(
         parentDir.mkdirs()
         val content = json.encodeToString(
             ApiKeySettingsDto.serializer(),
-            ApiKeySettingsDto(settings.minimax, settings.deepSeek, settings.openCodeGo)
+            ApiKeySettingsDto(settings.minimax, settings.deepSeek, settings.openCodeGo, settings.openRouter)
         )
         val tempFile = Files.createTempFile(parentDir.toPath(), settingsFile.name, ".tmp").toFile()
         try {
@@ -162,7 +169,7 @@ internal class LocalApiKeyDataSource(
     }
 
     private fun ApiKeySettingsDto.toDomain(): ApiKeySettings {
-        return ApiKeySettings(minimax = minimax, deepSeek = deepSeek, openCodeGo = openCodeGo)
+        return ApiKeySettings(minimax = minimax, deepSeek = deepSeek, openCodeGo = openCodeGo, openRouter = openRouter)
     }
 
     private companion object {

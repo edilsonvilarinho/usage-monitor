@@ -22,6 +22,7 @@ import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.repository.KiloRepository
 import com.usagemonitor.domain.repository.OpenCodeGoRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
+import com.usagemonitor.domain.repository.OpenRouterRepository
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
@@ -30,6 +31,7 @@ import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeGoUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
+import com.usagemonitor.domain.usecase.GetOpenRouterUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
@@ -99,6 +101,22 @@ class DashboardViewModel(
         object : KiloRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
                 return Result.failure(IllegalStateException("Kilo local database is unavailable"))
+            }
+        }
+    ),
+    /**
+     * Default que falha pelo mesmo motivo de [getOpenCodeGoUsage]: fonte
+     * opt-in dependente de chave, e uma build sem o repositório ligado tem de
+     * dizer o que falta em vez de ficar em carga eterna.
+     */
+    private val getOpenRouterUsage: GetOpenRouterUsageUseCase = GetOpenRouterUsageUseCase(
+        object : OpenRouterRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(
+                    IllegalStateException(
+                        "Chave da API OpenRouter não configurada. Abra Configurações > APIs e informe a chave."
+                    )
+                )
             }
         }
     ),
@@ -667,6 +685,7 @@ class DashboardViewModel(
             ApiSource.OPENCODE -> getOpenCodeUsage()
             ApiSource.OPENCODE_GO -> getOpenCodeGoUsage()
             ApiSource.KILO -> getKiloUsage()
+            ApiSource.OPENROUTER -> getOpenRouterUsage()
         }
     }
 

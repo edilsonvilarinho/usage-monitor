@@ -28,12 +28,13 @@
   --crit:      #E86A6A;
   --info:      #4C8DFF;
 
-  --anthropic: #4F8CFF;
-  --codex:     #27BFA3;
-  --deepseek:  #C084FC;
-  --minimax:   #FF8A3D;
-  --oc:        #7BD389;
-  --kilo:      #E6D84E;
+  --anthropic:  #4F8CFF;
+  --codex:      #27BFA3;
+  --deepseek:   #C084FC;
+  --minimax:    #FF8A3D;
+  --oc:         #7BD389;
+  --kilo:       #E6D84E;
+  --openrouter: #FF6FA8;
 
   --input:     #4C8DFF;
   --output:    #B07CFF;
@@ -69,6 +70,7 @@
 
     --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
     --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
+    --openrouter:#B23368;
 
     --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
     --cwrite:#8A5000; --savings:#00697A;
@@ -93,6 +95,7 @@
 
   --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
   --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
+  --openrouter:#B23368;
 
   --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
   --cwrite:#8A5000; --savings:#00697A;
@@ -106,7 +109,7 @@
   --fg:#F2EDED; --muted:#B8B2B2;
   --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --info:#4C8DFF;
   --anthropic:#4F8CFF; --codex:#27BFA3; --deepseek:#C084FC;
-  --minimax:#FF8A3D; --oc:#7BD389; --kilo:#E6D84E;
+  --minimax:#FF8A3D; --oc:#7BD389; --kilo:#E6D84E; --openrouter:#FF6FA8;
   --input:#4C8DFF; --output:#B07CFF; --cread:#4CAF50;
   --cwrite:#FFA726; --savings:#26C6DA;
   --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
@@ -471,7 +474,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
 </div>
 <p class="note">Todo estado carrega <b>ponto + palavra</b>. A cor reforça, não informa sozinha — é o que mantém a tela legível para quem não distingue as matizes.</p>
 
-<h3>Identidade das seis integrações</h3>
+<h3>Identidade das sete integrações</h3>
 <div class="legend" style="margin-bottom:var(--s2)">
   <span><i style="background:var(--anthropic)"></i>Anthropic</span>
   <span><i style="background:var(--codex)"></i>Codex</span>
@@ -479,6 +482,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <span><i style="background:var(--minimax)"></i>MiniMax</span>
   <span><i style="background:var(--oc)"></i>OpenCode</span>
   <span><i style="background:var(--kilo)"></i>Kilo</span>
+  <span><i style="background:var(--openrouter)"></i>OpenRouter</span>
 </div>
 <p class="note">Os acentos são os que já passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre si). <b>Não mudam.</b> O que muda é a área: de fundo de card inteiro para um marcador de 2px, linha de gráfico e texto de valor. E a cor <code>opencode</code> continua sendo a da <b>integração</b> monitorada — não vira a cor da marca do app.</p>
 
@@ -788,13 +792,32 @@ table.dt td.num, table.dt th.num { text-align: right; }
         <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
       </div>
 
+      <!-- OpenRouter -->
+      <div class="panel">
+        <div class="phead">
+          <span class="srcmark" style="background:var(--openrouter)"></span>
+          <span class="ptitle">OpenRouter</span>
+          <span class="sp"></span>
+          <span class="st ok" title="Projeção de uso · Cota Saldo · Status Normal · No ritmo atual, os créditos devem acabar em Sex 20/11 09h12 BRT.">Normal</span>
+          <button class="btn icon" type="button" aria-label="Atualizar">↻</button>
+          <button class="btn icon" type="button" aria-label="Minimizar card">–</button>
+        </div>
+        <div class="pbody flush">
+          <div class="row"><div class="stack" style="gap:3px;flex:1">
+            <div class="hstack"><span class="k">Saldo</span><span class="sp"></span><span class="v big">US$ 5,00</span></div>
+            <span class="k dim">Saldo não expira</span>
+          </div></div>
+        </div>
+        <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
+      </div>
+
     </div>
   </div>
   <div class="statusbar">
     <span>v35.0.0</span>
     <span>Próxima coleta em 06:41</span>
     <span class="sp"></span>
-    <span class="st ok">4 fontes</span>
+    <span class="st ok">5 fontes</span>
     <button class="btn ghost" type="button">Atualizar tudo</button>
     <button class="btn ghost" type="button">Configurações</button>
   </div>
@@ -846,7 +869,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
 <code>GET /zen/go/v1/usage</code> com a chave da API do OpenCode e devolve <b>percentual</b> de três janelas —
 5h deslizante, semanal e mensal —, exatamente a forma da Anthropic; o Zen gratuito abaixo vem do SQLite local
 em requisições observadas. Uma máquina pode ter uma das duas sem a outra, e os dois cards <b>dividem o acento
-<code>--oc</code></b>: as seis identidades de fonte deste sistema não mudam, e quem separa os cards é o título.
+<code>--oc</code></b>: as sete identidades de fonte deste sistema não mudam, e quem separa os cards é o título.
 <b>A API não devolve valor em dinheiro</b> — nem gasto, nem limite —, então não há linha de saldo e nenhum
 número de tokens é estimado a partir do percentual. <b>Chave válida sem plano Go não é erro de credencial:</b>
 é o estado normal de quem só usa o Zen pago, e o banner manda assinar ou desligar em vez de pedir novo login —
@@ -1637,10 +1660,11 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Zen Free</span><span class="st off">Desativada</span><span class="sw"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Go</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--openrouter)"></span><span class="v sm" style="flex:1">OpenRouter</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo Free</span><span class="st off">Desativada</span><span class="sw"></span></div>
   </div></div></div>
 </div>
-<p class="note"><b>Ativação de MiniMax, DeepSeek e OpenCode Go.</b> Ao ligar uma dessas integrações sem chave cadastrada, o interruptor não é persistido imediatamente: abre-se o diálogo abaixo. A chave é mascarada por padrão, pode ser revelada pelo olho e só habilita a integração depois de <b>Salvar</b>. Ela fica em armazenamento local protegido; variáveis de ambiente não são lidas.</p>
+<p class="note"><b>Ativação de MiniMax, DeepSeek, OpenCode Go e OpenRouter.</b> Ao ligar uma dessas integrações sem chave cadastrada, o interruptor não é persistido imediatamente: abre-se o diálogo abaixo. A chave é mascarada por padrão, pode ser revelada pelo olho e só habilita a integração depois de <b>Salvar</b>. Ela fica em armazenamento local protegido; variáveis de ambiente não são lidas.</p>
 <p class="note"><b>O lápis gerencia a chave já cadastrada</b> (issue #125). Ele só aparece nas três linhas que
 dependem de chave e abre o <b>mesmo</b> diálogo, agora com <b>Remover chave</b>. O campo <b>nunca</b> vem
 pré-preenchido com o segredo guardado: a linha já diz "Chave configurada", e trazer a chave para dentro da tela não

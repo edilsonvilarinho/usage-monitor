@@ -641,7 +641,8 @@ private val EDITABLE_API_KEY_SOURCES: Set<ApiSource> =
 private fun ApiSource.requiresApiKey(): Boolean {
     return this == ApiSource.MINIMAX ||
         this == ApiSource.DEEPSEEK ||
-        this == ApiSource.OPENCODE_GO
+        this == ApiSource.OPENCODE_GO ||
+        this == ApiSource.OPENROUTER
 }
 
 @Composable

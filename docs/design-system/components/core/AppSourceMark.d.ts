@@ -6,7 +6,7 @@ import type { CSSProperties } from 'react';
  * @startingPoint section="Core" subtitle="2px integration marker + legend dot" viewport="700x120"
  */
 export interface AppSourceMarkProps {
-  source?: 'anthropic' | 'codex' | 'deepseek' | 'minimax' | 'opencode' | 'kilo' | 'neutral';
+  source?: 'anthropic' | 'codex' | 'deepseek' | 'minimax' | 'opencode' | 'kilo' | 'openrouter' | 'neutral';
   /** Escape hatch for team-member series colors. Prefer `source`. */
   color?: string;
   style?: CSSProperties;
