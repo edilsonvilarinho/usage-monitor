@@ -146,11 +146,15 @@ internal fun deepSeekSeriesSubtitle(series: UsageHistorySeries, language: AppLan
     }
 }
 
-internal fun deepSeekForecastText(forecast: UsageForecast, language: AppLanguage): String? {
+/**
+ * Ao contrário do card genérico, este tinha texto próprio só em
+ * [UsageForecast.EstimatedExhaustionAt] e sumia (`null`) nos outros três estados — era isso que
+ * fazia a previsão do DeepSeek "aparecer e sumir" quando o saldo parava de cair entre duas coletas
+ * (issue #140). Os outros estados delegam pro mesmo rótulo que o card genérico já usa
+ * ([forecastLabel]): nenhuma cópia nova, e os dois cards passam a concordar.
+ */
+internal fun deepSeekForecastText(forecast: UsageForecast, language: AppLanguage): String {
     return when (forecast) {
-        UsageForecast.InsufficientData -> null
-        UsageForecast.NoGrowth -> null
-        UsageForecast.ResetsBeforeExhaustion -> null
         is UsageForecast.EstimatedExhaustionAt -> {
             if (language == AppLanguage.PT) {
                 "Mantendo esse ritmo, o saldo pode acabar por volta de ${formatInstant(forecast.instant)}."
@@ -158,6 +162,7 @@ internal fun deepSeekForecastText(forecast: UsageForecast, language: AppLanguage
                 "At the current pace, the balance may run out around ${formatInstant(forecast.instant)}."
             }
         }
+        else -> forecastLabel(forecast, language)
     }
 }
 

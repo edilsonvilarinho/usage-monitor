@@ -645,13 +645,11 @@ private fun DeepSeekHistoryCard(
                     accentColor = accentColor
                 )
 
-                deepSeekForecastText(series.forecast, language)?.let { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = deepSeekForecastText(series.forecast, language),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
     }
 }

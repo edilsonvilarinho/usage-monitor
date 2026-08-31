@@ -477,6 +477,159 @@ class UsageHistoryRepositoryImplTest {
         assertNull(series.riskSummary)
     }
 
+    // ------------------------------------------------------------------
+    // OpenRouter (issue #140): mesmo formato de saldo pré-pago do DeepSeek —
+    // `CURRENCY_USD`, `Instant.DISTANT_FUTURE`, sem reset conhecido. Prova que
+    // o pipeline novo (#139) se comporta como o par mais próximo que já tinha
+    // cobertura.
+    // ------------------------------------------------------------------
+
+    private fun openRouterBalanceRecords(
+        first: Long,
+        second: Long,
+        third: Long
+    ): List<UsageSnapshotRecord> {
+        return listOf(
+            openRouterBalanceRecord("2026-04-28T14:00:00Z", first),
+            openRouterBalanceRecord("2026-04-28T15:00:00Z", second),
+            openRouterBalanceRecord("2026-04-28T16:00:00Z", third)
+        )
+    }
+
+    private fun openRouterBalanceRecord(capturedAt: String, cents: Long): UsageSnapshotRecord {
+        return UsageSnapshotRecord(
+            source = ApiSource.OPENROUTER,
+            quotaLabel = "Saldo",
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.CURRENCY_USD,
+            used = 0L,
+            total = cents,
+            rawUsed = cents,
+            rawTotal = cents,
+            periodEndAt = Instant.DISTANT_FUTURE,
+            capturedAt = Instant.parse(capturedAt),
+            hasKnownResetAt = false
+        )
+    }
+
+    @Test
+    fun `saldo OpenRouter sem reset com muita autonomia fica ON_TRACK`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(openRouterBalanceRecords(10_000L, 9_998L, 9_996L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.OPENROUTER, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.EstimatedExhaustionAt>(series.forecast)
+        assertEquals(UsageRiskLevel.ON_TRACK, series.riskSummary?.level)
+        assertEquals(false, series.riskSummary?.hasKnownResetAt)
+    }
+
+    @Test
+    fun `saldo OpenRouter sem reset prestes a acabar fica critico`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(openRouterBalanceRecords(180L, 140L, 100L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.OPENROUTER, HistoryRange.LAST_24_HOURS, now)
+
+        assertEquals(UsageRiskLevel.WILL_EXCEED, report.series.single().riskSummary?.level)
+    }
+
+    @Test
+    fun `saldo OpenRouter sem reset e sem consumo nao tem previsao`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(openRouterBalanceRecords(5_000L, 5_000L, 5_000L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.OPENROUTER, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.NoGrowth>(series.forecast)
+        assertNull(series.riskSummary)
+    }
+
+    // ------------------------------------------------------------------
+    // OpenCode Go (issue #140): PERCENTAGE com reset real por janela — o
+    // formato mais parecido é o de MiniMax/Codex, não o de saldo. Cobre os
+    // dois ramos de `hasKnownResetAt` que `OpenCodeGoMapper` produz.
+    // ------------------------------------------------------------------
+
+    /** Sentinela que `OpenCodeGoMapper.OPEN_CODE_GO_UNKNOWN_RESET_AT` grava quando não há `resetsAt`. */
+    private val openCodeGoUnknownResetAt = Instant.parse("2100-01-01T00:00:00Z")
+
+    private fun openCodeGoWindowRecord(
+        capturedAt: String,
+        percent: Long,
+        periodEndAt: Instant,
+        hasKnownResetAt: Boolean
+    ): UsageSnapshotRecord {
+        return UsageSnapshotRecord(
+            source = ApiSource.OPENCODE_GO,
+            quotaLabel = "Rolling",
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.PERCENTAGE,
+            used = percent,
+            total = 100L,
+            rawUsed = 0L,
+            rawTotal = 0L,
+            periodEndAt = periodEndAt,
+            capturedAt = Instant.parse(capturedAt),
+            hasKnownResetAt = hasKnownResetAt
+        )
+    }
+
+    @Test
+    fun `OpenCode Go com reset conhecido e consumo lento reinicia antes de esgotar`() = kotlinx.coroutines.test.runTest {
+        val resetAt = Instant.parse("2026-04-28T18:30:00Z")
+        val records = listOf(
+            openCodeGoWindowRecord("2026-04-28T14:00:00Z", 10L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T15:00:00Z", 20L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T16:00:00Z", 30L, resetAt, hasKnownResetAt = true)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.OPENCODE_GO, HistoryRange.LAST_24_HOURS, now)
+
+        // 10%/h de ritmo, 70% restantes: esgotaria em 7h, bem depois do reset às 18:30.
+        assertIs<UsageForecast.ResetsBeforeExhaustion>(report.series.single().forecast)
+    }
+
+    @Test
+    fun `OpenCode Go com reset conhecido e consumo rapido esgota antes do reset`() = kotlinx.coroutines.test.runTest {
+        val resetAt = Instant.parse("2026-04-29T18:30:00Z")
+        val records = listOf(
+            openCodeGoWindowRecord("2026-04-28T14:00:00Z", 10L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T15:00:00Z", 50L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T16:00:00Z", 90L, resetAt, hasKnownResetAt = true)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.OPENCODE_GO, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.EstimatedExhaustionAt>(series.forecast)
+        assertEquals(true, series.riskSummary?.hasKnownResetAt)
+        assertEquals(UsageRiskLevel.WILL_EXCEED, series.riskSummary?.level)
+    }
+
+    @Test
+    fun `OpenCode Go sem resetsAt cai na regua de runway em vez de travar em InsufficientData`() = kotlinx.coroutines.test.runTest {
+        val records = listOf(
+            openCodeGoWindowRecord("2026-04-28T14:00:00Z", 10L, openCodeGoUnknownResetAt, hasKnownResetAt = false),
+            openCodeGoWindowRecord("2026-04-28T15:00:00Z", 20L, openCodeGoUnknownResetAt, hasKnownResetAt = false),
+            openCodeGoWindowRecord("2026-04-28T16:00:00Z", 30L, openCodeGoUnknownResetAt, hasKnownResetAt = false)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.OPENCODE_GO, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.EstimatedExhaustionAt>(series.forecast)
+        assertEquals(false, series.riskSummary?.hasKnownResetAt)
+    }
+
     private fun steadyGrowthRecords(): List<UsageSnapshotRecord> {
         return listOf(
             record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 200, 1000),
