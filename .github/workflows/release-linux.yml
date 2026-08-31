@@ -1,4 +1,4 @@
-﻿name: Release Desktop Packages
+name: Release Desktop Packages
 
 on:
   push:
@@ -45,7 +45,7 @@ jobs:
       # nunca escreve: quem grava e o push na main do `ci.yml`, mesmo runner
       # (`windows-latest`), mesmo wrapper.
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           cache-read-only: true
 
@@ -305,7 +305,7 @@ jobs:
       # saiu por ser redundante: `gradle-wrapper.properties` ja fixa 8.6, e
       # `gradlew.bat` usa a propria distribuicao do wrapper.
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           cache-read-only: true
 

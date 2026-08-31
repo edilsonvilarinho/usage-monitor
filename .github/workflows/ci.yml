@@ -113,7 +113,7 @@ jobs:
       # (`gradle/gradle-build-action`), entao nao e precedente novo no repositorio.
       - name: Setup Gradle
         if: steps.filter.outputs.relevant == 'true'
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           # So a `main` escreve. Cache gravado num run de PR fica com o escopo
           # daquele PR e nenhum outro run consegue le-lo: seria pagar a gravacao
