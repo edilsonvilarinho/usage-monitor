@@ -76,7 +76,7 @@ jobs:
       # tambem no ramo em que a suite nao roda, que e justamente o que ele tem de
       # anunciar. Sao ~5 s.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Guarda de paridade entre a tabela de precos do domain Kotlin e a que o
       # servidor publica. Ela roda AQUI e no `ci-server.yml` porque os filtros de
@@ -94,7 +94,7 @@ jobs:
 
       - name: Setup JDK
         if: steps.filter.outputs.relevant == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -113,7 +113,7 @@ jobs:
       # (`gradle/gradle-build-action`), entao nao e precedente novo no repositorio.
       - name: Setup Gradle
         if: steps.filter.outputs.relevant == 'true'
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
           # So a `main` escreve. Cache gravado num run de PR fica com o escopo
           # daquele PR e nenhum outro run consegue le-lo: seria pagar a gravacao
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload coverage report
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.relevant == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: kover-report
           path: build/reports/kover/html/**
@@ -184,7 +184,7 @@ jobs:
       # comparar duracao entre runs nem investigar intermitencia depois do fato.
       - name: Upload test reports
         if: always() && steps.filter.outputs.relevant == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-reports
           path: |
@@ -215,7 +215,7 @@ jobs:
         # `fatal: ...: no merge base` -- o passo falha, o job falha, e os cenarios
         # NUNCA rodam. Aconteceu de verdade: o CI do PR #85 ficou vermelho por
         # isto, e o defeito ja estava catalogado como P1-09 na contra-auditoria.
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -396,7 +396,7 @@ jobs:
         # filtro usa diff de tres pontos, que precisa de base comum, e com o
         # checkout raso o git responde `no merge base` -- o passo falha, o job
         # falha, e os cenarios NUNCA rodam.
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
