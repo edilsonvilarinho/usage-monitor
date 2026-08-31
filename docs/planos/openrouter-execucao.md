@@ -58,6 +58,7 @@ design system — e é atualizado **no mesmo commit** de cada atividade que desc
 | A00 | Levantamento e decisão (issue #138) | testes reais contra `/api/v1/credits` e `/api/v1/key`, dois estados de conta (`$0` e `$5`) | Viabilidade confirmada, todos os pontos em aberto fechados |
 | A01 | Enum `ApiSource.OPENROUTER`, `OpenRouterRepository`/`GetOpenRouterUsageUseCase` (domain, com default que falha — mesmo padrão do `OPENCODE_GO`), rótulo, acento (`#FF6FA8`/`#B23368`) e os cinco `when` exaustivos (`displayName`, `sourceLabelFromKey`, `warningActionFor`, `accentColorFor`, `fetchTarget`) | `gradlew.bat compileKotlinDesktop` | `BUILD SUCCESSFUL`. Nenhum call site de `DashboardViewModel(...)` quebrou — todos param no último argumento posicional obrigatório (`recordUsageSnapshot`) e nomeiam o resto |
 | A02 | DTO (`OpenRouterCreditsDto`/`Response`), mapper (`OpenRouterMapper`, mesmo padrão do `DeepSeekMapper`: `used=0`, `total=total_credits-total_usage`, `hasKnownResetAt=false`), `RemoteApiDataSource.fetchOpenRouterCredits` e `OpenRouterRepositoryImpl` | `gradlew.bat compileKotlinDesktop` | `BUILD SUCCESSFUL` |
+| A03 | Chave em `api-keys.json` (`ApiKeySettings.openRouter`, DTO, `toDomain`/`write`, `requireLocalKeySource`), `requiresApiKey()` em `SettingsDialogContent.kt` (risco A01/A02 fechado — era o único ponto sem `when` exaustivo), `API_KEY_DEPENDENT_SOURCES` e DI completa no `Main.kt` (repo, use case, `remember`) | `gradlew.bat compileTestKotlinDesktop` | `BUILD SUCCESSFUL` |
 
 _(demais linhas entram conforme cada atividade fecha)_
 
@@ -65,7 +66,7 @@ _(demais linhas entram conforme cada atividade fecha)_
 
 | Risco | Estado |
 |---|---|
-| `requiresApiKey()` não é `when` exaustivo — pode esquecer `OPENROUTER` sem erro de compilação | aberto |
+| `requiresApiKey()` não é `when` exaustivo — pode esquecer `OPENROUTER` sem erro de compilação | fechado na A03 |
 | Auth de `/api/v1/credits` com chave normal confirmada só empiricamente (2 testes, 1 conta) — sem doc oficial declarando isso contrato estável | aceito, mesmo risco já coberto para outras fontes não documentadas oficialmente (OpenCode Go, `usage` da Anthropic) |
 | `total_credits`/`total_usage` testados só com `0` e `5` (inteiros) — shape com centavos/decimais e com `usage > 0` não verificado | aberto |
 | `is_free_tier` não testado com uso real (só a transição `true → false` ao comprar crédito, sem nenhuma chamada de inferência feita) | aberto |
