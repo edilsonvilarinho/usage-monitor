@@ -477,6 +477,79 @@ class UsageHistoryRepositoryImplTest {
         assertNull(series.riskSummary)
     }
 
+    // ------------------------------------------------------------------
+    // OpenRouter (issue #140): mesmo formato de saldo pré-pago do DeepSeek —
+    // `CURRENCY_USD`, `Instant.DISTANT_FUTURE`, sem reset conhecido. Prova que
+    // o pipeline novo (#139) se comporta como o par mais próximo que já tinha
+    // cobertura.
+    // ------------------------------------------------------------------
+
+    private fun openRouterBalanceRecords(
+        first: Long,
+        second: Long,
+        third: Long
+    ): List<UsageSnapshotRecord> {
+        return listOf(
+            openRouterBalanceRecord("2026-04-28T14:00:00Z", first),
+            openRouterBalanceRecord("2026-04-28T15:00:00Z", second),
+            openRouterBalanceRecord("2026-04-28T16:00:00Z", third)
+        )
+    }
+
+    private fun openRouterBalanceRecord(capturedAt: String, cents: Long): UsageSnapshotRecord {
+        return UsageSnapshotRecord(
+            source = ApiSource.OPENROUTER,
+            quotaLabel = "Saldo",
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.CURRENCY_USD,
+            used = 0L,
+            total = cents,
+            rawUsed = cents,
+            rawTotal = cents,
+            periodEndAt = Instant.DISTANT_FUTURE,
+            capturedAt = Instant.parse(capturedAt),
+            hasKnownResetAt = false
+        )
+    }
+
+    @Test
+    fun `saldo OpenRouter sem reset com muita autonomia fica ON_TRACK`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(openRouterBalanceRecords(10_000L, 9_998L, 9_996L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.OPENROUTER, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.EstimatedExhaustionAt>(series.forecast)
+        assertEquals(UsageRiskLevel.ON_TRACK, series.riskSummary?.level)
+        assertEquals(false, series.riskSummary?.hasKnownResetAt)
+    }
+
+    @Test
+    fun `saldo OpenRouter sem reset prestes a acabar fica critico`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(openRouterBalanceRecords(180L, 140L, 100L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.OPENROUTER, HistoryRange.LAST_24_HOURS, now)
+
+        assertEquals(UsageRiskLevel.WILL_EXCEED, report.series.single().riskSummary?.level)
+    }
+
+    @Test
+    fun `saldo OpenRouter sem reset e sem consumo nao tem previsao`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(
+            FakeHistoryDataSource(openRouterBalanceRecords(5_000L, 5_000L, 5_000L))
+        )
+
+        val report = repository.getHistoryReport(ApiSource.OPENROUTER, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.NoGrowth>(series.forecast)
+        assertNull(series.riskSummary)
+    }
+
     private fun steadyGrowthRecords(): List<UsageSnapshotRecord> {
         return listOf(
             record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 200, 1000),
