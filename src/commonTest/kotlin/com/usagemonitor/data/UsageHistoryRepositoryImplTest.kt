@@ -550,6 +550,86 @@ class UsageHistoryRepositoryImplTest {
         assertNull(series.riskSummary)
     }
 
+    // ------------------------------------------------------------------
+    // OpenCode Go (issue #140): PERCENTAGE com reset real por janela — o
+    // formato mais parecido é o de MiniMax/Codex, não o de saldo. Cobre os
+    // dois ramos de `hasKnownResetAt` que `OpenCodeGoMapper` produz.
+    // ------------------------------------------------------------------
+
+    /** Sentinela que `OpenCodeGoMapper.OPEN_CODE_GO_UNKNOWN_RESET_AT` grava quando não há `resetsAt`. */
+    private val openCodeGoUnknownResetAt = Instant.parse("2100-01-01T00:00:00Z")
+
+    private fun openCodeGoWindowRecord(
+        capturedAt: String,
+        percent: Long,
+        periodEndAt: Instant,
+        hasKnownResetAt: Boolean
+    ): UsageSnapshotRecord {
+        return UsageSnapshotRecord(
+            source = ApiSource.OPENCODE_GO,
+            quotaLabel = "Rolling",
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.PERCENTAGE,
+            used = percent,
+            total = 100L,
+            rawUsed = 0L,
+            rawTotal = 0L,
+            periodEndAt = periodEndAt,
+            capturedAt = Instant.parse(capturedAt),
+            hasKnownResetAt = hasKnownResetAt
+        )
+    }
+
+    @Test
+    fun `OpenCode Go com reset conhecido e consumo lento reinicia antes de esgotar`() = kotlinx.coroutines.test.runTest {
+        val resetAt = Instant.parse("2026-04-28T18:30:00Z")
+        val records = listOf(
+            openCodeGoWindowRecord("2026-04-28T14:00:00Z", 10L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T15:00:00Z", 20L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T16:00:00Z", 30L, resetAt, hasKnownResetAt = true)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.OPENCODE_GO, HistoryRange.LAST_24_HOURS, now)
+
+        // 10%/h de ritmo, 70% restantes: esgotaria em 7h, bem depois do reset às 18:30.
+        assertIs<UsageForecast.ResetsBeforeExhaustion>(report.series.single().forecast)
+    }
+
+    @Test
+    fun `OpenCode Go com reset conhecido e consumo rapido esgota antes do reset`() = kotlinx.coroutines.test.runTest {
+        val resetAt = Instant.parse("2026-04-29T18:30:00Z")
+        val records = listOf(
+            openCodeGoWindowRecord("2026-04-28T14:00:00Z", 10L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T15:00:00Z", 50L, resetAt, hasKnownResetAt = true),
+            openCodeGoWindowRecord("2026-04-28T16:00:00Z", 90L, resetAt, hasKnownResetAt = true)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.OPENCODE_GO, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.EstimatedExhaustionAt>(series.forecast)
+        assertEquals(true, series.riskSummary?.hasKnownResetAt)
+        assertEquals(UsageRiskLevel.WILL_EXCEED, series.riskSummary?.level)
+    }
+
+    @Test
+    fun `OpenCode Go sem resetsAt cai na regua de runway em vez de travar em InsufficientData`() = kotlinx.coroutines.test.runTest {
+        val records = listOf(
+            openCodeGoWindowRecord("2026-04-28T14:00:00Z", 10L, openCodeGoUnknownResetAt, hasKnownResetAt = false),
+            openCodeGoWindowRecord("2026-04-28T15:00:00Z", 20L, openCodeGoUnknownResetAt, hasKnownResetAt = false),
+            openCodeGoWindowRecord("2026-04-28T16:00:00Z", 30L, openCodeGoUnknownResetAt, hasKnownResetAt = false)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.OPENCODE_GO, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertIs<UsageForecast.EstimatedExhaustionAt>(series.forecast)
+        assertEquals(false, series.riskSummary?.hasKnownResetAt)
+    }
+
     private fun steadyGrowthRecords(): List<UsageSnapshotRecord> {
         return listOf(
             record("Codex 5h", ApiSource.CODEX, "2026-04-28T15:00:00Z", 200, 1000),
