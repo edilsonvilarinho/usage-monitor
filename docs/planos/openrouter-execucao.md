@@ -63,8 +63,7 @@ design system — e é atualizado **no mesmo commit** de cada atividade que desc
 | A05 | Card do saldo OpenRouter (mesmo desenho do DeepSeek), rótulo acessível do lápis de chave na aba APIs (`Gerenciar chave — OpenRouter`) | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ComponentTest"` | `BUILD SUCCESSFUL`, 88 testes, 0 falhas |
 | A06 | Suíte completa | `gradlew.bat allTests` | `BUILD SUCCESSFUL` em 2m03s, **1650 testes, 0 falhas, 0 erros** |
 | A07 | Protótipo (paleta ×3, legenda, card do saldo, linha em Configurações → APIs, nota, contador "5 fontes"), `design-system/readme.md` ("seis acentos, sete fontes" → "sete acentos, oito fontes"), primitiva `AppSourceMark` (`.jsx`/`.d.ts`/`.prompt.md`/demo), `Dashboard.jsx`/`Settings.jsx` | revisão visual (sem verificação automatizada — HTML/JSX de referência, não compilado) | Consistente nos três documentos |
-
-_(demais linhas entram conforme cada atividade fecha)_
+| A08 | Resumo final na issue, seção de desvios preenchida | — | Implementação completa em 7 commits, branch `feat/openrouter-integration-138`, **local — ainda sem push/PR** |
 
 ## Problemas em aberto e riscos
 
@@ -78,4 +77,25 @@ _(demais linhas entram conforme cada atividade fecha)_
 
 ## Desvios do plano e achados da execução
 
-_(preenchido ao final da última atividade)_
+Nenhum desvio de rota — as sete atividades saíram na ordem planejada (A01→A07), cada uma
+compilando/testando limpo na primeira passada.
+
+- **`requiresApiKey()` era o único ponto de fiação sem `when` exaustivo.** Risco identificado antes
+  de escrever código (seção "Atividades" acima) e fechado deliberadamente na A03, não descoberto
+  durante a execução — vale registrar porque é o padrão a repetir na próxima fonte nova: os cinco
+  `when` sobre `ApiSource` o compilador garante, os pontos fora de `when` (`requiresApiKey`,
+  `API_KEY_DEPENDENT_SOURCES`, `requireLocalKeySource`) exigem checklist manual.
+- **`OpenRouterRepository`/`GetOpenRouterUsageUseCase` nasceram na A01, não na A02.** O plano original
+  (issue) previa "DTO, mapper, HTTP, repositório" como um bloco só; na prática o `fetchTarget`
+  exaustivo da A01 exige a interface de domínio e o use case para compilar (default que falha, mesmo
+  padrão do `OPENCODE_GO`) — então a interface entrou na A01 e só a implementação HTTP (`data/`)
+  ficou para a A02. Divisão mais fina do que o plano previa, mesma fronteira `domain`/`data` de
+  sempre.
+- **Nenhum call site de `DashboardViewModel(...)` quebrou** apesar do novo parâmetro entrar no meio
+  da zona de defaults — verificado manualmente que todo call site para no último argumento
+  posicional obrigatório (`recordUsageSnapshot`) antes de nomear o resto. Vale conferir de novo na
+  próxima fonte: um call site que mudasse esse padrão silenciosamente ligaria o parâmetro errado.
+- **Não testado nesta entrega**: saldo com `usage > 0` real (só `$0`/`$5` puros, sem gasto), e
+  `total_credits`/`total_usage` com casas decimais — a API só devolveu inteiros nos dois testes
+  reais feitos na issue. `parseToCents` trata `Double` corretamente em teoria (`OpenRouterMapperTest`
+  cobre `20.0 - 7.5`), mas não há confirmação de que a API real devolve decimais nesse formato.
