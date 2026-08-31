@@ -64,9 +64,9 @@ tinha equivalente pras duas fontes novas.
 
 ## Ponto de situação
 
-| Atividade | Status | Resultado | Comentário na issue |
+| Atividade | Status | Commit | Comentário na issue |
 |---|---|---|---|
-| A01 — DeepSeekHistoryCard sempre mostra previsão | Concluída | `desktopTest --tests "com.usagemonitor.presentation.*"` verde (4 testes novos) | pendente |
+| A01 — DeepSeekHistoryCard sempre mostra previsão | Concluída | `feeda7a` (branch `fix/issue-140-usage-forecast-visibility`) | feito |
 | A02 — Teste E2E forecast OpenRouter | Pendente | — | — |
 | A03 — Teste E2E forecast OpenCode Go | Pendente | — | — |
 
