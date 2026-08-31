@@ -61,6 +61,7 @@ design system — e é atualizado **no mesmo commit** de cada atividade que desc
 | A03 | Chave em `api-keys.json` (`ApiKeySettings.openRouter`, DTO, `toDomain`/`write`, `requireLocalKeySource`), `requiresApiKey()` em `SettingsDialogContent.kt` (risco A01/A02 fechado — era o único ponto sem `when` exaustivo), `API_KEY_DEPENDENT_SOURCES` e DI completa no `Main.kt` (repo, use case, `remember`) | `gradlew.bat compileTestKotlinDesktop` | `BUILD SUCCESSFUL` |
 | A04 | `OpenRouterMapperTest` (4), `OpenRouterRepositoryImplTest` (4), `RemoteApiDataSourceHttpTest` (+2, 14 no total), `LocalApiKeyDataSourceTest` (8, com OpenRouter no round-trip e no `withoutKey`) | `gradlew.bat desktopTest --tests "com.usagemonitor.data.OpenRouter*" --tests "com.usagemonitor.data.RemoteApiDataSourceHttpTest" --tests "com.usagemonitor.data.LocalApiKeyDataSourceTest"` | `BUILD SUCCESSFUL`, 30 testes, 0 falhas |
 | A05 | Card do saldo OpenRouter (mesmo desenho do DeepSeek), rótulo acessível do lápis de chave na aba APIs (`Gerenciar chave — OpenRouter`) | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ComponentTest"` | `BUILD SUCCESSFUL`, 88 testes, 0 falhas |
+| A06 | Suíte completa | `gradlew.bat allTests` | `BUILD SUCCESSFUL` em 2m03s, **1650 testes, 0 falhas, 0 erros** |
 
 _(demais linhas entram conforme cada atividade fecha)_
 
