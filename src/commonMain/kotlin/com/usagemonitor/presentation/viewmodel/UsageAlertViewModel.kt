@@ -71,6 +71,16 @@ class UsageAlertViewModel(
     /** Pior risco entre as cotas visíveis; `null` quando nenhuma está em risco. */
     val worstRisk: StateFlow<UsageRiskLevel?> = _worstRisk.asStateFlow()
 
+    private val _worstSnapshot = MutableStateFlow<WorstQuotaSnapshot?>(null)
+
+    /**
+     * A cota que produz [worstRisk], com a fonte e a projeção dela — para a
+     * barra HUD (issue #164), que precisa dizer qual fonte e quando ela
+     * reseta, não só o nível. Ao lado de [worstRisk], não em vez: a bandeja
+     * continua lendo só o nível.
+     */
+    internal val worstSnapshot: StateFlow<WorstQuotaSnapshot?> = _worstSnapshot.asStateFlow()
+
     private var state = UsageAlertState.EMPTY
 
     /** `Triple` não comporta a quarta fonte, e um `Pair` de `Pair` não se lê. */
@@ -128,6 +138,12 @@ class UsageAlertViewModel(
             ?.takeIf { level -> level != UsageRiskLevel.ON_TRACK }
 
         val now = clock.now()
+
+        _worstSnapshot.value = worstQuotaSnapshot(
+            stats = success?.data.orEmpty(),
+            riskSummaries = success?.riskSummaries.orEmpty(),
+            now = now
+        )
         val evaluation = evaluateUsageAlerts(
             stats = success?.data.orEmpty(),
             sessionPulse = pulses.values.mergeSessionPulses(),

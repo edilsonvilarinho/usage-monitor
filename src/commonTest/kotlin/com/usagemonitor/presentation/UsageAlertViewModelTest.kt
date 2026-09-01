@@ -31,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 private val NOW = Instant.parse("2026-08-13T12:00:00Z")
 private val TARGET = UsageTargetKey(ApiSource.ANTHROPIC, DEFAULT_ANTHROPIC_PROFILE_ID)
@@ -141,6 +142,63 @@ class UsageAlertViewModelTest {
         viewModel.onDestroy()
     }
 
+    /** A barra HUD (issue #164) precisa da fonte vencedora, não só do nível. */
+    @Test
+    fun `the worst snapshot picks the source with the highest risk, not the first`() = runTest {
+        val dashboard = MutableStateFlow<UiState>(UiState.Loading)
+        val viewModel = buildViewModel(dashboard = dashboard, dispatcher = UnconfinedTestDispatcher(testScheduler))
+
+        val codexTarget = UsageTargetKey.forSource(ApiSource.CODEX)
+        val codexQuotaKey = QuotaSeriesKey("Codex 5h", PeriodType.INTERVAL)
+
+        dashboard.value = UiState.Success(
+            data = listOf(
+                stats(usedPercent = 10),
+                stats(usedPercent = 20, source = ApiSource.CODEX, target = codexTarget, label = "Codex 5h")
+            ),
+            riskSummaries = mapOf(
+                TARGET to mapOf(QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.AT_RISK, NOW + 1.hours)),
+                codexTarget to mapOf(codexQuotaKey to QuotaRiskSummary(UsageRiskLevel.WILL_EXCEED, NOW + 30.minutes))
+            )
+        )
+        runCurrent()
+
+        val snapshot = viewModel.worstSnapshot.value
+        assertEquals(ApiSource.CODEX, snapshot?.stats?.source)
+        assertEquals(UsageRiskLevel.WILL_EXCEED, snapshot?.risk?.level)
+
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `the worst snapshot ignores an expired quota`() = runTest {
+        val dashboard = MutableStateFlow<UiState>(UiState.Loading)
+        val viewModel = buildViewModel(dashboard = dashboard, dispatcher = UnconfinedTestDispatcher(testScheduler))
+
+        dashboard.value = UiState.Success(
+            data = listOf(stats(usedPercent = 10, periodEndAt = NOW - 1.hours)),
+            riskSummaries = mapOf(
+                TARGET to mapOf(QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.WILL_EXCEED, NOW - 30.minutes))
+            )
+        )
+        runCurrent()
+
+        assertNull(viewModel.worstSnapshot.value)
+
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `the worst snapshot is null outside a successful dashboard state`() = runTest {
+        val dashboard = MutableStateFlow<UiState>(UiState.Loading)
+        val viewModel = buildViewModel(dashboard = dashboard, dispatcher = UnconfinedTestDispatcher(testScheduler))
+        runCurrent()
+
+        assertNull(viewModel.worstSnapshot.value)
+
+        viewModel.onDestroy()
+    }
+
     @Test
     fun `disabling the alerts stops the emission`() = runTest {
         val dashboard = MutableStateFlow<UiState>(UiState.Loading)
@@ -185,17 +243,23 @@ class UsageAlertViewModelTest {
     }
 }
 
-private fun stats(usedPercent: Int): ApiUsageStats {
+private fun stats(
+    usedPercent: Int,
+    source: ApiSource = ApiSource.ANTHROPIC,
+    target: UsageTargetKey = TARGET,
+    label: String = "Sessão 5h",
+    periodEndAt: Instant = NOW + 2.hours
+): ApiUsageStats {
     return ApiUsageStats(
-        source = ApiSource.ANTHROPIC,
-        targetKey = TARGET,
-        apiName = "Anthropic",
+        source = source,
+        targetKey = target,
+        apiName = source.name,
         quotas = listOf(
             QuotaInfo(
-                label = "Sessão 5h",
+                label = label,
                 used = usedPercent.toLong(),
                 total = 100L,
-                periodEndAt = NOW + 2.hours,
+                periodEndAt = periodEndAt,
                 periodType = PeriodType.INTERVAL,
                 unit = UsageUnit.PERCENTAGE
             )
