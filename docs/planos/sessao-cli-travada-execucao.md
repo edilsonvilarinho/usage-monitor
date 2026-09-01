@@ -68,6 +68,6 @@ usuário posterior ao último marcador significa turno aberto que nunca fechou.
 | A2 | Data: leitura da cauda do transcript | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest"` | `BUILD SUCCESSFUL`, 57 testes (7 novos) |
 | A3 | Caso de uso + publicação no laço de 30 s | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.SessionPulseViewModelTest"` | `BUILD SUCCESSFUL`, 16 testes (5 novos) |
 | A4 | Alerta na bandeja | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.UsageAlertTest" --tests "com.usagemonitor.UsageAlertPreferencesTest" --tests "com.usagemonitor.presentation.UsageAlertMessagesTest"` | `BUILD SUCCESSFUL`: 19 + 10 + 3 testes |
-| A5 | Configurações → Alertas | — | pendente |
+| A5 | Configurações → Alertas | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ComponentTest"` | `BUILD SUCCESSFUL` (falhou antes com `Semantic Node has no parent layout with a Scroll SemanticsAction`: a seção é montada solta no teste, sem pai rolável — `performScrollTo` removido) |
 | A6 | Marca na lista de Sessões CLI | — | pendente |
 | A7 | CLAUDE.md | — | pendente |

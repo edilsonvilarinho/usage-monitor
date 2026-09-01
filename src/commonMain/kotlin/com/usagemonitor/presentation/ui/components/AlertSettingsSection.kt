@@ -22,11 +22,29 @@ import com.usagemonitor.domain.entity.UsageAlertSettings
 
 const val ALERT_SETTINGS_QUOTA_SWITCH_TEST_TAG = "alertSettingsQuotaSwitch"
 const val ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG = "alertSettingsSessionSwitch"
+const val ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG = "alertSettingsStalledSwitch"
+const val ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG = "alertSettingsStallThreshold"
 const val ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG = "alertSettingsQuietSwitch"
 const val ALERT_SETTINGS_BUDGET_FIELD_TEST_TAG = "alertSettingsBudgetField"
 
 /** Limiares oferecidos na tela. Outros valores continuam válidos se já gravados. */
 private val OFFERED_PERCENTS = listOf(50, 75, 90, 100)
+
+/**
+ * Limiares de "sem resposta" oferecidos, em minutos.
+ *
+ * Meia hora é o piso do domain: abaixo disso o aviso alcançaria turno longo
+ * legítimo, com muitas ferramentas e subagente. Quatro horas é o teto útil — o
+ * detector ignora pendência acima de 24h de qualquer jeito.
+ */
+private val OFFERED_STALL_THRESHOLD_MINUTES = listOf(30, 60, 120, 240)
+
+private fun stallThresholdLabel(minutes: Int): String {
+    if (minutes < 60) {
+        return "${minutes}min"
+    }
+    return "${minutes / 60}h"
+}
 
 private val DEFAULT_QUIET_HOURS = QuietHours(22, 8)
 
@@ -114,6 +132,54 @@ fun AlertSettingsSection(
             testTag = ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG,
             onCheckedChange = { checked -> onSettingsChange(settings.copy(sessionAlertsEnabled = checked)) }
         )
+
+        AlertToggleRow(
+            label = if (isPt) {
+                "Avisar quando uma sessão CLI ficar sem resposta"
+            } else {
+                "Warn when a CLI session goes unanswered"
+            },
+            checked = settings.stalledSessionAlertsEnabled,
+            testTag = ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG,
+            onCheckedChange = { checked ->
+                onSettingsChange(settings.copy(stalledSessionAlertsEnabled = checked))
+            }
+        )
+
+        if (settings.stalledSessionAlertsEnabled) {
+            // Segmentado, e não chip: o limiar é escolha única entre alternativas.
+            // Os chips logo acima respondem outra pergunta — os limiares de quota
+            // são escolha múltipla, 75 e 90 podem estar ligados ao mesmo tempo.
+            val selectedIndex = OFFERED_STALL_THRESHOLD_MINUTES
+                .indexOfFirst { minutes -> minutes * 60_000L == settings.effectiveStallThresholdMillis }
+            AppSegmentedControl(
+                options = OFFERED_STALL_THRESHOLD_MINUTES.map { minutes ->
+                    AppSegment(label = stallThresholdLabel(minutes))
+                },
+                // Valor gravado fora da lista oferecida (registro editado à mão)
+                // não pode marcar o segmento errado: sem correspondência, nenhum
+                // fica selecionado.
+                selectedIndex = selectedIndex,
+                onSelect = { index ->
+                    val minutes = OFFERED_STALL_THRESHOLD_MINUTES[index]
+                    onSettingsChange(settings.copy(stallThresholdMillis = minutes * 60_000L))
+                },
+                modifier = Modifier.testTag(ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG)
+            )
+            Text(
+                text = if (isPt) {
+                    "O aviso diz apenas que não houve resposta desde o último pedido — o app não " +
+                        "verifica o processo do Claude Code. Pendência acima de 24h é tratada como " +
+                        "sessão abandonada e não gera aviso."
+                } else {
+                    "The warning only says there was no reply since the last request — the app does " +
+                        "not check the Claude Code process. Anything pending for over 24h counts as " +
+                        "an abandoned session and raises no warning."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         AlertToggleRow(
             label = if (isPt) "Silenciar num período do dia" else "Mute during a time range",

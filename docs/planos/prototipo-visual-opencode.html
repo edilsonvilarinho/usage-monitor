@@ -1646,10 +1646,18 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="panel"><div class="phead"><span class="ptitle">Alertas na bandeja</span><span class="sp"></span><span class="sw on"></span></div><div class="pbody flush">
       <div class="row"><span class="v sm">Limiares de cota</span><span class="sp"></span><div class="hstack"><input class="field" value="75" style="width:56px"><input class="field" value="90" style="width:56px"><input class="field" value="100" style="width:56px"><span class="k">%</span></div></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI saturada</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só o veredito saturado vira notificação. Atenção apareceu em 7 de 70 sessões medidas — notificar nesse patamar tornaria o alerta rotina.</span></div><span class="sw on"></span></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI sem resposta</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Houve pedido e não houve resposta no transcript acima do limiar. O app não verifica o processo do Claude Code, e o texto do aviso não afirma que ele travou.</span></div><span class="sw on"></span></div>
+      <div class="row"><span class="v sm" style="flex:1">Limiar sem resposta</span><div class="seg"><button type="button">30min</button><button type="button">1h</button><button class="on" type="button">2h</button><button type="button">4h</button></div></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Silenciar até</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">No período silenciado o limiar cruzado não é marcado como disparado: o aviso sai quando o silêncio terminar.</span></div><input class="field" value="18:00" style="width:90px"></div>
     </div></div>
   </div>
 </div>
+<p class="note"><b>O limiar é segmentado, não chip</b> (issue #177). Os limiares de cota logo acima são escolha
+múltipla — 75 e 90 podem estar ligados ao mesmo tempo — e por isso são chips de alternância; este é escolha única
+entre alternativas, que é a definição do segmentado. A faixa vai de 30min (piso: abaixo disso o aviso alcançaria
+turno longo legítimo, com muitas ferramentas e subagente) a 4h. <b>Desligado o interruptor, o segmentado sai da
+tela</b>: controle sem efeito é pior que controle ausente. Pendência acima de <b>24h</b> é sessão abandonada e
+nunca gera aviso — sem esse teto, transcript interrompido meses atrás viraria alerta a cada arranque do app.</p>
 
 <h2 id="cfg-apis">12c · Configurações — APIs</h2>
 <div class="win mid" style="max-width:none">
