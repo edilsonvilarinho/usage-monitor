@@ -1560,16 +1560,26 @@ private fun runUsageMonitor(
         // Terceira saída do modo somente cards, ao lado da bandeja e da faixa de
         // hover. Um modo que esconde o botão de fechar precisa de mais de um
         // caminho de volta, e o teclado é o único que funciona com a janela
-        // coberta por outra.
+        // coberta por outra. A barra HUD (issue #164) tem combinação própria
+        // — Ctrl+Shift+H —, sem colidir com Ctrl+Shift+M.
         onKeyEvent = { event ->
-            val isToggle = event.type == KeyEventType.KeyDown &&
+            val isCardsOnlyToggle = event.type == KeyEventType.KeyDown &&
                 event.isCtrlPressed &&
                 event.isShiftPressed &&
                 event.key == Key.M
-            if (isToggle) {
+            if (isCardsOnlyToggle) {
                 setCardsOnlyMode(!cardsOnlyMode)
             }
-            isToggle
+
+            val isHudToggle = event.type == KeyEventType.KeyDown &&
+                event.isCtrlPressed &&
+                event.isShiftPressed &&
+                event.key == Key.H
+            if (isHudToggle) {
+                setHudMode(!hudMode)
+            }
+
+            isCardsOnlyToggle || isHudToggle
         }
     ) {
         LaunchedEffect(window) {
