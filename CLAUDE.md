@@ -530,6 +530,40 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
 - A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
   as capturas do README continuam com a moldura inteira.
 
+**Barra HUD** (`DesktopWindowFrame(hud)` + `HudBar` + `HudModePreferences.kt`; issue #164): terceiro
+chrome, ainda mais discreto que o modo somente cards — a mesma janela principal encolhida a uma faixa
+de 24dp (`AppChrome.hud`) de largura total, ancorada no topo da tela, sempre no topo. Não mostra
+cards, só `AppStatusIndicator` com o pior risco entre todas as cotas, a fonte que o determinou
+(`UsageAlertViewModel.worstSnapshot`, ao lado de `worstRisk` — a bandeja continua lendo só o nível) e
+o tempo até o reset (`resetLabel`, a mesma função do cabeçalho expandido do card — nenhum formato de
+data novo). **Também não é valor novo em enum nenhum**: `hud` é um terceiro booleano de
+`DesktopWindowFrame`, irmão de `compact`, e a exclusão mútua entre os dois é regra de negócio dos
+setters em `Main.kt` (ligar um desliga o outro), não do tipo.
+- **A janela muda de tamanho de verdade — não é overlay como o modo somente cards.** `alwaysOnTop`
+  vira `alwaysOnTopEnabled || hudMode` (expressão recomposta a cada leitura, nunca uma gravação: a
+  preferência do usuário não é sobrescrita) e `resizable = false`. Sair restaura tamanho, posição e
+  `placement` de antes, guardados num `remember` local — não em `MainWindowSnapshot`, que nunca
+  carregou posição porque a janela normal não precisava dela.
+- **Duas armadilhas de geometria, as duas medidas, não deduzidas.** (1) O coletor que persiste
+  tamanho/posição da janela (`LaunchedEffect(mainWindowState, settings)`, debounce de 250ms) ignora
+  toda mudança enquanto `hudMode=true` — sem o guard, a faixa de 24dp seria gravada como "tamanho
+  normal" e o app nasceria nela na próxima abertura. (2) `ApplyWindowMinimumSize` usa um piso bem
+  menor em HUD (`HUD_MIN_WINDOW_WIDTH_DP` + `AppChrome.hud`), chamado **antes** do efeito que
+  redimensiona, na mesma ordem textual dentro do `Window { ... }`: os dois reagem a `hudMode` na
+  mesma recomposição, e é a ordem — não o tipo — que decide qual dos dois o AWT aplica primeiro. Sem
+  isso o piso normal (240×320dp) impediria a faixa de existir, e a janela ficaria presa no tamanho
+  antigo por baixo do que `mainWindowState.size` pede.
+- **Três saídas, mesmo padrão do modo somente cards**: clique em qualquer ponto da faixa (não há
+  botão próprio — a semântica vai no container inteiro, não só em `onClickLabel`), o item na bandeja
+  e `Ctrl+Shift+H`, combinação própria sem colidir com o `Ctrl+Shift+M` do modo somente cards.
+- **`HudBar` não usa `WindowScope` nem `WindowDraggableArea`.** Decisão tomada antes de escrever
+  código: a faixa não tem cards para reordenar, então o argumento que mantém a área de arrasto fora
+  do `CompactTitleBarOverlay` (colidir com a pressão longa do drag de card) não se aplica aqui — mas
+  arrasto sempre presente também não protege nada nesta faixa. Ancoragem é geometria decidida por
+  `Main.kt`, nunca gesto do usuário.
+- **Não é primitiva de risco nova.** `AppHudBar`/`HudBar` reusa `AppStatusIndicator` por dentro —
+  mesma relação de `AppUpdateStrip` com `AppButton` no design system.
+
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
 abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e
 a janela do modo somente cards tem ~230dp úteis — ali a tooltip cobre o card inteiro, escondendo
