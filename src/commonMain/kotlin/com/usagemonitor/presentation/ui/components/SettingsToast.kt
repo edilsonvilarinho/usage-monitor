@@ -21,7 +21,8 @@ enum class SettingsField {
     TEAM_KEY,
     TEAM_ALIAS,
     TEAM_ACCOUNTS,
-    TEAM_ADMIN_TOKEN
+    TEAM_ADMIN_TOKEN,
+    NETWORK_PROXY
 }
 
 /**
@@ -101,6 +102,7 @@ private fun savedMessage(field: SettingsField, isPt: Boolean): String {
         SettingsField.TEAM_ALIAS -> "Apelido salvo"
         SettingsField.TEAM_ACCOUNTS -> "Contas do time salvas"
         SettingsField.TEAM_ADMIN_TOKEN -> "Token de administração salvo"
+        SettingsField.NETWORK_PROXY -> "Proxy salvo"
     }
 }
 
@@ -125,5 +127,6 @@ private fun fieldLabel(field: SettingsField, isPt: Boolean): String {
         SettingsField.TEAM_ACCOUNTS -> if (isPt) "contas do time" else "Team accounts"
         SettingsField.TEAM_ADMIN_TOKEN ->
             if (isPt) "token de administração" else "Admin token"
+        SettingsField.NETWORK_PROXY -> if (isPt) "proxy" else "Proxy"
     }
 }

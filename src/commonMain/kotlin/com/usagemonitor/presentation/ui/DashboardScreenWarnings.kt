@@ -35,6 +35,13 @@ internal fun warningActionFor(
     warning: DashboardWarning,
     onRetryTarget: (UsageTargetKey) -> Unit
 ): (() -> Unit)? {
+    // Falha de conectividade não é problema de uma fonte específica — é a rede
+    // inteira sem proxy —, então o retry vale para qualquer fonte, não só a
+    // Anthropic. Checado antes do `when` para não precisar repetir o mesmo
+    // lambda nos 8 ramos.
+    if (warning.forcesUniversalRetry) {
+        return { onRetryTarget(warning.target) }
+    }
     return when (warning.source) {
         ApiSource.ANTHROPIC -> {
             { onRetryTarget(warning.target) }
@@ -67,6 +74,47 @@ internal fun warningFor(
     language: AppLanguage
 ): DashboardWarning? {
     val label = warningTargetLabel(error)
+
+    // Avaliada primeiro: falha de conectividade (proxy corporativo ausente ou
+    // incorreto, DNS, timeout de conexão) nunca teve resposta HTTP nenhuma, e
+    // não pode ser confundida com rate limit (429) ou credencial (401/403).
+    if (error.isConnectivityIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                target = error.target,
+                title = "$label sem conexão",
+                description = "Não foi possível conectar ao servidor. Se a rede exige proxy corporativo, configure-o em Configurações > Rede e reinicie o app para aplicar.",
+                actionLabel = "Tentar novamente",
+                forcesUniversalRetry = true
+            )
+        } else {
+            DashboardWarning(
+                target = error.target,
+                title = "$label could not connect",
+                description = "Could not connect to the server. If the network requires a corporate proxy, configure it under Settings > Network and restart the app to apply it.",
+                actionLabel = "Retry",
+                forcesUniversalRetry = true
+            )
+        }
+    }
+
+    if (error.isProxyAuthIssue) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                target = error.target,
+                title = "Proxy exige autenticação",
+                description = "O proxy configurado recusou a credencial enviada (HTTP 407). Revise usuário e senha em Configurações > Rede e reinicie o app.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                target = error.target,
+                title = "Proxy requires authentication",
+                description = "The configured proxy rejected the sent credential (HTTP 407). Review the username and password under Settings > Network and restart the app.",
+                actionLabel = null
+            )
+        }
+    }
 
     if (error.isRateLimitIssue) {
         return if (language == AppLanguage.PT) {
@@ -395,7 +443,14 @@ internal data class DashboardWarning(
     val target: UsageTargetKey,
     val title: String,
     val description: String,
-    val actionLabel: String?
+    val actionLabel: String?,
+    /**
+     * Falha de conectividade (issue #174) não é problema de uma fonte
+     * específica — sem essa marca, ela virava banner sem ação (só a Anthropic
+     * tem retry em [warningActionFor]) e o usuário atrás de proxy corporativo
+     * perdia o botão "Tentar novamente" que o erro genérico já oferecia antes.
+     */
+    val forcesUniversalRetry: Boolean = false
 ) {
     val source: ApiSource
         get() = target.source

@@ -145,6 +145,86 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
     }
 
     @Test
+    fun `classifies connection refused as connectivity issue without emitting toast`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                java.net.ConnectException("Connection refused: connect")
+            )
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System,
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel)
+
+        assertIs<UiState.Success>(state)
+        assertEquals(1, state.errors.size)
+        assertTrue(state.errors.first().isConnectivityIssue)
+        // Sem banner nenhum, o toast genérico dispararia para cada fonte que
+        // falhar por proxy ausente — a classificação existe justamente para
+        // que a UI dê um único banner orientando a configurar o proxy, não um
+        // toast por fonte.
+        assertEquals(null, viewModel.toastMessage.value)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `classifies unknown host as connectivity issue`() = runTest {
+        val recordedSnapshots = mutableListOf<ApiUsageStats>()
+        val anthropicRepo = object : AnthropicRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(
+                java.net.UnknownHostException("proxy.empresa.invalid")
+            )
+        }
+        val minimaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+        }
+        val codexRepo = object : CodexRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+        val deepSeekRepo = object : DeepSeekRepository {
+            override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        }
+
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(anthropicRepo),
+            GetMiniMaxUsageUseCase(minimaxRepo),
+            GetCodexUsageUseCase(codexRepo),
+            GetDeepSeekUsageUseCase(deepSeekRepo),
+            defaultEnabledApis(),
+            historyUseCase(recordedSnapshots),
+            clock = Clock.System,
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+        val state = awaitSettledState(viewModel)
+
+        assertIs<UiState.Success>(state)
+        assertTrue(state.errors.first().isConnectivityIssue)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `clearToast nulls the toast message`() = runTest {
         val viewModel = successViewModel(mutableListOf())
         viewModel.clearToast()

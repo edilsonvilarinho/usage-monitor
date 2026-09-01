@@ -165,6 +165,51 @@ class UiStateTest {
     }
 
     @Test
+    fun `isConnectivityIssue true when the connectivity marker is present`() {
+        val error = UiApiError(
+            source = ApiSource.ANTHROPIC,
+            message = "usage-monitor:network-connectivity-failure (Connection refused: connect)"
+        )
+        assertTrue(error.isConnectivityIssue)
+    }
+
+    @Test
+    fun `isConnectivityIssue false without the marker`() {
+        val error = UiApiError(source = ApiSource.ANTHROPIC, message = "Connection refused: connect")
+        assertFalse(error.isConnectivityIssue)
+    }
+
+    @Test
+    fun `isConnectivityIssue is not a configuration issue`() {
+        // Categoria própria (issue #174): a causa não é credencial errada, e
+        // classificar como configuração orientaria o usuário a revisar login
+        // em vez de proxy.
+        val error = UiApiError(
+            source = ApiSource.ANTHROPIC,
+            message = "usage-monitor:network-connectivity-failure (Connection refused: connect)"
+        )
+        assertFalse(error.isConfigurationIssue)
+    }
+
+    @Test
+    fun `isProxyAuthIssue true for HTTP 407`() {
+        val error = UiApiError(source = ApiSource.ANTHROPIC, message = "Anthropic HTTP 407: Proxy Authentication Required")
+        assertTrue(error.isProxyAuthIssue)
+    }
+
+    @Test
+    fun `isProxyAuthIssue counts as configuration issue`() {
+        val error = UiApiError(source = ApiSource.ANTHROPIC, message = "Anthropic HTTP 407: Proxy Authentication Required")
+        assertTrue(error.isConfigurationIssue)
+    }
+
+    @Test
+    fun `isProxyAuthIssue false for unrelated status`() {
+        val error = UiApiError(source = ApiSource.ANTHROPIC, message = "Anthropic HTTP 400: invalid request")
+        assertFalse(error.isProxyAuthIssue)
+    }
+
+    @Test
     fun `formattedMessage prefixes source label`() {
         assertEquals(
             "Anthropic: timeout",

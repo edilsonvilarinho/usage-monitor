@@ -355,7 +355,8 @@ private fun ErrorContent(
 ) {
     val warnings = errors.mapNotNull { error -> warningFor(error = error, language = language) }
     val genericErrors = errors.filterNot { error ->
-        error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue
+        error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue ||
+            error.isConnectivityIssue
     }
 
     Box(
@@ -428,7 +429,8 @@ private fun SuccessContent(
         apiStatsList.filter { stats -> stats.targetKey !in orderedTargets }
     val warnings = partialErrors.mapNotNull { error -> warningFor(error = error, language = language) }
     val genericErrors = partialErrors.filterNot { error ->
-        error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue
+        error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue ||
+            error.isConnectivityIssue
     }
     val scrollState = rememberScrollState()
 

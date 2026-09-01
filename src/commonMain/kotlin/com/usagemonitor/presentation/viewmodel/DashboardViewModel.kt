@@ -57,9 +57,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.net.ssl.SSLHandshakeException
 
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
 
@@ -696,7 +702,21 @@ class DashboardViewModel(
         } else {
             null
         }
-        val rawMessage = error.message ?: error::class.simpleName ?: "erro desconhecido"
+        val originalMessage = error.message ?: error::class.simpleName ?: "erro desconhecido"
+        // Falha de conectividade (proxy ausente/incorreto, DNS, timeout de conexão)
+        // é classificada pelo TIPO da exceção, não por substring da mensagem: o
+        // texto de `ConnectException`/`SocketTimeoutException` varia por JVM e SO,
+        // e não dá para confiar nele. O marcador fixo entra como prefixo — mesmo
+        // mecanismo de `HTTP_RATE_LIMIT_MARKER` — para o `UiApiError`/`warningFor`
+        // existentes reconhecerem por substring sem precisar de um enum de erro
+        // novo. HTTP 407 (proxy exige credencial) não passa por aqui: chega como
+        // resposta HTTP normal e cai no mecanismo de marcador de status já usado
+        // por 429/503 (ver `RemoteApiDataSource.requireSuccess`).
+        val rawMessage = if (isConnectivityFailure(error)) {
+            "$NETWORK_CONNECTIVITY_MARKER ($originalMessage)"
+        } else {
+            originalMessage
+        }
         val message = sanitizeUiErrorMessage(source, rawMessage)
 
         // Funil único de toda falha de coleta, e por isso o único ponto de
@@ -708,12 +728,20 @@ class DashboardViewModel(
         // para o usuário, e o relatório é ainda mais público que a tela dele.
         breadcrumbs.record(BreadcrumbCategory.API_CALL, "${source.name}: falhou — $message")
 
-        if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
-            _toastMessage.value = DashboardToast.RateLimit(source)
-            return UiApiError(target = target, message = message, rawMessage = rawMessage, targetLabel = targetLabel)
+        val uiError = UiApiError(target = target, message = message, rawMessage = rawMessage, targetLabel = targetLabel)
+
+        // Avaliada antes de rate limit/credencial: falha de conectividade nunca
+        // teve resposta HTTP nenhuma, então não pode ser confundida com 429/401 —
+        // e sem banner próprio (`warningFor`) o toast genérico dispararia uma vez
+        // por fonte, virando ruído quando a rede inteira está sem proxy.
+        if (uiError.isConnectivityIssue) {
+            return uiError
         }
 
-        val uiError = UiApiError(target = target, message = message, rawMessage = rawMessage, targetLabel = targetLabel)
+        if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
+            _toastMessage.value = DashboardToast.RateLimit(source)
+            return uiError
+        }
 
         if (uiError.isServiceUnavailableIssue) {
             return uiError
@@ -727,6 +755,31 @@ class DashboardViewModel(
         }
 
         return uiError
+    }
+
+    /**
+     * `error.cause` também é checado porque o Ktor às vezes envelopa a exceção de
+     * socket original numa própria (ex.: `HttpRequestTimeoutException` não estende
+     * `SocketTimeoutException` e não carrega a causa de rede como `cause` sempre,
+     * mas outros wrappers do client engine podem).
+     */
+    private fun isConnectivityFailure(error: Throwable): Boolean {
+        return isConnectivityException(error) || isConnectivityException(error.cause)
+    }
+
+    private fun isConnectivityException(error: Throwable?): Boolean {
+        return when (error) {
+            null -> false
+            // `ConnectTimeoutException` do Ktor estende `ConnectException`, então
+            // este branch já cobre o timeout de conexão do próprio Ktor.
+            is UnknownHostException,
+            is NoRouteToHostException,
+            is ConnectException,
+            is SocketTimeoutException,
+            is SSLHandshakeException,
+            is HttpRequestTimeoutException -> true
+            else -> false
+        }
     }
 
     private fun publishUiState(enabledTargets: Set<UsageTargetKey>) {
