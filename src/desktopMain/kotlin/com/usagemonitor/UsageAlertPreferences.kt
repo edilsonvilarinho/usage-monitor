@@ -2,12 +2,16 @@ package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
+import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
+import com.usagemonitor.domain.entity.MIN_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.UsageAlertSettings
 
 private const val QUOTA_ALERTS_ENABLED_KEY = "alertsQuotaEnabled"
 private const val QUOTA_ALERT_PERCENTS_KEY = "alertsQuotaPercents"
 private const val SESSION_ALERTS_ENABLED_KEY = "alertsSessionEnabled"
+private const val STALLED_ALERTS_ENABLED_KEY = "alertsStalledEnabled"
+private const val STALL_THRESHOLD_MINUTES_KEY = "alertsStallThresholdMinutes"
 private const val QUIET_HOURS_KEY = "alertsQuietHours"
 
 /**
@@ -23,6 +27,8 @@ internal fun readPersistedAlertSettings(settings: PreferencesSettings): UsageAle
         quotaAlertsEnabled = settings.getBoolean(QUOTA_ALERTS_ENABLED_KEY, true),
         quotaPercents = decodeQuotaPercents(settings.getStringOrNull(QUOTA_ALERT_PERCENTS_KEY)),
         sessionAlertsEnabled = settings.getBoolean(SESSION_ALERTS_ENABLED_KEY, true),
+        stalledSessionAlertsEnabled = settings.getBoolean(STALLED_ALERTS_ENABLED_KEY, true),
+        stallThresholdMillis = decodeStallThresholdMillis(settings.getIntOrNull(STALL_THRESHOLD_MINUTES_KEY)),
         quietHours = decodeQuietHours(settings.getStringOrNull(QUIET_HOURS_KEY))
     )
 }
@@ -31,6 +37,8 @@ internal fun persistAlertSettings(settings: PreferencesSettings, value: UsageAle
     settings.putBoolean(QUOTA_ALERTS_ENABLED_KEY, value.quotaAlertsEnabled)
     settings.putString(QUOTA_ALERT_PERCENTS_KEY, encodeQuotaPercents(value.quotaPercents))
     settings.putBoolean(SESSION_ALERTS_ENABLED_KEY, value.sessionAlertsEnabled)
+    settings.putBoolean(STALLED_ALERTS_ENABLED_KEY, value.stalledSessionAlertsEnabled)
+    settings.putInt(STALL_THRESHOLD_MINUTES_KEY, (value.effectiveStallThresholdMillis / 60_000L).toInt())
     settings.putString(QUIET_HOURS_KEY, encodeQuietHours(value.quietHours))
 }
 
@@ -57,6 +65,24 @@ internal fun encodeQuotaPercents(percents: List<Int>): String {
         .distinct()
         .sorted()
         .joinToString(",")
+}
+
+/**
+ * Limiar gravado em minutos, com o piso do domain aplicado na leitura.
+ *
+ * Minutos e não millis porque o valor vai em claro para o registro e é lá que
+ * alguém pode editá-lo à mão. Ausente ou abaixo do piso cai no default — o
+ * armazenamento não é fonte confiável de faixa válida.
+ */
+internal fun decodeStallThresholdMillis(storedMinutes: Int?): Long {
+    if (storedMinutes == null) {
+        return DEFAULT_STALL_THRESHOLD_MILLIS
+    }
+    val millis = storedMinutes.toLong() * 60_000L
+    if (millis < MIN_STALL_THRESHOLD_MILLIS) {
+        return DEFAULT_STALL_THRESHOLD_MILLIS
+    }
+    return millis
 }
 
 /** `"22-8"` significa das 22h às 8h do dia seguinte. Vazio ou inválido = sem silêncio. */

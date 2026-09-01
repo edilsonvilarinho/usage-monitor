@@ -78,6 +78,7 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
+import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
 import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
@@ -712,6 +713,13 @@ private fun runUsageMonitor(
             liveIntervalMillis = TEAM_PRESENCE_LIVE_INTERVAL_MILLIS
         )
     }
+    // Preferências de alerta como flow, e não como estado da composição: quem as
+    // consome é o view model, que vive fora dela. Declarado antes do semáforo
+    // porque é dele que sai o limiar da detecção de sessão sem resposta.
+    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
+    val getStalledCliSessions = remember(cliSessionRepository) {
+        GetStalledCliSessionsUseCase(cliSessionRepository)
+    }
     // Semáforo dos botões dos cards: lê o índice local de todas as contas e, para
     // as que participam do time, o servidor. Reusa o mesmo `syncCliSessionIndex`
     // das outras telas — o índice é um só.
@@ -720,6 +728,11 @@ private fun runUsageMonitor(
             getCliPulses = GetActiveCliSessionPulsesUseCase(cliSessionRepository),
             getTeamPulse = GetActiveTeamSessionPulseUseCase(teamUsageRepository),
             syncCliSessionIndex = syncCliSessionIndex,
+            // Detecção de sessão sem resposta: mora aqui porque a passada local
+            // deste laço continua com a janela minimizada, que é o destinatário
+            // do aviso.
+            getStalledSessions = getStalledCliSessions,
+            stallThresholdProvider = { alertSettingsFlow.value.effectiveStallThresholdMillis },
             teamTargetsProvider = {
                 buildSessionPulseTargets(
                     registry = profileRegistry,
@@ -733,14 +746,12 @@ private fun runUsageMonitor(
     }
     val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()
     val teamSessionPulses by sessionPulseViewModel.teamPulses.collectAsState()
-    // Preferências de alerta como flow, e não como estado da composição: quem as
-    // consome é o view model, que vive fora dela.
-    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
     val usageAlertViewModel = remember(viewModel, sessionPulseViewModel, alertSettingsFlow) {
         UsageAlertViewModel(
             dashboardState = viewModel.uiState,
             cliPulses = sessionPulseViewModel.cliPulses,
-            alertSettings = alertSettingsFlow
+            alertSettings = alertSettingsFlow,
+            stalledSessions = sessionPulseViewModel.stalledSessions
         )
     }
     val teamKeysViewModel = remember(teamAdminRepository) {

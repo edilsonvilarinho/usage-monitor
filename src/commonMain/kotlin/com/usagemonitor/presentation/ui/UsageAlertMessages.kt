@@ -20,6 +20,7 @@ fun usageAlertMessage(alert: UsageAlert, language: AppLanguage): UsageAlertMessa
     return when (alert) {
         is UsageAlert.QuotaThreshold -> quotaThresholdMessage(alert, language)
         is UsageAlert.SessionSaturated -> sessionSaturatedMessage(alert, language)
+        is UsageAlert.SessionStalled -> sessionStalledMessage(alert, language)
     }
 }
 
@@ -67,6 +68,37 @@ private fun sessionSaturatedMessage(
     } else {
         val subject = alert.projectName?.let { name -> "The session in $name" } ?: "A session"
         "$subject filled its context window. Run /compact or start a new session."
+    }
+
+    return UsageAlertMessage(title = title, body = body)
+}
+
+/**
+ * Ausência de resposta, nunca "seu processo travou".
+ *
+ * A evidência é o transcript: houve pedido e não houve resposta. O app não olha o
+ * sistema operacional e não sabe se o processo existe — prometer isso na
+ * notificação seria afirmar o que não se mediu, e a própria issue #177 pede a
+ * reserva.
+ */
+private fun sessionStalledMessage(
+    alert: UsageAlert.SessionStalled,
+    language: AppLanguage
+): UsageAlertMessage {
+    val isPt = language == AppLanguage.PT
+    val title = if (isPt) "Sessão CLI sem resposta" else "CLI session with no reply"
+    // Mesmo formatador da coluna de tempo ativo das Sessões CLI: um segundo dono
+    // do formato daria duas grafias para a mesma grandeza na mesma tela.
+    val elapsed = formatActiveTime(alert.pendingMillis)
+
+    val body = if (isPt) {
+        val subject = alert.projectName?.let { name -> "A sessão em $name" } ?: "Uma sessão"
+        "$subject está há $elapsed sem resposta desde o último pedido. " +
+            "Verifique se o processo do Claude Code ainda está em execução."
+    } else {
+        val subject = alert.projectName?.let { name -> "The session in $name" } ?: "A session"
+        "$subject has had no reply for $elapsed since the last request. " +
+            "Check whether the Claude Code process is still running."
     }
 
     return UsageAlertMessage(title = title, body = body)

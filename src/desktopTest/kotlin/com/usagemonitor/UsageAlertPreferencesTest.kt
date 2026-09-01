@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
+import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.presentation.ui.components.wrapHour
 import kotlin.test.Test
@@ -45,6 +46,24 @@ class UsageAlertPreferencesTest {
         assertNull(decodeQuietHours("22-99"))
         assertNull(decodeQuietHours("noite-manha"))
         assertNull(decodeQuietHours(""))
+    }
+
+    @Test
+    fun `an absent stall threshold falls back to the default`() {
+        assertEquals(DEFAULT_STALL_THRESHOLD_MILLIS, decodeStallThresholdMillis(null))
+    }
+
+    @Test
+    fun `a stall threshold survives a round trip in minutes`() {
+        assertEquals(60L * 60 * 1_000, decodeStallThresholdMillis(60))
+        assertEquals(4L * 60 * 60 * 1_000, decodeStallThresholdMillis(240))
+    }
+
+    /** Registro editado à mão não é fonte confiável de faixa válida. */
+    @Test
+    fun `a stall threshold below the floor falls back to the default`() {
+        assertEquals(DEFAULT_STALL_THRESHOLD_MILLIS, decodeStallThresholdMillis(5))
+        assertEquals(DEFAULT_STALL_THRESHOLD_MILLIS, decodeStallThresholdMillis(-30))
     }
 
     @Test
