@@ -129,6 +129,7 @@ import com.usagemonitor.presentation.ui.DesktopDialogFrame
 import com.usagemonitor.presentation.ui.BugReportHost
 import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
+import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -152,6 +153,10 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.resetLabel
+import com.usagemonitor.presentation.ui.components.riskLevelLabel
+import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
@@ -182,6 +187,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.prefs.Preferences
@@ -1071,7 +1077,24 @@ private fun runUsageMonitor(
     // sem o coletor com debounce que a opacidade e a escala precisam — não há
     // slider aqui, e um clique não vira uma gravação por pixel.
     var cardsOnlyMode by remember { mutableStateOf(readPersistedCardsOnlyMode(settings)) }
+    // Barra HUD (issue #164): terceiro chrome, ainda mais discreto. Mutuamente
+    // exclusivo com o modo somente cards por regra de negócio aqui — os dois
+    // setters se desligam um ao outro —, não por tipo: só uma moldura reduzida
+    // por vez faz sentido.
+    var hudMode by remember { mutableStateOf(readPersistedHudMode(settings)) }
+    val setHudMode: (Boolean) -> Unit = { enabled ->
+        if (enabled) {
+            cardsOnlyMode = false
+            persistCardsOnlyMode(settings, false)
+        }
+        hudMode = enabled
+        persistHudMode(settings, enabled)
+    }
     val setCardsOnlyMode: (Boolean) -> Unit = { enabled ->
+        if (enabled) {
+            hudMode = false
+            persistHudMode(settings, false)
+        }
         cardsOnlyMode = enabled
         persistCardsOnlyMode(settings, enabled)
     }
@@ -1569,6 +1592,19 @@ private fun runUsageMonitor(
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
+        // Barra HUD (issue #164): a mesma fonte que já move o ícone da bandeja
+        // (UsageAlertViewModel.worstRisk), só que com a cota vencedora e não
+        // apenas o nível — é o que deixa a faixa dizer qual fonte e quando ela
+        // reseta. `resetLabel` é a mesma função que o cabeçalho expandido do
+        // card usa: nenhum formato de data novo.
+        val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
+        val hudStatusLabel = hudSnapshot?.let { snapshot -> riskLevelLabel(snapshot.risk.level, language) }
+            ?: if (language == AppLanguage.PT) "Carregando" else "Loading"
+        val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
+        val hudSourceLabel = hudSnapshot?.stats?.let { stats ->
+            stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName
+        }
+        val hudResetLabel = hudSnapshot?.let { snapshot -> resetLabel(snapshot.quota, language, Clock.System.now()) }
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopWindowFrame(
                 title = "Usage Monitor",
@@ -1578,7 +1614,17 @@ private fun runUsageMonitor(
                     shutdownApplication()
                 },
                 compact = cardsOnlyMode,
-                onExitCompact = { setCardsOnlyMode(false) }
+                onExitCompact = { setCardsOnlyMode(false) },
+                hud = hudMode,
+                hudContent = {
+                    HudBar(
+                        statusLabel = hudStatusLabel,
+                        statusTone = hudStatusTone,
+                        sourceLabel = hudSourceLabel,
+                        resetLabel = hudResetLabel,
+                        onOpenFull = { setHudMode(false) }
+                    )
+                }
             ) {
                 DashboardScreen(
                     viewModel = viewModel,
