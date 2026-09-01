@@ -22,6 +22,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.isTraySupported
@@ -157,6 +158,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.resetLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import com.usagemonitor.presentation.ui.components.toneFor
+import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
@@ -220,6 +222,15 @@ private val API_KEY_DEPENDENT_SOURCES = setOf(
 internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 /** Piso horizontal do Dashboard; abaixo disso os cards já operam em coluna única. */
 private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
+
+/**
+ * Piso horizontal da faixa HUD (issue #164) — bem abaixo do piso normal, que
+ * existe para caber os cards. A faixa não tem cards, só o dot+word de
+ * [com.usagemonitor.presentation.ui.HudBar]; a largura real é sempre a da
+ * tela inteira (`resizable = false`), este número só evita que o AWT recuse
+ * um valor absurdo.
+ */
+private const val HUD_MIN_WINDOW_WIDTH_DP = 160
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
@@ -918,6 +929,11 @@ private fun runUsageMonitor(
             screenWorkArea
         )
     )
+    // Declarado aqui — antes do coletor de persistência logo abaixo — e não
+    // junto de `cardsOnlyMode` (bem mais adiante): aquele coletor precisa
+    // saber se está em modo HUD para não gravar a faixa de 24dp como se fosse
+    // o tamanho normal da janela salvo pelo usuário.
+    var hudMode by remember { mutableStateOf(readPersistedHudMode(settings)) }
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -930,6 +946,12 @@ private fun runUsageMonitor(
             .debounce(250.milliseconds)
             .collect { (isMinimized, size, placement) ->
             isAppVisible.value = !isMinimized
+            // Em modo HUD, `size`/`placement` descrevem a faixa de 24dp, não a
+            // janela do usuário — gravá-los aqui é o defeito que a issue #164
+            // custou a medir: o app nasceria na faixa na próxima abertura.
+            if (hudMode) {
+                return@collect
+            }
             persistMainWindowState(
                 settings = settings,
                 snapshot = MainWindowSnapshot(
@@ -1080,8 +1102,10 @@ private fun runUsageMonitor(
     // Barra HUD (issue #164): terceiro chrome, ainda mais discreto. Mutuamente
     // exclusivo com o modo somente cards por regra de negócio aqui — os dois
     // setters se desligam um ao outro —, não por tipo: só uma moldura reduzida
-    // por vez faz sentido.
-    var hudMode by remember { mutableStateOf(readPersistedHudMode(settings)) }
+    // por vez faz sentido. `hudMode` em si é declarado mais acima, perto de
+    // `screenWorkArea`: o coletor que persiste tamanho/posição da janela
+    // principal precisa dele antes deste ponto, para não gravar a faixa de
+    // 24dp como se fosse o tamanho normal da janela.
     val setHudMode: (Boolean) -> Unit = { enabled ->
         if (enabled) {
             cardsOnlyMode = false
@@ -1524,7 +1548,15 @@ private fun runUsageMonitor(
         icon = iconImage,
         state = mainWindowState,
         undecorated = true,
-        alwaysOnTop = alwaysOnTopEnabled,
+        // A preferência do usuário nunca é sobrescrita: isto é uma expressão
+        // recomposta a cada leitura, não uma gravação — `alwaysOnTopEnabled`
+        // continua sendo lido/gravado só pelo toggle de Configurações. Em
+        // modo HUD a janela fica sempre no topo independente da preferência,
+        // porque uma faixa que uma outra janela cobre deixou de ser HUD.
+        alwaysOnTop = alwaysOnTopEnabled || hudMode,
+        // Arrastar ou redimensionar a faixa pela borda não faz sentido: ela é
+        // ancorada, de largura e altura fixas.
+        resizable = !hudMode,
         // Terceira saída do modo somente cards, ao lado da bandeja e da faixa de
         // hover. Um modo que esconde o botão de fechar precisa de mais de um
         // caminho de volta, e o teclado é o único que funciona com a janela
@@ -1569,13 +1601,46 @@ private fun runUsageMonitor(
                 )
             }
         }
+        // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
+        // faixa de 24dp — a janela ficaria presa no tamanho antigo por baixo
+        // do que `mainWindowState.size` pede. Precisa vir **antes** do efeito
+        // que redimensiona logo abaixo: os dois reagem a `hudMode` na mesma
+        // recomposição, e é a ordem textual aqui dentro que decide qual
+        // aplica primeiro.
         ApplyWindowMinimumSize(
             window = window,
-            widthDp = MAIN_MIN_WINDOW_WIDTH_DP,
-            heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+            widthDp = if (hudMode) HUD_MIN_WINDOW_WIDTH_DP else MAIN_MIN_WINDOW_WIDTH_DP,
+            heightDp = if (hudMode) AppChrome.hud.value.toInt() else DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
             uiScalePercent = uiScalePercent,
             workArea = screenWorkArea
         )
+        // Geometria da faixa HUD: encolhe a janela principal para o topo da
+        // tela ao entrar, restaura tamanho/posição/estado de antes ao sair.
+        // O snapshot mora aqui, e não em `MainWindowSnapshot` (que não
+        // carrega posição — a janela normal nunca precisou dela): só esta
+        // transição precisa saber "de onde veio" para voltar.
+        var preHudWindowGeometry by remember {
+            mutableStateOf<Triple<DpSize, WindowPosition, WindowPlacement>?>(null)
+        }
+        LaunchedEffect(hudMode) {
+            if (hudMode) {
+                preHudWindowGeometry = Triple(
+                    mainWindowState.size,
+                    mainWindowState.position,
+                    mainWindowState.placement
+                )
+                mainWindowState.placement = WindowPlacement.Floating
+                mainWindowState.size = DpSize(screenWorkArea.size.width, AppChrome.hud)
+                mainWindowState.position = WindowPosition(screenWorkArea.x, screenWorkArea.y)
+            } else {
+                preHudWindowGeometry?.let { (size, position, placement) ->
+                    mainWindowState.size = size
+                    mainWindowState.position = position
+                    mainWindowState.placement = placement
+                }
+                preHudWindowGeometry = null
+            }
+        }
         // O ACK sai daqui e nao do topo do `main()`: ele afirma que esta versao
         // subiu inteira, e o unico ponto em que isso e verdade e depois de o
         // `SingleInstanceGuard` ter deixado passar, dos recursos criticos terem
