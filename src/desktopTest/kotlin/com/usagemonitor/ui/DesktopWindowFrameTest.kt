@@ -13,7 +13,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.COMPACT_EXIT_DESCRIPTION
+import com.usagemonitor.presentation.ui.HUD_BAR_OPEN_DESCRIPTION
+import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.TitleBarButton
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
@@ -98,6 +101,72 @@ class DesktopWindowFrameTest {
      * continuar iguais: é o que faz a janela do dashboard e a janela de sessões
      * lerem como o mesmo produto.
      */
+    /**
+     * `HudBar` não depende de `WindowScope` (decisão já tomada: sem arrasto),
+     * então é exercitável aqui inteiro, ao contrário do resto do cromo.
+     */
+    @Test
+    fun `a barra HUD preenche a altura do token`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Crítico",
+                        statusTone = AppTone.CRITICAL,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 42min",
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Crítico").assertIsDisplayed()
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).assertHeightIsEqualTo(AppChrome.hud)
+    }
+
+    /** Não há botão próprio: a faixa inteira é o alvo de clique. */
+    @Test
+    fun `a barra HUD despacha o clique em qualquer ponto da faixa`() = runDesktopComposeUiTest {
+        var clicks = 0
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Normal",
+                        statusTone = AppTone.OK,
+                        sourceLabel = null,
+                        resetLabel = null,
+                        onOpenFull = { clicks += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
+        assertEquals(1, clicks)
+    }
+
+    /** Estado de carregamento: fonte e reset ainda não chegaram. */
+    @Test
+    fun `a barra HUD sem fonte nem reset nao quebra o layout`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Normal",
+                        statusTone = AppTone.OK,
+                        sourceLabel = null,
+                        resetLabel = null,
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Normal").assertIsDisplayed()
+    }
+
     @Test
     fun `as alturas do cromo batem com o contrato do design system`() {
         assertEquals(34.dp, AppChrome.titleBar)

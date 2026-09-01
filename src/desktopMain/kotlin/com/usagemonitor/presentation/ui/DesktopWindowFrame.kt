@@ -51,6 +51,8 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.usagemonitor.presentation.ui.components.AppDivider
+import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -63,6 +65,9 @@ private val WindowCornerRadius = 10.dp
 
 /** Descrição semântica do botão que devolve a moldura completa da janela. */
 internal const val COMPACT_EXIT_DESCRIPTION = "Sair do modo somente cards"
+
+/** Descrição semântica da faixa HUD inteira: é o único alvo de clique dela. */
+internal const val HUD_BAR_OPEN_DESCRIPTION = "Abrir Usage Monitor"
 
 /**
  * Altura da barra de título das seis janelas.
@@ -97,13 +102,25 @@ fun WindowScope.DesktopWindowFrame(
     compact: Boolean = false,
     /** Volta ao modo normal; `null` esconde o botão correspondente na faixa. */
     onExitCompact: (() -> Unit)? = null,
+    /**
+     * Barra HUD (issue #164): terceiro chrome, ainda mais discreto que
+     * [compact] — sem título, sem [content], só [HudBar]. Mutuamente
+     * exclusivo com `compact` por regra de negócio de quem chama esta
+     * função (`Main.kt`), não por tipo.
+     */
+    hud: Boolean = false,
+    /** Conteúdo da barra HUD; ignorado quando [hud] é `false`. */
+    hudContent: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
     val isMaximized = windowState.placement == WindowPlacement.Maximized
 
-    DisposableEffect(isMaximized, density) {
-        if (isMaximized) {
+    // Cantos arredondados pressupõem a janela flutuando sobre o desktop; a
+    // faixa HUD, encostada na borda superior da tela, sai reta como uma
+    // janela maximizada.
+    DisposableEffect(isMaximized, hud, density) {
+        if (isMaximized || hud) {
             window.shape = null
         } else {
             applyWindowShape(density, WindowCornerRadius)
@@ -123,7 +140,7 @@ fun WindowScope.DesktopWindowFrame(
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (!compact) {
+            if (!compact && !hud) {
                 DesktopTitleBar(
                     title = title,
                     iconPainter = iconPainter,
@@ -138,6 +155,14 @@ fun WindowScope.DesktopWindowFrame(
                     .weight(1f)
                     .background(MaterialTheme.colorScheme.background)
             ) {
+                // Em modo HUD, content() não compõe: a faixa não mostra cards,
+                // só o resumo que hudContent traz. A janela real, redimensionada
+                // por quem chama esta função, mal tem altura para mais que isso.
+                if (hud) {
+                    hudContent?.invoke()
+                    return@Box
+                }
+
                 content()
 
                 if (compact) {
@@ -205,6 +230,67 @@ private fun WindowScope.CompactTitleBarOverlay(
                 windowState = windowState,
                 onCloseRequest = onCloseRequest,
                 onExitCompact = onExitCompact
+            )
+        }
+    }
+}
+
+/**
+ * Conteúdo da barra HUD (issue #164): o pior risco entre todas as cotas, a
+ * fonte que o determinou e o tempo até o reset.
+ *
+ * **Sem [WindowScope], sem `WindowDraggableArea`.** Decisão já tomada: a
+ * barra HUD não arrasta a janela — não há cards para reordenar nesta faixa,
+ * então o argumento que mantém a área de arrasto fora de
+ * [CompactTitleBarOverlay] não se aplica aqui, mas o oposto (arrasto sempre
+ * presente) também não tem função a proteger. Ancoragem é geometria de
+ * `Main.kt`, não gesto do usuário.
+ *
+ * **A faixa inteira é o alvo de clique** que devolve a janela completa — não
+ * há botão próprio, e por isso a semântica vai no container inteiro, não só
+ * em `onClickLabel` (armadilha nº2 do design system: sem
+ * `Modifier.semantics { contentDescription = ... }`, `onNodeWithContentDescription`
+ * não encontra o nó).
+ */
+@Composable
+internal fun HudBar(
+    statusLabel: String,
+    statusTone: AppTone,
+    sourceLabel: String?,
+    resetLabel: String?,
+    onOpenFull: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(AppChrome.hud)
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClickLabel = HUD_BAR_OPEN_DESCRIPTION, onClick = onOpenFull)
+            .semantics { contentDescription = HUD_BAR_OPEN_DESCRIPTION }
+            .padding(horizontal = AppSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
+    ) {
+        AppStatusIndicator(label = statusLabel, tone = statusTone)
+
+        if (sourceLabel != null) {
+            Text(
+                text = sourceLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        if (resetLabel != null) {
+            Text(
+                text = resetLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
         }
     }
