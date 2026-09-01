@@ -639,6 +639,17 @@ FROM team_accounts
 `;
 
 /**
+ * O e-mail de **uma** conta, para a autorizacao de cada requisicao.
+ *
+ * Irma de [SELECT_ACCOUNT_EMAILS_SQL], que le a tabela inteira porque monta uma
+ * tela. Aqui a pergunta e sobre a conta do pedido, e varrer todas para responder
+ * sobre uma so cresceria com o time a cada chamada.
+ */
+const SELECT_ACCOUNT_EMAIL_SQL = `
+SELECT account_email AS accountEmail FROM team_accounts WHERE account_key = @accountKey
+`;
+
+/**
  * Apaga somente os turnos da sessao que ainda pertence ao device informado.
  *
  * O subselect impede um identificador de maquina obsoleto de apagar uma sessao
@@ -724,6 +735,21 @@ export class TeamRepository {
     });
 
     run();
+  }
+
+  /**
+   * Ultimo e-mail que a conta reportou, ou `null` se ela nunca reportou nenhum.
+   *
+   * Confiavel como memoria porque [upsertAccountEmail] nunca sobrescreve com
+   * nulo: uma vez reportado, o valor so muda para outro e-mail valido. E o que
+   * permite a autorizacao das **leituras** — que nao carregam e-mail no pedido —
+   * conferirem a mesma coisa que o ingest confere.
+   */
+  accountEmailOf(accountKey: string): string | null {
+    const row = this.db.prepare(SELECT_ACCOUNT_EMAIL_SQL).get({ accountKey }) as
+      | { accountEmail: string }
+      | undefined;
+    return row?.accountEmail ?? null;
   }
 
   /** Grava membro, sessoes e turnos numa transacao unica. Idempotente. */

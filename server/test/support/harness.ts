@@ -45,6 +45,7 @@ export function createHarness(configOverrides: Partial<Config> = {}): Harness {
     keySecret: TEST_KEY_SECRET,
     reportToken: TEST_REPORT_TOKEN,
     legacyKeyMode: 'open',
+    keyLabelMatch: 'strict',
     retentionDays: 45,
     maxTurnsPerRequest: 5000,
     trustProxyHops: 0,

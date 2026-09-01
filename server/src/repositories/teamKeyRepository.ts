@@ -18,6 +18,15 @@ export interface TeamKeyRecord {
 /** O minimo que a autorizacao precisa saber. Nunca traz a chave crua. */
 export interface ResolvedTeamKey {
   id: string;
+  /**
+   * Rotulo emitido pelo admin — a relacao do time, quando traz e-mail.
+   *
+   * Vem no mesmo `SELECT` da resolucao por hash porque a autorizacao precisa
+   * dele em **toda** requisicao; busca-lo por [TeamKeyRepository.findById]
+   * depois seria uma consulta a mais por chamada, e a mais cara das duas,
+   * porque aquela decifra a chave crua.
+   */
+  label: string;
   maxAccounts: number;
   accounts: string[];
 }
@@ -55,7 +64,7 @@ INSERT INTO team_keys (
  * seguinte, sem cache a invalidar em lugar nenhum.
  */
 const SELECT_BY_HASH_SQL = `
-SELECT id, max_accounts AS maxAccounts
+SELECT id, label, max_accounts AS maxAccounts
 FROM team_keys
 WHERE key_hash = @keyHash AND revoked_at IS NULL
 `;
@@ -180,14 +189,19 @@ export class TeamKeyRepository {
   /** Devolve `null` para chave desconhecida ou revogada — os dois viram 401. */
   resolve(keyHash: string): ResolvedTeamKey | null {
     const row = this.db.prepare(SELECT_BY_HASH_SQL).get({ keyHash }) as
-      | { id: string; maxAccounts: number }
+      | { id: string; label: string; maxAccounts: number }
       | undefined;
 
     if (row === undefined) {
       return null;
     }
 
-    return { id: row.id, maxAccounts: row.maxAccounts, accounts: this.accountsOf(row.id) };
+    return {
+      id: row.id,
+      label: row.label,
+      maxAccounts: row.maxAccounts,
+      accounts: this.accountsOf(row.id),
+    };
   }
 
   /**

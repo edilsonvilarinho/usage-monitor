@@ -33,6 +33,19 @@ export interface Config {
    */
   reportToken: string | null;
   legacyKeyMode: LegacyKeyMode;
+  /**
+   * O rotulo da chave vale como relacao do time?
+   *
+   * `strict` (default) recusa a conta cujo e-mail nao esta no rotulo, quando o
+   * rotulo declara algum. `off` devolve o comportamento anterior, em que o
+   * rotulo era decoracao — e a valvula de rollback sem redeploy de codigo,
+   * mesmo desenho de [legacyKeyMode].
+   *
+   * Nao desliga a **lista de bloqueio**: aquela e decisao explicita de quem
+   * administra, e desfaze-la por variavel de ambiente seria outra pessoa
+   * decidindo.
+   */
+  keyLabelMatch: KeyLabelMatchMode;
   retentionDays: number;
   maxTurnsPerRequest: number;
   trustProxyHops: number;
@@ -40,10 +53,14 @@ export interface Config {
 
 export type LegacyKeyMode = 'open' | 'off';
 
+export type KeyLabelMatchMode = 'strict' | 'off';
+
 /** Tamanho minimo de qualquer segredo aceito. Abaixo disso o boot falha. */
 export const MIN_TEAM_API_KEY_LENGTH = 32;
 
 const LEGACY_KEY_MODES: readonly string[] = ['open', 'off'];
+
+const KEY_LABEL_MATCH_MODES: readonly string[] = ['strict', 'off'];
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_RETENTION_DAYS = 45;
@@ -61,6 +78,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Config 
     keySecret: readOptionalSecret(env.TEAM_KEY_SECRET),
     reportToken: readOptionalSecret(env.TEAM_REPORT_TOKEN),
     legacyKeyMode: parseLegacyKeyMode(env.TEAM_LEGACY_KEY_MODE),
+    keyLabelMatch: parseKeyLabelMatchMode(env.TEAM_KEY_LABEL_MATCH),
     retentionDays: parseIntegerOrDefault(env.TEAM_RETENTION_DAYS, DEFAULT_RETENTION_DAYS),
     maxTurnsPerRequest: parseIntegerOrDefault(
       env.TEAM_MAX_TURNS_PER_REQUEST,
@@ -142,6 +160,17 @@ function parseLegacyKeyMode(raw: string | undefined): LegacyKeyMode {
     throw new Error(`TEAM_LEGACY_KEY_MODE aceita apenas ${LEGACY_KEY_MODES.join(' ou ')}.`);
   }
   return normalized as LegacyKeyMode;
+}
+
+function parseKeyLabelMatchMode(raw: string | undefined): KeyLabelMatchMode {
+  if (raw === undefined || raw.trim() === '') {
+    return 'strict';
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (!KEY_LABEL_MATCH_MODES.includes(normalized)) {
+    throw new Error(`TEAM_KEY_LABEL_MATCH aceita apenas ${KEY_LABEL_MATCH_MODES.join(' ou ')}.`);
+  }
+  return normalized as KeyLabelMatchMode;
 }
 
 function parseIntegerOrDefault(raw: string | undefined, fallback: number): number {
