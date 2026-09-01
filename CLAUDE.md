@@ -161,6 +161,41 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
   - As preferências vão em `PreferencesSettings` (`UsageAlertPreferences.kt`), não em `~/.usage-monitor/`: ali moram os segredos do time, e limiar não é segredo. **`UserPreferences` (domain) é código morto** — nenhuma leitura o referencia; não use aquele caminho.
   - Fechar a janela continua encerrando o app: não existe "minimizar para a bandeja".
 
+- **Sessão CLI sem resposta** (`CliStalledSession.kt` + `GetStalledCliSessionsUseCase` + `readSessionTails`;
+  issue #177, plano [`sessao-cli-travada-execucao.md`](docs/planos/sessao-cli-travada-execucao.md)): aviso quando
+  o último pedido de uma sessão fica sem resposta acima do limiar (default 2h, segmentado de 30min a 4h na aba
+  Alertas). Sai na bandeja e marca a linha da tela de Sessões CLI.
+  - **A regra sugerida na issue não sobrevive à medição.** "Sem turno novo há X" marcaria **as 323 sessões** dos
+    transcripts reais das três contas: pelo `last_ts` do índice, sessão encerrada e sessão travada são idênticas —
+    as duas param de produzir turno. O discriminador está no `.jsonl`, não no índice.
+  - **O marcador é `{"type":"system","subtype":"turn_duration"}`**, escrito pelo próprio CLI ao fechar um turno —
+    não por hook do usuário (66 dos 181 arquivos que o trazem não têm `stop_hook_summary` nenhum). Pedido `user`
+    posterior ao último marcador significa turno aberto que nunca fechou; com essa regra a marcação cai para **4 de
+    181** sessões avaliáveis, todas abandonadas há mais de 500h.
+  - **Ausência de marcador é `NOT_EVALUATED`, nunca "sem resposta"** — mesma recusa de `withKnownWindow()`. Entre as
+    sessões que o app indexa a cobertura é ~96%; ficam de fora os transcripts de subagente (0 de 102) e um punhado
+    de sessões conduzidas por harness de agente.
+  - **Teto de 24h** (`STALLED_SESSION_MAX_AGE_MILLIS`): terminal fechado no meio de um turno deixa a cauda pendente
+    para sempre, e sem o teto essas sessões virariam alerta a cada arranque — a dedup de `UsageAlertState` vive em
+    memória. Processo que não existe há um dia também não queima cota, que é o que a detecção existe para flagrar.
+  - **Só os últimos 256 KB do arquivo são lidos** (`SESSION_TAIL_WINDOW_BYTES`), e isso reproduz o veredito do
+    arquivo inteiro nos 323 casos medidos; com 64 KB um deles degrada para `NOT_EVALUATED`. A primeira linha da
+    janela vem cortada ao meio e é descartada.
+  - **A cauda usa `ClaudeTranscriptTailLineDto`, um DTO próprio.** `ClaudeTranscriptLineDto` materializa
+    `message.content` como `JsonElement`, e a cauda é justamente onde moram os `tool_result` de centenas de KB. O
+    efeito colateral é a garantia de privacidade: esta leitura **não tem como** enxergar texto de prompt ou resposta.
+  - **O caminho do transcript é derivado, não lido de `cli_sessions.file_path`.** O subagente vive em
+    `<sessionId>/subagents/agent-*.jsonl`, carrega o `sessionId` do pai e é varrido junto — e o `UPSERT` grava
+    `file_path = excluded.file_path`, então a coluna pode apontar para ele. A cauda do subagente responderia sobre
+    o subagente.
+  - **Nada disso entra no laço de indexação e não há bump de `INDEX_SCHEMA_VERSION`**: decodificar toda linha ali
+    custaria uma releitura completa de 426 MB. A leitura é sob demanda, sobre um conjunto candidato de tipicamente
+    0–5 arquivos, com cache por `(caminho, tamanho, data de modificação)` — sessão travada não escreve mais nada.
+  - **Mora no laço do `SessionPulseViewModel`**, cuja passada local continua com a janela minimizada — que é o
+    destinatário do aviso: quem deixou automação rodando e não está olhando a tela.
+  - **O texto diz "sem resposta desde o último pedido", nunca "travou"**, e há teste afirmando isso nos dois
+    idiomas: a evidência é o transcript, e o app não olha o sistema operacional.
+
 ### Empacotamento
 
 `TargetFormat.Exe` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). **O `Msi` saiu**: os dois instaladores de Windows gravavam no mesmo `%LOCALAPPDATA%\Usage Monitor`, e o do MSI nunca poderia se atualizar sozinho — `selectArtifact` só aceita `WINDOWS_NSIS`. O `upgradeUuid` continua no `build.gradle.kts` porque é o UpgradeCode das instalações MSI que já existem, e é por ele que o `UsageMonitor.nsi` as encontra e remove antes de instalar. O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
