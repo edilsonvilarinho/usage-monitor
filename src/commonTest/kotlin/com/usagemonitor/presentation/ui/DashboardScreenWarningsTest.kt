@@ -124,6 +124,57 @@ class DashboardScreenWarningsTest {
         assertNull(warningActionFor(warning = warning) { })
     }
 
+    // ── Conectividade / proxy corporativo (issue #174) ──────────────────
+
+    @Test
+    fun `connectivity warning offers retry even for a non anthropic source`() {
+        val target = UsageTargetKey.forSource(ApiSource.MINIMAX)
+        val warning = warningFor(
+            error = UiApiError(
+                target = target,
+                message = "usage-monitor:network-connectivity-failure (Connection refused: connect)"
+            ),
+            language = AppLanguage.PT
+        )
+
+        assertNotNull(warning)
+        assertTrue(warning.forcesUniversalRetry)
+
+        val retried = mutableListOf<UsageTargetKey>()
+        val action = warningActionFor(warning = warning) { key -> retried.add(key) }
+        assertNotNull(action)
+        action()
+        assertEquals(listOf(target), retried)
+    }
+
+    @Test
+    fun `connectivity warning is not classified as a configuration issue`() {
+        val error = UiApiError(
+            source = ApiSource.MINIMAX,
+            message = "usage-monitor:network-connectivity-failure (Connection refused: connect)"
+        )
+
+        assertTrue(error.isConnectivityIssue)
+        assertNotNull(warningFor(error = error, language = AppLanguage.PT))
+    }
+
+    @Test
+    fun `proxy auth failure asks to review credentials without offering a retry`() {
+        // Fonte não-Anthropic de propósito: `warningActionFor` sempre devolve
+        // ação para ApiSource.ANTHROPIC, independente do `actionLabel` — mesmo
+        // comportamento das demais mensagens de configuração (MiniMax, Kilo,
+        // OpenCode Go), que também usam `actionLabel = null` só em fontes que
+        // não sejam Anthropic.
+        val warning = warningFor(
+            error = UiApiError(source = ApiSource.MINIMAX, message = "MiniMax HTTP 407: Proxy Authentication Required"),
+            language = AppLanguage.EN
+        )
+
+        assertNotNull(warning)
+        assertNull(warning.actionLabel)
+        assertNull(warningActionFor(warning = warning) { })
+    }
+
     // ── OpenCode Go (issue #124) ─────────────────────────────────────────
 
     @Test

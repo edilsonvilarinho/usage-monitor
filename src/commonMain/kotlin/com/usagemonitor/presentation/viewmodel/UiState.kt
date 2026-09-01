@@ -96,6 +96,19 @@ data class UiApiError(
     val isServiceUnavailableIssue: Boolean
         get() = isServiceUnavailableMessage(message)
 
+    /**
+     * Falha de conectividade (proxy corporativo ausente/incorreto, DNS, timeout
+     * de conexão) — issue #174. Categoria própria, **fora** de
+     * [isConfigurationIssue]: a causa não é uma credencial errada, e tratar como
+     * tal orientaria o usuário a revisar login em vez de proxy.
+     */
+    val isConnectivityIssue: Boolean
+        get() = message.contains(NETWORK_CONNECTIVITY_MARKER, ignoreCase = true)
+
+    /** Proxy exige autenticação e a credencial enviada (ou nenhuma) foi recusada. */
+    val isProxyAuthIssue: Boolean
+        get() = isProxyAuthMessage(message)
+
     val isConfigurationIssue: Boolean
         get() = isAnthropicCredentialIssue ||
             isMiniMaxApiKeyIssue ||
@@ -103,7 +116,8 @@ data class UiApiError(
             isOpenCodeLocalIssue ||
             isOpenCodeGoApiKeyIssue ||
             isOpenCodeGoSubscriptionIssue ||
-            isKiloLocalIssue
+            isKiloLocalIssue ||
+            isProxyAuthIssue
 }
 
 internal fun sanitizeUiErrorMessage(source: ApiSource, rawMessage: String): String {
@@ -189,6 +203,23 @@ private val SERVICE_UNAVAILABLE_MARKERS = listOf(
     "remote connection failure"
 )
 
+/**
+ * Nunca mostrado ao usuário — é só um token de correspondência que
+ * `DashboardViewModel.handleTargetFailure` embute na mensagem quando o tipo da
+ * exceção indica falha de conectividade (issue #174). Mesmo mecanismo de
+ * `HTTP_RATE_LIMIT_MARKER`, só que acionado por tipo de exceção em vez de
+ * status HTTP.
+ */
+internal const val NETWORK_CONNECTIVITY_MARKER = "usage-monitor:network-connectivity-failure"
+
+// Ao contrário da falha de conectividade, HTTP 407 chega como resposta HTTP
+// normal (ver `RemoteApiDataSource.requireSuccess`), então cai no mesmo
+// mecanismo de marcador por substring dos demais status.
+private val PROXY_AUTH_MARKERS = listOf(
+    "HTTP 407",
+    "Proxy Authentication Required"
+)
+
 private fun isAnthropicCredentialMessage(message: String): Boolean {
     return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }
@@ -225,4 +256,8 @@ private fun isRateLimitMessage(message: String): Boolean {
 
 private fun isServiceUnavailableMessage(message: String): Boolean {
     return SERVICE_UNAVAILABLE_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isProxyAuthMessage(message: String): Boolean {
+    return PROXY_AUTH_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }

@@ -68,6 +68,7 @@ import com.usagemonitor.domain.entity.MAX_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.domain.entity.MIN_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MIN_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.domain.entity.UI_SCALE_STEP_PERCENT
+import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -100,7 +101,7 @@ const val REPORT_BUG_BUTTON_TEST_TAG = "reportBugButton"
  * exaustivos de `AppLanguage` e companhia não têm nada a ver com esta escolha.
  * A ordem de declaração é a ordem das abas na tela.
  */
-enum class SettingsTab { GENERAL, ALERTS, APIS, ACCOUNTS, TEAM }
+enum class SettingsTab { GENERAL, ALERTS, APIS, ACCOUNTS, TEAM, NETWORK }
 
 /** Marcado por aba: o rótulo é traduzido e buscar por texto amarraria o teste ao idioma. */
 fun settingsTabTestTag(tab: SettingsTab): String = "settingsTab_${tab.name}"
@@ -113,6 +114,7 @@ internal fun settingsTabLabel(tab: SettingsTab, language: AppLanguage): String {
         SettingsTab.APIS -> if (isPt) "APIs" else "APIs"
         SettingsTab.ACCOUNTS -> if (isPt) "Contas" else "Accounts"
         SettingsTab.TEAM -> if (isPt) "Time" else "Team"
+        SettingsTab.NETWORK -> if (isPt) "Rede" else "Network"
     }
 }
 
@@ -202,6 +204,14 @@ fun SettingsDialogContent(
     onTeamValidateAdminToken: () -> Unit = {},
     onTeamOpenKeysManager: () -> Unit = {},
     onTeamExitAdminMode: () -> Unit = {},
+    proxySettings: ProxySettings = ProxySettings(),
+    proxyConnection: ProxyConnectionUiState = ProxyConnectionUiState(),
+    onProxyUseEnvironmentChange: (Boolean) -> Unit = {},
+    onProxyHostChange: (String) -> Unit = {},
+    onProxyPortChange: (String) -> Unit = {},
+    onProxyUsernameChange: (String) -> Unit = {},
+    onProxyPasswordChange: (String) -> Unit = {},
+    onProxyTestConnection: () -> Unit = {},
     toastEvent: SettingsToastEvent? = null,
     /** Aba aberta ao entrar; existe para os geradores de captura escolherem a seção. */
     initialTab: SettingsTab = SettingsTab.GENERAL,
@@ -344,6 +354,20 @@ fun SettingsDialogContent(
                             onValidateAdminToken = onTeamValidateAdminToken,
                             onOpenKeysManager = onTeamOpenKeysManager,
                             onExitAdminMode = onTeamExitAdminMode
+                        )
+                    }
+
+                    SettingsTab.NETWORK -> {
+                        NetworkSettingsSection(
+                            settings = proxySettings,
+                            language = currentLanguage,
+                            connection = proxyConnection,
+                            onUseEnvironmentProxyChange = onProxyUseEnvironmentChange,
+                            onHostChange = onProxyHostChange,
+                            onPortChange = onProxyPortChange,
+                            onUsernameChange = onProxyUsernameChange,
+                            onPasswordChange = onProxyPasswordChange,
+                            onTestConnection = onProxyTestConnection
                         )
                     }
                 }

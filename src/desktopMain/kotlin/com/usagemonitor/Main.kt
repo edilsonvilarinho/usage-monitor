@@ -40,6 +40,7 @@ import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
+import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
@@ -58,6 +59,7 @@ import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeGoRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
 import com.usagemonitor.data.repository.OpenRouterRepositoryImpl
+import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
 import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
@@ -73,6 +75,7 @@ import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
+import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -145,6 +148,8 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsField
 import com.usagemonitor.presentation.ui.components.SettingsToast
 import com.usagemonitor.presentation.ui.components.SettingsToastEvent
+import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
+import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -166,13 +171,8 @@ import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.updateAckTokenFromEnv
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logging
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.client.request.get
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -183,7 +183,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.prefs.Preferences
 import java.io.File
@@ -368,24 +367,18 @@ private fun runUsageMonitor(
         )
     }
 
-    val httpClient = remember {
-        HttpClient(OkHttp) {
-            install(ContentNegotiation) {
-                json(Json {
-                    ignoreUnknownKeys = true
-                    isLenient = true
-                })
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 20_000
-                connectTimeoutMillis = 10_000
-                socketTimeoutMillis = 20_000
-            }
-            install(Logging) {
-                level = LogLevel.NONE
-            }
-        }
+    // Lido ANTES do `httpClient`: o proxy precisa estar resolvido no momento em
+    // que o engine é montado, e o client é criado uma única vez em `remember`
+    // sem chave de recomposição — mudar a configuração nas Configurações só
+    // vale a partir do próximo arranque (issue #174).
+    val proxySettingsDataSource = remember { LocalProxySettingsDataSource() }
+    val proxySettingsFlow = remember(proxySettingsDataSource) {
+        MutableStateFlow(proxySettingsDataSource.load())
     }
+    val proxySettings by proxySettingsFlow.collectAsState()
+    val effectiveProxy = remember { resolveEffectiveProxy(proxySettingsFlow.value) }
+
+    val httpClient = remember { buildHttpClient(effectiveProxy) }
 
     val preferencesNode = remember { Preferences.userRoot().node("com.usagemonitor") }
     val settings = remember(preferencesNode) { PreferencesSettings(preferencesNode) }
@@ -1189,6 +1182,48 @@ private fun runUsageMonitor(
     var teamPresenceIsAdminOverview by remember { mutableStateOf(false) }
     var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var teamAdminConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
+    var proxyConnectionState by remember { mutableStateOf(ProxyConnectionUiState()) }
+    val networkScope = rememberCoroutineScope()
+
+    /**
+     * Cliente **efêmero**, montado com o valor corrente de [proxySettingsFlow]
+     * (já commitado pelos campos da seção, mesmo antes de o app reiniciar) —
+     * nunca o `httpClient` compartilhado, que foi montado no arranque e não
+     * pode ser reconfigurado em runtime sem arriscar `ClosedException` numa
+     * requisição in-flight de outro consumidor (issue #174).
+     */
+    val checkProxyConnection: () -> Unit = {
+        val manualProxy = resolveEffectiveProxy(proxySettingsFlow.value.copy(useEnvironmentProxy = false))
+        proxyConnectionState = ProxyConnectionUiState(ProxyConnectionUiStatus.CHECKING)
+        networkScope.launch {
+            val testClient = buildHttpClient(manualProxy)
+            val result = Result.runCatching { testClient.get("https://api.github.com/zen") }
+            testClient.close()
+
+            proxyConnectionState = result.fold(
+                onSuccess = { response ->
+                    if (response.status.isSuccess()) {
+                        ProxyConnectionUiState(
+                            status = ProxyConnectionUiStatus.OK,
+                            message = if (language == AppLanguage.PT) "Conexão OK." else "Connection OK."
+                        )
+                    } else {
+                        ProxyConnectionUiState(
+                            status = ProxyConnectionUiStatus.FAILED,
+                            message = "HTTP ${response.status.value}"
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    ProxyConnectionUiState(
+                        status = ProxyConnectionUiStatus.FAILED,
+                        message = error.message
+                            ?: if (language == AppLanguage.PT) "Falha desconhecida." else "Unknown failure."
+                    )
+                }
+            )
+        }
+    }
     var isTeamKeysOpen by remember { mutableStateOf(false) }
     val teamSyncStatus by teamSyncService.syncStatus.collectAsState()
     val teamScope = rememberCoroutineScope()
@@ -2291,6 +2326,47 @@ private fun runUsageMonitor(
                             isTeamKeysOpen = false
                             reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
                         },
+                        proxySettings = proxySettings,
+                        proxyConnection = proxyConnectionState,
+                        onProxyUseEnvironmentChange = { useEnvironment ->
+                            val saved = updateProxySettings(
+                                proxySettingsFlow,
+                                proxySettingsDataSource
+                            ) { current -> current.copy(useEnvironmentProxy = useEnvironment) }
+                            proxyConnectionState = ProxyConnectionUiState()
+                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+                        },
+                        onProxyHostChange = { host ->
+                            val saved = updateProxySettings(
+                                proxySettingsFlow,
+                                proxySettingsDataSource
+                            ) { current -> current.copy(host = host) }
+                            proxyConnectionState = ProxyConnectionUiState()
+                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+                        },
+                        onProxyPortChange = { portText ->
+                            val saved = updateProxySettings(
+                                proxySettingsFlow,
+                                proxySettingsDataSource
+                            ) { current -> current.copy(port = portText.toIntOrNull() ?: 0) }
+                            proxyConnectionState = ProxyConnectionUiState()
+                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+                        },
+                        onProxyUsernameChange = { username ->
+                            val saved = updateProxySettings(
+                                proxySettingsFlow,
+                                proxySettingsDataSource
+                            ) { current -> current.copy(username = username) }
+                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+                        },
+                        onProxyPasswordChange = { password ->
+                            val saved = updateProxySettings(
+                                proxySettingsFlow,
+                                proxySettingsDataSource
+                            ) { current -> current.copy(password = password) }
+                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+                        },
+                        onProxyTestConnection = checkProxyConnection,
                         toastEvent = settingsToastEvent
                     )
                 }
@@ -2474,6 +2550,16 @@ private fun updateTeamSettings(
     settingsFlow: MutableStateFlow<TeamIntegrationSettings>,
     dataSource: LocalTeamSettingsDataSource,
     transform: (TeamIntegrationSettings) -> TeamIntegrationSettings
+): Boolean {
+    val updated = transform(settingsFlow.value)
+    settingsFlow.value = updated
+    return runCatching { dataSource.save(updated) }.isSuccess
+}
+
+private fun updateProxySettings(
+    settingsFlow: MutableStateFlow<ProxySettings>,
+    dataSource: LocalProxySettingsDataSource,
+    transform: (ProxySettings) -> ProxySettings
 ): Boolean {
     val updated = transform(settingsFlow.value)
     settingsFlow.value = updated
