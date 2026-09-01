@@ -108,4 +108,23 @@ CREATE TABLE IF NOT EXISTS team_key_accounts (
 -- simultaneos um grava e o outro falha na constraint em vez de duplicar.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_team_key_accounts_account
   ON team_key_accounts(account_key);
+
+-- Contas que o admin declarou fora do time.
+--
+-- Sem esta tabela, apagar uma conta era inutil: a maquina que ainda participa
+-- dela reivindica de novo na batida de presenca seguinte, e o historico volta a
+-- crescer. E o unico lugar onde "esta conta nao faz parte do time" fica escrito.
+--
+-- account_email e um RETRATO do momento do bloqueio, nao uma juncao com
+-- team_accounts: apagar a conta apaga a linha de la, e a lista precisa continuar
+-- legivel depois disso — UUID cru nao identifica ninguem para quem vai decidir
+-- desbloquear.
+--
+-- purgeExpiredData nao toca aqui: bloqueio nao envelhece.
+CREATE TABLE IF NOT EXISTS team_blocked_accounts (
+  account_key   TEXT    PRIMARY KEY,
+  account_email TEXT,
+  reason        TEXT,
+  blocked_at    INTEGER NOT NULL
+);
 `;

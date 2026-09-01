@@ -292,9 +292,18 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
    * porque as duas tabelas pertencem a repositorios diferentes; compor os dois
    * na rota e o mesmo padrao do `PATCH` aqui em cima.
    *
-   * Nao impede a conta de voltar: ingest e presenca reivindicam sozinhos, entao
-   * uma maquina que ainda participe dela a recria na batida seguinte. Quem trava
-   * isso e o cliente parar de marcar a conta, ou o `maxAccounts` da chave.
+   * **Impede a conta de voltar**, e e isto que separa esta rota da versao
+   * anterior dela. Antes, ingest e presenca reivindicavam a conta sozinhos e uma
+   * maquina que ainda participasse dela a recriava na batida seguinte — apagar
+   * era gesto sem efeito, com o admin achando que tinha resolvido. Agora a
+   * remocao tambem escreve a decisao em `team_blocked_accounts`, de onde so o
+   * proprio admin a tira.
+   *
+   * **A ordem e dados, vinculo, bloqueio.** O bloqueio vai por ultimo porque e o
+   * passo mais barato e o unico trivialmente reversivel: falhar nele deixa uma
+   * conta apagada e desvinculada, que e exatamente o estado da versao anterior
+   * desta rota. Escrever o bloqueio primeiro e falhar depois deixaria uma conta
+   * barrada com o historico inteiro no banco.
    */
   router.delete(
     '/admin/v1/accounts/:accountKey',
@@ -305,11 +314,59 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
           throw new ValidationError('Informe a conta a remover.');
         }
 
+        // Lido antes do delete: `deleteAccount` apaga a linha de `team_accounts`,
+        // e depois dela nao ha mais e-mail nenhum para guardar no retrato.
+        const accountEmail = deps.repository.accountEmailOf(accountKey);
         const report = deps.repository.deleteAccount(accountKey);
         const unlinked = deps.keyRepository.unclaimAccountAnywhere(accountKey);
+        deps.keyRepository.blockAccount(accountKey, accountEmail, null, deps.now());
 
-        logger.debug({ accountKey, ...report, unlinked }, 'conta removida');
-        res.json({ ...report, unlinkedKeys: unlinked ? 1 : 0 });
+        logger.debug({ accountKey, accountEmail, ...report, unlinked }, 'conta removida do time');
+        res.json({ ...report, unlinkedKeys: unlinked ? 1 : 0, blocked: true });
+      }),
+    ),
+  );
+
+  /**
+   * Contas que o admin declarou fora do time.
+   *
+   * Sob `protect` e nao `readOnly`: e politica de acesso, nao relatorio de uso.
+   * O token de relatorio le consumo; quem pode ver e mexer em quem entra no time
+   * e quem administra.
+   */
+  router.get(
+    '/admin/v1/blocked-accounts',
+    protect(
+      wrap((_req, res) => {
+        res.json({ accounts: deps.keyRepository.listBlockedAccounts() });
+      }),
+    ),
+  );
+
+  /**
+   * Devolve a conta ao time.
+   *
+   * **Nao restaura dado nenhum** — o historico foi apagado junto com o bloqueio e
+   * o cliente daquela maquina ja marcou os turnos como enviados. O que volta e a
+   * possibilidade de reivindicar a conta de novo, e dai em diante ela precisa
+   * passar pelo portao do rotulo como qualquer outra.
+   */
+  router.delete(
+    '/admin/v1/blocked-accounts/:accountKey',
+    protect(
+      wrap((req, res) => {
+        const accountKey = req.params.accountKey ?? '';
+        if (accountKey === '') {
+          throw new ValidationError('Informe a conta a desbloquear.');
+        }
+
+        const unblocked = deps.keyRepository.unblockAccount(accountKey);
+        if (!unblocked) {
+          throw new NotFoundError('Esta conta nao esta na lista de bloqueadas.');
+        }
+
+        logger.debug({ accountKey }, 'conta devolvida ao time');
+        res.json({ accounts: deps.keyRepository.listBlockedAccounts() });
       }),
     ),
   );

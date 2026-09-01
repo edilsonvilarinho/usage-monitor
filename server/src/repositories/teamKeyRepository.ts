@@ -31,6 +31,15 @@ export interface ResolvedTeamKey {
   accounts: string[];
 }
 
+/** Conta que o admin declarou fora do time, como a tela do admin a le. */
+export interface BlockedAccountRecord {
+  accountKey: string;
+  /** Retrato do e-mail no momento do bloqueio; `null` quando ela nunca reportou um. */
+  accountEmail: string | null;
+  reason: string | null;
+  blockedAt: number;
+}
+
 export interface CreateTeamKeyInput {
   label: string;
   maxAccounts: number;
@@ -135,6 +144,36 @@ DELETE FROM team_key_accounts WHERE account_key = @accountKey
 
 const UPDATE_KEY_SQL = `
 UPDATE team_keys SET label = @label, max_accounts = @maxAccounts WHERE id = @id
+`;
+
+/**
+ * Bloqueio idempotente.
+ *
+ * `DO UPDATE` em vez de `OR IGNORE` porque bloquear de novo uma conta ja
+ * bloqueada e o caminho de quem esta corrigindo o retrato: o e-mail pode ter
+ * sido descoberto entre um bloqueio e outro, e manter o antigo deixaria a lista
+ * mentindo. `blocked_at` fica no primeiro, que e quando a decisao foi tomada.
+ */
+const BLOCK_ACCOUNT_SQL = `
+INSERT INTO team_blocked_accounts (account_key, account_email, reason, blocked_at)
+VALUES (@accountKey, @accountEmail, @reason, @blockedAt)
+ON CONFLICT(account_key) DO UPDATE SET
+  account_email = COALESCE(excluded.account_email, team_blocked_accounts.account_email),
+  reason = COALESCE(excluded.reason, team_blocked_accounts.reason)
+`;
+
+const UNBLOCK_ACCOUNT_SQL = 'DELETE FROM team_blocked_accounts WHERE account_key = @accountKey';
+
+const SELECT_BLOCKED_ACCOUNT_SQL = `
+SELECT account_key AS accountKey FROM team_blocked_accounts WHERE account_key = @accountKey
+`;
+
+/** Mais recente primeiro: quem abre a lista quer ver o que acabou de bloquear. */
+const SELECT_BLOCKED_ACCOUNTS_SQL = `
+SELECT account_key AS accountKey, account_email AS accountEmail, reason,
+       blocked_at AS blockedAt
+FROM team_blocked_accounts
+ORDER BY blocked_at DESC, account_key ASC
 `;
 
 const REGENERATE_KEY_SQL = `
@@ -247,6 +286,42 @@ export class TeamKeyRepository {
   unclaimAccountAnywhere(accountKey: string): boolean {
     const result = this.db.prepare(DELETE_ACCOUNT_ANYWHERE_SQL).run({ accountKey });
     return result.changes > 0;
+  }
+
+  /**
+   * Declara a conta fora do time. Idempotente.
+   *
+   * Nao apaga dado nenhum e nao desfaz vinculo: quem faz isso e a rota que a
+   * chama. Aqui fica so a decisao, que e o que precisa sobreviver ao proximo
+   * ingest.
+   */
+  blockAccount(
+    accountKey: string,
+    accountEmail: string | null,
+    reason: string | null,
+    now: number,
+  ): void {
+    this.db.prepare(BLOCK_ACCOUNT_SQL).run({ accountKey, accountEmail, reason, blockedAt: now });
+  }
+
+  /** Devolve a conta ao time. `false` quando ela nao estava bloqueada. */
+  unblockAccount(accountKey: string): boolean {
+    return this.db.prepare(UNBLOCK_ACCOUNT_SQL).run({ accountKey }).changes > 0;
+  }
+
+  /**
+   * A conta esta fora do time?
+   *
+   * Consultado em toda requisicao com escopo de conta, e por isso e um `SELECT`
+   * por chave primaria e nao uma varredura: e a checagem mais barata possivel
+   * para a trava mais forte que existe aqui.
+   */
+  isAccountBlocked(accountKey: string): boolean {
+    return this.db.prepare(SELECT_BLOCKED_ACCOUNT_SQL).get({ accountKey }) !== undefined;
+  }
+
+  listBlockedAccounts(): BlockedAccountRecord[] {
+    return this.db.prepare(SELECT_BLOCKED_ACCOUNTS_SQL).all() as BlockedAccountRecord[];
   }
 
   create(input: CreateTeamKeyInput, now: number): TeamKeyRecord {

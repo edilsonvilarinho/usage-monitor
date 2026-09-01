@@ -33,7 +33,7 @@ de texto.
 | # | Atividade | Situação |
 |---|---|---|
 | A1 | Regra pura do rótulo, `TEAM_KEY_LABEL_MATCH`, `label` em `ResolvedTeamKey`, `accountEmailOf` | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 18 arquivos, 232 testes, todos verdes. `teamKeyLabel.test.ts` cobre rótulo vazio, nome sem e-mail, e-mail único, caixa/espaço, vários separadores, malformado no meio de válidos e os dois casos que aceitam de propósito (rótulo sem e-mail, e-mail desconhecido). |
-| A2 | Tabela `team_blocked_accounts` e rotas de bloqueio | Pendente |
+| A2 | Tabela `team_blocked_accounts` e rotas de bloqueio | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 18 arquivos, 239 testes, todos verdes (7 novos). `DELETE /admin/v1/accounts/:accountKey` passou a devolver `blocked: true` e a escrever a decisão; `GET`/`DELETE /admin/v1/blocked-accounts` sob `x-admin-token`, com token de relatório e chave de time recusados (401). |
 | A3 | As duas travas em `authorize()` + auditoria de arranque | Pendente |
 | A4 | `verify`/`claim` param de mentir (servidor + cliente) | Pendente |
 | A5 | Tela de chaves: e-mail por conta, "Remover do time", seção de bloqueadas | Pendente |
@@ -58,6 +58,19 @@ dele em toda requisição, e `findById` é a consulta mais cara das duas porque 
 **`accountEmailOf` é a irmã de uma consulta que já existia.** `SELECT_ACCOUNT_EMAILS_SQL` lê a
 tabela inteira porque monta uma tela; responder sobre uma conta varrendo todas cresceria com o time
 a cada chamada. A memória é confiável porque `upsertAccountEmail` nunca sobrescreve com nulo.
+
+**O e-mail da conta bloqueada é retrato, não junção.** `deleteAccount` apaga a linha de
+`team_accounts`, então a leitura acontece **antes** do delete; do contrário a lista de bloqueadas
+mostraria um UUID cru, que não identifica ninguém para quem vai decidir desbloquear.
+
+**A ordem da remoção é dados, vínculo, bloqueio.** O bloqueio vai por último porque é o passo mais
+barato e o único trivialmente reversível: falhar nele deixa a conta apagada e desvinculada, que é
+exatamente o estado da versão anterior da rota. Escrever o bloqueio primeiro e falhar depois
+deixaria uma conta barrada com o histórico inteiro no banco.
+
+**Desbloquear não restaura dado nenhum.** O histórico foi apagado junto e o cliente daquela máquina
+já marcou os turnos como enviados. O que volta é a possibilidade de reivindicar a conta de novo — e
+daí em diante ela passa pelo portão do rótulo como qualquer outra.
 
 **`TEAM_KEY_LABEL_MATCH` nasce `strict`**, ao contrário de `TEAM_LEGACY_KEY_MODE`, que nasce
 `open`. Aquele preservava clientes existentes numa mudança de autenticação; este é a correção de um
