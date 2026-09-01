@@ -9,8 +9,10 @@ import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
@@ -65,6 +67,13 @@ class CliSessionsViewModel(
     private val exportWriter: UsageExportWriter? = null,
     /** Orçamento mensal. `null` esconde o cartão. */
     private val getMonthlyBudgetStatus: GetMonthlyBudgetStatusUseCase? = null,
+    /**
+     * Sessões sem resposta, para a marca na linha. `null` esconde a marca — a
+     * mesma convenção dos outros recursos opcionais desta classe.
+     */
+    private val getStalledCliSessions: GetStalledCliSessionsUseCase? = null,
+    /** Limiar corrente da detecção; provider pelo mesmo motivo do semáforo. */
+    private val stallThresholdProvider: () -> Long = { DEFAULT_STALL_THRESHOLD_MILLIS },
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     autoLoad: Boolean = true,
     private val backgroundIndexIntervalMillis: Long? = null,
@@ -484,14 +493,32 @@ class CliSessionsViewModel(
         }
     }
 
+    /**
+     * Sessões sem resposta agora.
+     *
+     * Leitura acessória, como a grade de atividade: falha aqui **mantém** o valor
+     * anterior e não derruba a lista, que é a informação principal da tela.
+     */
+    private suspend fun loadStalledSessions(previous: Map<String, Long>): Map<String, Long> {
+        val useCase = getStalledCliSessions ?: return emptyMap()
+
+        return useCase(stallThresholdProvider())
+            .getOrNull()
+            ?.associate { stalled -> stalled.sessionId to stalled.pendingMillis }
+            ?: previous
+    }
+
     private suspend fun loadSessions() {
         val current = _uiState.value as? CliSessionsUiState.Success
+
+        val stalledSessions = loadStalledSessions(current?.stalledSessions.orEmpty())
 
         getCliSessions(profileId = profileId, range = range, windows = quotaWindows).fold(
             onSuccess = { result ->
                 val contentChanged = current == null ||
                     current.sessions != result.sessions ||
-                    current.indexWarning != result.indexError?.message
+                    current.indexWarning != result.indexError?.message ||
+                    current.stalledSessions != stalledSessions
 
                 _uiState.value = CliSessionsUiState.Success(
                     sessions = result.sessions,
@@ -522,7 +549,8 @@ class CliSessionsViewModel(
                     accountCredits = current?.accountCredits,
                     // A lista já chegou, mas o resumo descreve a mesma janela e
                     // pode estar a caminho: o aviso só sai quando os dois chegam.
-                    isRefreshing = breakdownReloadPending
+                    isRefreshing = breakdownReloadPending,
+                    stalledSessions = stalledSessions
                 )
             },
             onFailure = { error ->

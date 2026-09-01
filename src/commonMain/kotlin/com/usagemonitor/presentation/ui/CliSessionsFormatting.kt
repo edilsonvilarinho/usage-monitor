@@ -398,6 +398,18 @@ internal object CliSessionsLabels {
         }
     }
 
+    /**
+     * Marca de sessão sem resposta.
+     *
+     * Diz o fato medido — não houve resposta desde o último pedido — e não
+     * "travada": o app lê o transcript, não o sistema operacional. Mesma reserva
+     * do texto da notificação.
+     */
+    fun stalledLabel(pendingMillis: Long, language: AppLanguage): String {
+        val elapsed = formatActiveTime(pendingMillis)
+        return if (language == AppLanguage.PT) "Sem resposta há $elapsed" else "No reply for $elapsed"
+    }
+
     fun columnStatus(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Status" else "Status"
     }

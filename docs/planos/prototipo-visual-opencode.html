@@ -1176,7 +1176,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
           <span class="v sm" style="width:96px">US$ 5,4792</span>
           <span class="v sm" style="width:84px">2h 14min</span>
         </div>
-        <div class="hstack" style="gap:var(--s2)"><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
+        <div class="hstack" style="gap:var(--s2)"><span class="st warn">Sem resposta há 3h00</span><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
       </div></div>
       <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
         <div class="hstack" style="gap:var(--s3)">
@@ -1197,6 +1197,13 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     desfez a concessão foi o <b>veredito sair do fluxo de colunas</b>: ele media 210dp e desceu para a segunda linha da
     própria linha, junto da razão que o gerou. Com ele fora as seis colunas somam 766dp com o vão, a linha não quebra, e a
     janela ganha piso de 960dp para que ela continue não quebrando quando o usuário arrasta a borda.</p>
+    <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>A marca de sessão sem resposta fica na segunda linha, ao
+    lado do veredito</b> (issue #177). Não é uma sétima coluna pelo motivo do parágrafo acima: as seis já somam 766dp,
+    e a faixa de legendas não admite linha quebrada. Ela é <b>ponto e palavra</b>, como todo estado deste sistema — cor
+    sozinha não informa — e sai do mapa de sessões sem resposta, não do resumo: a evidência vem da cauda do transcript,
+    e sessão que respondeu, ou que não pôde ser avaliada, não ganha marca nenhuma. O texto diz "sem resposta há", nunca
+    "travada": o app lê o transcript, não o sistema operacional. <b>Na lista do time a marca nunca aparece</b> — o
+    transcript de outra máquina não está aqui para ser lido.</p>
 
     <div class="g2">
       <div><div class="cap">Lista vazia</div><div class="panel"><div class="state"><span class="msg">Nenhum turno nesta janela.</span></div></div></div>

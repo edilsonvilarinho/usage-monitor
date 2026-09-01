@@ -662,6 +662,14 @@ private fun runUsageMonitor(
     val syncCliSessionIndex = remember(cliSessionRepository) {
         SyncCliSessionIndexUseCase(cliSessionRepository)
     }
+    // Preferências de alerta como flow, e não como estado da composição: quem as
+    // consome são os view models, que vivem fora dela. Declaradas aqui porque é
+    // delas que sai o limiar da detecção de sessão sem resposta, lido tanto pelo
+    // semáforo quanto pela tela de Sessões CLI.
+    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
+    val getStalledCliSessions = remember(cliSessionRepository) {
+        GetStalledCliSessionsUseCase(cliSessionRepository)
+    }
     // A janela principal só existe depois da composição; por isso o writer
     // recebe uma função e não a referência.
     // O idioma sai das preferencias na hora de gerar, e nao do estado da tela:
@@ -681,6 +689,8 @@ private fun runUsageMonitor(
             getCliUsageBreakdown = GetCliUsageBreakdownUseCase(cliSessionRepository),
             exportWriter = usageExportWriter,
             getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(cliSessionRepository),
+            getStalledCliSessions = getStalledCliSessions,
+            stallThresholdProvider = { alertSettingsFlow.value.effectiveStallThresholdMillis },
             autoLoad = false,
             backgroundIndexIntervalMillis = CLI_SESSION_INDEX_INTERVAL_MILLIS,
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS,
@@ -712,13 +722,6 @@ private fun runUsageMonitor(
             deleteTeamAccount = DeleteTeamAccountUseCase(teamAdminRepository),
             liveIntervalMillis = TEAM_PRESENCE_LIVE_INTERVAL_MILLIS
         )
-    }
-    // Preferências de alerta como flow, e não como estado da composição: quem as
-    // consome é o view model, que vive fora dela. Declarado antes do semáforo
-    // porque é dele que sai o limiar da detecção de sessão sem resposta.
-    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
-    val getStalledCliSessions = remember(cliSessionRepository) {
-        GetStalledCliSessionsUseCase(cliSessionRepository)
     }
     // Semáforo dos botões dos cards: lê o índice local de todas as contas e, para
     // as que participam do time, o servidor. Reusa o mesmo `syncCliSessionIndex`
