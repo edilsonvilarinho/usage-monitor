@@ -3,6 +3,7 @@ package com.usagemonitor.data
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.activeTimeMillisOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
@@ -1178,6 +1179,190 @@ class LocalCliSessionDataSourceTest {
         }
     }
 
+    @Test
+    fun `a request with no turn end after it is reported as pending`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L),
+                turnEndLine("session-a", "2026-08-01T10:00:30Z"),
+                userLine("session-a", "2026-08-01T10:05:00Z")
+            )
+            dataSource.syncIndex()
+
+            val tail = dataSource.readSessionTails(listOf("session-a")).single()
+
+            assertEquals(CliSessionTailOutcome.PENDING_REQUEST, tail.outcome)
+            assertEquals(Instant.parse("2026-08-01T10:05:00Z"), tail.lastRequestAt)
+            assertEquals(Instant.parse("2026-08-01T10:00:30Z"), tail.lastTurnEndAt)
+        }
+    }
+
+    @Test
+    fun `a turn end after the last request closes the session`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                userLine("session-a", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:10Z", outputTokens = 100L),
+                turnEndLine("session-a", "2026-08-01T10:00:30Z")
+            )
+            dataSource.syncIndex()
+
+            val tail = dataSource.readSessionTails(listOf("session-a")).single()
+
+            assertEquals(CliSessionTailOutcome.TURN_COMPLETED, tail.outcome)
+            assertNull(tail.lastRequestAt)
+        }
+    }
+
+    /**
+     * Sem marcador não há veredito. É o caso do transcript de subagente e das
+     * sessões conduzidas por harness de agente — nenhuma delas pode ser chamada de
+     * "sem resposta" só porque o marcador não existe ali.
+     */
+    @Test
+    fun `a tail without any turn end marker is not evaluated`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                userLine("session-a", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:10Z", outputTokens = 100L)
+            )
+            dataSource.syncIndex()
+
+            val tail = dataSource.readSessionTails(listOf("session-a")).single()
+
+            assertEquals(CliSessionTailOutcome.NOT_EVALUATED, tail.outcome)
+        }
+    }
+
+    @Test
+    fun `an unknown session is not evaluated`() = runTest {
+        withFixture { _, dataSource ->
+            val tail = dataSource.readSessionTails(listOf("session-que-nao-existe")).single()
+
+            assertEquals(CliSessionTailOutcome.NOT_EVALUATED, tail.outcome)
+        }
+    }
+
+    /**
+     * A janela lida é a cauda: a primeira linha dela vem cortada ao meio e é
+     * descartada, senão o veredito sairia do lixo.
+     */
+    @Test
+    fun `a file larger than the tail window is read from the end`() = runTest {
+        withFixture { root, dataSource ->
+            // Linhas grandes o bastante para empurrar o começo do arquivo para fora
+            // da janela de 256 KB.
+            val padding = (1..40).map { index ->
+                userLine("session-a", "2026-08-01T09:%02d:00Z".format(index), padBytes = 8 * 1024)
+            }
+            writeTranscript(
+                root,
+                "session-a",
+                *(
+                    listOf(assistantLine("session-a", "msg-1", "2026-08-01T09:00:00Z", outputTokens = 100L)) +
+                        padding +
+                        listOf(
+                            turnEndLine("session-a", "2026-08-01T10:00:30Z"),
+                            userLine("session-a", "2026-08-01T10:05:00Z")
+                        )
+                    ).toTypedArray()
+            )
+            dataSource.syncIndex()
+
+            val tail = dataSource.readSessionTails(listOf("session-a")).single()
+
+            assertEquals(CliSessionTailOutcome.PENDING_REQUEST, tail.outcome)
+            assertEquals(Instant.parse("2026-08-01T10:05:00Z"), tail.lastRequestAt)
+        }
+    }
+
+    /** O transcript é escrito por outro processo: linha pela metade não derruba a leitura. */
+    @Test
+    fun `an unreadable line inside the tail does not break the verdict`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L),
+                turnEndLine("session-a", "2026-08-01T10:00:30Z"),
+                """{"type":"user","sessionId":"session-a",""",
+                userLine("session-a", "2026-08-01T10:05:00Z")
+            )
+            dataSource.syncIndex()
+
+            val tail = dataSource.readSessionTails(listOf("session-a")).single()
+
+            assertEquals(CliSessionTailOutcome.PENDING_REQUEST, tail.outcome)
+            assertEquals(Instant.parse("2026-08-01T10:05:00Z"), tail.lastRequestAt)
+        }
+    }
+
+    /**
+     * `cli_sessions.file_path` pode apontar para o transcript do subagente: ele
+     * carrega o `sessionId` do pai e é varrido junto. A cauda dele responderia
+     * sobre o subagente, não sobre a sessão.
+     */
+    @Test
+    fun `the tail comes from the main transcript even when a subagent file was indexed last`() = runTest {
+        withFixture { root, dataSource ->
+            val main = writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L),
+                turnEndLine("session-a", "2026-08-01T10:00:30Z"),
+                userLine("session-a", "2026-08-01T10:05:00Z")
+            )
+            val subagentDir = File(main.parentFile, "session-a/subagents").also { it.mkdirs() }
+            File(subagentDir, "agent-abc.jsonl").writeText(
+                listOf(
+                    assistantLine("session-a", "msg-2", "2026-08-01T10:06:00Z", outputTokens = 50L, isSidechain = true),
+                    turnEndLine("session-a", "2026-08-01T10:06:30Z")
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+
+            val tail = dataSource.readSessionTails(listOf("session-a")).single()
+
+            // O arquivo do subagente termina em marcador de fim; o principal, em
+            // pedido pendente. O veredito tem de ser o do principal.
+            assertEquals(CliSessionTailOutcome.PENDING_REQUEST, tail.outcome)
+            assertEquals(Instant.parse("2026-08-01T10:05:00Z"), tail.lastRequestAt)
+        }
+    }
+
+    /** Arquivo alterado invalida o cache: o veredito acompanha o que foi escrito. */
+    @Test
+    fun `the verdict follows the file after it changes`() = runTest {
+        withFixture { root, dataSource ->
+            val file = writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", outputTokens = 100L),
+                turnEndLine("session-a", "2026-08-01T10:00:30Z"),
+                userLine("session-a", "2026-08-01T10:05:00Z")
+            )
+            dataSource.syncIndex()
+            assertEquals(
+                CliSessionTailOutcome.PENDING_REQUEST,
+                dataSource.readSessionTails(listOf("session-a")).single().outcome
+            )
+
+            file.appendText(turnEndLine("session-a", "2026-08-01T10:07:00Z") + "\n")
+            file.setLastModified(file.lastModified() + 2_000L)
+
+            assertEquals(
+                CliSessionTailOutcome.TURN_COMPLETED,
+                dataSource.readSessionTails(listOf("session-a")).single().outcome
+            )
+        }
+    }
+
     private suspend fun withFixture(block: suspend (File, LocalCliSessionDataSource) -> Unit) {
         val tempDir = createTempDirectory().toFile()
         val projectsRoot = File(tempDir, "projects").also { it.mkdirs() }
@@ -1200,6 +1385,27 @@ class LocalCliSessionDataSourceTest {
         val file = File(projectDir, "$sessionId.jsonl")
         file.writeText(lines.joinToString(separator = "\n", postfix = "\n"))
         return file
+    }
+
+    /**
+     * Linha de pedido do usuário.
+     *
+     * [padBytes] enche a linha para empurrar o começo do arquivo para fora da
+     * janela de leitura da cauda. O conteúdo não é lido pela detecção — o DTO da
+     * cauda sequer declara `message` —, mas precisa existir para o arquivo crescer.
+     */
+    private fun userLine(sessionId: String, timestamp: String, padBytes: Int = 0): String {
+        val padding = if (padBytes <= 0) "" else ""","padding":"${"x".repeat(padBytes)}""""
+        return """{"type":"user","uuid":"uuid-user-$timestamp","sessionId":"$sessionId",""" +
+            """"timestamp":"$timestamp","cwd":"/workspace/usage-monitor","gitBranch":"main",""" +
+            """"isSidechain":false,"message":{"role":"user","content":"oi"}$padding}"""
+    }
+
+    /** Marcador de fim de turno, escrito pelo CLI ao fechar um turno. */
+    private fun turnEndLine(sessionId: String, timestamp: String): String {
+        return """{"type":"system","subtype":"turn_duration","durationMs":2971,""" +
+            """"sessionId":"$sessionId","timestamp":"$timestamp","isSidechain":false,""" +
+            """"uuid":"uuid-turn-$timestamp"}"""
     }
 
     private fun assistantLine(

@@ -65,7 +65,7 @@ usuário posterior ao último marcador significa turno aberto que nunca fechou.
 |---|---|---|---|
 | A0 | Medir o comportamento do ESC na cauda | inspeção dos 323 transcripts por `type`/`subtype` | **inconclusivo**: das 8 interrupções encontradas, 2 são seguidas de `turn_duration` (turno fechado) e as demais são seguidas de novo pedido do usuário, que resolve a pendência. Nenhum caso de interrupção deixando pendência permanente em arquivo com marcador. Verificação manual pendente. |
 | A1 | Domain: `CliSessionTail` + `detectStalledSessions` | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CliStalledSessionTest"` | `BUILD SUCCESSFUL`, 9 testes |
-| A2 | Data: leitura da cauda do transcript | — | pendente |
+| A2 | Data: leitura da cauda do transcript | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest"` | `BUILD SUCCESSFUL`, 57 testes (7 novos) |
 | A3 | Caso de uso + publicação no laço de 30 s | — | pendente |
 | A4 | Alerta na bandeja | — | pendente |
 | A5 | Configurações → Alertas | — | pendente |

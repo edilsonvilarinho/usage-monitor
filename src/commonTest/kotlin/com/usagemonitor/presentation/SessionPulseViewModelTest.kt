@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTail
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
@@ -327,6 +328,10 @@ private class FakePulseCliRepository(
     /** Não nulo faz a leitura do índice falhar; ver o teste de trilha do semáforo. */
     var sessionsFailure: Throwable? = null
 
+    var tails: Map<String, CliSessionTail> = emptyMap()
+    var tailsFailure: Throwable? = null
+    var lastTailSessionIds: List<String>? = null
+
     override suspend fun syncIndex(): Result<CliSessionIndexReport> {
         syncCalls++
         return Result.success(CliSessionIndexReport())
@@ -365,6 +370,12 @@ private class FakePulseCliRepository(
         sinceEpochMillis: Long
     ): Result<List<CliToolUsage>> {
         return Result.success(emptyList())
+    }
+
+    override suspend fun getSessionTails(sessionIds: Collection<String>): Result<List<CliSessionTail>> {
+        lastTailSessionIds = sessionIds.toList()
+        tailsFailure?.let { failure -> return Result.failure(failure) }
+        return Result.success(sessionIds.mapNotNull { sessionId -> tails[sessionId] })
     }
 }
 

@@ -3,6 +3,7 @@ package com.usagemonitor.domain.repository
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTail
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
@@ -67,4 +68,13 @@ interface CliSessionRepository {
         profileId: String? = null,
         sinceEpochMillis: Long = 0L
     ): Result<List<CliToolUsage>>
+
+    /**
+     * O que a cauda do transcript diz sobre o último pedido de cada sessão.
+     *
+     * Fato bruto, sem veredito: quem decide o que é uma sessão sem resposta é
+     * `detectStalledSessions`, que conhece o relógio e o limiar. Sai daqui e não
+     * de [getSessions] porque a resposta não está no índice — está no `.jsonl`.
+     */
+    suspend fun getSessionTails(sessionIds: Collection<String>): Result<List<CliSessionTail>>
 }

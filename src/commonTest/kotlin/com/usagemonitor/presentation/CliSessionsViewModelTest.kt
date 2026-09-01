@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTail
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageBreakdown
@@ -992,6 +993,10 @@ private class FakeCliSessionRepository(
     var lastSinceEpochMillis: Long? = null
     var lastProfileId: String? = null
 
+    var tailsResult: Result<List<CliSessionTail>> = Result.success(emptyList())
+    var tailCalls: Int = 0
+    var lastTailSessionIds: List<String>? = null
+
     var breakdownResult: Result<CliUsageBreakdown> = Result.success(CliUsageBreakdown())
     var hourlyResult: Result<List<CliHourlyUsageRow>> = Result.success(emptyList())
     var toolResult: Result<List<CliToolUsage>> = Result.success(emptyList())
@@ -1043,6 +1048,12 @@ private class FakeCliSessionRepository(
         sinceEpochMillis: Long
     ): Result<List<CliToolUsage>> {
         return toolResult
+    }
+
+    override suspend fun getSessionTails(sessionIds: Collection<String>): Result<List<CliSessionTail>> {
+        tailCalls++
+        lastTailSessionIds = sessionIds.toList()
+        return tailsResult
     }
 }
 
