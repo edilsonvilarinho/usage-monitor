@@ -106,5 +106,6 @@ class DesktopWindowFrameTest {
         assertEquals(28.dp, AppChrome.control)
         assertEquals(28.dp, AppChrome.updateStrip)
         assertEquals(AppChrome.titleBar, AppChrome.toolbar)
+        assertEquals(24.dp, AppChrome.hud)
     }
 }
