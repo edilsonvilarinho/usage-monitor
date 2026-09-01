@@ -1516,6 +1516,17 @@ private fun runUsageMonitor(
                     },
                     onClick = { setCardsOnlyMode(!cardsOnlyMode) }
                 )
+                // Item irmão do de cima: mesmo padrão, mesma razão de existir
+                // (issue #164) — com a janela reduzida a uma faixa, a bandeja
+                // continua sendo um caminho de volta.
+                Item(
+                    text = if (hudMode) {
+                        if (language == AppLanguage.PT) "Sair da barra HUD" else "Exit HUD strip"
+                    } else {
+                        if (language == AppLanguage.PT) "Barra HUD" else "HUD strip"
+                    },
+                    onClick = { setHudMode(!hudMode) }
+                )
                 Separator()
                 Item(
                     text = if (language == AppLanguage.PT) "Sair" else "Quit",
