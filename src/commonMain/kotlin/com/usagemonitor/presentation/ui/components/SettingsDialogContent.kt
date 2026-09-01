@@ -85,6 +85,7 @@ const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
 const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
+const val HUD_MODE_SWITCH_TEST_TAG = "hudModeSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
@@ -140,6 +141,7 @@ fun SettingsDialogContent(
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean = false,
     cardsOnlyMode: Boolean = false,
+    hudMode: Boolean = false,
     windowOpacityPercent: Int = MAX_WINDOW_OPACITY_PERCENT,
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
@@ -152,6 +154,8 @@ fun SettingsDialogContent(
     onAlwaysOnTopChange: (Boolean) -> Unit = {},
     /** Default vazio para não arrastar os geradores de captura e os testes de componente. */
     onCardsOnlyModeChange: (Boolean) -> Unit = {},
+    /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
+    onHudModeChange: (Boolean) -> Unit = {},
     autoUpdateEnabled: Boolean = false,
     /**
      * Default `UNAVAILABLE`: quem não passa a origem não tem o mecanismo, e o
@@ -285,6 +289,7 @@ fun SettingsDialogContent(
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
                         cardsOnlyMode = cardsOnlyMode,
+                        hudMode = hudMode,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacityEnabled,
                         uiScalePercent = uiScalePercent,
@@ -298,6 +303,7 @@ fun SettingsDialogContent(
                         onAutoStartChange = onAutoStartChange,
                         onAlwaysOnTopChange = onAlwaysOnTopChange,
                         onCardsOnlyModeChange = onCardsOnlyModeChange,
+                        onHudModeChange = onHudModeChange,
                         onAutoUpdateChange = onAutoUpdateChange,
                         onWindowOpacityChange = onWindowOpacityChange,
                         onUiScaleChange = onUiScaleChange,
@@ -430,6 +436,7 @@ private fun GeneralSettingsTab(
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean,
     cardsOnlyMode: Boolean,
+    hudMode: Boolean,
     windowOpacityPercent: Int,
     windowOpacityEnabled: Boolean,
     uiScalePercent: Int,
@@ -443,6 +450,7 @@ private fun GeneralSettingsTab(
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit,
     onCardsOnlyModeChange: (Boolean) -> Unit,
+    onHudModeChange: (Boolean) -> Unit,
     onAutoUpdateChange: (Boolean) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit,
@@ -529,7 +537,14 @@ private fun GeneralSettingsTab(
         CardsOnlyModeToggle(
             enabled = cardsOnlyMode,
             language = currentLanguage,
-            onToggle = onCardsOnlyModeChange,
+            onToggle = onCardsOnlyModeChange
+        )
+        // Terceiro chrome, mesma seção: as duas reduzem a moldura da janela,
+        // só que a um extremo diferente.
+        HudModeToggle(
+            enabled = hudMode,
+            language = currentLanguage,
+            onToggle = onHudModeChange,
             showDivider = false
         )
     }
@@ -1186,6 +1201,39 @@ fun CardsOnlyModeToggle(
             checked = enabled,
             onCheckedChange = { onToggle(it) },
             modifier = Modifier.testTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG)
+        )
+    }
+}
+
+/**
+ * Barra HUD (issue #164): terceiro chrome, ainda mais discreto que o modo
+ * somente cards — uma faixa de 24dp ancorada no topo da tela, sem título, sem
+ * cards. Mesma razão de existir do texto de apoio do modo somente cards: as
+ * saídas têm de estar escritas onde o interruptor liga.
+ */
+@Composable
+fun HudModeToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
+) {
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Barra HUD" else "HUD strip",
+        description = if (isPt) {
+            "Reduz a janela a uma faixa fina no topo da tela, com só o pior risco e o tempo até o reset. Para voltar: clique na faixa, Ctrl+Shift+H ou o ícone na bandeja."
+        } else {
+            "Shrinks the window to a thin strip at the top of the screen, showing only the worst risk and the time to reset. To return: click the strip, Ctrl+Shift+H, or the tray icon."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(HUD_MODE_SWITCH_TEST_TAG)
         )
     }
 }

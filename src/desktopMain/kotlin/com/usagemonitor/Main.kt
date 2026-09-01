@@ -2141,6 +2141,7 @@ private fun runUsageMonitor(
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
                         cardsOnlyMode = cardsOnlyMode,
+                        hudMode = hudMode,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacitySupported,
                         uiScalePercent = uiScalePercent,
@@ -2189,6 +2190,10 @@ private fun runUsageMonitor(
                         onCardsOnlyModeChange = { enabled ->
                             setCardsOnlyMode(enabled)
                             showSettingsToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
+                        },
+                        onHudModeChange = { enabled ->
+                            setHudMode(enabled)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.HUD_MODE))
                         },
                         autoUpdateEnabled = autoUpdate.isEnabled(),
                         autoUpdateSupport = autoUpdate.support,
