@@ -1,4 +1,4 @@
-<!-- @dsCard group="Components" viewport="700x420" name="Shell — window, toolbar, status bar, update strip, settings nav" subtitle="34dp title bar, 34dp toolbar, 30dp status bar, 28dp update strip" -->
+<!-- @dsCard group="Components" viewport="700x480" name="Shell — window, toolbar, status bar, update strip, settings nav, HUD bar" subtitle="34dp title bar, 34dp toolbar, 30dp status bar, 28dp update strip, 24dp HUD bar" -->
 <!DOCTYPE html>
 <html lang="pt-BR" data-app-theme="dark">
 <head>
@@ -21,10 +21,17 @@
 <script type="text/babel" data-presets="react">
 let DS = {};
 function Demo() {
-  const { AppWindowFrame, AppStatusBar, AppToolbar, AppUpdateStrip, AppSettingsNav, AppButton, AppSegmentedControl, AppTextField, AppStatusIndicator, AppSwitch } = DS;
+  const { AppWindowFrame, AppStatusBar, AppToolbar, AppUpdateStrip, AppSettingsNav, AppButton, AppSegmentedControl, AppTextField, AppStatusIndicator, AppSwitch, AppHudBar } = DS;
   const [sec, setSec] = React.useState('Geral');
   const [win, setWin] = React.useState('7 dias');
   return (
+    <div className="grid">
+    <div>
+      <div className="cap">Barra HUD — terceiro chrome, ancorado no topo da tela (issue #164)</div>
+      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r3)', overflow: 'hidden' }}>
+        <AppHudBar level="crit" label="Crítico" sourceLabel="Anthropic · Padrão" resetLabel="reset em 42min" />
+      </div>
+    </div>
     <AppWindowFrame
       title="Sessões CLI — dev@example.com"
       dense
@@ -47,6 +54,7 @@ function Demo() {
         </div>
       </div>
     </AppWindowFrame>
+    </div>
   );
 }
 (async () => {

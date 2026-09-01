@@ -170,7 +170,7 @@ invented here.
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
 | `components/data/` | AppProgressTrack · AppStatusIndicator · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
 | `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
-| `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav |
+| `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
 | `ui_kits/desktop-app/` | Click-through recreation: Dashboard, cards-only mode, History, CLI Sessions, Session detail, Team usage, Presence, Settings |
 | `_ds_local.js` | Mount helper so cards and kits render before/without the compiled bundle |
@@ -181,8 +181,10 @@ invented here.
 The prototype names 17 shared primitives but does not enumerate them all. Beyond the ones it
 draws explicitly, this system adds four **chrome** components that the prototype's screens use
 without naming: `AppWindowFrame`, `AppStatusBar`, `AppToolbar`, `AppSettingsNav` — plus
-`AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados") and
-`AppColumnHeader` (its `.colhead` strip). Nothing else was invented.
+`AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados"),
+`AppColumnHeader` (its `.colhead` strip), and `AppHudBar` (its "Barra HUD" strip,
+issue #164 — the 24dp top-anchored strip that hosts nothing but an
+`AppStatusIndicator` and the winning source/reset time). Nothing else was invented.
 
 ### The conformance pass — 2026-08-27
 

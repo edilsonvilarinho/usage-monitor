@@ -1,0 +1,39 @@
+import React from 'react';
+import { AppStatusIndicator } from '../data/AppStatusIndicator.jsx';
+
+export function AppHudBar({ level = 'ok', label, sourceLabel, resetLabel, onOpen, style }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label="Abrir Usage Monitor"
+      onClick={onOpen}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--s3)',
+        height: 'var(--h-hud)',
+        padding: '0 var(--s3)',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)',
+        cursor: 'default',
+        flex: 'none',
+        minWidth: 0,
+        ...style
+      }}
+    >
+      <AppStatusIndicator level={level}>{label}</AppStatusIndicator>
+      {sourceLabel ? (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {sourceLabel}
+        </span>
+      ) : null}
+      <span style={{ flex: 1 }} />
+      {resetLabel ? (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+          {resetLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+}

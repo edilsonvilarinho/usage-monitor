@@ -27,7 +27,8 @@
     'components/shell/AppStatusBar.jsx',
     'components/shell/AppToolbar.jsx',
     'components/shell/AppUpdateStrip.jsx',
-    'components/shell/AppSettingsNav.jsx'
+    'components/shell/AppSettingsNav.jsx',
+    'components/shell/AppHudBar.jsx'
   ];
 
   function published() {

@@ -17,4 +17,8 @@
   --h-toolbar:   34px;
   --h-control:   28px;
   --h-updatestrip: 28px;
+  /* Furo deliberado no piso de 28dp acima: a barra HUD (issue #164) não é um
+     controle interativo, é ponto+palavra de risco — o mínimo que cabe sem
+     virar ilegível. */
+  --h-hud: 24px;
 }
