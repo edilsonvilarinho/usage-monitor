@@ -14,7 +14,10 @@ export function AppHudBar({ level = 'ok', label, sourceLabel, resetLabel, onOpen
         gap: 'var(--s3)',
         height: 'var(--h-hud)',
         padding: '0 var(--s3)',
-        borderBottom: '1px solid var(--border)',
+        border: '1px solid var(--border)',
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: 'var(--r2)',
+        boxShadow: 'var(--shadow-8)',
         background: 'var(--surface)',
         cursor: 'default',
         flex: 'none',
@@ -24,13 +27,14 @@ export function AppHudBar({ level = 'ok', label, sourceLabel, resetLabel, onOpen
     >
       <AppStatusIndicator level={level}>{label}</AppStatusIndicator>
       {sourceLabel ? (
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {sourceLabel}
         </span>
-      ) : null}
-      <span style={{ flex: 1 }} />
+      ) : (
+        <span style={{ flex: 1 }} />
+      )}
       {resetLabel ? (
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+        <span style={{ flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
           {resetLabel}
         </span>
       ) : null}

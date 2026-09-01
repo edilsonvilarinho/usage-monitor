@@ -27,9 +27,9 @@ function Demo() {
   return (
     <div className="grid">
     <div>
-      <div className="cap">Barra HUD — terceiro chrome, ancorado no topo da tela (issue #164)</div>
-      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r3)', overflow: 'hidden' }}>
-        <AppHudBar level="crit" label="Crítico" sourceLabel="Anthropic · Padrão" resetLabel="reset em 42min" />
+      <div className="cap">Barra HUD — pílula de 320dp, canto superior direito (issue #164)</div>
+      <div style={{ display: 'inline-block' }}>
+        <AppHudBar level="crit" label="Crítico" sourceLabel="Anthropic · Padrão" resetLabel="reset em 42min" style={{ width: 320 }} />
       </div>
     </div>
     <AppWindowFrame

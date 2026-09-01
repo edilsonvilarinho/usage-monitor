@@ -182,9 +182,10 @@ The prototype names 17 shared primitives but does not enumerate them all. Beyond
 draws explicitly, this system adds four **chrome** components that the prototype's screens use
 without naming: `AppWindowFrame`, `AppStatusBar`, `AppToolbar`, `AppSettingsNav` — plus
 `AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados"),
-`AppColumnHeader` (its `.colhead` strip), and `AppHudBar` (its "Barra HUD" strip,
-issue #164 — the 24dp top-anchored strip that hosts nothing but an
-`AppStatusIndicator` and the winning source/reset time). Nothing else was invented.
+`AppColumnHeader` (its `.colhead` strip), and `AppHudBar` (its "Barra HUD" pill,
+issue #164 — a 320×24dp pill docked to the top-right corner that hosts nothing but an
+`AppStatusIndicator` and the winning source/reset time; full width was the first version, found wrong
+live — always-on-top plus edge-to-edge covered other windows' own top 24dp). Nothing else was invented.
 
 ### The conformance pass — 2026-08-27
 

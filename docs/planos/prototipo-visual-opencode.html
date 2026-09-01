@@ -199,15 +199,33 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
 .titlebar .wbtn:hover { background: var(--raised); color: var(--fg); }
 .titlebar .wbtn.close:hover { background: var(--crit); color: #fff; }
 
-/* Barra HUD: 24dp, ancorada no topo da tela — sem título, sem botões de janela.
-   Mesma altura em ambas as barras que a issue #164 mede contra o piso de 28dp
-   do cromo existente; abaixo dele porque aqui não há controle interativo, só
-   o ponto+palavra de risco (.st) e a fonte/tempo até reset. */
+/* Barra HUD: pílula de largura fixa (320px), ancorada no canto superior
+   direito da tela — sem título, sem botões de janela. 24dp de altura mede
+   contra o piso de 28dp do cromo existente; abaixo dele porque aqui não há
+   controle interativo, só o ponto+palavra de risco (.st) e a fonte/tempo até
+   reset. Largura total foi a primeira versão (issue #164) — e por estar
+   sempre no topo (alwaysOnTop), cobria os controles de qualquer outra janela
+   que também tivesse algo nos primeiros 24dp do topo da tela: barra de menu
+   de IDE, atalhos de editor. Achado testando ao vivo, corrigido para pílula
+   de canto — a mesma correção resolve a elevação que ficava em aberto no
+   sistema visual: sendo de fato flutuante agora, --shadow-8 se aplica sem
+   ambiguidade. */
+.hudscreen {
+  position: relative; height: 168px; border: 1px solid var(--border); border-radius: var(--r3);
+  background: var(--bg); overflow: hidden; margin-bottom: var(--s4);
+}
+.hudscreen .win {
+  position: absolute; inset: 28px 16px 16px; margin: 0; max-width: none; box-shadow: none;
+}
 .hudbar {
+  position: absolute; top: 0; right: 0; width: 320px; max-width: calc(100% - 16px);
   display: flex; align-items: center; gap: var(--s3); height: 24px; padding: 0 var(--s3);
-  background: var(--surface); border-bottom: 1px solid var(--border);
+  background: var(--surface); border: 1px solid var(--border);
+  border-top-right-radius: 0; border-bottom-left-radius: var(--r2);
+  box-shadow: var(--shadow-8);
 }
 .hudbar .sp { flex: 1; }
+.hudbar .v.sm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .body { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
 .body.tight { padding: var(--s3); gap: var(--s2); }
@@ -946,9 +964,15 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 <p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
 
 <h3>Barra HUD</h3>
-<p class="lede">Um terceiro chrome, ainda mais discreto que o modo somente cards (issue #164): a mesma janela principal encolhida a uma faixa de 24dp de largura total, ancorada no topo da tela, sempre visível. Não mostra cards — só o pior risco entre todas as cotas, a fonte que o determinou e o tempo até o reset. Sem arrasto de reordenar (não há cards para reordenar), sem barra de título: a faixa inteira é a superfície clicável que devolve a janela completa.</p>
+<p class="lede">Um terceiro chrome, ainda mais discreto que o modo somente cards (issue #164): a mesma janela principal encolhida a uma pílula de 320×24dp, ancorada no canto superior direito da tela, sempre visível. Não mostra cards — só o pior risco entre todas as cotas, a fonte que o determinou e o tempo até o reset. Sem arrasto de reordenar (não há cards para reordenar), sem barra de título: a pílula inteira é a superfície clicável que devolve a janela completa.</p>
 
-<div class="win narrow" style="max-width:520px">
+<div class="hudscreen">
+  <div class="win narrow" style="max-width:280px">
+    <div class="titlebar"><span class="t">outra janela</span></div>
+    <div class="body tight">
+      <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
+    </div>
+  </div>
   <div class="hudbar">
     <span class="st crit">Crítico</span>
     <span class="v sm">Anthropic · Padrão</span>
@@ -956,7 +980,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <span class="dim v sm">reset em 42min</span>
   </div>
 </div>
-<p class="note"><b>Mesma janela, terceiro chrome — não uma janela nova.</b> A janela principal (<code>DesktopWindowFrame</code>) redimensiona e reposiciona para a faixa; sair do modo restaura o tamanho e a posição de antes. Fechar a janela continua encerrando o app: a barra HUD não é "minimizar para segundo plano", é a mesma semântica do modo somente cards levada a um extremo. <b>Três saídas</b>, mesmo padrão do modo somente cards: clique em qualquer ponto da faixa, item na bandeja e <code>Ctrl+Shift+H</code> — combinação própria, sem colidir com <code>Ctrl+Shift+M</code>. O ponto+palavra reusa <code>AppStatusIndicator</code>/<code>.st</code>: nenhuma primitiva de risco nova, só uma faixa nova que os hospeda.</p>
+<p class="note"><b>Pílula de canto, não faixa de largura total.</b> A primeira versão ocupava a tela inteira e, por estar sempre no topo (<code>alwaysOnTop</code>), cobria os controles de qualquer outra janela que também tivesse algo nos primeiros 24dp do topo — barra de menu de IDE, atalhos de editor. O Compose Desktop não tem click-through parcial numa janela comum: a região inteira captura o clique, visível ou não. Achado testando ao vivo, não antecipado no plano original. 320dp é a mesma ordem de grandeza da largura mínima de card (<code>NarrowCardWidthThreshold</code>) — não o mesmo token, só o bastante para um rótulo de conta típico; texto mais longo trunca com reticências.</p>
+<p class="note"><b>Mesma janela, terceiro chrome — não uma janela nova.</b> A janela principal (<code>DesktopWindowFrame</code>) redimensiona e reposiciona para o canto; sair do modo restaura o tamanho e a posição de antes. Fechar a janela continua encerrando o app: a barra HUD não é "minimizar para segundo plano", é a mesma semântica do modo somente cards levada a um extremo. <b>Três saídas</b>, mesmo padrão do modo somente cards: clique em qualquer ponto da pílula, item na bandeja e <code>Ctrl+Shift+H</code> — combinação própria, sem colidir com <code>Ctrl+Shift+M</code>. O ponto+palavra reusa <code>AppStatusIndicator</code>/<code>.st</code>: nenhuma primitiva de risco nova, só uma pílula nova que os hospeda.</p>
 
 <h2 id="dash-estados">4b · Dashboard — os estados que o card precisa cobrir</h2>
 <div class="g2">

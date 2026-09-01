@@ -1,12 +1,18 @@
 import type { ReactNode, CSSProperties } from 'react';
 
 /**
- * One 24dp line, anchored to the top edge of the screen. The third window
- * chrome (issue #164), one step past cards-only mode: no title, no card, no
- * drag-to-reorder — just the worst risk across every quota, the source that
- * produced it, and the reset countdown. The whole strip is the click target
- * that returns the full window.
- * @startingPoint section="Shell" subtitle="24dp HUD strip — top-anchored" viewport="700x110"
+ * A 320×24dp pill, docked to the top-right corner of the screen. The third
+ * window chrome (issue #164), one step past cards-only mode: no title, no
+ * card, no drag-to-reorder — just the worst risk across every quota, the
+ * source that produced it, and the reset countdown. The whole pill is the
+ * click target that returns the full window.
+ *
+ * Full width was the first version; always-on-top plus edge-to-edge covered
+ * whatever another window had in its own top 24dp. Fixed-width pill in one
+ * corner is the fix — desktop windows have no partial click-through. The
+ * component doesn't own its width: it fills whatever the host gives it, and
+ * `sourceLabel`/`resetLabel` truncate rather than force it wider.
+ * @startingPoint section="Shell" subtitle="320×24dp HUD pill — corner-docked" viewport="700x110"
  */
 export interface AppHudBarProps {
   level?: 'ok' | 'warn' | 'crit';

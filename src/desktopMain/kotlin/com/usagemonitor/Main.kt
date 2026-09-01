@@ -224,13 +224,32 @@ internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
 
 /**
- * Piso horizontal da faixa HUD (issue #164) — bem abaixo do piso normal, que
- * existe para caber os cards. A faixa não tem cards, só o dot+word de
- * [com.usagemonitor.presentation.ui.HudBar]; a largura real é sempre a da
- * tela inteira (`resizable = false`), este número só evita que o AWT recuse
- * um valor absurdo.
+ * Piso horizontal da barra HUD (issue #164) — bem abaixo do piso normal, que
+ * existe para caber os cards. A janela não tem cards, só o dot+word de
+ * [com.usagemonitor.presentation.ui.HudBar]. Fica abaixo de [HUD_PILL_WIDTH_DP]
+ * de propósito: é rede contra o AWT recusar um valor absurdo, não a largura
+ * real (`resizable = false` já trava isso).
  */
 private const val HUD_MIN_WINDOW_WIDTH_DP = 160
+
+/**
+ * Largura da pílula HUD, ancorada no canto superior direito da tela.
+ *
+ * A primeira versão ocupava a largura inteira da tela — e por estar sempre no
+ * topo (`alwaysOnTop`), cobria os controles de qualquer outra janela que
+ * também tivesse algo nos primeiros 24dp do topo (barra de menu de IDE,
+ * atalhos do editor). O Compose Desktop não tem click-through parcial numa
+ * `Window` comum: a região inteira do retângulo captura o clique, visível ou
+ * não. Reduzir para uma pílula do tamanho do conteúdo, num canto só, é a
+ * única correção viável nesta arquitetura (mesma janela, sem hack de shape
+ * nativo) — achado testando ao vivo, não antecipado no plano original.
+ * 320dp é a mesma magnitude de [com.usagemonitor.presentation.ui.components.NarrowCardWidthThreshold]
+ * — não o mesmo token (responde a outra pergunta), só a mesma ordem de
+ * grandeza para um rótulo de conta típico. Texto mais longo que isso trunca
+ * com reticências; a janela completa continua sendo o caminho para o nome
+ * inteiro.
+ */
+private const val HUD_PILL_WIDTH_DP = 320
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
@@ -1635,11 +1654,11 @@ private fun runUsageMonitor(
             uiScalePercent = uiScalePercent,
             workArea = screenWorkArea
         )
-        // Geometria da faixa HUD: encolhe a janela principal para o topo da
-        // tela ao entrar, restaura tamanho/posição/estado de antes ao sair.
-        // O snapshot mora aqui, e não em `MainWindowSnapshot` (que não
-        // carrega posição — a janela normal nunca precisou dela): só esta
-        // transição precisa saber "de onde veio" para voltar.
+        // Geometria da pílula HUD: encolhe a janela principal para o canto
+        // superior direito da tela ao entrar, restaura tamanho/posição/estado
+        // de antes ao sair. O snapshot mora aqui, e não em `MainWindowSnapshot`
+        // (que não carrega posição — a janela normal nunca precisou dela): só
+        // esta transição precisa saber "de onde veio" para voltar.
         var preHudWindowGeometry by remember {
             mutableStateOf<Triple<DpSize, WindowPosition, WindowPlacement>?>(null)
         }
@@ -1651,8 +1670,18 @@ private fun runUsageMonitor(
                     mainWindowState.placement
                 )
                 mainWindowState.placement = WindowPlacement.Floating
-                mainWindowState.size = DpSize(screenWorkArea.size.width, AppChrome.hud)
-                mainWindowState.position = WindowPosition(screenWorkArea.x, screenWorkArea.y)
+                val hudWidth = HUD_PILL_WIDTH_DP.dp * uiScaleFactor(uiScalePercent)
+                val hudSize = DpSize(hudWidth, AppChrome.hud)
+                mainWindowState.size = hudSize
+                // Canto superior direito: `fitWindowPosition` prende dentro da
+                // área útil, para um monitor mais estreito que a pílula não
+                // jogar o canto esquerdo dela para fora da tela.
+                mainWindowState.position = fitWindowPosition(
+                    x = screenWorkArea.x + screenWorkArea.size.width - hudWidth,
+                    y = screenWorkArea.y,
+                    size = hudSize,
+                    workArea = screenWorkArea
+                )
             } else {
                 preHudWindowGeometry?.let { (size, position, placement) ->
                     mainWindowState.size = size

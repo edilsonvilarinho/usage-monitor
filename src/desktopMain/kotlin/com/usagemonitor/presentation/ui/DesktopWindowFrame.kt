@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
@@ -251,6 +252,12 @@ private fun WindowScope.CompactTitleBarOverlay(
  * em `onClickLabel` (armadilha nº2 do design system: sem
  * `Modifier.semantics { contentDescription = ... }`, `onNodeWithContentDescription`
  * não encontra o nó).
+ *
+ * **Largura de quem chama, não fixa aqui.** `Main.kt` ancora a janela como
+ * uma pílula de largura fixa no canto da tela (não mais a tela inteira —
+ * cobria controles de outras janelas na mesma faixa); `HudBar` só sabe
+ * preencher o que recebe, e por isso `sourceLabel`/`resetLabel` truncam com
+ * reticências em vez de estourar o container.
  */
 @Composable
 internal fun HudBar(
@@ -279,18 +286,21 @@ internal fun HudBar(
                 text = sourceLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
         }
-
-        Spacer(modifier = Modifier.weight(1f))
 
         if (resetLabel != null) {
             Text(
                 text = resetLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
