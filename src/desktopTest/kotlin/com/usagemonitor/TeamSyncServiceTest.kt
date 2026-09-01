@@ -12,6 +12,7 @@ import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.repository.TeamUsageTrendData
+import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
 import kotlinx.coroutines.test.runTest
@@ -412,6 +413,72 @@ class TeamSyncServiceTest {
             val status = service.syncStatus.value
             assertTrue(status.isFailing)
             assertEquals("servidor fora", status.lastFailureMessage)
+        }
+    }
+
+    @Test
+    fun `recusa do servidor fica presa na conta que a causou`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository(
+                failure = TeamServerException(
+                    statusCode = 403,
+                    message = "Servidor de time recusou a envio ao time (HTTP 403): fora do rótulo",
+                    detail = "fora do rótulo"
+                )
+            )
+            val service = newService(syncState, repository)
+
+            service.syncOnce()
+
+            // O detalhe, e não a mensagem inteira: a linha da conta já diz de
+            // quem é o problema, e o prefixo da operação ocuparia metade dela.
+            val status = service.syncStatus.value
+            assertEquals(mapOf(PROFILE_ID to "fora do rótulo"), status.rejectedProfiles)
+        }
+    }
+
+    @Test
+    fun `falha que nao e recusa de conta nao marca conta nenhuma`() = runTest {
+        withFixture { _, _, syncState ->
+            // 401 é chave errada e 5xx é o servidor: nenhum dos dois aponta para
+            // uma conta específica, e marcar a linha mandaria o usuário desmarcar
+            // uma conta que não tem defeito nenhum.
+            val repository = RecordingTeamRepository(
+                failure = TeamServerException(
+                    statusCode = 401,
+                    message = "chave inválida",
+                    detail = "chave inválida"
+                )
+            )
+            val service = newService(syncState, repository)
+
+            service.syncOnce()
+
+            assertTrue(service.syncStatus.value.isFailing)
+            assertTrue(service.syncStatus.value.rejectedProfiles.isEmpty())
+        }
+    }
+
+    @Test
+    fun `desmarcar a conta recusada limpa o aviso dela`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository(
+                failure = TeamServerException(
+                    statusCode = 403,
+                    message = "recusada",
+                    detail = "recusada"
+                )
+            )
+            val service = newService(syncState, repository)
+            service.syncOnce()
+            assertTrue(service.syncStatus.value.rejectedProfiles.isNotEmpty())
+
+            repository.failure = null
+            service.syncOnce()
+
+            // A passada corrente é quem sabe quais contas ainda são recusadas:
+            // acumular deixaria o aviso preso numa conta já consertada.
+            assertTrue(service.syncStatus.value.rejectedProfiles.isEmpty())
         }
     }
 

@@ -4,6 +4,7 @@ import {
   ACCOUNT_A,
   ACCOUNT_B,
   TEST_ADMIN_TOKEN,
+  TEST_REPORT_TOKEN,
   TEST_TEAM_KEY,
   createHarness,
   createKeyViaAdmin,
@@ -317,6 +318,7 @@ describe('remocao de conta inteira', () => {
       deletedSessions: 1,
       deletedMembers: 1,
       unlinkedKeys: 1,
+      blocked: true,
     });
 
     // A visao global e derivada de team_members e team_turns: sem eles a conta
@@ -362,8 +364,14 @@ describe('remocao de conta inteira', () => {
     );
     expect(antigaDepois.accounts).toEqual([]);
 
-    // O slot volta a ficar livre: sem isso a conta ficaria presa a uma chave que
-    // nao a usa mais, e nenhuma outra poderia adota-la.
+    // Desbloquear e obrigatorio antes de reivindicar: remover a conta declara que
+    // ela nao faz parte do time, e essa decisao nao pode ser desfeita por um
+    // ingest. Depois disso o slot volta a ficar livre — sem isso a conta ficaria
+    // presa a uma chave que nao a usa mais e nenhuma outra poderia adota-la.
+    await request(harness.app)
+      .delete(`/api/admin/v1/blocked-accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
     const reivindicada = await ingestWith(harness, nova.key, ACCOUNT_A, 'session-c', 'msg-c');
     expect(reivindicada.status).toBe(200);
   });
@@ -379,6 +387,7 @@ describe('remocao de conta inteira', () => {
       deletedSessions: 0,
       deletedMembers: 0,
       unlinkedKeys: 0,
+      blocked: true,
     });
   });
 
@@ -450,7 +459,15 @@ describe('remocao de conta inteira', () => {
       .toBe(true);
   });
 
+  // Com `keyLabelMatch` estrito esta combinacao — rotulo de um e-mail, conta
+  // reportando outro — e justamente a que o portao recusa, e a conta nunca
+  // chegaria a gravar e-mail nenhum. O caso aqui e sobre a **precedencia do
+  // e-mail na visao global**, nao sobre admissao: o `off` isola uma pergunta da
+  // outra em vez de esconder a segunda.
   it('e-mail reportado prevalece sobre label e label invalido nao vira fallback', async () => {
+    harness.cleanup();
+    harness = createHarness({ keyLabelMatch: 'off' });
+
     const reported = await createKeyViaAdmin(harness, 'fallback@empresa.com');
     const invalid = await createKeyViaAdmin(harness, 'Pessoa sem e-mail');
     await request(harness.app)
@@ -471,6 +488,135 @@ describe('remocao de conta inteira', () => {
       emailSource: 'reported',
     });
     expect(byKey.get(ACCOUNT_B)).toMatchObject({ accountEmail: null, emailSource: null });
+  });
+});
+
+describe('contas fora do time', () => {
+  let harness: Harness;
+
+  beforeEach(() => {
+    harness = createHarness();
+  });
+
+  afterEach(() => {
+    harness.cleanup();
+  });
+
+  it('nasce vazia', async () => {
+    const response = await request(harness.app)
+      .get('/api/admin/v1/blocked-accounts')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.status).toBe(200);
+    expect(response.body.accounts).toEqual([]);
+  });
+
+  // Rotulo sem e-mail deixa o portao desligado, que e como a conta intrusa da
+  // issue #179 entrou: ela chegou antes de existir criterio nenhum.
+  it('remover a conta a coloca na lista com o e-mail que ela reportou', async () => {
+    const created = await createKeyViaAdmin(harness, 'Chave do setor');
+    await request(harness.app)
+      .post('/api/v1/ingest')
+      .set('x-team-key', created.key)
+      .send(makePayload({ accountKey: ACCOUNT_A, accountEmail: 'pessoal@gmail.com' }));
+
+    await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    const response = await request(harness.app)
+      .get('/api/admin/v1/blocked-accounts')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.body.accounts).toHaveLength(1);
+    // O retrato e lido antes do delete: depois dele a linha de team_accounts nao
+    // existe mais, e a lista ficaria com um UUID cru que nao identifica ninguem.
+    expect(response.body.accounts[0]).toMatchObject({
+      accountKey: ACCOUNT_A,
+      accountEmail: 'pessoal@gmail.com',
+    });
+  });
+
+  it('guarda a conta que nunca reportou e-mail, com o retrato nulo', async () => {
+    const created = await createKeyViaAdmin(harness, 'Pessoa sem e-mail');
+    await ingestWith(harness, created.key, ACCOUNT_A);
+
+    await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    const response = await request(harness.app)
+      .get('/api/admin/v1/blocked-accounts')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.body.accounts[0]).toMatchObject({
+      accountKey: ACCOUNT_A,
+      accountEmail: null,
+    });
+  });
+
+  it('remover duas vezes nao duplica a linha', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    await ingestWith(harness, created.key, ACCOUNT_A);
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const removed = await request(harness.app)
+        .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+        .set('x-admin-token', TEST_ADMIN_TOKEN);
+      expect(removed.status).toBe(200);
+    }
+
+    const response = await request(harness.app)
+      .get('/api/admin/v1/blocked-accounts')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.body.accounts).toHaveLength(1);
+  });
+
+  it('desbloquear tira da lista e devolve a lista restante', async () => {
+    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com', 2);
+    await ingestWith(harness, created.key, ACCOUNT_A);
+    await ingestWith(harness, created.key, ACCOUNT_B, 'session-b', 'msg-b');
+
+    for (const accountKey of [ACCOUNT_A, ACCOUNT_B]) {
+      await request(harness.app)
+        .delete(`/api/admin/v1/accounts/${accountKey}`)
+        .set('x-admin-token', TEST_ADMIN_TOKEN);
+    }
+
+    const response = await request(harness.app)
+      .delete(`/api/admin/v1/blocked-accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.status).toBe(200);
+    expect(response.body.accounts).toHaveLength(1);
+    expect(response.body.accounts[0].accountKey).toBe(ACCOUNT_B);
+  });
+
+  it('desbloquear conta que nao esta na lista responde 404', async () => {
+    const response = await request(harness.app)
+      .delete(`/api/admin/v1/blocked-accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.status).toBe(404);
+    expect(response.body.code).toBe('not_found');
+  });
+
+  // Politica de acesso, nao relatorio de uso: o token de relatorio le consumo, e
+  // quem decide quem entra no time e quem administra.
+  it('recusa o token de relatorio e a chave de time', async () => {
+    const semAdmin = await request(harness.app).get('/api/admin/v1/blocked-accounts');
+    expect(semAdmin.status).toBe(401);
+
+    const comRelatorio = await request(harness.app)
+      .get('/api/admin/v1/blocked-accounts')
+      .set('x-report-key', TEST_REPORT_TOKEN);
+    expect(comRelatorio.status).toBe(401);
+
+    const comChave = await request(harness.app)
+      .get('/api/admin/v1/blocked-accounts')
+      .set('x-team-key', TEST_TEAM_KEY);
+    expect(comChave.status).toBe(401);
   });
 });
 

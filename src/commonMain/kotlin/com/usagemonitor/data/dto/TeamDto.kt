@@ -187,10 +187,18 @@ data class TeamSessionDetailResponseDto(
     val turns: List<TeamTurnRowDto> = emptyList()
 )
 
-/** Corpo de `POST /api/v1/claim`. A credencial vai no header. */
+/**
+ * Corpo de `POST /api/v1/claim`. A credencial vai no header.
+ *
+ * O `accountEmail` viaja junto porque o servidor confere a conta contra o rótulo
+ * da chave (servidor 0.11.0+): sem ele o vínculo seria aprovado aqui e recusado
+ * no envio seguinte, deixando a sincronia parada em silêncio. Servidor anterior
+ * ignora o campo.
+ */
 @Serializable
 data class TeamClaimRequestDto(
-    val accountKey: String
+    val accountKey: String,
+    val accountEmail: String? = null
 )
 
 /** Resposta de `GET /api/v1/verify` e de `POST /api/v1/claim`. */
@@ -217,9 +225,41 @@ data class TeamKeyDto(
     val keyPrefix: String = "",
     val maxAccounts: Int = 1,
     val accounts: List<String> = emptyList(),
+    /**
+     * As mesmas contas de [accounts], com e-mail e veredito (servidor 0.11.0+).
+     *
+     * Campo novo ao lado da lista antiga, e não no lugar dela: mudar a forma de
+     * `accounts` quebraria app anterior. Vazia contra servidor mais velho, e aí
+     * a tela cai em [accounts] e mostra só o UUID, como sempre mostrou.
+     */
+    val accountDetails: List<TeamKeyAccountDto> = emptyList(),
     val createdAt: Long? = null,
     val revokedAt: Long? = null,
     val lastUsedAt: Long? = null
+)
+
+/** Conta vinculada a uma chave, com o que a tela precisa para decidir sobre ela. */
+@Serializable
+data class TeamKeyAccountDto(
+    val accountKey: String,
+    val accountEmail: String? = null,
+    /** `false` quando o e-mail da conta não está na relação declarada no rótulo. */
+    val authorized: Boolean = true
+)
+
+/** Resposta de `GET` e `DELETE /api/admin/v1/blocked-accounts`. */
+@Serializable
+data class TeamBlockedAccountListDto(
+    val accounts: List<TeamBlockedAccountDto> = emptyList()
+)
+
+@Serializable
+data class TeamBlockedAccountDto(
+    val accountKey: String,
+    /** Retrato do e-mail no momento do bloqueio; a conta em si já foi apagada. */
+    val accountEmail: String? = null,
+    val reason: String? = null,
+    val blockedAt: Long? = null
 )
 
 @Serializable

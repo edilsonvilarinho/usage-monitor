@@ -1,7 +1,11 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { Config } from '../config.js';
+import { normalizeAccountEmail } from '../domain/accountEmail.js';
 import { ForbiddenError, UnauthorizedError } from '../domain/errors.js';
-import { hashKey, type TeamKeyRepository } from '../repositories/teamKeyRepository.js';
+import { isAccountAllowedByLabel } from '../domain/teamKeyLabel.js';
+import { logger } from '../logger.js';
+import { hashKey, type ResolvedTeamKey, type TeamKeyRepository } from '../repositories/teamKeyRepository.js';
+import type { TeamRepository } from '../repositories/teamRepository.js';
 import { isValidTeamKey, TEAM_KEY_HEADER } from './auth.js';
 
 export const ADMIN_TOKEN_HEADER = 'x-admin-token';
@@ -10,6 +14,8 @@ export const REPORT_TOKEN_HEADER = 'x-report-key';
 export interface AccessDeps {
   config: Config;
   keyRepository: TeamKeyRepository;
+  /** Le o e-mail que a conta reportou, para o portao do rotulo valer nas leituras. */
+  repository: TeamRepository;
   now: () => number;
 }
 
@@ -32,6 +38,15 @@ export interface TeamAccessOptions {
    * escrita, ao contrario, prova que aquela maquina realmente usa a conta.
    */
   allowClaim?: boolean;
+  /**
+   * Le o e-mail que a conta declara **nesta** requisicao.
+   *
+   * So ingest e presenca o tem, porque so eles carregam corpo. As leituras caem
+   * no e-mail gravado, que e a mesma informacao vinda da escrita anterior — a
+   * memoria e confiavel porque `upsertAccountEmail` nunca a sobrescreve com
+   * nulo.
+   */
+  extractAccountEmail?: (req: Request) => unknown;
 }
 
 const ACCESS_LOCALS_KEY = 'teamAccess';
@@ -62,10 +77,11 @@ export function requireTeamAccess(
   options: TeamAccessOptions = {},
 ): RequestHandler {
   const allowClaim = options.allowClaim ?? false;
+  const extractAccountEmail = options.extractAccountEmail;
 
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      const access = authorize(deps, req, extractAccountKey, allowClaim);
+      const access = authorize(deps, req, extractAccountKey, allowClaim, extractAccountEmail);
       res.locals[ACCESS_LOCALS_KEY] = access;
       handler(req, res, next);
     } catch (error) {
@@ -132,7 +148,16 @@ function authorize(
   req: Request,
   extractAccountKey: AccountKeyExtractor,
   allowClaim: boolean,
+  extractAccountEmail?: (req: Request) => unknown,
 ): TeamAccess {
+  // Antes de qualquer decisao de credencial no caminho de escrita: conta
+  // declarada fora do time nao entra por porta nenhuma, nem pela chave legada em
+  // modo aberto. Escrever era justamente o que trazia a conta de volta depois de
+  // o admin a remover.
+  if (allowClaim) {
+    assertNotBlocked(deps, readAccountKey(extractAccountKey(req)));
+  }
+
   const adminToken = deps.config.adminToken;
   if (!allowClaim && adminToken !== null) {
     const received = req.header(ADMIN_TOKEN_HEADER);
@@ -181,6 +206,15 @@ function authorize(
     throw new ForbiddenError('Requisicao sem conta alvo.');
   }
 
+  // Tambem na leitura: quem foi declarado fora do time nao le o time.
+  assertNotBlocked(deps, accountKey);
+
+  // **Antes** do teste de vinculo, e nao so no ramo que reivindica: e isto que
+  // faz o portao valer para os vinculos que ja existiam. Uma conta que entrou
+  // quando nada era conferido continuaria sincronizando para sempre se a
+  // verificacao morasse so no caminho do `claim`.
+  assertAllowedByLabel(deps, resolved, accountKey, readAccountEmail(req, extractAccountEmail));
+
   if (resolved.accounts.includes(accountKey)) {
     return { keyId: resolved.id, kind: 'team-key' };
   }
@@ -196,7 +230,83 @@ function authorize(
   throw new ForbiddenError(describeRefusal(deps, resolved, accountKey));
 }
 
+/**
+ * Recusa a conta que o admin declarou fora do time.
+ *
+ * A trava mais forte que existe aqui, e por isso a primeira: ela vem de uma
+ * decisao explicita de quem administra, enquanto o portao do rotulo e regra
+ * derivada de um texto. `TEAM_KEY_LABEL_MATCH=off` desliga aquele e **nao**
+ * desliga este — desfazer a decisao do admin por variavel de ambiente seria
+ * outra pessoa decidindo.
+ */
+export function assertNotBlocked(deps: AccessDeps, accountKey: string | null): void {
+  if (accountKey === null) {
+    return;
+  }
+  if (deps.keyRepository.isAccountBlocked(accountKey)) {
+    logger.warn({ accountKey }, 'requisicao de conta declarada fora do time');
+    throw new ForbiddenError(BLOCKED_ACCOUNT_MESSAGE);
+  }
+}
+
+/**
+ * Recusa a conta que nao esta na relacao declarada no rotulo da chave.
+ *
+ * O e-mail do pedido vence o gravado: numa maquina que trocou de conta, o
+ * gravado descreve a anterior. O gravado cobre as leituras, que nao carregam
+ * e-mail nenhum.
+ */
+export function assertAllowedByLabel(
+  deps: AccessDeps,
+  resolved: ResolvedTeamKey,
+  accountKey: string,
+  reportedEmail: string | null,
+): void {
+  if (deps.config.keyLabelMatch === 'off') {
+    return;
+  }
+
+  const accountEmail = reportedEmail ?? deps.repository.accountEmailOf(accountKey);
+  if (isAccountAllowedByLabel(resolved.label, accountEmail)) {
+    return;
+  }
+
+  logger.warn(
+    { keyId: resolved.id, label: resolved.label, accountKey, accountEmail },
+    'conta fora da relacao declarada no rotulo da chave',
+  );
+  throw new ForbiddenError(labelMismatchMessage(resolved.label, accountEmail));
+}
+
+function readAccountEmail(req: Request, extract?: (req: Request) => unknown): string | null {
+  if (extract === undefined) {
+    return null;
+  }
+  const value = extract(req);
+  return typeof value === 'string' ? normalizeAccountEmail(value) : null;
+}
+
 export const OTHER_KEY_MESSAGE = 'Esta conta ja pertence a outra chave de time.';
+
+export const BLOCKED_ACCOUNT_MESSAGE =
+  'Esta conta foi removida do time pelo administrador e nao participa mais dele. ' +
+  'Desmarque-a em Configuracoes > Time, ou peca ao administrador para devolve-la ao time.';
+
+/**
+ * Diz **quem** a chave cobre e **qual** conta foi recusada.
+ *
+ * As duas metades importam: sem a primeira o usuario nao sabe se colou a chave
+ * de outra pessoa; sem a segunda ele nao sabe qual das contas marcadas na
+ * maquina e a intrusa — e o caso tipico e justamente uma maquina com duas.
+ */
+export function labelMismatchMessage(label: string, accountEmail: string | null): string {
+  const account = accountEmail ?? 'sem e-mail conhecido';
+  return (
+    `Esta chave de time e de ${label}, e a conta ${account} nao esta na relacao dela. ` +
+    'Desmarque essa conta em Configuracoes > Time, ou peca ao administrador para incluir ' +
+    'o e-mail dela no rotulo da chave.'
+  );
+}
 
 export const NOT_CLAIMED_MESSAGE =
   'Esta conta ainda nao foi vinculada a esta chave. O vinculo nasce no primeiro envio: ' +

@@ -1,10 +1,14 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
+import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
+import com.usagemonitor.domain.usecase.ListBlockedTeamAccountsUseCase
 import com.usagemonitor.domain.usecase.ListTeamKeysUseCase
 import com.usagemonitor.domain.usecase.RegenerateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.RevokeTeamKeyUseCase
+import com.usagemonitor.domain.usecase.UnblockTeamAccountUseCase
 import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
 import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
 import kotlinx.coroutines.CoroutineDispatcher
@@ -28,6 +32,15 @@ sealed interface TeamKeysUiState {
 
     data class Success(
         val keys: List<TeamKeyEntry> = emptyList(),
+        /**
+         * Contas que o admin declarou fora do time.
+         *
+         * Vem na mesma carga das chaves, e não de uma leitura por abertura de
+         * seção: as duas listas descrevem a mesma decisão — remover uma conta
+         * tira o vínculo de uma e cria a linha na outra —, e lê-las em momentos
+         * diferentes mostraria a tela pela metade depois de uma remoção.
+         */
+        val blockedAccounts: List<TeamBlockedAccount> = emptyList(),
         /**
          * Falha da última ação, fora da lista.
          *
@@ -55,6 +68,9 @@ class TeamKeysAdminViewModel(
     private val regenerateKey: RegenerateTeamKeyUseCase,
     private val revokeKey: RevokeTeamKeyUseCase,
     private val unclaimAccount: UnclaimTeamKeyAccountUseCase,
+    private val deleteAccount: DeleteTeamAccountUseCase,
+    private val listBlockedAccounts: ListBlockedTeamAccountsUseCase,
+    private val unblockAccount: UnblockTeamAccountUseCase,
     dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -110,6 +126,22 @@ class TeamKeysAdminViewModel(
         runAction { unclaimAccount(id = id, accountKey = accountKey) }
     }
 
+    /**
+     * Apaga a conta e a declara fora do time. **Irreversível.**
+     *
+     * A tela pede confirmação antes: os dados vão embora e não voltam nem
+     * desbloqueando, porque a máquina daquela conta já marcou os turnos dela como
+     * enviados.
+     */
+    fun removeAccountFromTeam(accountKey: String) {
+        runAction { deleteAccount(accountKey) }
+    }
+
+    /** Devolve a conta ao time. Não restaura dado nenhum. */
+    fun unblock(accountKey: String) {
+        runAction { unblockAccount(accountKey) }
+    }
+
     fun clearActionError() {
         val current = _uiState.value
         if (current is TeamKeysUiState.Success) {
@@ -125,7 +157,7 @@ class TeamKeysAdminViewModel(
      * exemplo, muda de valor — e mostrar a antiga por engano faria o admin
      * distribuir uma chave que já não vale.
      */
-    private fun runAction(block: suspend () -> Result<TeamKeyEntry>) {
+    private fun runAction(block: suspend () -> Result<*>) {
         val current = _uiState.value as? TeamKeysUiState.Success
         if (current?.busy == true) {
             return
@@ -153,9 +185,14 @@ class TeamKeysAdminViewModel(
     }
 
     private suspend fun load() {
+        // As bloqueadas primeiro, porque a falha delas não pode derrubar a lista
+        // de chaves: contra servidor anterior à 0.11.0 a leitura devolve lista
+        // vazia, que é a verdade daquele deploy.
+        val blocked = listBlockedAccounts().getOrDefault(emptyList())
+
         listKeys().fold(
             onSuccess = { keys ->
-                _uiState.value = TeamKeysUiState.Success(keys = keys)
+                _uiState.value = TeamKeysUiState.Success(keys = keys, blockedAccounts = blocked)
             },
             onFailure = { error ->
                 val message = error.message ?: UNKNOWN_ERROR_MESSAGE
@@ -165,7 +202,7 @@ class TeamKeysAdminViewModel(
                 _uiState.value = if (current == null) {
                     TeamKeysUiState.Error(message)
                 } else {
-                    current.copy(busy = false, actionError = message)
+                    current.copy(busy = false, actionError = message, blockedAccounts = blocked)
                 }
             }
         )

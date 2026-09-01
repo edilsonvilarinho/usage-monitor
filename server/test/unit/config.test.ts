@@ -86,6 +86,33 @@ describe('loadConfigFromEnv', () => {
     ).toThrow(/TEAM_LEGACY_KEY_MODE/);
   });
 
+  // Ao contrario do modo legado, este nasce estrito: o rotulo passou a ser a
+  // relacao do time, e um default frouxo deixaria o portao desligado em todo
+  // deploy que nao soubesse da variavel.
+  it('nasce com TEAM_KEY_LABEL_MATCH estrito', () => {
+    const config = loadConfigFromEnv({ TEAM_API_KEY: VALID_KEY } as NodeJS.ProcessEnv);
+
+    expect(config.keyLabelMatch).toBe('strict');
+  });
+
+  it('aceita TEAM_KEY_LABEL_MATCH=off', () => {
+    const config = loadConfigFromEnv({
+      TEAM_API_KEY: VALID_KEY,
+      TEAM_KEY_LABEL_MATCH: 'off',
+    } as NodeJS.ProcessEnv);
+
+    expect(config.keyLabelMatch).toBe('off');
+  });
+
+  it('falha com TEAM_KEY_LABEL_MATCH desconhecido', () => {
+    expect(() =>
+      loadConfigFromEnv({
+        TEAM_API_KEY: VALID_KEY,
+        TEAM_KEY_LABEL_MATCH: 'talvez',
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/TEAM_KEY_LABEL_MATCH/);
+  });
+
   it('aceita TEAM_LEGACY_KEY_MODE=off', () => {
     const config = loadConfigFromEnv({
       TEAM_API_KEY: VALID_KEY,

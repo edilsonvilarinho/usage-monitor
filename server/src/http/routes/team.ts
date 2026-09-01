@@ -32,6 +32,7 @@ export function createTeamRouter(deps: TeamRouterDeps): Router {
   const access: AccessDeps = {
     config: deps.config,
     keyRepository: deps.keyRepository,
+    repository: deps.repository,
     now: deps.now,
   };
 

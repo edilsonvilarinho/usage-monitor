@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
+import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamMemberIdentity
@@ -53,6 +54,21 @@ internal data class ConfirmedIdentity(
     val accountEmail: String?
 )
 
+/**
+ * A frase do servidor quando ele **recusou esta conta**, ou `null`.
+ *
+ * Só `403`: é o status que o servidor reserva para "a credencial vale, mas não
+ * para esta conta" — conta fora da relação declarada no rótulo, conta declarada
+ * fora do time, conta de outra chave, limite de contas cheio. Os quatro têm o
+ * mesmo conserto do lado de cá: esta conta não deveria estar marcada com esta
+ * chave. `401` é chave errada e `5xx` é o servidor, e nenhum dos dois aponta
+ * para uma conta específica.
+ */
+private fun Throwable.admissionRejection(): String? {
+    val serverError = this as? TeamServerException ?: return null
+    return serverError.detail.takeIf { serverError.statusCode == 403 }
+}
+
 private fun TeamIntegrationSettings.confirmedIdentity(target: TeamSyncTarget): ConfirmedIdentity {
     return ConfirmedIdentity(alias = alias, apiKey = apiKey, accountEmail = target.accountEmail)
 }
@@ -67,7 +83,18 @@ private fun TeamIntegrationSettings.confirmedIdentity(target: TeamSyncTarget): C
 data class TeamSyncStatus(
     val lastSuccessAt: Instant? = null,
     val lastFailureAt: Instant? = null,
-    val lastFailureMessage: String? = null
+    val lastFailureMessage: String? = null,
+    /**
+     * Contas que o servidor **recusou**, por `profileId`, com o motivo dele.
+     *
+     * Separado de [lastFailureMessage] porque o conserto é outro: uma falha de
+     * rede é do servidor ou da conexão, e uma recusa é da configuração desta
+     * máquina — a conta marcada aqui não pertence à chave que está colada aqui.
+     * Sem o `profileId` a mensagem geral dizia que **algo** foi recusado sem
+     * dizer qual das contas marcadas era a errada, e numa máquina com duas ou
+     * três isso não aponta nada.
+     */
+    val rejectedProfiles: Map<String, String> = emptyMap()
 ) {
     /**
      * Há falha pendente, e o aviso deve aparecer.
@@ -230,6 +257,8 @@ internal class TeamSyncService(
                     .onFailure { error -> failures += error }
             }
 
+            val rejections = mutableMapOf<String, String>()
+
             for (target in targetsProvider()) {
                 if (!settings.participates(target.profileId)) {
                     continue
@@ -239,6 +268,16 @@ internal class TeamSyncService(
                 pushedTurns += result.pushedTurns
                 batches += result.batches
                 failures += result.failures
+
+                // A recusa fica presa na conta que a causou. A primeira basta:
+                // as seguintes na mesma passada são a mesma causa repetida em
+                // presença, identidade e lote.
+                val rejection = result.failures.firstNotNullOfOrNull { error ->
+                    error.admissionRejection()
+                }
+                if (rejection != null) {
+                    rejections[target.profileId] = rejection
+                }
             }
 
             val report = TeamSyncReport(
@@ -246,7 +285,7 @@ internal class TeamSyncService(
                 batches = batches,
                 failures = failures
             )
-            publishStatus(report)
+            publishStatus(report, rejections)
             report
         }
     }
@@ -258,13 +297,17 @@ internal class TeamSyncService(
      * trocar a mensagem a cada tique de 30s faria o aviso piscar sem informar
      * nada novo.
      */
-    private fun publishStatus(report: TeamSyncReport) {
+    private fun publishStatus(report: TeamSyncReport, rejections: Map<String, String>) {
         val now = clock.now()
         val current = _syncStatus.value
         _syncStatus.value = if (report.hasFailure) {
             current.copy(
                 lastFailureAt = now,
-                lastFailureMessage = report.failures.first().message ?: UNKNOWN_FAILURE_MESSAGE
+                lastFailureMessage = report.failures.first().message ?: UNKNOWN_FAILURE_MESSAGE,
+                // Substitui, não acumula: a conta que deixou de ser recusada — o
+                // usuário a desmarcou, ou o admin corrigiu o rótulo — precisa
+                // sumir do aviso, e a passada corrente é quem sabe disso.
+                rejectedProfiles = rejections
             )
         } else {
             // Passada limpa apaga a falha: o aviso é sobre o estado atual, e uma

@@ -54,6 +54,7 @@ Todas as variáveis estão documentadas em [`.env.example`](.env.example).
 | `TEAM_KEY_SECRET` | com admin | — | Mínimo 32 caracteres. Cifra as chaves emitidas em repouso. |
 | `TEAM_API_KEY` | ver nota | — | Mínimo 32 caracteres. Chave única **legada**. |
 | `TEAM_LEGACY_KEY_MODE` | não | `open` | `open` mantém a chave legada lendo tudo; `off` a rejeita. |
+| `TEAM_KEY_LABEL_MATCH` | não | `strict` | **0.11.0+.** `strict` recusa a conta cujo e-mail não está no rótulo da chave, quando o rótulo declara algum; `off` volta ao comportamento anterior, em que o rótulo era decoração. **Não desliga a lista de contas removidas.** |
 | `TEAM_REPORT_TOKEN` | não | — | **0.10.0+.** Mínimo 32 caracteres. Credencial de **leitura global** para o consumidor externo. Não escreve nada e não alcança `DELETE` nenhum. |
 | `DATA_DIR` | não | `./data` | `/data` no container. |
 | `PORT` | não | `3000` | |
@@ -79,14 +80,16 @@ Cada pessoa recebe uma chave própria, emitida pelo app desktop de quem administ
 Fluxo:
 
 1. No app do administrador: **Configurações → Integração com time** → ligar → informar o **servidor** → **Eu sou admin do servidor** → colar o `TEAM_ADMIN_TOKEN` → **Validar**. Não é preciso chave de time, apelido nem conta marcada: quem administra não participa necessariamente de nenhum time.
-2. **Configurar chaves das contas** → emitir uma chave por pessoa. O **rótulo** é texto livre (use o e-mail) e o servidor **não o verifica** — quem prova o vínculo é o `accountUuid` que aparece ao lado depois que a chave é usada.
+2. **Configurar chaves das contas** → emitir uma chave por pessoa. O **rótulo** é a **relação do time daquela chave** (0.11.0+): escreva ali o e-mail da pessoa e só a conta que reporta aquele e-mail poderá usá-la. Vírgula, ponto e vírgula ou espaço separam mais de um. Rótulo **sem e-mail** não declara relação nenhuma e aceita qualquer conta, que é o comportamento anterior.
 3. Entregar a chave à pessoa por canal fechado. Ela cola em **Chave do time**, marca a conta e clica em **Testar conexão** — é esse clique que cria o vínculo, por `POST /v1/claim`. Contra um servidor 0.3.0 o app cai no `GET /v1/verify`, que só informa, e o vínculo volta a depender do próximo envio de turnos.
-4. Máquina logada em duas contas da empresa: subir `maxAccounts` daquela chave para `2`. A segunda conta se reivindica sozinha na passada seguinte.
+4. Máquina logada em duas contas da empresa: subir `maxAccounts` daquela chave para `2` **e listar os dois e-mails no rótulo**. A segunda conta se reivindica sozinha na passada seguinte.
 5. Depois que todos migrarem, definir `TEAM_LEGACY_KEY_MODE=off`. **É este passo que efetiva o isolamento.**
 
 **Uma conta pertence a no máximo uma chave**, garantido por índice único. Se a chave errada reivindicar a conta, use `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` (botão **Desvincular** no painel) para liberá-la.
 
-**Regerar** troca a chave crua mantendo os vínculos — serve para chave perdida ou vazada, e a antiga para de valer na requisição seguinte. **Revogar** tira o acesso e **não apaga** nada, e **Desvincular** também não: os dois mexem em quem pode ler, não no que já foi enviado. Apagar histórico exige o token de admin: `DELETE /api/v1/member` remove uma máquina, `DELETE /api/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId` remove uma sessão e `DELETE /api/admin/v1/accounts/:accountKey` remove a conta inteira.
+**Regerar** troca a chave crua mantendo os vínculos — serve para chave perdida ou vazada, e a antiga para de valer na requisição seguinte. **Revogar** tira o acesso e **não apaga** nada, e **Desvincular** também não: os dois mexem em quem pode ler, não no que já foi enviado. Apagar histórico exige o token de admin: `DELETE /api/v1/member` remove uma máquina, `DELETE /api/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId` remove uma sessão e `DELETE /api/admin/v1/accounts/:accountKey` remove a conta inteira **e a declara fora do time** (0.11.0+).
+
+**O rótulo não autentica ninguém — ele autoriza.** O `accountEmail` que ele confere é autodeclarado pelo cliente, como o `accountKey` sempre foi: o portão impede a conta errada de entrar por engano, não um cliente hostil de mentir. Contra decisão deliberada existe a lista de contas removidas, que é por `accountUuid`. Conta que **nunca reportou e-mail** (cliente anterior à 0.3.x) passa pelo portão: recusá-la derrubaria instalação que a mudança não pretende atingir.
 
 O `label` é PII quando você digita um e-mail nele. Ele é gravado no banco por decisão de quem administra — **nenhum e-mail vem do cliente**.
 
@@ -456,13 +459,15 @@ Disponíveis a partir da versão **0.3.0**, e **só quando `TEAM_ADMIN_TOKEN` es
 | `GET /api/admin/v1/ping` | `{"status":"ok"}`. É o que o botão **Validar** do app chama. |
 | `GET /api/admin/v1/overview?since=&until=&gapCutoffMs=` | Todas as contas: `{ accounts: [{ accountKey, label, accountEmail, emailSource, members[], rows[], activity[] }] }`. `emailSource` é `reported`, `label` ou `null`; e-mail reportado sempre prevalece. Mesmo formato de `/v1/team`, uma entrada por conta. `activity` a partir da 0.7.0, metadados de e-mail a partir da 0.9.0 e `until` a partir da 0.10.0. Também aceita `x-report-key` (0.10.0+). |
 | `POST /api/admin/v1/keys` | `{ label, maxAccounts? }` → `201` com a chave crua. |
-| `GET /api/admin/v1/keys` | Lista **com a chave crua**, mais `keyPrefix`, `maxAccounts`, `accounts[]` e as datas. |
+| `GET /api/admin/v1/keys` | Lista **com a chave crua**, mais `keyPrefix`, `maxAccounts`, `accounts[]` e as datas. **0.11.0+:** `accountDetails[]` traz `{ accountKey, accountEmail, authorized }` para as mesmas contas — campo novo ao lado de `accounts`, que segue igual. |
 | `PATCH /api/admin/v1/keys/:id` | `{ label?, maxAccounts? }`. Teto abaixo do já reivindicado → `400`. |
 | `POST /api/admin/v1/keys/:id/regenerate` | Nova chave crua, vínculos mantidos, antiga invalidada na hora. |
 | `DELETE /api/admin/v1/keys/:id` | Revoga. **Não apaga dados.** |
 | `DELETE /api/admin/v1/keys/:id/accounts/:accountKey` | Desfaz um vínculo errado. **Não apaga dados.** |
 | `DELETE /api/admin/v1/accounts/:accountKey/members/:deviceId/sessions/:sessionId` | **0.8.0+.** Apaga somente a sessão e seus turnos. Irreversível; novos turnos podem recriá-la. |
-| `DELETE /api/admin/v1/accounts/:accountKey` | **0.5.0+.** Apaga a conta inteira: integrantes, sessões, turnos e o vínculo. Irreversível. |
+| `DELETE /api/admin/v1/accounts/:accountKey` | **0.5.0+.** Apaga a conta inteira: integrantes, sessões, turnos e o vínculo. Irreversível. **0.11.0+:** também a declara fora do time, e a resposta ganha `blocked: true`. |
+| `GET /api/admin/v1/blocked-accounts` | **0.11.0+.** `{ accounts: [{ accountKey, accountEmail, reason, blockedAt }] }`. O e-mail é o retrato do momento do bloqueio. Só `x-admin-token`: é política de acesso, não relatório de uso. |
+| `DELETE /api/admin/v1/blocked-accounts/:accountKey` | **0.11.0+.** Devolve a conta ao time e responde com a lista restante. **Não restaura dado nenhum.** Conta fora da lista → `404`. |
 
 Conta que entrou pela chave legada aparece no `overview` com `label: null` — existe nos dados e não tem chave dona. Enquanto uma conta histórica ainda não reportou o e-mail, um `label` com formato válido de e-mail aparece como fallback provisório (`emailSource: "label"`); texto livre inválido não vira e-mail.
 
@@ -472,7 +477,9 @@ Conta que entrou pela chave legada aparece no `overview` com `label: null` — e
 { "deletedTurns": 1240, "deletedSessions": 8, "deletedMembers": 3, "unlinkedKeys": 1 }
 ```
 
-Idempotente: conta desconhecida responde `200` com zeros. **Apagar não impede a conta de voltar**: ingest e presença reivindicam sozinhos, então uma máquina que ainda participe dela a recria na batida seguinte. As travas são do lado do cliente — desmarcar a conta nas Configurações daquela máquina — ou baixar o `maxAccounts` da chave até o slot ficar cheio, o que faz a reivindicação receber `403`.
+Idempotente: conta desconhecida responde `200` com zeros — e a declara fora do time do mesmo jeito, porque a decisão vale para o que ainda pode chegar.
+
+**A partir da 0.11.0, apagar impede a conta de voltar.** Antes disso não impedia: ingest e presença reivindicam sozinhos, e uma máquina que ainda participasse da conta a recriava na batida seguinte — apagar era gesto sem efeito, com quem administra achando que tinha resolvido. Agora a remoção grava a conta em `team_blocked_accounts`, e de lá ela só sai por `DELETE /api/admin/v1/blocked-accounts/:accountKey`. **A ordem é dados, vínculo, bloqueio**: falhar no último deixa a conta apagada e desvinculada, que é exatamente o estado da versão anterior da rota.
 
 A chave crua vem no corpo do `GET` de propósito: o painel é a lista de "quem tem qual chave", e mostrá-la só na criação obrigaria o administrador a guardá-la fora do sistema ou a regerar a cada consulta. O preço está em [Modelo de segurança](#modelo-de-segurança).
 
@@ -546,9 +553,11 @@ O `HEALTHCHECK` está no Dockerfile e no compose. O processo roda como `node` (u
 7. **Deploy.** Confira `GET https://<dominio>/api/health`.
 8. **Auto Deploy:** ative o webhook na branch `main` se quiser redeploy a cada push.
 
-**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**; apagar uma conta inteira depende da **0.5.0**; excluir uma sessão depende da rota administrativa da **0.8.0**; o agrupamento pelo e-mail real depende da **0.9.0**; e a tabela de preços publicada, as rotas de relatório e o filtro `until` dependem da **0.10.0**. Contra servidor anterior, a exclusão de sessão responde `404` e o app exige atualização, pois não existe fallback seguro. Nas leituras compatíveis, o painel continua caindo no agregado ou no heartbeat via ingest conforme o recurso ausente. Um redeploy resolve.
+**Atualizar o servidor junto com o app.** O detalhe de sessão do modal de time depende do `GET /api/v1/session`, que só existe a partir da **0.2.0**; as chaves por conta, a validação de vínculo e a visão global dependem da **0.3.0**; a presença em tempo real depende do `POST /api/v1/presence`, que só existe a partir da **0.4.0**; apagar uma conta inteira depende da **0.5.0**; excluir uma sessão depende da rota administrativa da **0.8.0**; o agrupamento pelo e-mail real depende da **0.9.0**; a tabela de preços publicada, as rotas de relatório e o filtro `until` dependem da **0.10.0**; e a lista de contas removidas do time, mais o e-mail de cada conta vinculada na tela de chaves, dependem da **0.11.0**. Contra servidor anterior, a exclusão de sessão responde `404` e o app exige atualização, pois não existe fallback seguro. Nas leituras compatíveis, o painel continua caindo no agregado ou no heartbeat via ingest conforme o recurso ausente. Um redeploy resolve.
 
-Não há migração manual de banco a rodar: as tabelas novas são criadas no boot. A 0.3.0 criou `team_keys`, `team_key_accounts` e `server_meta`; a 0.9.0 cria `team_accounts` sem alterar nem fundir os dados existentes. As versões 0.4.0, 0.5.0 e 0.8.0 não acrescentaram tabela nem coluna. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
+**A 0.11.0 pode cortar quem sincronizava ontem, e isso é o ponto.** O portão do rótulo vale para os vínculos que **já existiam**: uma chave rotulada com um e-mail que não bate com o da conta vinculada passa a recusar aquela conta na primeira requisição depois do redeploy. Por isso o arranque varre os vínculos e emite um `warn` por vínculo que o portão recusaria, com rótulo, conta e e-mail — **leia esse log antes de avisar o time**. Se a lista trouxer alguém legítimo, o conserto é o rótulo (`PATCH /api/admin/v1/keys/:id`), não desligar o portão. Para desligar mesmo assim: `TEAM_KEY_LABEL_MATCH=off`.
+
+Não há migração manual de banco a rodar: as tabelas novas são criadas no boot. A 0.3.0 criou `team_keys`, `team_key_accounts` e `server_meta`; a 0.9.0 cria `team_accounts` e a 0.11.0 cria `team_blocked_accounts`, nenhuma delas alterando ou fundindo os dados existentes. As versões 0.4.0, 0.5.0 e 0.8.0 não acrescentaram tabela nem coluna. Um servidor 0.3.0 com `TEAM_LEGACY_KEY_MODE=open` e só `TEAM_API_KEY` definida se comporta exatamente como a 0.2.x.
 
 Rodando em **Docker Swarm**, mantenha **1 réplica**: o SQLite é um arquivo local e duas réplicas em nós diferentes veriam bancos distintos. Se o cluster tiver mais de um nó, fixe uma constraint de nó para o volume seguir o serviço.
 

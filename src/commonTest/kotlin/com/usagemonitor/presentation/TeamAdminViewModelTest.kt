@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamAccountDeletion
+import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
@@ -12,9 +13,12 @@ import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamOverviewUseCase
+import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
+import com.usagemonitor.domain.usecase.ListBlockedTeamAccountsUseCase
 import com.usagemonitor.domain.usecase.ListTeamKeysUseCase
 import com.usagemonitor.domain.usecase.RegenerateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.RevokeTeamKeyUseCase
+import com.usagemonitor.domain.usecase.UnblockTeamAccountUseCase
 import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
 import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
@@ -39,6 +43,9 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
     var listResult: Result<List<TeamKeyEntry>>? = null
     var actionResult: Result<TeamKeyEntry>? = null
     var overview: List<TeamAccountUsage> = emptyList()
+    var blockedAccounts: List<TeamBlockedAccount> = emptyList()
+    var blockedResult: Result<List<TeamBlockedAccount>>? = null
+    val unblockedAccounts = mutableListOf<String>()
     var overviewResult: Result<List<TeamAccountUsage>>? = null
 
     var listCalls = 0
@@ -122,7 +129,24 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
 
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
         deletedAccounts += accountKey
-        return Result.failure(UnsupportedOperationException())
+        keys.replaceAll { entry -> entry.copy(accounts = entry.accounts - accountKey) }
+        return Result.success(
+            TeamAccountDeletion(
+                deletedTurns = 1,
+                deletedSessions = 1,
+                deletedMembers = 1,
+                unlinkedKeys = 1
+            )
+        )
+    }
+
+    override suspend fun fetchBlockedAccounts(): Result<List<TeamBlockedAccount>> =
+        blockedResult ?: Result.success(blockedAccounts)
+
+    override suspend fun unblockAccount(accountKey: String): Result<List<TeamBlockedAccount>> {
+        unblockedAccounts += accountKey
+        blockedAccounts = blockedAccounts.filterNot { it.accountKey == accountKey }
+        return Result.success(blockedAccounts)
     }
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> {
@@ -136,11 +160,17 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
         sessionId: String
     ): Result<CliSessionDetail?> = Result.failure(UnsupportedOperationException())
 
-    override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun verifyKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         return Result.success(TeamKeyVerification(authorized = true, claimed = true))
     }
 
-    override suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         return Result.success(TeamKeyVerification(authorized = true, claimed = true))
     }
 }
@@ -277,6 +307,79 @@ class TeamKeysAdminViewModelTest {
         assertNull(state.actionError)
     }
 
+    @Test
+    fun `carrega as contas fora do time junto das chaves`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        repository.blockedAccounts = listOf(
+            TeamBlockedAccount(accountKey = ADMIN_ACCOUNT_B, accountEmail = "pessoal@gmail.com")
+        )
+        val viewModel = buildViewModel(repository)
+
+        viewModel.open()
+        runCurrent()
+
+        // Na mesma carga, e não numa leitura por abertura de seção: remover uma
+        // conta muda as duas listas, e lê-las em momentos diferentes mostraria a
+        // tela pela metade.
+        val state = assertIs<TeamKeysUiState.Success>(viewModel.uiState.value)
+        assertEquals(1, state.keys.size)
+        assertEquals(listOf("pessoal@gmail.com"), state.blockedAccounts.map { it.accountEmail })
+    }
+
+    @Test
+    fun `remover a conta do time recarrega as duas listas`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        val viewModel = buildViewModel(repository)
+        viewModel.open()
+        runCurrent()
+        val callsAfterOpen = repository.listCalls
+
+        repository.blockedAccounts = listOf(TeamBlockedAccount(accountKey = ADMIN_ACCOUNT_A))
+        viewModel.removeAccountFromTeam(ADMIN_ACCOUNT_A)
+        runCurrent()
+
+        assertEquals(listOf(ADMIN_ACCOUNT_A), repository.deletedAccounts)
+        assertTrue(repository.listCalls > callsAfterOpen)
+        val state = assertIs<TeamKeysUiState.Success>(viewModel.uiState.value)
+        assertEquals(1, state.blockedAccounts.size)
+    }
+
+    @Test
+    fun `devolver a conta ao time tira a linha da lista`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        repository.blockedAccounts = listOf(TeamBlockedAccount(accountKey = ADMIN_ACCOUNT_B))
+        val viewModel = buildViewModel(repository)
+        viewModel.open()
+        runCurrent()
+
+        viewModel.unblock(ADMIN_ACCOUNT_B)
+        runCurrent()
+
+        assertEquals(listOf(ADMIN_ACCOUNT_B), repository.unblockedAccounts)
+        val state = assertIs<TeamKeysUiState.Success>(viewModel.uiState.value)
+        assertTrue(state.blockedAccounts.isEmpty())
+    }
+
+    // Contra servidor anterior à 0.11.0 a leitura devolve lista vazia; se ela
+    // falhasse, a tela de chaves inteira sumiria por causa de uma seção acessória.
+    @Test
+    fun `falha ao ler as bloqueadas nao derruba a lista de chaves`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        repository.blockedResult = Result.failure(IllegalStateException("servidor fora"))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.open()
+        runCurrent()
+
+        val state = assertIs<TeamKeysUiState.Success>(viewModel.uiState.value)
+        assertEquals(1, state.keys.size)
+        assertTrue(state.blockedAccounts.isEmpty())
+    }
+
     private fun buildViewModel(repository: FakeTeamAdminRepository): TeamKeysAdminViewModel {
         return TeamKeysAdminViewModel(
             listKeys = ListTeamKeysUseCase(repository),
@@ -285,6 +388,9 @@ class TeamKeysAdminViewModelTest {
             regenerateKey = RegenerateTeamKeyUseCase(repository),
             revokeKey = RevokeTeamKeyUseCase(repository),
             unclaimAccount = UnclaimTeamKeyAccountUseCase(repository),
+            deleteAccount = DeleteTeamAccountUseCase(repository),
+            listBlockedAccounts = ListBlockedTeamAccountsUseCase(repository),
+            unblockAccount = UnblockTeamAccountUseCase(repository),
             dispatcher = UnconfinedTestDispatcher()
         )
     }

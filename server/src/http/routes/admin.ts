@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import type { KeyLabelMatchMode } from '../../config.js';
 import { NotFoundError, ValidationError } from '../../domain/errors.js';
+import { isAccountAllowedByLabel } from '../../domain/teamKeyLabel.js';
 import { logger } from '../../logger.js';
 import type { TeamKeyRepository, TeamKeyRecord } from '../../repositories/teamKeyRepository.js';
 import type { TeamRepository } from '../../repositories/teamRepository.js';
@@ -18,6 +20,13 @@ export interface AdminRouterDeps {
   adminToken: string;
   /** Credencial de leitura global. So a visao agregada a aceita; nenhum `DELETE` a ve. */
   reportToken: string | null;
+  /**
+   * Modo do portao do rotulo, so para a lista dizer a verdade.
+   *
+   * Com o portao desligado toda conta vinculada esta autorizada, e marcar
+   * divergencia ali anunciaria uma recusa que nao vai acontecer.
+   */
+  keyLabelMatch: KeyLabelMatchMode;
   repository: TeamRepository;
   keyRepository: TeamKeyRepository;
   now: () => number;
@@ -31,14 +40,42 @@ export interface AdminRouterDeps {
  * quem nao pediu por uma.
  *
  * O que a torna usavel sem ninguem descobrir `accountUuid` de ninguem: a chave
- * nasce sem conta e o `label` e texto livre — normalmente o e-mail da pessoa,
- * digitado por quem administra. O servidor **nao** verifica esse rotulo; a
- * verdade e a lista `accounts`, preenchida no primeiro ingest de cada chave.
+ * nasce sem conta e se amarra a primeira que a usar num ingest.
+ *
+ * O `label` continua sendo texto livre, mas deixou de ser decoracao: quando ele
+ * declara e-mail, aquela e a **relacao do time** daquela chave, e conta de fora
+ * dela e recusada (`assertAllowedByLabel`, em `http/access.ts`). Rotulo sem
+ * e-mail nao declara relacao nenhuma e o portao fica desligado.
  */
 export function createAdminRouter(deps: AdminRouterDeps): Router {
   const router = Router();
   const protect = (handler: Parameters<typeof requireAdminToken>[1]) =>
     requireAdminToken(deps.adminToken, handler);
+
+  /**
+   * A chave com o e-mail de cada conta vinculada ao lado.
+   *
+   * Sem isto a tela do admin listava UUID cru, e a conta intrusa da issue #179
+   * era indistinguivel das legitimas — descobrir que `879df04a…` era um gmail
+   * pessoal exigia cruzar com outra tela. `accounts` continua sendo a lista de
+   * UUIDs: mudar a forma dela quebraria app anterior, e o campo novo e ignorado
+   * por quem nao o conhece.
+   */
+  const describeKey = (record: TeamKeyRecord) => {
+    const emails = deps.repository.accountEmails();
+    return toKeyResponse(
+      record,
+      record.accounts.map((accountKey) => {
+        const accountEmail = emails.get(accountKey) ?? null;
+        return {
+          accountKey,
+          accountEmail,
+          authorized:
+            deps.keyLabelMatch === 'off' || isAccountAllowedByLabel(record.label, accountEmail),
+        };
+      }),
+    );
+  };
 
   // Leitura que nao expoe segredo nem apaga nada aceita tambem `x-report-key`.
   // `protect` continua sendo o portao de tudo o mais — inclusive da listagem de
@@ -162,7 +199,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
     '/admin/v1/keys',
     protect(
       wrap((_req, res) => {
-        res.json({ keys: deps.keyRepository.list().map(toKeyResponse) });
+        res.json({ keys: deps.keyRepository.list().map(describeKey) });
       }),
     ),
   );
@@ -181,7 +218,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
 
         const created = deps.keyRepository.create(parsed.data, deps.now());
         logger.debug({ keyId: created.id, label: created.label }, 'chave de time criada');
-        res.status(201).json(toKeyResponse(created));
+        res.status(201).json(describeKey(created));
       }),
     ),
   );
@@ -212,7 +249,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         }
 
         const updated = deps.keyRepository.update(current.id, parsed.data);
-        res.json(toKeyResponse(updated as TeamKeyRecord));
+        res.json(describeKey(updated as TeamKeyRecord));
       }),
     ),
   );
@@ -231,7 +268,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         const current = requireKey(deps.keyRepository, req.params.id);
         const regenerated = deps.keyRepository.regenerate(current.id);
         logger.debug({ keyId: current.id }, 'chave de time regerada');
-        res.json(toKeyResponse(regenerated as TeamKeyRecord));
+        res.json(describeKey(regenerated as TeamKeyRecord));
       }),
     ),
   );
@@ -250,7 +287,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         const current = requireKey(deps.keyRepository, req.params.id);
         const revoked = deps.keyRepository.revoke(current.id, deps.now());
         logger.debug({ keyId: current.id }, 'chave de time revogada');
-        res.json(toKeyResponse(revoked as TeamKeyRecord));
+        res.json(describeKey(revoked as TeamKeyRecord));
       }),
     ),
   );
@@ -271,7 +308,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         if (!removed) {
           throw new NotFoundError('Vinculo nao encontrado para esta chave e conta.');
         }
-        res.json(toKeyResponse(deps.keyRepository.findById(current.id) as TeamKeyRecord));
+        res.json(describeKey(deps.keyRepository.findById(current.id) as TeamKeyRecord));
       }),
     ),
   );
@@ -292,9 +329,18 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
    * porque as duas tabelas pertencem a repositorios diferentes; compor os dois
    * na rota e o mesmo padrao do `PATCH` aqui em cima.
    *
-   * Nao impede a conta de voltar: ingest e presenca reivindicam sozinhos, entao
-   * uma maquina que ainda participe dela a recria na batida seguinte. Quem trava
-   * isso e o cliente parar de marcar a conta, ou o `maxAccounts` da chave.
+   * **Impede a conta de voltar**, e e isto que separa esta rota da versao
+   * anterior dela. Antes, ingest e presenca reivindicavam a conta sozinhos e uma
+   * maquina que ainda participasse dela a recriava na batida seguinte — apagar
+   * era gesto sem efeito, com o admin achando que tinha resolvido. Agora a
+   * remocao tambem escreve a decisao em `team_blocked_accounts`, de onde so o
+   * proprio admin a tira.
+   *
+   * **A ordem e dados, vinculo, bloqueio.** O bloqueio vai por ultimo porque e o
+   * passo mais barato e o unico trivialmente reversivel: falhar nele deixa uma
+   * conta apagada e desvinculada, que e exatamente o estado da versao anterior
+   * desta rota. Escrever o bloqueio primeiro e falhar depois deixaria uma conta
+   * barrada com o historico inteiro no banco.
    */
   router.delete(
     '/admin/v1/accounts/:accountKey',
@@ -305,11 +351,59 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
           throw new ValidationError('Informe a conta a remover.');
         }
 
+        // Lido antes do delete: `deleteAccount` apaga a linha de `team_accounts`,
+        // e depois dela nao ha mais e-mail nenhum para guardar no retrato.
+        const accountEmail = deps.repository.accountEmailOf(accountKey);
         const report = deps.repository.deleteAccount(accountKey);
         const unlinked = deps.keyRepository.unclaimAccountAnywhere(accountKey);
+        deps.keyRepository.blockAccount(accountKey, accountEmail, null, deps.now());
 
-        logger.debug({ accountKey, ...report, unlinked }, 'conta removida');
-        res.json({ ...report, unlinkedKeys: unlinked ? 1 : 0 });
+        logger.debug({ accountKey, accountEmail, ...report, unlinked }, 'conta removida do time');
+        res.json({ ...report, unlinkedKeys: unlinked ? 1 : 0, blocked: true });
+      }),
+    ),
+  );
+
+  /**
+   * Contas que o admin declarou fora do time.
+   *
+   * Sob `protect` e nao `readOnly`: e politica de acesso, nao relatorio de uso.
+   * O token de relatorio le consumo; quem pode ver e mexer em quem entra no time
+   * e quem administra.
+   */
+  router.get(
+    '/admin/v1/blocked-accounts',
+    protect(
+      wrap((_req, res) => {
+        res.json({ accounts: deps.keyRepository.listBlockedAccounts() });
+      }),
+    ),
+  );
+
+  /**
+   * Devolve a conta ao time.
+   *
+   * **Nao restaura dado nenhum** — o historico foi apagado junto com o bloqueio e
+   * o cliente daquela maquina ja marcou os turnos como enviados. O que volta e a
+   * possibilidade de reivindicar a conta de novo, e dai em diante ela precisa
+   * passar pelo portao do rotulo como qualquer outra.
+   */
+  router.delete(
+    '/admin/v1/blocked-accounts/:accountKey',
+    protect(
+      wrap((req, res) => {
+        const accountKey = req.params.accountKey ?? '';
+        if (accountKey === '') {
+          throw new ValidationError('Informe a conta a desbloquear.');
+        }
+
+        const unblocked = deps.keyRepository.unblockAccount(accountKey);
+        if (!unblocked) {
+          throw new NotFoundError('Esta conta nao esta na lista de bloqueadas.');
+        }
+
+        logger.debug({ accountKey }, 'conta devolvida ao time');
+        res.json({ accounts: deps.keyRepository.listBlockedAccounts() });
       }),
     ),
   );
@@ -339,7 +433,7 @@ function requireKey(repository: TeamKeyRepository, id: string | undefined): Team
  * para ser a lista de "quem tem qual chave". O preco esta registrado: quem tiver
  * o banco **e** o `TEAM_KEY_SECRET` le todas as chaves.
  */
-function toKeyResponse(record: TeamKeyRecord) {
+function toKeyResponse(record: TeamKeyRecord, accountDetails: AccountDetail[]) {
   return {
     id: record.id,
     label: record.label,
@@ -347,8 +441,16 @@ function toKeyResponse(record: TeamKeyRecord) {
     keyPrefix: record.keyPrefix,
     maxAccounts: record.maxAccounts,
     accounts: record.accounts,
+    accountDetails,
     createdAt: record.createdAt,
     revokedAt: record.revokedAt,
     lastUsedAt: record.lastUsedAt,
   };
+}
+
+/** Uma conta vinculada, com o que a tela precisa para decidir sobre ela. */
+interface AccountDetail {
+  accountKey: string;
+  accountEmail: string | null;
+  authorized: boolean;
 }

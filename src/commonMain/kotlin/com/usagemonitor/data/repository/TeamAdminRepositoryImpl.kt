@@ -9,6 +9,7 @@ import com.usagemonitor.data.mapper.toDomain
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
+import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
@@ -22,6 +23,10 @@ private const val NOT_CONFIGURED_MESSAGE =
 
 private const val OUTDATED_SERVER_MESSAGE =
     "Este servidor de time não sabe apagar contas. Atualize-o para a versão 0.5.0 ou mais nova."
+
+private const val OUTDATED_BLOCKED_ACCOUNTS_SERVER_MESSAGE =
+    "Este servidor de time não conhece a lista de contas fora do time. " +
+        "Atualize-o para a versão 0.11.0 ou mais nova."
 
 private const val OUTDATED_SESSION_DELETE_SERVER_MESSAGE =
     "Este servidor de time não sabe apagar sessões. Atualize-o para a versão 0.8.0 ou mais nova."
@@ -172,6 +177,50 @@ class TeamAdminRepositoryImpl(
         return result
     }
 
+    /**
+     * Contas que o admin declarou fora do time.
+     *
+     * `404` é servidor anterior à 0.11.0, e vira lista vazia em vez de falha: sem
+     * a tabela não há conta bloqueada nenhuma naquele deploy, e um erro na tela
+     * mandaria o admin atrás de um problema que não existe.
+     */
+    override suspend fun fetchBlockedAccounts(): Result<List<TeamBlockedAccount>> {
+        val result = withAdmin { settings ->
+            remoteDataSource.fetchBlockedAccounts(
+                baseUrl = settings.normalizedServerUrl,
+                adminToken = settings.adminToken
+            ).toDomain()
+        }
+
+        if (result.isMissingRoute()) {
+            return Result.success(emptyList())
+        }
+        return result
+    }
+
+    /**
+     * Devolve a conta ao time. Sem fallback, como [deleteAccount].
+     *
+     * `404` aqui é ambíguo entre servidor antigo e conta que não está na lista, e
+     * as duas leituras levam ao mesmo lugar: não há nada a desbloquear por este
+     * caminho. A mensagem manda atualizar, que é o único conserto possível para a
+     * primeira.
+     */
+    override suspend fun unblockAccount(accountKey: String): Result<List<TeamBlockedAccount>> {
+        val result = withAdmin { settings ->
+            remoteDataSource.unblockAccount(
+                baseUrl = settings.normalizedServerUrl,
+                adminToken = settings.adminToken,
+                accountKey = accountKey
+            ).toDomain()
+        }
+
+        if (result.isMissingRoute()) {
+            return Result.failure(IllegalStateException(OUTDATED_BLOCKED_ACCOUNTS_SERVER_MESSAGE))
+        }
+        return result
+    }
+
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> {
         return withAdmin { settings ->
             remoteDataSource.fetchOverview(
@@ -216,7 +265,10 @@ class TeamAdminRepositoryImpl(
      * reprovar uma configuração correta porque o servidor da empresa ficou para
      * trás — mesmo tratamento que `fetchSessionDetail` já dá ao detalhe ausente.
      */
-    override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun verifyKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         val settings = settingsProvider()
         val credential = settings.readCredential()
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
@@ -225,7 +277,8 @@ class TeamAdminRepositoryImpl(
             remoteDataSource.verifyKey(
                 baseUrl = settings.normalizedServerUrl,
                 credential = credential,
-                accountKey = accountKey
+                accountKey = accountKey,
+                accountEmail = accountEmail
             ).toDomain()
         }.recoverIfMissingRoute()
     }
@@ -238,7 +291,10 @@ class TeamAdminRepositoryImpl(
      * trocava a chave numa máquina sem turno pendente não emitia requisição
      * nenhuma e a conta ficava sem dona — com a leitura recusada o tempo todo.
      */
-    override suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         val settings = settingsProvider()
         val credential = settings.readCredential()
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
@@ -247,13 +303,14 @@ class TeamAdminRepositoryImpl(
             remoteDataSource.claimKey(
                 baseUrl = settings.normalizedServerUrl,
                 credential = credential,
-                accountKey = accountKey
+                accountKey = accountKey,
+                accountEmail = accountEmail
             ).toDomain()
         }
 
         if (result.isMissingRoute()) {
             // Servidor 0.3.0: sem rota de vínculo, resta informar.
-            return verifyKeyForAccount(accountKey)
+            return verifyKeyForAccount(accountKey, accountEmail)
         }
         return result
     }

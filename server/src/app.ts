@@ -69,7 +69,7 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
   // existir. Rota ausente faria "credencial errada" e "variavel nao definida"
   // chegarem ao consumidor como o mesmo 404.
   app.use('/api', createReportRouter({ config, repository, keyRepository }));
-  app.use('/api', createVerifyRouter({ config, keyRepository, now }));
+  app.use('/api', createVerifyRouter({ config, repository, keyRepository, now }));
 
   // Sem token de administracao as rotas nem existem: caem na coringa 404 abaixo,
   // e um deploy que nunca pediu administracao nao ganha superficie nova.
@@ -79,6 +79,7 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
       createAdminRouter({
         adminToken: config.adminToken,
         reportToken: config.reportToken,
+        keyLabelMatch: config.keyLabelMatch,
         repository,
         keyRepository,
         now,

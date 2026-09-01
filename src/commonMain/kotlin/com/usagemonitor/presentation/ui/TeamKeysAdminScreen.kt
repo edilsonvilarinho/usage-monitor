@@ -26,11 +26,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamBlockedAccount
+import com.usagemonitor.domain.entity.TeamKeyAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppConfirmationDialog
 import com.usagemonitor.presentation.ui.components.AppDataSurface
+import com.usagemonitor.presentation.ui.components.AppSectionHeader
+import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -43,6 +49,11 @@ internal const val TEAM_KEYS_CREATE_FIELD_TAG = "teamKeysCreateField"
 internal const val TEAM_KEYS_CREATE_BUTTON_TAG = "teamKeysCreateButton"
 internal const val TEAM_KEYS_ROW_TAG_PREFIX = "teamKeyRow:"
 internal const val TEAM_KEYS_ERROR_TAG = "teamKeysError"
+internal const val TEAM_KEYS_REMOVE_ACCOUNT_TAG_PREFIX = "teamKeyRemoveAccount:"
+internal const val TEAM_KEYS_REMOVE_CONFIRM_TAG = "teamKeyRemoveAccountConfirm"
+internal const val TEAM_KEYS_UNAUTHORIZED_TAG_PREFIX = "teamKeyUnauthorized:"
+internal const val TEAM_KEYS_BLOCKED_SECTION_TAG = "teamKeysBlockedSection"
+internal const val TEAM_KEYS_UNBLOCK_TAG_PREFIX = "teamKeyUnblock:"
 
 /** Único componente stateful: lê o estado do ViewModel e delega para filhos puros. */
 @Composable
@@ -62,6 +73,8 @@ fun TeamKeysAdminScreen(
         onRegenerate = { id -> viewModel.regenerate(id) },
         onRevoke = { id -> viewModel.revoke(id) },
         onUnclaim = { id, accountKey -> viewModel.unclaim(id, accountKey) },
+        onRemoveAccount = { accountKey -> viewModel.removeAccountFromTeam(accountKey) },
+        onUnblockAccount = { accountKey -> viewModel.unblock(accountKey) },
         onDismissError = { viewModel.clearActionError() },
         onRetry = { viewModel.refresh() },
         modifier = modifier
@@ -79,6 +92,8 @@ internal fun TeamKeysAdminContent(
     onRegenerate: (String) -> Unit = {},
     onRevoke: (String) -> Unit = {},
     onUnclaim: (String, String) -> Unit = { _, _ -> },
+    onRemoveAccount: (String) -> Unit = {},
+    onUnblockAccount: (String) -> Unit = {},
     onDismissError: () -> Unit = {},
     onRetry: () -> Unit = {}
 ) {
@@ -113,6 +128,8 @@ internal fun TeamKeysAdminContent(
                 onRegenerate = onRegenerate,
                 onRevoke = onRevoke,
                 onUnclaim = onUnclaim,
+                onRemoveAccount = onRemoveAccount,
+                onUnblockAccount = onUnblockAccount,
                 onDismissError = onDismissError
             )
         }
@@ -129,8 +146,15 @@ private fun TeamKeysList(
     onRegenerate: (String) -> Unit,
     onRevoke: (String) -> Unit,
     onUnclaim: (String, String) -> Unit,
+    onRemoveAccount: (String) -> Unit,
+    onUnblockAccount: (String) -> Unit,
     onDismissError: () -> Unit
 ) {
+    // A conta pendente de confirmação: a ação apaga dados e não tem desfazer.
+    // Mora aqui, e não no ViewModel, porque é estado de diálogo — nada que o
+    // servidor conheça.
+    var pendingAccount by remember { mutableStateOf<TeamKeyAccount?>(null) }
+
     // O corpo desta janela era `Column(fillMaxSize).padding(16.dp)` com
     // `spacedBy(12.dp)` — exatamente o que `AppWindowScaffold` faz, com os dois
     // valores escritos como literal em vez de sair de `AppSpacing`.
@@ -164,7 +188,7 @@ private fun TeamKeysList(
             }
         }
 
-        if (state.keys.isEmpty()) {
+        if (state.keys.isEmpty() && state.blockedAccounts.isEmpty()) {
             AppEmptyState(TeamKeysLabels.empty(language))
             return@AppWindowScaffold
         }
@@ -182,7 +206,99 @@ private fun TeamKeysList(
                     onSetMaxAccounts = onSetMaxAccounts,
                     onRegenerate = onRegenerate,
                     onRevoke = onRevoke,
-                    onUnclaim = onUnclaim
+                    onUnclaim = onUnclaim,
+                    onRequestRemoveAccount = { account -> pendingAccount = account }
+                )
+            }
+
+            // Dentro da lista, e não abaixo dela: a seção rola junto das chaves,
+            // que é o que ela descreve — a conta removida saiu de uma delas.
+            if (state.blockedAccounts.isNotEmpty()) {
+                item(key = TEAM_KEYS_BLOCKED_SECTION_TAG) {
+                    BlockedAccountsCard(
+                        accounts = state.blockedAccounts,
+                        language = language,
+                        enabled = !state.busy,
+                        onUnblock = onUnblockAccount
+                    )
+                }
+            }
+        }
+    }
+
+    val accountToRemove = pendingAccount
+    if (accountToRemove != null) {
+        AppConfirmationDialog(
+            title = TeamKeysLabels.removeAccountTitle(language),
+            message = TeamKeysLabels.removeAccountWarning(
+                account = accountToRemove.accountEmail ?: accountToRemove.accountKey,
+                language = language
+            ),
+            confirmLabel = TeamKeysLabels.confirmRemoveAccount(language),
+            cancelLabel = TeamKeysLabels.cancel(language),
+            confirmTag = TEAM_KEYS_REMOVE_CONFIRM_TAG,
+            onConfirm = {
+                pendingAccount = null
+                onRemoveAccount(accountToRemove.accountKey)
+            },
+            onDismiss = { pendingAccount = null }
+        )
+    }
+}
+
+/**
+ * As contas que o administrador tirou do time.
+ *
+ * O e-mail é o retrato guardado no bloqueio: os dados da conta foram apagados
+ * junto, então não há de onde relê-lo — e o UUID sozinho não identifica ninguém
+ * para quem vai decidir se devolve a conta.
+ */
+@Composable
+private fun BlockedAccountsCard(
+    accounts: List<TeamBlockedAccount>,
+    language: AppLanguage,
+    enabled: Boolean,
+    onUnblock: (String) -> Unit
+) {
+    AppDataSurface(
+        modifier = Modifier.fillMaxWidth().testTag(TEAM_KEYS_BLOCKED_SECTION_TAG),
+        shape = AppShapes.large,
+        contentPadding = 12.dp,
+        verticalArrangement = Arrangement.Top
+    ) {
+        AppSectionHeader(title = TeamKeysLabels.blockedSection(language))
+
+        for (account in accounts) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = account.accountEmail ?: TeamKeysLabels.noEmail(language),
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = account.blockedAt
+                            ?.let { at -> TeamKeysLabels.blockedAt(formatInstant(at), language) }
+                            ?: account.accountKey,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                AppButton(
+                    label = TeamKeysLabels.unblock(language),
+                    onClick = { onUnblock(account.accountKey) },
+                    enabled = enabled,
+                    tone = AppButtonTone.GHOST,
+                    modifier = Modifier.testTag(
+                        "$TEAM_KEYS_UNBLOCK_TAG_PREFIX${account.accountKey}"
+                    )
                 )
             }
         }
@@ -283,7 +399,8 @@ private fun TeamKeyCard(
     onSetMaxAccounts: (String, Int) -> Unit,
     onRegenerate: (String) -> Unit,
     onRevoke: (String) -> Unit,
-    onUnclaim: (String, String) -> Unit
+    onUnclaim: (String, String) -> Unit,
+    onRequestRemoveAccount: (TeamKeyAccount) -> Unit
 ) {
     // Só visualização: mostrar a chave é decisão de quem está olhando a tela, e
     // não estado que o servidor conheça.
@@ -356,24 +473,58 @@ private fun TeamKeyCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                for (accountKey in entry.accounts) {
+                for (account in entry.accountEntries) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = accountKey,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            // O e-mail em cima e o uuid embaixo: era o uuid
+                            // sozinho, e a conta pessoal que entrou no time ficava
+                            // indistinguível das legítimas.
+                            Text(
+                                text = account.accountEmail
+                                    ?: TeamKeysLabels.noEmail(language),
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = account.accountKey,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (!account.authorized) {
+                            // Ponto e palavra, nunca cor sozinha.
+                            AppStatusIndicator(
+                                label = TeamKeysLabels.unauthorizedAccount(language),
+                                tone = AppTone.WARNING,
+                                modifier = Modifier.testTag(
+                                    "$TEAM_KEYS_UNAUTHORIZED_TAG_PREFIX${account.accountKey}"
+                                )
+                            )
+                        }
                         AppButton(
                             label = TeamKeysLabels.unlink(language),
-                            onClick = { onUnclaim(entry.id, accountKey) },
+                            onClick = { onUnclaim(entry.id, account.accountKey) },
                             enabled = enabled,
                             tone = AppButtonTone.GHOST
+                        )
+                        // Destrutiva ao lado da branda: desvincular solta o
+                        // vínculo e deixa os dados, e o envio seguinte daquela
+                        // máquina refaz tudo. Remover é o que encerra.
+                        AppButton(
+                            label = TeamKeysLabels.removeAccount(language),
+                            onClick = { onRequestRemoveAccount(account) },
+                            enabled = enabled,
+                            tone = AppButtonTone.DANGER,
+                            modifier = Modifier.testTag(
+                                "$TEAM_KEYS_REMOVE_ACCOUNT_TAG_PREFIX${account.accountKey}"
+                            )
                         )
                     }
                 }
@@ -474,13 +625,13 @@ internal object TeamKeysLabels {
     }
 
     fun explanation(language: AppLanguage): String = if (language == AppLanguage.PT) {
-        "Cada chave vale para as contas que ela já usou. O rótulo é livre — use o e-mail da " +
-            "pessoa — e não é verificado pelo servidor: quem prova o vínculo é a conta listada, " +
-            "gravada no primeiro envio daquela chave."
+        "O rótulo é a relação do time daquela chave: escreva ali o e-mail da pessoa, e só a " +
+            "conta com aquele e-mail poderá usá-la. Separe por vírgula para incluir mais de uma. " +
+            "Rótulo sem e-mail aceita qualquer conta."
     } else {
-        "Each key covers the accounts it has already used. The label is free text — use the " +
-            "person's e-mail — and is not verified by the server: the listed account is what " +
-            "proves the link, recorded on that key's first upload."
+        "The label is that key's team roster: type the person's e-mail there and only the " +
+            "account with that e-mail may use it. Separate with commas to list more than one. " +
+            "A label without an e-mail accepts any account."
     }
 
     fun empty(language: AppLanguage): String = if (language == AppLanguage.PT) {
@@ -542,4 +693,52 @@ internal object TeamKeysLabels {
 
     fun retry(language: AppLanguage): String =
         if (language == AppLanguage.PT) "Tentar de novo" else "Retry"
+
+    fun noEmail(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "sem e-mail reportado" else "no reported e-mail"
+
+    fun unauthorizedAccount(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Fora do rótulo" else "Outside the label"
+
+    fun removeAccount(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Remover do time" else "Remove from team"
+
+    fun removeAccountTitle(language: AppLanguage): String = if (language == AppLanguage.PT) {
+        "Remover esta conta do time?"
+    } else {
+        "Remove this account from the team?"
+    }
+
+    /**
+     * Diz as duas coisas que a ação faz, porque a segunda é irreversível e a
+     * primeira, sozinha, seria desfeita pelo envio seguinte daquela máquina.
+     */
+    fun removeAccountWarning(account: String, language: AppLanguage): String =
+        if (language == AppLanguage.PT) {
+            "Apaga tudo o que $account enviou — integrantes, sessões e turnos — e passa a " +
+                "recusá-la, mesmo que a máquina dela continue enviando. Os dados não voltam nem " +
+                "depois de devolvê-la ao time."
+        } else {
+            "Deletes everything $account sent — members, sessions and turns — and starts " +
+                "refusing it, even if that machine keeps uploading. The data does not come back, " +
+                "not even after returning the account to the team."
+        }
+
+    fun confirmRemoveAccount(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Remover do time" else "Remove from team"
+
+    fun blockedSection(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Contas fora do time" else "Accounts outside the team"
+
+    fun blockedEmpty(language: AppLanguage): String = if (language == AppLanguage.PT) {
+        "Nenhuma conta removida."
+    } else {
+        "No account removed."
+    }
+
+    fun unblock(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Devolver ao time" else "Return to team"
+
+    fun blockedAt(timestamp: String, language: AppLanguage): String =
+        if (language == AppLanguage.PT) "removida em $timestamp" else "removed on $timestamp"
 }

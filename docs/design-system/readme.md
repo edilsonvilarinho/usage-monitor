@@ -169,7 +169,7 @@ invented here.
 | `components/core/` | AppButton · AppIconButton · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
 | `components/data/` | AppProgressTrack · AppStatusIndicator · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
-| `components/feedback/` | AppBanner · AppEmptyState · AppLoadingState · AppErrorState |
+| `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
 | `ui_kits/desktop-app/` | Click-through recreation: Dashboard, cards-only mode, History, CLI Sessions, Session detail, Team usage, Presence, Settings |

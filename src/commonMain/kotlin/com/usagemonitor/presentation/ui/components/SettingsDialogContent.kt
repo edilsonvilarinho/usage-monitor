@@ -195,6 +195,8 @@ fun SettingsDialogContent(
     onTeamProfileParticipationChange: (String, Boolean) -> Unit = { _, _ -> },
     onTeamTestConnection: () -> Unit = {},
     teamSyncFailureMessage: String? = null,
+    /** Contas recusadas pelo servidor, por `profileId`. Aponta a linha errada. */
+    teamRejectedProfiles: Map<String, String> = emptyMap(),
     teamAdminConnection: TeamConnectionUiState = TeamConnectionUiState(),
     onTeamAdminTokenChange: (String) -> Unit = {},
     onTeamValidateAdminToken: () -> Unit = {},
@@ -336,6 +338,7 @@ fun SettingsDialogContent(
                             onProfileParticipationChange = onTeamProfileParticipationChange,
                             onTestConnection = onTeamTestConnection,
                             syncFailureMessage = teamSyncFailureMessage,
+                            rejectedProfiles = teamRejectedProfiles,
                             adminConnection = teamAdminConnection,
                             onAdminTokenChange = onTeamAdminTokenChange,
                             onValidateAdminToken = onTeamValidateAdminToken,

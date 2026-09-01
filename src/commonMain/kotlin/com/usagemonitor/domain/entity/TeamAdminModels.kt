@@ -22,10 +22,28 @@ data class TeamKeyEntry(
     val maxAccounts: Int,
     /** `accountUuid` já vinculados. Vazia enquanto a chave nunca foi usada. */
     val accounts: List<String> = emptyList(),
+    /**
+     * As mesmas contas de [accounts], com e-mail e veredito do rótulo.
+     *
+     * Vazia contra servidor anterior à 0.11.0, e por isso a tela lê por
+     * [accountEntries], que cai em [accounts] quando ela não vem — mostrar o
+     * UUID cru é o que a tela sempre fez, e vale mais que uma lista em branco.
+     */
+    val accountDetails: List<TeamKeyAccount> = emptyList(),
     val createdAt: Instant? = null,
     val revokedAt: Instant? = null,
     val lastUsedAt: Instant? = null
 ) {
+    /** Um item por conta vinculada, com ou sem os detalhes que o servidor manda. */
+    val accountEntries: List<TeamKeyAccount>
+        get() = accountDetails.ifEmpty {
+            accounts.map { accountKey -> TeamKeyAccount(accountKey = accountKey) }
+        }
+
+    /** Alguma conta vinculada está fora da relação declarada no rótulo. */
+    val hasUnauthorizedAccount: Boolean
+        get() = accountDetails.any { account -> !account.authorized }
+
     val isRevoked: Boolean
         get() = revokedAt != null
 
@@ -36,6 +54,34 @@ data class TeamKeyEntry(
     val hasRoomForAnotherAccount: Boolean
         get() = accounts.size < maxAccounts
 }
+
+/**
+ * Conta vinculada a uma chave.
+ *
+ * [accountEmail] é o e-mail que a máquina reportou — o servidor nunca o inventa.
+ * Sem ele a tela mostrava só o `accountUuid`, e a conta pessoal que entrou no
+ * time era indistinguível das legítimas.
+ */
+data class TeamKeyAccount(
+    val accountKey: String,
+    val accountEmail: String? = null,
+    /** `false` quando o e-mail não está na relação declarada no rótulo da chave. */
+    val authorized: Boolean = true
+)
+
+/**
+ * Conta que o administrador declarou fora do time.
+ *
+ * Os dados dela foram apagados junto, então [accountEmail] é o retrato do
+ * momento do bloqueio: é ele que identifica a linha para quem vai decidir se
+ * devolve a conta ao time.
+ */
+data class TeamBlockedAccount(
+    val accountKey: String,
+    val accountEmail: String? = null,
+    val reason: String? = null,
+    val blockedAt: Instant? = null
+)
 
 /**
  * Resposta de `GET /v1/verify`: esta chave serve para esta conta?

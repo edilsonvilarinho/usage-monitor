@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -322,6 +324,45 @@ fun AppErrorState(
             AppButton(label = retryLabel, onClick = onRetry)
         }
     }
+}
+
+/**
+ * Confirmação obrigatória antes de uma ação destrutiva.
+ *
+ * Nasceu privada na tela de presença e virou primitiva quando a segunda tela
+ * precisou dela: nenhuma tela reimplementa primitiva, e duas cópias divergiriam
+ * no primeiro ajuste de tom ou de posição dos botões.
+ *
+ * A ação confirmadora é **sempre** [AppButtonTone.DANGER] e a de cancelar é
+ * fantasma — quem chega aqui está prestes a apagar algo, e o botão que desfaz
+ * não pode ter o mesmo peso do que executa.
+ */
+@Composable
+fun AppConfirmationDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    cancelLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    confirmTag: String? = null
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { ModalDialogText(message) },
+        confirmButton = {
+            AppButton(
+                label = confirmLabel,
+                onClick = onConfirm,
+                tone = AppButtonTone.DANGER,
+                modifier = if (confirmTag == null) Modifier else Modifier.testTag(confirmTag)
+            )
+        },
+        dismissButton = {
+            AppButton(label = cancelLabel, onClick = onDismiss, tone = AppButtonTone.GHOST)
+        }
+    )
 }
 
 @Composable

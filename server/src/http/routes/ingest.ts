@@ -21,6 +21,7 @@ export function createIngestRouter(deps: IngestRouterDeps): Router {
   const access: AccessDeps = {
     config: deps.config,
     keyRepository: deps.keyRepository,
+    repository: deps.repository,
     now: deps.now,
   };
 
@@ -70,7 +71,15 @@ export function createIngestRouter(deps: IngestRouterDeps): Router {
 
         res.json(receipt);
       }),
-      { allowClaim: true },
+      {
+        allowClaim: true,
+        // Mesmo corpo, mesmo motivo do extrator de conta acima: e o e-mail
+        // declarado nesta requisicao que o portao do rotulo confere, e ele
+        // vence o gravado — numa maquina que trocou de conta, o gravado
+        // descreve a anterior.
+        extractAccountEmail: (req) =>
+          (req.body as { accountEmail?: unknown } | undefined)?.accountEmail,
+      },
     ),
   );
 

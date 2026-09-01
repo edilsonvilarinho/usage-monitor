@@ -104,9 +104,11 @@ import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
 import com.usagemonitor.domain.usecase.GetTeamUsageUseCase
+import com.usagemonitor.domain.usecase.ListBlockedTeamAccountsUseCase
 import com.usagemonitor.domain.usecase.ListTeamKeysUseCase
 import com.usagemonitor.domain.usecase.RegenerateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.RevokeTeamKeyUseCase
+import com.usagemonitor.domain.usecase.UnblockTeamAccountUseCase
 import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
 import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
@@ -764,7 +766,10 @@ private fun runUsageMonitor(
             updateKey = UpdateTeamKeyUseCase(teamAdminRepository),
             regenerateKey = RegenerateTeamKeyUseCase(teamAdminRepository),
             revokeKey = RevokeTeamKeyUseCase(teamAdminRepository),
-            unclaimAccount = UnclaimTeamKeyAccountUseCase(teamAdminRepository)
+            unclaimAccount = UnclaimTeamKeyAccountUseCase(teamAdminRepository),
+            deleteAccount = DeleteTeamAccountUseCase(teamAdminRepository),
+            listBlockedAccounts = ListBlockedTeamAccountsUseCase(teamAdminRepository),
+            unblockAccount = UnblockTeamAccountUseCase(teamAdminRepository)
         )
     }
     val validateAdminToken = remember(teamAdminRepository) {
@@ -1233,7 +1238,7 @@ private fun runUsageMonitor(
                 // Vincula, e não apenas confere: o vínculo antes só nascia dentro
                 // de um envio de turnos, então numa máquina já sincronizada ele
                 // nunca acontecia e a leitura ficava recusada indefinidamente.
-                val result = claimTeamKeyForAccount(target.accountKey)
+                val result = claimTeamKeyForAccount(target.accountKey, target.accountEmail)
                 val error = result.exceptionOrNull()
                 if (error != null) {
                     failures += "$label: ${error.message.orEmpty()}"
@@ -2235,6 +2240,7 @@ private fun runUsageMonitor(
                         teamSyncFailureMessage = teamSyncStatus
                             .takeIf { status -> status.isFailing }
                             ?.lastFailureMessage,
+                        teamRejectedProfiles = teamSyncStatus.rejectedProfiles,
                         teamAdminConnection = teamAdminConnectionState,
                         onTeamAdminTokenChange = { token ->
                             val saved = updateTeamSettings(

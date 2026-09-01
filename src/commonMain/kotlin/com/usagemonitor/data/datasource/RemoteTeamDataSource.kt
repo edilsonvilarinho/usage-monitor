@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CreateTeamKeyRequestDto
 import com.usagemonitor.data.dto.TeamAccountDeletionDto
+import com.usagemonitor.data.dto.TeamBlockedAccountListDto
 import com.usagemonitor.data.dto.TeamClaimRequestDto
 import com.usagemonitor.data.dto.TeamErrorDto
 import com.usagemonitor.data.dto.TeamIngestRequestDto
@@ -259,12 +260,20 @@ open class RemoteTeamDataSource(
     open suspend fun verifyKey(
         baseUrl: String,
         credential: TeamCredential,
-        accountKey: String
+        accountKey: String,
+        accountEmail: String? = null
     ): TeamVerificationDto {
         val response = requireSuccess(
             response = httpClient.get("$baseUrl/api/v1/verify") {
                 authenticate(credential)
                 parameter("accountKey", accountKey)
+                // Servidor 0.11.0+ confere a conta contra o rótulo da chave. Sem
+                // o e-mail ele responderia pelo que a conta já gravou, e numa
+                // máquina que nunca enviou nada não há nada gravado — a consulta
+                // aprovaria uma conta que o envio seguinte recusa.
+                if (accountEmail != null) {
+                    parameter("accountEmail", accountEmail)
+                }
             },
             operation = "verificação da chave"
         )
@@ -282,13 +291,14 @@ open class RemoteTeamDataSource(
     open suspend fun claimKey(
         baseUrl: String,
         credential: TeamCredential,
-        accountKey: String
+        accountKey: String,
+        accountEmail: String? = null
     ): TeamVerificationDto {
         val response = requireSuccess(
             response = httpClient.post("$baseUrl/api/v1/claim") {
                 authenticate(credential)
                 contentType(ContentType.Application.Json)
-                setBody(TeamClaimRequestDto(accountKey = accountKey))
+                setBody(TeamClaimRequestDto(accountKey = accountKey, accountEmail = accountEmail))
             },
             operation = "vínculo da chave com a conta"
         )
@@ -436,6 +446,51 @@ open class RemoteTeamDataSource(
         return response.body()
     }
 
+    /**
+     * `GET /api/admin/v1/blocked-accounts`. As contas que o admin tirou do time.
+     *
+     * Existe a partir da versão 0.11.0 do servidor. Contra um servidor anterior
+     * a rota responde `404`, e quem chama lê isso como lista vazia — que é a
+     * verdade daquele deploy: sem a tabela não há conta bloqueada nenhuma.
+     */
+    open suspend fun fetchBlockedAccounts(
+        baseUrl: String,
+        adminToken: String
+    ): TeamBlockedAccountListDto {
+        val response = requireSuccess(
+            response = httpClient.get("$baseUrl/api/admin/v1/blocked-accounts") {
+                authenticate(TeamCredential.AdminToken(adminToken))
+            },
+            operation = "leitura das contas fora do time"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `DELETE /api/admin/v1/blocked-accounts/{accountKey}`. Devolve a conta ao time.
+     *
+     * **Não restaura dado nenhum**: o histórico foi apagado junto do bloqueio e
+     * a máquina daquela conta já marcou os turnos como enviados. O que volta é a
+     * possibilidade de a conta se vincular de novo.
+     */
+    open suspend fun unblockAccount(
+        baseUrl: String,
+        adminToken: String,
+        accountKey: String
+    ): TeamBlockedAccountListDto {
+        val response = requireSuccess(
+            response = httpClient.delete(
+                "$baseUrl/api/admin/v1/blocked-accounts/${accountKey.encodeURLPathPart()}"
+            ) {
+                authenticate(TeamCredential.AdminToken(adminToken))
+            },
+            operation = "devolução da conta ao time"
+        )
+
+        return response.body()
+    }
+
     private fun HttpRequestBuilder.authenticate(credential: TeamCredential) {
         val headerName = when (credential) {
             is TeamCredential.TeamKey -> TEAM_KEY_HEADER
@@ -468,6 +523,7 @@ open class RemoteTeamDataSource(
 
         throw TeamServerException(
             statusCode = response.status.value,
+            detail = detail,
             message = "Servidor de time recusou a $operation (HTTP ${response.status.value}): $detail"
         )
     }
@@ -476,5 +532,14 @@ open class RemoteTeamDataSource(
 /** Falha vinda do servidor de time, com o status para a UI diferenciar 401 de 500. */
 class TeamServerException(
     val statusCode: Int,
-    override val message: String
+    override val message: String,
+    /**
+     * A frase do servidor, sem o prefixo que diz qual operação falhou.
+     *
+     * Existe para o aviso preso **numa conta** — ali a operação não acrescenta
+     * nada, porque a linha já diz de quem é o problema, e o prefixo ocuparia
+     * metade do espaço. O [message] completo continua servindo ao aviso geral,
+     * onde não há conta para apontar.
+     */
+    val detail: String = message
 ) : Exception(message)
