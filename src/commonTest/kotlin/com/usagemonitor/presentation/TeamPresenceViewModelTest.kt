@@ -3,6 +3,7 @@ package com.usagemonitor.presentation
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamAccountDeletion
+import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -139,6 +140,12 @@ private class FakePresenceAdminRepository(
         deviceId: String,
         sessionId: String
     ): Result<Unit> = Result.failure(UnsupportedOperationException())
+
+    override suspend fun fetchBlockedAccounts(): Result<List<TeamBlockedAccount>> =
+        Result.success(emptyList())
+
+    override suspend fun unblockAccount(accountKey: String): Result<List<TeamBlockedAccount>> =
+        Result.success(emptyList())
 
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> {
         deletedAccounts += accountKey

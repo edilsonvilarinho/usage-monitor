@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.TeamAccountDeletion
+import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -1289,6 +1290,12 @@ private class FakeAdminOverviewRepository(
     }
 
     override suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun fetchBlockedAccounts(): Result<List<TeamBlockedAccount>> =
+        Result.success(emptyList())
+
+    override suspend fun unblockAccount(accountKey: String): Result<List<TeamBlockedAccount>> =
         Result.failure(UnsupportedOperationException())
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> =

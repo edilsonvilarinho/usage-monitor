@@ -1,6 +1,7 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.dto.TeamAccountDeletionDto
+import com.usagemonitor.data.dto.TeamBlockedAccountListDto
 import com.usagemonitor.data.dto.TeamKeyDto
 import com.usagemonitor.data.dto.TeamOverviewDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
@@ -8,6 +9,8 @@ import com.usagemonitor.data.dto.TeamVerificationDto
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamAccountEmailSource
+import com.usagemonitor.domain.entity.TeamBlockedAccount
+import com.usagemonitor.domain.entity.TeamKeyAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
 import kotlinx.datetime.Instant
@@ -30,10 +33,28 @@ fun TeamKeyDto.toDomain(): TeamKeyEntry {
         keyPrefix = keyPrefix,
         maxAccounts = maxAccounts,
         accounts = accounts,
+        accountDetails = accountDetails.map { account ->
+            TeamKeyAccount(
+                accountKey = account.accountKey,
+                accountEmail = account.accountEmail,
+                authorized = account.authorized
+            )
+        },
         createdAt = createdAt.toInstantOrNull(),
         revokedAt = revokedAt.toInstantOrNull(),
         lastUsedAt = lastUsedAt.toInstantOrNull()
     )
+}
+
+fun TeamBlockedAccountListDto.toDomain(): List<TeamBlockedAccount> {
+    return accounts.map { account ->
+        TeamBlockedAccount(
+            accountKey = account.accountKey,
+            accountEmail = account.accountEmail,
+            reason = account.reason,
+            blockedAt = account.blockedAt.toInstantOrNull()
+        )
+    }
 }
 
 fun TeamAccountDeletionDto.toDomain(): TeamAccountDeletion {

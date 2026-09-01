@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -51,6 +50,7 @@ import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppConfirmationDialog
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppCellValue
@@ -66,7 +66,6 @@ import com.usagemonitor.presentation.ui.components.AppToggleChip
 import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
-import com.usagemonitor.presentation.ui.components.ModalDialogText
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
@@ -260,12 +259,12 @@ internal fun TeamPresenceContent(
 
     val memberToRemove = pendingMember
     if (memberToRemove != null) {
-        ConfirmationDialog(
+        AppConfirmationDialog(
             title = TeamUsageLabels.removeMemberTitle(language),
             message = TeamUsageLabels.removeMemberWarning(memberToRemove.alias, language),
             confirmLabel = TeamUsageLabels.confirmRemoval(language),
+            cancelLabel = TeamUsageLabels.cancel(language),
             confirmTag = PRESENCE_REMOVE_CONFIRM_TAG,
-            language = language,
             onConfirm = {
                 pendingMember = null
                 onRemoveMember(memberToRemove.memberKey)
@@ -276,7 +275,7 @@ internal fun TeamPresenceContent(
 
     val accountToDelete = pendingAccount
     if (accountToDelete != null) {
-        ConfirmationDialog(
+        AppConfirmationDialog(
             title = TeamPresenceLabels.deleteAccountTitle(language),
             message = TeamPresenceLabels.deleteAccountWarning(
                 accountKey = accountToDelete.groupKey,
@@ -284,8 +283,8 @@ internal fun TeamPresenceContent(
                 language = language
             ),
             confirmLabel = TeamPresenceLabels.confirmAccountDeletion(language),
+            cancelLabel = TeamUsageLabels.cancel(language),
             confirmTag = PRESENCE_DELETE_ACCOUNT_CONFIRM_TAG,
-            language = language,
             onConfirm = {
                 pendingAccount = null
                 onDeleteAccount(accountToDelete.groupKey)
@@ -293,39 +292,6 @@ internal fun TeamPresenceContent(
             onDismiss = { pendingAccount = null }
         )
     }
-}
-
-/** Confirmação obrigatória: as duas ações apagam dados e não têm desfazer. */
-@Composable
-private fun ConfirmationDialog(
-    title: String,
-    message: String,
-    confirmLabel: String,
-    confirmTag: String,
-    language: AppLanguage,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { ModalDialogText(message) },
-        confirmButton = {
-            AppButton(
-                label = confirmLabel,
-                onClick = onConfirm,
-                tone = AppButtonTone.DANGER,
-                modifier = Modifier.testTag(confirmTag)
-            )
-        },
-        dismissButton = {
-            AppButton(
-                label = TeamUsageLabels.cancel(language),
-                onClick = onDismiss,
-                tone = AppButtonTone.GHOST
-            )
-        }
-    )
 }
 
 @Composable

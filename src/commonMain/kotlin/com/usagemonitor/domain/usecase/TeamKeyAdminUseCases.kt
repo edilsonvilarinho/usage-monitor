@@ -1,6 +1,7 @@
 package com.usagemonitor.domain.usecase
 
 import com.usagemonitor.domain.entity.TeamAccountDeletion
+import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
 import com.usagemonitor.domain.repository.TeamAdminRepository
@@ -121,14 +122,38 @@ class RemoveAdminTeamSessionUseCase(
  * [UnclaimTeamKeyAccountUseCase] não resolve esse caso: solta o vínculo e deixa
  * os dados, então a conta continua na tela, agora sem rótulo.
  *
- * Não impede a conta de voltar: uma máquina que ainda participe dela a recria na
- * batida seguinte, porque envio e presença reivindicam sozinhos.
+ * **Também declara a conta fora do time** (servidor 0.11.0+). Sem isso apagar era
+ * gesto sem efeito: envio e presença reivindicam sozinhos, e uma máquina que
+ * ainda participasse da conta a recriava na batida seguinte. Para devolvê-la
+ * existe [UnblockTeamAccountUseCase].
  */
 class DeleteTeamAccountUseCase(
     private val repository: TeamAdminRepository
 ) {
     suspend operator fun invoke(accountKey: String): Result<TeamAccountDeletion> =
         repository.deleteAccount(accountKey)
+}
+
+/** Contas que o administrador declarou fora do time. */
+class ListBlockedTeamAccountsUseCase(
+    private val repository: TeamAdminRepository
+) {
+    suspend operator fun invoke(): Result<List<TeamBlockedAccount>> =
+        repository.fetchBlockedAccounts()
+}
+
+/**
+ * Devolve a conta ao time, e responde com a lista restante.
+ *
+ * Não restaura dado nenhum: o histórico saiu junto do bloqueio e a máquina
+ * daquela conta já marcou os turnos como enviados. O que volta é a possibilidade
+ * de a conta se vincular de novo.
+ */
+class UnblockTeamAccountUseCase(
+    private val repository: TeamAdminRepository
+) {
+    suspend operator fun invoke(accountKey: String): Result<List<TeamBlockedAccount>> =
+        repository.unblockAccount(accountKey)
 }
 
 /**

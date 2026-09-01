@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.CreateTeamKeyRequestDto
 import com.usagemonitor.data.dto.TeamAccountDeletionDto
+import com.usagemonitor.data.dto.TeamBlockedAccountListDto
 import com.usagemonitor.data.dto.TeamClaimRequestDto
 import com.usagemonitor.data.dto.TeamErrorDto
 import com.usagemonitor.data.dto.TeamIngestRequestDto
@@ -440,6 +441,51 @@ open class RemoteTeamDataSource(
                 authenticate(TeamCredential.AdminToken(adminToken))
             },
             operation = "remoção da conta"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `GET /api/admin/v1/blocked-accounts`. As contas que o admin tirou do time.
+     *
+     * Existe a partir da versão 0.11.0 do servidor. Contra um servidor anterior
+     * a rota responde `404`, e quem chama lê isso como lista vazia — que é a
+     * verdade daquele deploy: sem a tabela não há conta bloqueada nenhuma.
+     */
+    open suspend fun fetchBlockedAccounts(
+        baseUrl: String,
+        adminToken: String
+    ): TeamBlockedAccountListDto {
+        val response = requireSuccess(
+            response = httpClient.get("$baseUrl/api/admin/v1/blocked-accounts") {
+                authenticate(TeamCredential.AdminToken(adminToken))
+            },
+            operation = "leitura das contas fora do time"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * `DELETE /api/admin/v1/blocked-accounts/{accountKey}`. Devolve a conta ao time.
+     *
+     * **Não restaura dado nenhum**: o histórico foi apagado junto do bloqueio e
+     * a máquina daquela conta já marcou os turnos como enviados. O que volta é a
+     * possibilidade de a conta se vincular de novo.
+     */
+    open suspend fun unblockAccount(
+        baseUrl: String,
+        adminToken: String,
+        accountKey: String
+    ): TeamBlockedAccountListDto {
+        val response = requireSuccess(
+            response = httpClient.delete(
+                "$baseUrl/api/admin/v1/blocked-accounts/${accountKey.encodeURLPathPart()}"
+            ) {
+                authenticate(TeamCredential.AdminToken(adminToken))
+            },
+            operation = "devolução da conta ao time"
         )
 
         return response.body()

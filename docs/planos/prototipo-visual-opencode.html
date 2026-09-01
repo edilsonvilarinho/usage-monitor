@@ -1580,16 +1580,21 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="titlebar"><span class="t">Chaves de time</span><span class="wbtn">×</span></div>
   <div class="body">
     <div class="hstack"><input class="field" type="text" placeholder="Rótulo — e-mail da pessoa"><button class="btn primary" type="button">Emitir chave</button></div>
+    <span class="k">O rótulo é a relação do time daquela chave: só a conta com aquele e-mail pode usá-la. Vírgula separa mais de uma. Rótulo sem e-mail aceita qualquer conta.</span>
     <div class="panel"><div class="pbody flush">
-      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">ana@example.com</span><span class="k">conta account-primary · 1 de 1</span></div><span class="st ok">Ativa</span><button class="btn ghost" type="button">Desvincular</button><button class="btn danger" type="button">Revogar</button></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">ana@example.com</span><span class="k">ana@example.com · account-primary</span></div><span class="st ok">Ativa</span><button class="btn ghost" type="button">Desvincular</button><button class="btn danger" type="button">Remover do time</button></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">ana@example.com</span><span class="k">pessoal@gmail.com · account-870f</span></div><span class="st warn">Fora do rótulo</span><button class="btn ghost" type="button">Desvincular</button><button class="btn danger" type="button">Remover do time</button></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">bruno@example.com</span><span class="k">sem conta vinculada · 0 de 1</span></div><span class="st off">Aguardando</span><button class="btn danger" type="button">Revogar</button></div>
     </div></div>
+    <div class="panel"><div class="phead"><span class="srcmark"></span><span class="ptitle">Contas fora do time</span></div><div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">pessoal@gmail.com</span><span class="k">removida em 01/09 15:58 BRT</span></div><button class="btn ghost" type="button">Devolver ao time</button></div>
+    </div></div>
     <div class="panel" style="box-shadow:var(--shadow-8)">
-      <div class="phead"><span class="srcmark" style="background:var(--crit)"></span><span class="ptitle">Apagar a conta account-primary?</span></div>
+      <div class="phead"><span class="srcmark" style="background:var(--crit)"></span><span class="ptitle">Remover esta conta do time?</span></div>
       <div class="pbody">
-        <span class="v sm">Isto remove integrantes, sessões, turnos e o vínculo da chave. O histórico enviado por essas máquinas não volta.</span>
-        <span class="k">Apagar não impede a conta de voltar: ingest e presença reivindicam sozinhos.</span>
-        <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Cancelar</button><button class="btn danger" type="button">Apagar conta</button></div>
+        <span class="v sm">Apaga tudo o que pessoal@gmail.com enviou — integrantes, sessões e turnos — e passa a recusá-la, mesmo que a máquina dela continue enviando.</span>
+        <span class="k">Os dados não voltam nem depois de devolvê-la ao time.</span>
+        <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Cancelar</button><button class="btn danger" type="button">Remover do time</button></div>
       </div>
     </div>
   </div>

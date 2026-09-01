@@ -3,6 +3,7 @@ package com.usagemonitor.domain.repository
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamAccountUsage
+import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
 
@@ -56,8 +57,32 @@ interface TeamAdminRepository {
      * Diferente de [unclaimAccount], que só solta o vínculo: a conta desvinculada
      * continua na visão global, agora sem rótulo, porque a agregação parte dos
      * dados de uso e não da tabela de vínculos.
+     *
+     * A partir do servidor 0.11.0 a remoção também **declara a conta fora do
+     * time**: sem isso a máquina que ainda participa dela a recriava na batida
+     * seguinte, e apagar era gesto sem efeito. Para devolvê-la existe
+     * [unblockAccount].
      */
     suspend fun deleteAccount(accountKey: String): Result<TeamAccountDeletion>
+
+    /**
+     * Contas que o administrador declarou fora do time.
+     *
+     * Lista vazia contra servidor anterior à 0.11.0 — sem a tabela não há conta
+     * bloqueada naquele deploy, e um erro mandaria o admin atrás de um problema
+     * que não existe.
+     */
+    suspend fun fetchBlockedAccounts(): Result<List<TeamBlockedAccount>>
+
+    /**
+     * Devolve a conta ao time e responde com a lista restante.
+     *
+     * **Não restaura dado nenhum**: o histórico foi apagado junto do bloqueio e a
+     * máquina daquela conta já marcou os turnos como enviados. O que volta é a
+     * possibilidade de a conta se vincular de novo — e daí em diante ela passa
+     * pelo rótulo da chave como qualquer outra.
+     */
+    suspend fun unblockAccount(accountKey: String): Result<List<TeamBlockedAccount>>
 
     /**
      * Consumo de todas as contas do servidor.

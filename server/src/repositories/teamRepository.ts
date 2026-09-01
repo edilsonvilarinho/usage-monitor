@@ -738,6 +738,20 @@ export class TeamRepository {
   }
 
   /**
+   * `accountKey -> e-mail reportado`, de uma vez.
+   *
+   * Existe para a lista de chaves do admin nao virar um `SELECT` por conta
+   * vinculada: sao poucas, mas o laco seria N+1 e cresceria com o time.
+   */
+  accountEmails(): Map<string, string> {
+    const rows = this.db.prepare(SELECT_ACCOUNT_EMAILS_SQL).all() as Array<{
+      accountKey: string;
+      accountEmail: string;
+    }>;
+    return new Map(rows.map((row) => [row.accountKey, row.accountEmail]));
+  }
+
+  /**
    * Ultimo e-mail que a conta reportou, ou `null` se ela nunca reportou nenhum.
    *
    * Confiavel como memoria porque [upsertAccountEmail] nunca sobrescreve com

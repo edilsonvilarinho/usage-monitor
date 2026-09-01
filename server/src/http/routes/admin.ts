@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import type { KeyLabelMatchMode } from '../../config.js';
 import { NotFoundError, ValidationError } from '../../domain/errors.js';
+import { isAccountAllowedByLabel } from '../../domain/teamKeyLabel.js';
 import { logger } from '../../logger.js';
 import type { TeamKeyRepository, TeamKeyRecord } from '../../repositories/teamKeyRepository.js';
 import type { TeamRepository } from '../../repositories/teamRepository.js';
@@ -18,6 +20,13 @@ export interface AdminRouterDeps {
   adminToken: string;
   /** Credencial de leitura global. So a visao agregada a aceita; nenhum `DELETE` a ve. */
   reportToken: string | null;
+  /**
+   * Modo do portao do rotulo, so para a lista dizer a verdade.
+   *
+   * Com o portao desligado toda conta vinculada esta autorizada, e marcar
+   * divergencia ali anunciaria uma recusa que nao vai acontecer.
+   */
+  keyLabelMatch: KeyLabelMatchMode;
   repository: TeamRepository;
   keyRepository: TeamKeyRepository;
   now: () => number;
@@ -42,6 +51,31 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
   const router = Router();
   const protect = (handler: Parameters<typeof requireAdminToken>[1]) =>
     requireAdminToken(deps.adminToken, handler);
+
+  /**
+   * A chave com o e-mail de cada conta vinculada ao lado.
+   *
+   * Sem isto a tela do admin listava UUID cru, e a conta intrusa da issue #179
+   * era indistinguivel das legitimas — descobrir que `879df04a…` era um gmail
+   * pessoal exigia cruzar com outra tela. `accounts` continua sendo a lista de
+   * UUIDs: mudar a forma dela quebraria app anterior, e o campo novo e ignorado
+   * por quem nao o conhece.
+   */
+  const describeKey = (record: TeamKeyRecord) => {
+    const emails = deps.repository.accountEmails();
+    return toKeyResponse(
+      record,
+      record.accounts.map((accountKey) => {
+        const accountEmail = emails.get(accountKey) ?? null;
+        return {
+          accountKey,
+          accountEmail,
+          authorized:
+            deps.keyLabelMatch === 'off' || isAccountAllowedByLabel(record.label, accountEmail),
+        };
+      }),
+    );
+  };
 
   // Leitura que nao expoe segredo nem apaga nada aceita tambem `x-report-key`.
   // `protect` continua sendo o portao de tudo o mais — inclusive da listagem de
@@ -165,7 +199,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
     '/admin/v1/keys',
     protect(
       wrap((_req, res) => {
-        res.json({ keys: deps.keyRepository.list().map(toKeyResponse) });
+        res.json({ keys: deps.keyRepository.list().map(describeKey) });
       }),
     ),
   );
@@ -184,7 +218,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
 
         const created = deps.keyRepository.create(parsed.data, deps.now());
         logger.debug({ keyId: created.id, label: created.label }, 'chave de time criada');
-        res.status(201).json(toKeyResponse(created));
+        res.status(201).json(describeKey(created));
       }),
     ),
   );
@@ -215,7 +249,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         }
 
         const updated = deps.keyRepository.update(current.id, parsed.data);
-        res.json(toKeyResponse(updated as TeamKeyRecord));
+        res.json(describeKey(updated as TeamKeyRecord));
       }),
     ),
   );
@@ -234,7 +268,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         const current = requireKey(deps.keyRepository, req.params.id);
         const regenerated = deps.keyRepository.regenerate(current.id);
         logger.debug({ keyId: current.id }, 'chave de time regerada');
-        res.json(toKeyResponse(regenerated as TeamKeyRecord));
+        res.json(describeKey(regenerated as TeamKeyRecord));
       }),
     ),
   );
@@ -253,7 +287,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         const current = requireKey(deps.keyRepository, req.params.id);
         const revoked = deps.keyRepository.revoke(current.id, deps.now());
         logger.debug({ keyId: current.id }, 'chave de time revogada');
-        res.json(toKeyResponse(revoked as TeamKeyRecord));
+        res.json(describeKey(revoked as TeamKeyRecord));
       }),
     ),
   );
@@ -274,7 +308,7 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
         if (!removed) {
           throw new NotFoundError('Vinculo nao encontrado para esta chave e conta.');
         }
-        res.json(toKeyResponse(deps.keyRepository.findById(current.id) as TeamKeyRecord));
+        res.json(describeKey(deps.keyRepository.findById(current.id) as TeamKeyRecord));
       }),
     ),
   );
@@ -399,7 +433,7 @@ function requireKey(repository: TeamKeyRepository, id: string | undefined): Team
  * para ser a lista de "quem tem qual chave". O preco esta registrado: quem tiver
  * o banco **e** o `TEAM_KEY_SECRET` le todas as chaves.
  */
-function toKeyResponse(record: TeamKeyRecord) {
+function toKeyResponse(record: TeamKeyRecord, accountDetails: AccountDetail[]) {
   return {
     id: record.id,
     label: record.label,
@@ -407,8 +441,16 @@ function toKeyResponse(record: TeamKeyRecord) {
     keyPrefix: record.keyPrefix,
     maxAccounts: record.maxAccounts,
     accounts: record.accounts,
+    accountDetails,
     createdAt: record.createdAt,
     revokedAt: record.revokedAt,
     lastUsedAt: record.lastUsedAt,
   };
+}
+
+/** Uma conta vinculada, com o que a tela precisa para decidir sobre ela. */
+interface AccountDetail {
+  accountKey: string;
+  accountEmail: string | null;
+  authorized: boolean;
 }

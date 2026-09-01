@@ -230,6 +230,60 @@ describe('testar conexao contra as duas travas', () => {
   });
 });
 
+// Sem isto a tela do admin listava UUID cru: descobrir que a conta intrusa era
+// um gmail pessoal exigia cruzar com outra tela.
+describe('contas vinculadas na lista de chaves', () => {
+  let harness: Harness;
+
+  beforeEach(() => {
+    harness = createHarness();
+  });
+
+  afterEach(() => {
+    harness.cleanup();
+  });
+
+  function listKeys() {
+    return request(harness.app).get('/api/admin/v1/keys').set('x-admin-token', TEST_ADMIN_TOKEN);
+  }
+
+  it('traz o e-mail e marca a conta autorizada', async () => {
+    const key = await createKeyViaAdmin(harness, CORPORATE);
+    await ingest(harness, key.key, CORPORATE);
+
+    const response = await listKeys();
+
+    expect(response.body.keys[0].accountDetails).toEqual([
+      { accountKey: ACCOUNT_A, accountEmail: CORPORATE, authorized: true },
+    ]);
+    // A lista antiga continua na resposta: mudar a forma dela quebraria app anterior.
+    expect(response.body.keys[0].accounts).toEqual([ACCOUNT_A]);
+  });
+
+  it('marca como nao autorizada a conta que passou a divergir do rotulo', async () => {
+    const key = await createKeyViaAdmin(harness, 'Chave do setor', 10);
+    await ingest(harness, key.key, PERSONAL);
+    await renameKey(harness, key.id, CORPORATE);
+
+    const response = await listKeys();
+
+    expect(response.body.keys[0].accountDetails).toEqual([
+      { accountKey: ACCOUNT_A, accountEmail: PERSONAL, authorized: false },
+    ]);
+  });
+
+  it('trata como autorizada a conta sem e-mail conhecido', async () => {
+    const key = await createKeyViaAdmin(harness, CORPORATE, 10);
+    await ingest(harness, key.key);
+
+    const response = await listKeys();
+
+    expect(response.body.keys[0].accountDetails).toEqual([
+      { accountKey: ACCOUNT_A, accountEmail: null, authorized: true },
+    ]);
+  });
+});
+
 describe('portao do rotulo desligado', () => {
   let harness: Harness;
 
@@ -245,6 +299,22 @@ describe('portao do rotulo desligado', () => {
     const key = await createKeyViaAdmin(harness, CORPORATE, 10);
 
     expect((await ingest(harness, key.key, PERSONAL)).status).toBe(200);
+  });
+
+  // Marcar divergencia com o portao desligado anunciaria uma recusa que nao vai
+  // acontecer.
+  it('nao marca divergencia na lista de chaves', async () => {
+    const key = await createKeyViaAdmin(harness, CORPORATE, 10);
+    await ingest(harness, key.key, PERSONAL);
+
+    const response = await request(harness.app)
+      .get('/api/admin/v1/keys')
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.body.keys[0].accountDetails[0]).toMatchObject({
+      accountEmail: PERSONAL,
+      authorized: true,
+    });
   });
 
   // A valvula de rollback e do portao, nao da decisao do admin: desfazer a

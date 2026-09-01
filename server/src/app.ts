@@ -79,6 +79,7 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
       createAdminRouter({
         adminToken: config.adminToken,
         reportToken: config.reportToken,
+        keyLabelMatch: config.keyLabelMatch,
         repository,
         keyRepository,
         now,
