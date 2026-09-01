@@ -1233,7 +1233,7 @@ private fun runUsageMonitor(
                 // Vincula, e não apenas confere: o vínculo antes só nascia dentro
                 // de um envio de turnos, então numa máquina já sincronizada ele
                 // nunca acontecia e a leitura ficava recusada indefinidamente.
-                val result = claimTeamKeyForAccount(target.accountKey)
+                val result = claimTeamKeyForAccount(target.accountKey, target.accountEmail)
                 val error = result.exceptionOrNull()
                 if (error != null) {
                     failures += "$label: ${error.message.orEmpty()}"

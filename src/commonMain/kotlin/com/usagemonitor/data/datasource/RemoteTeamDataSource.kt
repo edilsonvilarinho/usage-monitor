@@ -259,12 +259,20 @@ open class RemoteTeamDataSource(
     open suspend fun verifyKey(
         baseUrl: String,
         credential: TeamCredential,
-        accountKey: String
+        accountKey: String,
+        accountEmail: String? = null
     ): TeamVerificationDto {
         val response = requireSuccess(
             response = httpClient.get("$baseUrl/api/v1/verify") {
                 authenticate(credential)
                 parameter("accountKey", accountKey)
+                // Servidor 0.11.0+ confere a conta contra o rótulo da chave. Sem
+                // o e-mail ele responderia pelo que a conta já gravou, e numa
+                // máquina que nunca enviou nada não há nada gravado — a consulta
+                // aprovaria uma conta que o envio seguinte recusa.
+                if (accountEmail != null) {
+                    parameter("accountEmail", accountEmail)
+                }
             },
             operation = "verificação da chave"
         )
@@ -282,13 +290,14 @@ open class RemoteTeamDataSource(
     open suspend fun claimKey(
         baseUrl: String,
         credential: TeamCredential,
-        accountKey: String
+        accountKey: String,
+        accountEmail: String? = null
     ): TeamVerificationDto {
         val response = requireSuccess(
             response = httpClient.post("$baseUrl/api/v1/claim") {
                 authenticate(credential)
                 contentType(ContentType.Application.Json)
-                setBody(TeamClaimRequestDto(accountKey = accountKey))
+                setBody(TeamClaimRequestDto(accountKey = accountKey, accountEmail = accountEmail))
             },
             operation = "vínculo da chave com a conta"
         )

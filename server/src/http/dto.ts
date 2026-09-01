@@ -141,14 +141,24 @@ export const deleteMemberQuerySchema = z.object({
   deviceId: z.string().min(1).max(TEXT_MAX),
 });
 
-/** A conta e o unico parametro: a credencial vem no header. */
+/**
+ * A conta e a credencial no header, mais o e-mail que ela declara.
+ *
+ * O e-mail e opcional e chega **na query** aqui, ao contrario do ingest: o
+ * verify e `GET`. Sem ele o "Testar conexao" aprovaria uma conta que o portao do
+ * rotulo recusa no envio seguinte — dizer "autorizada" e falhar depois
+ * transformaria um erro de configuracao numa sincronia parada em silencio, que e
+ * o defeito que esta rota existe para evitar.
+ */
 export const verifyQuerySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
+  accountEmail: optionalAccountEmail,
 });
 
 /** Mesmo escopo do verify, mas no corpo: `POST /v1/claim` cria vinculo. */
 export const claimBodySchema = z.object({
   accountKey: z.string().min(1).max(TEXT_MAX),
+  accountEmail: optionalAccountEmail,
 });
 
 /** Recorte opcional da visao global. Mesma semantica de `/v1/team`. */

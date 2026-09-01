@@ -35,7 +35,7 @@ de texto.
 | A1 | Regra pura do rótulo, `TEAM_KEY_LABEL_MATCH`, `label` em `ResolvedTeamKey`, `accountEmailOf` | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 18 arquivos, 232 testes, todos verdes. `teamKeyLabel.test.ts` cobre rótulo vazio, nome sem e-mail, e-mail único, caixa/espaço, vários separadores, malformado no meio de válidos e os dois casos que aceitam de propósito (rótulo sem e-mail, e-mail desconhecido). |
 | A2 | Tabela `team_blocked_accounts` e rotas de bloqueio | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 18 arquivos, 239 testes, todos verdes (7 novos). `DELETE /admin/v1/accounts/:accountKey` passou a devolver `blocked: true` e a escrever a decisão; `GET`/`DELETE /admin/v1/blocked-accounts` sob `x-admin-token`, com token de relatório e chave de time recusados (401). |
 | A3 | As duas travas em `authorize()` + auditoria de arranque | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 20 arquivos, 258 testes, todos verdes (19 novos, em `test/api/admission.test.ts` e `test/unit/keyLabelAudit.test.ts`). Cobre: rótulo com um e com dois e-mails, recusa nomeando as duas pontas, vínculo que já existia, leitura pelo e-mail gravado, rótulo sem e-mail, cliente sem e-mail, chave legada fora do portão, `keyLabelMatch=off` e as quatro portas de volta da conta bloqueada (ingest, presença, leitura, chave legada). |
-| A4 | `verify`/`claim` param de mentir (servidor + cliente) | Pendente |
+| A4 | `verify`/`claim` param de mentir (servidor + cliente) | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 20 arquivos, 264 testes, verdes. `gradlew.bat allTests` → `BUILD SUCCESSFUL in 2m 6s`. As duas rotas passaram a aplicar as mesmas travas do ingest, reusando `assertNotBlocked`/`assertAllowedByLabel`; `accountEmail` viaja na query do `verify` e no corpo do `claim`, e o `FakeRemoteTeamDataSource` passou a **afirmar** que ele chega — inclusive na queda para o `verify` contra servidor sem a rota. |
 | A5 | Tela de chaves: e-mail por conta, "Remover do time", seção de bloqueadas | Pendente |
 | A6 | Documentação (`server/README.md`, `CLAUDE.md`, versão `0.11.0`) | Pendente |
 
@@ -95,6 +95,17 @@ precedência de e-mail na visão global roda com `keyLabelMatch: 'off'` porque a
 monta — rótulo de um e-mail, conta reportando outro — é exatamente a que o portão recusa; o `off`
 isola a pergunta dele da admissão em vez de escondê-la. E o de liberar a conta para outra chave
 passou a desbloquear antes de reivindicar, que é o contrato novo.
+
+**O "Testar conexão" precisa mandar o e-mail, senão ele mente.** Sem o campo, `verify`/`claim`
+responderiam pelo e-mail **gravado**, e numa máquina que nunca enviou nada não há nada gravado: o
+botão aprovaria a conta e o envio seguinte a recusaria — a sincronia parada em silêncio que aquelas
+duas rotas existem para evitar. O campo é opcional nos dois schemas, então servidor e cliente
+antigos continuam se entendendo.
+
+**As duas rotas reusam os asserts de `access.ts`.** Uma segunda cópia da regra daria duas respostas
+para a mesma pergunta, e a rota existe justamente para antecipar o veredito do envio. A verificação
+vale também para a conta **já vinculada**: no `GET`, um "autorizada" para quem o ingest recusa é a
+mentira mais cara que esta rota pode contar.
 
 **`TEAM_KEY_LABEL_MATCH` nasce `strict`**, ao contrário de `TEAM_LEGACY_KEY_MODE`, que nasce
 `open`. Aquele preservava clientes existentes numa mudança de autenticação; este é a correção de um

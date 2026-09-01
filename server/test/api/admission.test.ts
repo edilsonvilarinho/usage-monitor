@@ -39,6 +39,22 @@ function readTeam(harness: Harness, key: string) {
     .query({ accountKey: ACCOUNT_A });
 }
 
+function verify(harness: Harness, key: string, accountEmail?: string) {
+  const query: Record<string, string> = { accountKey: ACCOUNT_A };
+  if (accountEmail !== undefined) {
+    query.accountEmail = accountEmail;
+  }
+  return request(harness.app).get('/api/v1/verify').set('x-team-key', key).query(query);
+}
+
+function claim(harness: Harness, key: string, accountEmail?: string) {
+  const body: Record<string, unknown> = { accountKey: ACCOUNT_A };
+  if (accountEmail !== undefined) {
+    body.accountEmail = accountEmail;
+  }
+  return request(harness.app).post('/api/v1/claim').set('x-team-key', key).send(body);
+}
+
 function renameKey(harness: Harness, keyId: string, label: string) {
   return request(harness.app)
     .patch(`/api/admin/v1/keys/${keyId}`)
@@ -141,6 +157,76 @@ describe('portao do rotulo', () => {
     const response = await ingest(harness, TEST_TEAM_KEY, PERSONAL);
 
     expect(response.status).toBe(200);
+  });
+});
+
+// "Testar conexao" chama claim e cai em verify contra servidor antigo. Aprovar
+// aqui e recusar no envio seguinte deixaria a sincronia parada em silencio, que
+// e o defeito que essas duas rotas existem para evitar.
+describe('testar conexao contra as duas travas', () => {
+  let harness: Harness;
+
+  beforeEach(() => {
+    harness = createHarness();
+  });
+
+  afterEach(() => {
+    harness.cleanup();
+  });
+
+  it('vincula a conta que esta no rotulo', async () => {
+    const key = await createKeyViaAdmin(harness, CORPORATE);
+
+    const response = await claim(harness, key.key, CORPORATE);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ authorized: true, claimed: true });
+  });
+
+  it('recusa o vinculo da conta fora do rotulo, em vez de aprovar e falhar depois', async () => {
+    const key = await createKeyViaAdmin(harness, CORPORATE, 10);
+
+    const response = await claim(harness, key.key, PERSONAL);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toContain(PERSONAL);
+    // E nao vinculou: aprovar o vinculo e recusar o ingest seria o pior dos dois.
+    expect((await ingest(harness, key.key, PERSONAL)).status).toBe(403);
+  });
+
+  it('recusa a consulta da conta fora do rotulo', async () => {
+    const key = await createKeyViaAdmin(harness, CORPORATE, 10);
+
+    expect((await verify(harness, key.key, PERSONAL)).status).toBe(403);
+  });
+
+  // Sem o e-mail na requisicao o verify responderia pelo gravado, e numa conta
+  // que nunca enviou nada nao ha gravado nenhum: e por isso que o cliente passou
+  // a mandar o e-mail tambem aqui.
+  it('aprova a conta desconhecida quando o cliente nao manda e-mail', async () => {
+    const key = await createKeyViaAdmin(harness, CORPORATE, 10);
+
+    expect((await verify(harness, key.key)).status).toBe(200);
+  });
+
+  it('recusa a conta ja vinculada que passou a divergir do rotulo', async () => {
+    const key = await createKeyViaAdmin(harness, 'Chave do setor', 10);
+    await ingest(harness, key.key, PERSONAL);
+    await renameKey(harness, key.id, CORPORATE);
+
+    expect((await verify(harness, key.key, PERSONAL)).status).toBe(403);
+    expect((await claim(harness, key.key, PERSONAL)).status).toBe(403);
+  });
+
+  it('recusa a conta que o admin removeu do time', async () => {
+    const key = await createKeyViaAdmin(harness, 'Chave do setor', 10);
+    await ingest(harness, key.key, PERSONAL);
+    await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect((await verify(harness, key.key, PERSONAL)).status).toBe(403);
+    expect((await claim(harness, key.key, PERSONAL)).status).toBe(403);
   });
 });
 

@@ -84,8 +84,16 @@ interface TeamAdminRepository {
      *
      * Fica aqui, e não em [TeamUsageRepository], por simetria com o resto da
      * verificação de credencial — mas usa a chave de time, não o token de admin.
+     *
+     * [accountEmail] é o e-mail que a conta reporta. O servidor confere a conta
+     * contra o rótulo da chave (0.11.0+), e sem ele responderia pelo que aquela
+     * conta já gravou — que numa máquina que nunca enviou nada é nada, e a
+     * resposta aprovaria uma conta que o envio seguinte recusa.
      */
-    suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification>
+    suspend fun verifyKeyForAccount(
+        accountKey: String,
+        accountEmail: String? = null
+    ): Result<TeamKeyVerification>
 
     /**
      * Amarra a conta à chave de time configurada. Idempotente.
@@ -94,5 +102,8 @@ interface TeamAdminRepository {
      * resolve. O vínculo antes só nascia dentro de um envio de turnos, e uma
      * máquina sem turno pendente nunca o criava.
      */
-    suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification>
+    suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String? = null
+    ): Result<TeamKeyVerification>
 }

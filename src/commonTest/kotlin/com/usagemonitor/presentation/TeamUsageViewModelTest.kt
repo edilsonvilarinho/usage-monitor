@@ -1304,10 +1304,16 @@ private class FakeAdminOverviewRepository(
         return detailResult
     }
 
-    override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> =
+    override suspend fun verifyKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> =
         Result.success(TeamKeyVerification(authorized = true, claimed = true))
 
-    override suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification> =
+    override suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> =
         Result.success(TeamKeyVerification(authorized = true, claimed = true))
 }
 

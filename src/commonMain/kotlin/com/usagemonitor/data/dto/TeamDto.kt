@@ -187,10 +187,18 @@ data class TeamSessionDetailResponseDto(
     val turns: List<TeamTurnRowDto> = emptyList()
 )
 
-/** Corpo de `POST /api/v1/claim`. A credencial vai no header. */
+/**
+ * Corpo de `POST /api/v1/claim`. A credencial vai no header.
+ *
+ * O `accountEmail` viaja junto porque o servidor confere a conta contra o rótulo
+ * da chave (servidor 0.11.0+): sem ele o vínculo seria aprovado aqui e recusado
+ * no envio seguinte, deixando a sincronia parada em silêncio. Servidor anterior
+ * ignora o campo.
+ */
 @Serializable
 data class TeamClaimRequestDto(
-    val accountKey: String
+    val accountKey: String,
+    val accountEmail: String? = null
 )
 
 /** Resposta de `GET /api/v1/verify` e de `POST /api/v1/claim`. */

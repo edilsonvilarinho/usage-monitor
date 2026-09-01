@@ -216,7 +216,10 @@ class TeamAdminRepositoryImpl(
      * reprovar uma configuração correta porque o servidor da empresa ficou para
      * trás — mesmo tratamento que `fetchSessionDetail` já dá ao detalhe ausente.
      */
-    override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun verifyKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         val settings = settingsProvider()
         val credential = settings.readCredential()
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
@@ -225,7 +228,8 @@ class TeamAdminRepositoryImpl(
             remoteDataSource.verifyKey(
                 baseUrl = settings.normalizedServerUrl,
                 credential = credential,
-                accountKey = accountKey
+                accountKey = accountKey,
+                accountEmail = accountEmail
             ).toDomain()
         }.recoverIfMissingRoute()
     }
@@ -238,7 +242,10 @@ class TeamAdminRepositoryImpl(
      * trocava a chave numa máquina sem turno pendente não emitia requisição
      * nenhuma e a conta ficava sem dona — com a leitura recusada o tempo todo.
      */
-    override suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         val settings = settingsProvider()
         val credential = settings.readCredential()
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
@@ -247,13 +254,14 @@ class TeamAdminRepositoryImpl(
             remoteDataSource.claimKey(
                 baseUrl = settings.normalizedServerUrl,
                 credential = credential,
-                accountKey = accountKey
+                accountKey = accountKey,
+                accountEmail = accountEmail
             ).toDomain()
         }
 
         if (result.isMissingRoute()) {
             // Servidor 0.3.0: sem rota de vínculo, resta informar.
-            return verifyKeyForAccount(accountKey)
+            return verifyKeyForAccount(accountKey, accountEmail)
         }
         return result
     }

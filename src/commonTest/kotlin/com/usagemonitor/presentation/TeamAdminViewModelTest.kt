@@ -136,11 +136,17 @@ private class FakeTeamAdminRepository : TeamAdminRepository {
         sessionId: String
     ): Result<CliSessionDetail?> = Result.failure(UnsupportedOperationException())
 
-    override suspend fun verifyKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun verifyKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         return Result.success(TeamKeyVerification(authorized = true, claimed = true))
     }
 
-    override suspend fun claimKeyForAccount(accountKey: String): Result<TeamKeyVerification> {
+    override suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> {
         return Result.success(TeamKeyVerification(authorized = true, claimed = true))
     }
 }

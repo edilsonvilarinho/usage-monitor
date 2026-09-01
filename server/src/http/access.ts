@@ -239,7 +239,7 @@ function authorize(
  * desliga este — desfazer a decisao do admin por variavel de ambiente seria
  * outra pessoa decidindo.
  */
-function assertNotBlocked(deps: AccessDeps, accountKey: string | null): void {
+export function assertNotBlocked(deps: AccessDeps, accountKey: string | null): void {
   if (accountKey === null) {
     return;
   }
@@ -256,7 +256,7 @@ function assertNotBlocked(deps: AccessDeps, accountKey: string | null): void {
  * gravado descreve a anterior. O gravado cobre as leituras, que nao carregam
  * e-mail nenhum.
  */
-function assertAllowedByLabel(
+export function assertAllowedByLabel(
   deps: AccessDeps,
   resolved: ResolvedTeamKey,
   accountKey: string,

@@ -24,6 +24,7 @@ private val CONFIGURED = TeamIntegrationSettings(
 )
 
 private const val ACCOUNT_KEY = "account-uuid-aaa"
+private const val ACCOUNT_EMAIL = "pessoa@empresa.com"
 
 /** Mesmas configurações, mais o token que liga o modo administrador. */
 private val ADMIN = CONFIGURED.copy(adminToken = "token-de-admin-com-tamanho-suficiente")
@@ -43,6 +44,8 @@ private class FakeRemoteTeamDataSource(
 ) : RemoteTeamDataSource(HttpClient()) {
     var claimCalls = 0
     var verifyCalls = 0
+    var lastClaimEmail: String? = null
+    var lastVerifyEmail: String? = null
     var deleteMemberCalls = 0
     var deleteSessionCalls = 0
     var deleteAccountCalls = 0
@@ -100,18 +103,22 @@ private class FakeRemoteTeamDataSource(
     override suspend fun claimKey(
         baseUrl: String,
         credential: TeamCredential,
-        accountKey: String
+        accountKey: String,
+        accountEmail: String?
     ): TeamVerificationDto {
         claimCalls += 1
+        lastClaimEmail = accountEmail
         return claimResult.getOrThrow()
     }
 
     override suspend fun verifyKey(
         baseUrl: String,
         credential: TeamCredential,
-        accountKey: String
+        accountKey: String,
+        accountEmail: String?
     ): TeamVerificationDto {
         verifyCalls += 1
+        lastVerifyEmail = accountEmail
         return verifyResult.getOrThrow()
     }
 }
@@ -126,11 +133,14 @@ class TeamAdminRepositoryImplTest {
         )
         val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
 
-        val result = repository.claimKeyForAccount(ACCOUNT_KEY)
+        val result = repository.claimKeyForAccount(ACCOUNT_KEY, ACCOUNT_EMAIL)
 
         assertEquals(true, result.getOrThrow().claimed)
         assertEquals(1, remote.claimCalls)
         assertEquals(0, remote.verifyCalls)
+        // O e-mail viaja no vínculo: o servidor confere a conta contra o rótulo
+        // da chave, e sem ele o botão aprovaria uma conta que o envio recusa.
+        assertEquals(ACCOUNT_EMAIL, remote.lastClaimEmail)
     }
 
     @Test
@@ -141,13 +151,16 @@ class TeamAdminRepositoryImplTest {
         )
         val repository = TeamAdminRepositoryImpl(remote) { CONFIGURED }
 
-        val result = repository.claimKeyForAccount(ACCOUNT_KEY)
+        val result = repository.claimKeyForAccount(ACCOUNT_KEY, ACCOUNT_EMAIL)
 
         // Servidor 0.3.0 não conhece o vínculo explícito; informar ainda é melhor
         // que reprovar uma configuração correta.
         assertTrue(result.isSuccess)
         assertEquals(false, result.getOrThrow().claimed)
         assertEquals(1, remote.verifyCalls)
+        // O e-mail acompanha a queda para a verificação: perdê-lo no caminho
+        // faria a consulta responder por outra pergunta que não a do vínculo.
+        assertEquals(ACCOUNT_EMAIL, remote.lastVerifyEmail)
     }
 
     @Test

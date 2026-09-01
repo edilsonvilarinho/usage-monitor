@@ -141,8 +141,10 @@ class DeleteTeamAccountUseCase(
 class VerifyTeamKeyForAccountUseCase(
     private val repository: TeamAdminRepository
 ) {
-    suspend operator fun invoke(accountKey: String): Result<TeamKeyVerification> =
-        repository.verifyKeyForAccount(accountKey)
+    suspend operator fun invoke(
+        accountKey: String,
+        accountEmail: String? = null
+    ): Result<TeamKeyVerification> = repository.verifyKeyForAccount(accountKey, accountEmail)
 }
 
 /**
@@ -155,6 +157,8 @@ class VerifyTeamKeyForAccountUseCase(
 class ClaimTeamKeyForAccountUseCase(
     private val repository: TeamAdminRepository
 ) {
-    suspend operator fun invoke(accountKey: String): Result<TeamKeyVerification> =
-        repository.claimKeyForAccount(accountKey)
+    suspend operator fun invoke(
+        accountKey: String,
+        accountEmail: String? = null
+    ): Result<TeamKeyVerification> = repository.claimKeyForAccount(accountKey, accountEmail)
 }

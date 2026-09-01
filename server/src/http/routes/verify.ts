@@ -2,7 +2,14 @@ import { Router } from 'express';
 import type { Config } from '../../config.js';
 import { ForbiddenError, UnauthorizedError, ValidationError } from '../../domain/errors.js';
 import { hashKey, type ResolvedTeamKey, type TeamKeyRepository } from '../../repositories/teamKeyRepository.js';
-import { ADMIN_TOKEN_HEADER, MAX_ACCOUNTS_MESSAGE, OTHER_KEY_MESSAGE } from '../access.js';
+import type { TeamRepository } from '../../repositories/teamRepository.js';
+import {
+  ADMIN_TOKEN_HEADER,
+  MAX_ACCOUNTS_MESSAGE,
+  OTHER_KEY_MESSAGE,
+  assertAllowedByLabel,
+  assertNotBlocked,
+} from '../access.js';
 import { isValidTeamKey, TEAM_KEY_HEADER } from '../auth.js';
 import { claimBodySchema, verifyQuerySchema } from '../dto.js';
 import { wrap } from '../errorHandler.js';
@@ -10,6 +17,8 @@ import { wrap } from '../errorHandler.js';
 export interface VerifyRouterDeps {
   config: Config;
   keyRepository: TeamKeyRepository;
+  /** Le o e-mail gravado da conta, para as travas responderem como no ingest. */
+  repository: TeamRepository;
   now: () => number;
 }
 
@@ -57,6 +66,7 @@ export function createVerifyRouter(deps: VerifyRouterDeps): Router {
       }
 
       const accountKey = parsed.data.accountKey;
+      requireAdmissible(deps, resolution, accountKey, parsed.data.accountEmail ?? null);
       if (!resolution.accounts.includes(accountKey)) {
         requireClaimable(deps, resolution, accountKey);
       }
@@ -89,6 +99,7 @@ export function createVerifyRouter(deps: VerifyRouterDeps): Router {
       }
 
       const accountKey = parsed.data.accountKey;
+      requireAdmissible(deps, resolution, accountKey, parsed.data.accountEmail ?? null);
       if (!resolution.accounts.includes(accountKey)) {
         requireClaimable(deps, resolution, accountKey);
 
@@ -138,6 +149,28 @@ function resolveCredential(
     throw new UnauthorizedError();
   }
   return resolved;
+}
+
+/**
+ * As mesmas duas travas do ingest, aplicadas antes de responder.
+ *
+ * Reusa os asserts de `access.ts` em vez de repetir a regra: uma segunda copia
+ * daria duas respostas para a mesma pergunta, e esta rota existe justamente para
+ * antecipar o veredito do envio. Aprovar aqui e recusar la transformaria um erro
+ * de configuracao numa sincronia parada em silencio — o mesmo motivo pelo qual
+ * [requireClaimable] ja recusa dona diferente.
+ *
+ * Vale tambem para a conta **ja vinculada**: no `GET`, um "autorizada" para quem
+ * o ingest recusa e a mentira mais cara que esta rota pode contar.
+ */
+function requireAdmissible(
+  deps: VerifyRouterDeps,
+  resolution: ResolvedTeamKey,
+  accountKey: string,
+  accountEmail: string | null,
+): void {
+  assertNotBlocked(deps, accountKey);
+  assertAllowedByLabel(deps, resolution, accountKey, accountEmail);
 }
 
 /**
