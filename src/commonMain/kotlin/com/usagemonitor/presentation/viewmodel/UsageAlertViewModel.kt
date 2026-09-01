@@ -81,6 +81,16 @@ class UsageAlertViewModel(
      */
     internal val worstSnapshot: StateFlow<WorstQuotaSnapshot?> = _worstSnapshot.asStateFlow()
 
+    private val _sourceRisks = MutableStateFlow<List<WorstQuotaSnapshot>>(emptyList())
+
+    /**
+     * O risco de cada fonte, pior primeiro — inclui [worstSnapshot] como o
+     * primeiro item. O hover da barra HUD lista aqui as fontes que não são a
+     * vencedora, e sem essa lista o hover não teria o que mostrar além do
+     * que a faixa já diz.
+     */
+    internal val sourceRisks: StateFlow<List<WorstQuotaSnapshot>> = _sourceRisks.asStateFlow()
+
     private var state = UsageAlertState.EMPTY
 
     /** `Triple` não comporta a quarta fonte, e um `Pair` de `Pair` não se lê. */
@@ -139,11 +149,13 @@ class UsageAlertViewModel(
 
         val now = clock.now()
 
-        _worstSnapshot.value = worstQuotaSnapshot(
+        val sourceRisks = allSourceRisks(
             stats = success?.data.orEmpty(),
             riskSummaries = success?.riskSummaries.orEmpty(),
             now = now
         )
+        _sourceRisks.value = sourceRisks
+        _worstSnapshot.value = sourceRisks.firstOrNull()
         val evaluation = evaluateUsageAlerts(
             stats = success?.data.orEmpty(),
             sessionPulse = pulses.values.mergeSessionPulses(),

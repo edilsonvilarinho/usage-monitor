@@ -22,6 +22,12 @@ export interface AppHudBarProps {
   sourceLabel?: ReactNode;
   /** The reset countdown, e.g. "reset em 42min". Omitted while loading. */
   resetLabel?: ReactNode;
+  /**
+   * Native-tooltip stand-in for the hover list of every monitored source
+   * (worst first) — the real Compose side opens a `HoverTooltipBox` with one
+   * metric row per source instead of a single string.
+   */
+  tooltipTitle?: string;
   /** Fires on a click anywhere on the strip — restores the full window. */
   onOpen?: () => void;
   style?: CSSProperties;

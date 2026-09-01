@@ -54,6 +54,8 @@ import androidx.compose.ui.window.WindowState
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.HoverTooltipBox
+import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -258,6 +260,13 @@ private fun WindowScope.CompactTitleBarOverlay(
  * cobria controles de outras janelas na mesma faixa); `HudBar` só sabe
  * preencher o que recebe, e por isso `sourceLabel`/`resetLabel` truncam com
  * reticências em vez de estourar o container.
+ *
+ * **O hover lista todas as fontes, não só a vencedora.** A faixa mostra uma
+ * única fonte (a pior); com várias contas/fontes monitoradas, as outras
+ * ficavam sem nenhum sinal de que existiam fora de abrir a janela completa —
+ * achado pedido depois de ver a faixa ao vivo. `tooltipMetrics` é
+ * `allSourceRisks` já formatado, mesmo padrão do `HoverTooltipBox` que a
+ * cota de cada card já usa.
  */
 @Composable
 internal fun HudBar(
@@ -265,43 +274,52 @@ internal fun HudBar(
     statusTone: AppTone,
     sourceLabel: String?,
     resetLabel: String?,
+    /** `null` esconde o título do hover; sem métricas, o hover não abre nada. */
+    tooltipTitle: String? = null,
+    tooltipMetrics: List<TooltipMetric> = emptyList(),
     onOpenFull: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    HoverTooltipBox(
+        metrics = tooltipMetrics,
+        title = tooltipTitle,
         modifier = modifier
-            .fillMaxWidth()
-            .height(AppChrome.hud)
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClickLabel = HUD_BAR_OPEN_DESCRIPTION, onClick = onOpenFull)
-            .semantics { contentDescription = HUD_BAR_OPEN_DESCRIPTION }
-            .padding(horizontal = AppSpacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
     ) {
-        AppStatusIndicator(label = statusLabel, tone = statusTone)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(AppChrome.hud)
+                .background(MaterialTheme.colorScheme.surface)
+                .clickable(onClickLabel = HUD_BAR_OPEN_DESCRIPTION, onClick = onOpenFull)
+                .semantics { contentDescription = HUD_BAR_OPEN_DESCRIPTION }
+                .padding(horizontal = AppSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
+        ) {
+            AppStatusIndicator(label = statusLabel, tone = statusTone)
 
-        if (sourceLabel != null) {
-            Text(
-                text = sourceLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
-        }
+            if (sourceLabel != null) {
+                Text(
+                    text = sourceLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
 
-        if (resetLabel != null) {
-            Text(
-                text = resetLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (resetLabel != null) {
+                Text(
+                    text = resetLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

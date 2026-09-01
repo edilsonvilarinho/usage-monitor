@@ -17,6 +17,7 @@ import com.usagemonitor.presentation.ui.HUD_BAR_OPEN_DESCRIPTION
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.TitleBarButton
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
@@ -143,6 +144,37 @@ class DesktopWindowFrameTest {
             }
         }
 
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
+        assertEquals(1, clicks)
+    }
+
+    /**
+     * O hover lista as outras fontes (issue #164); a faixa não pode parar de
+     * despachar o clique só por carregar `tooltipMetrics`.
+     */
+    @Test
+    fun `a barra HUD com metricas de tooltip continua clicavel`() = runDesktopComposeUiTest {
+        var clicks = 0
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Crítico",
+                        statusTone = AppTone.CRITICAL,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 42min",
+                        tooltipTitle = "Todas as fontes",
+                        tooltipMetrics = listOf(
+                            TooltipMetric(label = "Anthropic · Padrão", value = "Crítico"),
+                            TooltipMetric(label = "Codex", value = "Normal")
+                        ),
+                        onOpenFull = { clicks += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Crítico").assertIsDisplayed()
         onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
         assertEquals(1, clicks)
     }

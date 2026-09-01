@@ -170,6 +170,36 @@ class UsageAlertViewModelTest {
         viewModel.onDestroy()
     }
 
+    /** O hover da barra HUD (issue #164) lista todas as fontes, não só a vencedora. */
+    @Test
+    fun `the source risks list includes every source, worst first`() = runTest {
+        val dashboard = MutableStateFlow<UiState>(UiState.Loading)
+        val viewModel = buildViewModel(dashboard = dashboard, dispatcher = UnconfinedTestDispatcher(testScheduler))
+
+        val codexTarget = UsageTargetKey.forSource(ApiSource.CODEX)
+        val codexQuotaKey = QuotaSeriesKey("Codex 5h", PeriodType.INTERVAL)
+
+        dashboard.value = UiState.Success(
+            data = listOf(
+                stats(usedPercent = 10),
+                stats(usedPercent = 20, source = ApiSource.CODEX, target = codexTarget, label = "Codex 5h")
+            ),
+            riskSummaries = mapOf(
+                TARGET to mapOf(QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.AT_RISK, NOW + 1.hours)),
+                codexTarget to mapOf(codexQuotaKey to QuotaRiskSummary(UsageRiskLevel.WILL_EXCEED, NOW + 30.minutes))
+            )
+        )
+        runCurrent()
+
+        assertEquals(
+            listOf(ApiSource.CODEX, ApiSource.ANTHROPIC),
+            viewModel.sourceRisks.value.map { snapshot -> snapshot.stats.source }
+        )
+        assertEquals(viewModel.sourceRisks.value.first(), viewModel.worstSnapshot.value)
+
+        viewModel.onDestroy()
+    }
+
     @Test
     fun `the worst snapshot ignores an expired quota`() = runTest {
         val dashboard = MutableStateFlow<UiState>(UiState.Loading)

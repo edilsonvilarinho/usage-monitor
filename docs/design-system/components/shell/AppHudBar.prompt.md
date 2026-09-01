@@ -15,3 +15,9 @@ windows have no partial click-through: the whole rectangle eats the click whethe
 visibly drawn there. A fixed-width pill in one corner is the fix — found live, not anticipated. The
 component itself doesn't know its own width; it fills whatever the host gives it (`sourceLabel`/
 `resetLabel` truncate with an ellipsis, they never force the container wider).
+
+**The pill shows one source; hover lists every source.** With more than one account/source
+monitored, only the worst one was ever visible — the others had no signal at all short of opening
+the full window. The whole pill is now a `HoverTooltipBox` trigger: hovering opens the same
+metric-list tooltip the quota cells already use, one row per source (label + risk word), worst first.
+

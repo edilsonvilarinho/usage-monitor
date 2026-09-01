@@ -575,6 +575,11 @@ setters em `Main.kt` (ligar um desliga o outro), não do tipo.
   `Main.kt`, nunca gesto do usuário.
 - **Não é primitiva de risco nova.** `AppHudBar`/`HudBar` reusa `AppStatusIndicator` por dentro —
   mesma relação de `AppUpdateStrip` com `AppButton` no design system.
+- **O hover lista todas as fontes, não só a vencedora** (pedido de quem tem várias contas, depois de
+  ver a pílula ao vivo). A pílula inteira é o gatilho de um `HoverTooltipBox` — o mesmo que a cota de
+  cada card já usa —, com `allSourceRisks` (`WorstQuotaSnapshot.kt`) formatado como uma
+  `TooltipMetric` por fonte, pior primeiro. `worstQuotaSnapshot` passou a ser só a primeira entrada de
+  `allSourceRisks`: duas passadas pela mesma lista divergiriam eventualmente.
 
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
 abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e

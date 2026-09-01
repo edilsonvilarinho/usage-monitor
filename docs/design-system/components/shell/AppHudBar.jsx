@@ -1,12 +1,13 @@
 import React from 'react';
 import { AppStatusIndicator } from '../data/AppStatusIndicator.jsx';
 
-export function AppHudBar({ level = 'ok', label, sourceLabel, resetLabel, onOpen, style }) {
+export function AppHudBar({ level = 'ok', label, sourceLabel, resetLabel, tooltipTitle, onOpen, style }) {
   return (
     <div
       role="button"
       tabIndex={0}
       aria-label="Abrir Usage Monitor"
+      title={tooltipTitle}
       onClick={onOpen}
       style={{
         display: 'flex',

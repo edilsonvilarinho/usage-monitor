@@ -973,7 +973,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
     </div>
   </div>
-  <div class="hudbar">
+  <div class="hudbar" title="Todas as fontes&#10;Anthropic — INFORMATA2 · Crítico&#10;Anthropic — Padrão · Atenção&#10;Codex · Normal">
     <span class="st crit">Crítico</span>
     <span class="v sm">Anthropic · Padrão</span>
     <span class="sp"></span>
@@ -982,6 +982,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 </div>
 <p class="note"><b>Pílula de canto, não faixa de largura total.</b> A primeira versão ocupava a tela inteira e, por estar sempre no topo (<code>alwaysOnTop</code>), cobria os controles de qualquer outra janela que também tivesse algo nos primeiros 24dp do topo — barra de menu de IDE, atalhos de editor. O Compose Desktop não tem click-through parcial numa janela comum: a região inteira captura o clique, visível ou não. Achado testando ao vivo, não antecipado no plano original. 320dp é a mesma ordem de grandeza da largura mínima de card (<code>NarrowCardWidthThreshold</code>) — não o mesmo token, só o bastante para um rótulo de conta típico; texto mais longo trunca com reticências.</p>
 <p class="note"><b>Mesma janela, terceiro chrome — não uma janela nova.</b> A janela principal (<code>DesktopWindowFrame</code>) redimensiona e reposiciona para o canto; sair do modo restaura o tamanho e a posição de antes. Fechar a janela continua encerrando o app: a barra HUD não é "minimizar para segundo plano", é a mesma semântica do modo somente cards levada a um extremo. <b>Três saídas</b>, mesmo padrão do modo somente cards: clique em qualquer ponto da pílula, item na bandeja e <code>Ctrl+Shift+H</code> — combinação própria, sem colidir com <code>Ctrl+Shift+M</code>. O ponto+palavra reusa <code>AppStatusIndicator</code>/<code>.st</code>: nenhuma primitiva de risco nova, só uma pílula nova que os hospeda.</p>
+<p class="note"><b>Passe o mouse na pílula acima:</b> a faixa mostra só a pior fonte; com várias contas monitoradas, as outras não tinham nenhum sinal fora de abrir a janela completa — pedido de quem usa múltiplas contas, depois de ver a pílula ao vivo. O hover abre a mesma lista de métricas (<code>HoverTooltipBox</code>) que a cota de cada card já usa, uma linha por fonte, pior primeiro.</p>
 
 <h2 id="dash-estados">4b · Dashboard — os estados que o card precisa cobrir</h2>
 <div class="g2">

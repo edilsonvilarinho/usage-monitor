@@ -155,6 +155,7 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.components.resetLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import com.usagemonitor.presentation.ui.components.toneFor
@@ -1712,14 +1713,27 @@ private fun runUsageMonitor(
         // apenas o nível — é o que deixa a faixa dizer qual fonte e quando ela
         // reseta. `resetLabel` é a mesma função que o cabeçalho expandido do
         // card usa: nenhum formato de data novo.
+        val hudSourceLabelOf = { stats: ApiUsageStats ->
+            stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName
+        }
         val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
         val hudStatusLabel = hudSnapshot?.let { snapshot -> riskLevelLabel(snapshot.risk.level, language) }
             ?: if (language == AppLanguage.PT) "Carregando" else "Loading"
         val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
-        val hudSourceLabel = hudSnapshot?.stats?.let { stats ->
-            stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName
-        }
+        val hudSourceLabel = hudSnapshot?.stats?.let(hudSourceLabelOf)
         val hudResetLabel = hudSnapshot?.let { snapshot -> resetLabel(snapshot.quota, language, Clock.System.now()) }
+        // A faixa mostra só a fonte que perde; o hover lista todas — pedido de
+        // quem tem várias contas/fontes e não quer abrir a janela completa só
+        // para saber se as outras também estão em risco (issue #164, achado
+        // testando ao vivo).
+        val hudSourceRisks by usageAlertViewModel.sourceRisks.collectAsState()
+        val hudTooltipMetrics = hudSourceRisks.map { snapshot ->
+            TooltipMetric(
+                label = hudSourceLabelOf(snapshot.stats),
+                value = riskLevelLabel(snapshot.risk.level, language)
+            )
+        }
+        val hudTooltipTitle = if (language == AppLanguage.PT) "Todas as fontes" else "All sources"
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopWindowFrame(
                 title = "Usage Monitor",
@@ -1737,6 +1751,8 @@ private fun runUsageMonitor(
                         statusTone = hudStatusTone,
                         sourceLabel = hudSourceLabel,
                         resetLabel = hudResetLabel,
+                        tooltipTitle = hudTooltipTitle,
+                        tooltipMetrics = hudTooltipMetrics,
                         onOpenFull = { setHudMode(false) }
                     )
                 }

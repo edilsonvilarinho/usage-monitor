@@ -16,7 +16,11 @@ export function Hud() {
         barra HUD · pílula de 320dp ancorada no canto superior direito, sem barra de título, sem cards
       </span>
       <HudScreen>
-        <AppHudBar level="crit" label="Crítico" sourceLabel="Anthropic · Padrão" resetLabel="reset em 42min" style={{ width: 320 }} />
+        <AppHudBar
+          level="crit" label="Crítico" sourceLabel="Anthropic · Padrão" resetLabel="reset em 42min"
+          tooltipTitle={'Todas as fontes\nAnthropic — INFORMATA2 · Crítico\nAnthropic — Padrão · Atenção\nCodex · Normal'}
+          style={{ width: 320 }}
+        />
       </HudScreen>
       <HudScreen>
         <AppHudBar level="ok" label="Normal" sourceLabel="Codex" resetLabel="reset em 3h 12min" style={{ width: 320 }} />
@@ -26,7 +30,8 @@ export function Hud() {
         redimensionada a uma pílula de 320×24dp. A primeira versão ocupava a largura inteira da tela
         e cobria os controles de outras janelas (achado testando ao vivo) — daqui em diante fica só
         no canto. Sem drag-to-reorder — não há cards. Três saídas: clique em qualquer ponto da
-        pílula, item na bandeja e Ctrl+Shift+H.
+        pílula, item na bandeja e Ctrl+Shift+H. Hover lista todas as fontes monitoradas, não só a
+        pior — o real usa HoverTooltipBox, aqui é o atributo nativo title.
       </span>
     </div>
   );
