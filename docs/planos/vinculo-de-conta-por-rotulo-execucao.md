@@ -34,7 +34,7 @@ de texto.
 |---|---|---|
 | A1 | Regra pura do rótulo, `TEAM_KEY_LABEL_MATCH`, `label` em `ResolvedTeamKey`, `accountEmailOf` | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 18 arquivos, 232 testes, todos verdes. `teamKeyLabel.test.ts` cobre rótulo vazio, nome sem e-mail, e-mail único, caixa/espaço, vários separadores, malformado no meio de válidos e os dois casos que aceitam de propósito (rótulo sem e-mail, e-mail desconhecido). |
 | A2 | Tabela `team_blocked_accounts` e rotas de bloqueio | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 18 arquivos, 239 testes, todos verdes (7 novos). `DELETE /admin/v1/accounts/:accountKey` passou a devolver `blocked: true` e a escrever a decisão; `GET`/`DELETE /admin/v1/blocked-accounts` sob `x-admin-token`, com token de relatório e chave de time recusados (401). |
-| A3 | As duas travas em `authorize()` + auditoria de arranque | Pendente |
+| A3 | As duas travas em `authorize()` + auditoria de arranque | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 20 arquivos, 258 testes, todos verdes (19 novos, em `test/api/admission.test.ts` e `test/unit/keyLabelAudit.test.ts`). Cobre: rótulo com um e com dois e-mails, recusa nomeando as duas pontas, vínculo que já existia, leitura pelo e-mail gravado, rótulo sem e-mail, cliente sem e-mail, chave legada fora do portão, `keyLabelMatch=off` e as quatro portas de volta da conta bloqueada (ingest, presença, leitura, chave legada). |
 | A4 | `verify`/`claim` param de mentir (servidor + cliente) | Pendente |
 | A5 | Tela de chaves: e-mail por conta, "Remover do time", seção de bloqueadas | Pendente |
 | A6 | Documentação (`server/README.md`, `CLAUDE.md`, versão `0.11.0`) | Pendente |
@@ -71,6 +71,30 @@ deixaria uma conta barrada com o histórico inteiro no banco.
 **Desbloquear não restaura dado nenhum.** O histórico foi apagado junto e o cliente daquela máquina
 já marcou os turnos como enviados. O que volta é a possibilidade de reivindicar a conta de novo — e
 daí em diante ela passa pelo portão do rótulo como qualquer outra.
+
+**O portão é avaliado antes do teste de vínculo, não dentro do ramo que reivindica.** É isso que o
+faz valer para os vínculos que já existiam — que é o caso da issue: a conta intrusa já estava
+vinculada quando a regra foi escrita. Com a verificação só no caminho do `claim`, ela continuaria
+sincronizando para sempre.
+
+**O bloqueio vem antes do portão, e antes até da credencial no caminho de escrita.** A chave legada
+em modo aberto retorna cedo em `authorize()` e escreveria sem passar por conta nenhuma — era por ela
+que a conta removida voltaria num deploy que ainda não migrou para chaves por pessoa. Nas leituras,
+o bloqueio só alcança a chave de time: admin e token de relatório continuam lendo, porque
+administrar não é participar.
+
+**As leituras conferem pelo e-mail gravado.** Elas não carregam corpo, então não há e-mail no
+pedido; o gravado é a mesma informação vinda da escrita anterior. Nas escritas o e-mail do pedido
+vence o gravado — numa máquina que trocou de conta, o gravado descreve a anterior.
+
+**A auditoria de arranque usa a mesma função pura da recusa.** Duplicar a regra no diagnóstico daria
+duas respostas para a mesma pergunta, e o diagnóstico existe justamente para prever a recusa.
+
+**Dois testes existentes descreviam o contrato antigo e foram reescritos, não afrouxados.** O de
+precedência de e-mail na visão global roda com `keyLabelMatch: 'off'` porque a combinação que ele
+monta — rótulo de um e-mail, conta reportando outro — é exatamente a que o portão recusa; o `off`
+isola a pergunta dele da admissão em vez de escondê-la. E o de liberar a conta para outra chave
+passou a desbloquear antes de reivindicar, que é o contrato novo.
 
 **`TEAM_KEY_LABEL_MATCH` nasce `strict`**, ao contrário de `TEAM_LEGACY_KEY_MODE`, que nasce
 `open`. Aquele preservava clientes existentes numa mudança de autenticação; este é a correção de um

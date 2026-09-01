@@ -79,9 +79,10 @@ CREATE TABLE IF NOT EXISTS server_meta (
 -- incrementalmente. key_cipher/key_iv/key_tag existem apenas para o modal do
 -- admin reler a chave depois de criada; a autenticacao nunca decifra nada.
 --
--- label e texto livre de quem administra (normalmente o e-mail da pessoa) e o
--- servidor NAO o verifica. A verdade de quem e aquela chave esta em
--- team_key_accounts.
+-- label e texto livre de quem administra (normalmente o e-mail da pessoa). Ele
+-- nao autentica nada, mas passou a AUTORIZAR: quando traz e-mail, so a conta que
+-- reporta um dos e-mails listados ali pode usar a chave. Rotulo sem e-mail nao
+-- declara relacao nenhuma e a verificacao fica desligada.
 CREATE TABLE IF NOT EXISTS team_keys (
   id           TEXT    PRIMARY KEY,
   key_hash     TEXT    NOT NULL UNIQUE,

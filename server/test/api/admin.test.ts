@@ -459,7 +459,15 @@ describe('remocao de conta inteira', () => {
       .toBe(true);
   });
 
+  // Com `keyLabelMatch` estrito esta combinacao — rotulo de um e-mail, conta
+  // reportando outro — e justamente a que o portao recusa, e a conta nunca
+  // chegaria a gravar e-mail nenhum. O caso aqui e sobre a **precedencia do
+  // e-mail na visao global**, nao sobre admissao: o `off` isola uma pergunta da
+  // outra em vez de esconder a segunda.
   it('e-mail reportado prevalece sobre label e label invalido nao vira fallback', async () => {
+    harness.cleanup();
+    harness = createHarness({ keyLabelMatch: 'off' });
+
     const reported = await createKeyViaAdmin(harness, 'fallback@empresa.com');
     const invalid = await createKeyViaAdmin(harness, 'Pessoa sem e-mail');
     await request(harness.app)
@@ -503,8 +511,10 @@ describe('contas fora do time', () => {
     expect(response.body.accounts).toEqual([]);
   });
 
+  // Rotulo sem e-mail deixa o portao desligado, que e como a conta intrusa da
+  // issue #179 entrou: ela chegou antes de existir criterio nenhum.
   it('remover a conta a coloca na lista com o e-mail que ela reportou', async () => {
-    const created = await createKeyViaAdmin(harness, 'fulano@empresa.com');
+    const created = await createKeyViaAdmin(harness, 'Chave do setor');
     await request(harness.app)
       .post('/api/v1/ingest')
       .set('x-team-key', created.key)

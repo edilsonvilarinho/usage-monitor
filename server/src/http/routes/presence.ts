@@ -32,6 +32,7 @@ export function createPresenceRouter(deps: PresenceRouterDeps): Router {
   const access: AccessDeps = {
     config: deps.config,
     keyRepository: deps.keyRepository,
+    repository: deps.repository,
     now: deps.now,
   };
 
@@ -81,7 +82,14 @@ export function createPresenceRouter(deps: PresenceRouterDeps): Router {
       //    `accountKey` e auto-declarado no corpo nos dois casos, entao a forca
       //    da prova e a mesma; sem isso o fallback por 404 (que e ingest, e
       //    portanto vincula) teria semantica diferente do caminho primario.
-      { allowClaim: true },
+      {
+        allowClaim: true,
+        // A batida carrega o mesmo `accountEmail` do ingest, e e ela que chega
+        // primeiro numa maquina sem turno pendente: sem o extrator aqui, o
+        // portao so veria o e-mail no envio seguinte, que pode nunca vir.
+        extractAccountEmail: (req) =>
+          (req.body as { accountEmail?: unknown } | undefined)?.accountEmail,
+      },
     ),
   );
 

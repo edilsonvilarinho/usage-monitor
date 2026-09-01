@@ -31,9 +31,12 @@ export interface AdminRouterDeps {
  * quem nao pediu por uma.
  *
  * O que a torna usavel sem ninguem descobrir `accountUuid` de ninguem: a chave
- * nasce sem conta e o `label` e texto livre — normalmente o e-mail da pessoa,
- * digitado por quem administra. O servidor **nao** verifica esse rotulo; a
- * verdade e a lista `accounts`, preenchida no primeiro ingest de cada chave.
+ * nasce sem conta e se amarra a primeira que a usar num ingest.
+ *
+ * O `label` continua sendo texto livre, mas deixou de ser decoracao: quando ele
+ * declara e-mail, aquela e a **relacao do time** daquela chave, e conta de fora
+ * dela e recusada (`assertAllowedByLabel`, em `http/access.ts`). Rotulo sem
+ * e-mail nao declara relacao nenhuma e o portao fica desligado.
  */
 export function createAdminRouter(deps: AdminRouterDeps): Router {
   const router = Router();
