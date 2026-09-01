@@ -37,6 +37,7 @@ de texto.
 | A3 | As duas travas em `authorize()` + auditoria de arranque | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 20 arquivos, 258 testes, todos verdes (19 novos, em `test/api/admission.test.ts` e `test/unit/keyLabelAudit.test.ts`). Cobre: rótulo com um e com dois e-mails, recusa nomeando as duas pontas, vínculo que já existia, leitura pelo e-mail gravado, rótulo sem e-mail, cliente sem e-mail, chave legada fora do portão, `keyLabelMatch=off` e as quatro portas de volta da conta bloqueada (ingest, presença, leitura, chave legada). |
 | A4 | `verify`/`claim` param de mentir (servidor + cliente) | **Concluída.** `npx tsc --noEmit` sem saída; `npx vitest run` → 20 arquivos, 264 testes, verdes. `gradlew.bat allTests` → `BUILD SUCCESSFUL in 2m 6s`. As duas rotas passaram a aplicar as mesmas travas do ingest, reusando `assertNotBlocked`/`assertAllowedByLabel`; `accountEmail` viaja na query do `verify` e no corpo do `claim`, e o `FakeRemoteTeamDataSource` passou a **afirmar** que ele chega — inclusive na queda para o `verify` contra servidor sem a rota. |
 | A5 | Tela de chaves: e-mail por conta, "Remover do time", seção de bloqueadas | **Concluída.** `npx vitest run` → 20 arquivos, 268 testes, verdes (4 novos de `accountDetails`). `gradlew.bat allTests` → `BUILD SUCCESSFUL in 2m 8s`, com 4 testes de view model e 4 de componente novos. `ConfirmationDialog` saiu de privado na tela de presença e virou `AppConfirmationDialog`, adotada nas duas telas no mesmo commit; registrada em `docs/design-system/components/feedback/` e no índice do `readme.md`, e a §11 do protótipo passou a mostrar a linha divergente, a seção de bloqueadas e o texto novo da confirmação. |
+| A7 | Aviso da recusa na linha da conta (Configurações → Time) | **Concluída.** `gradlew.bat allTests` → `BUILD SUCCESSFUL in 2m 8s`, com 3 testes de serviço e 2 de componente novos. `TeamSyncStatus.rejectedProfiles` leva a recusa do servidor por `profileId` até a linha da conta em Configurações → Time, com ponto, palavra e o motivo que o servidor mandou. |
 | A6 | Documentação (`server/README.md`, `CLAUDE.md`, versão `0.11.0`) | **Concluída.** `server/package.json` em `0.11.0`; README com `TEAM_KEY_LABEL_MATCH`, o rótulo como relação do time no passo 2 do fluxo, `accountDetails`, as duas rotas de `blocked-accounts`, o novo significado de `DELETE /admin/v1/accounts/:accountKey` e o aviso de que a 0.11.0 corta vínculo divergente no redeploy — com o log de arranque como o que se lê antes. `CLAUDE.md` reescreveu as duas afirmações que deixaram de valer. |
 
 ## Notas de engenharia
@@ -126,6 +127,29 @@ ajuste de tom ou de posição dos botões. O commit que a cria e os que a consom
 **Desvincular continua existindo ao lado de "Remover do time".** São decisões diferentes: a primeira
 solta o vínculo e deixa os dados, e o envio seguinte daquela máquina refaz tudo; a segunda encerra.
 Fundir as duas faria a ação branda carregar o risco da destrutiva.
+
+**O aviso da recusa fica preso na conta, não no rodapé da seção.** A mensagem geral dizia que
+*algo* foi recusado sem dizer **qual** das contas marcadas era a errada, e numa máquina com duas ou
+três isso não aponta nada. O conserto é desligar aquele interruptor, que está na mesma linha.
+
+**Só `403` marca conta.** É o status que o servidor reserva para "a credencial vale, mas não para
+esta conta" — fora do rótulo, fora do time, conta de outra chave, limite cheio —, e os quatro têm o
+mesmo conserto do lado do cliente. `401` é chave errada e `5xx` é o servidor: marcar a linha ali
+mandaria o usuário desmarcar uma conta que não tem defeito nenhum.
+
+**`TeamServerException` ganhou `detail`** — a frase do servidor sem o prefixo "recusou a <operação>".
+Na linha da conta o prefixo ocuparia metade do espaço e não acrescenta nada, porque a linha já diz de
+quem é o problema. O `message` completo segue no aviso geral, onde não há conta para apontar.
+
+**O mapa é substituído a cada passada, nunca acumulado.** A conta que deixou de ser recusada — o
+usuário a desmarcou, o admin corrigiu o rótulo — precisa sumir do aviso, e quem sabe disso é a
+passada corrente.
+
+**A validação já acontece no arranque, sem laço novo.** `TeamSyncService.start()` chama `syncOnce()`
+**antes** do primeiro `delay`, e o `LaunchedEffect` de `Main.kt:799` o dispara assim que a integração
+fica ativa. Na primeira passada de cada abertura o envio de identidade sai sempre — o marcador
+`confirmedIdentityByAccount` é só em memória e nasce vazio — e a presença sai em toda passada, então
+o servidor é consultado por conta mesmo numa máquina sem turno pendente.
 
 **`TEAM_KEY_LABEL_MATCH` nasce `strict`**, ao contrário de `TEAM_LEGACY_KEY_MODE`, que nasce
 `open`. Aquele preservava clientes existentes numa mudança de autenticação; este é a correção de um

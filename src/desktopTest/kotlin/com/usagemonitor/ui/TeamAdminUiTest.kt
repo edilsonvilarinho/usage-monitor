@@ -35,7 +35,10 @@ import com.usagemonitor.presentation.ui.TeamKeysAdminContent
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_EXIT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_KEYS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_VALIDATE_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TEAM_PROFILE_REJECTION_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.TEAM_SYNC_STATUS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
@@ -137,10 +140,65 @@ class TeamAdminSectionTest {
         onAllNodesWithTag(TEAM_SYNC_STATUS_TEST_TAG).assertCountEquals(0)
     }
 
+    // O aviso de recusa mora na linha da conta, e não junto do erro geral: o
+    // conserto é desligar aquele interruptor, que está ali do lado.
+    @Test
+    fun `conta recusada pelo servidor e marcada na propria linha`() = runDesktopComposeUiTest {
+        renderSection(
+            settings = TeamIntegrationSettings(
+                enabled = true,
+                serverUrl = "https://time.local",
+                apiKey = "chave-de-time-com-tamanho-suficiente",
+                alias = "romero",
+                deviceId = "device-1",
+                participatingProfileIds = setOf("pessoal", "empresa")
+            ),
+            profiles = listOf(
+                profileModel("pessoal", "Pessoal", "ronac2007@gmail.com"),
+                profileModel("empresa", "Empresa", "helio.sales@empresa.com")
+            ),
+            rejectedProfiles = mapOf("pessoal" to "a conta ronac2007@gmail.com nao esta na relacao")
+        )
+
+        onNodeWithTag("${TEAM_PROFILE_REJECTION_TAG_PREFIX}pessoal").assertIsDisplayed()
+        // A conta boa da mesma máquina não pode ser marcada junto.
+        onAllNodesWithTag("${TEAM_PROFILE_REJECTION_TAG_PREFIX}empresa").assertCountEquals(0)
+    }
+
+    @Test
+    fun `sem recusa nenhuma conta e marcada`() = runDesktopComposeUiTest {
+        renderSection(
+            settings = TeamIntegrationSettings(
+                enabled = true,
+                serverUrl = "https://time.local",
+                apiKey = "chave-de-time-com-tamanho-suficiente",
+                alias = "romero",
+                deviceId = "device-1",
+                participatingProfileIds = setOf("pessoal")
+            ),
+            profiles = listOf(profileModel("pessoal", "Pessoal", "ronac2007@gmail.com"))
+        )
+
+        onAllNodesWithTag("${TEAM_PROFILE_REJECTION_TAG_PREFIX}pessoal").assertCountEquals(0)
+    }
+
+    private fun profileModel(id: String, label: String, identity: String) =
+        AnthropicProfileUiModel(
+            id = id,
+            label = label,
+            path = "~/.claude-$id",
+            enabled = true,
+            removable = true,
+            identityLabel = identity,
+            status = AnthropicProfileUiStatus.READY
+        )
+
     private fun ComposeUiTest.renderSection(
         settings: TeamIntegrationSettings,
         onExitAdminMode: () -> Unit = {},
-        syncFailureMessage: String? = null
+        syncFailureMessage: String? = null,
+        profiles: List<AnthropicProfileUiModel> = emptyList(),
+        rejectedProfiles: Map<String, String> = emptyMap()
     ) {
         setContent {
             AppTheme(isDark = true) {
@@ -148,7 +206,7 @@ class TeamAdminSectionTest {
                     TeamIntegrationSection(
                         settings = settings,
                         language = AppLanguage.PT,
-                        profiles = emptyList(),
+                        profiles = profiles,
                         connection = TeamConnectionUiState(),
                         onEnabledChange = {},
                         onServerUrlChange = {},
@@ -157,6 +215,7 @@ class TeamAdminSectionTest {
                         onProfileParticipationChange = { _, _ -> },
                         onTestConnection = {},
                         syncFailureMessage = syncFailureMessage,
+                        rejectedProfiles = rejectedProfiles,
                         onExitAdminMode = onExitAdminMode
                     )
                 }

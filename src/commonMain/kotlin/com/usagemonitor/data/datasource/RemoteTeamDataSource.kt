@@ -523,6 +523,7 @@ open class RemoteTeamDataSource(
 
         throw TeamServerException(
             statusCode = response.status.value,
+            detail = detail,
             message = "Servidor de time recusou a $operation (HTTP ${response.status.value}): $detail"
         )
     }
@@ -531,5 +532,14 @@ open class RemoteTeamDataSource(
 /** Falha vinda do servidor de time, com o status para a UI diferenciar 401 de 500. */
 class TeamServerException(
     val statusCode: Int,
-    override val message: String
+    override val message: String,
+    /**
+     * A frase do servidor, sem o prefixo que diz qual operação falhou.
+     *
+     * Existe para o aviso preso **numa conta** — ali a operação não acrescenta
+     * nada, porque a linha já diz de quem é o problema, e o prefixo ocuparia
+     * metade do espaço. O [message] completo continua servindo ao aviso geral,
+     * onde não há conta para apontar.
+     */
+    val detail: String = message
 ) : Exception(message)

@@ -2240,6 +2240,7 @@ private fun runUsageMonitor(
                         teamSyncFailureMessage = teamSyncStatus
                             .takeIf { status -> status.isFailing }
                             ?.lastFailureMessage,
+                        teamRejectedProfiles = teamSyncStatus.rejectedProfiles,
                         teamAdminConnection = teamAdminConnectionState,
                         onTeamAdminTokenChange = { token ->
                             val saved = updateTeamSettings(

@@ -40,6 +40,7 @@ const val TEAM_ADMIN_SWITCH_TEST_TAG = "teamIntegrationAdminSwitch"
 const val TEAM_ADMIN_VALIDATE_TEST_TAG = "teamIntegrationAdminValidate"
 const val TEAM_ADMIN_KEYS_TEST_TAG = "teamIntegrationAdminKeys"
 const val TEAM_ADMIN_EXIT_TEST_TAG = "teamIntegrationAdminExit"
+const val TEAM_PROFILE_REJECTION_TAG_PREFIX = "teamIntegrationProfileRejection:"
 
 /**
  * Seção "Integração com time" das Configurações.
@@ -73,6 +74,15 @@ fun TeamIntegrationSection(
      * quem traduz o estado é o `Main`.
      */
     syncFailureMessage: String? = null,
+    /**
+     * Contas que o servidor recusou, por `profileId`, com o motivo dele.
+     *
+     * O aviso mora **na linha da conta**, e não junto do erro geral lá embaixo:
+     * o conserto é desligar aquele interruptor, que está ali do lado. Uma
+     * mensagem no rodapé dizia que algo foi recusado sem dizer qual das contas
+     * marcadas era a errada.
+     */
+    rejectedProfiles: Map<String, String> = emptyMap(),
     /** Resultado da última validação do token; separado do teste da chave de time. */
     adminConnection: TeamConnectionUiState = TeamConnectionUiState(),
     onAdminTokenChange: (String) -> Unit = {},
@@ -178,6 +188,8 @@ fun TeamIntegrationSection(
                         onCheckedChange = { checked ->
                             onProfileParticipationChange(profile.id, checked)
                         },
+                        rejection = rejectedProfiles[profile.id],
+                        language = language,
                         showDivider = profile !== profiles.last()
                     )
                 }
@@ -359,6 +371,8 @@ private fun TeamProfileCheckboxRow(
     profile: AnthropicProfileUiModel,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    language: AppLanguage,
+    rejection: String? = null,
     showDivider: Boolean = true
 ) {
     // Linha de dados como as opções da aba Geral: rótulo em mono à esquerda,
@@ -377,6 +391,22 @@ private fun TeamProfileCheckboxRow(
                     text = identity,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // Ponto e palavra, e o motivo que o próprio servidor mandou: ele
+            // nomeia a chave e a conta, que é o que separa "desmarque esta
+            // conta" de "peça outra chave ao administrador".
+            if (rejection != null) {
+                AppStatusIndicator(
+                    label = if (language == AppLanguage.PT) {
+                        "Recusada pelo servidor — $rejection"
+                    } else {
+                        "Refused by the server — $rejection"
+                    },
+                    tone = AppTone.CRITICAL,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .testTag("$TEAM_PROFILE_REJECTION_TAG_PREFIX${profile.id}")
                 )
             }
         }
