@@ -12,8 +12,22 @@ data class UsageAlertSettings(
     val quotaAlertsEnabled: Boolean = true,
     val quotaPercents: List<Int> = DEFAULT_QUOTA_ALERT_PERCENTS,
     val sessionAlertsEnabled: Boolean = true,
+    /** Aviso de sessão cujo último pedido ficou sem resposta; ver [StalledCliSession]. */
+    val stalledSessionAlertsEnabled: Boolean = true,
+    val stallThresholdMillis: Long = DEFAULT_STALL_THRESHOLD_MILLIS,
     val quietHours: QuietHours? = null
 ) {
+    /**
+     * Limiar saneado, com [MIN_STALL_THRESHOLD_MILLIS] como piso.
+     *
+     * Mora aqui pelo mesmo motivo de [effectiveQuotaPercents]: o valor vem de
+     * armazenamento em claro, e dois leitores saneando por conta própria acabariam
+     * divergindo. `detectStalledSessions` não sabe nada disto — ela aplica o que
+     * recebe.
+     */
+    val effectiveStallThresholdMillis: Long
+        get() = stallThresholdMillis.coerceAtLeast(MIN_STALL_THRESHOLD_MILLIS)
+
     /**
      * Limiares normalizados: dentro de 1..100, sem repetidos e em ordem.
      *
@@ -88,6 +102,20 @@ sealed interface UsageAlert {
         val sessionId: String,
         val projectName: String?
     ) : UsageAlert
+
+    /**
+     * O último pedido de uma sessão CLI não recebeu resposta dentro do limiar.
+     *
+     * Carrega ausência de resposta, e não "processo travado": a evidência está no
+     * transcript, e o app não olha o sistema operacional. A frase montada na borda
+     * da UI mantém a mesma reserva.
+     */
+    data class SessionStalled(
+        val sessionId: String,
+        val projectName: String?,
+        val pendingSince: Instant,
+        val pendingMillis: Long
+    ) : UsageAlert
 }
 
 /**
@@ -98,7 +126,8 @@ sealed interface UsageAlert {
  */
 data class UsageAlertState(
     val quotaWindows: Map<QuotaAlertScope, FiredQuotaWindow> = emptyMap(),
-    val firedSessionIds: Set<String> = emptySet()
+    val firedSessionIds: Set<String> = emptySet(),
+    val firedStalledSessionIds: Set<String> = emptySet()
 ) {
     companion object {
         val EMPTY = UsageAlertState()
@@ -140,7 +169,8 @@ fun evaluateUsageAlerts(
     previous: UsageAlertState,
     settings: UsageAlertSettings,
     now: Instant,
-    currentLocalHour: Int? = null
+    currentLocalHour: Int? = null,
+    stalledSessions: List<StalledCliSession> = emptyList()
 ): UsageAlertEvaluation {
     val silenced = currentLocalHour != null && settings.quietHours?.contains(currentLocalHour) == true
 
@@ -157,12 +187,19 @@ fun evaluateUsageAlerts(
         settings = settings,
         silenced = silenced
     )
+    val stalledResult = evaluateStalledSessionAlerts(
+        stalledSessions = stalledSessions,
+        previous = previous.firedStalledSessionIds,
+        settings = settings,
+        silenced = silenced
+    )
 
     return UsageAlertEvaluation(
-        alerts = quotaResult.alerts + sessionResult.alerts,
+        alerts = quotaResult.alerts + sessionResult.alerts + stalledResult.alerts,
         state = UsageAlertState(
             quotaWindows = quotaResult.windows,
-            firedSessionIds = sessionResult.firedIds
+            firedSessionIds = sessionResult.firedIds,
+            firedStalledSessionIds = stalledResult.firedIds
         )
     )
 }
@@ -280,6 +317,47 @@ private fun evaluateSessionAlerts(
     }
 
     return SessionAlertResult(alerts, stillKnown + pending.map { alert -> alert.sessionId })
+}
+
+/**
+ * Um aviso por sessão que ficou sem resposta.
+ *
+ * Mesma anatomia de [evaluateSessionAlerts], e pelas mesmas razões: desligar o
+ * alerta zera o estado, para religá-lo voltar a avisar sobre o que está
+ * acontecendo agora; o silêncio adia sem marcar, porque a pendência só cresce
+ * dentro da janela de idade e o aviso continua verdadeiro quando o silêncio
+ * terminar; e o estado só guarda sessão ainda presente na lista — uma sessão que
+ * saiu (respondeu, ou passou do teto de idade) e volta a ficar sem resposta é um
+ * problema novo e merece aviso novo.
+ */
+private fun evaluateStalledSessionAlerts(
+    stalledSessions: List<StalledCliSession>,
+    previous: Set<String>,
+    settings: UsageAlertSettings,
+    silenced: Boolean
+): SessionAlertResult {
+    if (!settings.stalledSessionAlertsEnabled) {
+        return SessionAlertResult(emptyList(), emptySet())
+    }
+
+    val currentIds = stalledSessions.map { stalled -> stalled.sessionId }.toSet()
+    val stillKnown = previous.intersect(currentIds)
+
+    if (silenced) {
+        return SessionAlertResult(emptyList(), stillKnown)
+    }
+
+    val pending = stalledSessions.filter { stalled -> stalled.sessionId !in stillKnown }
+    val alerts = pending.map { stalled ->
+        UsageAlert.SessionStalled(
+            sessionId = stalled.sessionId,
+            projectName = stalled.projectName,
+            pendingSince = stalled.pendingSince,
+            pendingMillis = stalled.pendingMillis
+        )
+    }
+
+    return SessionAlertResult(alerts, stillKnown + pending.map { stalled -> stalled.sessionId })
 }
 
 /**

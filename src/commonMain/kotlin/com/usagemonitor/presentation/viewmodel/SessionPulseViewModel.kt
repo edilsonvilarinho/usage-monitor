@@ -5,10 +5,13 @@ import com.usagemonitor.domain.entity.breadcrumbReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
+import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +63,18 @@ class SessionPulseViewModel(
      * apenas o que outro laço já indexou.
      */
     private val syncCliSessionIndex: SyncCliSessionIndexUseCase? = null,
+    /**
+     * Sessões sem resposta há tempo demais. `null` desliga a detecção — a
+     * instalação passa a se comportar como antes dela existir.
+     */
+    private val getStalledSessions: GetStalledCliSessionsUseCase? = null,
+    /**
+     * Limiar corrente da detecção, lido a cada passada.
+     *
+     * Provider e não valor fixo pelo mesmo motivo de [teamTargetsProvider]: a
+     * escolha vive nas preferências e muda sem recriar o view model.
+     */
+    private val stallThresholdProvider: () -> Long = { DEFAULT_STALL_THRESHOLD_MILLIS },
     /** Contas participantes do time; vazio zera os pulsos do botão de time. */
     private val teamTargetsProvider: () -> List<TeamPulseTarget> = { emptyList() },
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
@@ -82,6 +97,17 @@ class SessionPulseViewModel(
 
     /** Sessões de todo o time na conta do card, incluindo as desta máquina. */
     val teamPulses: StateFlow<Map<UsageTargetKey, SessionPulse>> = _teamPulses.asStateFlow()
+
+    private val _stalledSessions = MutableStateFlow<List<StalledCliSession>>(emptyList())
+
+    /**
+     * Sessões desta máquina cujo último pedido ficou sem resposta.
+     *
+     * Vive neste laço, e não num próprio, porque a passada local continua rodando
+     * com a janela minimizada — que é exatamente o destinatário do aviso: quem
+     * deixou automação rodando e não está olhando a tela.
+     */
+    val stalledSessions: StateFlow<List<StalledCliSession>> = _stalledSessions.asStateFlow()
 
     init {
         if (autoStart) {
@@ -122,6 +148,7 @@ class SessionPulseViewModel(
 
         val now = clock.now()
         refreshCliPulses(now)
+        refreshStalledSessions()
         if (includeTeam) {
             refreshTeamPulses(now)
         } else {
@@ -172,6 +199,42 @@ class SessionPulseViewModel(
 
     /** Ver [refreshCliPulses]: motivo da última falha anotada, para não repeti-la. */
     private var lastCliPulseFailure: String? = null
+
+    /**
+     * Leitura que falha **mantém** a lista anterior, como o pulso: a cauda de um
+     * transcript pode estar sendo escrita neste instante, e apagar a lista faria o
+     * aviso piscar sem nada ter mudado nas sessões. O valor antigo não envelhece
+     * sozinho aqui — quem o descarta é o teto de idade do próprio detector.
+     */
+    private suspend fun refreshStalledSessions() {
+        val useCase = getStalledSessions ?: return
+
+        val result = useCase(stallThresholdProvider())
+
+        // Mesma deduplicação da trilha do semáforo: 120 passadas por hora e uma
+        // leitura quebrada expulsariam da trilha tudo o que explica o defeito.
+        val failure = result.exceptionOrNull()
+        if (failure == null) {
+            lastStalledFailure = null
+        } else {
+            val reason = breadcrumbReasonOf(failure)
+            if (reason != lastStalledFailure) {
+                lastStalledFailure = reason
+                breadcrumbs.record(
+                    BreadcrumbCategory.ERROR,
+                    "sessões sem resposta não puderam ser lidas: $reason"
+                )
+            }
+        }
+
+        val stalled = result.getOrNull() ?: return
+        if (stalled != _stalledSessions.value) {
+            _stalledSessions.value = stalled
+        }
+    }
+
+    /** Ver [refreshStalledSessions]. */
+    private var lastStalledFailure: String? = null
 
     private suspend fun refreshTeamPulses(now: Instant) {
         val targets = teamTargetsProvider()

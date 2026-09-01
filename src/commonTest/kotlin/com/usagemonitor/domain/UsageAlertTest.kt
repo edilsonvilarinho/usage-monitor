@@ -8,7 +8,9 @@ import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.MIN_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageAlertState
@@ -302,6 +304,136 @@ class UsageAlertTest {
     }
 
     @Test
+    fun `a stalled session alerts once while it stays in the list`() {
+        val stalled = listOf(stalledSession("s1"))
+
+        val first = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            stalledSessions = stalled
+        )
+        val alert = first.alerts.filterIsInstance<UsageAlert.SessionStalled>().single()
+        assertEquals("s1", alert.sessionId)
+        assertEquals("usage-monitor", alert.projectName)
+
+        val second = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = first.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 30.minutes,
+            stalledSessions = stalled
+        )
+        assertTrue(second.alerts.isEmpty())
+    }
+
+    /** Respondeu e voltou a ficar sem resposta: é um problema novo. */
+    @Test
+    fun `a stalled session that answered and stalled again alerts again`() {
+        val stalled = listOf(stalledSession("s1"))
+
+        val first = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            stalledSessions = stalled
+        )
+        val cleared = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = first.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 1.hours,
+            stalledSessions = emptyList()
+        )
+        val again = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = cleared.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 2.hours,
+            stalledSessions = stalled
+        )
+
+        assertEquals(1, again.alerts.filterIsInstance<UsageAlert.SessionStalled>().size)
+    }
+
+    /** No silêncio o aviso é adiado, não consumido: a pendência não desaparece sozinha. */
+    @Test
+    fun `quiet hours postpone the stalled alert`() {
+        val stalled = listOf(stalledSession("s1"))
+        val settings = UsageAlertSettings.DEFAULT.copy(quietHours = QuietHours(22, 8))
+
+        val silenced = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = settings,
+            now = NOW,
+            currentLocalHour = 23,
+            stalledSessions = stalled
+        )
+        assertTrue(silenced.alerts.isEmpty())
+
+        val afterwards = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = silenced.state,
+            settings = settings,
+            now = NOW + 3.hours,
+            currentLocalHour = 9,
+            stalledSessions = stalled
+        )
+        assertEquals(1, afterwards.alerts.filterIsInstance<UsageAlert.SessionStalled>().size)
+    }
+
+    @Test
+    fun `disabling the stalled alert clears the fired state`() {
+        val stalled = listOf(stalledSession("s1"))
+
+        val first = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            stalledSessions = stalled
+        )
+        val disabled = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = first.state,
+            settings = UsageAlertSettings.DEFAULT.copy(stalledSessionAlertsEnabled = false),
+            now = NOW + 30.minutes,
+            stalledSessions = stalled
+        )
+        assertTrue(disabled.alerts.isEmpty())
+        assertTrue(disabled.state.firedStalledSessionIds.isEmpty())
+
+        val reenabled = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = disabled.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 1.hours,
+            stalledSessions = stalled
+        )
+        assertEquals(1, reenabled.alerts.filterIsInstance<UsageAlert.SessionStalled>().size)
+    }
+
+    @Test
+    fun `a stall threshold below the floor falls back to the default`() {
+        val settings = UsageAlertSettings.DEFAULT.copy(stallThresholdMillis = 60_000L)
+
+        assertEquals(MIN_STALL_THRESHOLD_MILLIS, settings.effectiveStallThresholdMillis)
+    }
+
+    @Test
     fun `invalid thresholds are dropped and the list is normalized`() {
         val settings = UsageAlertSettings.DEFAULT.copy(quotaPercents = listOf(90, 0, 75, 90, 150, 100))
 
@@ -332,6 +464,16 @@ private fun stats(
                 unit = UsageUnit.PERCENTAGE
             )
         )
+    )
+}
+
+private fun stalledSession(sessionId: String): StalledCliSession {
+    return StalledCliSession(
+        sessionId = sessionId,
+        projectName = "usage-monitor",
+        profileId = DEFAULT_ANTHROPIC_PROFILE_ID,
+        pendingSince = NOW - 3.hours,
+        pendingMillis = 3.hours.inWholeMilliseconds
     )
 }
 

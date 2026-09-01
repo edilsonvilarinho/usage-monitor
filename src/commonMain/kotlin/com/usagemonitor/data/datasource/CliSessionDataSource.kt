@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.CliSessionActiveTime
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliSessionTail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
@@ -78,4 +79,17 @@ interface CliSessionDataSource {
         sinceEpochMillis: Long = 0L,
         gapCutoffMillis: Long = TURN_GAP_CUTOFF_MILLIS
     ): List<CliSessionActiveTime>
+
+    /**
+     * O que a cauda do transcript de cada sessão diz sobre o último pedido.
+     *
+     * Não sai do índice: `cli_turns` só guarda turno do assistente, e o que separa
+     * "sessão encerrada" de "sessão sem resposta" é o marcador de fim de turno que
+     * o CLI escreve no `.jsonl`. Devolve o fato bruto — quem decide se é uma
+     * sessão travada é `detectStalledSessions`, que conhece o relógio e o limiar.
+     *
+     * Sessão desconhecida, arquivo ausente ou cauda sem marcador saem como
+     * [com.usagemonitor.domain.entity.CliSessionTailOutcome.NOT_EVALUATED].
+     */
+    suspend fun readSessionTails(sessionIds: Collection<String>): List<CliSessionTail>
 }

@@ -85,6 +85,8 @@ import com.usagemonitor.presentation.ui.components.settingsTabTestTag
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
 import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
 import com.usagemonitor.presentation.ui.components.UI_SCALE_VALUE_TEST_TAG
@@ -2689,6 +2691,38 @@ class ComponentTest {
 
         onNodeWithText("63%").assertIsDisplayed()
         onNodeWithText("90%").assertIsDisplayed()
+    }
+
+    @Test
+    fun `AlertSettingsSection picks the stall threshold and hides it when disabled`() = runDesktopComposeUiTest {
+        var current = UsageAlertSettings.DEFAULT
+
+        setContent {
+            AppTheme(isDark = true) {
+                var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
+                AlertSettingsSection(
+                    settings = settings,
+                    language = AppLanguage.PT,
+                    onSettingsChange = { updated ->
+                        settings = updated
+                        current = updated
+                    }
+                )
+            }
+        }
+
+        // Ligado por padrão: o segmentado do limiar já está na tela.
+        onNodeWithTag(ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG).assertIsDisplayed()
+
+        onNodeWithText("30min").performClick()
+        assertEquals(30L * 60 * 1_000, current.effectiveStallThresholdMillis)
+
+        onNodeWithText("4h").performClick()
+        assertEquals(4L * 60 * 60 * 1_000, current.effectiveStallThresholdMillis)
+
+        // Desligado, o limiar some: controle sem efeito é pior que controle ausente.
+        onNodeWithTag(ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG).performClick()
+        onAllNodesWithTag(ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG).assertCountEquals(0)
     }
 
     @Test

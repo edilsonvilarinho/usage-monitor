@@ -5,6 +5,8 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTail
+import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
@@ -20,6 +22,7 @@ import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.repository.TeamUsageTrendData
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
 import com.usagemonitor.domain.usecase.GetActiveTeamSessionPulseUseCase
+import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
@@ -35,6 +38,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 private val NOW = Instant.parse("2026-08-13T12:00:00Z")
@@ -268,6 +272,93 @@ class SessionPulseViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `a session whose last request went unanswered is published`() = runTest {
+        val stale = session("a", lastTs = NOW - 3.hours)
+        val repository = FakePulseCliRepository(listOf(stale))
+        repository.tails = mapOf(
+            "a" to CliSessionTail(
+                sessionId = "a",
+                outcome = CliSessionTailOutcome.PENDING_REQUEST,
+                lastRequestAt = NOW - 3.hours
+            )
+        )
+        val viewModel = buildViewModel(repository, detectStalled = true)
+
+        viewModel.refreshOnce()
+
+        val stalled = viewModel.stalledSessions.value.single()
+        assertEquals("a", stalled.sessionId)
+        assertEquals(3.hours.inWholeMilliseconds, stalled.pendingMillis)
+    }
+
+    /** Sessão com turno recente não é candidata: o corte poupa a leitura da cauda. */
+    @Test
+    fun `a session with a recent turn is never asked about`() = runTest {
+        val repository = FakePulseCliRepository(listOf(session("a")))
+        val viewModel = buildViewModel(repository, detectStalled = true)
+
+        viewModel.refreshOnce()
+
+        assertTrue(viewModel.stalledSessions.value.isEmpty())
+        assertEquals(emptyList(), repository.lastTailSessionIds ?: emptyList<String>())
+    }
+
+    /** Leitura que falha mantém a lista: apagar faria o aviso piscar à toa. */
+    @Test
+    fun `a failed tail read keeps the previous list`() = runTest {
+        val stale = session("a", lastTs = NOW - 3.hours)
+        val repository = FakePulseCliRepository(listOf(stale))
+        repository.tails = mapOf(
+            "a" to CliSessionTail("a", CliSessionTailOutcome.PENDING_REQUEST, lastRequestAt = NOW - 3.hours)
+        )
+        val viewModel = buildViewModel(repository, detectStalled = true)
+        viewModel.refreshOnce()
+        assertEquals(1, viewModel.stalledSessions.value.size)
+
+        repository.tailsFailure = IllegalStateException("disco ocupado")
+        viewModel.refreshOnce()
+
+        assertEquals(1, viewModel.stalledSessions.value.size)
+    }
+
+    @Test
+    fun `the threshold comes from the provider at every pass`() = runTest {
+        val stale = session("a", lastTs = NOW - 40.minutes)
+        val repository = FakePulseCliRepository(listOf(stale))
+        repository.tails = mapOf(
+            "a" to CliSessionTail("a", CliSessionTailOutcome.PENDING_REQUEST, lastRequestAt = NOW - 40.minutes)
+        )
+
+        val strict = buildViewModel(repository, detectStalled = true)
+        strict.refreshOnce()
+        assertTrue(strict.stalledSessions.value.isEmpty())
+
+        val lenient = buildViewModel(
+            repository,
+            detectStalled = true,
+            stallThresholdMillis = 30L * 60 * 1_000
+        )
+        lenient.refreshOnce()
+        assertEquals(1, lenient.stalledSessions.value.size)
+    }
+
+    /** Sem o caso de uso a detecção some, e o resto do semáforo segue igual. */
+    @Test
+    fun `detection stays off when the use case is absent`() = runTest {
+        val stale = session("a", lastTs = NOW - 3.hours)
+        val repository = FakePulseCliRepository(listOf(stale))
+        repository.tails = mapOf(
+            "a" to CliSessionTail("a", CliSessionTailOutcome.PENDING_REQUEST, lastRequestAt = NOW - 3.hours)
+        )
+        val viewModel = buildViewModel(repository)
+
+        viewModel.refreshOnce()
+
+        assertTrue(viewModel.stalledSessions.value.isEmpty())
+        assertNull(repository.lastTailSessionIds)
+    }
+
     private fun buildViewModel(
         repository: FakePulseCliRepository,
         teamRepository: FakePulseTeamRepository = FakePulseTeamRepository(),
@@ -277,12 +368,16 @@ class SessionPulseViewModelTest {
         dispatcher: kotlinx.coroutines.CoroutineDispatcher = UnconfinedTestDispatcher(),
         autoStart: Boolean = false,
         breadcrumbs: com.usagemonitor.domain.repository.BreadcrumbRecorder =
-            com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
+            com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder,
+        detectStalled: Boolean = false,
+        stallThresholdMillis: Long = 2L * 60 * 60 * 1_000
     ): SessionPulseViewModel {
         return SessionPulseViewModel(
             getCliPulses = GetActiveCliSessionPulsesUseCase(repository, clock),
             getTeamPulse = GetActiveTeamSessionPulseUseCase(teamRepository, clock),
             syncCliSessionIndex = SyncCliSessionIndexUseCase(repository),
+            getStalledSessions = if (detectStalled) GetStalledCliSessionsUseCase(repository, clock) else null,
+            stallThresholdProvider = { stallThresholdMillis },
             teamTargetsProvider = { teamTargets },
             isAppVisible = isAppVisible,
             intervalMillis = INTERVAL_MILLIS,
@@ -296,7 +391,8 @@ class SessionPulseViewModelTest {
     private fun session(
         sessionId: String,
         profileId: String? = "conta2",
-        liveContextTokens: Long = SATURATED_CONTEXT_TOKENS
+        liveContextTokens: Long = SATURATED_CONTEXT_TOKENS,
+        lastTs: Instant = NOW
     ): CliSessionSummary {
         return CliSessionSummary(
             sessionId = sessionId,
@@ -304,7 +400,7 @@ class SessionPulseViewModelTest {
             profileId = profileId,
             cwd = "/home/dev/$sessionId",
             firstTs = NOW - 30.minutes,
-            lastTs = NOW,
+            lastTs = lastTs,
             primaryModel = "claude-opus-5",
             liveContextTokens = liveContextTokens,
             liveContextModel = "claude-opus-5"
@@ -326,6 +422,10 @@ private class FakePulseCliRepository(
 
     /** Não nulo faz a leitura do índice falhar; ver o teste de trilha do semáforo. */
     var sessionsFailure: Throwable? = null
+
+    var tails: Map<String, CliSessionTail> = emptyMap()
+    var tailsFailure: Throwable? = null
+    var lastTailSessionIds: List<String>? = null
 
     override suspend fun syncIndex(): Result<CliSessionIndexReport> {
         syncCalls++
@@ -365,6 +465,12 @@ private class FakePulseCliRepository(
         sinceEpochMillis: Long
     ): Result<List<CliToolUsage>> {
         return Result.success(emptyList())
+    }
+
+    override suspend fun getSessionTails(sessionIds: Collection<String>): Result<List<CliSessionTail>> {
+        lastTailSessionIds = sessionIds.toList()
+        tailsFailure?.let { failure -> return Result.failure(failure) }
+        return Result.success(sessionIds.mapNotNull { sessionId -> tails[sessionId] })
     }
 }
 

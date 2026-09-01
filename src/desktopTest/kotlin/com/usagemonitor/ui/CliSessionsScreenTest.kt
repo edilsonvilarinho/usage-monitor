@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -33,6 +34,7 @@ import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
+import com.usagemonitor.presentation.ui.cliSessionStalledTag
 import com.usagemonitor.presentation.ui.TOTAL_SESSIONS_BLOCK_TAG
 import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.EXPORT_CSV_TAG
@@ -69,6 +71,42 @@ class CliSessionsScreenTest {
      */
     private companion object {
         const val BREAKDOWN_SCENE_HEIGHT = 1_600
+    }
+
+    /**
+     * A marca sai do mapa de sessões sem resposta, não do resumo da sessão: ela
+     * vem da cauda do transcript, e linha sem entrada no mapa não ganha marca
+     * nenhuma.
+     */
+    @Test
+    fun `only the unanswered session row carries the stalled mark`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(
+                                summary("session-abcdef01"),
+                                summary("session-beefcafe")
+                            ),
+                            stalledSessions = mapOf("session-abcdef01" to 3L * 60 * 60 * 1_000)
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // Árvore não mesclada: a linha inteira é clicável e mescla os descendentes,
+        // então a marca não aparece como nó próprio na árvore mesclada.
+        onNodeWithTag(cliSessionStalledTag("session-abcdef01"), useUnmergedTree = true)
+            .assertIsDisplayed()
+        onNodeWithText("Sem resposta há 3h00").assertIsDisplayed()
+        onAllNodesWithTag(cliSessionStalledTag("session-beefcafe"), useUnmergedTree = true)
+            .assertCountEquals(0)
     }
 
     @Test

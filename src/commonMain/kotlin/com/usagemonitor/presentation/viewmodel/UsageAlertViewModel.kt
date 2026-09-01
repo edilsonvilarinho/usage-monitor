@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageAlertState
@@ -41,6 +42,8 @@ class UsageAlertViewModel(
     dashboardState: StateFlow<UiState>,
     cliPulses: StateFlow<Map<UsageTargetKey, SessionPulse>>,
     alertSettings: StateFlow<UsageAlertSettings>,
+    /** Sessões sem resposta, publicadas pelo mesmo laço do semáforo. */
+    stalledSessions: StateFlow<List<StalledCliSession>> = MutableStateFlow(emptyList()),
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.of(ALERT_TIME_ZONE_ID),
@@ -70,11 +73,20 @@ class UsageAlertViewModel(
 
     private var state = UsageAlertState.EMPTY
 
+    /** `Triple` não comporta a quarta fonte, e um `Pair` de `Pair` não se lê. */
+    private data class AlertInputs(
+        val dashboard: UiState,
+        val pulses: Map<UsageTargetKey, SessionPulse>,
+        val settings: UsageAlertSettings,
+        val stalled: List<StalledCliSession>
+    )
+
     private val sources = combine(
         dashboardState,
         cliPulses,
-        alertSettings
-    ) { dashboard, pulses, settings -> Triple(dashboard, pulses, settings) }
+        alertSettings,
+        stalledSessions
+    ) { dashboard, pulses, settings, stalled -> AlertInputs(dashboard, pulses, settings, stalled) }
 
     init {
         if (autoStart) {
@@ -88,8 +100,8 @@ class UsageAlertViewModel(
             return
         }
         collectJob = viewModelScope.launch {
-            sources.collect { (dashboard, pulses, settings) ->
-                evaluate(dashboard, pulses, settings)
+            sources.collect { inputs ->
+                evaluate(inputs.dashboard, inputs.pulses, inputs.settings, inputs.stalled)
             }
         }
     }
@@ -104,7 +116,8 @@ class UsageAlertViewModel(
     internal suspend fun evaluate(
         dashboard: UiState,
         pulses: Map<UsageTargetKey, SessionPulse>,
-        settings: UsageAlertSettings
+        settings: UsageAlertSettings,
+        stalledSessions: List<StalledCliSession> = emptyList()
     ) {
         val success = dashboard as? UiState.Success
 
@@ -121,7 +134,8 @@ class UsageAlertViewModel(
             previous = state,
             settings = settings,
             now = now,
-            currentLocalHour = now.toLocalDateTime(timeZone).hour
+            currentLocalHour = now.toLocalDateTime(timeZone).hour,
+            stalledSessions = stalledSessions
         )
 
         state = evaluation.state

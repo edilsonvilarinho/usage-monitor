@@ -114,7 +114,17 @@ sealed interface CliSessionsUiState {
          *
          * Só a ação do usuário liga a bandeira; o tique do laço ao vivo não.
          */
-        val isRefreshing: Boolean = false
+        val isRefreshing: Boolean = false,
+        /**
+         * Sessões sem resposta, por `sessionId` → há quanto tempo estão assim.
+         *
+         * Mapa, e não uma coluna a mais em [CliSessionSummary]: a resposta não vem
+         * do índice, vem da cauda do transcript, e carregá-la no resumo obrigaria
+         * toda leitura de sessão a abrir arquivo. Ausência do id significa "não
+         * está sem resposta" ou "não foi avaliada" — a tela trata as duas do mesmo
+         * jeito, porque em nenhuma delas há algo a dizer.
+         */
+        val stalledSessions: Map<String, Long> = emptyMap()
     ) : CliSessionsUiState {
 
         val totalCostMicros: Long

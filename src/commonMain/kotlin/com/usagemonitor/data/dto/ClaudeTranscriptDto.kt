@@ -69,6 +69,29 @@ data class ClaudeTranscriptMessageDto(
 
 private const val TOOL_USE_BLOCK_TYPE = "tool_use"
 
+/**
+ * A mesma linha do transcript, lida só pelo cabeçalho.
+ *
+ * DTO separado de [ClaudeTranscriptLineDto], e não campo novo nele, por causa do
+ * custo: aquele materializa `message.content` como [JsonElement], e a cauda de um
+ * transcript é justamente onde moram as linhas de `tool_result` de centenas de
+ * kilobytes. Aqui `message` é chave desconhecida e o parser a atravessa sem
+ * construir nada.
+ *
+ * É também o que garante a regra de privacidade: esta leitura **não tem como**
+ * enxergar texto de prompt ou de resposta, do mesmo jeito que a extração de
+ * ferramentas só enxerga o nome.
+ */
+@Serializable
+data class ClaudeTranscriptTailLineDto(
+    val type: String? = null,
+    /** Distingue os vários `type: "system"`; `turn_duration` é o fim de turno. */
+    val subtype: String? = null,
+    val timestamp: String? = null,
+    @SerialName("sessionId") val sessionId: String? = null,
+    @SerialName("isSidechain") val isSidechain: Boolean = false
+)
+
 @Serializable
 data class ClaudeTranscriptUsageDto(
     @SerialName("input_tokens") val inputTokens: Long = 0L,

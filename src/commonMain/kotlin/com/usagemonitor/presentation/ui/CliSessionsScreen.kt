@@ -153,6 +153,11 @@ fun cliSessionRowTag(sessionId: String): String = "$CLI_SESSION_ROW_TAG_PREFIX$s
 /** Faixa de legendas da lista de sessões, na tela da máquina e no bloco do time. */
 const val CLI_SESSION_COLUMN_HEADER_TAG = "cliSessionColumnHeader"
 
+/** Marca de "sem resposta" de uma linha; ausente quando a sessão respondeu. */
+const val CLI_SESSION_STALLED_TAG_PREFIX = "cliSessionStalled:"
+
+fun cliSessionStalledTag(sessionId: String): String = "$CLI_SESSION_STALLED_TAG_PREFIX$sessionId"
+
 // Larguras das colunas da lista de sessões, num lugar só: a faixa de legendas e
 // as linhas têm de cair no mesmo x.
 //
@@ -348,7 +353,8 @@ private fun CliSessionsList(
                     CliSessionRow(
                         session = session,
                         language = language,
-                        onOpen = { onOpenSession(session.sessionId) }
+                        onOpen = { onOpenSession(session.sessionId) },
+                        stalledForMillis = state.stalledSessions[session.sessionId]
                     )
                 }
             }
@@ -662,7 +668,15 @@ internal fun CliSessionRow(
     onRemove: (() -> Unit)? = null,
     removeButtonTag: String? = null,
     /** A lista tem coluna de ação; esta linha reserva a casa mesmo sem botão. */
-    hasActionColumn: Boolean = onRemove != null
+    hasActionColumn: Boolean = onRemove != null,
+    /**
+     * Há quanto tempo o último pedido desta sessão está sem resposta; `null` é o
+     * caso normal — respondeu, ou não foi possível avaliar.
+     *
+     * Sempre `null` na lista do time: a marca sai da cauda do transcript, que só
+     * existe na máquina onde a sessão rodou.
+     */
+    stalledForMillis: Long? = null
 ) {
     val status = session.contextStatus
     val statusTone = healthTone(status.health)
@@ -761,6 +775,17 @@ internal fun CliSessionRow(
                     label = CliSessionsLabels.healthShort(status.health, language),
                     tone = statusTone
                 )
+                // Ponto e palavra, como o veredito ao lado: a marca não pode ser
+                // só cor. Fica na segunda linha, e não numa sétima coluna — o
+                // orçamento de largura das seis colunas não comporta mais uma, e
+                // a faixa de legendas não admite linha quebrada.
+                if (stalledForMillis != null) {
+                    AppStatusIndicator(
+                        label = CliSessionsLabels.stalledLabel(stalledForMillis, language),
+                        tone = AppTone.WARNING,
+                        modifier = Modifier.testTag(cliSessionStalledTag(session.sessionId))
+                    )
+                }
                 Text(
                     text = CliSessionsLabels.healthReason(
                         saturationLabel = status.contextSaturation?.let { value -> formatPercent(value) },

@@ -1,17 +1,21 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.dto.ClaudeTranscriptLineDto
+import com.usagemonitor.data.dto.ClaudeTranscriptTailLineDto
 import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionActiveTime
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTail
+import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ModelPricingTable
+import com.usagemonitor.domain.entity.SESSION_TAIL_WINDOW_BYTES
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +27,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.sql.Connection
 import java.sql.ResultSet
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Indexa os transcripts do Claude Code (`~/.claude/projects/**/*.jsonl`) num
@@ -66,6 +71,14 @@ class LocalCliSessionDataSource(
      * e não pode entrar no laço de indexação.
      */
     private val hostName: String? by lazy { resolveHostName() }
+
+    /**
+     * Vereditos de cauda já calculados, por caminho de transcript.
+     *
+     * `ConcurrentHashMap` porque a leitura roda no dispatcher de I/O e pode ser
+     * chamada por dois laços — o do semáforo e o da tela de Sessões CLI.
+     */
+    private val tailCache = ConcurrentHashMap<String, CachedTail>()
 
     override suspend fun syncIndex(): CliSessionIndexReport = withContext(Dispatchers.IO) {
         val discovered = projectRootsProvider().flatMap { root -> listTranscriptFiles(root) }
@@ -263,8 +276,158 @@ class LocalCliSessionDataSource(
         }
     }
 
+    override suspend fun readSessionTails(sessionIds: Collection<String>): List<CliSessionTail> {
+        if (sessionIds.isEmpty()) {
+            return emptyList()
+        }
+        return withContext(Dispatchers.IO) {
+            val paths = connectionManager.useConnection { connection ->
+                readSessionFilePaths(connection, sessionIds)
+            }
+            sessionIds.map { sessionId ->
+                val transcript = paths[sessionId]?.let { path -> mainTranscriptOf(path, sessionId) }
+                if (transcript == null || !transcript.isFile) {
+                    CliSessionTail(sessionId, CliSessionTailOutcome.NOT_EVALUATED)
+                } else {
+                    readCachedTail(sessionId, transcript)
+                }
+            }
+        }
+    }
+
     override fun close() {
         connectionManager.close()
+    }
+
+    /**
+     * Caminho do transcript **principal** de uma sessão.
+     *
+     * `cli_sessions.file_path` não serve direto: os transcripts de subagente vivem
+     * em `projects/<slug>/<sessionId>/subagents/agent-*.jsonl`, carregam o
+     * `sessionId` do pai e são varridos pelo `walkTopDown` — e o `UPSERT` grava
+     * `file_path = excluded.file_path`, então a coluna pode acabar apontando para
+     * o arquivo do subagente. Ler a cauda dele responderia sobre o subagente, não
+     * sobre a sessão.
+     *
+     * A derivação é estrutural, não heurística: dentro de `subagents` o transcript
+     * principal é `<sessionId>.jsonl` dois níveis acima.
+     */
+    private fun mainTranscriptOf(filePath: String, sessionId: String): File? {
+        val file = File(filePath)
+        if (file.parentFile?.name != SUBAGENTS_DIRECTORY_NAME) {
+            return file
+        }
+        val projectDir = file.parentFile?.parentFile?.parentFile ?: return null
+        return File(projectDir, "$sessionId$TRANSCRIPT_EXTENSION")
+    }
+
+    /**
+     * Veredito da cauda, relido apenas quando o arquivo mudou.
+     *
+     * Sessão travada, por definição, não escreve mais nada: sem o cache, cada
+     * passada do laço de trinta segundos releria os mesmos 256 KB para chegar à
+     * mesma conclusão. A chave é `(tamanho, data de modificação)`, o mesmo par que
+     * `syncIndex` já usa para decidir se um arquivo precisa ser relido.
+     */
+    private fun readCachedTail(sessionId: String, file: File): CliSessionTail {
+        val sizeBytes = file.length()
+        val lastModified = file.lastModified()
+
+        val cached = tailCache[file.absolutePath]
+        if (cached != null && cached.sizeBytes == sizeBytes && cached.lastModified == lastModified) {
+            return cached.tail.copy(sessionId = sessionId)
+        }
+
+        val tail = readTail(sessionId, file, sizeBytes)
+        tailCache[file.absolutePath] = CachedTail(sizeBytes, lastModified, tail)
+        return tail
+    }
+
+    /**
+     * Lê a última janela do arquivo e compara o último pedido com o último
+     * marcador de fim de turno.
+     *
+     * A primeira linha da janela é descartada quando a leitura não começou no
+     * início do arquivo: ela está cortada ao meio e decodificá-la daria lixo. Pela
+     * mesma razão, linha que não decodifica é ignorada em vez de derrubar a
+     * leitura — o transcript é escrito por outro processo e pode estar no meio de
+     * um `append`.
+     *
+     * Sem nenhum marcador na janela o veredito é
+     * [CliSessionTailOutcome.NOT_EVALUATED]: pode ser sessão de versão que não o
+     * escreve, cauda maior que a janela, ou transcript de subagente. Chamar isso
+     * de "sem resposta" seria afirmar o que não se sabe.
+     */
+    private fun readTail(sessionId: String, file: File, sizeBytes: Long): CliSessionTail {
+        val startOffset = (sizeBytes - SESSION_TAIL_WINDOW_BYTES).coerceAtLeast(0L)
+
+        var lastRequestAt: Instant? = null
+        var lastTurnEndAt: Instant? = null
+        var isFirstLine = true
+
+        forEachCompleteLine(file, startOffset) { rawLine ->
+            val skipPartialLine = isFirstLine && startOffset > 0L
+            isFirstLine = false
+            if (skipPartialLine) {
+                return@forEachCompleteLine
+            }
+
+            val line = runCatching { json.decodeFromString<ClaudeTranscriptTailLineDto>(rawLine) }.getOrNull()
+                ?: return@forEachCompleteLine
+            val instant = line.timestamp
+                ?.let { value -> runCatching { Instant.parse(value) }.getOrNull() }
+
+            when {
+                line.type == USER_LINE_TYPE -> {
+                    // Sem carimbo o pedido existe mas não tem idade a medir: guardar
+                    // o anterior faria a pendência parecer mais velha do que é.
+                    lastRequestAt = instant
+                }
+
+                line.type == SYSTEM_LINE_TYPE && line.subtype == TURN_END_SUBTYPE -> {
+                    lastTurnEndAt = instant ?: lastTurnEndAt
+                    lastRequestAt = null
+                }
+            }
+        }
+
+        if (lastTurnEndAt == null) {
+            return CliSessionTail(sessionId, CliSessionTailOutcome.NOT_EVALUATED)
+        }
+
+        val pendingRequestAt = lastRequestAt
+        if (pendingRequestAt == null) {
+            return CliSessionTail(
+                sessionId = sessionId,
+                outcome = CliSessionTailOutcome.TURN_COMPLETED,
+                lastTurnEndAt = lastTurnEndAt
+            )
+        }
+
+        return CliSessionTail(
+            sessionId = sessionId,
+            outcome = CliSessionTailOutcome.PENDING_REQUEST,
+            lastRequestAt = pendingRequestAt,
+            lastTurnEndAt = lastTurnEndAt
+        )
+    }
+
+    private fun readSessionFilePaths(
+        connection: Connection,
+        sessionIds: Collection<String>
+    ): Map<String, String> {
+        val placeholders = sessionIds.joinToString(separator = ",") { "?" }
+        val sql = "SELECT session_id, file_path FROM cli_sessions WHERE session_id IN ($placeholders);"
+        return connection.prepareStatement(sql).use { statement ->
+            sessionIds.forEachIndexed { index, sessionId -> statement.setString(index + 1, sessionId) }
+            statement.executeQuery().use { rows ->
+                buildMap {
+                    while (rows.next()) {
+                        put(rows.getString("session_id"), rows.getString("file_path"))
+                    }
+                }
+            }
+        }
     }
 
     /** Agregados históricos completos, lidos direto de `cli_sessions`. */
@@ -994,6 +1157,13 @@ class LocalCliSessionDataSource(
         val lastOffset: Long
     )
 
+    /** Ver [readCachedTail]: veredito válido enquanto o par tamanho + data não mudar. */
+    private data class CachedTail(
+        val sizeBytes: Long,
+        val lastModified: Long,
+        val tail: CliSessionTail
+    )
+
     private data class SessionMetadata(
         val cwd: String?,
         val gitBranch: String?
@@ -1024,6 +1194,18 @@ class LocalCliSessionDataSource(
     companion object {
         private const val TRANSCRIPT_EXTENSION = ".jsonl"
         private const val ASSISTANT_LINE_TYPE = "assistant"
+        private const val USER_LINE_TYPE = "user"
+        private const val SYSTEM_LINE_TYPE = "system"
+
+        /**
+         * Marcador de fim de turno escrito pelo próprio CLI — não por hook do
+         * usuário: 66 dos 181 transcripts que o trazem não têm `stop_hook_summary`
+         * nenhum. É ele que separa sessão encerrada de sessão sem resposta.
+         */
+        private const val TURN_END_SUBTYPE = "turn_duration"
+
+        /** Pasta dos transcripts de subagente, dentro da pasta da sessão. */
+        private const val SUBAGENTS_DIRECTORY_NAME = "subagents"
         private const val USAGE_MARKER = "\"usage\""
         private const val READ_BUFFER_BYTES = 64 * 1024
         private val NEW_LINE_BYTE = '\n'.code.toByte()

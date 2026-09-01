@@ -7,6 +7,8 @@ import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliSessionTail
+import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageBreakdown
@@ -15,6 +17,7 @@ import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.startOfMonthMillis
@@ -74,6 +77,46 @@ class CliSessionsViewModelTest {
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
         assertEquals(listOf("a", "b"), state.sessions.map { session -> session.sessionId })
         assertEquals(1, repository.syncCalls)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `unanswered sessions reach the state and survive a failed read`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a"), summary("b")))
+        repository.tailsResult = Result.success(
+            listOf(
+                CliSessionTail(
+                    sessionId = "a",
+                    outcome = CliSessionTailOutcome.PENDING_REQUEST,
+                    lastRequestAt = FIXED_NOW - 3.hours
+                )
+            )
+        )
+        val viewModel = buildViewModel(repository, detectStalled = true)
+
+        val first = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(mapOf("a" to 3.hours.inWholeMilliseconds), first.stalledSessions)
+
+        // Leitura acessória que falha mantém o valor anterior e não derruba a
+        // lista, como a grade de atividade do resumo.
+        repository.tailsResult = Result.failure(IllegalStateException("disco ocupado"))
+        viewModel.refresh()
+
+        val second = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(mapOf("a" to 3.hours.inWholeMilliseconds), second.stalledSessions)
+        assertEquals(2, second.sessions.size)
+        viewModel.onDestroy()
+    }
+
+    /** Sem o caso de uso a marca some, e a lista continua igual. */
+    @Test
+    fun `the stalled mark stays empty when detection is off`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+
+        val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(emptyMap(), state.stalledSessions)
+        assertEquals(0, repository.tailCalls)
         viewModel.onDestroy()
     }
 
@@ -900,7 +943,8 @@ class CliSessionsViewModelTest {
         clock: Clock = FixedClock(FIXED_NOW),
         // O corte da janela é resolvido dentro do caso de uso; separá-lo do
         // relógio do carimbo permite mover o tempo só onde interessa.
-        useCaseClock: Clock = FixedClock(FIXED_NOW)
+        useCaseClock: Clock = FixedClock(FIXED_NOW),
+        detectStalled: Boolean = false
     ): CliSessionsViewModel {
         return CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(repository, useCaseClock),
@@ -909,6 +953,11 @@ class CliSessionsViewModelTest {
             getCliUsageBreakdown = GetCliUsageBreakdownUseCase(repository, useCaseClock),
             exportWriter = exportWriter,
             getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(repository, useCaseClock),
+            getStalledCliSessions = if (detectStalled) {
+                GetStalledCliSessionsUseCase(repository, useCaseClock)
+            } else {
+                null
+            },
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             autoLoad = autoLoad,
             backgroundIndexIntervalMillis = backgroundIndexIntervalMillis,
@@ -992,6 +1041,10 @@ private class FakeCliSessionRepository(
     var lastSinceEpochMillis: Long? = null
     var lastProfileId: String? = null
 
+    var tailsResult: Result<List<CliSessionTail>> = Result.success(emptyList())
+    var tailCalls: Int = 0
+    var lastTailSessionIds: List<String>? = null
+
     var breakdownResult: Result<CliUsageBreakdown> = Result.success(CliUsageBreakdown())
     var hourlyResult: Result<List<CliHourlyUsageRow>> = Result.success(emptyList())
     var toolResult: Result<List<CliToolUsage>> = Result.success(emptyList())
@@ -1043,6 +1096,12 @@ private class FakeCliSessionRepository(
         sinceEpochMillis: Long
     ): Result<List<CliToolUsage>> {
         return toolResult
+    }
+
+    override suspend fun getSessionTails(sessionIds: Collection<String>): Result<List<CliSessionTail>> {
+        tailCalls++
+        lastTailSessionIds = sessionIds.toList()
+        return tailsResult
     }
 }
 
