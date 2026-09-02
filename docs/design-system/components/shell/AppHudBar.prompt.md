@@ -1,10 +1,11 @@
-One 20dp row per account: dot and word for its worst quota, then one dot per quota.
+One 20dp row per account: dot and word for its worst quota, then one dot per quota, and the
+countdown to the next collection at the end of the first row.
 
 ```jsx
 <AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
-  quotas: [{ text: '5h 28%', level: 'ok' }, { text: '7d 9%', level: 'crit' }] }]} />
+  quotas: [{ text: '5h 28%', level: 'ok' }, { text: '7d 9%', level: 'crit' }] }]} countdown="02:05" />
 <AppHudBar level="ok" dotOnly />
-<AppHudBar sources={ACCOUNTS} expanded />
+<AppHudBar sources={ACCOUNTS} expanded countdown="02:05" />
 ```
 
 Not a new risk primitive — the dot+word is `AppStatusIndicator`, and the collapsed state reuses
@@ -56,6 +57,32 @@ which. Drop it and color would be informing state alone, which this system does 
 reset comes from the *same* date parts the card's line uses, just trimmed: no prefix, no timezone,
 and no day-of-month when the window is intraday. Absent means "no reset to show" — the column
 disappears rather than printing a dash.
+
+**The countdown is drawn once, on the first row.** The polling is a single loop for the whole app,
+not one per account, so repeating it on every row would claim each account has its own collection.
+It is absent from the collapsed state, where there is no text at all — hover brings the panel back,
+and the countdown with it. On the loading row it stays: that row *is* the first row, and while
+nothing has been collected "when is the next attempt" is the most useful thing the strip has to say.
+
+**The icon is what says which time this is.** There is no tooltip to lean on — a popup here is a
+layer *inside* the window, clipped to its bounds, and it would land on top of its own trigger — so a
+bare `02:05` beside the quota percentages would explain nothing. The sentence rides in the icon's
+accessible name, which is also how a screen reader reaches it.
+
+**The reference component takes the value already formatted; the Compose one ticks inside.** That is
+a deliberate split, not drift. Here the host is the window composable that builds the whole
+application graph, and a per-second state in it would recompose all of it — so the clock lives in the
+strip, with the time source and the wait injected, and an explicit switch to turn the loop off. The
+switch is not a user preference: under the component tests' clock the wait advances on its own and a
+fixed time source never lets the countdown reach zero, so the loop spins forever and the idle wait
+never returns.
+
+**The width is measured from a fixed `00:00` placeholder, never from the running clock.** This window
+is sized from its content, so measuring the live text would resize it every second. Mono type is what
+makes the placeholder honest — every value the strip prints has the same width.
+
+**No new format.** The countdown is the footer's own `mm:ss`, and the sentence behind the icon has a
+single owner shared with it: the same countdown said twice would drift apart at the first correction.
 
 **`dotOnly` is the idle state, for when every source is on track.** The data does not vanish — it
 stops occupying screen while it says everything is fine, and hover brings the whole panel back. This

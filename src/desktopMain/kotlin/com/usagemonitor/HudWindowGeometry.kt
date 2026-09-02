@@ -41,8 +41,17 @@ import kotlin.math.abs
  * nome, treze caracteres: toda conta virava "Anthropic — I…", que é justamente
  * o que a lista existe para distinguir. Continua bem abaixo do piso da janela
  * normal (240dp de card × n).
+ *
+ * **E de 420 para 484 quando a contagem entrou** (issue #185), que é exatamente
+ * o teto anterior mais [hudCountdownWidth] — não um número escolhido por ser
+ * redondo. O 420 foi calibrado para a linha **sem** a coluna, e mantê-lo faria a
+ * coluna nova ser paga pelo nome da conta. Medido com as contas reais: sem a
+ * contagem, `Anthropic — Padrão` pedia 356,9dp e `OpenCode Go` 361,6dp, os dois
+ * abaixo do teto; com ela passavam a 420,9 e 425,6 e começavam a truncar. É a
+ * mesma razão do salto anterior, e a aritmética preserva exatamente a
+ * capacidade de nome que a barra já tinha.
  */
-internal val HUD_PILL_MAX_WIDTH = 420.dp
+internal val HUD_PILL_MAX_WIDTH = 484.dp
 
 /**
  * Distância em que a pílula solta gruda na borda da área útil.
@@ -79,6 +88,42 @@ internal val HUD_PILL_DOT_ONLY_PADDING = AppSpacing.sm
 
 /** Padding vertical do painel expandido, acima e abaixo da lista. */
 internal val HUD_PANEL_VERTICAL_PADDING = AppSpacing.xs
+
+/**
+ * Ícone da contagem regressiva até a próxima coleta (issue #185).
+ *
+ * **O ícone é o único portador de significado disponível aqui.** No HUD não cabe
+ * tooltip — popup no Compose Desktop é camada *dentro* da janela e sai recortado
+ * sobre o próprio alvo, como a #164 já pagou —, e um `02:05` solto ao lado dos
+ * percentuais não diria de que tempo se trata.
+ *
+ * 12dp cabe na linha de 20dp e é o menor tamanho em que a seta circular ainda se
+ * lê; o ícone do rodapé, que tem 30dp de barra, usa 16.
+ */
+internal val HUD_COUNTDOWN_ICON_SIZE = 12.dp
+
+/**
+ * Texto que a geometria mede no lugar da contagem corrente.
+ *
+ * **A largura é estimada sobre um placeholder, nunca sobre o valor do relógio.**
+ * A janela é dimensionada pelo conteúdo, então medir o texto corrente faria a
+ * janela mudar de tamanho junto com o relógio. Com o poll de 10 minutos o
+ * `%02d:%02d` de `formatRefreshCountdown` dá sempre cinco caracteres, e a escala
+ * `label*` é mono: o placeholder tem exatamente a largura de qualquer valor que
+ * a barra vá imprimir.
+ */
+private const val HUD_COUNTDOWN_PLACEHOLDER = "00:00"
+
+/**
+ * Largura da coluna da contagem: o vão que a separa das cotas, o ícone, o vão
+ * interno e o texto.
+ */
+private fun hudCountdownWidth(): Dp {
+    return AppSpacing.md +
+        HUD_COUNTDOWN_ICON_SIZE +
+        AppSpacing.xs +
+        labelMediumWidth(HUD_COUNTDOWN_PLACEHOLDER)
+}
 
 /**
  * Avanço de caractere da IBM Plex Mono, em fração do corpo.
@@ -176,28 +221,42 @@ private fun hudFallbackRowWidth(fallbackLabel: String): Dp {
  * Sem fonte nenhuma sobra a linha de carregamento: zero linhas dariam uma janela
  * de altura nula, que o AWT não sabe desenhar e o usuário leria como o app ter
  * sumido.
+ *
+ * **A contagem regressiva ([showsCountdown]) mede só na primeira linha.** O
+ * polling é um só — dez minutos para o app inteiro, não por conta —, e repeti-la
+ * em cada linha afirmaria que cada conta tem coleta própria. Recolhida ao ponto
+ * ela não existe: ali não há texto nenhum.
  */
 internal fun hudWindowSize(
     sources: List<HudSourceStatus>,
     fallbackLabel: String,
     dotOnly: Boolean,
-    expanded: Boolean
+    expanded: Boolean,
+    showsCountdown: Boolean = false
 ): DpSize {
     if (dotOnly) {
         return DpSize(hudDotOnlyWidth(), AppChrome.hud)
     }
 
+    val countdownWidth = if (showsCountdown) hudCountdownWidth() else 0.dp
     val visible = if (expanded) sources else sources.take(1)
 
     if (visible.isEmpty()) {
+        // A linha de carregamento é a primeira linha, e enquanto nada foi
+        // coletado "quando é a próxima tentativa" é o que a barra tem a dizer.
         return DpSize(
-            width = hudFallbackRowWidth(fallbackLabel).coerceAtMost(HUD_PILL_MAX_WIDTH),
+            width = (hudFallbackRowWidth(fallbackLabel) + countdownWidth)
+                .coerceAtMost(HUD_PILL_MAX_WIDTH),
             height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT
         )
     }
 
     val width = visible
-        .maxOf { source -> hudSourceRowWidth(source).value }
+        .mapIndexed { index, source ->
+            val row = hudSourceRowWidth(source)
+            if (index == 0) (row + countdownWidth).value else row.value
+        }
+        .max()
         .dp
         .coerceAtMost(HUD_PILL_MAX_WIDTH)
 

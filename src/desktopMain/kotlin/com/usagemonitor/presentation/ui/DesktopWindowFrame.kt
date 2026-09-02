@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,6 +63,10 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import java.awt.Cursor
+import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import com.usagemonitor.HUD_COUNTDOWN_ICON_SIZE
 import com.usagemonitor.HUD_PANEL_VERTICAL_PADDING
 import com.usagemonitor.HUD_PILL_DOT_ONLY_PADDING
 import com.usagemonitor.HUD_PILL_PADDING
@@ -69,6 +75,7 @@ import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppStatusDot
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -386,12 +393,41 @@ internal fun HudBar(
      * da bandeja, que não acende nada em `ON_TRACK`.
      */
     dotOnly: Boolean = false,
+    /**
+     * Quando a próxima coleta automática acontece (issue #185).
+     *
+     * `null` esconde a coluna inteira — é o default porque os geradores de
+     * captura e os testes de geometria montam a barra sem relógio nenhum.
+     */
+    nextRefreshAt: Instant? = null,
+    /**
+     * O que o ícone da contagem significa, por extenso.
+     *
+     * Vem pronto de quem chama, como `statusLabel` e `fallbackLabel`: a barra não
+     * conhece idioma. É o `contentDescription` do ícone — no HUD não cabe tooltip
+     * (popup aqui é camada dentro da janela e sai recortado sobre o próprio
+     * alvo), então esta é a única frase que explica o número.
+     */
+    countdownDescription: String? = null,
     onHoverChange: (Boolean) -> Unit = {},
     onDragStart: () -> Unit = {},
     onDragMove: () -> Unit = {},
     onDragEnd: () -> Unit = {},
     onOpenFull: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Injetáveis pela mesma razão do `FooterBar`: afirmar o decremento sem esperar segundos reais. */
+    nowProvider: () -> Instant = { Clock.System.now() },
+    waitNextTick: suspend () -> Unit = { delay(1_000L) },
+    /**
+     * Desliga o laço do relógio, deixando a contagem parada no valor de entrada.
+     *
+     * **Não é preferência de usuário, é o mesmo interruptor do `FooterBar`.** Sob
+     * o relógio dos testes de componente o `delay` avança sozinho, e com o
+     * `nowProvider` fixo o laço nunca chega a zero: ele gira para sempre e o
+     * `waitForIdle` não retorna. Quem exercita o decremento injeta
+     * [waitNextTick]; quem só quer o número na tela desliga aqui.
+     */
+    countdownUpdatesEnabled: Boolean = true
 ) {
     val hoverInteraction = remember { MutableInteractionSource() }
     val isHovered by hoverInteraction.collectIsHoveredAsState()
@@ -450,15 +486,41 @@ internal fun HudBar(
                 .padding(vertical = HUD_PANEL_VERTICAL_PADDING)
         ) {
             val visible = if (expanded) sources else sources.take(1)
+            // A contagem é do app inteiro — o polling é um só —, então ela sai
+            // **uma vez**, na primeira linha. Uma por linha afirmaria que cada
+            // conta tem coleta própria.
+            val countdown: (@Composable () -> Unit)? =
+                if (nextRefreshAt == null || countdownDescription == null) {
+                    null
+                } else {
+                    {
+                        HudCountdown(
+                            nextRefreshAt = nextRefreshAt,
+                            description = countdownDescription,
+                            nowProvider = nowProvider,
+                            waitNextTick = waitNextTick,
+                            updatesEnabled = countdownUpdatesEnabled
+                        )
+                    }
+                }
 
             if (visible.isEmpty()) {
                 HudPanelRow {
-                    AppStatusIndicator(label = fallbackLabel, tone = statusTone)
+                    // O `weight` mora no indicador, e não num `Spacer` próprio: a
+                    // `HudPanelRow` espaça os filhos, e um terceiro filho traria
+                    // um vão que `hudFallbackRowWidth` não conta — a janela
+                    // nasceria estreita e o texto sairia comprimido.
+                    AppStatusIndicator(
+                        label = fallbackLabel,
+                        tone = statusTone,
+                        modifier = Modifier.weight(1f)
+                    )
+                    countdown?.invoke()
                 }
                 return@Column
             }
 
-            visible.forEach { source ->
+            visible.forEachIndexed { index, source ->
                 HudPanelRow {
                     AppStatusIndicator(label = source.statusLabel, tone = source.tone)
                     Text(
@@ -488,9 +550,75 @@ internal fun HudBar(
                             }
                         }
                     }
+
+                    if (index == 0) {
+                        countdown?.invoke()
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * A contagem regressiva até a próxima coleta automática (issue #185).
+ *
+ * **O tique mora aqui, não em quem chama.** Em `Main.kt` ele recomporia `main()`
+ * inteiro a cada segundo, e aquele composable já está no limite do backend JVM.
+ * As duas esperas são injetáveis pela mesma razão do `FooterBar`: é o que deixa o
+ * decremento ser afirmado sem esperar segundos reais.
+ *
+ * **O laço para em zero**, e não é animação: `waitNextTick` é uma suspensão, não
+ * um quadro pendente, então o `waitForIdle` dos testes de componente não trava.
+ *
+ * **Nenhum formato novo** — `formatRefreshCountdown` é a mesma do rodapé.
+ */
+@Composable
+private fun HudCountdown(
+    nextRefreshAt: Instant,
+    description: String,
+    nowProvider: () -> Instant,
+    waitNextTick: suspend () -> Unit,
+    updatesEnabled: Boolean
+) {
+    val remainingOf = { (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt() }
+    var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(remainingOf()) }
+
+    LaunchedEffect(nextRefreshAt, updatesEnabled) {
+        secondsUntilRefresh = remainingOf()
+        if (!updatesEnabled) {
+            return@LaunchedEffect
+        }
+
+        while (true) {
+            val remaining = remainingOf()
+            secondsUntilRefresh = remaining
+            if (remaining <= 0) {
+                break
+            }
+            waitNextTick()
+        }
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+    ) {
+        // O ícone é o que diz de que tempo se trata: aqui não cabe tooltip, e um
+        // `02:05` solto ao lado dos percentuais não se explica. A descrição vai
+        // na semântica, que é o caminho do leitor de tela e dos asserts.
+        Icon(
+            imageVector = Icons.Rounded.Refresh,
+            contentDescription = description,
+            modifier = Modifier.size(HUD_COUNTDOWN_ICON_SIZE),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = formatRefreshCountdown(secondsUntilRefresh),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
     }
 }
 

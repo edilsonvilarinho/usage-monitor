@@ -54,12 +54,14 @@ class HudWindowGeometryTest {
         sources: List<HudSourceStatus> = this.sources,
         fallbackLabel: String = "Carregando",
         dotOnly: Boolean = false,
-        expanded: Boolean = true
+        expanded: Boolean = true,
+        showsCountdown: Boolean = false
     ) = hudWindowSize(
         sources = sources,
         fallbackLabel = fallbackLabel,
         dotOnly = dotOnly,
-        expanded = expanded
+        expanded = expanded,
+        showsCountdown = showsCountdown
     )
 
     // ------------------------------------------------------------------ ponto
@@ -146,6 +148,111 @@ class HudWindowGeometryTest {
         val aberta = size(sources = listOf(estreita, larga), expanded = true)
 
         assertTrue(parada.width < aberta.width, "esperava ${parada.width} < ${aberta.width}")
+    }
+
+    // ------------------------------------------------------ coluna da contagem
+
+    /**
+     * A contagem até a próxima coleta (issue #185) é uma coluna a mais na linha,
+     * e a janela é medida pelo conteúdo: sem reservar a largura dela, o texto
+     * nasceria fora da janela.
+     */
+    @Test
+    fun `a coluna da contagem alarga a janela`() {
+        val sem = size(expanded = false)
+        val com = size(expanded = false, showsCountdown = true)
+
+        assertTrue(sem.width < com.width, "esperava ${sem.width} < ${com.width}")
+        assertEquals(sem.height, com.height)
+    }
+
+    /**
+     * **O caso que separa "uma coluna" de "uma por linha".** A primeira linha é a
+     * estreita e a segunda é larga o bastante para continuar mandando na largura
+     * mesmo depois de a primeira ganhar a contagem. Se a coluna entrasse em todas
+     * as linhas, a janela cresceria; entrando só na primeira, ela não muda.
+     */
+    @Test
+    fun `a coluna da contagem entra so na primeira linha`() {
+        val estreita = source("Ana", "Normal", AppTone.OK, "5h 1%" to AppTone.OK)
+        val larga = source(
+            "Uma conta com nome bem comprido", "Crítico", AppTone.CRITICAL,
+            "5h 92%" to AppTone.CRITICAL
+        )
+        val lista = listOf(estreita, larga)
+
+        val sem = size(sources = lista, showsCountdown = false)
+        val com = size(sources = lista, showsCountdown = true)
+
+        assertEquals(sem.width, com.width)
+    }
+
+    /** Aberta, a primeira linha continua sendo a que carrega a coluna. */
+    @Test
+    fun `aberta a contagem alarga quando a primeira linha e a mais larga`() {
+        val sem = size(showsCountdown = false)
+        val com = size(showsCountdown = true)
+
+        assertTrue(sem.width < com.width, "esperava ${sem.width} < ${com.width}")
+    }
+
+    /**
+     * Enquanto nada foi coletado, "quando é a próxima tentativa" é a informação
+     * mais útil que a barra tem — e a linha de carregamento é a primeira linha.
+     */
+    @Test
+    fun `a linha de carregamento tambem reserva a contagem`() {
+        val sem = size(sources = emptyList(), showsCountdown = false)
+        val com = size(sources = emptyList(), showsCountdown = true)
+
+        assertTrue(sem.width < com.width, "esperava ${sem.width} < ${com.width}")
+    }
+
+    /** Recolhida ao ponto não há texto nenhum, e portanto não há o que reservar. */
+    @Test
+    fun `recolhida ao ponto a contagem nao muda nada`() {
+        assertEquals(
+            size(dotOnly = true, showsCountdown = false),
+            size(dotOnly = true, showsCountdown = true)
+        )
+    }
+
+    /**
+     * **O caso que fez o teto subir de 420 para 484.** Medidas com as contas
+     * reais: `Anthropic — Padrão` pedia 356,9dp sem a contagem e 420,9dp com ela.
+     * Com o teto antigo, a coluna nova seria paga pelo nome — exatamente o que o
+     * salto anterior, de 320 para 420, existiu para evitar.
+     */
+    @Test
+    fun `uma conta de nome realista cabe com a contagem`() {
+        val realista = source(
+            "Anthropic — Padrão", "Atenção", AppTone.WARNING,
+            "5h 68%" to AppTone.WARNING,
+            "7d 41%" to AppTone.OK
+        )
+
+        val largura = size(sources = listOf(realista), showsCountdown = true).width
+
+        assertTrue(largura < HUD_PILL_MAX_WIDTH, "esperava $largura abaixo do teto")
+    }
+
+    /** O teto é do painel inteiro, e a coluna nova não o fura. */
+    @Test
+    fun `com a contagem o rotulo longo continua preso ao teto`() {
+        val longa = size(
+            sources = listOf(
+                source(
+                    "Anthropic — conta corporativa da empresa inteira e mais um pouco",
+                    "Crítico",
+                    AppTone.CRITICAL,
+                    "5h 92%" to AppTone.CRITICAL,
+                    "7d 88%" to AppTone.CRITICAL
+                )
+            ),
+            showsCountdown = true
+        )
+
+        assertEquals(HUD_PILL_MAX_WIDTH, longa.width)
     }
 
     // ----------------------------------------------------------------- altura
@@ -370,7 +477,10 @@ class HudWindowGeometryTest {
 
     @Test
     fun `os valores de contrato continuam onde estavam`() {
-        assertEquals(420.dp, HUD_PILL_MAX_WIDTH)
+        // 484 = o teto anterior (420) mais a largura da coluna da contagem. Este
+        // teste reprovou a mudança, que é o trabalho dele: o valor só se move com
+        // a razão escrita junto, e ela está em `HUD_PILL_MAX_WIDTH`.
+        assertEquals(484.dp, HUD_PILL_MAX_WIDTH)
         assertEquals(20.dp, HUD_SOURCE_ROW_HEIGHT)
     }
 }

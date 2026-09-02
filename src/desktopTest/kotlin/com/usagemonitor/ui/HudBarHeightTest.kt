@@ -16,6 +16,9 @@ import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.HudSourceStatus
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import kotlinx.datetime.Instant
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 
 /**
@@ -63,13 +66,15 @@ class HudBarHeightTest {
     private fun assertMeasuredHeightMatchesGeometry(
         sources: List<HudSourceStatus>,
         expanded: Boolean,
-        dotOnly: Boolean = false
+        dotOnly: Boolean = false,
+        showsCountdown: Boolean = false
     ) = runDesktopComposeUiTest {
         val expected = hudWindowSize(
             sources = sources,
             fallbackLabel = "Carregando",
             dotOnly = dotOnly,
-            expanded = expanded
+            expanded = expanded,
+            showsCountdown = showsCountdown
         ).height
 
         setContent {
@@ -83,6 +88,10 @@ class HudBarHeightTest {
                         fallbackLabel = "Carregando",
                         dotOnly = dotOnly,
                         expanded = expanded,
+                        nextRefreshAt = if (showsCountdown) NEXT_REFRESH_AT else null,
+                        countdownDescription = if (showsCountdown) "Próxima coleta" else null,
+                        nowProvider = { NOW },
+                        countdownUpdatesEnabled = false,
                         onOpenFull = {}
                     )
                 }
@@ -116,5 +125,43 @@ class HudBarHeightTest {
     @Test
     fun `a altura calculada bate com a composta recolhida ao ponto`() {
         assertMeasuredHeightMatchesGeometry(sources = sources, expanded = false, dotOnly = true)
+    }
+
+    /**
+     * A contagem da issue #185 entra na linha que já existe, então a altura não
+     * pode mudar — e é aqui que se afirma isso, não por leitura do código: as
+     * duas contas são independentes e já divergiram uma vez, quando o antigo
+     * rodapé fez a janela nascer 8dp mais curta que o conteúdo.
+     */
+    @Test
+    fun `a altura calculada bate com a composta com a contagem`() {
+        assertMeasuredHeightMatchesGeometry(
+            sources = sources,
+            expanded = false,
+            showsCountdown = true
+        )
+    }
+
+    @Test
+    fun `a altura calculada bate com a composta aberta com a contagem`() {
+        assertMeasuredHeightMatchesGeometry(
+            sources = sources,
+            expanded = true,
+            showsCountdown = true
+        )
+    }
+
+    @Test
+    fun `a altura calculada bate com a composta na linha de carregamento com a contagem`() {
+        assertMeasuredHeightMatchesGeometry(
+            sources = emptyList(),
+            expanded = true,
+            showsCountdown = true
+        )
+    }
+
+    private companion object {
+        val NOW: Instant = Instant.parse("2026-09-02T12:00:00Z")
+        val NEXT_REFRESH_AT: Instant = NOW + 2.minutes + 5.seconds
     }
 }

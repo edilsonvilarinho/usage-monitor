@@ -153,11 +153,7 @@ private fun FooterCompactStatusGroup(
 ) {
     val refreshLabel = formatRefreshCountdown(secondsUntilRefresh)
     val versionTooltip = if (language == AppLanguage.PT) "Versão do app" else "App version"
-    val refreshTooltip = if (language == AppLanguage.PT) {
-        "Próxima atualização automática"
-    } else {
-        "Next automatic refresh"
-    }
+    val refreshTooltip = nextRefreshLabel(language)
 
     FlowRow(
         modifier = modifier.fillMaxWidth(),
@@ -337,6 +333,22 @@ private fun FooterIconActionButton(
         ) {
             content()
         }
+    }
+}
+
+/**
+ * O que a contagem regressiva significa, por extenso.
+ *
+ * **Dono único da frase.** Ela é a tooltip do rodapé e a descrição semântica do
+ * ícone da barra HUD (issue #185): a mesma contagem, o mesmo texto. Escrita nos
+ * dois lugares, uma tradução corrigida num deles deixaria o outro para trás sem
+ * nada reclamar.
+ */
+internal fun nextRefreshLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) {
+        "Próxima atualização automática"
+    } else {
+        "Next automatic refresh"
     }
 }
 
