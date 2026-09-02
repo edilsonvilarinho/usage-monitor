@@ -131,12 +131,21 @@ class HudWindowGeometryTest {
         assertEquals(HUD_SOURCE_ROW_HEIGHT, tres.height - duas.height)
     }
 
+    /**
+     * O rodapé é um **bloco**, não uma linha solta: ele tem o mesmo padding
+     * vertical da lista. Contar só a divisória mais a linha deixava a janela 8dp
+     * mais curta que o conteúdo, e o texto do rodapé aparecia cortado ao meio na
+     * borda de baixo.
+     */
     @Test
-    fun `o rodape acrescenta uma linha e a divisoria`() {
+    fun `o rodape acrescenta divisoria, padding e linha`() {
         val semRodape = size()
         val comRodape = size(footerLabel = "2 sessões")
 
-        assertEquals(HUD_SOURCE_ROW_HEIGHT + 1.dp, comRodape.height - semRodape.height)
+        assertEquals(
+            1.dp + HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT,
+            comRodape.height - semRodape.height
+        )
     }
 
     /** Zero linhas dariam altura nula, que o usuário leria como o app ter sumido. */

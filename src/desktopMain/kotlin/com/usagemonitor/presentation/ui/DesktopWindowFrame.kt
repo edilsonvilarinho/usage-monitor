@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
@@ -80,6 +81,16 @@ internal const val COMPACT_EXIT_DESCRIPTION = "Sair do modo somente cards"
 
 /** Descrição semântica da faixa HUD inteira: é o único alvo de clique dela. */
 internal const val HUD_BAR_OPEN_DESCRIPTION = "Abrir Usage Monitor"
+
+/**
+ * O conteúdo do HUD, sem o preenchimento da janela.
+ *
+ * A raiz usa `fillMaxSize` para a superfície pintar a janela inteira, e por isso
+ * ela mede o que a cena der — inútil para conferir altura. Esta marca é do bloco
+ * que **envolve o conteúdo**, e é sobre ela que `HudBarHeightTest` compara o que
+ * o Compose mede com o que `hudWindowSize` calcula.
+ */
+internal const val HUD_CONTENT_TEST_TAG = "hudContent"
 
 /**
  * Altura da barra de título das seis janelas.
@@ -375,7 +386,8 @@ internal fun HudBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(AppChrome.hud)
-                    .padding(horizontal = HUD_PILL_DOT_ONLY_PADDING),
+                    .padding(horizontal = HUD_PILL_DOT_ONLY_PADDING)
+                    .testTag(HUD_CONTENT_TEST_TAG),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AppStatusDot(tone = statusTone)
@@ -383,6 +395,7 @@ internal fun HudBar(
             return@Column
         }
 
+        Column(modifier = Modifier.fillMaxWidth().testTag(HUD_CONTENT_TEST_TAG)) {
         Column(modifier = Modifier.padding(vertical = HUD_PANEL_VERTICAL_PADDING)) {
             if (sources.isEmpty()) {
                 HudPanelRow {
@@ -432,6 +445,7 @@ internal fun HudBar(
                     )
                 }
             }
+        }
         }
     }
 }

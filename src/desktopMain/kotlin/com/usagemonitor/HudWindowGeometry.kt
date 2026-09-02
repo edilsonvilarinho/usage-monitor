@@ -188,7 +188,12 @@ internal fun hudWindowSize(
     val rowCount = maxOf(sources.size, 1)
     var height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT * rowCount
     if (footerLabel != null) {
-        height += HUD_DIVIDER_HEIGHT + HUD_SOURCE_ROW_HEIGHT
+        // **O rodapé é um bloco, não uma linha solta.** Ele tem o mesmo padding
+        // vertical da lista, e contar só a divisória mais a linha deixava a
+        // janela 8dp mais curta que o conteúdo: o texto do rodapé aparecia
+        // cortado ao meio na borda de baixo. `HudBarHeightTest` compara esta
+        // conta com o que o Compose realmente mede, que é o teste que faltava.
+        height += HUD_DIVIDER_HEIGHT + HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT
     }
 
     return DpSize(width, height)
