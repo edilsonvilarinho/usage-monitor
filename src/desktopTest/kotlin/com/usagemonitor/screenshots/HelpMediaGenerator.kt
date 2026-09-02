@@ -39,6 +39,7 @@ import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.FooterBar
+import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -459,7 +460,15 @@ private fun recordWindowModes(outputDir: File) {
                                 onRefresh = {},
                                 onOpenSettings = {},
                                 nowProvider = { ScreenshotFixtures.NOW },
-                                countdownUpdatesEnabled = false
+                                countdownUpdatesEnabled = false,
+                                // O ícone que abre as três molduras (issue #187).
+                                // A demo é justamente a deste tópico: sem ele,
+                                // ela mostraria um rodapé que o app não tem mais.
+                                // O menu **aberto** fica de fora — ele é popup, e
+                                // o gravador compõe a cena offscreen, onde a
+                                // camada de popup não entra no quadro.
+                                windowMode = WindowMode.STANDARD,
+                                onWindowModeChange = {}
                             )
                         }
 
