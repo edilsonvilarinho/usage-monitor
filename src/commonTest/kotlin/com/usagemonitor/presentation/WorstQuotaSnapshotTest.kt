@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.viewmodel.allQuotaRisks
 import com.usagemonitor.presentation.viewmodel.allSourceRisks
 import com.usagemonitor.presentation.viewmodel.worstQuotaSnapshot
 import kotlinx.datetime.Instant
@@ -83,11 +84,19 @@ class WorstQuotaSnapshotTest {
     }
 
     private fun stats(source: ApiSource, target: UsageTargetKey, label: String): ApiUsageStats {
+        return statsWithQuotas(source, target, listOf(label))
+    }
+
+    private fun statsWithQuotas(
+        source: ApiSource,
+        target: UsageTargetKey,
+        labels: List<String>
+    ): ApiUsageStats {
         return ApiUsageStats(
             source = source,
             targetKey = target,
             apiName = source.name,
-            quotas = listOf(
+            quotas = labels.map { label ->
                 QuotaInfo(
                     label = label,
                     used = 10L,
@@ -96,7 +105,104 @@ class WorstQuotaSnapshotTest {
                     periodType = PeriodType.INTERVAL,
                     unit = UsageUnit.PERCENTAGE
                 )
+            }
+        )
+    }
+
+    // ------------------------------------------------------------ allQuotaRisks
+
+    /**
+     * O caso que abriu esta correção: uma conta com janela de 5h e de 7d
+     * aparecia no HUD com **uma** linha, e o outro limite não existia na tela.
+     */
+    @Test
+    fun `allQuotaRisks emits one entry per quota, not per source`() {
+        val stats = listOf(
+            statsWithQuotas(ApiSource.ANTHROPIC, ANTHROPIC_TARGET, listOf("Sessão 5h", "Sessão 7d"))
+        )
+        val riskSummaries = mapOf(
+            ANTHROPIC_TARGET to mapOf(
+                ANTHROPIC_QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.AT_RISK, NOW + 1.hours)
             )
         )
+
+        val entries = allQuotaRisks(stats, riskSummaries, NOW)
+
+        assertEquals(listOf("Sessão 5h", "Sessão 7d"), entries.map { it.quota.label })
+        assertEquals(1, allSourceRisks(stats, riskSummaries, NOW).size)
+    }
+
+    /**
+     * Sem projeção a linha continua saindo: o percentual é fato medido e não
+     * depende de previsão. Kilo e OpenCode nunca têm projeção, e com a regra do
+     * badge do card eles sumiriam do HUD inteiro.
+     */
+    @Test
+    fun `allQuotaRisks keeps quotas without a forecast`() {
+        val stats = listOf(stats(ApiSource.CODEX, CODEX_TARGET, "Codex 5h"))
+
+        val entries = allQuotaRisks(stats, emptyMap(), NOW)
+
+        assertEquals(1, entries.size)
+        assertNull(entries.single().risk)
+    }
+
+    /** "Sem projeção" vai depois de `ON_TRACK`: um normal conhecido informa mais. */
+    @Test
+    fun `allQuotaRisks sorts unknown forecasts last`() {
+        val stats = listOf(
+            stats(ApiSource.CODEX, CODEX_TARGET, "Codex 5h"),
+            stats(ApiSource.ANTHROPIC, ANTHROPIC_TARGET, "Sessão 5h")
+        )
+        val riskSummaries = mapOf(
+            ANTHROPIC_TARGET to mapOf(
+                ANTHROPIC_QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.ON_TRACK, NOW + 1.hours)
+            )
+        )
+
+        val entries = allQuotaRisks(stats, riskSummaries, NOW)
+
+        assertEquals(listOf("Sessão 5h", "Codex 5h"), entries.map { it.quota.label })
+    }
+
+    /** Cota vencida continua fora: o número seria o da janela anterior. */
+    @Test
+    fun `allQuotaRisks drops expired quotas`() {
+        val expired = ApiUsageStats(
+            source = ApiSource.ANTHROPIC,
+            targetKey = ANTHROPIC_TARGET,
+            apiName = ApiSource.ANTHROPIC.name,
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Sessão 5h",
+                    used = 10L,
+                    total = 100L,
+                    periodEndAt = NOW - 1.hours,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            )
+        )
+
+        assertEquals(emptyList(), allQuotaRisks(listOf(expired), emptyMap(), NOW))
+    }
+
+    /** Ordem total: empate de nível desempata por fonte e depois por cota. */
+    @Test
+    fun `allQuotaRisks orders by level then source then quota label`() {
+        val stats = listOf(
+            statsWithQuotas(ApiSource.ANTHROPIC, ANTHROPIC_TARGET, listOf("Sessão 7d", "Sessão 5h"))
+        )
+        val riskSummaries = mapOf(
+            ANTHROPIC_TARGET to mapOf(
+                ANTHROPIC_QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.WILL_EXCEED, NOW + 30.minutes)
+            )
+        )
+
+        val entries = allQuotaRisks(stats, riskSummaries, NOW)
+
+        // A de 5h tem projeção crítica e vem primeiro; a de 7d não tem e cai
+        // para o fim, mesmo tendo sido declarada antes.
+        assertEquals(listOf("Sessão 5h", "Sessão 7d"), entries.map { it.quota.label })
     }
 }

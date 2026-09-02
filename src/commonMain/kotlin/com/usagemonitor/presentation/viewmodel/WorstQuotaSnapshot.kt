@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.worstQuotaRisk
 import kotlinx.datetime.Instant
@@ -57,4 +58,56 @@ internal fun worstQuotaSnapshot(
     now: Instant
 ): WorstQuotaSnapshot? {
     return allSourceRisks(stats, riskSummaries, now).firstOrNull()
+}
+
+/**
+ * Uma cota de uma fonte, com a projeção dela quando existe — para a barra HUD
+ * (issue #164) listar **todos os limites**, não um por fonte.
+ *
+ * [allSourceRisks] devolve a pior cota de cada fonte, e era o que o HUD
+ * mostrava: uma conta Anthropic com janela de 5h e de 7d aparecia com uma linha
+ * só, e o outro limite não existia na tela. Quem usa pediu os dois.
+ *
+ * **`risk` é nulo quando não há projeção**, e a linha continua saindo: o
+ * percentual é fato medido e não depende de previsão nenhuma. É a diferença
+ * para o badge do card, que some sem projeção — lá a pergunta é "qual o
+ * estado", aqui é "quanto já foi". Kilo e OpenCode nunca têm projeção
+ * (`currentSegment` vê um ponto por segmento e devolve `InsufficientData`), e
+ * com a regra do badge eles sumiriam do HUD inteiro.
+ *
+ * **Cota vencida continua fora**, como em [allSourceRisks]: o número na tela
+ * seria o da janela anterior.
+ */
+internal data class HudQuotaEntry(
+    val stats: ApiUsageStats,
+    val quota: QuotaInfo,
+    val risk: QuotaRiskSummary?
+)
+
+/**
+ * Todas as cotas de todas as fontes, pior primeiro.
+ *
+ * Ordem total e determinística — nível desc. com "sem projeção" por último,
+ * depois nome da fonte, depois rótulo da cota. Duas leituras iguais têm de
+ * produzir a mesma lista, ou o `StateFlow` reemite e a janela redimensiona à
+ * toa. "Sem projeção" vai **depois** de `ON_TRACK`: um normal conhecido informa
+ * mais que um desconhecido.
+ */
+internal fun allQuotaRisks(
+    stats: List<ApiUsageStats>,
+    riskSummaries: Map<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>,
+    now: Instant
+): List<HudQuotaEntry> {
+    return stats
+        .flatMap { entry ->
+            val riskByQuota = riskSummaries[entry.targetKey].orEmpty()
+            entry.quotas
+                .filterNot { quota -> quota.isExpiredAt(now) }
+                .map { quota -> HudQuotaEntry(entry, quota, riskByQuota[quota.seriesKey]) }
+        }
+        .sortedWith(
+            compareByDescending<HudQuotaEntry> { entry -> entry.risk?.level?.ordinal ?: -1 }
+                .thenBy { entry -> entry.stats.apiName }
+                .thenBy { entry -> entry.quota.label }
+        )
 }

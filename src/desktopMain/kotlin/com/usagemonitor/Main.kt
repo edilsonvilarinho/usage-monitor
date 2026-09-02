@@ -1666,33 +1666,41 @@ private fun runUsageMonitor(
         // Vem **antes** da geometria logo abaixo, e não junto da composição da
         // pílula: é destes rótulos que sai a largura da janela, e a janela é
         // dimensionada antes de existir composição para medir.
-        val hudSourceLabelOf = { stats: ApiUsageStats ->
-            stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName
-        }
         val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
         val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
         val hudFallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
-        // **Uma linha por fonte, não só a que perde.** Mostrar apenas a pior era
-        // a queixa que abriu esta passada: com várias contas, as outras não
-        // tinham sinal nenhum de que existiam. `compactPercentageLabel` e
-        // `resetShortLabel` são os formatos que o card já usa — o segundo é o
-        // primeiro recortado, e nenhum dos dois é formato de data novo.
+        // **Uma linha por cota, não por fonte.** A versão anterior mostrava a pior
+        // cota de cada fonte, e uma conta Anthropic com janela de 5h e de 7d
+        // aparecia com uma linha só — o outro limite não existia na tela.
+        // `compactPercentageLabel` e `resetShortLabel` são os formatos que o card
+        // já usa, e nenhum dos dois é formato de data novo.
         val hudNow = Clock.System.now()
-        val hudSourceRisks by usageAlertViewModel.sourceRisks.collectAsState()
-        val hudSources = hudSourceRisks.map { snapshot ->
+        val hudQuotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
+        val hudNoForecastLabel = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
+        val hudSources = hudQuotaRisks.map { entry ->
             HudSourceStatus(
-                label = hudSourceLabelOf(snapshot.stats),
-                statusLabel = riskLevelLabel(snapshot.risk.level, language),
-                tone = toneFor(snapshot.risk.level),
-                percentLabel = compactPercentageLabel(snapshot.quota),
-                resetLabel = resetShortLabel(snapshot.quota, language, hudNow)
+                // O rótulo da cota já diz o fornecedor ("Claude 5h"), então
+                // repetir "Anthropic" ao lado gastaria a largura que o nome da
+                // conta precisa. Sem perfil, a fonte identifica sozinha.
+                label = "${entry.stats.profileLabel ?: entry.stats.apiName} · ${entry.quota.label}",
+                // Sem projeção a linha continua saindo, com ponto neutro e a
+                // palavra dizendo isso: o percentual é fato medido e não depende
+                // de previsão. É a diferença para o badge do card, que some sem
+                // projeção — lá a pergunta é "qual o estado", aqui é "quanto já
+                // foi".
+                statusLabel = entry.risk?.let { risk -> riskLevelLabel(risk.level, language) }
+                    ?: hudNoForecastLabel,
+                tone = entry.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
+                percentLabel = compactPercentageLabel(entry.quota),
+                resetLabel = resetShortLabel(entry.quota, language, hudNow)
             )
         }
         // Nada em risco: o painel recolhe ao ponto e devolve a tela. Lista vazia
         // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
-        // que está tudo bem antes de saber.
-        val hudDotOnly = hudSourceRisks.isNotEmpty() &&
-            hudSourceRisks.all { snapshot -> snapshot.risk.level == UsageRiskLevel.ON_TRACK }
+        // que está tudo bem antes de saber. Cota sem projeção também não recolhe:
+        // "está tudo bem" seria uma garantia que ninguém deu.
+        val hudDotOnly = hudQuotaRisks.isNotEmpty() &&
+            hudQuotaRisks.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
         // `null` antes da primeira leitura: o rodapé não é composto e a janela
         // não reserva altura para uma linha que ainda não tem o que dizer.
         val hudFooterLabel = hudSessionSummary?.let { summary ->

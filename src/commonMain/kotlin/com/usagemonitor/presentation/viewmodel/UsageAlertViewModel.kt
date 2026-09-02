@@ -91,6 +91,15 @@ class UsageAlertViewModel(
      */
     internal val sourceRisks: StateFlow<List<WorstQuotaSnapshot>> = _sourceRisks.asStateFlow()
 
+    private val _quotaRisks = MutableStateFlow<List<HudQuotaEntry>>(emptyList())
+
+    /**
+     * **Todas** as cotas de todas as fontes, pior primeiro — uma linha por
+     * limite, e não por fonte. Uma conta Anthropic com janela de 5h e de 7d
+     * aparecia no HUD com uma linha só, e o outro limite não existia na tela.
+     */
+    internal val quotaRisks: StateFlow<List<HudQuotaEntry>> = _quotaRisks.asStateFlow()
+
     private var state = UsageAlertState.EMPTY
 
     /** `Triple` não comporta a quarta fonte, e um `Pair` de `Pair` não se lê. */
@@ -156,6 +165,11 @@ class UsageAlertViewModel(
         )
         _sourceRisks.value = sourceRisks
         _worstSnapshot.value = sourceRisks.firstOrNull()
+        _quotaRisks.value = allQuotaRisks(
+            stats = success?.data.orEmpty(),
+            riskSummaries = success?.riskSummaries.orEmpty(),
+            now = now
+        )
         val evaluation = evaluateUsageAlerts(
             stats = success?.data.orEmpty(),
             sessionPulse = pulses.values.mergeSessionPulses(),
