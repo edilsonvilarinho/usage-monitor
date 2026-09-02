@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
@@ -131,6 +132,7 @@ import com.usagemonitor.presentation.ui.BugReportHost
 import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.HudSourceStatus
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -155,11 +157,11 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.components.resetLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AppChrome
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
@@ -1624,10 +1626,46 @@ private fun runUsageMonitor(
                 )
             }
         }
+        // Barra HUD (issue #164): a mesma fonte que já move o ícone da bandeja
+        // (UsageAlertViewModel.worstRisk), só que com a cota vencedora e não
+        // apenas o nível — é o que deixa a pílula dizer qual fonte e quando ela
+        // reseta. `resetLabel` é a mesma função que o cabeçalho expandido do
+        // card usa: nenhum formato de data novo.
+        //
+        // Vem **antes** da geometria logo abaixo, e não junto da composição da
+        // pílula: é destes rótulos que sai a largura da janela, e a janela é
+        // dimensionada antes de existir composição para medir.
+        val hudSourceLabelOf = { stats: ApiUsageStats ->
+            stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName
+        }
+        val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
+        val hudStatusLabel = hudSnapshot?.let { snapshot -> riskLevelLabel(snapshot.risk.level, language) }
+            ?: if (language == AppLanguage.PT) "Carregando" else "Loading"
+        val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
+        val hudSourceLabel = hudSnapshot?.stats?.let(hudSourceLabelOf)
+        val hudResetLabel = hudSnapshot?.let { snapshot -> resetLabel(snapshot.quota, language, Clock.System.now()) }
+        // A pílula mostra só a fonte que perde; o hover lista todas — pedido de
+        // quem tem várias contas/fontes e não quer abrir a janela completa só
+        // para saber se as outras também estão em risco (issue #164, achado
+        // testando ao vivo).
+        val hudSourceRisks by usageAlertViewModel.sourceRisks.collectAsState()
+        val hudSources = hudSourceRisks.map { snapshot ->
+            HudSourceStatus(
+                label = hudSourceLabelOf(snapshot.stats),
+                statusLabel = riskLevelLabel(snapshot.risk.level, language),
+                tone = toneFor(snapshot.risk.level)
+            )
+        }
+        val hudPillWidthDp = hudPillWidth(
+            statusLabel = hudStatusLabel,
+            sourceLabel = hudSourceLabel,
+            resetLabel = hudResetLabel
+        )
+        val hudPanelWidthDp = hudPanelWidth(hudSources)
         // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
-        // faixa de 24dp — a janela ficaria presa no tamanho antigo por baixo
-        // do que `mainWindowState.size` pede. Precisa vir **antes** do efeito
-        // que redimensiona logo abaixo: os dois reagem a `hudMode` na mesma
+        // pílula — a janela ficaria presa no tamanho antigo por baixo do que
+        // `mainWindowState.size` pede. Precisa vir **antes** do efeito que
+        // redimensiona logo abaixo: os dois reagem a `hudMode` na mesma
         // recomposição, e é a ordem textual aqui dentro que decide qual
         // aplica primeiro.
         ApplyWindowMinimumSize(
@@ -1637,14 +1675,50 @@ private fun runUsageMonitor(
             uiScalePercent = uiScalePercent,
             workArea = screenWorkArea
         )
-        // Geometria da pílula HUD: encolhe a janela principal para o canto
-        // superior direito da tela ao entrar, restaura tamanho/posição/estado
-        // de antes ao sair. O snapshot mora aqui, e não em `MainWindowSnapshot`
-        // (que não carrega posição — a janela normal nunca precisou dela): só
-        // esta transição precisa saber "de onde veio" para voltar.
+        // Geometria da pílula HUD: encolhe a janela principal ao entrar,
+        // restaura tamanho/posição/estado de antes ao sair. O snapshot mora
+        // aqui, e não em `MainWindowSnapshot` (que não carrega posição — a
+        // janela normal nunca precisou dela): só esta transição precisa saber
+        // "de onde veio" para voltar.
         var preHudWindowGeometry by remember {
             mutableStateOf<Triple<DpSize, WindowPosition, WindowPlacement>?>(null)
         }
+        // O canto da pílula **colapsada**, que é a âncora de tudo: expandir e
+        // colapsar recalculam a janela a partir dele, e não da posição corrente
+        // — senão cada expansão que cresce para cima deslocaria a âncora, e a
+        // pílula subiria a cada passagem do mouse.
+        var hudAnchor by remember { mutableStateOf<DpOffset?>(null) }
+        var hudHovered by remember { mutableStateOf(false) }
+        var hudExpanded by remember { mutableStateOf(false) }
+
+        // Expandir é imediato; colapsar espera uma passada de `AppMotion.fast`.
+        // Sem a espera, o ponteiro que cruza a divisória entre a pílula e a
+        // lista pode gerar um `Exit` de um quadro, e a janela encolheria debaixo
+        // dele. Não é animação: é um atraso único, e animação infinita travaria
+        // o `waitForIdle` dos testes de componente.
+        LaunchedEffect(hudHovered) {
+            if (hudHovered) {
+                hudExpanded = true
+            } else {
+                delay(AppMotion.fast.toLong())
+                hudExpanded = false
+            }
+        }
+
+        val hudScale = uiScaleFactor(uiScalePercent)
+        val hudCollapsedSize = hudWindowSize(
+            pillWidth = hudPillWidthDp,
+            panelWidth = hudPanelWidthDp,
+            sourceCount = hudSources.size,
+            expanded = false
+        ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
+        val hudTargetSize = hudWindowSize(
+            pillWidth = hudPillWidthDp,
+            panelWidth = hudPanelWidthDp,
+            sourceCount = hudSources.size,
+            expanded = hudExpanded
+        ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
+
         LaunchedEffect(hudMode) {
             if (hudMode) {
                 preHudWindowGeometry = Triple(
@@ -1653,19 +1727,20 @@ private fun runUsageMonitor(
                     mainWindowState.placement
                 )
                 mainWindowState.placement = WindowPlacement.Floating
-                val hudWidth = HUD_PILL_MAX_WIDTH * uiScaleFactor(uiScalePercent)
-                val hudSize = DpSize(hudWidth, AppChrome.hud)
-                mainWindowState.size = hudSize
                 // Canto superior direito: `fitWindowPosition` prende dentro da
                 // área útil, para um monitor mais estreito que a pílula não
                 // jogar o canto esquerdo dela para fora da tela.
-                mainWindowState.position = fitWindowPosition(
-                    x = screenWorkArea.x + screenWorkArea.size.width - hudWidth,
+                val entryPosition = fitWindowPosition(
+                    x = screenWorkArea.x + screenWorkArea.size.width - hudCollapsedSize.width,
                     y = screenWorkArea.y,
-                    size = hudSize,
+                    size = hudCollapsedSize,
                     workArea = screenWorkArea
                 )
+                hudAnchor = DpOffset(entryPosition.x, entryPosition.y)
             } else {
+                hudHovered = false
+                hudExpanded = false
+                hudAnchor = null
                 preHudWindowGeometry?.let { (size, position, placement) ->
                     mainWindowState.size = size
                     mainWindowState.position = position
@@ -1673,6 +1748,25 @@ private fun runUsageMonitor(
                 }
                 preHudWindowGeometry = null
             }
+        }
+        // A janela HUD muda de tamanho de verdade a cada hover — não é overlay
+        // como o modo somente cards. Era isso ou um `Popup`, e popup no Compose
+        // Desktop é camada dentro da janela: numa faixa de 24dp ele saía
+        // recortado sobre o próprio alvo e a tooltip piscava.
+        LaunchedEffect(hudMode, hudAnchor, hudTargetSize, hudCollapsedSize) {
+            val anchor = hudAnchor
+            if (!hudMode || anchor == null) {
+                return@LaunchedEffect
+            }
+
+            mainWindowState.size = hudTargetSize
+            mainWindowState.position = hudExpandedPosition(
+                collapsedX = anchor.x,
+                collapsedY = anchor.y,
+                collapsedSize = hudCollapsedSize,
+                expandedSize = hudTargetSize,
+                workArea = screenWorkArea
+            )
         }
         // O ACK sai daqui e nao do topo do `main()`: ele afirma que esta versao
         // subiu inteira, e o unico ponto em que isso e verdade e depois de o
@@ -1690,32 +1784,6 @@ private fun runUsageMonitor(
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
-        // Barra HUD (issue #164): a mesma fonte que já move o ícone da bandeja
-        // (UsageAlertViewModel.worstRisk), só que com a cota vencedora e não
-        // apenas o nível — é o que deixa a faixa dizer qual fonte e quando ela
-        // reseta. `resetLabel` é a mesma função que o cabeçalho expandido do
-        // card usa: nenhum formato de data novo.
-        val hudSourceLabelOf = { stats: ApiUsageStats ->
-            stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName
-        }
-        val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
-        val hudStatusLabel = hudSnapshot?.let { snapshot -> riskLevelLabel(snapshot.risk.level, language) }
-            ?: if (language == AppLanguage.PT) "Carregando" else "Loading"
-        val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
-        val hudSourceLabel = hudSnapshot?.stats?.let(hudSourceLabelOf)
-        val hudResetLabel = hudSnapshot?.let { snapshot -> resetLabel(snapshot.quota, language, Clock.System.now()) }
-        // A faixa mostra só a fonte que perde; o hover lista todas — pedido de
-        // quem tem várias contas/fontes e não quer abrir a janela completa só
-        // para saber se as outras também estão em risco (issue #164, achado
-        // testando ao vivo).
-        val hudSourceRisks by usageAlertViewModel.sourceRisks.collectAsState()
-        val hudTooltipMetrics = hudSourceRisks.map { snapshot ->
-            TooltipMetric(
-                label = hudSourceLabelOf(snapshot.stats),
-                value = riskLevelLabel(snapshot.risk.level, language)
-            )
-        }
-        val hudTooltipTitle = if (language == AppLanguage.PT) "Todas as fontes" else "All sources"
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopWindowFrame(
                 title = "Usage Monitor",
@@ -1733,8 +1801,9 @@ private fun runUsageMonitor(
                         statusTone = hudStatusTone,
                         sourceLabel = hudSourceLabel,
                         resetLabel = hudResetLabel,
-                        tooltipTitle = hudTooltipTitle,
-                        tooltipMetrics = hudTooltipMetrics,
+                        sources = hudSources,
+                        expanded = hudExpanded,
+                        onHoverChange = { hovered -> hudHovered = hovered },
                         onOpenFull = { setHudMode(false) }
                     )
                 }

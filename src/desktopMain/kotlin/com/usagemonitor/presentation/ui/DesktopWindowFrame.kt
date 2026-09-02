@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -51,11 +50,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
+import com.usagemonitor.HUD_PANEL_VERTICAL_PADDING
+import com.usagemonitor.HUD_PILL_PADDING
+import com.usagemonitor.HUD_SOURCE_ROW_HEIGHT
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.components.HoverTooltipBox
-import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -258,31 +258,29 @@ internal data class HudSourceStatus(
  * Conteúdo da barra HUD (issue #164): o pior risco entre todas as cotas, a
  * fonte que o determinou e o tempo até o reset.
  *
- * **Sem [WindowScope], sem `WindowDraggableArea`.** Decisão já tomada: a
- * barra HUD não arrasta a janela — não há cards para reordenar nesta faixa,
- * então o argumento que mantém a área de arrasto fora de
- * [CompactTitleBarOverlay] não se aplica aqui, mas o oposto (arrasto sempre
- * presente) também não tem função a proteger. Ancoragem é geometria de
- * `Main.kt`, não gesto do usuário.
+ * **A lista de fontes é conteúdo da janela, não `Popup`.** Ela saía por
+ * `HoverTooltipBox` → `TooltipBox` → `Popup`, e popup no Compose Desktop é
+ * camada **dentro** da janela (`compose.layers.type` não está definido neste
+ * projeto, e o default recorta pelos limites): numa janela de 24dp, um balão
+ * com piso de 180dp de largura e uma linha por fonte não cabe — ele era
+ * recortado sobre o próprio alvo, o ponteiro passava a estar sobre o balão, a
+ * faixa recebia `Exit` e a tooltip fechava, para reabrir no quadro seguinte.
+ * Quem cresce agora é a janela, e sem popup não há laço.
  *
- * **A faixa inteira é o alvo de clique** que devolve a janela completa — não
- * há botão próprio, e por isso a semântica vai no container inteiro, não só
- * em `onClickLabel` (armadilha nº2 do design system: sem
- * `Modifier.semantics { contentDescription = ... }`, `onNodeWithContentDescription`
- * não encontra o nó).
+ * **O hover mora no container inteiro, não na pílula.** Preso aos 24dp de
+ * cima, mover o ponteiro para dentro da lista tiraria o hover, a janela
+ * colapsaria e o ponteiro voltaria à pílula — o mesmo laço com outro nome.
  *
- * **Largura de quem chama, não fixa aqui.** `Main.kt` ancora a janela como
- * uma pílula de largura fixa no canto da tela (não mais a tela inteira —
- * cobria controles de outras janelas na mesma faixa); `HudBar` só sabe
- * preencher o que recebe, e por isso `sourceLabel`/`resetLabel` truncam com
- * reticências em vez de estourar o container.
+ * **A pílula é o alvo de clique** que devolve a janela completa — não há botão
+ * próprio, e por isso a semântica vai no container dela, não só em
+ * `onClickLabel` (armadilha nº2 do design system: sem
+ * `Modifier.semantics { contentDescription = ... }`,
+ * `onNodeWithContentDescription` não encontra o nó).
  *
- * **O hover lista todas as fontes, não só a vencedora.** A faixa mostra uma
- * única fonte (a pior); com várias contas/fontes monitoradas, as outras
- * ficavam sem nenhum sinal de que existiam fora de abrir a janela completa —
- * achado pedido depois de ver a faixa ao vivo. `tooltipMetrics` é
- * `allSourceRisks` já formatado, mesmo padrão do `HoverTooltipBox` que a
- * cota de cada card já usa.
+ * **Largura de quem chama, não fixa aqui.** `Main.kt` dimensiona a janela pelo
+ * conteúdo (`hudPillWidth`); `HudBar` só sabe preencher o que recebe, e por
+ * isso `sourceLabel`/`resetLabel` truncam com reticências em vez de estourar o
+ * container.
  */
 @Composable
 internal fun HudBar(
@@ -290,25 +288,34 @@ internal fun HudBar(
     statusTone: AppTone,
     sourceLabel: String?,
     resetLabel: String?,
-    /** `null` esconde o título do hover; sem métricas, o hover não abre nada. */
-    tooltipTitle: String? = null,
-    tooltipMetrics: List<TooltipMetric> = emptyList(),
+    /** Todas as fontes, pior primeiro. Vazia, o painel não é composto. */
+    sources: List<HudSourceStatus> = emptyList(),
+    /** Quem decide é `Main.kt`, que é quem redimensiona a janela de verdade. */
+    expanded: Boolean = false,
+    onHoverChange: (Boolean) -> Unit = {},
     onOpenFull: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    HoverTooltipBox(
-        metrics = tooltipMetrics,
-        title = tooltipTitle,
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
+
+    LaunchedEffect(isHovered) {
+        onHoverChange(isHovered)
+    }
+
+    Column(
         modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .hoverable(hoverInteraction)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(AppChrome.hud)
-                .background(MaterialTheme.colorScheme.surface)
                 .clickable(onClickLabel = HUD_BAR_OPEN_DESCRIPTION, onClick = onOpenFull)
                 .semantics { contentDescription = HUD_BAR_OPEN_DESCRIPTION }
-                .padding(horizontal = AppSpacing.md),
+                .padding(horizontal = HUD_PILL_PADDING),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
         ) {
@@ -335,6 +342,52 @@ internal fun HudBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+        }
+
+        if (expanded && sources.isNotEmpty()) {
+            AppDivider()
+            HudSourcePanel(sources = sources)
+        }
+    }
+}
+
+/**
+ * A lista de fontes abaixo da pílula.
+ *
+ * **A linha não é `AppDataRow`**: aquela primitiva tem piso de 32dp mais 8dp de
+ * padding vertical, e seis fontes dariam um painel de ~288dp — uma janela, não
+ * um HUD. É a mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp
+ * do cromo, e pela mesma razão: aqui não há alvo de clique nem célula de tabela,
+ * só o rótulo da fonte e o estado dela.
+ */
+@Composable
+private fun HudSourcePanel(sources: List<HudSourceStatus>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal = HUD_PILL_PADDING,
+                vertical = HUD_PANEL_VERTICAL_PADDING
+            )
+    ) {
+        sources.forEach { source ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(HUD_SOURCE_ROW_HEIGHT),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
+            ) {
+                Text(
+                    text = source.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                AppStatusIndicator(label = source.statusLabel, tone = source.tone)
             }
         }
     }

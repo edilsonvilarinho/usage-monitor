@@ -72,3 +72,4 @@ cota"): popup que cobre o próprio alvo é defeito já conhecido deste app.
 |---|---|---|---|
 | A1 | Geometria pura: largura por conteúdo, altura do painel, encaixe e canto de expansão | `gradlew.bat desktopTest --tests "com.usagemonitor.HudWindowGeometryTest"` | `BUILD SUCCESSFUL`, 23 testes |
 | A2 | Posição da pílula persistida em `PreferencesSettings` | `gradlew.bat desktopTest --tests "com.usagemonitor.HudWindowPreferencesTest"` | `BUILD SUCCESSFUL`, 6 testes |
+| A3 | O hover cresce a janela; o `Popup` sai do HUD | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1799 testes (11 em `DesktopWindowFrameTest`, 4 novos) |

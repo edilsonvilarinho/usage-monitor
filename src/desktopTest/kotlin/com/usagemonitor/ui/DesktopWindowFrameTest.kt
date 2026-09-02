@@ -4,20 +4,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.COMPACT_EXIT_DESCRIPTION
 import com.usagemonitor.presentation.ui.HUD_BAR_OPEN_DESCRIPTION
 import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.HudSourceStatus
 import com.usagemonitor.presentation.ui.TitleBarButton
 import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.components.TooltipMetric
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
@@ -37,6 +39,12 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalTestApi::class)
 class DesktopWindowFrameTest {
+
+    private val sources = listOf(
+        HudSourceStatus(label = "Anthropic · Padrão", statusLabel = "Crítico", tone = AppTone.CRITICAL),
+        HudSourceStatus(label = "Anthropic · Empresa", statusLabel = "Atenção", tone = AppTone.WARNING),
+        HudSourceStatus(label = "OpenCode Go", statusLabel = "Normal", tone = AppTone.OK)
+    )
 
     /**
      * O botão preenche a altura da barra menos a divisória de 1dp.
@@ -149,12 +157,11 @@ class DesktopWindowFrameTest {
     }
 
     /**
-     * O hover lista as outras fontes (issue #164); a faixa não pode parar de
-     * despachar o clique só por carregar `tooltipMetrics`.
+     * Colapsada, a pílula mostra uma fonte só — a que perde. Carregar a lista
+     * não pode desenhá-la: é o hover que a revela, crescendo a janela.
      */
     @Test
-    fun `a barra HUD com metricas de tooltip continua clicavel`() = runDesktopComposeUiTest {
-        var clicks = 0
+    fun `a barra HUD colapsada nao desenha as outras fontes`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(400.dp).height(120.dp)) {
@@ -163,20 +170,100 @@ class DesktopWindowFrameTest {
                         statusTone = AppTone.CRITICAL,
                         sourceLabel = "Anthropic · Padrão",
                         resetLabel = "reset em 42min",
-                        tooltipTitle = "Todas as fontes",
-                        tooltipMetrics = listOf(
-                            TooltipMetric(label = "Anthropic · Padrão", value = "Crítico"),
-                            TooltipMetric(label = "Codex", value = "Normal")
-                        ),
-                        onOpenFull = { clicks += 1 }
+                        sources = sources,
+                        expanded = false,
+                        onOpenFull = {}
                     )
                 }
             }
         }
 
-        onNodeWithText("Crítico").assertIsDisplayed()
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
-        assertEquals(1, clicks)
+        onNodeWithText("Anthropic · Padrão").assertIsDisplayed()
+        onNodeWithText("OpenCode Go").assertDoesNotExist()
+    }
+
+    /**
+     * A lista de fontes é conteúdo da janela, não `Popup`: o balão do Material
+     * é camada **dentro** da janela e numa faixa de 24dp saía recortado sobre o
+     * próprio alvo, com o hover piscando entre abrir e fechar.
+     */
+    @Test
+    fun `a barra HUD expandida lista todas as fontes`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(200.dp)) {
+                    HudBar(
+                        statusLabel = "Crítico",
+                        statusTone = AppTone.CRITICAL,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 42min",
+                        sources = sources,
+                        expanded = true,
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Anthropic · Empresa").assertIsDisplayed()
+        onNodeWithText("OpenCode Go").assertIsDisplayed()
+    }
+
+    /** Sem fonte nenhuma não há painel: expandir não desenha divisória solta. */
+    @Test
+    fun `a barra HUD expandida sem fontes nao desenha painel`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(200.dp)) {
+                    HudBar(
+                        statusLabel = "Carregando",
+                        statusTone = AppTone.NEUTRAL,
+                        sourceLabel = null,
+                        resetLabel = null,
+                        sources = emptyList(),
+                        expanded = true,
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Carregando").assertIsDisplayed()
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION)
+            .assertHeightIsEqualTo(AppChrome.hud)
+    }
+
+    /**
+     * É `onHoverChange` que faz `Main.kt` crescer a janela. Sem esta fiação o
+     * painel existe e nunca aparece — e o teste da lista acima passaria mesmo
+     * assim, porque ele injeta `expanded` direto.
+     */
+    @Test
+    fun `a barra HUD avisa quando o ponteiro entra e sai`() = runDesktopComposeUiTest {
+        val reported = mutableListOf<Boolean>()
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(200.dp)) {
+                    HudBar(
+                        statusLabel = "Crítico",
+                        statusTone = AppTone.CRITICAL,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 42min",
+                        sources = sources,
+                        onHoverChange = { hovered -> reported += hovered },
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(true, reported.last())
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput { exit(Offset(-1f, -1f)) }
+        waitForIdle()
+        assertEquals(false, reported.last())
     }
 
     /** Estado de carregamento: fonte e reset ainda não chegaram. */
