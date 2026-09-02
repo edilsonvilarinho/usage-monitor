@@ -1,9 +1,10 @@
-One line at rest; one 20dp row per monitored quota on hover.
+One 20dp row per account: dot and word for its worst quota, then one dot per quota.
 
 ```jsx
-<AppHudBar topLine={{ statusLabel: 'Crítico', level: 'crit', label: 'Padrão', quotaSummary: '5h 88% · 7d 9%' }} />
+<AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
+  quotas: [{ text: '5h 28%', level: 'ok' }, { text: '7d 9%', level: 'crit' }] }]} />
 <AppHudBar level="ok" dotOnly />
-<AppHudBar topLine={TOP} sources={QUOTAS} expanded />
+<AppHudBar sources={ACCOUNTS} expanded />
 ```
 
 Not a new risk primitive — the dot+word is `AppStatusIndicator`, and the collapsed state reuses
@@ -18,14 +19,23 @@ trigger got an `Exit`, and it closed and reopened every frame. (3) The list with
 all: quota is the provider's ceiling, and what the machine spent appeared nowhere. (4) One line per
 *source*, carrying that source's worst quota: an account with both a 5h and a 7d window still showed
 a single limit. (5) One row per *quota* plus a spend footer, always visible: ten rows on screen to
-say what fits in one. What stuck joins the two halves that were right — the summary fits one line,
-the detail is one mouse movement away. Each correction came from using it; none was anticipated.
+say what fits in one. (6) One row per quota on hover: the account with a 5h and a 7d window took two
+consecutive rows repeating its own name. What stuck is one row per **account**, with one dot per
+quota. Each correction came from using it; none was anticipated.
 
-**At rest the row is a summary, not the first list row.** It carries the source once and then every
-quota percentage of that source (`5h 88% · 7d 9%`), using the quota label's **last word**: the row
-shows a single source, so the prefix that tells providers apart is already said by the account name
-beside it. The word and tone come from that source's *worst* quota — showing "Normal" with the 7d
-window blown would be a lie.
+**The per-quota dot without a word has an exact precedent — it is the card's own design.** There a
+dot marks each quota and one header badge carries dot *and* word for the worst; here the row's word
+plays that badge's part. Color never states anything the row has not already said in writing, and
+the word comes from the account's **worst** quota: showing "Normal" with the 7d window blown would
+be a lie.
+
+**The window grows interpolated, not in one jump.** Opening the list swapped 24dp for 100dp in a
+single frame and read as the bar flickering in size. One pass of the system's normal motion with the
+entry easing — a single transition, never a loop, because an endless animation stalls the component
+tests' idle wait. Dragging does **not** animate: the bar would trail behind the pointer.
+
+**The chip text uses the quota label's last word** (`Claude 5h` → `5h`): the row already names the
+account, so the prefix that tells providers apart is said once, not per quota.
 
 **The order is the user's card order, never the risk order.** With risk deciding, the resting line
 changed account on its own and you never knew in advance who was on it.

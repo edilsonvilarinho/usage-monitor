@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.hudQuotaShortLabel
-import com.usagemonitor.presentation.ui.components.hudQuotaSummary
+import com.usagemonitor.presentation.ui.components.hudQuotaChipText
 import com.usagemonitor.presentation.ui.orderedByCardOrder
 import kotlinx.datetime.Instant
 import kotlin.test.Test
@@ -47,34 +47,22 @@ class HudTopLineFormattingTest {
         assertEquals("Créditos", hudQuotaShortLabel("Créditos"))
     }
 
-    // ------------------------------------------------------------------ resumo
+    // -------------------------------------------------------------------- chip
 
     /**
      * Com um número só, quem olha não sabe qual janela está vendo — foi o que
-     * faltava na linha parada.
+     * faltava na linha da conta.
      */
     @Test
-    fun `o resumo mostra 5h e 7d lado a lado`() {
-        val summary = hudQuotaSummary(listOf(quota("Claude 5h", 88), quota("Claude 7d", 9)))
-
-        assertEquals("5h 88% · 7d 9%", summary)
+    fun `o chip junta rotulo curto e percentual`() {
+        assertEquals("5h 88%", hudQuotaChipText(quota("Claude 5h", 88)))
+        assertEquals("7d 9%", hudQuotaChipText(quota("Claude 7d", 9)))
     }
 
     @Test
-    fun `o resumo respeita a ordem das cotas`() {
-        val summary = hudQuotaSummary(listOf(quota("Claude 7d", 9), quota("Claude 5h", 88)))
-
-        assertEquals("7d 9% · 5h 88%", summary)
-    }
-
-    @Test
-    fun `uma cota so rende um par`() {
-        assertEquals("5h 12%", hudQuotaSummary(listOf(quota("Go 5h", 12))))
-    }
-
-    @Test
-    fun `sem cota nenhuma o resumo e vazio`() {
-        assertEquals("", hudQuotaSummary(emptyList()))
+    fun `o chip usa o percentual do card`() {
+        // Truncado, nunca arredondado — a mesma regra do resto do app.
+        assertEquals("mensal 75%", hudQuotaChipText(quota("Codex mensal", 75)))
     }
 
     // ------------------------------------------------------------------- ordem

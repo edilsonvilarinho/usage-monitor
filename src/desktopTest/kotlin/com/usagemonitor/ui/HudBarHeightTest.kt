@@ -12,8 +12,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.hudWindowSize
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.HudSourceStatus
-import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
@@ -34,25 +34,30 @@ import kotlin.test.Test
 @OptIn(ExperimentalTestApi::class)
 class HudBarHeightTest {
 
-    private fun source(label: String, percent: String, reset: String?) = HudSourceStatus(
+    private fun source(
+        label: String,
+        statusLabel: String,
+        tone: AppTone,
+        vararg quotas: Pair<String, AppTone>
+    ) = HudSourceStatus(
         label = label,
-        statusLabel = "Crítico",
-        tone = AppTone.CRITICAL,
-        percentLabel = percent,
-        resetLabel = reset
+        statusLabel = statusLabel,
+        tone = tone,
+        quotas = quotas.map { (text, chipTone) -> HudQuotaChip(text = text, tone = chipTone) }
     )
 
     private val sources = listOf(
-        source("Anthropic — INFORMATA2", "92%", "Ter 22h59"),
-        source("Anthropic — Padrão", "41%", "4h12"),
-        source("Codex", "12%", null)
-    )
-
-    private val topLine = HudTopLine(
-        statusLabel = "Crítico",
-        tone = AppTone.CRITICAL,
-        label = "Padrão",
-        quotaSummary = "5h 88% · 7d 9%"
+        source(
+            "INFORMATA2", "Crítico", AppTone.CRITICAL,
+            "5h 28%" to AppTone.OK,
+            "7d 9%" to AppTone.CRITICAL
+        ),
+        source(
+            "Padrão", "Atenção", AppTone.WARNING,
+            "5h 88%" to AppTone.WARNING,
+            "7d 41%" to AppTone.OK
+        ),
+        source("Codex", "Normal", AppTone.OK, "mensal 75%" to AppTone.OK)
     )
 
     private fun assertMeasuredHeightMatchesGeometry(
@@ -61,7 +66,6 @@ class HudBarHeightTest {
         dotOnly: Boolean = false
     ) = runDesktopComposeUiTest {
         val expected = hudWindowSize(
-            topLine = topLine,
             sources = sources,
             fallbackLabel = "Carregando",
             dotOnly = dotOnly,
@@ -75,7 +79,6 @@ class HudBarHeightTest {
                 Box(modifier = Modifier.width(500.dp).height(400.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         dotOnly = dotOnly,

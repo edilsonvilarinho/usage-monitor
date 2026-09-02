@@ -638,16 +638,14 @@ internal fun hudQuotaShortLabel(label: String): String {
 }
 
 /**
- * `5h 88% · 7d 9%` — o percentual de cada cota de uma fonte, lado a lado.
+ * `5h 88%` — o rótulo curto de uma cota e o percentual dela, para a linha do HUD.
  *
- * Existe porque a linha parada precisa dizer 5h **e** 7d: com um número só,
- * quem olha não sabe qual das duas janelas ele está vendo. O percentual sai de
- * [compactPercentageLabel], o mesmo do card, e a ordem é a da resposta da API.
+ * Existe porque a linha precisa dizer 5h **e** 7d: com um número só, quem olha
+ * não sabe qual das duas janelas está vendo. O percentual sai de
+ * [compactPercentageLabel], o mesmo do card — nenhum formato novo.
  */
-internal fun hudQuotaSummary(quotas: List<QuotaInfo>): String {
-    return quotas.joinToString(" · ") { quota ->
-        "${hudQuotaShortLabel(quota.label)} ${compactPercentageLabel(quota)}"
-    }
+internal fun hudQuotaChipText(quota: QuotaInfo): String {
+    return "${hudQuotaShortLabel(quota.label)} ${compactPercentageLabel(quota)}"
 }
 
 internal fun formatUsage(quota: QuotaInfo): String {

@@ -4,7 +4,6 @@ import { AppStatusDot } from '../data/AppStatusDot.jsx';
 
 export function AppHudBar({
   level = 'ok',
-  topLine,
   sources = [],
   fallbackLabel = 'Carregando',
   dotOnly = false,
@@ -12,6 +11,9 @@ export function AppHudBar({
   onOpen,
   style
 }) {
+  // Parada mostra a primeira conta; com o ponteiro em cima, todas.
+  const visible = expanded ? sources : sources.slice(0, 1);
+
   return (
     <div
       role="button"
@@ -39,30 +41,22 @@ export function AppHudBar({
         </div>
       ) : (
         <div style={{ padding: 'var(--s1) 0' }}>
-          {!expanded ? (
-            <HudRow>
-              {topLine ? (
-                <>
-                  <AppStatusIndicator level={topLine.level}>{topLine.statusLabel}</AppStatusIndicator>
-                  <span style={NAME}>{topLine.label}</span>
-                  <span style={VALUE}>{topLine.quotaSummary}</span>
-                </>
-              ) : (
-                <AppStatusIndicator level="off">{fallbackLabel}</AppStatusIndicator>
-              )}
-            </HudRow>
-          ) : sources.length === 0 ? (
+          {visible.length === 0 ? (
             <HudRow>
               <AppStatusIndicator level="off">{fallbackLabel}</AppStatusIndicator>
             </HudRow>
-          ) : sources.map((source) => (
+          ) : visible.map((source) => (
             <HudRow key={source.label}>
               <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
               <span style={NAME}>{source.label}</span>
-              <span style={VALUE}>{source.percentLabel}</span>
-              {source.resetLabel ? (
-                <span style={{ ...VALUE, color: 'var(--muted)' }}>{source.resetLabel}</span>
-              ) : null}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+                {(source.quotas || []).map((chip) => (
+                  <span key={chip.text} style={{ display: 'flex', alignItems: 'center', gap: 'var(--s1)' }}>
+                    <AppStatusDot level={chip.level} />
+                    <span style={VALUE}>{chip.text}</span>
+                  </span>
+                ))}
+              </span>
             </HudRow>
           ))}
         </div>

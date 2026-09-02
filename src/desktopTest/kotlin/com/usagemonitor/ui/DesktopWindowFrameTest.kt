@@ -20,8 +20,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.COMPACT_EXIT_DESCRIPTION
 import com.usagemonitor.presentation.ui.HUD_BAR_OPEN_DESCRIPTION
 import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.HudSourceStatus
-import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.TitleBarButton
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
@@ -45,34 +45,30 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class DesktopWindowFrameTest {
 
-    private val topLine = HudTopLine(
-        statusLabel = "Crítico",
-        tone = AppTone.CRITICAL,
-        label = "Padrão",
-        quotaSummary = "5h 88% · 7d 9%"
+    private fun source(
+        label: String,
+        statusLabel: String,
+        tone: AppTone,
+        vararg quotas: Pair<String, AppTone>
+    ) = HudSourceStatus(
+        label = label,
+        statusLabel = statusLabel,
+        tone = tone,
+        quotas = quotas.map { (text, chipTone) -> HudQuotaChip(text = text, tone = chipTone) }
     )
 
     private val sources = listOf(
-        HudSourceStatus(
-            label = "Anthropic · Padrão",
-            statusLabel = "Crítico",
-            tone = AppTone.CRITICAL,
-            percentLabel = "92%",
-            resetLabel = "Ter 22h59"
+        source(
+            "INFORMATA2", "Crítico", AppTone.CRITICAL,
+            "5h 28%" to AppTone.OK,
+            "7d 9%" to AppTone.CRITICAL
         ),
-        HudSourceStatus(
-            label = "Anthropic · Empresa",
-            statusLabel = "Atenção",
-            tone = AppTone.WARNING,
-            percentLabel = "41%",
-            resetLabel = "4h12"
+        source(
+            "Padrão", "Atenção", AppTone.WARNING,
+            "5h 88%" to AppTone.WARNING,
+            "7d 41%" to AppTone.OK
         ),
-        HudSourceStatus(
-            label = "OpenCode Go",
-            statusLabel = "Normal",
-            tone = AppTone.OK,
-            percentLabel = "12%"
-        )
+        source("Codex", "Normal", AppTone.OK, "mensal 75%" to AppTone.OK)
     )
 
     /**
@@ -138,18 +134,17 @@ class DesktopWindowFrameTest {
      * callback e é `Main.kt` que move a janela AWT —, e é isso que a deixa
      * exercitável inteira aqui, ao contrário do resto do cromo.
      *
-     * **Uma linha por fonte, não só a que perde.** Mostrar apenas a pior era a
-     * queixa que abriu esta passada: com várias contas, as outras não tinham
-     * sinal nenhum de que existiam.
+     * **Uma linha por conta, com um ponto por cota.** Era uma linha por cota, e
+     * a conta com janela de 5h e de 7d ocupava duas linhas seguidas repetindo o
+     * próprio nome.
      */
     @Test
-    fun `a barra HUD lista todas as fontes com percentual e reset`() = runDesktopComposeUiTest {
+    fun `a barra HUD expandida lista uma linha por conta`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         expanded = true,
@@ -159,27 +154,26 @@ class DesktopWindowFrameTest {
             }
         }
 
-        onNodeWithText("Anthropic · Padrão").assertIsDisplayed()
-        onNodeWithText("Anthropic · Empresa").assertIsDisplayed()
-        onNodeWithText("OpenCode Go").assertIsDisplayed()
-        onNodeWithText("92%").assertIsDisplayed()
-        onNodeWithText("41%").assertIsDisplayed()
-        onNodeWithText("Ter 22h59").assertIsDisplayed()
+        onNodeWithText("INFORMATA2").assertIsDisplayed()
+        onNodeWithText("Padrão").assertIsDisplayed()
+        onNodeWithText("Codex").assertIsDisplayed()
+        onNodeWithText("5h 28%").assertIsDisplayed()
+        onNodeWithText("7d 9%").assertIsDisplayed()
     }
 
     /**
-     * Cada linha carrega ponto **e** palavra. O percentual descreve o consumo,
-     * não o risco — 40% às onze da manhã pode ser pior que 80% dez minutos antes
-     * do reinício —, e sem a palavra a cor informaria o estado sozinha.
+     * A palavra da linha é a da **pior** cota da conta: mostrar "Normal" com a
+     * 7d estourada seria mentir. Os pontos por cota detalham o que a palavra
+     * resumiu — mesmo desenho do card, onde o `RiskSemaphoreDot` de cada cota é
+     * só ponto e o badge do cabeçalho traz a palavra.
      */
     @Test
-    fun `cada linha da barra HUD carrega a palavra do estado`() = runDesktopComposeUiTest {
+    fun `cada linha carrega a palavra da pior cota da conta`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         expanded = true,
@@ -194,27 +188,30 @@ class DesktopWindowFrameTest {
         onNodeWithText("Normal").assertIsDisplayed()
     }
 
-    /** Fonte sem reset conhecido não imprime traço: a coluna some. */
+    /**
+     * Parada, a barra mostra **uma** linha: a primeira fonte da ordem de cards.
+     * Listar tudo o tempo todo virou conteúdo demais.
+     */
     @Test
-    fun `fonte sem reset nao desenha a coluna`() = runDesktopComposeUiTest {
+    fun `parada a barra HUD mostra so a primeira conta`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(240.dp)) {
                     HudBar(
-                        statusTone = AppTone.OK,
-                        topLine = topLine,
-                        sources = listOf(sources[2]),
+                        statusTone = AppTone.CRITICAL,
+                        sources = sources,
                         fallbackLabel = "Carregando",
-                        expanded = true,
+                        expanded = false,
                         onOpenFull = {}
                     )
                 }
             }
         }
 
-        onNodeWithText("OpenCode Go").assertIsDisplayed()
-        onNodeWithText("12%").assertIsDisplayed()
-        onNodeWithText("—").assertDoesNotExist()
+        onNodeWithText("INFORMATA2").assertIsDisplayed()
+        onNodeWithText("5h 28%").assertIsDisplayed()
+        onNodeWithText("Padrão").assertDoesNotExist()
+        onNodeWithText("Codex").assertDoesNotExist()
     }
 
     /** Antes da primeira coleta há uma linha só, e ela diz que está carregando. */
@@ -225,7 +222,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.NEUTRAL,
-                        topLine = null,
                         sources = emptyList(),
                         fallbackLabel = "Carregando",
                         expanded = true,
@@ -238,34 +234,6 @@ class DesktopWindowFrameTest {
         onNodeWithText("Carregando").assertIsDisplayed()
     }
 
-    /**
-     * Parada, a barra mostra **uma** linha: a primeira fonte da ordem de cards,
-     * com o percentual de todas as cotas dela. Listar tudo o tempo todo virou
-     * conteúdo demais — dez linhas para dizer o que cabe em uma.
-     */
-    @Test
-    fun `parada a barra HUD mostra so a linha de topo`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(500.dp).height(240.dp)) {
-                    HudBar(
-                        statusTone = AppTone.CRITICAL,
-                        topLine = topLine,
-                        sources = sources,
-                        fallbackLabel = "Carregando",
-                        expanded = false,
-                        onOpenFull = {}
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("Padrão").assertIsDisplayed()
-        onNodeWithText("5h 88% · 7d 9%").assertIsDisplayed()
-        onNodeWithText("Anthropic · Empresa").assertDoesNotExist()
-        onNodeWithText("OpenCode Go").assertDoesNotExist()
-    }
-
     /** Não há botão próprio: o painel inteiro é o alvo de clique. */
     @Test
     fun `a barra HUD despacha o clique em qualquer ponto do painel`() = runDesktopComposeUiTest {
@@ -275,7 +243,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.OK,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onOpenFull = { clicks += 1 }
@@ -302,7 +269,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onDragStart = { events += "start" },
@@ -350,7 +316,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
-                        topLine = null,
                         sources = sources,
                         // Recompõe de verdade: o texto depende do contador.
                         fallbackLabel = "movimentos $moves",
@@ -387,7 +352,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onDragStart = { events += "start" },
@@ -422,7 +386,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.OK,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         dotOnly = true,
@@ -432,9 +395,9 @@ class DesktopWindowFrameTest {
             }
         }
 
-        onNodeWithText("OpenCode Go").assertDoesNotExist()
-        onNodeWithText("12%").assertDoesNotExist()
-        onNodeWithText("Padrão").assertDoesNotExist()
+        onNodeWithText("INFORMATA2").assertDoesNotExist()
+        onNodeWithText("5h 28%").assertDoesNotExist()
+        onNodeWithText("Crítico").assertDoesNotExist()
         // A altura de 24dp do estado recolhido é decidida por `hudWindowSize`,
         // que dimensiona a janela; aqui o nó raiz preenche a cena de teste.
     }
@@ -448,7 +411,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.OK,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         dotOnly = true,
@@ -475,7 +437,6 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
-                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onHoverChange = { hovered -> reported += hovered },

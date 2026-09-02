@@ -5,7 +5,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
 import com.usagemonitor.presentation.ui.HudSourceStatus
-import com.usagemonitor.presentation.ui.HudTopLine
+import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -118,37 +118,37 @@ private val STATUS_INDICATOR_DOT_WIDTH = STATUS_DOT_SIZE + AppSpacing.xs
 private fun hudDotOnlyWidth(): Dp = HUD_PILL_DOT_ONLY_PADDING * 2 + STATUS_DOT_SIZE
 
 /**
- * Largura de uma linha da lista: estado, nome, percentual e reset.
+ * Largura das cotas de uma linha: um ponto e um texto por cota, com vão entre
+ * elas.
+ */
+private fun hudChipsWidth(quotas: List<HudQuotaChip>): Dp {
+    if (quotas.isEmpty()) {
+        return 0.dp
+    }
+
+    val chips = quotas.fold(0f) { total, chip ->
+        total + STATUS_DOT_SIZE.value + AppSpacing.xs.value + labelMediumWidth(chip.text).value
+    }
+    val gaps = AppSpacing.sm.value * (quotas.size - 1)
+
+    return (chips + gaps).dp
+}
+
+/**
+ * Largura de uma linha: estado da fonte, nome da conta e as cotas dela.
  *
  * O nome entra **inteiro** na conta e é ele que a composição encolhe quando a
- * soma passa do teto: as outras três colunas são curtas e de largura previsível,
- * e truncar o percentual ou o horário do reset não deixaria nada legível.
+ * soma passa do teto: as outras colunas são curtas e de largura previsível, e
+ * truncar um percentual não deixaria nada legível.
  */
 private fun hudSourceRowWidth(source: HudSourceStatus): Dp {
-    var width = HUD_PILL_PADDING * 2 +
+    return HUD_PILL_PADDING * 2 +
         STATUS_INDICATOR_DOT_WIDTH +
         labelSmallWidth(source.statusLabel) +
         AppSpacing.md +
         labelMediumWidth(source.label) +
         AppSpacing.md +
-        labelMediumWidth(source.percentLabel)
-
-    if (source.resetLabel != null) {
-        width += AppSpacing.md + labelMediumWidth(source.resetLabel)
-    }
-
-    return width + HUD_TEXT_SAFETY_MARGIN
-}
-
-/** Largura da linha parada: estado, conta e os percentuais de todas as cotas dela. */
-private fun hudTopLineWidth(topLine: HudTopLine): Dp {
-    return HUD_PILL_PADDING * 2 +
-        STATUS_INDICATOR_DOT_WIDTH +
-        labelSmallWidth(topLine.statusLabel) +
-        AppSpacing.md +
-        labelMediumWidth(topLine.label) +
-        AppSpacing.md +
-        labelMediumWidth(topLine.quotaSummary) +
+        hudChipsWidth(source.quotas) +
         HUD_TEXT_SAFETY_MARGIN
 }
 
@@ -163,20 +163,21 @@ private fun hudFallbackRowWidth(fallbackLabel: String): Dp {
 /**
  * Tamanho da janela HUD, medido pelo que ela vai mostrar.
  *
- * **Parada é uma linha; com o ponteiro em cima, é a lista inteira.** Listar tudo
- * o tempo todo virou conteúdo demais — dez linhas na tela para dizer o que, na
+ * **Parada é a primeira fonte; com o ponteiro em cima, todas.** Listar tudo o
+ * tempo todo virou conteúdo demais — dez linhas na tela para dizer o que, na
  * maior parte do tempo, cabe em uma.
  *
- * **A largura da lista é a da linha mais larga, presa em [HUD_PILL_MAX_WIDTH]**,
- * e não a da primeira: com linhas de larguras diferentes, dimensionar pela
- * primeira truncaria todas as outras sem motivo.
+ * **A largura é a da linha mais larga entre as visíveis, presa em
+ * [HUD_PILL_MAX_WIDTH]**, e não a da primeira: com linhas de larguras
+ * diferentes, dimensionar pela primeira truncaria todas as outras sem motivo.
+ * **Parada, ela é a da primeira linha só** — medir pela lista escondida deixaria
+ * a barra larga sem nada para mostrar ali.
  *
- * Sem linha de topo (antes da primeira coleta) sobra a de carregamento: zero
- * linhas dariam uma janela de altura nula, que o AWT não sabe desenhar e o
- * usuário leria como o app ter sumido.
+ * Sem fonte nenhuma sobra a linha de carregamento: zero linhas dariam uma janela
+ * de altura nula, que o AWT não sabe desenhar e o usuário leria como o app ter
+ * sumido.
  */
 internal fun hudWindowSize(
-    topLine: HudTopLine?,
     sources: List<HudSourceStatus>,
     fallbackLabel: String,
     dotOnly: Boolean,
@@ -186,21 +187,23 @@ internal fun hudWindowSize(
         return DpSize(hudDotOnlyWidth(), AppChrome.hud)
     }
 
-    if (!expanded || sources.isEmpty()) {
-        val width = (topLine?.let { line -> hudTopLineWidth(line) }
-            ?: hudFallbackRowWidth(fallbackLabel))
-            .coerceAtMost(HUD_PILL_MAX_WIDTH)
-        return DpSize(width, HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT)
+    val visible = if (expanded) sources else sources.take(1)
+
+    if (visible.isEmpty()) {
+        return DpSize(
+            width = hudFallbackRowWidth(fallbackLabel).coerceAtMost(HUD_PILL_MAX_WIDTH),
+            height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT
+        )
     }
 
-    val width = sources
+    val width = visible
         .maxOf { source -> hudSourceRowWidth(source).value }
         .dp
         .coerceAtMost(HUD_PILL_MAX_WIDTH)
 
     return DpSize(
         width = width,
-        height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT * sources.size
+        height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT * visible.size
     )
 }
 

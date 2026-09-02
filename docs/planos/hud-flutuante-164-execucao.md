@@ -84,3 +84,5 @@ cota"): popup que cobre o próprio alvo é defeito já conhecido deste app.
 | A12 | Uma linha por **cota**, não por fonte | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1832 testes (5 novos em `WorstQuotaSnapshotTest`) |
 | A14 | Uma linha parada, a lista inteira no hover; rodapé de sessão removido | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` | `BUILD SUCCESSFUL`. A maquinaria do rodapé (caso de uso, view model, formato e testes) foi **apagada**, não deixada sem consumidor |
 | A15 | A ordem da barra passa a ser a ordem de cards do usuário | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1824 testes (`orderedByCardOrder` compartilhado com a grade do dashboard) |
+| A16 | Uma linha por **conta**, com um ponto por cota; translucidez removida; cursor de mover | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1821 testes |
+| A17 | A janela cresce e encolhe interpolada ao abrir/fechar a lista | `gradlew.bat allTests` | `BUILD SUCCESSFUL`. `hudAppliedSize` separa o que anima (abrir/fechar) do que não pode animar (arrasto) |

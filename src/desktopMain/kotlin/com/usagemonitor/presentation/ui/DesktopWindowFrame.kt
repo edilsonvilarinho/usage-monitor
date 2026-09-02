@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
@@ -58,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
+import java.awt.Cursor
 import com.usagemonitor.HUD_PANEL_VERTICAL_PADDING
 import com.usagemonitor.HUD_PILL_DOT_ONLY_PADDING
 import com.usagemonitor.HUD_PILL_PADDING
@@ -269,52 +272,60 @@ private fun WindowScope.CompactTitleBarOverlay(
  * palavra, porque cor sozinha não informa estado neste sistema.
  */
 /**
- * A linha única que a barra HUD mostra parada: uma fonte, com o percentual de
- * **todas** as cotas dela lado a lado.
+ * Uma cota dentro da linha da fonte: o rótulo curto, o percentual e o tom.
  *
- * Existe porque listar tudo o tempo todo virou conteúdo demais — dez linhas
- * ocupando a tela para dizer o que, na maior parte do tempo, cabe em uma. A
- * lista inteira continua a um movimento de mouse.
- *
- * [quotaSummary] é montado por quem chama (`hudQuotaSummary`), e não aqui:
- * juntar rótulo e percentual é decisão de conteúdo, e a geometria precisa da
- * string pronta para medir a janela antes de existir composição.
+ * **Ponto sem palavra, e isto tem precedente exato.** É o mesmo desenho que o
+ * card já usa: `RiskSemaphoreDot` por cota, só ponto, mais **um** badge com
+ * ponto e palavra resumindo o pior. A palavra da linha (`HudSourceStatus`)
+ * cumpre aqui o papel do badge — a cor não informa estado sozinha, ela detalha
+ * um estado que a linha já disse por escrito.
  */
-internal data class HudTopLine(
-    /** Palavra do estado da pior cota desta fonte. */
-    val statusLabel: String,
-    val tone: AppTone,
-    /** Perfil ou nome da fonte, sem o rótulo da cota. */
-    val label: String,
-    /** `5h 88% · 7d 9%` — o percentual de cada cota, na ordem em que a API as devolve. */
-    val quotaSummary: String
+internal data class HudQuotaChip(
+    /** `5h 28%` — rótulo curto e percentual, montados por `hudQuotaChipText`. */
+    val text: String,
+    val tone: AppTone
 )
 
+/**
+ * Uma fonte monitorada como a barra HUD a mostra: **uma linha por conta**, com
+ * o estado da pior cota e o percentual de todas elas.
+ *
+ * Foi uma linha por cota antes disso, e a conta com janela de 5h e de 7d
+ * ocupava duas linhas seguidas repetindo o próprio nome. Com dez cotas em cinco
+ * contas, a lista virou parede de texto para dizer o que cabe em cinco linhas.
+ */
 internal data class HudSourceStatus(
+    /** Perfil ou nome da fonte, sem rótulo de cota. */
     val label: String,
+    /** Palavra da **pior** cota desta fonte — o papel do badge do card. */
     val statusLabel: String,
     val tone: AppTone,
-    /** `compactPercentageLabel` da cota que determinou o estado — nenhum formato novo. */
-    val percentLabel: String,
-    /** `resetShortLabel` da mesma cota; `null` esconde a coluna em vez de imprimir traço. */
-    val resetLabel: String? = null
+    /** Todas as cotas da fonte, na ordem em que a API as devolve. */
+    val quotas: List<HudQuotaChip> = emptyList()
 )
 
 /**
  * Conteúdo da barra HUD (issue #164): **uma linha parada, a lista inteira no
  * hover**.
  *
- * A linha parada é a primeira fonte da ordem de cards do usuário, com o
- * percentual de todas as cotas dela lado a lado; o hover troca essa linha pela
- * lista de todas as cotas, com reset por linha.
+ * Cada linha é uma **fonte**: ponto e palavra da pior cota dela, o nome da
+ * conta, e um ponto por cota ao lado do percentual. Parada, a barra mostra a
+ * primeira fonte da ordem de cards do usuário; com o ponteiro em cima, todas.
+ *
+ * **O ponto por cota sem palavra tem precedente exato**: é o desenho do card —
+ * `RiskSemaphoreDot` por cota, só ponto, mais um badge com ponto e palavra
+ * resumindo o pior. A palavra da linha faz o papel do badge, então a cor nunca
+ * informa um estado que a linha não tenha dito por escrito.
  *
  * **O caminho até aqui foi por tentativa, e cada volta corrigiu a anterior.**
  * (1) Uma linha com a fonte de pior risco: as outras contas não tinham sinal de
  * que existiam. (2) As outras num `HoverTooltipBox`: o popup piscava. (3) Uma
  * linha por fonte, sempre visível: a conta com 5h e 7d mostrava um limite só.
  * (4) Uma linha por cota, sempre visível: dez linhas na tela para dizer o que
- * cabe em uma. O que sobrou junta as duas metades certas — o resumo cabe numa
- * linha, e o detalhe fica a um movimento de mouse.
+ * cabe em uma. (5) Uma linha por cota no hover: a conta com 5h e 7d ocupava duas
+ * linhas seguidas repetindo o próprio nome. O que sobrou junta as metades certas
+ * — uma linha por conta, o resumo cabe numa, e o detalhe fica a um movimento de
+ * mouse.
  *
  * **A lista é conteúdo da janela, nunca `Popup`.** Ela saía por
  * `HoverTooltipBox` → `TooltipBox` → `Popup`, e popup no Compose Desktop é
@@ -356,18 +367,16 @@ internal data class HudSourceStatus(
  */
 @Composable
 internal fun HudBar(
-    /** Tom do ponto no estado recolhido; nas linhas, cada cota traz o seu. */
+    /** Tom do ponto no estado recolhido; nas linhas, cada fonte traz o seu. */
     statusTone: AppTone,
     /**
-     * A linha que a barra mostra parada. `null` cai na linha de carregamento —
-     * antes da primeira coleta não há fonte para resumir.
+     * Uma entrada por fonte, na ordem de card do usuário. Parada, a barra mostra
+     * só a **primeira**; com o ponteiro em cima, todas.
      */
-    topLine: HudTopLine? = null,
-    /** Todas as cotas, na ordem de card do usuário. Só aparecem com [expanded]. */
     sources: List<HudSourceStatus> = emptyList(),
-    /** Palavra da linha única enquanto nenhuma cota foi coletada. */
+    /** Palavra da linha única enquanto nenhuma fonte foi coletada. */
     fallbackLabel: String,
-    /** O ponteiro está sobre a barra: a lista inteira substitui a linha única. */
+    /** O ponteiro está sobre a barra: as demais fontes aparecem abaixo da primeira. */
     expanded: Boolean = false,
     /**
      * Todas as fontes em `ON_TRACK` e sem o ponteiro em cima: recolhe ao ponto.
@@ -396,6 +405,12 @@ internal fun HudBar(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
             .hoverable(hoverInteraction)
+            // **O cursor é o que diz que a barra se move.** Sem barra de título
+            // e sem pegador visível, nada na tela informava que ela é arrastável
+            // — a pergunta "como eu consigo mover?" veio de quem já estava com
+            // ela na tela. O cursor de mover é a afordância que o cromo de
+            // janela normalmente dá de graça.
+            .pointerHoverIcon(PointerIcon(Cursor(Cursor.MOVE_CURSOR)))
             .hudPressGesture(
                 onDragStart = onDragStart,
                 onDragMove = onDragMove,
@@ -434,39 +449,16 @@ internal fun HudBar(
                 .testTag(HUD_CONTENT_TEST_TAG)
                 .padding(vertical = HUD_PANEL_VERTICAL_PADDING)
         ) {
-            if (!expanded) {
-                HudPanelRow {
-                    if (topLine == null) {
-                        AppStatusIndicator(label = fallbackLabel, tone = statusTone)
-                    } else {
-                        AppStatusIndicator(label = topLine.statusLabel, tone = topLine.tone)
-                        Text(
-                            text = topLine.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = topLine.quotaSummary,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1
-                        )
-                    }
-                }
-                return@Column
-            }
+            val visible = if (expanded) sources else sources.take(1)
 
-            if (sources.isEmpty()) {
+            if (visible.isEmpty()) {
                 HudPanelRow {
                     AppStatusIndicator(label = fallbackLabel, tone = statusTone)
                 }
                 return@Column
             }
 
-            sources.forEach { source ->
+            visible.forEach { source ->
                 HudPanelRow {
                     AppStatusIndicator(label = source.statusLabel, tone = source.tone)
                     Text(
@@ -477,19 +469,24 @@ internal fun HudBar(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    Text(
-                        text = source.percentLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
-                    if (source.resetLabel != null) {
-                        Text(
-                            text = source.resetLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+                    ) {
+                        source.quotas.forEach { chip ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+                            ) {
+                                AppStatusDot(tone = chip.tone)
+                                Text(
+                                    text = chip.text,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     }
                 }
             }

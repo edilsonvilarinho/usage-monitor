@@ -1,10 +1,16 @@
 import type { ReactNode, CSSProperties } from 'react';
 
 /**
- * The HUD: **one line at rest, the whole list on hover.** At rest it shows the
- * first source in the user's card order, with every one of that source's quota
- * percentages side by side; hovering swaps that line for one 20dp row per
- * quota, each with its reset. Dragged to wherever the user wants it; on release
+ * The HUD: **one 20dp row per account.** Each row carries dot and word for that
+ * account's worst quota, the account name, and one dot per quota beside its
+ * percentage. At rest only the first account in the user's card order is drawn;
+ * hovering draws them all, with the window growing interpolated rather than in
+ * one jump.
+ *
+ * The per-quota dot without a word has an exact precedent: it is the card's own
+ * design — a dot per quota, plus one header badge with dot and word summarising
+ * the worst. The row's word plays that badge's part, so color never states
+ * anything the row has not already said in writing. Dragged to wherever the user wants it; on release
  * it snaps to the nearest work-area edge. A short click anywhere returns the
  * full window.
  *
@@ -27,26 +33,17 @@ export interface AppHudBarProps {
   /** Tone of the dot in the collapsed state; each row carries its own. */
   level?: 'ok' | 'warn' | 'crit' | 'off';
   /**
-   * The line shown at rest. Absent falls back to the loading line — before the
-   * first collection there is no source to summarise.
+   * One entry per account, in the user's card order. At rest only the **first**
+   * is drawn; hovering draws them all.
    */
-  topLine?: {
-    /** Word for the worst quota of that source. */
-    statusLabel: ReactNode;
-    level?: 'ok' | 'warn' | 'crit' | 'off';
+  sources?: Array<{
     /** Profile or source name, without any quota label. */
     label: ReactNode;
-    /** `5h 88% · 7d 9%` — every quota of that source, in the API's order. */
-    quotaSummary: ReactNode;
-  };
-  /** Every quota, in the user's card order. Only drawn when `expanded`. */
-  sources?: Array<{
-    label: ReactNode;
+    /** Word for the **worst** quota of that account — the card badge's role. */
     statusLabel: ReactNode;
     level?: 'ok' | 'warn' | 'crit' | 'off';
-    percentLabel: ReactNode;
-    /** Absent hides the column — never a dash. */
-    resetLabel?: ReactNode;
+    /** Every quota of that account, in the API's order. */
+    quotas?: Array<{ text: ReactNode; level?: 'ok' | 'warn' | 'crit' | 'off' }>;
   }>;
   /** Word of the single line shown before the first collection lands. */
   fallbackLabel?: ReactNode;

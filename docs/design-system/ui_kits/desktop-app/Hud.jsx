@@ -2,16 +2,22 @@ const { AppHudBar } = DS;
 
 // Uma linha por COTA, não por fonte: a conta com janela de 5h e de 7d mostra
 // as duas. Cota sem projeção sai com ponto neutro e a palavra dizendo isso.
+// Uma linha por CONTA, com um ponto por cota: a palavra é a da pior cota, e os
+// pontos detalham o que ela resumiu -- o desenho do card.
 const SOURCES = [
-  { label: 'INFORMATA2 · Claude 5h', statusLabel: 'Crítico', level: 'crit', percentLabel: '92%', resetLabel: 'Ter 22h59' },
-  { label: 'INFORMATA2 · Claude 7d', statusLabel: 'Atenção', level: 'warn', percentLabel: '41%', resetLabel: 'Sáb 11h37' },
-  { label: 'Padrão · Claude 5h', statusLabel: 'Normal', level: 'ok', percentLabel: '12%', resetLabel: 'Ter 1h00' },
-  { label: 'OpenCode Go · Rolling', statusLabel: 'Sem projeção', level: 'off', percentLabel: '3%' }
+  {
+    label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
+    quotas: [{ text: '5h 28%', level: 'ok' }, { text: '7d 9%', level: 'crit' }]
+  },
+  {
+    label: 'Padrão', statusLabel: 'Atenção', level: 'warn',
+    quotas: [{ text: '5h 88%', level: 'warn' }, { text: '7d 41%', level: 'ok' }]
+  },
+  {
+    label: 'OpenCode Go', statusLabel: 'Sem projeção', level: 'off',
+    quotas: [{ text: '5h 0%', level: 'off' }, { text: 'mensal 47%', level: 'off' }]
+  }
 ];
-
-const TOP = {
-  statusLabel: 'Crítico', level: 'crit', label: 'Padrão', quotaSummary: '5h 88% · 7d 9%'
-};
 
 function HudScreen({ children, corner = 'top-right', tall = false }) {
   const anchor = corner === 'top-right' ? { top: 0, right: 0 } : { bottom: 0, right: 0 };
@@ -38,12 +44,12 @@ export function Hud() {
 
       <Caption>1 · parada — uma linha, a primeira da ordem de cards</Caption>
       <HudScreen>
-        <AppHudBar topLine={TOP} />
+        <AppHudBar sources={SOURCES} />
       </HudScreen>
 
       <Caption>2 · hover — a lista de todas as cotas</Caption>
       <HudScreen tall>
-        <AppHudBar topLine={TOP} sources={SOURCES} expanded />
+        <AppHudBar sources={SOURCES} expanded />
       </HudScreen>
 
       <Caption>3 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</Caption>
@@ -58,7 +64,7 @@ export function Hud() {
 
       <Caption>5 · arrastado para a borda de baixo — logo acima da barra de tarefas</Caption>
       <HudScreen corner="bottom-right" tall>
-        <AppHudBar topLine={TOP} sources={SOURCES.slice(0, 2)} expanded />
+        <AppHudBar sources={SOURCES.slice(0, 2)} expanded />
       </HudScreen>
 
       <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '54ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>

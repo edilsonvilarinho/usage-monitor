@@ -2,8 +2,8 @@ package com.usagemonitor
 
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.HudSourceStatus
-import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import kotlin.test.Test
@@ -24,41 +24,38 @@ class HudWindowGeometryTest {
         size = DpSize(1366.dp, 728.dp)
     )
 
-    private val sources = listOf(
-        source("Anthropic — pessoal", "Crítico", AppTone.CRITICAL, "92%", "Ter 22h59"),
-        source("Anthropic — empresa", "Atenção", AppTone.WARNING, "41%", "4h12"),
-        source("OpenCode Go", "Normal", AppTone.OK, "12%", null)
-    )
-
     private fun source(
         label: String,
         statusLabel: String,
         tone: AppTone,
-        percentLabel: String,
-        resetLabel: String?
+        vararg quotas: Pair<String, AppTone>
     ) = HudSourceStatus(
         label = label,
         statusLabel = statusLabel,
         tone = tone,
-        percentLabel = percentLabel,
-        resetLabel = resetLabel
+        quotas = quotas.map { (text, chipTone) -> HudQuotaChip(text = text, tone = chipTone) }
     )
 
-    private val topLine = HudTopLine(
-        statusLabel = "Crítico",
-        tone = AppTone.CRITICAL,
-        label = "Padrão",
-        quotaSummary = "5h 88% · 7d 9%"
+    private val sources = listOf(
+        source(
+            "INFORMATA2", "Crítico", AppTone.CRITICAL,
+            "5h 28%" to AppTone.OK,
+            "7d 9%" to AppTone.CRITICAL
+        ),
+        source(
+            "Padrão", "Atenção", AppTone.WARNING,
+            "5h 88%" to AppTone.WARNING,
+            "7d 41%" to AppTone.OK
+        ),
+        source("Codex", "Normal", AppTone.OK, "mensal 75%" to AppTone.OK)
     )
 
     private fun size(
         sources: List<HudSourceStatus> = this.sources,
-        topLine: HudTopLine? = this.topLine,
         fallbackLabel: String = "Carregando",
         dotOnly: Boolean = false,
         expanded: Boolean = true
     ) = hudWindowSize(
-        topLine = topLine,
         sources = sources,
         fallbackLabel = fallbackLabel,
         dotOnly = dotOnly,
@@ -102,8 +99,8 @@ class HudWindowGeometryTest {
                     "Anthropic — conta corporativa da empresa inteira e mais um pouco",
                     "Crítico",
                     AppTone.CRITICAL,
-                    "92%",
-                    "Ter 22h59"
+                    "5h 92%" to AppTone.CRITICAL,
+                    "7d 88%" to AppTone.CRITICAL
                 )
             )
         )
@@ -133,18 +130,22 @@ class HudWindowGeometryTest {
     }
 
     /** A largura parada sai da linha de topo, não da lista que ela esconde. */
+    /**
+     * Parada, a largura sai da **primeira** linha só: medir pela lista escondida
+     * deixaria a barra larga sem nada para mostrar ali.
+     */
     @Test
-    fun `parada a largura sai da linha de topo`() {
-        val curta = size(
-            expanded = false,
-            topLine = topLine.copy(label = "Ana", quotaSummary = "5h 1%")
+    fun `parada a largura ignora as linhas escondidas`() {
+        val larga = source(
+            "Uma conta com nome bem comprido", "Crítico", AppTone.CRITICAL,
+            "5h 92%" to AppTone.CRITICAL
         )
-        val longa = size(
-            expanded = false,
-            topLine = topLine.copy(quotaSummary = "5h 88% · 7d 9% · Créditos 12%")
-        )
+        val estreita = source("Ana", "Normal", AppTone.OK, "5h 1%" to AppTone.OK)
 
-        assertTrue(curta.width < longa.width, "esperava ${curta.width} < ${longa.width}")
+        val parada = size(sources = listOf(estreita, larga), expanded = false)
+        val aberta = size(sources = listOf(estreita, larga), expanded = true)
+
+        assertTrue(parada.width < aberta.width, "esperava ${parada.width} < ${aberta.width}")
     }
 
     // ----------------------------------------------------------------- altura
@@ -160,7 +161,7 @@ class HudWindowGeometryTest {
     /** Zero linhas dariam altura nula, que o usuário leria como o app ter sumido. */
     @Test
     fun `sem fonte nenhuma sobra a linha de carregamento`() {
-        val vazia = size(sources = emptyList(), topLine = null)
+        val vazia = size(sources = emptyList())
 
         assertEquals(HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT, vazia.height)
         assertTrue(vazia.width > 0.dp)

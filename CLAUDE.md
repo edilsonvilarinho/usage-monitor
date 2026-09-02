@@ -534,20 +534,25 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
 `HudSummaryViewModel` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
 [`hud-flutuante-164-execucao.md`](docs/planos/hud-flutuante-164-execucao.md)): terceiro chrome, ainda
 mais discreto que o modo somente cards — a mesma janela principal encolhida a um painel de **largura
-medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: parada mostra **uma
-linha** — a primeira fonte da ordem de cards do usuário, com o percentual de todas as cotas dela lado
-a lado —, e com o ponteiro em cima troca essa linha pela **lista de todas as cotas**
-(`allQuotaRisks`, em `WorstQuotaSnapshot.kt`), com reset por linha. **Também não é valor novo em enum nenhum**: `hud`
+medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: cada linha é uma
+**conta**, com ponto e palavra da pior cota dela, o nome, e um ponto por cota ao lado do percentual
+(`allQuotaRisks`, em `WorstQuotaSnapshot.kt`). Parada mostra a **primeira** conta da ordem de cards
+do usuário; com o ponteiro em cima, todas. **Também não é valor novo em enum nenhum**: `hud`
 é um terceiro booleano de `DesktopWindowFrame`, irmão de `compact`, e a exclusão mútua entre os dois é
 regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do tipo.
-- **Cinco versões de conteúdo, quatro corrigidas depois de usar.** (1) Uma linha com a fonte de pior
+- **Seis versões de conteúdo, cinco corrigidas depois de usar.** (1) Uma linha com a fonte de pior
   risco: com várias contas, as outras não tinham sinal nenhum de que existiam. (2) As outras num
   `HoverTooltipBox`: o dado ficou atrás de um gesto, e o popup piscava. (3) Uma linha por **fonte**,
   sempre visível, com a pior cota de cada uma: a conta com janela de 5h e de 7d mostrava um limite
   só. (4) Uma linha por **cota**, sempre visível, mais um rodapé de consumo: dez linhas na tela para
-  dizer o que cabe em uma. (5) A que ficou junta as duas metades certas — o resumo cabe numa linha, o
-  detalhe fica a um movimento de mouse. Nenhuma dessas voltas foi antecipada em plano; todas
-  apareceram usando.
+  dizer o que cabe em uma. (5) Uma linha por cota no hover: a conta com 5h e 7d ocupava duas linhas
+  seguidas repetindo o próprio nome. (6) A que ficou: uma linha por **conta**, com um ponto por cota.
+  Nenhuma dessas voltas foi antecipada em plano; todas apareceram usando.
+- **O ponto por cota sem palavra tem precedente exato — é o desenho do card.** Ali o
+  `RiskSemaphoreDot` de cada cota é só ponto, e um badge de cabeçalho resume o pior com ponto **e**
+  palavra; a palavra da linha do HUD faz o papel desse badge. A cor nunca informa um estado que a
+  linha não tenha dito por escrito, e a palavra sai da **pior** cota da conta: mostrar "Normal" com a
+  7d estourada seria mentir.
 - **O rodapé de consumo foi removido, e a maquinaria dele junto.** `GetHudSessionSummaryUseCase`,
   `HudSessionSummary`, `HudSummaryViewModel` e `hudSessionSummaryLabel` foram **apagados**, não
   deixados sem consumidor: código morto com laço de 30s é pior que código morto parado, e este
@@ -599,8 +604,13 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   e reabria no quadro seguinte. Sem popup não há laço.
   - **Cada linha carrega ponto E palavra** (`AppStatusIndicator`), não só o ponto colorido. O
     percentual ao lado descreve o **consumo**, não o risco: 40% às onze da manhã pode ser pior que
-    80% dez minutos antes do reinício, e é a palavra que diz qual dos dois é o caso. Sem ela a cor
-    informaria estado sozinha.
+    80% dez minutos antes do reinício, e é a palavra que diz qual dos dois é o caso.
+  - **A janela cresce e encolhe interpolada** (`animate` + `AppMotion.normal`), não em um salto:
+    abrir a lista trocava 24dp por 100dp num quadro só, e o que se via era a barra piscando de
+    tamanho. **Transição única, nunca laço** — animação infinita trava o `waitForIdle`. E é a janela
+    AWT que anda, não um `graphicsLayer`: aqui o tamanho é real, não overlay. `hudAppliedSize` separa
+    "abrir/fechar a lista", que anima, de "a barra andou com o ponteiro", que **não** pode animar —
+    arrastar com a janela interpolando deixaria a barra correndo atrás do mouse.
   - **Cota sem projeção continua na lista**, com ponto neutro e a palavra dizendo isso. O percentual
     é fato medido e não depende de previsão — é a diferença para o badge do card, que some sem
     projeção: lá a pergunta é "qual o estado", aqui é "quanto já foi". Com a regra do badge, Kilo e
@@ -661,15 +671,21 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   exigiria limites físicos de tela e disputa de ordem-z com uma janela que também é topmost. Leitura
   e escrita passam sempre por `fitWindowPosition`: posição salva num monitor que já não existe
   descreve uma tela que sumiu.
-- **Tudo em `ON_TRACK` recolhe a pílula ao ponto** (`AppStatusDot`, extraído de
+- **Tudo em `ON_TRACK` recolhe a barra ao ponto** (`AppStatusDot`, extraído de
   `AppStatusIndicator`). O dado não some — para de ocupar tela enquanto diz que está tudo bem, e o
-  hover devolve a pílula inteira. É a **única** exceção a "cor nunca informa sozinha" neste sistema,
-  e só se sustenta porque a palavra está a um movimento de mouse; em lista, célula ou cabeçalho
+  hover devolve a barra inteira. É a **única** exceção a "cor nunca informa sozinha" neste sistema, e
+  só se sustenta porque a palavra está a um movimento de mouse; em lista, célula ou cabeçalho
   continua sendo o indicador com palavra. Mesmo princípio do ponto de risco da bandeja, que não
   acende nada em `ON_TRACK`. **Lista vazia não recolhe**: ali ainda não se coletou nada, e o ponto
-  afirmaria que está tudo bem antes de saber. Parada, a janela fica translúcida
-  (`HUD_IDLE_OPACITY_PERCENT`, aplicado como **teto** sobre a preferência do usuário — quem escolheu
-  60% não passa a ver 70 por entrar no HUD).
+  afirmaria que está tudo bem antes de saber.
+- **A barra não tem translucidez própria.** Ela chegou a ficar translúcida parada, para incomodar
+  menos a leitura do que está atrás; na prática deixou o texto mais difícil de ler sem devolver a
+  área, porque a janela continua capturando o clique de qualquer jeito. Quem decide a opacidade é só
+  a preferência do usuário, em todos os modos.
+- **O cursor é o que diz que a barra se move.** Sem barra de título e sem pegador visível, nada na
+  tela informava que ela é arrastável — a pergunta "como eu consigo mover?" veio de quem já estava
+  com ela na tela. `PointerIcon(Cursor.MOVE_CURSOR)` é a afordância que o cromo de janela normalmente
+  dá de graça.
 - **Três saídas, mesmo padrão do modo somente cards**: clique curto em qualquer ponto da pílula, o
   item na bandeja e `Ctrl+Shift+H`, combinação própria sem colidir com o `Ctrl+Shift+M` do modo
   somente cards.

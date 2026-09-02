@@ -10,10 +10,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -135,7 +138,7 @@ import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.HudSourceStatus
 import com.usagemonitor.presentation.ui.orderedByCardOrder
-import com.usagemonitor.presentation.ui.HudTopLine
+import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -161,7 +164,7 @@ import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
-import com.usagemonitor.presentation.ui.components.hudQuotaSummary
+import com.usagemonitor.presentation.ui.components.hudQuotaChipText
 import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.resetLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
@@ -242,14 +245,6 @@ private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
  * largura real — quem a decide é `hudPillWidth`.
  */
 private const val HUD_MIN_WINDOW_WIDTH_DP = 32
-
-/**
- * Translucidez da pílula sem o ponteiro em cima.
- *
- * Entra como **teto** sobre a preferência do usuário, nunca como valor: quem já
- * escolheu uma janela a 60% não passa a ver 70 por entrar no modo HUD.
- */
-private const val HUD_IDLE_OPACITY_PERCENT = 70
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
@@ -1668,49 +1663,39 @@ private fun runUsageMonitor(
         val hudOrderedQuotas = orderedByCardOrder(hudQuotaRisks, cardOrder) { entry ->
             entry.stats.targetKey
         }
-        val hudSources = hudOrderedQuotas.map { entry ->
-            HudSourceStatus(
-                // O rótulo da cota já diz o fornecedor ("Claude 5h"), então
-                // repetir "Anthropic" ao lado gastaria a largura que o nome da
-                // conta precisa. Sem perfil, a fonte identifica sozinha.
-                label = "${entry.stats.profileLabel ?: entry.stats.apiName} · ${entry.quota.label}",
-                // Sem projeção a linha continua saindo, com ponto neutro e a
-                // palavra dizendo isso: o percentual é fato medido e não depende
-                // de previsão. É a diferença para o badge do card, que some sem
-                // projeção — lá a pergunta é "qual o estado", aqui é "quanto já
-                // foi".
-                statusLabel = entry.risk?.let { risk -> riskLevelLabel(risk.level, language) }
-                    ?: hudNoForecastLabel,
-                tone = entry.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
-                percentLabel = compactPercentageLabel(entry.quota),
-                resetLabel = resetShortLabel(entry.quota, language, hudNow)
-            )
-        }
-        // Nada em risco: o painel recolhe ao ponto e devolve a tela. Lista vazia
+        // **Uma linha por conta, não por cota.** A conta com janela de 5h e de
+        // 7d ocupava duas linhas seguidas repetindo o próprio nome; com dez
+        // cotas em cinco contas, a lista virou parede de texto. Cada linha traz
+        // a palavra da **pior** cota da conta e um ponto por cota ao lado do
+        // percentual — o mesmo desenho do card, onde o `RiskSemaphoreDot` de
+        // cada cota é só ponto e o badge do cabeçalho resume o pior com palavra.
+        val hudSources = hudOrderedQuotas
+            .groupBy { entry -> entry.stats.targetKey }
+            .map { (_, entries) ->
+                val first = entries.first()
+                val worst = entries.maxByOrNull { entry -> entry.risk?.level?.ordinal ?: -1 }
+                HudSourceStatus(
+                    label = first.stats.profileLabel ?: first.stats.apiName,
+                    statusLabel = worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) }
+                        ?: hudNoForecastLabel,
+                    tone = worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
+                    quotas = entries.map { entry ->
+                        HudQuotaChip(
+                            text = hudQuotaChipText(entry.quota),
+                            tone = entry.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL
+                        )
+                    }
+                )
+            }
+        // Nada em risco: a barra recolhe ao ponto e devolve a tela. Lista vazia
         // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
         // que está tudo bem antes de saber. Cota sem projeção também não recolhe:
         // "está tudo bem" seria uma garantia que ninguém deu.
         val hudDotOnly = hudOrderedQuotas.isNotEmpty() &&
             hudOrderedQuotas.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
-        // A linha que a barra mostra parada: a **primeira** fonte da ordem de
-        // cards, com o percentual de todas as cotas dela lado a lado. A palavra
-        // e o tom saem da pior cota dessa fonte — é ela que decide se a conta
-        // está bem, e mostrar "Normal" com a 7d estourada seria mentir.
-        val hudTopQuotas = hudOrderedQuotas.firstOrNull()?.let { first ->
-            hudOrderedQuotas.filter { entry -> entry.stats.targetKey == first.stats.targetKey }
-        }.orEmpty()
-        val hudTopLine = hudTopQuotas.firstOrNull()?.let { first ->
-            val worst = hudTopQuotas.maxByOrNull { entry -> entry.risk?.level?.ordinal ?: -1 }
-            HudTopLine(
-                statusLabel = worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) }
-                    ?: hudNoForecastLabel,
-                tone = worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
-                label = first.stats.profileLabel ?: first.stats.apiName,
-                quotaSummary = hudQuotaSummary(hudTopQuotas.map { entry -> entry.quota })
-            )
-        }
+
         // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
-        // pílula — a janela ficaria presa no tamanho antigo por baixo do que
+        // barra — a janela ficaria presa no tamanho antigo por baixo do que
         // `mainWindowState.size` pede. Precisa vir **antes** do efeito que
         // redimensiona logo abaixo: os dois reagem a `hudMode` na mesma
         // recomposição, e é a ordem textual aqui dentro que decide qual
@@ -1722,33 +1707,33 @@ private fun runUsageMonitor(
             uiScalePercent = uiScalePercent,
             workArea = screenWorkArea
         )
-        // Geometria da pílula HUD: encolhe a janela principal ao entrar,
-        // restaura tamanho/posição/estado de antes ao sair. O snapshot mora
-        // aqui, e não em `MainWindowSnapshot` (que não carrega posição — a
-        // janela normal nunca precisou dela): só esta transição precisa saber
-        // "de onde veio" para voltar.
+        // Geometria da barra HUD: encolhe a janela principal ao entrar, restaura
+        // tamanho/posição/estado de antes ao sair. O snapshot mora aqui, e não
+        // em `MainWindowSnapshot` (que não carrega posição — a janela normal
+        // nunca precisou dela): só esta transição precisa saber "de onde veio"
+        // para voltar.
         var preHudWindowGeometry by remember {
             mutableStateOf<Triple<DpSize, WindowPosition, WindowPlacement>?>(null)
         }
-        // O canto da pílula **colapsada**, que é a âncora de tudo: expandir e
-        // colapsar recalculam a janela a partir dele, e não da posição corrente
+        // O canto da barra **parada**, que é a âncora de tudo: expandir e
+        // recolher recalculam a janela a partir dele, e não da posição corrente
         // — senão cada expansão que cresce para cima deslocaria a âncora, e a
-        // pílula subiria a cada passagem do mouse.
+        // barra subiria a cada passagem do mouse.
         var hudAnchor by remember { mutableStateOf<DpOffset?>(null) }
         var hudHovered by remember { mutableStateOf(false) }
         var hudExpanded by remember { mutableStateOf(false) }
         // Última posição do ponteiro na tela durante o arrasto. Guardar a
-        // posição de **partida** e somar o total faria a pílula ficar presa na
+        // posição de **partida** e somar o total faria a barra ficar presa na
         // borda: arrastada 500px para fora e trazida 100px de volta, o total
         // continuaria além do limite e o encaixe a manteria colada. Incremental,
         // o excedente é descartado a cada quadro.
         var hudDragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
 
-        // Expandir é imediato; colapsar espera uma passada de `AppMotion.fast`.
-        // Sem a espera, o ponteiro que cruza a divisória entre a pílula e a
-        // lista pode gerar um `Exit` de um quadro, e a janela encolheria debaixo
-        // dele. Não é animação: é um atraso único, e animação infinita travaria
-        // o `waitForIdle` dos testes de componente.
+        // Expandir é imediato; recolher espera uma passada de `AppMotion.fast`.
+        // Sem a espera, o ponteiro que cruza a divisa entre duas linhas pode
+        // gerar um `Exit` de um quadro, e a janela encolheria debaixo dele. Não
+        // é animação: é um atraso único, e animação infinita travaria o
+        // `waitForIdle` dos testes de componente.
         LaunchedEffect(hudHovered) {
             if (hudHovered) {
                 hudExpanded = true
@@ -1768,14 +1753,12 @@ private fun runUsageMonitor(
         // ancorar no ponto faria a janela saltar toda vez que uma fonte saísse
         // de `ON_TRACK`.
         val hudAnchorSize = hudWindowSize(
-            topLine = hudTopLine,
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
             dotOnly = false,
             expanded = false
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
         val hudTargetSize = hudWindowSize(
-            topLine = hudTopLine,
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
             dotOnly = hudCollapsedToDot,
@@ -1821,20 +1804,73 @@ private fun runUsageMonitor(
         // como o modo somente cards. Era isso ou um `Popup`, e popup no Compose
         // Desktop é camada dentro da janela: numa faixa de 24dp ele saía
         // recortado sobre o próprio alvo e a tooltip piscava.
+        // O último tamanho já aplicado à janela. É ele que separa "abrir/fechar
+        // a lista", que anima, de "a barra andou com o ponteiro", que não pode
+        // animar — arrastar com a janela interpolando ficaria com a barra
+        // correndo atrás do mouse.
+        var hudAppliedSize by remember { mutableStateOf<DpSize?>(null) }
+
         LaunchedEffect(hudMode, hudAnchor, hudTargetSize, hudAnchorSize) {
             val anchor = hudAnchor
             if (!hudMode || anchor == null) {
+                hudAppliedSize = null
                 return@LaunchedEffect
             }
 
-            mainWindowState.size = hudTargetSize
-            mainWindowState.position = hudWindowPosition(
+            val targetPosition = hudWindowPosition(
                 anchorX = anchor.x,
                 anchorY = anchor.y,
                 anchorSize = hudAnchorSize,
                 windowSize = hudTargetSize,
                 workArea = screenWorkArea
             )
+            val fromSize = hudAppliedSize
+            val fromPosition = mainWindowState.position
+            val animatable = fromSize != null &&
+                fromSize != hudTargetSize &&
+                fromPosition.x.value.isFinite() &&
+                fromPosition.y.value.isFinite()
+
+            if (!animatable) {
+                // Entrada no modo, arrasto, e qualquer passo em que o tamanho
+                // não mudou: aplica direto.
+                mainWindowState.size = hudTargetSize
+                mainWindowState.position = targetPosition
+                hudAppliedSize = hudTargetSize
+                return@LaunchedEffect
+            }
+
+            // **A janela cresce e encolhe interpolada, não em um salto.** Abrir
+            // a lista trocava 24dp por 100dp num quadro só, e o que se via era a
+            // barra piscando de tamanho. Uma passada de `AppMotion.normal` com o
+            // easing de entrada do sistema é o mesmo tempo que o resto do app usa
+            // para revelar conteúdo.
+            //
+            // **Transição única, nunca laço**: animação infinita trava o
+            // `waitForIdle` dos testes de componente. E é a janela AWT que anda,
+            // não um `graphicsLayer` — o conteúdo aqui não é overlay, é o tamanho
+            // real da janela.
+            val startSize = requireNotNull(fromSize)
+            val startX = fromPosition.x
+            val startY = fromPosition.y
+            animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = AppMotion.normal,
+                    easing = AppMotion.enterEasing
+                )
+            ) { fraction, _ ->
+                mainWindowState.size = DpSize(
+                    width = lerp(startSize.width, hudTargetSize.width, fraction),
+                    height = lerp(startSize.height, hudTargetSize.height, fraction)
+                )
+                mainWindowState.position = WindowPosition(
+                    x = lerp(startX, targetPosition.x, fraction),
+                    y = lerp(startY, targetPosition.y, fraction)
+                )
+            }
+            hudAppliedSize = hudTargetSize
         }
         // Arrasto da pílula. O movimento é aplicado à **âncora**, não à janela:
         // com isso existe um caminho só até a geometria — o efeito acima —, e a
@@ -1890,18 +1926,14 @@ private fun runUsageMonitor(
                 }
             }
         }
-        // Parada, a pílula fica translúcida; com o ponteiro em cima, opaca. Ela
-        // continua capturando o clique de quem está atrás — o Compose Desktop
-        // não tem click-through parcial —, mas incomoda menos a leitura do que
-        // está por baixo. Nunca **acima** da preferência do usuário: quem já
-        // escolheu 60% não passa a ver 70 por entrar no HUD.
-        LaunchedEffect(windowOpacityPercent, hudMode, hudHovered) {
-            val effective = if (hudMode && !hudHovered) {
-                minOf(windowOpacityPercent, HUD_IDLE_OPACITY_PERCENT)
-            } else {
-                windowOpacityPercent
-            }
-            applyWindowOpacity(window, effective)
+        // **A barra HUD não tem translucidez própria.** Ela chegou a ficar
+        // translúcida parada, para incomodar menos a leitura do que está atrás;
+        // na prática deixou o texto mais difícil de ler sem devolver a área,
+        // porque a janela continua capturando o clique de qualquer jeito — o
+        // Compose Desktop não tem click-through parcial. Quem decide a
+        // opacidade é só a preferência do usuário, em todos os modos.
+        LaunchedEffect(windowOpacityPercent) {
+            applyWindowOpacity(window, windowOpacityPercent)
         }
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopWindowFrame(
@@ -1917,7 +1949,6 @@ private fun runUsageMonitor(
                 hudContent = {
                     HudBar(
                         statusTone = hudStatusTone,
-                        topLine = hudTopLine,
                         sources = hudSources,
                         fallbackLabel = hudFallbackLabel,
                         dotOnly = hudCollapsedToDot,
