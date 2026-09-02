@@ -85,3 +85,4 @@ orçamento mensal. Sem uma lista, elas só são descobertas por acidente — ou 
 | # | Atividade | Comando | Resultado |
 |---|---|---|---|
 | A01 | Plano e comentário-índice na issue | `gh issue comment 184` | plano criado; comentário-índice `5503612844`, editado a cada atividade por `gh api -X PATCH repos/:owner/:repo/issues/comments/5503612844` |
+| A02 | Catálogo bilíngue dos 12 tópicos, sem UI | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HelpCatalogTest"` | `BUILD SUCCESSFUL`, 6 testes. Os passos de ativação citam o rótulo real do controle — `"Teto mensal em USD (vazio desliga)"`, `"Sessões CLI desta conta"`, `Ctrl+Shift+H` —, lidos de `AlertSettingsSection.kt`, `ApiUsageCardFormatting.kt` e do `onKeyEvent` de `Main.kt`. A primeira redação usava segunda pessoa ("as integrações que você usa") e foi reescrita em voz impessoal antes do commit — regra de conteúdo do design system, que o texto do app inteiro segue |
