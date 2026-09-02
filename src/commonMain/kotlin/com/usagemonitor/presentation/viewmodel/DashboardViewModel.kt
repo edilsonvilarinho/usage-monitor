@@ -1,10 +1,14 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.UsageSpike
+import com.usagemonitor.domain.entity.detectSpike
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -60,6 +64,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -153,6 +158,16 @@ class DashboardViewModel(
      */
     private val onUpdateScheduleFailure: (String, String) -> Unit = { _, _ -> },
     private val currentAppVersion: String = "0.0.0",
+    /**
+     * Fator corrente da detecção de anomalia, lido das preferências de alerta.
+     *
+     * Provedor e não valor, pelo mesmo motivo do `stallThresholdProvider` do
+     * semáforo: a preferência muda nas Configurações e o view model é construído
+     * uma vez só.
+     */
+    private val spikeFactorProvider: () -> Double = { DEFAULT_SPIKE_FACTOR },
+    /** Fuso em que o dia da anomalia é recortado. Injetável para o teste não depender da máquina. */
+    private val alertTimeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID),
     private val clock: Clock = Clock.System,
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
     private val anthropicProfiles: StateFlow<List<AnthropicProfileRef>> =
@@ -195,6 +210,17 @@ class DashboardViewModel(
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
     val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
 
+    private val _spikes = MutableStateFlow<List<UsageSpike>>(emptyList())
+
+    /**
+     * As cotas consumindo hoje muito acima do hábito do usuário.
+     *
+     * Sai daqui, e não de um laço próprio, porque é derivada do mesmo relatório de
+     * histórico que a projeção de risco já lê a cada coleta. Quem a transforma em
+     * notificação é o [UsageAlertViewModel].
+     */
+    val spikes: StateFlow<List<UsageSpike>> = _spikes.asStateFlow()
+
     private val viewModelScope = CoroutineScope(SupervisorJob() + config.workerDispatcher)
     private val stateMutex = Mutex()
     private val updateMutex = Mutex()
@@ -203,6 +229,7 @@ class DashboardViewModel(
     private val cachedStatsByTarget = mutableMapOf<UsageTargetKey, ApiUsageStats>()
     private val cachedErrorsByTarget = mutableMapOf<UsageTargetKey, UiApiError>()
     private val cachedRiskByTarget = mutableMapOf<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>()
+    private val cachedSpikeByTarget = mutableMapOf<UsageTargetKey, List<UsageSpike>>()
     private val sourceFetchSemaphore = Semaphore(config.maxConcurrentSourceFetches.coerceAtLeast(1))
     private val pollWakeUpSignal = Channel<Unit>(capacity = Channel.CONFLATED)
     private val initialFetchCancelled = AtomicBoolean(false)
@@ -335,7 +362,7 @@ class DashboardViewModel(
         }
         val now = clock.now()
         restored.forEach { stats ->
-            refreshRiskSummaries(stats.targetKey, stats, now, overwriteExisting = false)
+            refreshHistoryDerivedState(stats.targetKey, stats, now, overwriteExisting = false)
         }
         stateMutex.withLock {
             publishUiState(enabledTargets())
@@ -542,7 +569,7 @@ class DashboardViewModel(
                             statsUpdates[target] = stats
                             errorUpdates[target] = null
                             persistSnapshot(stats, snapshotCapturedAt)
-                            refreshRiskSummaries(target, stats, snapshotCapturedAt)
+                            refreshHistoryDerivedState(target, stats, snapshotCapturedAt)
                         } else {
                             errorUpdates[target] = handleTargetFailure(
                                 target,
@@ -811,6 +838,10 @@ class DashboardViewModel(
         cachedStatsByTarget.keys.removeAll { target -> target !in enabledTargets }
         cachedErrorsByTarget.keys.removeAll { target -> target !in enabledTargets }
         cachedRiskByTarget.keys.removeAll { target -> target !in enabledTargets }
+        // Fonte desmarcada não pode continuar alertando: a anomalia dela descreve
+        // um consumo que o usuário deixou de monitorar.
+        cachedSpikeByTarget.keys.removeAll { target -> target !in enabledTargets }
+        publishSpikes()
     }
 
     private fun markRefreshing(targets: Set<UsageTargetKey>, refreshing: Boolean) {
@@ -878,32 +909,65 @@ class DashboardViewModel(
      * pode ter completado no meio do restore, e a projeção dela é a mais nova.
      * Mesma regra que o consumo restaurado segue em [loadCachedStateIfAvailable].
      */
-    private suspend fun refreshRiskSummaries(
+    private suspend fun refreshHistoryDerivedState(
         target: UsageTargetKey,
         stats: ApiUsageStats,
         capturedAt: Instant,
         overwriteExisting: Boolean = true
     ) {
         val historyUseCase = getUsageHistory ?: return
-        val risks = runCatching {
+        val series = runCatching {
             historyUseCase(
                 source = stats.source,
                 range = HistoryRange.LAST_7_DAYS,
                 accountKey = stats.accountContext?.key,
                 now = capturedAt
             )
-        }.getOrNull()?.series
-            ?.mapNotNull { series -> series.riskSummary?.let { risk -> series.seriesKey to risk } }
-            ?.toMap()
-            ?: return
+        }.getOrNull()?.series ?: return
+
+        val risks = series
+            .mapNotNull { item -> item.riskSummary?.let { risk -> item.seriesKey to risk } }
+            .toMap()
+
+        // A anomalia de gasto sai do **mesmo** relatório, e não de uma leitura
+        // própria: os pontos que a linha de referência precisa já estão aqui, e
+        // uma segunda ida ao SQLite por alvo a cada dez minutos pagaria de novo
+        // por dado idêntico.
+        val targetLabel = stats.profileLabel?.takeIf { label -> label.isNotBlank() } ?: stats.apiName
+        val minFactor = spikeFactorProvider()
+        val spikes = series.mapNotNull { item ->
+            item.detectSpike(
+                target = target,
+                targetLabel = targetLabel,
+                now = capturedAt,
+                timeZone = alertTimeZone,
+                minFactor = minFactor
+            )
+        }
 
         // Sob o mutex porque o restore do cache e a coleta escrevem no mesmo
         // mapa: `mutableMapOf` não aguenta dois escritores.
         stateMutex.withLock {
             if (overwriteExisting || target !in cachedRiskByTarget) {
                 cachedRiskByTarget[target] = risks
+                cachedSpikeByTarget[target] = spikes
             }
+            publishSpikes()
         }
+    }
+
+    /**
+     * Republica a lista achatada de anomalias.
+     *
+     * **Só sob o [stateMutex]**, como [publishUiState]: um alvo por coroutine
+     * escreve `cachedSpikeByTarget`, e percorrer o mapa fora do lock daria
+     * `ConcurrentModificationException` numa coleta com duas contas.
+     *
+     * Remonta a lista inteira em vez de acrescentar à anterior, porque um alvo que
+     * deixou de ter anomalia precisa sumir dela.
+     */
+    private fun publishSpikes() {
+        _spikes.value = cachedSpikeByTarget.values.flatten()
     }
 
     private suspend fun checkForUpdate() {

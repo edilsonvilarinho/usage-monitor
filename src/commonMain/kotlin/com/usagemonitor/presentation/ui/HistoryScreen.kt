@@ -53,6 +53,7 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.dailyBaseline
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.requiresUsageAccount
 import com.usagemonitor.presentation.ui.components.AppButton
@@ -254,7 +255,8 @@ fun HistoryScreen(
                                                             quotaLabel = series.quotaLabel,
                                                             periodType = series.periodType,
                                                             selectedRange = current.selectedRange
-                                                        )
+                                                        ),
+                                                        referenceAt = current.report.lastUpdatedAt
                                                     )
                                                 }
                                             }
@@ -285,7 +287,8 @@ fun HistoryScreen(
                                                         ),
                                                         titleOverride = model.baseLabel,
                                                         subtitleOverride = genericHistorySubtitle(language),
-                                                        weeklySummary = model.weeklySummary
+                                                        weeklySummary = model.weeklySummary,
+                                                        referenceAt = current.report.lastUpdatedAt
                                                     )
                                                 }
                                             }
@@ -757,7 +760,9 @@ private fun HistorySeriesCard(
     chartSelectionKey: String,
     titleOverride: String? = null,
     subtitleOverride: String? = null,
-    weeklySummary: UsageHistorySeries? = null
+    weeklySummary: UsageHistorySeries? = null,
+    /** Carimbo do último ponto coletado; base da linha de referência diária. */
+    referenceAt: Instant? = null
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -826,19 +831,22 @@ private fun HistorySeriesCard(
                         title = intervalSummaryLabel(language),
                         source = source,
                         series = series,
-                        language = language
+                        language = language,
+                        referenceAt = referenceAt
                     )
                     HistoryMetricsPanel(
                         title = weeklySummaryLabel(language),
                         source = source,
                         series = weeklySummary,
-                        language = language
+                        language = language,
+                        referenceAt = referenceAt
                     )
                 } else {
                     HistoryMetrics(
                         source = source,
                         series = series,
-                        language = language
+                        language = language,
+                        referenceAt = referenceAt
                     )
                 }
             }
@@ -851,7 +859,8 @@ private fun HistoryMetricsPanel(
     title: String,
     source: ApiSource,
     series: UsageHistorySeries,
-    language: AppLanguage
+    language: AppLanguage,
+    referenceAt: Instant?
 ) {
     AppDataSurfaceFlush(
         header = { AppSectionHeader(title = title) }
@@ -860,7 +869,8 @@ private fun HistoryMetricsPanel(
             HistoryMetrics(
                 source = source,
                 series = series,
-                language = language
+                language = language,
+                referenceAt = referenceAt
             )
         }
     }
@@ -881,10 +891,16 @@ private fun HistoryMetricsPanel(
 private fun HistoryMetrics(
     source: ApiSource,
     series: UsageHistorySeries,
-    language: AppLanguage
+    language: AppLanguage,
+    referenceAt: Instant?
 ) {
     HistoryMetricTable(
-        entries = historyMetricEntries(source = source, series = series, language = language)
+        entries = historyMetricEntries(
+            source = source,
+            series = series,
+            language = language,
+            referenceAt = referenceAt
+        )
     )
 }
 
@@ -922,7 +938,7 @@ private fun HistoryMetricTable(entries: List<HistoryMetricEntry>) {
 }
 
 /** Um par de métrica. Nome e valor já formatados e já traduzidos. */
-private data class HistoryMetricEntry(val label: String, val value: String)
+internal data class HistoryMetricEntry(val label: String, val value: String)
 
 /**
  * As métricas que a série publica, na ordem em que a tela as mostra.
@@ -931,10 +947,11 @@ private data class HistoryMetricEntry(val label: String, val value: String)
  * tipo de período, da unidade e da fonte — regra de apresentação que não tem
  * nada a ver com o layout de duas colunas.
  */
-private fun historyMetricEntries(
+internal fun historyMetricEntries(
     source: ApiSource,
     series: UsageHistorySeries,
-    language: AppLanguage
+    language: AppLanguage,
+    referenceAt: Instant?
 ): List<HistoryMetricEntry> {
     val entries = mutableListOf<HistoryMetricEntry>()
 
@@ -1021,6 +1038,21 @@ private fun historyMetricEntries(
         entries += HistoryMetricEntry(
             label = if (language == AppLanguage.PT) "vs. período anterior" else "vs. previous period",
             value = periodComparisonLabel(comparison, language)
+        )
+    }
+
+    // O consumo de hoje contra o hábito, ao lado da comparação de janelas — as
+    // duas respondem "está mais ou menos que antes", e é a linha acima que
+    // responde "quanto falta para o teto". A referência de tempo é o carimbo do
+    // último ponto coletado, e **nunca** `Clock.System.now()`: num composable ele
+    // mudaria a cada recomposição e o teste não teria valor previsível para
+    // afirmar.
+    val baseline = referenceAt?.let { at -> series.dailyBaseline(at, HISTORY_TIME_ZONE) }
+    val baselineFactor = baseline?.factor
+    if (baselineFactor != null) {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Hoje vs. mediana diária" else "Today vs. daily median",
+            value = dailyBaselineLabel(baselineFactor, baseline.completeDays, language)
         )
     }
 

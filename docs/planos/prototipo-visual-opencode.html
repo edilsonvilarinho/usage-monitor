@@ -1291,6 +1291,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <tr><td>Uso atual</td><td class="num">68% de 100%</td><td>Consumido no período</td><td class="num">62 pp</td></tr>
         <tr><td>Média por hora</td><td class="num">5,6 pp/h</td><td>Previsão</td><td class="num">Esgota Qua 17h00 BRT</td></tr>
         <tr><td>Reinício</td><td class="num">Qua 13h00 BRT</td><td>Variação observada</td><td class="num" style="color:var(--warn)">+18% vs. período anterior</td></tr>
+        <tr><td>Hoje vs. mediana diária</td><td class="num" style="color:var(--warn)">3,4× (6 dias)</td><td></td><td></td></tr>
       </table></div>
     </div>
 
@@ -1300,12 +1301,21 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <tr><td>Uso atual</td><td class="num">41% de 100%</td><td>Consumido no período</td><td class="num">23 pp</td></tr>
         <tr><td>Média por hora</td><td class="num">1,0 pp/h</td><td>Previsão</td><td class="num">A janela deve reiniciar antes do limite</td></tr>
         <tr><td>Reinício</td><td class="num">Sáb 15/08 21h00 BRT</td><td>Variação observada</td><td class="num" style="color:var(--ok)">−4% vs. período anterior</td></tr>
+        <tr><td>Hoje vs. mediana diária</td><td class="num">1,1× (6 dias)</td><td></td><td></td></tr>
       </table></div>
     </div>
     <div class="statusbar"><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
   </div>
 </div>
 <p class="note">Preservados: seleção por fonte e por conta, as quatro janelas, reinícios, média por hora, forecast, comparação com o período anterior e as regras próprias de saldo e de créditos. Os pontos da janela anterior continuam <b>fora do gráfico</b> — entram só no delta.</p>
+<p class="note"><b>«Hoje vs. mediana diária» fica ao lado de «vs. período anterior», e não junto da previsão</b>
+(issue #163). As duas respondem &ldquo;está mais ou menos que antes&rdquo;; a previsão responde &ldquo;quanto falta
+para o teto&rdquo;. O valor traz a <b>contagem de dias</b> entre parênteses porque ela é a régua — <code>3,4×</code>
+sem dizer acima de quê não permite julgar se o número merece atenção. A referência de tempo é a <b>última coleta</b>
+impressa na barra de estado, nunca o relógio do momento da recomposição. <b>A linha some</b> quando há menos de três
+dias completos medidos, quando o consumo habitual é zero e nas janelas reportadas — nesses casos não há o que
+afirmar, e um valor ali seria estatística de dois pontos. Os painéis próprios do DeepSeek e do OpenCode montam a
+própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as oito fontes.</p>
 
 <!-- ═══════════════════════════════ SESSÕES ═══════════════════════════ -->
 <h2 id="sessoes">6 · Sessões CLI</h2>
@@ -1831,6 +1841,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI saturada</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só o veredito saturado vira notificação. Atenção apareceu em 7 de 70 sessões medidas — notificar nesse patamar tornaria o alerta rotina.</span></div><span class="sw on"></span></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI sem resposta</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Houve pedido e não houve resposta no transcript acima do limiar. O app não verifica o processo do Claude Code, e o texto do aviso não afirma que ele travou.</span></div><span class="sw on"></span></div>
       <div class="row"><span class="v sm" style="flex:1">Limiar sem resposta</span><div class="seg"><button type="button">30min</button><button type="button">1h</button><button class="on" type="button">2h</button><button type="button">4h</button></div></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Consumo fora do habitual</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">A referência é a mediana dos últimos dias, no mesmo horário — não o limite da cota. Sem pelo menos três dias medidos, ou com consumo habitual perto de zero, nenhum aviso é emitido.</span></div><span class="sw on"></span></div>
+      <div class="row"><span class="v sm" style="flex:1">Múltiplo do habitual</span><div class="seg"><button type="button">2×</button><button class="on" type="button">3×</button><button type="button">5×</button></div></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Silenciar até</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">No período silenciado o limiar cruzado não é marcado como disparado: o aviso sai quando o silêncio terminar.</span></div><input class="field" value="18:00" style="width:90px"></div>
     </div></div>
   </div>
@@ -1841,6 +1853,13 @@ entre alternativas, que é a definição do segmentado. A faixa vai de 30min (pi
 turno longo legítimo, com muitas ferramentas e subagente) a 4h. <b>Desligado o interruptor, o segmentado sai da
 tela</b>: controle sem efeito é pior que controle ausente. Pendência acima de <b>24h</b> é sessão abandonada e
 nunca gera aviso — sem esse teto, transcript interrompido meses atrás viraria alerta a cada arranque do app.</p>
+<p class="note"><b>O aviso de consumo fora do habitual responde a outra pergunta</b> (issue #163). Os três acima
+medem distância até o <b>teto</b> — limiar de cota, saturação, ausência de resposta. Este mede distância até o
+<b>hábito do próprio usuário</b>: um dia três vezes acima do normal não cruza limiar nenhum enquanto estiver longe
+do limite, e é aí que mora o vazamento de custo. Por isso o múltiplo é <b>segmentado</b>, como o limiar sem
+resposta e pela mesma razão: escolha única entre alternativas. A referência é a <b>mediana</b> e não a média — com
+três a seis amostras, um único incidente anterior levantaria a média e esconderia o próximo, que é justamente o
+caso que a detecção existe para pegar. <b>Desligado o interruptor, o segmentado sai da tela.</b></p>
 
 <h2 id="cfg-apis">12c · Configurações — APIs</h2>
 <div class="win mid" style="max-width:none">

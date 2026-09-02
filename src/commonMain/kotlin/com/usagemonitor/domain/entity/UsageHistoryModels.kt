@@ -103,6 +103,39 @@ data class UsageHistoryPoint(
         }
 }
 
+/**
+ * Consumo observado ao longo de uma sequência de pontos.
+ *
+ * **Só as variações no sentido do gasto entram.** Para [UsageUnit.CURRENCY_USD] o
+ * ponto guarda o saldo, então gastar é o saldo **cair** e a função soma as quedas;
+ * para as demais unidades o ponto guarda o acumulado e gastar é subir. É por isso
+ * que o reset de uma janela — que derruba o acumulado a zero — contribui zero em
+ * vez de um delta negativo que apagaria o consumo anterior.
+ *
+ * Mora no domain, e não em quem lê o histórico, porque tem dois consumidores: o
+ * relatório do histórico e a linha de referência diária de [UsageDailyBaseline].
+ * Duas cópias divergiriam justamente no tratamento do reset, que é a parte
+ * sutil.
+ */
+fun positiveDeltaOf(points: List<UsageHistoryPoint>, unit: UsageUnit): Long {
+    var delta = 0L
+    for (index in 1 until points.size) {
+        val current = points[index]
+        val previous = points[index - 1]
+        val diff = current.displayUsed - previous.displayUsed
+        if (unit == UsageUnit.CURRENCY_USD) {
+            if (diff < 0L) {
+                delta += -diff
+            }
+        } else {
+            if (diff > 0L) {
+                delta += diff
+            }
+        }
+    }
+    return delta
+}
+
 sealed interface UsageForecast {
     data object InsufficientData : UsageForecast
     data object NoGrowth : UsageForecast

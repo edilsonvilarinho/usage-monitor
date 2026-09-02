@@ -2,16 +2,21 @@ package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
+import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
+import com.usagemonitor.domain.entity.MIN_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.MIN_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.UsageAlertSettings
+import kotlin.math.roundToInt
 
 private const val QUOTA_ALERTS_ENABLED_KEY = "alertsQuotaEnabled"
 private const val QUOTA_ALERT_PERCENTS_KEY = "alertsQuotaPercents"
 private const val SESSION_ALERTS_ENABLED_KEY = "alertsSessionEnabled"
 private const val STALLED_ALERTS_ENABLED_KEY = "alertsStalledEnabled"
 private const val STALL_THRESHOLD_MINUTES_KEY = "alertsStallThresholdMinutes"
+private const val SPIKE_ALERTS_ENABLED_KEY = "alertsSpikeEnabled"
+private const val SPIKE_FACTOR_TENTHS_KEY = "alertsSpikeFactorTenths"
 private const val QUIET_HOURS_KEY = "alertsQuietHours"
 
 /**
@@ -29,6 +34,8 @@ internal fun readPersistedAlertSettings(settings: PreferencesSettings): UsageAle
         sessionAlertsEnabled = settings.getBoolean(SESSION_ALERTS_ENABLED_KEY, true),
         stalledSessionAlertsEnabled = settings.getBoolean(STALLED_ALERTS_ENABLED_KEY, true),
         stallThresholdMillis = decodeStallThresholdMillis(settings.getIntOrNull(STALL_THRESHOLD_MINUTES_KEY)),
+        spikeAlertsEnabled = settings.getBoolean(SPIKE_ALERTS_ENABLED_KEY, true),
+        spikeFactor = decodeSpikeFactor(settings.getIntOrNull(SPIKE_FACTOR_TENTHS_KEY)),
         quietHours = decodeQuietHours(settings.getStringOrNull(QUIET_HOURS_KEY))
     )
 }
@@ -39,7 +46,28 @@ internal fun persistAlertSettings(settings: PreferencesSettings, value: UsageAle
     settings.putBoolean(SESSION_ALERTS_ENABLED_KEY, value.sessionAlertsEnabled)
     settings.putBoolean(STALLED_ALERTS_ENABLED_KEY, value.stalledSessionAlertsEnabled)
     settings.putInt(STALL_THRESHOLD_MINUTES_KEY, (value.effectiveStallThresholdMillis / 60_000L).toInt())
+    settings.putBoolean(SPIKE_ALERTS_ENABLED_KEY, value.spikeAlertsEnabled)
+    settings.putInt(SPIKE_FACTOR_TENTHS_KEY, (value.effectiveSpikeFactor * 10.0).roundToInt())
     settings.putString(QUIET_HOURS_KEY, encodeQuietHours(value.quietHours))
+}
+
+/**
+ * Fator gravado em **décimos inteiros**, com o piso do domain aplicado na leitura.
+ *
+ * Inteiro e não `Double` porque o valor vai em claro para o registro, e é lá que
+ * alguém pode editá-lo à mão: `30` é legível e não tem separador decimal para
+ * depender do idioma do sistema. Ausente ou abaixo do piso cai no default — o
+ * armazenamento não é fonte confiável de faixa válida.
+ */
+internal fun decodeSpikeFactor(storedTenths: Int?): Double {
+    if (storedTenths == null) {
+        return DEFAULT_SPIKE_FACTOR
+    }
+    val factor = storedTenths.toDouble() / 10.0
+    if (factor < MIN_SPIKE_FACTOR) {
+        return DEFAULT_SPIKE_FACTOR
+    }
+    return factor
 }
 
 /**

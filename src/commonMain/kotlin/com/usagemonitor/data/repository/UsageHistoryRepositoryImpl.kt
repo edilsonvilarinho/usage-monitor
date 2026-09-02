@@ -12,6 +12,7 @@ import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsagePeriodComparison
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isSamePeriod
+import com.usagemonitor.domain.entity.positiveDeltaOf
 import com.usagemonitor.domain.entity.riskSummary
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -113,7 +114,7 @@ class UsageHistoryRepositoryImpl(
         }
         val unit = records.first().unit
         val currentPoint = renderPoints.last()
-        val deltaDisplayUsed = calculatePositiveDelta(renderPoints, unit)
+        val deltaDisplayUsed = positiveDeltaOf(renderPoints, unit)
         val hoursObserved = calculateObservedHours(renderPoints)
         val averagePerHour = if (key.periodType == PeriodType.REPORTED) {
             0.0
@@ -167,7 +168,7 @@ class UsageHistoryRepositoryImpl(
         }
         return UsagePeriodComparison(
             currentDelta = currentDelta,
-            previousDelta = calculatePositiveDelta(previousRecords.map(::toHistoryPoint), unit)
+            previousDelta = positiveDeltaOf(previousRecords.map(::toHistoryPoint), unit)
         )
     }
 
@@ -182,7 +183,7 @@ class UsageHistoryRepositoryImpl(
             return UsageForecast.InsufficientData
         }
 
-        val positiveDelta = calculatePositiveDelta(activeSegment, unit)
+        val positiveDelta = positiveDeltaOf(activeSegment, unit)
         if (positiveDelta <= 0L) {
             return UsageForecast.NoGrowth
         }
@@ -262,25 +263,6 @@ class UsageHistoryRepositoryImpl(
             sampled += points[scaledIndex]
         }
         return sampled.toList()
-    }
-
-    private fun calculatePositiveDelta(points: List<UsageHistoryPoint>, unit: UsageUnit): Long {
-        var delta = 0L
-        for (index in 1 until points.size) {
-            val current = points[index]
-            val previous = points[index - 1]
-            val diff = current.displayUsed - previous.displayUsed
-            if (unit == UsageUnit.CURRENCY_USD) {
-                if (diff < 0L) {
-                    delta += -diff
-                }
-            } else {
-                if (diff > 0L) {
-                    delta += diff
-                }
-            }
-        }
-        return delta
     }
 
     private fun calculateObservedHours(points: List<UsageHistoryPoint>): Double {

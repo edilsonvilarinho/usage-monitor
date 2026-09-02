@@ -53,6 +53,10 @@ export function History() {
         <AppMetric label="Pico" value="81%" hint="Ter 12/08 16h BRT" />
         <AppMetric label="Reinícios na janela" value="14" />
         <AppMetric label="Previsão de esgotamento" value="Qua 13h00" hint="antes do reset" />
+        {/* Distância até o hábito, e não até o teto: a contagem de dias vai junto
+            porque ela é a régua — "3,4×" sem dizer acima de quê não permite julgar
+            se o número merece atenção. Some com menos de três dias medidos. */}
+        <AppMetric label="Hoje vs. mediana diária" value="3,4×" hint="mediana de 6 dias" />
       </div>
 
       <AppPanel>

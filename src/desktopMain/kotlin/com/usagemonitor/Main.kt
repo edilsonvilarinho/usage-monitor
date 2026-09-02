@@ -647,6 +647,12 @@ private fun runUsageMonitor(
     // precisam dela e nenhum dos dois vive dentro do `Window`.
     var mainWindowRef by remember { mutableStateOf<java.awt.Window?>(null) }
     val isAppVisible = remember { MutableStateFlow(true) }
+    // Preferências de alerta como flow, e não como estado da composição: quem as
+    // consome são os view models, que vivem fora dela. Declaradas **antes** do
+    // `DashboardViewModel` porque é delas que sai o fator da detecção de anomalia,
+    // além do limiar de sessão sem resposta lido pelo semáforo e pela tela de
+    // Sessões CLI.
+    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
     val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, openCodeGoRepository, openRouterRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
@@ -669,6 +675,7 @@ private fun runUsageMonitor(
             onRestartAndUpdateRequested = { autoUpdate.requestRestart() },
             onUpdateScheduleFailure = ::writeUpdateScheduleFailureReceipt,
             currentAppVersion = CURRENT_APP_VERSION,
+            spikeFactorProvider = { alertSettingsFlow.value.effectiveSpikeFactor },
             isAppVisible = isAppVisible,
             anthropicProfiles = enabledAnthropicProfiles,
             persistedNextRefreshAt = persistedNextRefreshAt,
@@ -691,11 +698,6 @@ private fun runUsageMonitor(
     val syncCliSessionIndex = remember(cliSessionRepository) {
         SyncCliSessionIndexUseCase(cliSessionRepository)
     }
-    // Preferências de alerta como flow, e não como estado da composição: quem as
-    // consome são os view models, que vivem fora dela. Declaradas aqui porque é
-    // delas que sai o limiar da detecção de sessão sem resposta, lido tanto pelo
-    // semáforo quanto pela tela de Sessões CLI.
-    val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
     val getStalledCliSessions = remember(cliSessionRepository) {
         GetStalledCliSessionsUseCase(cliSessionRepository)
     }
@@ -783,7 +785,8 @@ private fun runUsageMonitor(
             dashboardState = viewModel.uiState,
             cliPulses = sessionPulseViewModel.cliPulses,
             alertSettings = alertSettingsFlow,
-            stalledSessions = sessionPulseViewModel.stalledSessions
+            stalledSessions = sessionPulseViewModel.stalledSessions,
+            spikes = viewModel.spikes
         )
     }
     val teamKeysViewModel = remember(teamAdminRepository) {

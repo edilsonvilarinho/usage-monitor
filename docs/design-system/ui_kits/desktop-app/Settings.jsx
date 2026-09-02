@@ -29,6 +29,7 @@ export function Settings() {
   const [autoStart, setAutoStart] = React.useState(true);
   const [dark, setDark] = React.useState(true);
   const [lang, setLang] = React.useState('PT');
+  const [spike, setSpike] = React.useState('3×');
   const [team, setTeam] = React.useState(false);
   const [apis, setApis] = React.useState(APIS.map((a) => a.on));
 
@@ -65,6 +66,12 @@ export function Settings() {
               </div>
               <AppSwitch checked label="Alertar quando uma sessão CLI saturar" />
               <AppSwitch checked label="Notificação nativa do sistema" />
+              {/* Mede distância até o hábito do usuário, não até o teto da cota: um dia
+                  três vezes acima do normal não cruza limiar nenhum enquanto estiver
+                  longe do limite. Segmentado porque o múltiplo é escolha única. */}
+              <AppSwitch checked label="Avisar quando o consumo do dia fugir do habitual" />
+              <AppKey>Múltiplo do habitual</AppKey>
+              <AppSegmentedControl items={['2×', '3×', '5×']} value={spike} onChange={setSpike} />
               <AppKey>Período de silêncio</AppKey>
               <div style={{ display: 'flex', gap: 'var(--s3)' }}>
                 <AppTextField label="De" value="22:00" style={{ width: 110 }} />

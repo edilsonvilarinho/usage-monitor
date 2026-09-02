@@ -21,7 +21,45 @@ fun usageAlertMessage(alert: UsageAlert, language: AppLanguage): UsageAlertMessa
         is UsageAlert.QuotaThreshold -> quotaThresholdMessage(alert, language)
         is UsageAlert.SessionSaturated -> sessionSaturatedMessage(alert, language)
         is UsageAlert.SessionStalled -> sessionStalledMessage(alert, language)
+        is UsageAlert.SpendSpike -> spendSpikeMessage(alert, language)
     }
+}
+
+/**
+ * O consumo de hoje contra o hábito, nunca contra o teto.
+ *
+ * Título fixo e alvo no corpo, como em [sessionSaturatedMessage]: o título de
+ * [quotaThresholdMessage] já é `alvo · cota`, e repeti-lo aqui faria os dois
+ * avisos chegarem à bandeja com a mesma primeira linha, dizendo coisas
+ * diferentes.
+ *
+ * A contagem de dias sai por extenso porque ela **é** a régua: "4,0× acima" sem
+ * dizer acima de quê não permite julgar se o número merece atenção. Sempre
+ * plural — [MIN_BASELINE_DAYS] são três.
+ */
+private fun spendSpikeMessage(
+    alert: UsageAlert.SpendSpike,
+    language: AppLanguage
+): UsageAlertMessage {
+    val isPt = language == AppLanguage.PT
+    val factor = formatSpikeFactor(alert.factor, language)
+    val subject = "${alert.targetLabel} · ${alert.quotaLabel}"
+
+    if (isPt) {
+        return UsageAlertMessage(
+            title = "Consumo acima do habitual",
+            body = "$subject: hoje está ${factor}× acima da mediana dos últimos " +
+                "${alert.baselineDays} dias no mesmo horário. Verifique se há automação ou " +
+                "sessão rodando sem supervisão."
+        )
+    }
+
+    return UsageAlertMessage(
+        title = "Usage above the usual",
+        body = "$subject: today is ${factor}× above the median of the last " +
+            "${alert.baselineDays} days at the same time of day. Check whether some automation " +
+            "or session is running unattended."
+    )
 }
 
 private fun quotaThresholdMessage(

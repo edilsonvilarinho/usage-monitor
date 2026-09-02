@@ -5,6 +5,8 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
+import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
+import com.usagemonitor.domain.entity.MIN_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -14,10 +16,13 @@ import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageAlertState
+import com.usagemonitor.domain.entity.UsageDailyBaseline
+import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.evaluateUsageAlerts
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -439,6 +444,171 @@ class UsageAlertTest {
 
         assertEquals(listOf(75, 90, 100), settings.effectiveQuotaPercents)
     }
+
+    @Test
+    fun `a spike emits one alert carrying the factor and the baseline`() {
+        val result = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            spikes = listOf(spike(factor = 4.0))
+        )
+
+        val alerts = result.alerts.filterIsInstance<UsageAlert.SpendSpike>()
+        assertEquals(1, alerts.size)
+        assertEquals(4.0, alerts.first().factor)
+        assertEquals(400L, alerts.first().todayDelta)
+        assertEquals(100L, alerts.first().baselineDelta)
+        assertEquals(3, alerts.first().baselineDays)
+    }
+
+    @Test
+    fun `the same spike does not repeat on the same day`() {
+        val first = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            spikes = listOf(spike(factor = 4.0))
+        )
+
+        val second = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = first.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 10.minutes,
+            spikes = listOf(spike(factor = 6.0))
+        )
+
+        assertTrue(second.alerts.filterIsInstance<UsageAlert.SpendSpike>().isEmpty())
+    }
+
+    /**
+     * O fator é `hoje / mediana` e os dois crescem ao longo do dia: a anomalia pode
+     * sair da lista e voltar. A memória não pode ser podada pela lista corrente,
+     * senão a volta viraria um aviso novo sobre o mesmo dia.
+     */
+    @Test
+    fun `a spike that disappears and comes back on the same day stays quiet`() {
+        val fired = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            spikes = listOf(spike(factor = 4.0))
+        )
+
+        val quiet = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = fired.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 10.minutes,
+            spikes = emptyList()
+        )
+
+        val back = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = quiet.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 20.minutes,
+            spikes = listOf(spike(factor = 5.0))
+        )
+
+        assertTrue(back.alerts.filterIsInstance<UsageAlert.SpendSpike>().isEmpty())
+    }
+
+    /** A virada do dia rearma: é um dia novo e uma medida nova. */
+    @Test
+    fun `the next day rearms the spike alert`() {
+        val first = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            spikes = listOf(spike(factor = 4.0))
+        )
+
+        val nextDay = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = first.state,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW + 24.hours,
+            spikes = listOf(spike(factor = 4.0, day = 14))
+        )
+
+        assertEquals(1, nextDay.alerts.filterIsInstance<UsageAlert.SpendSpike>().size)
+    }
+
+    /** Silêncio adia; não consome o aviso. */
+    @Test
+    fun `quiet hours postpone the spike alert`() {
+        val settings = UsageAlertSettings.DEFAULT.copy(quietHours = QuietHours(22, 8))
+
+        val silenced = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = settings,
+            now = NOW,
+            currentLocalHour = 23,
+            spikes = listOf(spike(factor = 4.0))
+        )
+        assertTrue(silenced.alerts.isEmpty())
+
+        val awake = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = silenced.state,
+            settings = settings,
+            now = NOW + 10.minutes,
+            currentLocalHour = 9,
+            spikes = listOf(spike(factor = 4.0))
+        )
+
+        assertEquals(1, awake.alerts.filterIsInstance<UsageAlert.SpendSpike>().size)
+    }
+
+    @Test
+    fun `disabling spike alerts clears the fired state`() {
+        val fired = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW,
+            spikes = listOf(spike(factor = 4.0))
+        )
+        assertTrue(fired.state.firedSpikeDays.isNotEmpty())
+
+        val off = evaluateUsageAlerts(
+            stats = emptyList(),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = fired.state,
+            settings = UsageAlertSettings.DEFAULT.copy(spikeAlertsEnabled = false),
+            now = NOW + 10.minutes,
+            spikes = listOf(spike(factor = 4.0))
+        )
+
+        assertTrue(off.alerts.isEmpty())
+        assertTrue(off.state.firedSpikeDays.isEmpty())
+    }
+
+    /** O valor vem de armazenamento em claro; abaixo do piso ele não vale. */
+    @Test
+    fun `the spike factor has a floor`() {
+        assertEquals(MIN_SPIKE_FACTOR, UsageAlertSettings.DEFAULT.copy(spikeFactor = 1.0).effectiveSpikeFactor)
+        assertEquals(5.0, UsageAlertSettings.DEFAULT.copy(spikeFactor = 5.0).effectiveSpikeFactor)
+        assertEquals(DEFAULT_SPIKE_FACTOR, UsageAlertSettings.DEFAULT.effectiveSpikeFactor)
+    }
 }
 
 private fun stats(
@@ -474,6 +644,20 @@ private fun stalledSession(sessionId: String): StalledCliSession {
         profileId = DEFAULT_ANTHROPIC_PROFILE_ID,
         pendingSince = NOW - 3.hours,
         pendingMillis = 3.hours.inWholeMilliseconds
+    )
+}
+
+private fun spike(factor: Double, day: Int = 13): UsageSpike {
+    return UsageSpike(
+        target = TARGET,
+        targetLabel = "Anthropic — Padrão",
+        quotaLabel = "Sessão 5h",
+        periodType = PeriodType.INTERVAL,
+        unit = UsageUnit.PERCENTAGE,
+        baseline = UsageDailyBaseline(todayDelta = 400L, baselineDelta = 100L, completeDays = 3),
+        factor = factor,
+        quotaTotal = 100L,
+        localDate = LocalDate(2026, 8, day)
     )
 }
 
