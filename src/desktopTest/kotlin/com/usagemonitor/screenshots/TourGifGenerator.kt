@@ -19,9 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -95,8 +92,8 @@ private fun recordTour(recorder: SceneRecorder, state: TourState) {
 
     // 2. Atualizar um card.
     state.cursor = state.cursor.copy(x = 300.dp, y = 400.dp, visible = true)
-    recorder.moveCursor(state, x = 322.dp, y = 46.dp, durationMillis = 450)
-    recorder.click(state) { state.refreshing = setOf(ScreenshotFixtures.primaryAnthropicTarget) }
+    recorder.moveCursor(state.cursorTrack, x = 322.dp, y = 46.dp, durationMillis = 450)
+    recorder.click(state.cursorTrack) { state.refreshing = setOf(ScreenshotFixtures.primaryAnthropicTarget) }
     recorder.animate(700) {}
     state.refreshing = emptySet()
     recorder.hold(700)
@@ -111,13 +108,13 @@ private fun recordTour(recorder: SceneRecorder, state: TourState) {
     recorder.fadeTo(state, TourScreen.CLI_SESSIONS, contentHeight = HEIGHT_DP.dp)
     recorder.hold(1_100)
 
-    recorder.moveCursor(state, x = 118.dp, y = 136.dp, durationMillis = 400)
-    recorder.click(state) { state.cliState = state.cliState.copy(range = CliSessionRange.LAST_7D) }
+    recorder.moveCursor(state.cursorTrack, x = 118.dp, y = 136.dp, durationMillis = 400)
+    recorder.click(state.cursorTrack) { state.cliState = state.cliState.copy(range = CliSessionRange.LAST_7D) }
     recorder.animate(300) {}
     recorder.hold(900)
 
-    recorder.moveCursor(state, x = 300.dp, y = 220.dp, durationMillis = 400)
-    recorder.click(state) { state.openSessionDetail() }
+    recorder.moveCursor(state.cursorTrack, x = 300.dp, y = 220.dp, durationMillis = 400)
+    recorder.click(state.cursorTrack) { state.openSessionDetail() }
     // Alto o bastante para o deslocamento não chegar ao fim da caixa: ali o
     // conteúdo acabaria e o quadro mostraria fundo vazio.
     state.contentHeight = 1_200.dp
@@ -133,8 +130,8 @@ private fun recordTour(recorder: SceneRecorder, state: TourState) {
     recorder.fadeTo(state, TourScreen.TEAM, contentHeight = HEIGHT_DP.dp)
     recorder.hold(1_000)
 
-    recorder.moveCursor(state, x = 300.dp, y = 218.dp, durationMillis = 400)
-    recorder.click(state) {
+    recorder.moveCursor(state.cursorTrack, x = 300.dp, y = 218.dp, durationMillis = 400)
+    recorder.click(state.cursorTrack) {
         state.teamState = state.teamState.copy(
             expandedMemberKeys = setOf(ScreenshotFixtures.LOCAL_DEVICE_ID)
         )
@@ -176,7 +173,14 @@ private class TourState {
 
     var refreshing by mutableStateOf(emptySet<UsageTargetKey>())
 
-    var cursor by mutableStateOf(TourCursorPose(x = 300.dp, y = 400.dp, visible = false))
+    /** O ponteiro é do gravador: os dois roteiros gravados desenham o mesmo. */
+    val cursorTrack = CursorTrack()
+
+    var cursor: TourCursorPose
+        get() = cursorTrack.pose
+        set(value) {
+            cursorTrack.pose = value
+        }
 
     var cliState by mutableStateOf(initialCliState())
 
@@ -264,31 +268,6 @@ private fun TourContent(state: TourState, historyViewModel: HistoryViewModel) {
         }
 
         TourCursorOverlay(state.cursor)
-    }
-}
-
-/**
- * Mede o conteúdo em [contentHeight] e o desloca em [pan] dentro da cena.
- *
- * É um `Layout` na mão porque os dois modificadores prontos falham aqui:
- * `height` é coagido pelas constraints do pai e nunca passaria dos 720dp da
- * cena, e `requiredHeight` mede alto mas **centraliza** o que sobra — o topo da
- * tela sumia e o deslocamento revelava vazio no rodapé.
- */
-@Composable
-private fun PannedViewport(contentHeight: Dp, pan: Dp, content: @Composable () -> Unit) {
-    Layout(
-        content = content,
-        modifier = Modifier.fillMaxSize().clipToBounds()
-    ) { measurables, constraints ->
-        val height = contentHeight.roundToPx()
-        val placeables = measurables.map { measurable ->
-            measurable.measure(Constraints.fixed(constraints.maxWidth, height))
-        }
-        layout(constraints.maxWidth, constraints.maxHeight) {
-            val top = -pan.roundToPx()
-            placeables.forEach { placeable -> placeable.place(0, top) }
-        }
     }
 }
 
@@ -388,38 +367,8 @@ private fun TeamSettingsTourScreen() {
 
 // --- Gravação ----------------------------------------------------------------
 
-private fun SceneRecorder.moveCursor(state: TourState, x: Dp, y: Dp, durationMillis: Long) {
-    val fromX = state.cursor.x
-    val fromY = state.cursor.y
-    animate(durationMillis) { progress ->
-        val eased = smoothStep(progress)
-        state.cursor = state.cursor.copy(
-            x = fromX + (x - fromX) * eased,
-            y = fromY + (y - fromY) * eased,
-            visible = true,
-            clickProgress = null
-        )
-    }
-}
-
-/** Onda do clique; [action] dispara no meio dela, não no fim. */
-private fun SceneRecorder.click(state: TourState, action: () -> Unit) {
-    var fired = false
-    animate(400) { progress ->
-        if (!fired && progress >= 0.35f) {
-            action()
-            fired = true
-        }
-        state.cursor = state.cursor.copy(clickProgress = progress)
-    }
-    state.cursor = state.cursor.copy(clickProgress = null)
-}
-
 private fun SceneRecorder.pan(state: TourState, to: Dp, durationMillis: Long) {
-    val from = state.pan
-    animate(durationMillis) { progress ->
-        state.pan = from + (to - from) * smoothStep(progress)
-    }
+    panValue(from = state.pan, to = to, durationMillis = durationMillis) { value -> state.pan = value }
 }
 
 /** Troca de tela: o ponteiro some, porque não há o que ele esteja acionando. */

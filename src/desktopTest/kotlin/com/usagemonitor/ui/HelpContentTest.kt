@@ -109,7 +109,7 @@ class HelpContentTest {
     ) {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.size(width = 900.dp, height = 620.dp)) {
+                Box(modifier = Modifier.size(width = 1_180.dp, height = 780.dp)) {
                     HelpContent(
                         selectedTopic = topic,
                         onSelectTopic = onSelectTopic,

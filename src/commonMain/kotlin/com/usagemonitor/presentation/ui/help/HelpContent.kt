@@ -290,9 +290,12 @@ private val HELP_NAV_WIDTH = 200.dp
 private val STEP_NUMBER_WIDTH = 20.dp
 
 /**
- * Altura da faixa da demo.
+ * Altura da faixa da demo, igual à altura da gravação.
  *
- * Cabe a gravação de 640×400 reduzida com folga e ainda deixa a seção "Como
- * ativar" acima da dobra numa janela de 620dp — que é a altura default desta.
+ * As demos são gravadas em 1000×420 porque as telas deste app têm orçamento de
+ * coluna de ~1000dp — gravá-las estreitas mostraria um layout que o app não tem.
+ * Exibir 1000×420 numa faixa mais baixa reduziria a demo, e reduzir texto de
+ * 12px pela metade torna ilegível justamente o rótulo que ela existe para
+ * apontar. Por isso a faixa tem a altura da gravação, e a janela é larga.
  */
-private val HELP_MEDIA_HEIGHT = 260.dp
+private val HELP_MEDIA_HEIGHT = 420.dp
