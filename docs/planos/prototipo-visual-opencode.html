@@ -478,6 +478,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <div class="grp">Saídas</div>
   <a href="#pdf">Relatório PDF</a>
   <a href="#chrome">Molduras e densidade</a>
+  <a href="#ajuda">Ajuda</a>
   <a href="#checklist">Checklist de aprovação</a>
 </nav>
 
@@ -866,6 +867,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <span class="st ok">5 fontes</span>
     <button class="btn ghost" type="button">Atualizar tudo</button>
     <button class="btn ghost" type="button">Configurações</button>
+    <button class="btn ghost" type="button">Ajuda</button>
   </div>
 </div>
 <div class="g2">
@@ -979,7 +981,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 7d</span><span class="sp"></span><span class="v">8%</span></div><div class="track ok"><i style="width:8%"></i></div></div></div></div></div>
   </div>
 </div>
-<p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
+<p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A ajuda (§14b) segue o mesmo desenho por ser a primeira coisa a sumir com o rodapé: botão no rodapé, item na bandeja e <code>F1</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
 
 <h3>Barra HUD</h3>
 <p class="lede">Um terceiro chrome, ainda mais discreto que o modo somente cards (issue #164): a mesma janela principal encolhida a um painel de largura medida pelo conteúdo, arrastável para qualquer ponto da tela, sempre visível. Não mostra cards — cada linha é uma <b>conta</b>, com ponto e palavra da pior cota dela, o nome, e um ponto por cota ao lado do percentual. Parada mostra a <b>primeira</b> conta da ordem de cards do usuário; com o ponteiro em cima, todas, com a janela crescendo interpolada. Sem arrasto de reordenar (não há cards para reordenar), sem barra de título: um clique curto em qualquer ponto devolve a janela completa, e o arrasto o move.</p>
@@ -2004,6 +2006,50 @@ O app fechou inesperadamente.
     <p class="note">Janelas continuam <em>undecorated</em>, com área arrastável, geometria persistida, sempre-visível e opacidade preservados. Altura da barra cai de 42 para 34dp; o raio da janela acompanha a escala nova.</p>
   </div>
 </div>
+
+<!-- ═══════════════════════════════ AJUDA ════════════════════════════ -->
+<h2 id="ajuda">14b · Ajuda — modal de funcionalidades</h2>
+<p class="lede">Issue #184. Doze tópicos num trilho lateral, e para cada um: resumo, uma demo animada gravada dos próprios componentes, a descrição e os passos de ativação. Janela em 900 × 620 dp, mínimo 600 × 320 dp.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Ajuda</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div style="display:grid;grid-template-columns:200px 1fr;min-height:420px">
+    <div style="border-right:1px solid var(--border);background:var(--surface);padding:var(--s3);display:flex;flex-direction:column;gap:2px">
+      <span class="k" style="margin-bottom:var(--s2)">Funcionalidades</span>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Dashboard e integrações</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Histórico e previsão</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Sessões do Claude Code</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Resumo por eixo</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Orçamento mensal</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Alertas e bandeja</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Exportação e relatório PDF</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Visão de time</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Presença ao vivo</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start;color:var(--fg);background:var(--raised)">Modos de janela</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Aparência e janela</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Atualização automática</button>
+    </div>
+    <div class="body">
+      <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--info)"></span><span class="ptitle">Modos de janela</span><span class="psub">A janela reduzida aos cards, ou a uma barra flutuante sempre visível.</span></div><div class="pbody">
+        <div style="height:260px;border:1px solid var(--border);border-radius:var(--r6);background:var(--raised);display:flex;align-items:center;justify-content:center"><span class="k">demo · help/window-modes.gif · 640×400 · toca em laço</span></div>
+        <span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg)">O modo somente cards tira a barra de título e o rodapé e deixa a grade de cards; a faixa de título volta enquanto o ponteiro está sobre o topo da janela. A barra HUD encolhe a janela a um painel de uma linha por conta, sempre no topo das outras, arrastável e que gruda na borda mais próxima. Os dois modos são exclusivos: ligar um desliga o outro.</span>
+      </div></div>
+      <div class="panel"><div class="phead"><span class="ptitle">Como ativar</span></div><div class="pbody flush">
+        <div class="row"><span class="k" style="width:20px">1.</span><span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg);flex:1">Abra Configurações → "Geral" e use "Somente os cards" ou "Barra HUD".</span></div>
+        <div class="row"><span class="k" style="width:20px">2.</span><span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg);flex:1">Pelo teclado: Ctrl+Shift+M alterna o modo somente cards e Ctrl+Shift+H alterna a barra HUD.</span></div>
+        <div class="row"><span class="k" style="width:20px">3.</span><span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg);flex:1">O menu do ícone da bandeja tem as duas entradas — é o caminho de volta quando a janela está coberta por outra.</span></div>
+        <div class="row"><span class="k" style="width:20px">4.</span><span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg);flex:1">Na barra HUD, arraste para escolher o canto; um clique curto devolve a janela normal.</span></div>
+      </div></div>
+      <div class="hstack"><span class="sp"></span><button class="btn primary" type="button">Fechar</button></div>
+    </div>
+  </div>
+</div>
+
+<p class="note"><b>Demo ausente não esconde o texto.</b> Sem a gravação no classpath a faixa vira estado vazio — "Demonstração indisponível. A gravação não veio nesta instalação. A descrição e os passos continuam válidos." —, e descrição e passos seguem na tela: a demo ilustra o tópico, não é o tópico.</p>
+
+<p class="note"><b>A faixa da demo tem altura fixa, não a proporção da gravação.</b> Com <code>aspectRatio</code> ela media ~410dp numa janela de 900dp e empurrava a seção "Como ativar" inteira para fora da vista — três asserts de componente falharam com <em>not displayed</em> antes da troca. Altura fixa também é o que mantém a página parada ao trocar de tópico, e a gravação entra com <code>Fit</code>: o que sobra é margem, nunca corte.</p>
+
+<p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Geral", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola, pela mesma razão de sempre: ele é o controle.</p>
 
 <!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
 <h2 id="checklist">15 · O que este protótipo não decide</h2>

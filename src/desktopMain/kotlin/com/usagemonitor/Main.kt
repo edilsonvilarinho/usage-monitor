@@ -142,6 +142,7 @@ import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.HelpWindow
 import com.usagemonitor.presentation.ui.ReleaseNotesWindow
 import com.usagemonitor.presentation.ui.TeamKeysAdminScreen
 import com.usagemonitor.presentation.ui.TeamPresenceScreen
@@ -1202,6 +1203,7 @@ private fun runUsageMonitor(
     val alertSettingsState by alertSettingsFlow.collectAsState()
     var monthlyBudgetMicros by remember { mutableStateOf(readPersistedBudgetMicros(settings)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
+    var isHelpDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
 
     // A queda da sessão anterior é lida **e consumida** uma vez por arranque: este
@@ -1522,6 +1524,16 @@ private fun runUsageMonitor(
                         settingsOpenGeneration++
                     }
                 )
+                // Mesma razão do item acima: com o rodapé escondido pelo modo
+                // somente cards ou pela barra HUD, a bandeja e o teclado são os
+                // únicos caminhos até a ajuda.
+                Item(
+                    text = if (language == AppLanguage.PT) "Ajuda" else "Help",
+                    onClick = {
+                        breadcrumbs.recordScreenOpened("Ajuda (bandeja)")
+                        isHelpDialogOpen = true
+                    }
+                )
                 Item(
                     text = if (cardsOnlyMode) {
                         if (language == AppLanguage.PT) "Sair do modo somente cards" else "Exit cards only mode"
@@ -1604,7 +1616,16 @@ private fun runUsageMonitor(
                 setHudMode(!hudMode)
             }
 
-            isCardsOnlyToggle || isHudToggle
+            // Terceira porta da ajuda, ao lado do rodapé e da bandeja. `F1` é a
+            // tecla que o sistema operacional reserva para isto e não colide com
+            // as duas combinações acima.
+            val isHelpShortcut = event.type == KeyEventType.KeyDown && event.key == Key.F1
+            if (isHelpShortcut) {
+                breadcrumbs.recordScreenOpened("Ajuda (F1)")
+                isHelpDialogOpen = true
+            }
+
+            isCardsOnlyToggle || isHudToggle || isHelpShortcut
         }
     ) {
         LaunchedEffect(window) {
@@ -2003,6 +2024,10 @@ private fun runUsageMonitor(
                         isSettingsDialogOpen = true
                         settingsOpenGeneration++
                     },
+                    onOpenHelp = {
+                        breadcrumbs.recordScreenOpened("Ajuda")
+                        isHelpDialogOpen = true
+                    },
                     // Só quem administra recebe o botão; `null` esconde. A conta
                     // não entra na condição de propósito: administrar o servidor
                     // não exige participar de nenhum time.
@@ -2305,6 +2330,17 @@ private fun runUsageMonitor(
     }
 
     // Sem notas ela não compõe nada; a decisão inteira mora no controlador.
+    if (isHelpDialogOpen) {
+        HelpWindow(
+            language = language,
+            themePreset = themePreset,
+            uiScalePercent = uiScalePercent,
+            iconImage = iconImage,
+            screenWorkArea = screenWorkArea,
+            onCloseRequest = { isHelpDialogOpen = false }
+        )
+    }
+
     ReleaseNotesWindow(
         controller = releaseNotes,
         language = language,

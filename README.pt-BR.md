@@ -43,6 +43,9 @@ envia conteúdo de prompt ou de resposta para lugar nenhum.
 - **Comportamento desktop** — auto-start nas três plataformas, tema claro e escuro, português e
   inglês, escala da interface de 80% a 150%, opacidade da janela ajustável, e atualização automática
   no Windows e no Linux.
+- **Ajuda dentro do app** — doze tópicos com o que cada funcionalidade faz, como ativá-la e uma
+  demonstração animada gravada dos próprios componentes. Abre pelo ícone do rodapé, pelo menu da
+  bandeja ou por `F1`.
 
 ## Integrações suportadas
 
@@ -123,7 +126,9 @@ Quem administra vê a mesma tela para todas as contas:
 </details>
 
 As capturas são renderizadas offscreen a partir dos próprios componentes da aplicação, com dados
-sintéticos. Nenhuma conta, máquina ou chave real aparece nelas.
+sintéticos. Nenhuma conta, máquina ou chave real aparece nelas. As demonstrações da janela de ajuda
+saem do mesmo motor (`gradlew.bat generateHelpMedia`) e viajam no instalador, em
+`src/desktopMain/resources/help/`.
 
 ## Instalação
 

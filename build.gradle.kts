@@ -246,6 +246,17 @@ tasks.register<JavaExec>("generateTourGif") {
     args(layout.projectDirectory.dir("img").asFile.absolutePath)
 }
 
+// Demos da janela de ajuda (issue #184). Saem em src/desktopMain/resources/help
+// para entrar no jar distribuido: sao lidas do classpath em tempo de execucao.
+tasks.register<JavaExec>("generateHelpMedia") {
+    group = "documentation"
+    description = "Renderiza offscreen as demos da janela de ajuda com dados sinteticos."
+
+    mainClass.set("com.usagemonitor.screenshots.HelpMediaGeneratorKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(layout.projectDirectory.dir("src/desktopMain/resources/help").asFile.absolutePath)
+}
+
 // Adicionar manifest ao desktopJar para tornÃƒÆ’Ã‚Â¡-lo executÃƒÆ’Ã‚Â¡vel
 tasks.named<Jar>("desktopJar") {
     manifest {

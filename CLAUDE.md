@@ -278,6 +278,49 @@ marca `releaseNotesSeenVersion`, nunca o recibo do instalador.**
 - O recibo continua vivo para outras duas coisas: a linha "Última atualização" das Configurações e a
   poda do artefato aplicado (`shouldDiscardUpdateArtifacts`).
 
+**Ajuda dentro do app** (`presentation/ui/help/` + `desktopMain/help/HelpMediaPlayer.kt` +
+`desktopMain/presentation/ui/HelpWindow.kt` + `src/desktopMain/resources/help/*.gif`; issue #184,
+plano [`modal-de-ajuda-184-execucao.md`](docs/planos/modal-de-ajuda-184-execucao.md)): doze tópicos
+com o que cada funcionalidade faz, **como ativá-la** e uma demo animada dela. Fora do app o produto
+já estava documentado no README; dentro dele não havia porta nenhuma, e as funcionalidades que
+precisam ser **ligadas** (HUD, somente cards, alertas, atualização automática, time, orçamento) só
+eram descobertas por acidente.
+- **O catálogo é `CliSessionsGlossary` com outro assunto**: enum de tópicos, `readingOrder` e
+  entradas PT/EN em `presentation/ui/`. Os passos de ativação citam o **rótulo real** do controle,
+  lido do código; trocar o rótulo na tela sem trocar aqui manda o usuário procurar um botão que não
+  existe. Os `when` exaustivos não pegam isso — pegam a entrada faltando, não a entrada errada —, e
+  por isso os testes afirmam que todo tópico tem os dois idiomas e pelo menos um passo.
+- **Compose não anima GIF; o `Codec` do Skia anima.** `frameCount`, `getFrameInfo(i).duration` e
+  `readPixels(bitmap, frame, priorFrame)` já estão no classpath (skiko 0.8.18). `priorFrame` é
+  **otimização, não correção**: sem ele o codec refaz a cadeia de quadros requeridos a cada tique, o
+  que num GIF delta é trabalho quadrático. O quadro publicado é **cópia imutável**
+  (`Image.makeFromBitmap`), porque `Bitmap.asComposeImageBitmap()` embrulha o mesmo bitmap e escrever
+  o quadro seguinte por cima mutaria a imagem que já está na tela, sem invalidar nada.
+- **O laço de quadros mora em `desktopMain`, nunca no composable de conteúdo.** É essa separação que
+  deixa `HelpContent` exercitável: animação infinita trava o `waitForIdle` dos testes de componente.
+  Pela mesma razão o tópico selecionado é hasteado — quem carrega a demo é o tocador, que precisa
+  saber qual está na tela.
+- **As demos são gravadas em 1000×420, a largura de uma janela real**, e não no tamanho da faixa do
+  modal: as telas deste app têm orçamento de coluna de ~1000dp, e gravá-las estreitas mostraria um
+  layout que o app não tem. Reduzir a gravação pela metade tornaria ilegível justamente o rótulo que
+  ela aponta. Por isso a janela nasce em 1180×780dp. `gradlew.bat generateHelpMedia` regenera todas,
+  pelo mesmo motor de `img/tour.gif` (`SceneRecorder`, extraído do gerador do tour).
+- **A faixa da demo é teto, não altura fixa.** Medido no app, numa área útil de 1280×752 com a escala
+  em 115%: os 420dp fixos deixavam a seção "Como ativar" abaixo da dobra — que é a pergunta que a
+  tela existe para responder. Ela cede até 55% da área rolável, e quem encolhe é a demo, que o `Fit`
+  mantém inteira; a seção que sai da vista não tem como se encolher.
+- **Mídia ausente não esconde o texto.** Recurso que não veio na instalação vira estado vazio com a
+  frase dizendo isso, e descrição e passos continuam: a demo ilustra o tópico, não é o tópico.
+- **Três portas — rodapé, bandeja e `F1`** —, o mesmo desenho do modo somente cards e da barra HUD: o
+  rodapé é a porta óbvia e é a primeira coisa que esses dois modos escondem.
+- **O que os testes não pegam, o olho pegou.** Quatro defeitos vieram de olhar o quadro gerado e de
+  abrir o app: o ponteiro sintético não estava sendo composto e as demos mostravam a tela reagindo
+  sozinha; o deslocamento passava do fim do conteúdo; a demo de modos de janela desenhava o HUD por
+  cima dos cards e as duas exibições se misturaram; e a grade de cards, fora de um contêiner rolável,
+  é ancorada pelo centro e o quadro começava no meio de um card. `HelpMediaResourcesTest` cobre o que
+  dá para afirmar por teste: todo `mediaId` resolve no classpath, decodifica, e **muda de um quadro
+  para o outro** — foi ele que reprovou a demo de presença, que tinha saído parada.
+
 ### Injeção de dependências
 
 Manual, em `Main.kt` (desktopMain). Sem framework.

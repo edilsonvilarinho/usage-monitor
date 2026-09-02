@@ -12,6 +12,10 @@ someone using the app.
 
 ### Added
 
+- In-app help window (`F1`, the footer icon, or the tray menu): twelve topics covering what each
+  feature does, how to turn it on, and an animated demo of it. The demos are recorded offscreen from
+  the app's own components and ship inside the installer, so the window works with no network.
+
 - MIT license, and the repository metadata that goes with an open project: description, topics,
   contribution guide, security policy, and issue and pull request templates.
 - English `README.md`, with a Portuguese mirror in

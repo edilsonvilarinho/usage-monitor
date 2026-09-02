@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Sensors
@@ -44,6 +45,8 @@ import com.usagemonitor.presentation.ui.theme.AppShapes
 const val FOOTER_ADMIN_OVERVIEW_TEST_TAG = "footerAdminOverview"
 
 const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
+
+const val FOOTER_HELP_TEST_TAG = "footerHelp"
 
 /**
  * Âncoras do rodapé.
@@ -91,7 +94,15 @@ fun FooterBar(
      * `null` esconde, pela mesma razão de [onOpenAdminOverview]: o integrante
      * comum entra pela porta do card, que já é escopada na conta dele.
      */
-    onOpenTeamPresence: (() -> Unit)? = null
+    onOpenTeamPresence: (() -> Unit)? = null,
+    /**
+     * Abre a janela de ajuda.
+     *
+     * Default vazio pela mesma razão dos demais: os geradores de captura montam
+     * o rodapé sem despachar nada. No app ele está sempre presente — a ajuda não
+     * depende de configuração nenhuma.
+     */
+    onOpenHelp: () -> Unit = {}
 ) {
     val initialRemaining = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
     var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(initialRemaining) }
@@ -126,7 +137,8 @@ fun FooterBar(
             onRefresh = onRefresh,
             onOpenSettings = onOpenSettings,
             onOpenAdminOverview = onOpenAdminOverview,
-            onOpenTeamPresence = onOpenTeamPresence
+            onOpenTeamPresence = onOpenTeamPresence,
+            onOpenHelp = onOpenHelp
         )
     }
 }
@@ -205,7 +217,8 @@ private fun FooterActionGroup(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenAdminOverview: (() -> Unit)? = null,
-    onOpenTeamPresence: (() -> Unit)? = null
+    onOpenTeamPresence: (() -> Unit)? = null,
+    onOpenHelp: () -> Unit = {}
 ) {
     Row(
         modifier = modifier,
@@ -271,6 +284,21 @@ private fun FooterActionGroup(
         ) {
             Icon(
                 imageVector = Icons.Rounded.Settings,
+                contentDescription = null,
+                modifier = Modifier.size(FOOTER_ICON_SIZE),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // A ajuda é a última do grupo: é a ação de que menos se precisa depois
+        // que se aprendeu o app, e as duas anteriores são as do uso diário.
+        FooterIconActionButton(
+            label = if (language == AppLanguage.PT) "Abrir ajuda" else "Open help",
+            onClick = onOpenHelp,
+            testTag = FOOTER_HELP_TEST_TAG
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
                 contentDescription = null,
                 modifier = Modifier.size(FOOTER_ICON_SIZE),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant

@@ -17,6 +17,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.FOOTER_ADMIN_OVERVIEW_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_COUNTDOWN_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_HELP_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_TEAM_PRESENCE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FooterBar
@@ -61,6 +62,38 @@ class FooterBarTest {
             .assertTextEquals("02:05")
         onNodeWithContentDescription("Abrir configurações").assertIsDisplayed()
         onAllNodesWithText("Histórico").assertCountEquals(0)
+    }
+
+    /**
+     * A ajuda é a porta óbvia do rodapé, e some no modo somente cards e no HUD —
+     * por isso ela também tem item na bandeja e `F1`, que este teste não alcança.
+     */
+    @Test
+    fun `FooterBar abre a ajuda`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+        var opened = 0
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        onOpenHelp = { opened++ },
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription("Abrir ajuda").assertIsDisplayed()
+        onNodeWithTag(FOOTER_HELP_TEST_TAG).performClick()
+
+        assertEquals(1, opened)
     }
 
     @Test
