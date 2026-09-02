@@ -9,6 +9,7 @@ Open `index.html`. The left rail switches screens; the top strip switches theme.
 | --- | --- | --- |
 | Dashboard | `Dashboard.jsx` | minimize/expand any card; card status-bar icons open History, CLI Sessions, Team, Presence; footer opens Settings |
 | Modo somente cards | `CardsOnly.jsx` | hover the top 34px to reveal the window frame |
+| Barra HUD | `Hud.jsx` | static — third chrome, 24dp strip anchored to the top edge (issue #164) |
 | Histórico | `History.jsx` | range segments; current vs. previous period |
 | Sessões CLI | `CliSessions.jsx` | tabs Sessões/Resumo/Tendência; window segments; live text filter; row opens the detail |
 | Detalhe de sessão | `SessionDetail.jsx` | collapse/expand the Avançado block |

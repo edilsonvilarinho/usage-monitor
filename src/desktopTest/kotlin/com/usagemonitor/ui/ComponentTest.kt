@@ -77,6 +77,7 @@ import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.HUD_MODE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
@@ -2473,6 +2474,36 @@ class ComponentTest {
         }
 
         onNodeWithTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG).performClick()
+
+        assertEquals(true, enabled)
+    }
+
+    /**
+     * Issue #164: o interruptor da barra HUD mora na mesma seção do modo
+     * somente cards — as duas reduzem a moldura da janela.
+     */
+    @Test
+    fun `SettingsDialogContent emits the hud mode change`() = runDesktopComposeUiTest {
+        var enabled: Boolean? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    hudMode = false,
+                    onHudModeChange = { value -> enabled = value },
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        onNodeWithTag(HUD_MODE_SWITCH_TEST_TAG).performScrollTo().performClick()
 
         assertEquals(true, enabled)
     }

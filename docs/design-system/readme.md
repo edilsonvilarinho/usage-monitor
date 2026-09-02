@@ -168,9 +168,9 @@ invented here.
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
-| `components/data/` | AppProgressTrack · AppStatusIndicator · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
+| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
 | `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
-| `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav |
+| `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
 | `ui_kits/desktop-app/` | Click-through recreation: Dashboard, cards-only mode, History, CLI Sessions, Session detail, Team usage, Presence, Settings |
 | `_ds_local.js` | Mount helper so cards and kits render before/without the compiled bundle |
@@ -181,8 +181,17 @@ invented here.
 The prototype names 17 shared primitives but does not enumerate them all. Beyond the ones it
 draws explicitly, this system adds four **chrome** components that the prototype's screens use
 without naming: `AppWindowFrame`, `AppStatusBar`, `AppToolbar`, `AppSettingsNav` — plus
-`AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados") and
-`AppColumnHeader` (its `.colhead` strip). Nothing else was invented.
+`AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados"),
+`AppColumnHeader` (its `.colhead` strip), and `AppHudBar` (its "Barra HUD", issue #164 — a draggable
+panel, no wider than 420dp, showing one summary line at rest and one 20dp row per monitored quota on
+hover). Seven versions were found wrong live, one at a time: full width, because always-on-top plus
+edge-to-edge covered other windows own top 24dp; a fixed 320dp corner pill, because it still measured
+320dp to show the word "Normal"; a single line with only the worst source, because the other accounts
+had no signal they existed; those others behind a hover tooltip, because the popup is clipped inside a
+24dp window and flickered over its own trigger; a list with no consumption at all; one row per source,
+because an account with a 5h and a 7d window still showed one limit; and one row per quota always
+visible, because ten rows on screen said what fits in one. `AppStatusDot` is the seventh addition,
+extracted from `AppStatusIndicator` for the collapsed state. Nothing else was invented.
 
 ### The conformance pass — 2026-08-27
 

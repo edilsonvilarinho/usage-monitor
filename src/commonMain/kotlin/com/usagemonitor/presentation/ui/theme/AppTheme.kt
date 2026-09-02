@@ -101,6 +101,14 @@ object AppChrome {
 
     /** Faixa de atualização, a linha mais baixa do sistema. */
     val updateStrip: Dp = 28.dp
+
+    /**
+     * Faixa HUD (issue #164): terceiro chrome da janela principal, ancorado no
+     * topo da tela. Fura de propósito o piso de 28dp acima — ali mora um
+     * controle interativo, aqui só o ponto+palavra de `AppStatusIndicator` e a
+     * fonte/tempo até reset, sem alvo de clique próprio além da faixa inteira.
+     */
+    val hud: Dp = 24.dp
 }
 
 /**

@@ -242,6 +242,47 @@ internal fun resetLabel(quota: QuotaInfo, language: AppLanguage, now: Instant): 
     }
 }
 
+/**
+ * O reset da cota em forma curta, para a barra HUD (issue #164).
+ *
+ * [resetLabel] é a linha do card: "Reinício: Ter 22h59 BRT" tem 23 caracteres e,
+ * numa linha de HUD que já carrega estado, nome da fonte e percentual, ela
+ * sozinha mede mais que todo o resto junto.
+ *
+ * **Não é um segundo formato de data** — sai das mesmas [formatBrtDateTimeParts]
+ * que a linha do card usa, só recortada: sem prefixo, sem fuso, e sem a data do
+ * dia quando a janela é intradiária e o reset é hoje de qualquer forma. Fuso,
+ * nome de dia e ordem de campos continuam com um dono só.
+ *
+ * `null` é "não há reset a mostrar" — saldo que não expira, janela sem reset
+ * conhecido. Quem chama omite a coluna, em vez de imprimir um traço que não
+ * informa nada.
+ */
+internal fun resetShortLabel(quota: QuotaInfo, language: AppLanguage, now: Instant): String? {
+    if (quota.isExtraCreditsQuota) {
+        return if (language == AppLanguage.PT) "mensal" else "monthly"
+    }
+
+    if (quota.unit == UsageUnit.CURRENCY_USD) {
+        return null
+    }
+
+    if (quota.isExpiredAt(now)) {
+        return if (language == AppLanguage.PT) "reiniciando" else "resetting"
+    }
+
+    if (!quota.hasKnownResetAt) {
+        return null
+    }
+
+    val (dayFormatted, _, timeFormatted) = formatBrtDateTimeParts(quota.periodEndAt, language)
+
+    return when (quota.periodType) {
+        PeriodType.INTERVAL -> timeFormatted
+        PeriodType.WEEKLY, PeriodType.MONTHLY, PeriodType.REPORTED -> "$dayFormatted $timeFormatted"
+    }
+}
+
 private data class BrtDateTimeParts(val day: String, val date: String, val time: String)
 
 private fun formatBrtDateTimeParts(instant: Instant, language: AppLanguage): BrtDateTimeParts {
@@ -577,6 +618,34 @@ internal fun compactPercentageLabel(quota: QuotaInfo): String {
         UsageUnit.PERCENTAGE -> "${quota.used}%"
         else -> "${(quota.percentageUsed * 100).toInt()}%"
     }
+}
+
+/**
+ * O rótulo da cota encurtado para a linha parada da barra HUD.
+ *
+ * É a **última palavra** do rótulo: "Claude 5h" → "5h", "Go semanal" →
+ * "semanal", "Saldo" → "Saldo". A linha parada mostra uma fonte só, então o
+ * prefixo que distingue fornecedores ("Claude", "Go", "Codex") já está dito
+ * pelo nome da conta ao lado — repeti-lo em cada cota gastaria a largura que a
+ * própria conta precisa.
+ *
+ * Regra deliberadamente burra: nenhum rótulo do app tem duas cotas da mesma
+ * fonte terminando na mesma palavra, e inventar um mapa de abreviações seria um
+ * segundo dono dos nomes de cota.
+ */
+internal fun hudQuotaShortLabel(label: String): String {
+    return label.substringAfterLast(' ')
+}
+
+/**
+ * `5h 88%` — o rótulo curto de uma cota e o percentual dela, para a linha do HUD.
+ *
+ * Existe porque a linha precisa dizer 5h **e** 7d: com um número só, quem olha
+ * não sabe qual das duas janelas está vendo. O percentual sai de
+ * [compactPercentageLabel], o mesmo do card — nenhum formato novo.
+ */
+internal fun hudQuotaChipText(quota: QuotaInfo): String {
+    return "${hudQuotaShortLabel(quota.label)} ${compactPercentageLabel(quota)}"
 }
 
 internal fun formatUsage(quota: QuotaInfo): String {

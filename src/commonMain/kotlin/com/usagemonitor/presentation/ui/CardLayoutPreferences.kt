@@ -176,3 +176,36 @@ internal fun moveVisibleCardToIndex(
         }
     }
 }
+
+
+/**
+ * Reordena qualquer lista pela ordem de cards que o usuário arrastou.
+ *
+ * O que não está em [cardOrder] vai para o fim, na ordem em que chegou: fonte
+ * recém-habilitada ainda não tem posição escolhida, e escondê-la seria pior que
+ * pô-la por último.
+ *
+ * **Existe como função porque tem dois donos.** A grade do dashboard já fazia
+ * essa conta inline, e a barra HUD passou a precisar da mesma ordem — "deve
+ * respeitar a ordem que ele escolher". Duas cópias divergiriam justamente no
+ * caso de borda, que é o item sem posição.
+ *
+ * `groupBy` e não `associateBy`: no dashboard há um card por alvo, mas no HUD há
+ * uma linha por **cota**, várias por alvo. Dentro do grupo a ordem de entrada é
+ * preservada, que é a ordem em que a API devolveu as cotas.
+ */
+internal fun <T> orderedByCardOrder(
+    items: List<T>,
+    cardOrder: List<UsageTargetKey>,
+    targetOf: (T) -> UsageTargetKey
+): List<T> {
+    if (cardOrder.isEmpty()) {
+        return items
+    }
+
+    val byTarget = items.groupBy(targetOf)
+    val positioned = cardOrder.toSet()
+
+    return cardOrder.flatMap { target -> byTarget[target].orEmpty() } +
+        items.filter { item -> targetOf(item) !in positioned }
+}

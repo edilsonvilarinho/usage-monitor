@@ -1,4 +1,4 @@
-<!-- @dsCard group="Components" viewport="700x420" name="Shell — window, toolbar, status bar, update strip, settings nav" subtitle="34dp title bar, 34dp toolbar, 30dp status bar, 28dp update strip" -->
+<!-- @dsCard group="Components" viewport="700x480" name="Shell — window, toolbar, status bar, update strip, settings nav, HUD bar" subtitle="34dp title bar, 34dp toolbar, 30dp status bar, 28dp update strip, 24dp HUD bar" -->
 <!DOCTYPE html>
 <html lang="pt-BR" data-app-theme="dark">
 <head>
@@ -21,10 +21,26 @@
 <script type="text/babel" data-presets="react">
 let DS = {};
 function Demo() {
-  const { AppWindowFrame, AppStatusBar, AppToolbar, AppUpdateStrip, AppSettingsNav, AppButton, AppSegmentedControl, AppTextField, AppStatusIndicator, AppSwitch } = DS;
+  const { AppWindowFrame, AppStatusBar, AppToolbar, AppUpdateStrip, AppSettingsNav, AppButton, AppSegmentedControl, AppTextField, AppStatusIndicator, AppSwitch, AppHudBar } = DS;
   const [sec, setSec] = React.useState('Geral');
   const [win, setWin] = React.useState('7 dias');
   return (
+    <div className="grid">
+    <div>
+      <div className="cap">Barra HUD — painel arrastável, uma linha por fonte, teto de 420dp (issue #164)</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+        <AppHudBar
+          sources={[
+            { label: 'INFORMATA2 · Claude 5h', statusLabel: 'Crítico', level: 'crit', percentLabel: '92%', resetLabel: 'Ter 22h59' },
+            { label: 'INFORMATA2 · Claude 7d', statusLabel: 'Atenção', level: 'warn', percentLabel: '41%', resetLabel: 'Sáb 11h37' },
+            { label: 'OpenCode Go · Rolling', statusLabel: 'Sem projeção', level: 'off', percentLabel: '3%' }
+          ]}
+          expanded
+        />
+        <AppHudBar level="ok" dotOnly />
+        <AppHudBar topLine={{ statusLabel: 'Crítico', level: 'crit', label: 'Padrão', quotaSummary: '5h 88% · 7d 9%' }} />
+      </div>
+    </div>
     <AppWindowFrame
       title="Sessões CLI — dev@example.com"
       dense
@@ -47,6 +63,7 @@ function Demo() {
         </div>
       </div>
     </AppWindowFrame>
+    </div>
   );
 }
 (async () => {

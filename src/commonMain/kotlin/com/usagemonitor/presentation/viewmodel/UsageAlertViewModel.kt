@@ -71,6 +71,35 @@ class UsageAlertViewModel(
     /** Pior risco entre as cotas visíveis; `null` quando nenhuma está em risco. */
     val worstRisk: StateFlow<UsageRiskLevel?> = _worstRisk.asStateFlow()
 
+    private val _worstSnapshot = MutableStateFlow<WorstQuotaSnapshot?>(null)
+
+    /**
+     * A cota que produz [worstRisk], com a fonte e a projeção dela — para a
+     * barra HUD (issue #164), que precisa dizer qual fonte e quando ela
+     * reseta, não só o nível. Ao lado de [worstRisk], não em vez: a bandeja
+     * continua lendo só o nível.
+     */
+    internal val worstSnapshot: StateFlow<WorstQuotaSnapshot?> = _worstSnapshot.asStateFlow()
+
+    private val _sourceRisks = MutableStateFlow<List<WorstQuotaSnapshot>>(emptyList())
+
+    /**
+     * O risco de cada fonte, pior primeiro — inclui [worstSnapshot] como o
+     * primeiro item. O hover da barra HUD lista aqui as fontes que não são a
+     * vencedora, e sem essa lista o hover não teria o que mostrar além do
+     * que a faixa já diz.
+     */
+    internal val sourceRisks: StateFlow<List<WorstQuotaSnapshot>> = _sourceRisks.asStateFlow()
+
+    private val _quotaRisks = MutableStateFlow<List<HudQuotaEntry>>(emptyList())
+
+    /**
+     * **Todas** as cotas de todas as fontes, pior primeiro — uma linha por
+     * limite, e não por fonte. Uma conta Anthropic com janela de 5h e de 7d
+     * aparecia no HUD com uma linha só, e o outro limite não existia na tela.
+     */
+    internal val quotaRisks: StateFlow<List<HudQuotaEntry>> = _quotaRisks.asStateFlow()
+
     private var state = UsageAlertState.EMPTY
 
     /** `Triple` não comporta a quarta fonte, e um `Pair` de `Pair` não se lê. */
@@ -128,6 +157,19 @@ class UsageAlertViewModel(
             ?.takeIf { level -> level != UsageRiskLevel.ON_TRACK }
 
         val now = clock.now()
+
+        val sourceRisks = allSourceRisks(
+            stats = success?.data.orEmpty(),
+            riskSummaries = success?.riskSummaries.orEmpty(),
+            now = now
+        )
+        _sourceRisks.value = sourceRisks
+        _worstSnapshot.value = sourceRisks.firstOrNull()
+        _quotaRisks.value = allQuotaRisks(
+            stats = success?.data.orEmpty(),
+            riskSummaries = success?.riskSummaries.orEmpty(),
+            now = now
+        )
         val evaluation = evaluateUsageAlerts(
             stats = success?.data.orEmpty(),
             sessionPulse = pulses.values.mergeSessionPulses(),

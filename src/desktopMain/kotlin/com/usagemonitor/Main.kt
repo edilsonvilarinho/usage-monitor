@@ -10,9 +10,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -22,6 +26,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.isTraySupported
@@ -78,6 +83,7 @@ import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
@@ -129,6 +135,10 @@ import com.usagemonitor.presentation.ui.DesktopDialogFrame
 import com.usagemonitor.presentation.ui.BugReportHost
 import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
+import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.orderedByCardOrder
+import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -152,6 +162,15 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.compactPercentageLabel
+import com.usagemonitor.presentation.ui.components.hudQuotaChipText
+import com.usagemonitor.presentation.ui.components.resetShortLabel
+import com.usagemonitor.presentation.ui.components.resetLabel
+import com.usagemonitor.presentation.ui.components.riskLevelLabel
+import com.usagemonitor.presentation.ui.components.toneFor
+import com.usagemonitor.presentation.ui.theme.AppChrome
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
@@ -173,6 +192,7 @@ import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import io.ktor.client.request.get
 import io.ktor.http.isSuccess
+import java.awt.MouseInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -182,6 +202,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.prefs.Preferences
@@ -214,6 +235,16 @@ private val API_KEY_DEPENDENT_SOURCES = setOf(
 internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 /** Piso horizontal do Dashboard; abaixo disso os cards já operam em coluna única. */
 private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
+
+/**
+ * Piso horizontal da barra HUD (issue #164).
+ *
+ * Bem abaixo do piso normal, que existe para caber os cards: a janela HUD não
+ * tem cards, e com a largura medida pelo conteúdo ela chega a ser só o ponto de
+ * `AppStatusIndicator`. É rede contra o AWT recusar um valor absurdo, não a
+ * largura real — quem a decide é `hudPillWidth`.
+ */
+private const val HUD_MIN_WINDOW_WIDTH_DP = 32
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
@@ -912,6 +943,11 @@ private fun runUsageMonitor(
             screenWorkArea
         )
     )
+    // Declarado aqui — antes do coletor de persistência logo abaixo — e não
+    // junto de `cardsOnlyMode` (bem mais adiante): aquele coletor precisa
+    // saber se está em modo HUD para não gravar a faixa de 24dp como se fosse
+    // o tamanho normal da janela salvo pelo usuário.
+    var hudMode by remember { mutableStateOf(readPersistedHudMode(settings)) }
     LaunchedEffect(mainWindowState, settings) {
         snapshotFlow {
             Triple(
@@ -924,6 +960,12 @@ private fun runUsageMonitor(
             .debounce(250.milliseconds)
             .collect { (isMinimized, size, placement) ->
             isAppVisible.value = !isMinimized
+            // Em modo HUD, `size`/`placement` descrevem a faixa de 24dp, não a
+            // janela do usuário — gravá-los aqui é o defeito que a issue #164
+            // custou a medir: o app nasceria na faixa na próxima abertura.
+            if (hudMode) {
+                return@collect
+            }
             persistMainWindowState(
                 settings = settings,
                 snapshot = MainWindowSnapshot(
@@ -1071,7 +1113,26 @@ private fun runUsageMonitor(
     // sem o coletor com debounce que a opacidade e a escala precisam — não há
     // slider aqui, e um clique não vira uma gravação por pixel.
     var cardsOnlyMode by remember { mutableStateOf(readPersistedCardsOnlyMode(settings)) }
+    // Barra HUD (issue #164): terceiro chrome, ainda mais discreto. Mutuamente
+    // exclusivo com o modo somente cards por regra de negócio aqui — os dois
+    // setters se desligam um ao outro —, não por tipo: só uma moldura reduzida
+    // por vez faz sentido. `hudMode` em si é declarado mais acima, perto de
+    // `screenWorkArea`: o coletor que persiste tamanho/posição da janela
+    // principal precisa dele antes deste ponto, para não gravar a faixa de
+    // 24dp como se fosse o tamanho normal da janela.
+    val setHudMode: (Boolean) -> Unit = { enabled ->
+        if (enabled) {
+            cardsOnlyMode = false
+            persistCardsOnlyMode(settings, false)
+        }
+        hudMode = enabled
+        persistHudMode(settings, enabled)
+    }
     val setCardsOnlyMode: (Boolean) -> Unit = { enabled ->
+        if (enabled) {
+            hudMode = false
+            persistHudMode(settings, false)
+        }
         cardsOnlyMode = enabled
         persistCardsOnlyMode(settings, enabled)
     }
@@ -1469,6 +1530,17 @@ private fun runUsageMonitor(
                     },
                     onClick = { setCardsOnlyMode(!cardsOnlyMode) }
                 )
+                // Item irmão do de cima: mesmo padrão, mesma razão de existir
+                // (issue #164) — com a janela reduzida a uma faixa, a bandeja
+                // continua sendo um caminho de volta.
+                Item(
+                    text = if (hudMode) {
+                        if (language == AppLanguage.PT) "Sair da barra HUD" else "Exit HUD strip"
+                    } else {
+                        if (language == AppLanguage.PT) "Barra HUD" else "HUD strip"
+                    },
+                    onClick = { setHudMode(!hudMode) }
+                )
                 Separator()
                 Item(
                     text = if (language == AppLanguage.PT) "Sair" else "Quit",
@@ -1501,20 +1573,38 @@ private fun runUsageMonitor(
         icon = iconImage,
         state = mainWindowState,
         undecorated = true,
-        alwaysOnTop = alwaysOnTopEnabled,
+        // A preferência do usuário nunca é sobrescrita: isto é uma expressão
+        // recomposta a cada leitura, não uma gravação — `alwaysOnTopEnabled`
+        // continua sendo lido/gravado só pelo toggle de Configurações. Em
+        // modo HUD a janela fica sempre no topo independente da preferência,
+        // porque uma faixa que uma outra janela cobre deixou de ser HUD.
+        alwaysOnTop = alwaysOnTopEnabled || hudMode,
+        // Arrastar ou redimensionar a faixa pela borda não faz sentido: ela é
+        // ancorada, de largura e altura fixas.
+        resizable = !hudMode,
         // Terceira saída do modo somente cards, ao lado da bandeja e da faixa de
         // hover. Um modo que esconde o botão de fechar precisa de mais de um
         // caminho de volta, e o teclado é o único que funciona com a janela
-        // coberta por outra.
+        // coberta por outra. A barra HUD (issue #164) tem combinação própria
+        // — Ctrl+Shift+H —, sem colidir com Ctrl+Shift+M.
         onKeyEvent = { event ->
-            val isToggle = event.type == KeyEventType.KeyDown &&
+            val isCardsOnlyToggle = event.type == KeyEventType.KeyDown &&
                 event.isCtrlPressed &&
                 event.isShiftPressed &&
                 event.key == Key.M
-            if (isToggle) {
+            if (isCardsOnlyToggle) {
                 setCardsOnlyMode(!cardsOnlyMode)
             }
-            isToggle
+
+            val isHudToggle = event.type == KeyEventType.KeyDown &&
+                event.isCtrlPressed &&
+                event.isShiftPressed &&
+                event.key == Key.H
+            if (isHudToggle) {
+                setHudMode(!hudMode)
+            }
+
+            isCardsOnlyToggle || isHudToggle
         }
     ) {
         LaunchedEffect(window) {
@@ -1546,13 +1636,283 @@ private fun runUsageMonitor(
                 )
             }
         }
+        // Barra HUD (issue #164): a mesma fonte que já move o ícone da bandeja
+        // (UsageAlertViewModel.worstRisk), só que com a cota vencedora e não
+        // apenas o nível — é o que deixa a pílula dizer qual fonte e quando ela
+        // reseta. `resetLabel` é a mesma função que o cabeçalho expandido do
+        // card usa: nenhum formato de data novo.
+        //
+        // Vem **antes** da geometria logo abaixo, e não junto da composição da
+        // pílula: é destes rótulos que sai a largura da janela, e a janela é
+        // dimensionada antes de existir composição para medir.
+        val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
+        val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
+        val hudFallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
+        // **Uma linha por cota, não por fonte.** A versão anterior mostrava a pior
+        // cota de cada fonte, e uma conta Anthropic com janela de 5h e de 7d
+        // aparecia com uma linha só — o outro limite não existia na tela.
+        // `compactPercentageLabel` e `resetShortLabel` são os formatos que o card
+        // já usa, e nenhum dos dois é formato de data novo.
+        val hudNow = Clock.System.now()
+        val hudQuotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
+        val hudNoForecastLabel = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
+        // **A ordem é a que o usuário arrastou no dashboard**, não a do risco:
+        // com o risco mandando, a linha parada trocava de conta sozinha e nunca
+        // se sabia de antemão quem estava ali. Mesmo `orderedByCardOrder` da
+        // grade de cards — duas cópias divergiriam no item sem posição.
+        val hudOrderedQuotas = orderedByCardOrder(hudQuotaRisks, cardOrder) { entry ->
+            entry.stats.targetKey
+        }
+        // **Uma linha por conta, não por cota.** A conta com janela de 5h e de
+        // 7d ocupava duas linhas seguidas repetindo o próprio nome; com dez
+        // cotas em cinco contas, a lista virou parede de texto. Cada linha traz
+        // a palavra da **pior** cota da conta e um ponto por cota ao lado do
+        // percentual — o mesmo desenho do card, onde o `RiskSemaphoreDot` de
+        // cada cota é só ponto e o badge do cabeçalho resume o pior com palavra.
+        val hudSources = hudOrderedQuotas
+            .groupBy { entry -> entry.stats.targetKey }
+            .map { (_, entries) ->
+                val first = entries.first()
+                val worst = entries.maxByOrNull { entry -> entry.risk?.level?.ordinal ?: -1 }
+                HudSourceStatus(
+                    label = first.stats.profileLabel ?: first.stats.apiName,
+                    statusLabel = worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) }
+                        ?: hudNoForecastLabel,
+                    tone = worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
+                    quotas = entries.map { entry ->
+                        HudQuotaChip(
+                            text = hudQuotaChipText(entry.quota),
+                            tone = entry.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL
+                        )
+                    }
+                )
+            }
+        // Nada em risco: a barra recolhe ao ponto e devolve a tela. Lista vazia
+        // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
+        // que está tudo bem antes de saber. Cota sem projeção também não recolhe:
+        // "está tudo bem" seria uma garantia que ninguém deu.
+        val hudDotOnly = hudOrderedQuotas.isNotEmpty() &&
+            hudOrderedQuotas.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
+
+        // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
+        // barra — a janela ficaria presa no tamanho antigo por baixo do que
+        // `mainWindowState.size` pede. Precisa vir **antes** do efeito que
+        // redimensiona logo abaixo: os dois reagem a `hudMode` na mesma
+        // recomposição, e é a ordem textual aqui dentro que decide qual
+        // aplica primeiro.
         ApplyWindowMinimumSize(
             window = window,
-            widthDp = MAIN_MIN_WINDOW_WIDTH_DP,
-            heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+            widthDp = if (hudMode) HUD_MIN_WINDOW_WIDTH_DP else MAIN_MIN_WINDOW_WIDTH_DP,
+            heightDp = if (hudMode) AppChrome.hud.value.toInt() else DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
             uiScalePercent = uiScalePercent,
             workArea = screenWorkArea
         )
+        // Geometria da barra HUD: encolhe a janela principal ao entrar, restaura
+        // tamanho/posição/estado de antes ao sair. O snapshot mora aqui, e não
+        // em `MainWindowSnapshot` (que não carrega posição — a janela normal
+        // nunca precisou dela): só esta transição precisa saber "de onde veio"
+        // para voltar.
+        var preHudWindowGeometry by remember {
+            mutableStateOf<Triple<DpSize, WindowPosition, WindowPlacement>?>(null)
+        }
+        // O canto da barra **parada**, que é a âncora de tudo: expandir e
+        // recolher recalculam a janela a partir dele, e não da posição corrente
+        // — senão cada expansão que cresce para cima deslocaria a âncora, e a
+        // barra subiria a cada passagem do mouse.
+        var hudAnchor by remember { mutableStateOf<DpOffset?>(null) }
+        var hudHovered by remember { mutableStateOf(false) }
+        var hudExpanded by remember { mutableStateOf(false) }
+        // Última posição do ponteiro na tela durante o arrasto. Guardar a
+        // posição de **partida** e somar o total faria a barra ficar presa na
+        // borda: arrastada 500px para fora e trazida 100px de volta, o total
+        // continuaria além do limite e o encaixe a manteria colada. Incremental,
+        // o excedente é descartado a cada quadro.
+        var hudDragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
+
+        // Expandir é imediato; recolher espera uma passada de `AppMotion.fast`.
+        // Sem a espera, o ponteiro que cruza a divisa entre duas linhas pode
+        // gerar um `Exit` de um quadro, e a janela encolheria debaixo dele. Não
+        // é animação: é um atraso único, e animação infinita travaria o
+        // `waitForIdle` dos testes de componente.
+        LaunchedEffect(hudHovered) {
+            if (hudHovered) {
+                hudExpanded = true
+            } else {
+                delay(AppMotion.fast.toLong())
+                hudExpanded = false
+            }
+        }
+
+        val hudScale = uiScaleFactor(uiScalePercent)
+        // `hudExpanded` deixou de significar "mostra a lista" — a lista é
+        // permanente — e passou a significar apenas "o ponteiro está em cima",
+        // que é o que desfaz o recolhimento ao ponto.
+        val hudCollapsedToDot = hudDotOnly && !hudExpanded
+        // **A âncora descreve o painel completo, sempre**, mesmo quando a janela
+        // na tela é o ponto: é ela que o arrasto move e que fica gravada, e
+        // ancorar no ponto faria a janela saltar toda vez que uma fonte saísse
+        // de `ON_TRACK`.
+        val hudAnchorSize = hudWindowSize(
+            sources = hudSources,
+            fallbackLabel = hudFallbackLabel,
+            dotOnly = false,
+            expanded = false
+        ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
+        val hudTargetSize = hudWindowSize(
+            sources = hudSources,
+            fallbackLabel = hudFallbackLabel,
+            dotOnly = hudCollapsedToDot,
+            expanded = hudExpanded
+        ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
+
+        LaunchedEffect(hudMode) {
+            if (hudMode) {
+                preHudWindowGeometry = Triple(
+                    mainWindowState.size,
+                    mainWindowState.position,
+                    mainWindowState.placement
+                )
+                mainWindowState.placement = WindowPlacement.Floating
+                // Onde ela ficou da última vez; na estreia, o canto superior
+                // direito. `fitWindowPosition` prende dentro da área útil nos
+                // dois casos — um monitor mais estreito que a pílula jogaria o
+                // canto esquerdo dela para fora da tela, e posição gravada num
+                // monitor que já não existe descreve uma tela que sumiu.
+                val stored = readPersistedHudPosition(settings)
+                val entryPosition = fitWindowPosition(
+                    x = stored?.xDp?.dp
+                        ?: (screenWorkArea.x + screenWorkArea.size.width - hudAnchorSize.width),
+                    y = stored?.yDp?.dp ?: screenWorkArea.y,
+                    size = hudAnchorSize,
+                    workArea = screenWorkArea
+                )
+                hudAnchor = DpOffset(entryPosition.x, entryPosition.y)
+            } else {
+                hudHovered = false
+                hudExpanded = false
+                hudAnchor = null
+                hudDragPointer = null
+                preHudWindowGeometry?.let { (size, position, placement) ->
+                    mainWindowState.size = size
+                    mainWindowState.position = position
+                    mainWindowState.placement = placement
+                }
+                preHudWindowGeometry = null
+            }
+        }
+        // A janela HUD muda de tamanho de verdade a cada hover — não é overlay
+        // como o modo somente cards. Era isso ou um `Popup`, e popup no Compose
+        // Desktop é camada dentro da janela: numa faixa de 24dp ele saía
+        // recortado sobre o próprio alvo e a tooltip piscava.
+        // O último tamanho já aplicado à janela. É ele que separa "abrir/fechar
+        // a lista", que anima, de "a barra andou com o ponteiro", que não pode
+        // animar — arrastar com a janela interpolando ficaria com a barra
+        // correndo atrás do mouse.
+        var hudAppliedSize by remember { mutableStateOf<DpSize?>(null) }
+
+        LaunchedEffect(hudMode, hudAnchor, hudTargetSize, hudAnchorSize) {
+            val anchor = hudAnchor
+            if (!hudMode || anchor == null) {
+                hudAppliedSize = null
+                return@LaunchedEffect
+            }
+
+            val targetPosition = hudWindowPosition(
+                anchorX = anchor.x,
+                anchorY = anchor.y,
+                anchorSize = hudAnchorSize,
+                windowSize = hudTargetSize,
+                workArea = screenWorkArea
+            )
+            val fromSize = hudAppliedSize
+            val fromPosition = mainWindowState.position
+            val animatable = fromSize != null &&
+                fromSize != hudTargetSize &&
+                fromPosition.x.value.isFinite() &&
+                fromPosition.y.value.isFinite()
+
+            if (!animatable) {
+                // Entrada no modo, arrasto, e qualquer passo em que o tamanho
+                // não mudou: aplica direto.
+                mainWindowState.size = hudTargetSize
+                mainWindowState.position = targetPosition
+                hudAppliedSize = hudTargetSize
+                return@LaunchedEffect
+            }
+
+            // **A janela cresce e encolhe interpolada, não em um salto.** Abrir
+            // a lista trocava 24dp por 100dp num quadro só, e o que se via era a
+            // barra piscando de tamanho. Uma passada de `AppMotion.normal` com o
+            // easing de entrada do sistema é o mesmo tempo que o resto do app usa
+            // para revelar conteúdo.
+            //
+            // **Transição única, nunca laço**: animação infinita trava o
+            // `waitForIdle` dos testes de componente. E é a janela AWT que anda,
+            // não um `graphicsLayer` — o conteúdo aqui não é overlay, é o tamanho
+            // real da janela.
+            val startSize = requireNotNull(fromSize)
+            val startX = fromPosition.x
+            val startY = fromPosition.y
+            animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = AppMotion.normal,
+                    easing = AppMotion.enterEasing
+                )
+            ) { fraction, _ ->
+                mainWindowState.size = DpSize(
+                    width = lerp(startSize.width, hudTargetSize.width, fraction),
+                    height = lerp(startSize.height, hudTargetSize.height, fraction)
+                )
+                mainWindowState.position = WindowPosition(
+                    x = lerp(startX, targetPosition.x, fraction),
+                    y = lerp(startY, targetPosition.y, fraction)
+                )
+            }
+            hudAppliedSize = hudTargetSize
+        }
+        // Arrasto da pílula. O movimento é aplicado à **âncora**, não à janela:
+        // com isso existe um caminho só até a geometria — o efeito acima —, e a
+        // pílula expandida acompanha o ponteiro sem que a conta de "cresce para
+        // cima ou para baixo" precise ser desfeita aqui.
+        //
+        // A posição vem de `MouseInfo`, absoluta na tela, e não do
+        // `positionChange` do Compose: durante o arrasto o componente se move
+        // junto com a janela, e o deslocamento local acumularia erro. É o mesmo
+        // caminho que o `WindowDraggableArea` usa por dentro.
+        val hudDragBegin = {
+            hudDragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
+        }
+        val hudDragTo = {
+            val previous = hudDragPointer
+            val current = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
+            val anchor = hudAnchor
+            if (previous != null && current != null && anchor != null) {
+                hudDragPointer = current
+                val moved = fitWindowPosition(
+                    x = anchor.x + (current.x - previous.x).dp,
+                    y = anchor.y + (current.y - previous.y).dp,
+                    size = hudAnchorSize,
+                    workArea = screenWorkArea
+                )
+                hudAnchor = DpOffset(moved.x, moved.y)
+            }
+        }
+        val hudDragFinish = {
+            hudDragPointer = null
+            hudAnchor?.let { anchor ->
+                val snapped = snapHudPosition(
+                    x = anchor.x,
+                    y = anchor.y,
+                    size = hudAnchorSize,
+                    workArea = screenWorkArea
+                )
+                hudAnchor = DpOffset(snapped.x, snapped.y)
+                persistHudPosition(settings, xDp = snapped.x.value, yDp = snapped.y.value)
+            }
+            Unit
+        }
         // O ACK sai daqui e nao do topo do `main()`: ele afirma que esta versao
         // subiu inteira, e o unico ponto em que isso e verdade e depois de o
         // `SingleInstanceGuard` ter deixado passar, dos recursos criticos terem
@@ -1566,6 +1926,12 @@ private fun runUsageMonitor(
                 }
             }
         }
+        // **A barra HUD não tem translucidez própria.** Ela chegou a ficar
+        // translúcida parada, para incomodar menos a leitura do que está atrás;
+        // na prática deixou o texto mais difícil de ler sem devolver a área,
+        // porque a janela continua capturando o clique de qualquer jeito — o
+        // Compose Desktop não tem click-through parcial. Quem decide a
+        // opacidade é só a preferência do usuário, em todos os modos.
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
@@ -1578,7 +1944,22 @@ private fun runUsageMonitor(
                     shutdownApplication()
                 },
                 compact = cardsOnlyMode,
-                onExitCompact = { setCardsOnlyMode(false) }
+                onExitCompact = { setCardsOnlyMode(false) },
+                hud = hudMode,
+                hudContent = {
+                    HudBar(
+                        statusTone = hudStatusTone,
+                        sources = hudSources,
+                        fallbackLabel = hudFallbackLabel,
+                        dotOnly = hudCollapsedToDot,
+                        expanded = hudExpanded,
+                        onHoverChange = { hovered -> hudHovered = hovered },
+                        onDragStart = hudDragBegin,
+                        onDragMove = hudDragTo,
+                        onDragEnd = hudDragFinish,
+                        onOpenFull = { setHudMode(false) }
+                    )
+                }
             ) {
                 DashboardScreen(
                     viewModel = viewModel,
@@ -2009,6 +2390,7 @@ private fun runUsageMonitor(
                         autoStartEnabled = autoStartEnabled,
                         alwaysOnTopEnabled = alwaysOnTopEnabled,
                         cardsOnlyMode = cardsOnlyMode,
+                        hudMode = hudMode,
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacitySupported,
                         uiScalePercent = uiScalePercent,
@@ -2057,6 +2439,10 @@ private fun runUsageMonitor(
                         onCardsOnlyModeChange = { enabled ->
                             setCardsOnlyMode(enabled)
                             showSettingsToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
+                        },
+                        onHudModeChange = { enabled ->
+                            setHudMode(enabled)
+                            showSettingsToast(SettingsToast.Saved(SettingsField.HUD_MODE))
                         },
                         autoUpdateEnabled = autoUpdate.isEnabled(),
                         autoUpdateSupport = autoUpdate.support,

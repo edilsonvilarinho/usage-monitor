@@ -199,6 +199,52 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
 .titlebar .wbtn:hover { background: var(--raised); color: var(--fg); }
 .titlebar .wbtn.close:hover { background: var(--crit); color: #fff; }
 
+/* Barra HUD: pílula arrastável, medida pelo conteúdo, com teto de 320px.
+   Sem título, sem botões de janela. 24dp de altura mede contra o piso de 28dp
+   do cromo existente; abaixo dele porque aqui não há controle interativo, só o
+   ponto+palavra de risco (.st) e a fonte/tempo até reset.
+   Duas versões foram achadas erradas testando ao vivo (issue #164): largura de
+   tela inteira, que por estar sempre no topo (alwaysOnTop) cobria os controles
+   de qualquer outra janela com algo nos primeiros 24dp do topo — barra de menu
+   de IDE, atalhos de editor —, e depois 320px fixos num canto, que ainda
+   mediam 320px para mostrar a palavra "Normal". Sendo de fato flutuante, a
+   --shadow-8 se aplica sem ambiguidade.
+   .hudpanel é a lista de fontes que o hover revela crescendo a própria janela:
+   popup nesta plataforma é camada DENTRO da janela e, numa faixa de 24dp,
+   saía recortado sobre o próprio alvo, piscando entre abrir e fechar. */
+.hudscreen {
+  position: relative; height: 168px; border: 1px solid var(--border); border-radius: var(--r3);
+  background: var(--bg); overflow: hidden; margin-bottom: var(--s4);
+}
+.hudscreen.tall { height: 208px; }
+.hudscreen .win {
+  position: absolute; inset: 28px 16px 16px; margin: 0; max-width: none; box-shadow: none;
+}
+.hudwrap {
+  position: absolute; top: 0; right: 0; max-width: calc(100% - 16px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2);
+  box-shadow: var(--shadow-8); overflow: hidden;
+}
+.hudwrap.bottom { top: auto; bottom: 0; }
+.hudbar {
+  display: flex; align-items: center; gap: var(--s3); height: 24px; padding: 0 var(--s3);
+}
+/* Recolhida ao ponto: o padding da pílula com texto faria um ponto de 6px
+   virar uma janela de 38px. */
+.hudbar.dot { padding: 0 var(--s2); gap: 0; }
+.hudbar .sp { flex: 1; }
+.hudbar .v.sm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.huddot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+/* 20px por linha, e não .row: a linha de dados floora em 32px mais padding, e
+   seis fontes dariam ~288px de painel — uma janela, não um HUD. */
+.hudlist { padding: var(--s1) 0; }
+.hudfoot { border-top: 1px solid var(--border); padding: var(--s1) 0; }
+.hudrow { display: flex; align-items: center; gap: var(--s3); height: 20px; padding: 0 var(--s3); }
+.hudrow .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hudrow .pct { flex: none; }
+.hudrow .rst { flex: none; color: var(--muted); }
+
 .body { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
 .body.tight { padding: var(--s3); gap: var(--s2); }
 
@@ -934,6 +980,81 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
+
+<h3>Barra HUD</h3>
+<p class="lede">Um terceiro chrome, ainda mais discreto que o modo somente cards (issue #164): a mesma janela principal encolhida a um painel de largura medida pelo conteúdo, arrastável para qualquer ponto da tela, sempre visível. Não mostra cards — cada linha é uma <b>conta</b>, com ponto e palavra da pior cota dela, o nome, e um ponto por cota ao lado do percentual. Parada mostra a <b>primeira</b> conta da ordem de cards do usuário; com o ponteiro em cima, todas, com a janela crescendo interpolada. Sem arrasto de reordenar (não há cards para reordenar), sem barra de título: um clique curto em qualquer ponto devolve a janela completa, e o arrasto o move.</p>
+
+<div class="cap">1 · parada — uma linha, a primeira da ordem de cards</div>
+<div class="hudscreen">
+  <div class="win narrow" style="max-width:280px">
+    <div class="titlebar"><span class="t">outra janela</span></div>
+    <div class="body tight">
+      <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
+    </div>
+  </div>
+  <div class="hudwrap">
+    <div class="hudlist">
+    <div class="hudrow"><span class="st crit">Crítico</span><span class="name v sm">Padrão</span><span class="pct v sm">5h 88% · 7d 9%</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="cap">2 · hover — a lista de todas as cotas, na mesma ordem</div>
+<div class="hudscreen tall">
+  <div class="win narrow" style="max-width:280px">
+    <div class="titlebar"><span class="t">outra janela</span></div>
+    <div class="body tight">
+      <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
+    </div>
+  </div>
+  <div class="hudwrap">
+    <div class="hudlist">
+    <div class="hudrow"><span class="st crit">Crítico</span><span class="name v sm">Padrão · Claude 5h</span><span class="pct v sm">88%</span><span class="rst v sm">Ter 1h00</span></div>
+    <div class="hudrow"><span class="st ok">Normal</span><span class="name v sm">Padrão · Claude 7d</span><span class="pct v sm">9%</span><span class="rst v sm">Sáb 11h37</span></div>
+    <div class="hudrow"><span class="st warn">Atenção</span><span class="name v sm">INFORMATA2 · Claude 5h</span><span class="pct v sm">21%</span><span class="rst v sm">1h59</span></div>
+    <div class="hudrow"><span class="st ok">Normal</span><span class="name v sm">INFORMATA2 · Claude 7d</span><span class="pct v sm">8%</span><span class="rst v sm">Ter 9h59</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="cap">3 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</div>
+<div class="hudscreen">
+  <div class="win narrow" style="max-width:280px">
+    <div class="titlebar"><span class="t">outra janela</span></div>
+    <div class="body tight">
+      <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
+    </div>
+  </div>
+  <div class="hudwrap">
+    <div class="hudbar dot"><span class="huddot" style="background:var(--ok)"></span></div>
+  </div>
+</div>
+
+<div class="cap">4 · arrastado para a borda de baixo — a lista cresce para cima</div>
+<div class="hudscreen tall">
+  <div class="win narrow" style="max-width:280px">
+    <div class="titlebar"><span class="t">outra janela</span></div>
+    <div class="body tight">
+      <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
+    </div>
+  </div>
+  <div class="hudwrap bottom">
+    <div class="hudlist">
+    <div class="hudrow"><span class="st warn">Atenção</span><span class="name v sm">INFORMATA2 · Claude 5h</span><span class="pct v sm">68%</span><span class="rst v sm">Ter 22h59</span></div>
+    <div class="hudrow"><span class="st off">Sem projeção</span><span class="name v sm">OpenCode Go · Go 5h</span><span class="pct v sm">0%</span><span class="rst v sm">3h30</span></div>
+    </div>
+  </div>
+</div>
+
+<p class="note"><b>Medido pelo conteúdo, com 420dp de teto — e arrastável.</b> Duas versões de ocupação foram achadas erradas testando ao vivo. A primeira ocupava a tela inteira e, por estar sempre no topo (<code>alwaysOnTop</code>), cobria os controles de qualquer outra janela que também tivesse algo nos primeiros 24dp do topo — barra de menu de IDE, atalhos de editor. A segunda reduziu para 320dp fixos no canto superior direito, e continuava medindo 320dp para mostrar a palavra "Normal", num canto que é exatamente onde IDE e navegador põem controles. O Compose Desktop não tem click-through parcial numa janela comum: a região inteira captura o clique, visível ou não, então a única mitigação é ocupar menos área e deixar o usuário escolher onde. A largura sai da métrica da fonte — a escala <code>label*</code> é mono, e por isso o avanço por caractere é calculável sem compor nada —, o teto mantém a promessa de não mudar de tamanho a cada coleta, e texto mais longo trunca com reticências. O teto subiu de 320 para 420 quando a linha ganhou quatro colunas: com 320 sobravam ~96dp para o nome, treze caracteres, e toda conta virava "Anthropic — I…".</p>
+<p class="note"><b>Seis versões de conteúdo, cinco corrigidas depois de usar.</b> Uma linha com a fonte de pior risco; as outras num hover que piscava; uma linha por <i>fonte</i>, e a conta com 5h e 7d mostrava um limite só; uma linha por <i>cota</i> mais um rodapé de consumo, e viraram dez linhas na tela; uma linha por cota no hover, e a conta com 5h e 7d ocupava duas linhas seguidas repetindo o próprio nome. A que ficou: <b>uma linha por conta</b>, com ponto e palavra da pior cota e um ponto por cota ao lado do percentual — o mesmo desenho do card, onde o ponto por cota é só ponto e o badge do cabeçalho traz a palavra. A <b>ordem é a que o usuário arrastou no dashboard</b>, não a do risco.</p>
+<p class="note"><b>A janela cresce interpolada, não em um salto.</b> Abrir a lista trocava 24dp por 100dp num quadro só, e o que se via era a barra piscando de tamanho. Uma passada de <code>--motion-normal</code> com o easing de entrada resolve — transição única, nunca laço, porque animação infinita trava o <code>waitForIdle</code> dos testes de componente. O arrasto <b>não</b> anima: a barra correria atrás do mouse.</p>
+<p class="note"><b>Cota sem projeção continua na lista</b>, com ponto neutro e a palavra dizendo isso. O percentual é fato medido e não depende de previsão — é a diferença para o badge do card, que some sem projeção: lá a pergunta é "qual o estado", aqui é "quanto já foi". Com a regra do badge, as fontes que nunca têm projeção sumiriam do HUD inteiro. O rótulo é <code>{perfil ou fonte} · {cota}</code>: o rótulo da cota já diz o fornecedor, e repetir "Anthropic" ao lado gastaria a largura que o nome da conta precisa.</p>
+<p class="note"><b>Cada linha carrega ponto E palavra.</b> O percentual ao lado descreve o consumo, não o risco: 40% às onze da manhã pode ser pior que 80% dez minutos antes do reinício, e é a palavra que diz qual dos dois é o caso. Só o ponto colorido deixaria a cor informando estado sozinha. Nenhum formato novo entra aqui — o percentual é o do card, truncado e não arredondado, e o reset sai das mesmas partes de data da linha do card, só recortadas. Reset ausente <b>some</b> a coluna, em vez de imprimir um traço.</p>
+<p class="note"><b>Arrastar e clicar são um gesto só, separados por limiar de deslocamento.</b> Um <code>clickable</code> empilhado sobre um detector de arrasto não funciona — ele consome o <code>down</code> e o arrasto nunca começa —, então a ação de clique é <b>declarada</b> na semântica em vez de instalada, para o leitor de tela não perder o único caminho de volta. Ao soltar, a pílula gruda na borda mais próxima da <b>área útil</b>, que já desconta a barra de tarefas: a borda de baixo é "logo acima dela". Desenhar <i>sobre</i> a barra de tarefas ficou fora de escopo — exigiria os limites físicos da tela e disputa de ordem-z com uma janela que também é topmost. A posição é gravada e devolvida na próxima vez que o modo é ligado.</p>
+<p class="note"><b>Tudo em ON_TRACK recolhe a pílula ao ponto.</b> O dado não some: ele para de ocupar tela enquanto diz que está tudo bem, e o hover devolve a pílula inteira. É o único lugar do sistema em que o ponto aparece sem a palavra, e só se sustenta porque a palavra está a um movimento de mouse — o mesmo princípio do ponto de risco da bandeja, que não acende nada em <code>ON_TRACK</code>. Parada, a janela ainda fica translúcida; com o ponteiro em cima, opaca. Lista vazia <b>não</b> recolhe: ali ainda não se coletou nada, e o ponto verde afirmaria que está tudo bem antes de saber.</p>
+<p class="note"><b>Mesma janela, terceiro chrome — não uma janela nova.</b> A janela principal (<code>DesktopWindowFrame</code>) redimensiona e reposiciona para o canto; sair do modo restaura o tamanho e a posição de antes. Fechar a janela continua encerrando o app: a barra HUD não é "minimizar para segundo plano", é a mesma semântica do modo somente cards levada a um extremo. <b>Três saídas</b>, mesmo padrão do modo somente cards: clique em qualquer ponto da pílula, item na bandeja e <code>Ctrl+Shift+H</code> — combinação própria, sem colidir com <code>Ctrl+Shift+M</code>. O ponto+palavra reusa <code>AppStatusIndicator</code>/<code>.st</code>: nenhuma primitiva de risco nova, só uma pílula nova que os hospeda.</p>
+<p class="note"><b>A lista é conteúdo da janela; nunca popup.</b> Ela chegou a sair por <code>HoverTooltipBox</code>, e popup nesta plataforma é camada <b>dentro</b> da janela, recortada pelos limites dela: numa janela de 24dp de altura, um balão com piso de 180dp de largura e uma linha por fonte não cabia — saía recortado sobre o próprio alvo, o ponteiro passava a estar sobre o balão, a faixa recebia <code>Exit</code> e a tooltip fechava para reabrir no quadro seguinte. Duas consequências que sobrevivem: o hover pertence ao <b>container inteiro</b> — ele só serve para desfazer o recolhimento ao ponto, e preso a uma linha mover o ponteiro para dentro do painel devolveria o mesmo laço com outro nome —, e a linha tem 20dp e não é <code>AppDataRow</code>, que floora em 32dp mais padding e daria ~288dp de painel com seis fontes.</p>
 
 <h2 id="dash-estados">4b · Dashboard — os estados que o card precisa cobrir</h2>
 <div class="g2">
@@ -1904,6 +2025,14 @@ O app fechou inesperadamente.
   <div class="row"><span class="st warn">Decisão registrada</span><span class="v sm" style="flex:1">As duas faixas de conta com colunas alinhadas não viram cabeçalho de painel: o cabeçalho é título, subtítulo e ações, e não tem onde pôr sete colunas alinhadas à linha do integrante</span><span class="k">issue #117</span></div>
   <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Cinco acentos continuam congelados na variante escura num <code>val</code> de topo de arquivo da tela de sessões, usados em 33 pontos. No tema claro o verde deles dá 2,64:1 contra a superfície, contra os 4,5:1 que o teste de contraste garante para o resto</span><span class="k">issue #117</span></div>
   <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Dos dezesseis temas do app, só dois — Obsidiana e Porcelana — têm os acentos medidos contra a própria superfície. Os outros catorze nunca foram</span><span class="k">issue #117</span></div>
+  <div class="row"><span class="st ok">Verificado ao vivo</span><span class="v sm" style="flex:1">O arrasto foi confirmado por quem usa: a janela acompanha o ponteiro. O <b>encaixe na borda</b>, a translucidez sem hover e o comportamento em mais de um monitor continuam sem verificação — dependem de plataforma e não têm harness</span><span class="k">issue #164</span></div>
+  <div class="row"><span class="st warn">Medição registrada</span><span class="v sm" style="flex:1">Suspeitou-se que trocar a chave do <code>pointerInput</code> no meio do gesto matasse o arrasto. <b>É falso</b> no Compose 1.7.1: com as lambdas como chave o contador de movimentos chega ao mesmo valor. A troca para <code>rememberUpdatedState</code> ficou como higiene, e o teste diz que não discrimina as duas versões</span><span class="k">issue #164</span></div>
+  <div class="row"><span class="st warn">Decisão registrada</span><span class="v sm" style="flex:1">O rodapé de consumo tem <b>laço próprio</b> de 30s, e não carona no semáforo de sessão: aquele pergunta "que sessão precisa de atenção", este pergunta "quanto foi queimado". Só lê com o HUD na tela, e não sincroniza o índice — o semáforo já faz isso na mesma cadência</span><span class="k">issue #164</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">Com quatro ou mais contas o painel passa de 100dp de altura e volta a disputar tela — o oposto do que o modo existe para fazer. O recolhimento ao ponto cobre o caso calmo; o caso de muitas contas <b>todas em risco</b> não tem mitigação além de arrastar o painel para um canto vazio</span><span class="k">issue #164</span></div>
+  <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">A largura da pílula é <b>estimada</b> pela métrica da mono (0,6em por caractere), não medida na composição: medir e devolver a largura para a janela fecharia o laço redimensionar → recompor → medir. Errar custa um caractere truncado a mais, que as reticências já tratam</span><span class="k">issue #164</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">A pílula continua capturando o clique de quem está atrás dela, onde quer que seja largada — o Compose Desktop não tem click-through parcial. Reduzir a área e deixar o usuário escolher o canto é mitigação, não correção</span><span class="k">issue #164</span></div>
+  <div class="row"><span class="st warn">Decisão registrada</span><span class="v sm" style="flex:1">Desenhar <b>sobre</b> a barra de tarefas (o modelo do TBH: Task Bar Hero) ficou fora de escopo: exigiria trocar o clamp de área útil por limites físicos de tela e disputar ordem-z com uma janela que também é topmost. O encaixe de baixo para logo <i>acima</i> dela</span><span class="k">issue #164</span></div>
+  <div class="row"><span class="st warn">Decisão registrada</span><span class="v sm" style="flex:1">O ponto sem palavra (<code>AppStatusDot</code>) é a única exceção a "cor nunca informa sozinha", e vale só na pílula recolhida — ali a palavra está a um movimento de mouse. Em lista, célula ou cabeçalho continua sendo o indicador com palavra</span><span class="k">issue #164</span></div>
 </div></div>
 <p class="note">Aprovado o protótipo, a execução começa pela Fase C (fundação): fontes, paleta, escala tipográfica, tokens de forma e as dezessete primitivas — oito commits antes de qualquer tela mudar de aparência.</p>
 
