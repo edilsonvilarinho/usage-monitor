@@ -225,32 +225,14 @@ internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
 
 /**
- * Piso horizontal da barra HUD (issue #164) — bem abaixo do piso normal, que
- * existe para caber os cards. A janela não tem cards, só o dot+word de
- * [com.usagemonitor.presentation.ui.HudBar]. Fica abaixo de [HUD_PILL_WIDTH_DP]
- * de propósito: é rede contra o AWT recusar um valor absurdo, não a largura
- * real (`resizable = false` já trava isso).
- */
-private const val HUD_MIN_WINDOW_WIDTH_DP = 160
-
-/**
- * Largura da pílula HUD, ancorada no canto superior direito da tela.
+ * Piso horizontal da barra HUD (issue #164).
  *
- * A primeira versão ocupava a largura inteira da tela — e por estar sempre no
- * topo (`alwaysOnTop`), cobria os controles de qualquer outra janela que
- * também tivesse algo nos primeiros 24dp do topo (barra de menu de IDE,
- * atalhos do editor). O Compose Desktop não tem click-through parcial numa
- * `Window` comum: a região inteira do retângulo captura o clique, visível ou
- * não. Reduzir para uma pílula do tamanho do conteúdo, num canto só, é a
- * única correção viável nesta arquitetura (mesma janela, sem hack de shape
- * nativo) — achado testando ao vivo, não antecipado no plano original.
- * 320dp é a mesma magnitude de [com.usagemonitor.presentation.ui.components.NarrowCardWidthThreshold]
- * — não o mesmo token (responde a outra pergunta), só a mesma ordem de
- * grandeza para um rótulo de conta típico. Texto mais longo que isso trunca
- * com reticências; a janela completa continua sendo o caminho para o nome
- * inteiro.
+ * Bem abaixo do piso normal, que existe para caber os cards: a janela HUD não
+ * tem cards, e com a largura medida pelo conteúdo ela chega a ser só o ponto de
+ * `AppStatusIndicator`. É rede contra o AWT recusar um valor absurdo, não a
+ * largura real — quem a decide é `hudPillWidth`.
  */
-private const val HUD_PILL_WIDTH_DP = 320
+private const val HUD_MIN_WINDOW_WIDTH_DP = 32
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
@@ -1671,7 +1653,7 @@ private fun runUsageMonitor(
                     mainWindowState.placement
                 )
                 mainWindowState.placement = WindowPlacement.Floating
-                val hudWidth = HUD_PILL_WIDTH_DP.dp * uiScaleFactor(uiScalePercent)
+                val hudWidth = HUD_PILL_MAX_WIDTH * uiScaleFactor(uiScalePercent)
                 val hudSize = DpSize(hudWidth, AppChrome.hud)
                 mainWindowState.size = hudSize
                 // Canto superior direito: `fitWindowPosition` prende dentro da

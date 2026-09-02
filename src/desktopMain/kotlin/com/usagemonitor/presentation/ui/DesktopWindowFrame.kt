@@ -239,6 +239,22 @@ private fun WindowScope.CompactTitleBarOverlay(
 }
 
 /**
+ * Uma fonte monitorada como a barra HUD a mostra: quem é, em que estado está e
+ * de que tom é esse estado.
+ *
+ * Existe porque a lista de fontes deixou de ser texto de tooltip e passou a ser
+ * conteúdo da própria janela — e porque a geometria (`HudWindowGeometry`) mede a
+ * janela a partir destes rótulos antes de a composição existir. Carrega o tom
+ * além da palavra: no painel cada linha é um `AppStatusIndicator`, ponto **e**
+ * palavra, porque cor sozinha não informa estado neste sistema.
+ */
+internal data class HudSourceStatus(
+    val label: String,
+    val statusLabel: String,
+    val tone: AppTone
+)
+
+/**
  * Conteúdo da barra HUD (issue #164): o pior risco entre todas as cotas, a
  * fonte que o determinou e o tempo até o reset.
  *

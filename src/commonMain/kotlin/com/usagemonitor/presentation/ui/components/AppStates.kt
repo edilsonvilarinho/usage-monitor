@@ -64,7 +64,13 @@ fun AppTone.color(): Color {
     }
 }
 
-private val STATUS_DOT_SIZE = 6.dp
+/**
+ * `internal` e não `private`: a geometria da barra HUD (`HudWindowGeometry`)
+ * dimensiona a janela pelo conteúdo e precisa saber quanto o ponto ocupa. Um
+ * segundo `6.dp` lá seria um segundo dono do mesmo valor, e o dia em que este
+ * mudasse a janela ficaria medindo o indicador anterior.
+ */
+internal val STATUS_DOT_SIZE = 6.dp
 private val TRACK_HEIGHT = 4.dp
 private val BANNER_BAR_WIDTH = 2.dp
 private val STATE_PADDING = 44.dp
