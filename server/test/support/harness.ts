@@ -48,6 +48,7 @@ export function createHarness(configOverrides: Partial<Config> = {}): Harness {
     keyLabelMatch: 'strict',
     retentionDays: 45,
     maxTurnsPerRequest: 5000,
+    metricsMaxSeries: 20000,
     trustProxyHops: 0,
     ...configOverrides,
   };

@@ -163,6 +163,43 @@ export interface ReportActivityRow extends TeamSessionActivityRow {
   accountKey: string;
 }
 
+/**
+ * Consumo de uma `(conta, maquina, modelo)` numa janela.
+ *
+ * Sem `sessionId`, `cwd` nem `gitBranch` — ver [SELECT_METRICS_USAGE_SQL].
+ */
+export interface MetricsUsageRow {
+  accountKey: string;
+  deviceId: string;
+  model: string | null;
+  turnCount: number;
+  sessionCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWrite5mTokens: number;
+  cacheWrite1hTokens: number;
+}
+
+/** Tempo de trabalho de uma maquina na janela. */
+export interface MetricsActivityRow {
+  accountKey: string;
+  deviceId: string;
+  activeMillis: number;
+}
+
+/**
+ * O que o `/metrics` precisa de uma janela.
+ *
+ * Consumo e atividade sao listas **separadas** pela mesma razao de sempre: a
+ * linha de uso e `(maquina, modelo)` e uma maquina que usou dois modelos apareceria
+ * duas vezes — somar a hora ali a contaria duas vezes.
+ */
+export interface MetricsWindowSnapshot {
+  usage: MetricsUsageRow[];
+  activity: MetricsActivityRow[];
+}
+
 /** Conta e integrantes, sem consumo: o "quem e quem" do relatorio. */
 export interface ReportAccountMembers {
   accountKey: string;
@@ -545,6 +582,65 @@ WHERE gap > 0 AND gap < @gapCutoffMs
 GROUP BY accountKey, deviceId, sessionId
 ORDER BY accountKey ASC, deviceId ASC, sessionId ASC
 LIMIT @limit
+`;
+
+/**
+ * Consumo agregado por `(conta, maquina, modelo)`, sem sessao.
+ *
+ * **A ausencia da sessao e o ponto.** Toda linha vira uma serie no Prometheus, e
+ * `session_id` e ilimitado — uma maquina produz sessoes novas todo dia e a
+ * cardinalidade cresceria para sempre, que e a forma classica de derrubar um
+ * servidor de metricas. `cwd` e `git_branch` ficam de fora pela mesma razao, com
+ * o agravante de serem caminho de disco.
+ *
+ * A contagem de sessoes distintas vem junto porque, sem a coluna de sessao, ela
+ * deixaria de ser derivavel pelo consumidor.
+ */
+const SELECT_METRICS_USAGE_SQL = `
+SELECT t.account_key AS accountKey,
+       s.device_id AS deviceId,
+       t.model AS model,
+       COUNT(*) AS turnCount,
+       COUNT(DISTINCT t.session_id) AS sessionCount,
+       SUM(t.input_tokens) AS inputTokens,
+       SUM(t.output_tokens) AS outputTokens,
+       SUM(t.cache_read_tokens) AS cacheReadTokens,
+       SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+FROM team_turns t
+JOIN team_sessions s
+  ON s.account_key = t.account_key AND s.session_id = t.session_id
+WHERE t.ts >= @since AND t.ts < @until
+GROUP BY t.account_key, s.device_id, t.model
+ORDER BY t.account_key ASC, s.device_id ASC, IFNULL(t.model, '') ASC
+`;
+
+/**
+ * Tempo de trabalho por `(conta, maquina)`.
+ *
+ * Mesma definicao das outras consultas de atividade — `LAG` sobre os turnos da
+ * thread principal, intervalos abaixo do corte —, so que somada por maquina em
+ * vez de por sessao. O `PARTITION BY` continua sendo por **sessao**: e nela que
+ * a sequencia de turnos existe, e particionar por maquina misturaria sessoes
+ * paralelas num intervalo so.
+ */
+const SELECT_METRICS_ACTIVITY_SQL = `
+SELECT accountKey, deviceId, SUM(gap) AS activeMillis
+FROM (
+  SELECT t.account_key AS accountKey,
+         s.device_id AS deviceId,
+         t.ts - LAG(t.ts) OVER (
+           PARTITION BY t.account_key, t.session_id ORDER BY t.ts, t.message_id
+         ) AS gap
+  FROM team_turns t
+  JOIN team_sessions s
+    ON s.account_key = t.account_key AND s.session_id = t.session_id
+  WHERE t.is_sidechain = 0
+    AND t.ts >= @since AND t.ts < @until
+)
+WHERE gap > 0 AND gap < @gapCutoffMs
+GROUP BY accountKey, deviceId
+ORDER BY accountKey ASC, deviceId ASC
 `;
 
 /**
@@ -1129,6 +1225,33 @@ export class TeamRepository {
     return [...byAccount.values()].sort((left, right) =>
       left.accountKey.localeCompare(right.accountKey),
     );
+  }
+
+  /**
+   * Consumo e tempo de trabalho de uma janela, para o `/metrics`.
+   *
+   * Janela **fechada dos dois lados** e obrigatoria, ao contrario das rotas de
+   * relatorio: a serie exposta e sempre "as ultimas N horas", e uma leitura sem
+   * `since` varreria a tabela inteira a cada scrape — que acontece a cada quinze
+   * segundos no padrao do Prometheus. `until` semiaberto, como em `/v1/report`.
+   */
+  readMetricsWindow(options: {
+    since: number;
+    until: number;
+    gapCutoffMs: number;
+  }): MetricsWindowSnapshot {
+    const usage = this.db.prepare(SELECT_METRICS_USAGE_SQL).all({
+      since: options.since,
+      until: options.until,
+    }) as MetricsUsageRow[];
+
+    const activity = this.db.prepare(SELECT_METRICS_ACTIVITY_SQL).all({
+      since: options.since,
+      until: options.until,
+      gapCutoffMs: options.gapCutoffMs,
+    }) as MetricsActivityRow[];
+
+    return { usage, activity };
   }
 
   private upsertAccountEmail(accountKey: string, accountEmail: string | null, now: number): void {

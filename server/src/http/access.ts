@@ -117,19 +117,45 @@ function authorizeGlobalRead(
   tokens: Pick<Config, 'adminToken' | 'reportToken'>,
   req: Request,
 ): TeamAccess | null {
+  const bearer = readBearerToken(req);
+
   if (
     tokens.adminToken !== null &&
-    isValidTeamKey(req.header(ADMIN_TOKEN_HEADER) ?? undefined, tokens.adminToken)
+    (isValidTeamKey(req.header(ADMIN_TOKEN_HEADER) ?? undefined, tokens.adminToken) ||
+      isValidTeamKey(bearer, tokens.adminToken))
   ) {
     return { keyId: null, kind: 'admin' };
   }
   if (
     tokens.reportToken !== null &&
-    isValidTeamKey(req.header(REPORT_TOKEN_HEADER) ?? undefined, tokens.reportToken)
+    (isValidTeamKey(req.header(REPORT_TOKEN_HEADER) ?? undefined, tokens.reportToken) ||
+      isValidTeamKey(bearer, tokens.reportToken))
   ) {
     return { keyId: null, kind: 'report' };
   }
   return null;
+}
+
+/**
+ * Le `Authorization: Bearer <token>`.
+ *
+ * Existe por causa do `/metrics`: o `scrape_config` do Prometheus sabe mandar
+ * `authorization`/`bearer_token` nativamente, e header de nome proprio nao e
+ * garantido em toda versao e em todo agente de coleta. E o **mesmo segredo por
+ * outro transporte** — nao amplia autoridade nenhuma, e por isso vale para toda a
+ * familia de leitura global, nao so para o `/metrics`.
+ *
+ * `requireAdminToken` **nao** passa por aqui: ele continua sendo o portao unico
+ * de todo `DELETE`, e afrouxar o transporte de uma credencial destrutiva por
+ * conveniencia de scrape seria outra decisao.
+ */
+function readBearerToken(req: Request): string | undefined {
+  const header = req.header('authorization');
+  if (header === undefined) {
+    return undefined;
+  }
+  const match = /^Bearer[ \t]+(.+)$/i.exec(header.trim());
+  return match?.[1]?.trim();
 }
 
 /** Envolve um handler exigindo o token de admin. */

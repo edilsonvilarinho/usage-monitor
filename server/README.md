@@ -60,6 +60,7 @@ Todas as variáveis estão documentadas em [`.env.example`](.env.example).
 | `PORT` | não | `3000` | |
 | `TEAM_RETENTION_DAYS` | não | `45` | |
 | `TEAM_MAX_TURNS_PER_REQUEST` | não | `5000` | |
+| `TEAM_METRICS_MAX_SERIES` | não | `20000` | **0.12.0+.** Teto de séries do `/metrics`. Acima dele o rótulo `model` é agregado fora e `usage_monitor_metrics_model_label_dropped` vai a `1`. |
 | `TRUST_PROXY_HOPS` | não | `0` | `1` atrás do Traefik do Dokploy. |
 | `LOG_LEVEL` | não | `info` | |
 
@@ -449,6 +450,69 @@ Rotas **planas e paginadas**, para quem coleta períodos fechados. Não são uma
 - **Sem `since`, a consulta de uso agrupa a tabela inteira** — o mesmo custo que `/admin/v1/overview` já paga hoje.
 
 A **0.10.0 não acrescenta tabela nem coluna**: as rotas leem o que o ingest já grava. Atualizar o servidor não migra banco.
+
+### `GET /metrics`
+
+Disponível a partir da versão **0.12.0**. Credencial: `x-report-key`, `x-admin-token` **ou**
+`Authorization: Bearer <token>` com qualquer um dos dois. **Na raiz, não sob `/api`** — é o caminho
+convencional de scrape.
+
+O bearer existe porque o `scrape_config` do Prometheus sabe mandar `authorization` nativamente, e
+header de nome próprio não é garantido em todo agente de coleta. É o **mesmo segredo por outro
+transporte**: não amplia autoridade nenhuma, e por isso vale para toda a família de leitura global.
+`requireAdminToken` não foi tocado e continua sendo o portão único de todo `DELETE`.
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: usage-monitor
+    scheme: https
+    static_configs:
+      - targets: ['usage.empresa.com']
+    authorization:
+      type: Bearer
+      credentials: <TEAM_REPORT_TOKEN>
+```
+
+| Série | Rótulos | O que é |
+|---|---|---|
+| `usage_monitor_tokens_window` | `account`, `member`, `model`, `kind`, `window` | Tokens da janela. `kind` ∈ `input`, `output`, `cache_read`, `cache_write_5m`, `cache_write_1h`. |
+| `usage_monitor_turns_window` | `account`, `member`, `model`, `window` | Turnos registrados. |
+| `usage_monitor_sessions_window` | `account`, `member`, `window` | Sessões distintas com atividade. |
+| `usage_monitor_cost_usd_window` | `account`, `member`, `model`, `window` | Custo estimado em USD, seis casas. |
+| `usage_monitor_unpriced_turns_window` | `account`, `member`, `model`, `window` | Turnos cujo modelo não tem tarifa: o custo é **piso**, não total. |
+| `usage_monitor_active_seconds_window` | `account`, `member`, `window` | Tempo de trabalho, mesma definição de `/report/activity`. |
+| `usage_monitor_account_info` | `account`, `label`, `email`, `email_source` | Identidade da conta, valor `1`. |
+| `usage_monitor_member_info` | `account`, `member`, `alias`, `host` | Identidade da máquina, valor `1`. |
+| `usage_monitor_member_last_seen_timestamp_seconds` | `account`, `member` | Último heartbeat, pelo relógio do servidor. |
+| `usage_monitor_activity_gap_cutoff_seconds` | — | Corte entre turnos contado como trabalho contínuo. |
+| `usage_monitor_metrics_model_label_dropped` | — | `1` quando o teto de séries foi excedido. |
+| `usage_monitor_build_info` | `version`, `pricing_version` | Valor `1`. Sai sempre, inclusive com banco vazio. |
+
+Todas são **gauges de janela deslizante**, com `window` ∈ `24h` e `7d`.
+
+- **Gauges, e não counters cumulativos.** O counter seria o idioma do Prometheus, mas a poda de
+  retenção (`TEAM_RETENTION_DAYS`, 45 por padrão) faz o total **cair**, e uma queda parcial é lida
+  como reset de contador: a taxa sairia inflacionada num dia qualquer, sem nada quebrar. **O preço
+  aceito é que `rate()` e `increase()` não se aplicam** — a janela já está agregada.
+- **Este é o único ponto em que o servidor precifica.** `/v1/report/*` continua devolvendo linhas
+  cruas e `/v1/pricing` continua publicando a tabela, para o consumidor aplicar a conta. Aqui não há
+  essa opção: o Prometheus ingere números, não aplica tabela de preço. A aritmética vive em
+  `src/domain/usageCost.ts`, espelhada de `ModelPricing.kt`, e usa **BigInt** — em JS o `number` é um
+  double e perde exatidão acima de 2^53, que a soma ponderada de um time real ultrapassa.
+- **Modelo sem tarifa não vira custo zero.** Ele sai em `usage_monitor_unpriced_turns_window`, e sem
+  essa série um painel mostraria queda de gasto onde houve modelo novo.
+- **Sessão, `cwd` e branch não são rótulos.** `session_id` é ilimitado — uma máquina produz sessões
+  novas todo dia — e como rótulo a cardinalidade cresceria para sempre. Para o corte por sessão
+  existe `/api/v1/report/usage`.
+- **Nome de pessoa fica em `_info`, nunca nas séries de valor.** `alias` é texto digitado e mutável:
+  como rótulo de valor, renomear a máquina criaria uma série nova e o gráfico quebraria no meio. A
+  junção se faz no PromQL:
+  `usage_monitor_cost_usd_window * on(account,member) group_left(alias) usage_monitor_member_info`.
+- **Cardinalidade**: `contas × máquinas × modelos × 5 kinds × 2 janelas` para os tokens, mais
+  `contas × máquinas × modelos × 2` para turnos e custo. Dez máquinas com quatro modelos ficam na
+  casa das centenas de séries.
+- **A 0.12.0 não acrescenta tabela nem coluna**: a rota lê o que o ingest já grava.
 
 ### Rotas administrativas
 

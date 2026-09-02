@@ -1,11 +1,17 @@
 /**
  * Tabela de precos por modelo, publicada como dado.
  *
- * O servidor continua **nao precificando**: ele publica a tabela e a regra de
- * match, e quem consome aplica a aritmetica. Uma tabela copiada a mao pelo
- * consumidor diverge na proxima mudanca de preco, e o painel e o PDF passam a
- * mostrar custos diferentes do mesmo periodo -- foi exatamente isso que a #105
- * mostrou acontecer dentro do proprio app.
+ * Nas rotas de relatorio o servidor continua **nao precificando**: ele publica a
+ * tabela e a regra de match, e quem consome aplica a aritmetica. Uma tabela
+ * copiada a mao pelo consumidor diverge na proxima mudanca de preco, e o painel e
+ * o PDF passam a mostrar custos diferentes do mesmo periodo -- foi exatamente
+ * isso que a #105 mostrou acontecer dentro do proprio app.
+ *
+ * **A excecao e o `/metrics`** (0.12.0+), onde `domain/usageCost.ts` aplica a
+ * aritmetica aqui mesmo: o Prometheus ingere numeros e nao aplica tabela de preco
+ * nenhuma, entao ou o custo sai calculado, ou o operador mantem a copia a mao que
+ * o paragrafo acima recusa. A tabela continua tendo um dono; o que aquele modulo
+ * acrescenta e a conta.
  *
  * A fonte de verdade continua sendo
  * `src/commonMain/kotlin/com/usagemonitor/domain/entity/ModelPricingTable.kt`.
