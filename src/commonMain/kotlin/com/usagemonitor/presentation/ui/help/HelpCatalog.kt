@@ -257,7 +257,8 @@ object HelpCatalog {
                 "cards; a faixa de título volta enquanto o ponteiro está sobre o topo da janela. A " +
                 "barra HUD vai mais longe: encolhe a janela a um painel de uma linha por conta, " +
                 "sempre no topo das outras, arrastável e que gruda na borda mais próxima. Com tudo " +
-                "normal ela se recolhe a um ponto; o ponteiro em cima devolve a lista inteira. Os " +
+                "normal ela se recolhe a um ponto; o ponteiro em cima devolve a lista inteira. A " +
+                "primeira linha termina com quanto falta para a próxima coleta automática. Os " +
                 "dois modos são exclusivos: ligar um desliga o outro.",
             steps = listOf(
                 "Abra Configurações → \"Geral\" e use \"Somente os cards\" ou \"Barra HUD\".",
@@ -476,7 +477,8 @@ object HelpCatalog {
                 "The HUD strip goes further: it shrinks the window to a panel with one line per " +
                 "account, always above other windows, draggable and snapping to the nearest edge. " +
                 "With everything on track it collapses to a single dot; hovering brings the whole " +
-                "list back. The two modes are mutually exclusive: turning one on turns the other off.",
+                "list back. The first row ends with how long is left until the next automatic " +
+                "collection. The two modes are mutually exclusive: turning one on turns the other off.",
             steps = listOf(
                 "Open Settings → \"General\" and use \"Cards only\" or \"HUD strip\".",
                 "From the keyboard: Ctrl+Shift+M toggles cards only mode and Ctrl+Shift+H toggles " +

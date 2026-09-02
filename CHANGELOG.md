@@ -12,6 +12,11 @@ someone using the app.
 
 ### Added
 
+- The HUD strip now ends with a countdown to the next automatic collection. It was already in the
+  footer, but the footer is not drawn in HUD mode, so the only way to know how long was left was to
+  leave the mode. It is drawn once, on the first row — the polling is a single loop for the whole
+  app, not one per account.
+
 - In-app help window (`F1`, the footer icon, or the tray menu): twelve topics covering what each
   feature does, how to turn it on, and an animated demo of it. The demos are recorded offscreen from
   the app's own components and ship inside the installer, so the window works with no network.

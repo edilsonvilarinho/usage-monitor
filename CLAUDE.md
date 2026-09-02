@@ -729,6 +729,29 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   tela informava que ela é arrastável — a pergunta "como eu consigo mover?" veio de quem já estava
   com ela na tela. `PointerIcon(Cursor.MOVE_CURSOR)` é a afordância que o cromo de janela normalmente
   dá de graça.
+- **A contagem até a próxima coleta sai uma vez só, na primeira linha** (`HudCountdown`, issue #185).
+  O rodapé, que já a mostrava, não é composto em modo HUD, e sem ela não havia como saber quanto
+  falta sem sair do modo. O polling é um laço **único** de 10 min para o app inteiro, não um por
+  conta: repeti-la em cada linha afirmaria que cada conta tem coleta própria. Recolhida ao ponto ela
+  não aparece — ali não há texto nenhum, e o hover devolve o painel com ela —, e aparece **também**
+  na linha de carregamento, que é a primeira linha.
+  - **O ícone é o que diz de que tempo se trata.** Aqui não cabe tooltip, pelo mesmo motivo que já
+    tirou a lista do `HoverTooltipBox`, e um `02:05` solto ao lado dos percentuais não se explica. A
+    frase por extenso vai no `contentDescription` do ícone, que é o caminho do leitor de tela e dos
+    asserts, e sai de `nextRefreshLabel(language)` — **dona única** do texto, compartilhada com a
+    tooltip do rodapé.
+  - **A largura é medida sobre um `"00:00"` fixo, nunca sobre o relógio.** A janela é dimensionada
+    pelo conteúdo; medir o texto corrente a faria mudar de tamanho a cada segundo. Com o poll de 10
+    min o `%02d:%02d` dá sempre cinco caracteres e a escala `label*` é mono, então o placeholder tem
+    exatamente a largura de qualquer valor que a barra imprima.
+  - **O tique mora no `HudBar`, e precisa de interruptor.** Em `Main.kt` ele recomporia `main()`
+    inteiro a cada segundo. `countdownUpdatesEnabled` **não é preferência de usuário**: sob o relógio
+    dos testes de componente o `delay` avança sozinho e o `nowProvider` fixo nunca deixa a contagem
+    chegar a zero, então o laço gira para sempre e o `waitForIdle` não retorna — foi medido, não
+    deduzido. É o mesmo interruptor que o `FooterBar` já tinha.
+  - **O `weight` da linha de carregamento mora no indicador**, não num `Spacer` próprio: a
+    `HudPanelRow` espaça os filhos, e um terceiro filho traria um vão que `hudFallbackRowWidth` não
+    conta — a janela nasceria estreita e o texto sairia comprimido.
 - **Três saídas, mesmo padrão do modo somente cards**: clique curto em qualquer ponto da pílula, o
   item na bandeja e `Ctrl+Shift+H`, combinação própria sem colidir com o `Ctrl+Shift+M` do modo
   somente cards.

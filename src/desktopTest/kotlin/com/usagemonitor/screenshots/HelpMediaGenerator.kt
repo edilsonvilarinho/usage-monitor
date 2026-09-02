@@ -488,6 +488,15 @@ private fun recordWindowModes(outputDir: File) {
                                     sources = ScreenshotFixtures.hudSources,
                                     fallbackLabel = "Carregando",
                                     expanded = true,
+                                    // A contagem da issue #185 é parte da barra, e a demo
+                                    // mostraria um desenho que o app não tem sem ela. O
+                                    // laço vai desligado: o gravador dorme em tempo real e
+                                    // um relógio andando faria cada passada produzir
+                                    // quadros diferentes.
+                                    nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
+                                    countdownDescription = "Próxima atualização automática",
+                                    nowProvider = { ScreenshotFixtures.NOW },
+                                    countdownUpdatesEnabled = false,
                                     onOpenFull = {}
                                 )
                             }
