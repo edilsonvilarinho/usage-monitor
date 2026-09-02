@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Wysiwyg
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,39 @@ const val FOOTER_ADMIN_OVERVIEW_TEST_TAG = "footerAdminOverview"
 const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
 
 const val FOOTER_HELP_TEST_TAG = "footerHelp"
+
+/** Gatilho do menu de modos de janela (issue #187). */
+const val FOOTER_WINDOW_MODE_TEST_TAG = "footerWindowMode"
+
+/** Prefixo da marca de cada opção do menu de modos: `footerWindowMode-HUD`. */
+const val FOOTER_WINDOW_MODE_OPTION_TAG_PREFIX = "footerWindowMode-"
+
+/**
+ * As três molduras da janela principal (issue #187).
+ *
+ * **Enum novo, e as preferências continuam sendo dois booleanos.** `cardsOnlyMode`
+ * e `hudMode` seguem separados em `PreferencesSettings`, e a exclusão mútua entre
+ * eles continua sendo regra dos setters em `Main.kt` — este tipo descreve o que o
+ * **controle** oferece, não como o estado é guardado.
+ *
+ * Os rótulos são os **mesmos** das Configurações. Dois nomes para a mesma moldura
+ * fariam o passo da ajuda ("use \"Somente os cards\"") apontar para um controle
+ * que a tela chama de outra coisa.
+ */
+enum class WindowMode {
+    STANDARD,
+    CARDS_ONLY,
+    HUD;
+
+    fun label(language: AppLanguage): String {
+        val isPt = language == AppLanguage.PT
+        return when (this) {
+            STANDARD -> if (isPt) "Padrão" else "Standard"
+            CARDS_ONLY -> if (isPt) "Somente os cards" else "Cards only"
+            HUD -> if (isPt) "Barra HUD" else "HUD strip"
+        }
+    }
+}
 
 /**
  * Âncoras do rodapé.
@@ -102,7 +136,17 @@ fun FooterBar(
      * o rodapé sem despachar nada. No app ele está sempre presente — a ajuda não
      * depende de configuração nenhuma.
      */
-    onOpenHelp: () -> Unit = {}
+    onOpenHelp: () -> Unit = {},
+    /** A moldura em que a janela está agora — marcada no menu de modos. */
+    windowMode: WindowMode = WindowMode.STANDARD,
+    /**
+     * Troca a moldura da janela (issue #187).
+     *
+     * `null` esconde o controle, pela mesma razão de [onOpenAdminOverview]: os
+     * geradores de captura montam o rodapé sem despachar nada, e um menu que
+     * não troca coisa alguma seria decoração.
+     */
+    onWindowModeChange: ((WindowMode) -> Unit)? = null
 ) {
     val initialRemaining = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
     var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(initialRemaining) }
@@ -138,7 +182,9 @@ fun FooterBar(
             onOpenSettings = onOpenSettings,
             onOpenAdminOverview = onOpenAdminOverview,
             onOpenTeamPresence = onOpenTeamPresence,
-            onOpenHelp = onOpenHelp
+            onOpenHelp = onOpenHelp,
+            windowMode = windowMode,
+            onWindowModeChange = onWindowModeChange
         )
     }
 }
@@ -214,13 +260,26 @@ private fun FooterActionGroup(
     modifier: Modifier = Modifier,
     onOpenAdminOverview: (() -> Unit)? = null,
     onOpenTeamPresence: (() -> Unit)? = null,
-    onOpenHelp: () -> Unit = {}
+    onOpenHelp: () -> Unit = {},
+    windowMode: WindowMode = WindowMode.STANDARD,
+    onWindowModeChange: ((WindowMode) -> Unit)? = null
 ) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // **Primeiro do grupo.** As demais agem sobre o conteúdo da janela
+        // (recoletar, configurar, explicar); esta age sobre a **moldura** dela,
+        // e é a única do rodapé que muda o que a janela é.
+        if (onWindowModeChange != null) {
+            WindowModeMenuButton(
+                language = language,
+                windowMode = windowMode,
+                onWindowModeChange = onWindowModeChange
+            )
+        }
+
         // Vem antes da visão global e ao lado dela: as duas são do administrador
         // e abrem o servidor inteiro, só que por perguntas diferentes — quem está
         // aí agora, e quanto cada um gastou.
@@ -295,6 +354,64 @@ private fun FooterActionGroup(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
+                contentDescription = null,
+                modifier = Modifier.size(FOOTER_ICON_SIZE),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * O acesso rápido às três molduras da janela (issue #187).
+ *
+ * **Menu, e não um segmentado com três rótulos.** O segmentado mostra todas as
+ * opções o tempo todo e custa a largura das três; numa barra de estado de 30dp
+ * que já carrega até cinco ações, "Padrão · Somente os cards · Barra HUD" não
+ * cabe. O menu mostra o modo corrente sob demanda e continua dizendo **quais**
+ * modos existem, que é metade da queixa da issue: os dois modos alternativos
+ * só eram descobertos por acidente.
+ *
+ * **Ele existe só no modo padrão**, porque o rodapé só é composto ali
+ * (`DashboardScreen(showFooter)`). Voltar continua sendo `Ctrl+Shift+M` /
+ * `Ctrl+Shift+H`, a bandeja, a faixa de hover do modo somente cards e o clique
+ * na pílula do HUD — quatro caminhos que já existiam e nenhum deles some.
+ *
+ * O estado de aberto/fechado mora aqui: nenhuma outra parte do app precisa
+ * saber que um menu está aberto no rodapé.
+ */
+@Composable
+private fun WindowModeMenuButton(
+    language: AppLanguage,
+    windowMode: WindowMode,
+    onWindowModeChange: (WindowMode) -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val modes = WindowMode.entries
+    val label = if (language == AppLanguage.PT) "Modo de janela" else "Window mode"
+
+    AppMenu(
+        expanded = menuExpanded,
+        options = modes.map { mode ->
+            AppMenuOption(
+                label = mode.label(language),
+                testTag = FOOTER_WINDOW_MODE_OPTION_TAG_PREFIX + mode.name
+            )
+        },
+        selectedIndex = modes.indexOf(windowMode),
+        onSelect = { index ->
+            menuExpanded = false
+            onWindowModeChange(modes[index])
+        },
+        onDismissRequest = { menuExpanded = false }
+    ) {
+        FooterIconActionButton(
+            label = label,
+            onClick = { menuExpanded = !menuExpanded },
+            testTag = FOOTER_WINDOW_MODE_TEST_TAG
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Wysiwyg,
                 contentDescription = null,
                 modifier = Modifier.size(FOOTER_ICON_SIZE),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
