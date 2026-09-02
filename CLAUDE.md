@@ -534,16 +534,18 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
 `HudSummaryViewModel` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
 [`hud-flutuante-164-execucao.md`](docs/planos/hud-flutuante-164-execucao.md)): terceiro chrome, ainda
 mais discreto que o modo somente cards — a mesma janela principal encolhida a um painel de **largura
-medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: mostra **uma linha por fonte
-monitorada** (`allSourceRisks`, em `WorstQuotaSnapshot.kt`) com estado, nome, percentual e reset, e um
+medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: mostra **uma linha por cota
+monitorada** (`allQuotaRisks`, em `WorstQuotaSnapshot.kt`) com estado, nome, percentual e reset, e um
 rodapé com o que a máquina queimou na janela de 5h. **Também não é valor novo em enum nenhum**: `hud`
 é um terceiro booleano de `DesktopWindowFrame`, irmão de `compact`, e a exclusão mútua entre os dois é
 regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do tipo.
-- **Três versões de conteúdo foram achadas erradas ao vivo, uma por vez.** (1) Uma linha só, a da
+- **Quatro versões de conteúdo foram achadas erradas ao vivo, uma por vez.** (1) Uma linha só, a da
   fonte que perde: com várias contas, as outras não tinham sinal nenhum de que existiam. (2) As
   outras num `HoverTooltipBox`: o dado ficou atrás de um gesto, e o popup piscava. (3) A lista sem
-  consumo: cota é o teto do fornecedor, e o que a máquina gastou não aparecia em lugar nenhum. Cada
-  correção só apareceu usando; nenhuma foi antecipada em plano.
+  consumo: cota é o teto do fornecedor, e o que a máquina gastou não aparecia em lugar nenhum. (4)
+  Uma linha por **fonte**, com a pior cota de cada uma: a conta Anthropic com janela de 5h e de 7d
+  aparecia com uma linha só, e o outro limite não existia na tela. Cada correção só apareceu usando;
+  nenhuma foi antecipada em plano.
 - **A janela muda de tamanho de verdade — não é overlay como o modo somente cards.** `alwaysOnTop`
   vira `alwaysOnTopEnabled || hudMode` (expressão recomposta a cada leitura, nunca uma gravação: a
   preferência do usuário não é sobrescrita) e `resizable = false`. Sair restaura tamanho, posição e
@@ -587,6 +589,15 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
     percentual ao lado descreve o **consumo**, não o risco: 40% às onze da manhã pode ser pior que
     80% dez minutos antes do reinício, e é a palavra que diz qual dos dois é o caso. Sem ela a cor
     informaria estado sozinha.
+  - **Cota sem projeção continua na lista**, com ponto neutro e a palavra dizendo isso. O percentual
+    é fato medido e não depende de previsão — é a diferença para o badge do card, que some sem
+    projeção: lá a pergunta é "qual o estado", aqui é "quanto já foi". Com a regra do badge, Kilo e
+    OpenCode (que nunca têm projeção, porque `currentSegment` vê um ponto por segmento) sumiriam do
+    HUD inteiro. Na ordem, "sem projeção" vem **depois** de `ON_TRACK`: um normal conhecido informa
+    mais que um desconhecido. O rótulo da linha é `{perfil ou fonte} · {cota}` — o rótulo da cota já
+    diz o fornecedor ("Claude 5h"), e repetir "Anthropic" ao lado gastaria a largura que o nome da
+    conta precisa. **Recolher ao ponto exige projeção em todas as cotas**: com uma sem projeção,
+    "está tudo bem" seria garantia que ninguém deu.
   - **Nenhum formato novo na linha.** O percentual é `compactPercentageLabel`, o mesmo do card —
     truncado, não arredondado. O reset é `resetShortLabel`, que sai das **mesmas**
     `formatBrtDateTimeParts` da linha do card, só recortada: sem prefixo, sem fuso, sem a data do
@@ -602,8 +613,14 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
     e é a simetria que mantém o ponto na mesma quina em que o painel estava, tanto crescendo quanto
     encolhendo.
   - **A linha do painel não é `AppDataRow`** (`HUD_SOURCE_ROW_HEIGHT`, 20dp): aquela primitiva tem
-    piso de 32dp mais 8dp de padding vertical, e seis fontes dariam ~288dp — uma janela, não um HUD.
+    piso de 32dp mais 8dp de padding vertical, e seis cotas dariam ~288dp — uma janela, não um HUD.
     Mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp do cromo.
+  - **O rodapé é um bloco, não uma linha solta**, e a altura tem de contar o padding vertical dele.
+    Contando só a divisória mais a linha, a janela nascia 8dp mais curta que o conteúdo e o
+    `fillMaxSize` da raiz recortava o texto do rodapé ao meio. `HudBarHeightTest` é a costura entre a
+    conta pura e o que o Compose dispõe — os testes de geometria conferiam a conta com ela mesma, e
+    os de componente rodam numa cena de altura fixa, onde sobra espaço. O bloco de conteúdo carrega
+    `HUD_CONTENT_TEST_TAG` porque a raiz mede o que a cena der.
 - **O rodapé fala do que a máquina gastou, e não de cota** (`GetHudSessionSummaryUseCase` +
   `HudSummaryViewModel` + `hudSessionSummaryLabel`): sessões vivas agora, custo e tokens da janela de
   5h. As linhas acima dele descrevem o teto que o fornecedor impõe; esta descreve o consumo real.

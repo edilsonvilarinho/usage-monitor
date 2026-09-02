@@ -1,4 +1,4 @@
-One 20dp line per monitored source, plus a footer with what the machine actually burned.
+One 20dp line per monitored quota, plus a footer with what the machine actually burned.
 
 ```jsx
 <AppHudBar sources={[{ label: 'Anthropic — pessoal', statusLabel: 'Crítico', level: 'crit', percentLabel: '92%', resetLabel: 'Ter 22h59' }]} />
@@ -9,14 +9,23 @@ One 20dp line per monitored source, plus a footer with what the machine actually
 Not a new risk primitive — the dot+word is `AppStatusIndicator`, and the collapsed state reuses
 `AppStatusDot`; this panel is only the shell that carries them.
 
-**Three content versions were found wrong live, one at a time.** (1) A single line with the worst
+**Four content versions were found wrong live, one at a time.** (1) A single line with the worst
 source only: with several accounts monitored, the others had no signal they existed. (2) The others
 behind a hover tooltip: the data sat behind a gesture, and the popup flickered — a popup on this
 platform is a layer *inside* the window, clipped to its bounds, so in a 24dp-tall window a bubble
 with a 180dp minimum width landed on top of its own trigger, the pointer moved onto the bubble, the
 trigger got an `Exit`, and it closed and reopened every frame. (3) The list with no consumption at
-all: quota is the provider's ceiling, and what the machine spent appeared nowhere. Each correction
-came from using it; none was anticipated.
+all: quota is the provider's ceiling, and what the machine spent appeared nowhere. (4) One line per
+*source*, carrying that source's worst quota: an account with both a 5h and a 7d window still showed
+a single limit. Each correction came from using it; none was anticipated.
+
+**A quota with no forecast still gets its line**, with a neutral dot and a word saying so. The
+percent is measured fact and does not depend on a projection — that is the difference from the
+card's badge, which disappears without one: there the question is "what state", here it is "how much
+already". Under the badge's rule, sources that never produce a forecast would vanish from the HUD
+entirely. In the ordering, "no forecast" sorts *after* on-track: a known normal informs more than an
+unknown. Collapsing to the dot requires a forecast on every quota — with one missing, "everything is
+fine" would be a guarantee nobody gave.
 
 **Every row carries dot AND word.** The percent beside it describes *consumption*, not risk — 40% at
 eleven in the morning can be worse than 80% ten minutes before the reset, and the word is what says

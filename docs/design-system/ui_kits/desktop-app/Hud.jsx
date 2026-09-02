@@ -1,10 +1,12 @@
 const { AppHudBar } = DS;
 
+// Uma linha por COTA, não por fonte: a conta com janela de 5h e de 7d mostra
+// as duas. Cota sem projeção sai com ponto neutro e a palavra dizendo isso.
 const SOURCES = [
-  { label: 'Anthropic — INFORMATA2', statusLabel: 'Crítico', level: 'crit', percentLabel: '92%', resetLabel: 'Ter 22h59' },
-  { label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', percentLabel: '41%', resetLabel: '4h12' },
-  { label: 'Codex', statusLabel: 'Normal', level: 'ok', percentLabel: '12%', resetLabel: 'Qua 09h00' },
-  { label: 'OpenCode Go', statusLabel: 'Normal', level: 'ok', percentLabel: '3%' }
+  { label: 'INFORMATA2 · Claude 5h', statusLabel: 'Crítico', level: 'crit', percentLabel: '92%', resetLabel: 'Ter 22h59' },
+  { label: 'INFORMATA2 · Claude 7d', statusLabel: 'Atenção', level: 'warn', percentLabel: '41%', resetLabel: 'Sáb 11h37' },
+  { label: 'Padrão · Claude 5h', statusLabel: 'Normal', level: 'ok', percentLabel: '12%', resetLabel: 'Ter 1h00' },
+  { label: 'OpenCode Go · Rolling', statusLabel: 'Sem projeção', level: 'off', percentLabel: '3%' }
 ];
 
 const FOOTER = '2 sessões ativas · $4.21 · 1,2M tok · 5h';
