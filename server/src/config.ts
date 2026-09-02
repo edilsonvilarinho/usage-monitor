@@ -48,6 +48,15 @@ export interface Config {
   keyLabelMatch: KeyLabelMatchMode;
   retentionDays: number;
   maxTurnsPerRequest: number;
+  /**
+   * Teto de series do `/metrics`.
+   *
+   * Acima dele o rotulo `model` e agregado fora e
+   * `usage_monitor_metrics_model_label_dropped` vai a 1. Degradar com sinal, e nao
+   * truncar em silencio nem responder 500 — que quebraria o scrape inteiro por
+   * causa de uma dimensao.
+   */
+  metricsMaxSeries: number;
   trustProxyHops: number;
 }
 
@@ -65,6 +74,12 @@ const KEY_LABEL_MATCH_MODES: readonly string[] = ['strict', 'off'];
 const DEFAULT_PORT = 3000;
 const DEFAULT_RETENTION_DAYS = 45;
 const DEFAULT_MAX_TURNS_PER_REQUEST = 5000;
+/**
+ * Teto generoso: com 10 maquinas, 4 modelos e as duas janelas, a exposicao fica
+ * na casa das centenas de series. O teto existe para o caso patologico — um time
+ * grande com muitos modelos —, nao para o uso normal.
+ */
+const DEFAULT_METRICS_MAX_SERIES = 20000;
 
 const GENERATE_HINT =
   'Gere um com: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"';
@@ -84,6 +99,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Config 
       env.TEAM_MAX_TURNS_PER_REQUEST,
       DEFAULT_MAX_TURNS_PER_REQUEST,
     ),
+    metricsMaxSeries: parseIntegerOrDefault(env.TEAM_METRICS_MAX_SERIES, DEFAULT_METRICS_MAX_SERIES),
     trustProxyHops: parseIntegerOrDefault(env.TRUST_PROXY_HOPS, 0),
   });
 }
@@ -125,6 +141,10 @@ export function validateConfig(config: Config): Config {
 
   if (!Number.isInteger(config.maxTurnsPerRequest) || config.maxTurnsPerRequest < 1) {
     throw new Error('TEAM_MAX_TURNS_PER_REQUEST deve ser um inteiro maior ou igual a 1.');
+  }
+
+  if (!Number.isInteger(config.metricsMaxSeries) || config.metricsMaxSeries < 1) {
+    throw new Error('TEAM_METRICS_MAX_SERIES deve ser um inteiro maior ou igual a 1.');
   }
 
   if (!Number.isInteger(config.trustProxyHops) || config.trustProxyHops < 0) {

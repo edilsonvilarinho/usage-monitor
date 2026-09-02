@@ -11,7 +11,9 @@ import { createIngestRouter } from './http/routes/ingest.js';
 import { createPresenceRouter } from './http/routes/presence.js';
 import { createReportRouter } from './http/routes/report.js';
 import { createTeamRouter } from './http/routes/team.js';
+import { createMetricsRouter } from './http/routes/metrics.js';
 import { createVerifyRouter } from './http/routes/verify.js';
+import { SERVER_VERSION } from './version.js';
 
 export interface BuildOverrides {
   /** Banco ja aberto. Os testes passam um em diretorio temporario. */
@@ -70,6 +72,9 @@ export function buildApp(config: Config, overrides: BuildOverrides = {}): BuiltA
   // chegarem ao consumidor como o mesmo 404.
   app.use('/api', createReportRouter({ config, repository, keyRepository }));
   app.use('/api', createVerifyRouter({ config, repository, keyRepository, now }));
+  // Na **raiz**, e nao sob `/api`: `/metrics` e o caminho convencional de scrape.
+  // Incondicional pela mesma razao das rotas de relatorio.
+  app.use(createMetricsRouter({ config, repository, keyRepository, now, version: SERVER_VERSION }));
 
   // Sem token de administracao as rotas nem existem: caem na coringa 404 abaixo,
   // e um deploy que nunca pediu administracao nao ganha superficie nova.
