@@ -423,10 +423,7 @@ private fun SuccessContent(
     onRetryTarget: (UsageTargetKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val itemByTarget = apiStatsList.associateBy { stats -> stats.targetKey }
-    val orderedTargets = cardOrder.toSet()
-    val items = cardOrder.mapNotNull(itemByTarget::get) +
-        apiStatsList.filter { stats -> stats.targetKey !in orderedTargets }
+    val items = orderedByCardOrder(apiStatsList, cardOrder) { stats -> stats.targetKey }
     val warnings = partialErrors.mapNotNull { error -> warningFor(error = error, language = language) }
     val genericErrors = partialErrors.filterNot { error ->
         error.isConfigurationIssue || error.isRateLimitIssue || error.isServiceUnavailableIssue ||

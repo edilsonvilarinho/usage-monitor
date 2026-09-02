@@ -9,7 +9,9 @@ const SOURCES = [
   { label: 'OpenCode Go · Rolling', statusLabel: 'Sem projeção', level: 'off', percentLabel: '3%' }
 ];
 
-const FOOTER = '2 sessões ativas · $4.21 · 1,2M tok · 5h';
+const TOP = {
+  statusLabel: 'Crítico', level: 'crit', label: 'Padrão', quotaSummary: '5h 88% · 7d 9%'
+};
 
 function HudScreen({ children, corner = 'top-right', tall = false }) {
   const anchor = corner === 'top-right' ? { top: 0, right: 0 } : { bottom: 0, right: 0 };
@@ -34,33 +36,36 @@ export function Hud() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', alignItems: 'flex-start' }}>
       <Caption>barra HUD · painel arrastável, uma linha por fonte, teto de 420dp</Caption>
 
-      <Caption>1 · o estado normal — cotas e consumo, sem gesto nenhum</Caption>
-      <HudScreen tall>
-        <AppHudBar sources={SOURCES} footerLabel={FOOTER} />
+      <Caption>1 · parada — uma linha, a primeira da ordem de cards</Caption>
+      <HudScreen>
+        <AppHudBar topLine={TOP} />
       </HudScreen>
 
-      <Caption>2 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</Caption>
+      <Caption>2 · hover — a lista de todas as cotas</Caption>
+      <HudScreen tall>
+        <AppHudBar topLine={TOP} sources={SOURCES} expanded />
+      </HudScreen>
+
+      <Caption>3 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</Caption>
       <HudScreen>
         <AppHudBar level="ok" dotOnly />
       </HudScreen>
 
-      <Caption>3 · antes da primeira coleta — uma linha, e ela diz o que está acontecendo</Caption>
+      <Caption>4 · antes da primeira coleta — uma linha, e ela diz o que está acontecendo</Caption>
       <HudScreen>
         <AppHudBar sources={[]} fallbackLabel="Carregando" />
       </HudScreen>
 
-      <Caption>4 · arrastado para a borda de baixo — logo acima da barra de tarefas</Caption>
+      <Caption>5 · arrastado para a borda de baixo — logo acima da barra de tarefas</Caption>
       <HudScreen corner="bottom-right" tall>
-        <AppHudBar sources={SOURCES.slice(0, 2)} footerLabel={FOOTER} />
+        <AppHudBar topLine={TOP} sources={SOURCES.slice(0, 2)} expanded />
       </HudScreen>
 
       <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '54ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>
         Terceiro chrome, um passo além do modo somente cards (issue #164): a mesma janela principal
         redimensionada a um painel. Três versões de conteúdo foram achadas erradas ao vivo, uma por
         vez — uma linha só com a pior fonte, depois as outras atrás de um hover, depois a lista sem
-        nenhum número de consumo. Agora cada fonte tem sua linha, com ponto, palavra, percentual e
-        reset, e o rodapé diz o que a máquina queimou na janela de 5h: as linhas falam do teto do
-        fornecedor, o rodapé fala do gasto real. A largura sai do conteúdo, com 420dp de teto, e o
+        nenhum número de consumo. Parada, a barra mostra uma linha; com o ponteiro em cima, todas as cotas. A largura sai do conteúdo, com 420dp de teto, e o
         painel é arrastado para onde o usuário quiser — ao soltar ele gruda na borda mais próxima da
         área útil e a posição é gravada. Três saídas: clique curto em qualquer ponto, item na bandeja
         e Ctrl+Shift+H.

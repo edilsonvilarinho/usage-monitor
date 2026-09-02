@@ -534,18 +534,30 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
 `HudSummaryViewModel` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
 [`hud-flutuante-164-execucao.md`](docs/planos/hud-flutuante-164-execucao.md)): terceiro chrome, ainda
 mais discreto que o modo somente cards — a mesma janela principal encolhida a um painel de **largura
-medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: mostra **uma linha por cota
-monitorada** (`allQuotaRisks`, em `WorstQuotaSnapshot.kt`) com estado, nome, percentual e reset, e um
-rodapé com o que a máquina queimou na janela de 5h. **Também não é valor novo em enum nenhum**: `hud`
+medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: parada mostra **uma
+linha** — a primeira fonte da ordem de cards do usuário, com o percentual de todas as cotas dela lado
+a lado —, e com o ponteiro em cima troca essa linha pela **lista de todas as cotas**
+(`allQuotaRisks`, em `WorstQuotaSnapshot.kt`), com reset por linha. **Também não é valor novo em enum nenhum**: `hud`
 é um terceiro booleano de `DesktopWindowFrame`, irmão de `compact`, e a exclusão mútua entre os dois é
 regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do tipo.
-- **Quatro versões de conteúdo foram achadas erradas ao vivo, uma por vez.** (1) Uma linha só, a da
-  fonte que perde: com várias contas, as outras não tinham sinal nenhum de que existiam. (2) As
-  outras num `HoverTooltipBox`: o dado ficou atrás de um gesto, e o popup piscava. (3) A lista sem
-  consumo: cota é o teto do fornecedor, e o que a máquina gastou não aparecia em lugar nenhum. (4)
-  Uma linha por **fonte**, com a pior cota de cada uma: a conta Anthropic com janela de 5h e de 7d
-  aparecia com uma linha só, e o outro limite não existia na tela. Cada correção só apareceu usando;
-  nenhuma foi antecipada em plano.
+- **Cinco versões de conteúdo, quatro corrigidas depois de usar.** (1) Uma linha com a fonte de pior
+  risco: com várias contas, as outras não tinham sinal nenhum de que existiam. (2) As outras num
+  `HoverTooltipBox`: o dado ficou atrás de um gesto, e o popup piscava. (3) Uma linha por **fonte**,
+  sempre visível, com a pior cota de cada uma: a conta com janela de 5h e de 7d mostrava um limite
+  só. (4) Uma linha por **cota**, sempre visível, mais um rodapé de consumo: dez linhas na tela para
+  dizer o que cabe em uma. (5) A que ficou junta as duas metades certas — o resumo cabe numa linha, o
+  detalhe fica a um movimento de mouse. Nenhuma dessas voltas foi antecipada em plano; todas
+  apareceram usando.
+- **O rodapé de consumo foi removido, e a maquinaria dele junto.** `GetHudSessionSummaryUseCase`,
+  `HudSessionSummary`, `HudSummaryViewModel` e `hudSessionSummaryLabel` foram **apagados**, não
+  deixados sem consumidor: código morto com laço de 30s é pior que código morto parado, e este
+  documento já registra o que acontece com um caminho que ninguém lê mais (`UserPreferences`). O
+  consumo do CLI volta a existir só na tela de Sessões CLI.
+- **A ordem é a que o usuário arrastou no dashboard** (`orderedByCardOrder`, compartilhado com a
+  grade de cards), não a do risco: com o risco mandando, a linha parada trocava de conta sozinha e
+  nunca se sabia de antemão quem estava ali. Por isso `allQuotaRisks` **não ordena** — duas ordens
+  brigando dariam um resultado que nenhuma das duas descreve. Dentro da fonte vale a ordem de
+  declaração das cotas, que é a da resposta da API: é ela que o resumo `5h 88% · 7d 9%` imprime.
 - **A janela muda de tamanho de verdade — não é overlay como o modo somente cards.** `alwaysOnTop`
   vira `alwaysOnTopEnabled || hudMode` (expressão recomposta a cada leitura, nunca uma gravação: a
   preferência do usuário não é sobrescrita) e `resizable = false`. Sair restaura tamanho, posição e
@@ -615,31 +627,18 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   - **A linha do painel não é `AppDataRow`** (`HUD_SOURCE_ROW_HEIGHT`, 20dp): aquela primitiva tem
     piso de 32dp mais 8dp de padding vertical, e seis cotas dariam ~288dp — uma janela, não um HUD.
     Mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp do cromo.
-  - **O rodapé é um bloco, não uma linha solta**, e a altura tem de contar o padding vertical dele.
-    Contando só a divisória mais a linha, a janela nascia 8dp mais curta que o conteúdo e o
-    `fillMaxSize` da raiz recortava o texto do rodapé ao meio. `HudBarHeightTest` é a costura entre a
-    conta pura e o que o Compose dispõe — os testes de geometria conferiam a conta com ela mesma, e
-    os de componente rodam numa cena de altura fixa, onde sobra espaço. O bloco de conteúdo carrega
-    `HUD_CONTENT_TEST_TAG` porque a raiz mede o que a cena der.
-- **O rodapé fala do que a máquina gastou, e não de cota** (`GetHudSessionSummaryUseCase` +
-  `HudSummaryViewModel` + `hudSessionSummaryLabel`): sessões vivas agora, custo e tokens da janela de
-  5h. As linhas acima dele descrevem o teto que o fornecedor impõe; esta descreve o consumo real.
-  - **A janela é a mesma `LAST_5H` da tela de Sessões CLI**, ancorada no fim da quota quando ele é
-    conhecido. Um corte próprio faria o rodapé e o cabeçalho daquela tela discordarem sobre o mesmo
-    gasto, sem o usuário ter como saber qual dos dois olhar. "Ativa" é o corte de 5 min do semáforo
-    (`ACTIVE_SESSION_WINDOW_MILLIS`), não um terceiro valor.
-  - **`activeSessionCount` e `windowSessionCount` são campos separados**: zero ativas **com** trabalho
-    na janela é o caso comum — ninguém digitando agora, o gasto da tarde ainda contando para a quota.
-    Colapsar os dois faria o rodapé sumir justamente quando o número interessa.
-  - **O caso de uso não sincroniza o índice.** `GetCliSessionsUseCase`, que responde a mesma pergunta
-    para a tela de Sessões CLI, começa por `syncIndex()`; ali a leitura é sob demanda do usuário.
-    Aqui o laço é de fundo e convive com o do `SessionPulseViewModel`, que já sincroniza a cada 30s.
-  - **Laço próprio, e não carona no semáforo**: aquele pergunta "que sessão precisa de atenção" e
-    publica pulsos, este pergunta "quanto foi queimado". Só lê com o HUD na tela, e ligar o modo
-    dispara leitura **imediata** — esperar até 30s faria o rodapé nascer vazio toda vez. Leitura que
-    falha mantém os números anteriores. O texto leva a janela escrita nele (`· 5h`), senão o número
-    seria lido como "hoje" ou "sempre"; turno sem tarifa marca o custo com `+`, mesma marca do resumo
-    por eixo.
+  - **`HudBarHeightTest` é a costura entre a geometria e o que o Compose dispõe.** A janela é
+    dimensionada antes de existir composição para medir, e as duas contas podem divergir sem nada
+    reclamar — foi o que aconteceu com o antigo rodapé, cujo padding vertical a geometria não
+    contava: a janela nascia 8dp mais curta e o `fillMaxSize` da raiz recortava o texto ao meio. Os
+    testes de geometria conferiam a conta com ela mesma; os de componente rodam numa cena de altura
+    fixa, onde sobra espaço. O bloco de conteúdo carrega `HUD_CONTENT_TEST_TAG` porque a raiz mede o
+    que a cena der.
+  - **O resumo da linha parada usa o rótulo curto da cota** (`hudQuotaShortLabel`, a última palavra:
+    "Claude 5h" → "5h"). A linha mostra uma fonte só, então o prefixo que distingue fornecedores já
+    está dito pelo nome da conta ao lado. Regra deliberadamente burra — nenhum rótulo do app tem duas
+    cotas da mesma fonte terminando na mesma palavra, e um mapa de abreviações seria um segundo dono
+    dos nomes de cota.
 - **`HudBar` ganhou arrasto, e continua sem `WindowScope`.** A decisão anterior ("ancoragem é
   geometria de `Main.kt`, nunca gesto do usuário") foi revertida: com posição imutável não havia para
   onde tirar a pílula de cima dos controles de outra janela. Mas `WindowDraggableArea` exigiria

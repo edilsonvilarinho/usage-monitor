@@ -7,7 +7,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
-import com.usagemonitor.domain.entity.HudSessionSummary
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 
 /** Formata micros de USD como `$1.2345` — quatro casas, porque turnos custam centavos de centavo. */
@@ -570,44 +569,4 @@ internal fun formatActiveTime(millis: Long): String {
         return "${minutes}min"
     }
     return "${hours}h${(minutes % 60L).toString().padStart(2, '0')}"
-}
-
-/**
- * O rodapé da barra HUD: sessões vivas, custo e tokens da janela de 5h.
- *
- * **Uma linha só, e com a janela escrita nela.** O HUD tem uma linha por fonte
- * logo acima, todas falando de cota; sem o "5h" no fim, o número do rodapé seria
- * lido como "hoje" ou "sempre", que são outras duas respostas.
- *
- * **`+` no custo quando há turno sem tarifa** — mesma marca do resumo por eixo:
- * ali o valor é piso, não total, e omitir a marca afirmaria que o resto custou
- * zero.
- *
- * Sem sessão nenhuma na janela devolve a frase, não `null`: a linha existir
- * dizendo "não houve" é informação; a linha sumir é ambíguo com o rodapé ainda
- * não ter carregado.
- */
-internal fun hudSessionSummaryLabel(
-    summary: HudSessionSummary,
-    language: AppLanguage
-): String {
-    if (summary.windowSessionCount <= 0) {
-        return if (language == AppLanguage.PT) {
-            "Sem sessão CLI nas últimas 5h"
-        } else {
-            "No CLI session in the last 5h"
-        }
-    }
-
-    val cost = formatMicrosUsdShort(summary.costMicros) +
-        if (summary.unpricedTurnCount > 0) "+" else ""
-    val tokens = formatQuantity(summary.totalTokens)
-
-    val sessions = if (language == AppLanguage.PT) {
-        if (summary.activeSessionCount == 1) "1 sessão ativa" else "${summary.activeSessionCount} sessões ativas"
-    } else {
-        if (summary.activeSessionCount == 1) "1 active session" else "${summary.activeSessionCount} active sessions"
-    }
-
-    return "$sessions · $cost · $tokens tok · 5h"
 }

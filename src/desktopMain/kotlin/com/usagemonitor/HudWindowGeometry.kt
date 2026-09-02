@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
 import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -117,7 +118,7 @@ private val STATUS_INDICATOR_DOT_WIDTH = STATUS_DOT_SIZE + AppSpacing.xs
 private fun hudDotOnlyWidth(): Dp = HUD_PILL_DOT_ONLY_PADDING * 2 + STATUS_DOT_SIZE
 
 /**
- * Largura de uma linha de fonte: estado, nome, percentual e reset.
+ * Largura de uma linha da lista: estado, nome, percentual e reset.
  *
  * O nome entra **inteiro** na conta e é ele que a composição encolhe quando a
  * soma passa do teto: as outras três colunas são curtas e de largura previsível,
@@ -139,6 +140,18 @@ private fun hudSourceRowWidth(source: HudSourceStatus): Dp {
     return width + HUD_TEXT_SAFETY_MARGIN
 }
 
+/** Largura da linha parada: estado, conta e os percentuais de todas as cotas dela. */
+private fun hudTopLineWidth(topLine: HudTopLine): Dp {
+    return HUD_PILL_PADDING * 2 +
+        STATUS_INDICATOR_DOT_WIDTH +
+        labelSmallWidth(topLine.statusLabel) +
+        AppSpacing.md +
+        labelMediumWidth(topLine.label) +
+        AppSpacing.md +
+        labelMediumWidth(topLine.quotaSummary) +
+        HUD_TEXT_SAFETY_MARGIN
+}
+
 /** Largura da linha única de carregamento: ponto, palavra e nada mais. */
 private fun hudFallbackRowWidth(fallbackLabel: String): Dp {
     return HUD_PILL_PADDING * 2 +
@@ -147,60 +160,49 @@ private fun hudFallbackRowWidth(fallbackLabel: String): Dp {
         HUD_TEXT_SAFETY_MARGIN
 }
 
-/** Largura do rodapé de sessão, que é uma linha de texto só. */
-private fun hudFooterWidth(footerLabel: String): Dp {
-    return HUD_PILL_PADDING * 2 + labelMediumWidth(footerLabel) + HUD_TEXT_SAFETY_MARGIN
-}
-
 /**
  * Tamanho da janela HUD, medido pelo que ela vai mostrar.
  *
- * **A largura é a da linha mais larga, presa em [HUD_PILL_MAX_WIDTH]**, e não a
- * da primeira: com linhas de larguras diferentes, dimensionar pela primeira
- * truncaria todas as outras sem motivo. **A altura é uma linha por fonte** —
- * mostrar só a pior era a queixa que abriu esta passada; as outras contas não
- * tinham sinal nenhum de que existiam.
+ * **Parada é uma linha; com o ponteiro em cima, é a lista inteira.** Listar tudo
+ * o tempo todo virou conteúdo demais — dez linhas na tela para dizer o que, na
+ * maior parte do tempo, cabe em uma.
  *
- * Lista vazia rende **uma** linha, a de carregamento: zero linhas dariam uma
- * janela de altura nula, que o AWT não sabe desenhar e o usuário leria como o
- * app ter sumido.
+ * **A largura da lista é a da linha mais larga, presa em [HUD_PILL_MAX_WIDTH]**,
+ * e não a da primeira: com linhas de larguras diferentes, dimensionar pela
+ * primeira truncaria todas as outras sem motivo.
+ *
+ * Sem linha de topo (antes da primeira coleta) sobra a de carregamento: zero
+ * linhas dariam uma janela de altura nula, que o AWT não sabe desenhar e o
+ * usuário leria como o app ter sumido.
  */
 internal fun hudWindowSize(
+    topLine: HudTopLine?,
     sources: List<HudSourceStatus>,
-    footerLabel: String?,
     fallbackLabel: String,
-    dotOnly: Boolean
+    dotOnly: Boolean,
+    expanded: Boolean
 ): DpSize {
     if (dotOnly) {
         return DpSize(hudDotOnlyWidth(), AppChrome.hud)
     }
 
-    val rowWidths = if (sources.isEmpty()) {
-        listOf(hudFallbackRowWidth(fallbackLabel))
-    } else {
-        sources.map { source -> hudSourceRowWidth(source) }
+    if (!expanded || sources.isEmpty()) {
+        val width = (topLine?.let { line -> hudTopLineWidth(line) }
+            ?: hudFallbackRowWidth(fallbackLabel))
+            .coerceAtMost(HUD_PILL_MAX_WIDTH)
+        return DpSize(width, HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT)
     }
-    val footerWidth = footerLabel?.let { label -> hudFooterWidth(label) } ?: 0.dp
-    val width = maxOf(rowWidths.maxOf { rowWidth -> rowWidth.value }, footerWidth.value)
+
+    val width = sources
+        .maxOf { source -> hudSourceRowWidth(source).value }
         .dp
         .coerceAtMost(HUD_PILL_MAX_WIDTH)
 
-    val rowCount = maxOf(sources.size, 1)
-    var height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT * rowCount
-    if (footerLabel != null) {
-        // **O rodapé é um bloco, não uma linha solta.** Ele tem o mesmo padding
-        // vertical da lista, e contar só a divisória mais a linha deixava a
-        // janela 8dp mais curta que o conteúdo: o texto do rodapé aparecia
-        // cortado ao meio na borda de baixo. `HudBarHeightTest` compara esta
-        // conta com o que o Compose realmente mede, que é o teste que faltava.
-        height += HUD_DIVIDER_HEIGHT + HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT
-    }
-
-    return DpSize(width, height)
+    return DpSize(
+        width = width,
+        height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT * sources.size
+    )
 }
-
-/** A divisória de 1dp entre a pílula e a lista, do mesmo `AppDivider` de sempre. */
-private val HUD_DIVIDER_HEIGHT = 1.dp
 
 /**
  * Posição da janela, a partir da âncora.

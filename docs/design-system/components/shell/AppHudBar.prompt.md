@@ -1,15 +1,15 @@
-One 20dp line per monitored quota, plus a footer with what the machine actually burned.
+One line at rest; one 20dp row per monitored quota on hover.
 
 ```jsx
-<AppHudBar sources={[{ label: 'Anthropic — pessoal', statusLabel: 'Crítico', level: 'crit', percentLabel: '92%', resetLabel: 'Ter 22h59' }]} />
+<AppHudBar topLine={{ statusLabel: 'Crítico', level: 'crit', label: 'Padrão', quotaSummary: '5h 88% · 7d 9%' }} />
 <AppHudBar level="ok" dotOnly />
-<AppHudBar sources={SOURCES} footerLabel="2 sessões ativas · $4.21 · 1,2M tok · 5h" />
+<AppHudBar topLine={TOP} sources={QUOTAS} expanded />
 ```
 
 Not a new risk primitive — the dot+word is `AppStatusIndicator`, and the collapsed state reuses
 `AppStatusDot`; this panel is only the shell that carries them.
 
-**Four content versions were found wrong live, one at a time.** (1) A single line with the worst
+**Five content versions, four corrected after using it.** (1) A single line with the worst
 source only: with several accounts monitored, the others had no signal they existed. (2) The others
 behind a hover tooltip: the data sat behind a gesture, and the popup flickered — a popup on this
 platform is a layer *inside* the window, clipped to its bounds, so in a 24dp-tall window a bubble
@@ -17,7 +17,18 @@ with a 180dp minimum width landed on top of its own trigger, the pointer moved o
 trigger got an `Exit`, and it closed and reopened every frame. (3) The list with no consumption at
 all: quota is the provider's ceiling, and what the machine spent appeared nowhere. (4) One line per
 *source*, carrying that source's worst quota: an account with both a 5h and a 7d window still showed
-a single limit. Each correction came from using it; none was anticipated.
+a single limit. (5) One row per *quota* plus a spend footer, always visible: ten rows on screen to
+say what fits in one. What stuck joins the two halves that were right — the summary fits one line,
+the detail is one mouse movement away. Each correction came from using it; none was anticipated.
+
+**At rest the row is a summary, not the first list row.** It carries the source once and then every
+quota percentage of that source (`5h 88% · 7d 9%`), using the quota label's **last word**: the row
+shows a single source, so the prefix that tells providers apart is already said by the account name
+beside it. The word and tone come from that source's *worst* quota — showing "Normal" with the 7d
+window blown would be a lie.
+
+**The order is the user's card order, never the risk order.** With risk deciding, the resting line
+changed account on its own and you never knew in advance who was on it.
 
 **A quota with no forecast still gets its line**, with a neutral dot and a word saying so. The
 percent is measured fact and does not depend on a projection — that is the difference from the
@@ -35,11 +46,6 @@ which. Drop it and color would be informing state alone, which this system does 
 reset comes from the *same* date parts the card's line uses, just trimmed: no prefix, no timezone,
 and no day-of-month when the window is intraday. Absent means "no reset to show" — the column
 disappears rather than printing a dash.
-
-**The footer speaks of spend, not quota.** The lines above it describe the ceiling the provider
-imposes; this one describes what the CLI actually burned in the same 5h window, with the window
-written into the text — without it the number reads as "today" or "ever". Unpriced turns mark the
-cost with `+`: the value is a floor, not a total.
 
 **`dotOnly` is the idle state, for when every source is on track.** The data does not vanish — it
 stops occupying screen while it says everything is fine, and hover brings the whole panel back. This

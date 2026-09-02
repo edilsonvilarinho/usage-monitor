@@ -147,22 +147,28 @@ class WorstQuotaSnapshotTest {
         assertNull(entries.single().risk)
     }
 
-    /** "Sem projeção" vai depois de `ON_TRACK`: um normal conhecido informa mais. */
+    /**
+     * **Não ordena por risco.** Quem ordena a barra HUD é a ordem de cards que o
+     * usuário arrastou; ordenar por risco aqui e por card ali daria duas ordens
+     * brigando, e a linha parada trocaria de conta sozinha conforme o risco
+     * mudasse.
+     */
     @Test
-    fun `allQuotaRisks sorts unknown forecasts last`() {
+    fun `allQuotaRisks keeps the incoming order`() {
         val stats = listOf(
             stats(ApiSource.CODEX, CODEX_TARGET, "Codex 5h"),
             stats(ApiSource.ANTHROPIC, ANTHROPIC_TARGET, "Sessão 5h")
         )
         val riskSummaries = mapOf(
             ANTHROPIC_TARGET to mapOf(
-                ANTHROPIC_QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.ON_TRACK, NOW + 1.hours)
+                ANTHROPIC_QUOTA_KEY to QuotaRiskSummary(UsageRiskLevel.WILL_EXCEED, NOW + 30.minutes)
             )
         )
 
         val entries = allQuotaRisks(stats, riskSummaries, NOW)
 
-        assertEquals(listOf("Sessão 5h", "Codex 5h"), entries.map { it.quota.label })
+        // A Anthropic está crítica e mesmo assim continua depois do Codex.
+        assertEquals(listOf("Codex 5h", "Sessão 5h"), entries.map { it.quota.label })
     }
 
     /** Cota vencida continua fora: o número seria o da janela anterior. */
@@ -187,9 +193,13 @@ class WorstQuotaSnapshotTest {
         assertEquals(emptyList(), allQuotaRisks(listOf(expired), emptyMap(), NOW))
     }
 
-    /** Ordem total: empate de nível desempata por fonte e depois por cota. */
+    /**
+     * Dentro da fonte, a ordem é a de declaração das cotas — a da resposta da
+     * API, 5h antes de 7d. É ela que o resumo da linha parada imprime, e trocá-la
+     * faria "5h 88% · 7d 9%" sair invertido sem nada ter mudado.
+     */
     @Test
-    fun `allQuotaRisks orders by level then source then quota label`() {
+    fun `allQuotaRisks keeps the declared quota order inside a source`() {
         val stats = listOf(
             statsWithQuotas(ApiSource.ANTHROPIC, ANTHROPIC_TARGET, listOf("Sessão 7d", "Sessão 5h"))
         )
@@ -201,8 +211,6 @@ class WorstQuotaSnapshotTest {
 
         val entries = allQuotaRisks(stats, riskSummaries, NOW)
 
-        // A de 5h tem projeção crítica e vem primeiro; a de 7d não tem e cai
-        // para o fim, mesmo tendo sido declarada antes.
-        assertEquals(listOf("Sessão 5h", "Sessão 7d"), entries.map { it.quota.label })
+        assertEquals(listOf("Sessão 7d", "Sessão 5h"), entries.map { it.quota.label })
     }
 }

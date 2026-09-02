@@ -85,29 +85,26 @@ internal data class HudQuotaEntry(
 )
 
 /**
- * Todas as cotas de todas as fontes, pior primeiro.
+ * Todas as cotas de todas as fontes, **na ordem em que chegaram**.
  *
- * Ordem total e determinística — nível desc. com "sem projeção" por último,
- * depois nome da fonte, depois rótulo da cota. Duas leituras iguais têm de
- * produzir a mesma lista, ou o `StateFlow` reemite e a janela redimensiona à
- * toa. "Sem projeção" vai **depois** de `ON_TRACK`: um normal conhecido informa
- * mais que um desconhecido.
+ * Não ordena por risco, e é decisão: quem ordena a barra HUD é a ordem de cards
+ * que o usuário arrastou (`orderedByCardOrder`), porque foi o que ele pediu —
+ * "deve respeitar a ordem que ele escolher". Ordenar por risco aqui e por card
+ * ali daria duas ordens brigando, e a linha parada trocaria de conta sozinha
+ * conforme o risco mudasse.
+ *
+ * Dentro de cada fonte a ordem é a de declaração das cotas, que é a da resposta
+ * da API — 5h antes de 7d. É ela que o resumo da linha parada imprime.
  */
 internal fun allQuotaRisks(
     stats: List<ApiUsageStats>,
     riskSummaries: Map<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>,
     now: Instant
 ): List<HudQuotaEntry> {
-    return stats
-        .flatMap { entry ->
-            val riskByQuota = riskSummaries[entry.targetKey].orEmpty()
-            entry.quotas
-                .filterNot { quota -> quota.isExpiredAt(now) }
-                .map { quota -> HudQuotaEntry(entry, quota, riskByQuota[quota.seriesKey]) }
-        }
-        .sortedWith(
-            compareByDescending<HudQuotaEntry> { entry -> entry.risk?.level?.ordinal ?: -1 }
-                .thenBy { entry -> entry.stats.apiName }
-                .thenBy { entry -> entry.quota.label }
-        )
+    return stats.flatMap { entry ->
+        val riskByQuota = riskSummaries[entry.targetKey].orEmpty()
+        entry.quotas
+            .filterNot { quota -> quota.isExpiredAt(now) }
+            .map { quota -> HudQuotaEntry(entry, quota, riskByQuota[quota.seriesKey]) }
+    }
 }

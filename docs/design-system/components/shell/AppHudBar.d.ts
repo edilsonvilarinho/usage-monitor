@@ -1,50 +1,64 @@
 import type { ReactNode, CSSProperties } from 'react';
 
 /**
- * The HUD panel: one 20dp line per monitored source — state word, name, percent
- * and reset — plus an optional footer with what the machine actually burned in
- * the current 5h window. Dragged to wherever the user wants it; on release it
- * snaps to the nearest work-area edge. A short click anywhere returns the full
- * window.
+ * The HUD: **one line at rest, the whole list on hover.** At rest it shows the
+ * first source in the user's card order, with every one of that source's quota
+ * percentages side by side; hovering swaps that line for one 20dp row per
+ * quota, each with its reset. Dragged to wherever the user wants it; on release
+ * it snaps to the nearest work-area edge. A short click anywhere returns the
+ * full window.
  *
- * Three content versions were found wrong live, one at a time. A single line
- * with only the worst source: with several accounts, the others had no signal
- * they existed. The others behind a hover tooltip: the data sat behind a
- * gesture, and the popup flickered — a popup here is a layer *inside* the
- * window, clipped to its bounds, and in a 24dp-tall window it landed on top of
- * its own trigger. The list with no consumption: quota is the provider's
- * ceiling, and what the machine spent appeared nowhere.
+ * Five content versions, four corrected after using it. A single line with the
+ * worst source: the other accounts had no signal they existed. Those others
+ * behind a hover tooltip: a popup here is a layer *inside* the window, clipped
+ * to its bounds, so it landed on top of its own trigger and flickered. One row
+ * per *source*, always visible: an account with both a 5h and a 7d window still
+ * showed a single limit. One row per *quota* plus a spend footer, always
+ * visible: ten rows on screen to say what fits in one. What stuck joins the two
+ * halves that were right.
  *
  * The component doesn't own its width: it fills whatever the host gives it, and
- * the source name truncates rather than force it wider. The host measures the
- * window from these same labels (mono type makes the advance calculable), caps
- * it at 420dp, and resizes.
- * @startingPoint section="Shell" subtitle="HUD panel — one line per source" viewport="700x320"
+ * the name truncates rather than force it wider. The host measures the window
+ * from these same labels (mono type makes the advance calculable), caps it at
+ * 420dp, and resizes.
+ * @startingPoint section="Shell" subtitle="HUD — one line, list on hover" viewport="700x320"
  */
 export interface AppHudBarProps {
   /** Tone of the dot in the collapsed state; each row carries its own. */
   level?: 'ok' | 'warn' | 'crit' | 'off';
-  /** Every monitored source, worst first. Empty renders the loading line. */
+  /**
+   * The line shown at rest. Absent falls back to the loading line — before the
+   * first collection there is no source to summarise.
+   */
+  topLine?: {
+    /** Word for the worst quota of that source. */
+    statusLabel: ReactNode;
+    level?: 'ok' | 'warn' | 'crit' | 'off';
+    /** Profile or source name, without any quota label. */
+    label: ReactNode;
+    /** `5h 88% · 7d 9%` — every quota of that source, in the API's order. */
+    quotaSummary: ReactNode;
+  };
+  /** Every quota, in the user's card order. Only drawn when `expanded`. */
   sources?: Array<{
     label: ReactNode;
     statusLabel: ReactNode;
-    level?: 'ok' | 'warn' | 'crit';
-    /** Consumption of the quota that decided the state, e.g. "92%". */
+    level?: 'ok' | 'warn' | 'crit' | 'off';
     percentLabel: ReactNode;
-    /** Short reset, e.g. "Ter 22h59". Absent hides the column — never a dash. */
+    /** Absent hides the column — never a dash. */
     resetLabel?: ReactNode;
   }>;
   /** Word of the single line shown before the first collection lands. */
   fallbackLabel?: ReactNode;
-  /** Session summary line; absent draws neither divider nor row. */
-  footerLabel?: ReactNode;
+  /** The pointer is over the bar: the list replaces the single line. */
+  expanded?: boolean;
   /**
-   * Every source on track and no pointer over it: collapse to the dot alone.
+   * Every quota on track and no pointer over it: collapse to the dot alone.
    * The data does not vanish — it stops occupying screen while it says
-   * everything is fine, and hover brings the whole panel back.
+   * everything is fine, and hover brings the panel back.
    */
   dotOnly?: boolean;
-  /** Fires on a short click anywhere on the panel — restores the full window. */
+  /** Fires on a short click anywhere — restores the full window. */
   onOpen?: () => void;
   style?: CSSProperties;
 }

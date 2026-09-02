@@ -13,6 +13,7 @@ import com.usagemonitor.hudWindowSize
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
@@ -47,16 +48,24 @@ class HudBarHeightTest {
         source("Codex", "12%", null)
     )
 
+    private val topLine = HudTopLine(
+        statusLabel = "Crítico",
+        tone = AppTone.CRITICAL,
+        label = "Padrão",
+        quotaSummary = "5h 88% · 7d 9%"
+    )
+
     private fun assertMeasuredHeightMatchesGeometry(
         sources: List<HudSourceStatus>,
-        footerLabel: String?,
+        expanded: Boolean,
         dotOnly: Boolean = false
     ) = runDesktopComposeUiTest {
         val expected = hudWindowSize(
+            topLine = topLine,
             sources = sources,
-            footerLabel = footerLabel,
             fallbackLabel = "Carregando",
-            dotOnly = dotOnly
+            dotOnly = dotOnly,
+            expanded = expanded
         ).height
 
         setContent {
@@ -66,10 +75,11 @@ class HudBarHeightTest {
                 Box(modifier = Modifier.width(500.dp).height(400.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
-                        footerLabel = footerLabel,
                         dotOnly = dotOnly,
+                        expanded = expanded,
                         onOpenFull = {}
                     )
                 }
@@ -80,38 +90,28 @@ class HudBarHeightTest {
     }
 
     @Test
-    fun `a altura calculada bate com a composta sem rodape`() {
-        assertMeasuredHeightMatchesGeometry(sources = sources, footerLabel = null)
+    fun `a altura calculada bate com a composta parada`() {
+        assertMeasuredHeightMatchesGeometry(sources = sources, expanded = false)
     }
 
-    /** O caso que estava cortando na tela. */
+    /** O caso que estava cortando na tela era este, com a lista aberta. */
     @Test
-    fun `a altura calculada bate com a composta com rodape`() {
-        assertMeasuredHeightMatchesGeometry(
-            sources = sources,
-            footerLabel = "1 sessão ativa · \$125.15 · 314,3M tok · 5h"
-        )
+    fun `a altura calculada bate com a composta expandida`() {
+        assertMeasuredHeightMatchesGeometry(sources = sources, expanded = true)
     }
 
     @Test
-    fun `a altura calculada bate com a composta em uma fonte so`() {
-        assertMeasuredHeightMatchesGeometry(
-            sources = sources.take(1),
-            footerLabel = "2 sessões ativas · \$4.21 · 1,2M tok · 5h"
-        )
+    fun `a altura calculada bate com a composta em uma cota so`() {
+        assertMeasuredHeightMatchesGeometry(sources = sources.take(1), expanded = true)
     }
 
     @Test
     fun `a altura calculada bate com a composta na linha de carregamento`() {
-        assertMeasuredHeightMatchesGeometry(sources = emptyList(), footerLabel = null)
+        assertMeasuredHeightMatchesGeometry(sources = emptyList(), expanded = true)
     }
 
     @Test
     fun `a altura calculada bate com a composta recolhida ao ponto`() {
-        assertMeasuredHeightMatchesGeometry(
-            sources = sources,
-            footerLabel = "2 sessões ativas · \$4.21 · 1,2M tok · 5h",
-            dotOnly = true
-        )
+        assertMeasuredHeightMatchesGeometry(sources = sources, expanded = false, dotOnly = true)
     }
 }

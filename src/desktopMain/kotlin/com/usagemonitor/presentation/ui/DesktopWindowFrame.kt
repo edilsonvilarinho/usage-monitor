@@ -268,6 +268,28 @@ private fun WindowScope.CompactTitleBarOverlay(
  * além da palavra: no painel cada linha é um `AppStatusIndicator`, ponto **e**
  * palavra, porque cor sozinha não informa estado neste sistema.
  */
+/**
+ * A linha única que a barra HUD mostra parada: uma fonte, com o percentual de
+ * **todas** as cotas dela lado a lado.
+ *
+ * Existe porque listar tudo o tempo todo virou conteúdo demais — dez linhas
+ * ocupando a tela para dizer o que, na maior parte do tempo, cabe em uma. A
+ * lista inteira continua a um movimento de mouse.
+ *
+ * [quotaSummary] é montado por quem chama (`hudQuotaSummary`), e não aqui:
+ * juntar rótulo e percentual é decisão de conteúdo, e a geometria precisa da
+ * string pronta para medir a janela antes de existir composição.
+ */
+internal data class HudTopLine(
+    /** Palavra do estado da pior cota desta fonte. */
+    val statusLabel: String,
+    val tone: AppTone,
+    /** Perfil ou nome da fonte, sem o rótulo da cota. */
+    val label: String,
+    /** `5h 88% · 7d 9%` — o percentual de cada cota, na ordem em que a API as devolve. */
+    val quotaSummary: String
+)
+
 internal data class HudSourceStatus(
     val label: String,
     val statusLabel: String,
@@ -279,14 +301,20 @@ internal data class HudSourceStatus(
 )
 
 /**
- * Conteúdo da barra HUD (issue #164): uma linha por fonte monitorada, com
- * estado, nome, percentual e reset, mais um rodapé opcional de sessão.
+ * Conteúdo da barra HUD (issue #164): **uma linha parada, a lista inteira no
+ * hover**.
  *
- * **Todas as fontes, não só a pior.** A primeira versão mostrava uma linha só —
- * a fonte que perdia — e as outras contas não tinham sinal nenhum de que
- * existiam sem abrir a janela completa. A segunda pôs as outras num hover. Nas
- * duas, o dado que o usuário queria estava escondido atrás de um gesto; agora a
- * lista **é** o conteúdo.
+ * A linha parada é a primeira fonte da ordem de cards do usuário, com o
+ * percentual de todas as cotas dela lado a lado; o hover troca essa linha pela
+ * lista de todas as cotas, com reset por linha.
+ *
+ * **O caminho até aqui foi por tentativa, e cada volta corrigiu a anterior.**
+ * (1) Uma linha com a fonte de pior risco: as outras contas não tinham sinal de
+ * que existiam. (2) As outras num `HoverTooltipBox`: o popup piscava. (3) Uma
+ * linha por fonte, sempre visível: a conta com 5h e 7d mostrava um limite só.
+ * (4) Uma linha por cota, sempre visível: dez linhas na tela para dizer o que
+ * cabe em uma. O que sobrou junta as duas metades certas — o resumo cabe numa
+ * linha, e o detalhe fica a um movimento de mouse.
  *
  * **A lista é conteúdo da janela, nunca `Popup`.** Ela saía por
  * `HoverTooltipBox` → `TooltipBox` → `Popup`, e popup no Compose Desktop é
@@ -328,14 +356,19 @@ internal data class HudSourceStatus(
  */
 @Composable
 internal fun HudBar(
-    /** Tom do ponto no estado recolhido; nas linhas, cada fonte traz o seu. */
+    /** Tom do ponto no estado recolhido; nas linhas, cada cota traz o seu. */
     statusTone: AppTone,
-    /** Todas as fontes, pior primeiro. Vazia rende a linha de carregamento. */
+    /**
+     * A linha que a barra mostra parada. `null` cai na linha de carregamento —
+     * antes da primeira coleta não há fonte para resumir.
+     */
+    topLine: HudTopLine? = null,
+    /** Todas as cotas, na ordem de card do usuário. Só aparecem com [expanded]. */
     sources: List<HudSourceStatus> = emptyList(),
-    /** Palavra da linha única enquanto nenhuma fonte foi coletada. */
+    /** Palavra da linha única enquanto nenhuma cota foi coletada. */
     fallbackLabel: String,
-    /** Resumo de sessão do rodapé; `null` não desenha divisória nem linha. */
-    footerLabel: String? = null,
+    /** O ponteiro está sobre a barra: a lista inteira substitui a linha única. */
+    expanded: Boolean = false,
     /**
      * Todas as fontes em `ON_TRACK` e sem o ponteiro em cima: recolhe ao ponto.
      *
@@ -395,18 +428,20 @@ internal fun HudBar(
             return@Column
         }
 
-        Column(modifier = Modifier.fillMaxWidth().testTag(HUD_CONTENT_TEST_TAG)) {
-        Column(modifier = Modifier.padding(vertical = HUD_PANEL_VERTICAL_PADDING)) {
-            if (sources.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(HUD_CONTENT_TEST_TAG)
+                .padding(vertical = HUD_PANEL_VERTICAL_PADDING)
+        ) {
+            if (!expanded) {
                 HudPanelRow {
-                    AppStatusIndicator(label = fallbackLabel, tone = statusTone)
-                }
-            } else {
-                sources.forEach { source ->
-                    HudPanelRow {
-                        AppStatusIndicator(label = source.statusLabel, tone = source.tone)
+                    if (topLine == null) {
+                        AppStatusIndicator(label = fallbackLabel, tone = statusTone)
+                    } else {
+                        AppStatusIndicator(label = topLine.statusLabel, tone = topLine.tone)
                         Text(
-                            text = source.label,
+                            text = topLine.label,
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
@@ -414,38 +449,50 @@ internal fun HudBar(
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            text = source.percentLabel,
+                            text = topLine.quotaSummary,
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1
                         )
-                        if (source.resetLabel != null) {
-                            Text(
-                                text = source.resetLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                        }
+                    }
+                }
+                return@Column
+            }
+
+            if (sources.isEmpty()) {
+                HudPanelRow {
+                    AppStatusIndicator(label = fallbackLabel, tone = statusTone)
+                }
+                return@Column
+            }
+
+            sources.forEach { source ->
+                HudPanelRow {
+                    AppStatusIndicator(label = source.statusLabel, tone = source.tone)
+                    Text(
+                        text = source.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = source.percentLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                    if (source.resetLabel != null) {
+                        Text(
+                            text = source.resetLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
                     }
                 }
             }
-        }
-
-        if (footerLabel != null) {
-            AppDivider()
-            Column(modifier = Modifier.padding(vertical = HUD_PANEL_VERTICAL_PADDING)) {
-                HudPanelRow {
-                    Text(
-                        text = footerLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
         }
     }
 }

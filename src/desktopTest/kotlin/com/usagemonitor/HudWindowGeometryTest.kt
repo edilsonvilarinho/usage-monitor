@@ -3,6 +3,7 @@ package com.usagemonitor
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import kotlin.test.Test
@@ -43,16 +44,25 @@ class HudWindowGeometryTest {
         resetLabel = resetLabel
     )
 
+    private val topLine = HudTopLine(
+        statusLabel = "Crítico",
+        tone = AppTone.CRITICAL,
+        label = "Padrão",
+        quotaSummary = "5h 88% · 7d 9%"
+    )
+
     private fun size(
         sources: List<HudSourceStatus> = this.sources,
-        footerLabel: String? = null,
+        topLine: HudTopLine? = this.topLine,
         fallbackLabel: String = "Carregando",
-        dotOnly: Boolean = false
+        dotOnly: Boolean = false,
+        expanded: Boolean = true
     ) = hudWindowSize(
+        topLine = topLine,
         sources = sources,
-        footerLabel = footerLabel,
         fallbackLabel = fallbackLabel,
-        dotOnly = dotOnly
+        dotOnly = dotOnly,
+        expanded = expanded
     )
 
     // ------------------------------------------------------------------ ponto
@@ -110,15 +120,31 @@ class HudWindowGeometryTest {
         assertTrue(size().width < HUD_PILL_MAX_WIDTH, "esperava ${size().width} abaixo do teto")
     }
 
+    /**
+     * Parada, a barra é **uma** linha: listar tudo o tempo todo virou conteúdo
+     * demais — dez linhas na tela para dizer o que cabe em uma.
+     */
     @Test
-    fun `o rodape alarga a janela quando e a linha mais larga`() {
-        val comRodapeCurto = size(footerLabel = "1 sessão")
-        val comRodapeLongo = size(
-            footerLabel = "3 sessões · \$12.34 · 1.2M tok · e mais um bocado de texto aqui"
+    fun `parada a janela tem uma linha so`() {
+        val parada = size(expanded = false)
+
+        assertEquals(HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT, parada.height)
+        assertTrue(parada.height < size().height)
+    }
+
+    /** A largura parada sai da linha de topo, não da lista que ela esconde. */
+    @Test
+    fun `parada a largura sai da linha de topo`() {
+        val curta = size(
+            expanded = false,
+            topLine = topLine.copy(label = "Ana", quotaSummary = "5h 1%")
+        )
+        val longa = size(
+            expanded = false,
+            topLine = topLine.copy(quotaSummary = "5h 88% · 7d 9% · Créditos 12%")
         )
 
-        assertEquals(size().width, comRodapeCurto.width)
-        assertTrue(comRodapeLongo.width > comRodapeCurto.width)
+        assertTrue(curta.width < longa.width, "esperava ${curta.width} < ${longa.width}")
     }
 
     // ----------------------------------------------------------------- altura
@@ -131,27 +157,10 @@ class HudWindowGeometryTest {
         assertEquals(HUD_SOURCE_ROW_HEIGHT, tres.height - duas.height)
     }
 
-    /**
-     * O rodapé é um **bloco**, não uma linha solta: ele tem o mesmo padding
-     * vertical da lista. Contar só a divisória mais a linha deixava a janela 8dp
-     * mais curta que o conteúdo, e o texto do rodapé aparecia cortado ao meio na
-     * borda de baixo.
-     */
-    @Test
-    fun `o rodape acrescenta divisoria, padding e linha`() {
-        val semRodape = size()
-        val comRodape = size(footerLabel = "2 sessões")
-
-        assertEquals(
-            1.dp + HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT,
-            comRodape.height - semRodape.height
-        )
-    }
-
     /** Zero linhas dariam altura nula, que o usuário leria como o app ter sumido. */
     @Test
     fun `sem fonte nenhuma sobra a linha de carregamento`() {
-        val vazia = size(sources = emptyList())
+        val vazia = size(sources = emptyList(), topLine = null)
 
         assertEquals(HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT, vazia.height)
         assertTrue(vazia.width > 0.dp)

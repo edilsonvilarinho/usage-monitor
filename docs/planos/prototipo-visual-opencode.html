@@ -982,9 +982,24 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 <p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
 
 <h3>Barra HUD</h3>
-<p class="lede">Um terceiro chrome, ainda mais discreto que o modo somente cards (issue #164): a mesma janela principal encolhida a um painel de largura medida pelo conteúdo, arrastável para qualquer ponto da tela, sempre visível. Não mostra cards — mostra <b>uma linha por cota monitorada</b>, com estado, nome, percentual e reset, e um rodapé com o que a máquina queimou na janela de 5h. Sem arrasto de reordenar (não há cards para reordenar), sem barra de título: um clique curto em qualquer ponto devolve a janela completa, e o arrasto o move.</p>
+<p class="lede">Um terceiro chrome, ainda mais discreto que o modo somente cards (issue #164): a mesma janela principal encolhida a um painel de largura medida pelo conteúdo, arrastável para qualquer ponto da tela, sempre visível. Não mostra cards — parada mostra <b>uma linha</b> — a primeira fonte da ordem de cards do usuário, com o percentual de todas as cotas dela lado a lado — e, com o ponteiro em cima, a <b>lista de todas as cotas</b> com reset por linha. Sem arrasto de reordenar (não há cards para reordenar), sem barra de título: um clique curto em qualquer ponto devolve a janela completa, e o arrasto o move.</p>
 
-<div class="cap">1 · o estado normal — cotas e consumo, sem gesto nenhum</div>
+<div class="cap">1 · parada — uma linha, a primeira da ordem de cards</div>
+<div class="hudscreen">
+  <div class="win narrow" style="max-width:280px">
+    <div class="titlebar"><span class="t">outra janela</span></div>
+    <div class="body tight">
+      <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
+    </div>
+  </div>
+  <div class="hudwrap">
+    <div class="hudlist">
+    <div class="hudrow"><span class="st crit">Crítico</span><span class="name v sm">Padrão</span><span class="pct v sm">5h 88% · 7d 9%</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="cap">2 · hover — a lista de todas as cotas, na mesma ordem</div>
 <div class="hudscreen tall">
   <div class="win narrow" style="max-width:280px">
     <div class="titlebar"><span class="t">outra janela</span></div>
@@ -994,18 +1009,15 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
   <div class="hudwrap">
     <div class="hudlist">
-    <div class="hudrow"><span class="st crit">Crítico</span><span class="name v sm">INFORMATA2 · Claude 5h</span><span class="pct v sm">92%</span><span class="rst v sm">Ter 22h59</span></div>
-    <div class="hudrow"><span class="st warn">Atenção</span><span class="name v sm">INFORMATA2 · Claude 7d</span><span class="pct v sm">41%</span><span class="rst v sm">4h12</span></div>
-    <div class="hudrow"><span class="st ok">Normal</span><span class="name v sm">Padrão · Claude 5h</span><span class="pct v sm">12%</span><span class="rst v sm">Qua 09h00</span></div>
-    <div class="hudrow"><span class="st ok">Normal</span><span class="name v sm">OpenCode Go · Rolling</span><span class="pct v sm">3%</span></div>
-    </div>
-    <div class="hudfoot">
-    <div class="hudrow"><span class="dim v sm">2 sessões ativas · $4.21 · 1,2M tok · 5h</span></div>
+    <div class="hudrow"><span class="st crit">Crítico</span><span class="name v sm">Padrão · Claude 5h</span><span class="pct v sm">88%</span><span class="rst v sm">Ter 1h00</span></div>
+    <div class="hudrow"><span class="st ok">Normal</span><span class="name v sm">Padrão · Claude 7d</span><span class="pct v sm">9%</span><span class="rst v sm">Sáb 11h37</span></div>
+    <div class="hudrow"><span class="st warn">Atenção</span><span class="name v sm">INFORMATA2 · Claude 5h</span><span class="pct v sm">21%</span><span class="rst v sm">1h59</span></div>
+    <div class="hudrow"><span class="st ok">Normal</span><span class="name v sm">INFORMATA2 · Claude 7d</span><span class="pct v sm">8%</span><span class="rst v sm">Ter 9h59</span></div>
     </div>
   </div>
 </div>
 
-<div class="cap">2 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</div>
+<div class="cap">3 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</div>
 <div class="hudscreen">
   <div class="win narrow" style="max-width:280px">
     <div class="titlebar"><span class="t">outra janela</span></div>
@@ -1018,22 +1030,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 
-<div class="cap">3 · antes da primeira coleta — uma linha, e ela diz o que está acontecendo</div>
-<div class="hudscreen">
-  <div class="win narrow" style="max-width:280px">
-    <div class="titlebar"><span class="t">outra janela</span></div>
-    <div class="body tight">
-      <p class="dim" style="font-size:var(--t12)">edição, terminal, o que estiver aberto por trás</p>
-    </div>
-  </div>
-  <div class="hudwrap">
-    <div class="hudlist">
-    <div class="hudrow"><span class="st off">Carregando</span></div>
-    </div>
-  </div>
-</div>
-
-<div class="cap">4 · arrastado para a borda de baixo — logo acima da barra de tarefas</div>
+<div class="cap">4 · arrastado para a borda de baixo — a lista cresce para cima</div>
 <div class="hudscreen tall">
   <div class="win narrow" style="max-width:280px">
     <div class="titlebar"><span class="t">outra janela</span></div>
@@ -1044,15 +1041,13 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   <div class="hudwrap bottom">
     <div class="hudlist">
     <div class="hudrow"><span class="st warn">Atenção</span><span class="name v sm">INFORMATA2 · Claude 5h</span><span class="pct v sm">68%</span><span class="rst v sm">Ter 22h59</span></div>
-    <div class="hudrow"><span class="st ok">Normal</span><span class="name v sm">Padrão · Claude 5h</span><span class="pct v sm">12%</span><span class="rst v sm">Qua 09h00</span></div>
-    </div>
-    <div class="hudfoot">
-    <div class="hudrow"><span class="dim v sm">2 sessões ativas · $4.21 · 1,2M tok · 5h</span></div>
+    <div class="hudrow"><span class="st off">Sem projeção</span><span class="name v sm">OpenCode Go · Go 5h</span><span class="pct v sm">0%</span><span class="rst v sm">3h30</span></div>
     </div>
   </div>
 </div>
+
 <p class="note"><b>Medido pelo conteúdo, com 420dp de teto — e arrastável.</b> Duas versões de ocupação foram achadas erradas testando ao vivo. A primeira ocupava a tela inteira e, por estar sempre no topo (<code>alwaysOnTop</code>), cobria os controles de qualquer outra janela que também tivesse algo nos primeiros 24dp do topo — barra de menu de IDE, atalhos de editor. A segunda reduziu para 320dp fixos no canto superior direito, e continuava medindo 320dp para mostrar a palavra "Normal", num canto que é exatamente onde IDE e navegador põem controles. O Compose Desktop não tem click-through parcial numa janela comum: a região inteira captura o clique, visível ou não, então a única mitigação é ocupar menos área e deixar o usuário escolher onde. A largura sai da métrica da fonte — a escala <code>label*</code> é mono, e por isso o avanço por caractere é calculável sem compor nada —, o teto mantém a promessa de não mudar de tamanho a cada coleta, e texto mais longo trunca com reticências. O teto subiu de 320 para 420 quando a linha ganhou quatro colunas: com 320 sobravam ~96dp para o nome, treze caracteres, e toda conta virava "Anthropic — I…".</p>
-<p class="note"><b>Quatro versões de conteúdo, cada uma corrigida depois de usar.</b> Primeiro uma linha só, a da fonte que perde: com várias contas, as outras não tinham sinal nenhum de que existiam. Depois as outras num hover — o dado passou a ficar atrás de um gesto, e o balão piscava. Depois uma linha por <i>fonte</i>, com a pior cota de cada uma — e a conta com janela de 5h e de 7d continuava mostrando um limite só. Agora cada <b>cota</b> tem a sua linha, e o painel ganhou um <b>rodapé de consumo</b>: as linhas descrevem o teto que o fornecedor impõe, o rodapé descreve o que a máquina queimou de fato na janela de 5h. A janela vai escrita no texto — sem o "5h", o número seria lido como "hoje" ou "sempre".</p>
+<p class="note"><b>Cinco versões de conteúdo, quatro corrigidas depois de usar.</b> Uma linha com a fonte de pior risco; as outras num hover que piscava; uma linha por <i>fonte</i>, e a conta com 5h e 7d mostrava um limite só; uma linha por <i>cota</i> mais um rodapé de consumo, e viraram dez linhas na tela para dizer o que cabe em uma. A que ficou junta as duas metades certas: parada, o resumo cabe numa linha; com o ponteiro em cima, a lista inteira. A <b>ordem é a que o usuário arrastou no dashboard</b>, não a do risco — com o risco mandando, a linha parada trocava de conta sozinha e nunca se sabia de antemão quem estava ali.</p>
 <p class="note"><b>Cota sem projeção continua na lista</b>, com ponto neutro e a palavra dizendo isso. O percentual é fato medido e não depende de previsão — é a diferença para o badge do card, que some sem projeção: lá a pergunta é "qual o estado", aqui é "quanto já foi". Com a regra do badge, as fontes que nunca têm projeção sumiriam do HUD inteiro. O rótulo é <code>{perfil ou fonte} · {cota}</code>: o rótulo da cota já diz o fornecedor, e repetir "Anthropic" ao lado gastaria a largura que o nome da conta precisa.</p>
 <p class="note"><b>Cada linha carrega ponto E palavra.</b> O percentual ao lado descreve o consumo, não o risco: 40% às onze da manhã pode ser pior que 80% dez minutos antes do reinício, e é a palavra que diz qual dos dois é o caso. Só o ponto colorido deixaria a cor informando estado sozinha. Nenhum formato novo entra aqui — o percentual é o do card, truncado e não arredondado, e o reset sai das mesmas partes de data da linha do card, só recortadas. Reset ausente <b>some</b> a coluna, em vez de imprimir um traço.</p>
 <p class="note"><b>Arrastar e clicar são um gesto só, separados por limiar de deslocamento.</b> Um <code>clickable</code> empilhado sobre um detector de arrasto não funciona — ele consome o <code>down</code> e o arrasto nunca começa —, então a ação de clique é <b>declarada</b> na semântica em vez de instalada, para o leitor de tela não perder o único caminho de volta. Ao soltar, a pílula gruda na borda mais próxima da <b>área útil</b>, que já desconta a barra de tarefas: a borda de baixo é "logo acima dela". Desenhar <i>sobre</i> a barra de tarefas ficou fora de escopo — exigiria os limites físicos da tela e disputa de ordem-z com uma janela que também é topmost. A posição é gravada e devolvida na próxima vez que o modo é ligado.</p>

@@ -99,7 +99,6 @@ import com.usagemonitor.domain.usecase.GetOpenRouterUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
-import com.usagemonitor.domain.usecase.GetHudSessionSummaryUseCase
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamSessionDetailUseCase
@@ -135,7 +134,8 @@ import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.HudSourceStatus
-import com.usagemonitor.presentation.ui.hudSessionSummaryLabel
+import com.usagemonitor.presentation.ui.orderedByCardOrder
+import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -161,6 +161,7 @@ import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
+import com.usagemonitor.presentation.ui.components.hudQuotaSummary
 import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.resetLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
@@ -172,7 +173,6 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
-import com.usagemonitor.presentation.viewmodel.HudSummaryViewModel
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
@@ -778,20 +778,6 @@ private fun runUsageMonitor(
             breadcrumbs = breadcrumbs
         )
     }
-    // Rodapé de consumo da barra HUD (issue #164). Laço próprio, e não uma
-    // carona no semáforo acima: aquele pergunta "que sessão precisa de atenção",
-    // este pergunta "quanto foi queimado na janela". Só lê com o HUD na tela.
-    val hudModeFlow = remember { MutableStateFlow(readPersistedHudMode(settings)) }
-    val hudSummaryViewModel = remember(cliSessionRepository, hudModeFlow) {
-        HudSummaryViewModel(
-            getSummary = GetHudSessionSummaryUseCase(cliSessionRepository),
-            isEnabled = hudModeFlow
-        )
-    }
-    DisposableEffect(hudSummaryViewModel) {
-        onDispose { hudSummaryViewModel.onDestroy() }
-    }
-    val hudSessionSummary by hudSummaryViewModel.summary.collectAsState()
     val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()
     val teamSessionPulses by sessionPulseViewModel.teamPulses.collectAsState()
     val usageAlertViewModel = remember(viewModel, sessionPulseViewModel, alertSettingsFlow) {
@@ -1145,13 +1131,11 @@ private fun runUsageMonitor(
             persistCardsOnlyMode(settings, false)
         }
         hudMode = enabled
-        hudModeFlow.value = enabled
         persistHudMode(settings, enabled)
     }
     val setCardsOnlyMode: (Boolean) -> Unit = { enabled ->
         if (enabled) {
             hudMode = false
-            hudModeFlow.value = false
             persistHudMode(settings, false)
         }
         cardsOnlyMode = enabled
@@ -1677,7 +1661,14 @@ private fun runUsageMonitor(
         val hudNow = Clock.System.now()
         val hudQuotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
         val hudNoForecastLabel = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
-        val hudSources = hudQuotaRisks.map { entry ->
+        // **A ordem é a que o usuário arrastou no dashboard**, não a do risco:
+        // com o risco mandando, a linha parada trocava de conta sozinha e nunca
+        // se sabia de antemão quem estava ali. Mesmo `orderedByCardOrder` da
+        // grade de cards — duas cópias divergiriam no item sem posição.
+        val hudOrderedQuotas = orderedByCardOrder(hudQuotaRisks, cardOrder) { entry ->
+            entry.stats.targetKey
+        }
+        val hudSources = hudOrderedQuotas.map { entry ->
             HudSourceStatus(
                 // O rótulo da cota já diz o fornecedor ("Claude 5h"), então
                 // repetir "Anthropic" ao lado gastaria a largura que o nome da
@@ -1699,12 +1690,24 @@ private fun runUsageMonitor(
         // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
         // que está tudo bem antes de saber. Cota sem projeção também não recolhe:
         // "está tudo bem" seria uma garantia que ninguém deu.
-        val hudDotOnly = hudQuotaRisks.isNotEmpty() &&
-            hudQuotaRisks.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
-        // `null` antes da primeira leitura: o rodapé não é composto e a janela
-        // não reserva altura para uma linha que ainda não tem o que dizer.
-        val hudFooterLabel = hudSessionSummary?.let { summary ->
-            hudSessionSummaryLabel(summary, language)
+        val hudDotOnly = hudOrderedQuotas.isNotEmpty() &&
+            hudOrderedQuotas.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
+        // A linha que a barra mostra parada: a **primeira** fonte da ordem de
+        // cards, com o percentual de todas as cotas dela lado a lado. A palavra
+        // e o tom saem da pior cota dessa fonte — é ela que decide se a conta
+        // está bem, e mostrar "Normal" com a 7d estourada seria mentir.
+        val hudTopQuotas = hudOrderedQuotas.firstOrNull()?.let { first ->
+            hudOrderedQuotas.filter { entry -> entry.stats.targetKey == first.stats.targetKey }
+        }.orEmpty()
+        val hudTopLine = hudTopQuotas.firstOrNull()?.let { first ->
+            val worst = hudTopQuotas.maxByOrNull { entry -> entry.risk?.level?.ordinal ?: -1 }
+            HudTopLine(
+                statusLabel = worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) }
+                    ?: hudNoForecastLabel,
+                tone = worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
+                label = first.stats.profileLabel ?: first.stats.apiName,
+                quotaSummary = hudQuotaSummary(hudTopQuotas.map { entry -> entry.quota })
+            )
         }
         // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
         // pílula — a janela ficaria presa no tamanho antigo por baixo do que
@@ -1765,21 +1768,19 @@ private fun runUsageMonitor(
         // ancorar no ponto faria a janela saltar toda vez que uma fonte saísse
         // de `ON_TRACK`.
         val hudAnchorSize = hudWindowSize(
+            topLine = hudTopLine,
             sources = hudSources,
-            footerLabel = hudFooterLabel,
             fallbackLabel = hudFallbackLabel,
-            dotOnly = false
+            dotOnly = false,
+            expanded = false
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
-        val hudTargetSize = if (hudCollapsedToDot) {
-            hudWindowSize(
-                sources = hudSources,
-                footerLabel = hudFooterLabel,
-                fallbackLabel = hudFallbackLabel,
-                dotOnly = true
-            ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
-        } else {
-            hudAnchorSize
-        }
+        val hudTargetSize = hudWindowSize(
+            topLine = hudTopLine,
+            sources = hudSources,
+            fallbackLabel = hudFallbackLabel,
+            dotOnly = hudCollapsedToDot,
+            expanded = hudExpanded
+        ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
 
         LaunchedEffect(hudMode) {
             if (hudMode) {
@@ -1916,10 +1917,11 @@ private fun runUsageMonitor(
                 hudContent = {
                     HudBar(
                         statusTone = hudStatusTone,
+                        topLine = hudTopLine,
                         sources = hudSources,
                         fallbackLabel = hudFallbackLabel,
-                        footerLabel = hudFooterLabel,
                         dotOnly = hudCollapsedToDot,
+                        expanded = hudExpanded,
                         onHoverChange = { hovered -> hudHovered = hovered },
                         onDragStart = hudDragBegin,
                         onDragMove = hudDragTo,

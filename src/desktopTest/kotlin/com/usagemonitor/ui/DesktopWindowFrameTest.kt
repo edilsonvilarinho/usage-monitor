@@ -21,6 +21,7 @@ import com.usagemonitor.presentation.ui.COMPACT_EXIT_DESCRIPTION
 import com.usagemonitor.presentation.ui.HUD_BAR_OPEN_DESCRIPTION
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.HudTopLine
 import com.usagemonitor.presentation.ui.TitleBarButton
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
@@ -43,6 +44,13 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class)
 class DesktopWindowFrameTest {
+
+    private val topLine = HudTopLine(
+        statusLabel = "Crítico",
+        tone = AppTone.CRITICAL,
+        label = "Padrão",
+        quotaSummary = "5h 88% · 7d 9%"
+    )
 
     private val sources = listOf(
         HudSourceStatus(
@@ -141,8 +149,10 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
+                        expanded = true,
                         onOpenFull = {}
                     )
                 }
@@ -169,8 +179,10 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
+                        expanded = true,
                         onOpenFull = {}
                     )
                 }
@@ -190,8 +202,10 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.OK,
+                        topLine = topLine,
                         sources = listOf(sources[2]),
                         fallbackLabel = "Carregando",
+                        expanded = true,
                         onOpenFull = {}
                     )
                 }
@@ -211,8 +225,10 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.NEUTRAL,
+                        topLine = null,
                         sources = emptyList(),
                         fallbackLabel = "Carregando",
+                        expanded = true,
                         onOpenFull = {}
                     )
                 }
@@ -222,23 +238,32 @@ class DesktopWindowFrameTest {
         onNodeWithText("Carregando").assertIsDisplayed()
     }
 
+    /**
+     * Parada, a barra mostra **uma** linha: a primeira fonte da ordem de cards,
+     * com o percentual de todas as cotas dela. Listar tudo o tempo todo virou
+     * conteúdo demais — dez linhas para dizer o que cabe em uma.
+     */
     @Test
-    fun `o rodape de sessao aparece abaixo das fontes`() = runDesktopComposeUiTest {
+    fun `parada a barra HUD mostra so a linha de topo`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 Box(modifier = Modifier.width(500.dp).height(240.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
-                        footerLabel = "2 sessões · \$4.21 · 1.2M tok",
+                        expanded = false,
                         onOpenFull = {}
                     )
                 }
             }
         }
 
-        onNodeWithText("2 sessões · \$4.21 · 1.2M tok").assertIsDisplayed()
+        onNodeWithText("Padrão").assertIsDisplayed()
+        onNodeWithText("5h 88% · 7d 9%").assertIsDisplayed()
+        onNodeWithText("Anthropic · Empresa").assertDoesNotExist()
+        onNodeWithText("OpenCode Go").assertDoesNotExist()
     }
 
     /** Não há botão próprio: o painel inteiro é o alvo de clique. */
@@ -250,6 +275,7 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.OK,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onOpenFull = { clicks += 1 }
@@ -276,6 +302,7 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onDragStart = { events += "start" },
@@ -323,6 +350,7 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = null,
                         sources = sources,
                         // Recompõe de verdade: o texto depende do contador.
                         fallbackLabel = "movimentos $moves",
@@ -359,6 +387,7 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onDragStart = { events += "start" },
@@ -393,9 +422,9 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.OK,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
-                        footerLabel = "2 sessões",
                         dotOnly = true,
                         onOpenFull = {}
                     )
@@ -405,7 +434,7 @@ class DesktopWindowFrameTest {
 
         onNodeWithText("OpenCode Go").assertDoesNotExist()
         onNodeWithText("12%").assertDoesNotExist()
-        onNodeWithText("2 sessões").assertDoesNotExist()
+        onNodeWithText("Padrão").assertDoesNotExist()
         // A altura de 24dp do estado recolhido é decidida por `hudWindowSize`,
         // que dimensiona a janela; aqui o nó raiz preenche a cena de teste.
     }
@@ -419,6 +448,7 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.OK,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         dotOnly = true,
@@ -445,6 +475,7 @@ class DesktopWindowFrameTest {
                 Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
                         statusTone = AppTone.CRITICAL,
+                        topLine = topLine,
                         sources = sources,
                         fallbackLabel = "Carregando",
                         onHoverChange = { hovered -> reported += hovered },

@@ -4,15 +4,14 @@ import { AppStatusDot } from '../data/AppStatusDot.jsx';
 
 export function AppHudBar({
   level = 'ok',
+  topLine,
   sources = [],
   fallbackLabel = 'Carregando',
-  footerLabel,
   dotOnly = false,
+  expanded = false,
   onOpen,
   style
 }) {
-  const rows = sources.length > 0 ? sources : null;
-
   return (
     <div
       role="button"
@@ -39,50 +38,44 @@ export function AppHudBar({
           <AppStatusDot level={level} />
         </div>
       ) : (
-        <>
-          <div style={{ padding: 'var(--s1) 0' }}>
-            {rows ? rows.map((source) => (
-              <HudRow key={source.label}>
-                <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
-                <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {source.label}
-                </span>
-                <span style={{ flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>
-                  {source.percentLabel}
-                </span>
-                {source.resetLabel ? (
-                  <span style={{ flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)' }}>
-                    {source.resetLabel}
-                  </span>
-                ) : null}
-              </HudRow>
-            )) : (
-              <HudRow>
+        <div style={{ padding: 'var(--s1) 0' }}>
+          {!expanded ? (
+            <HudRow>
+              {topLine ? (
+                <>
+                  <AppStatusIndicator level={topLine.level}>{topLine.statusLabel}</AppStatusIndicator>
+                  <span style={NAME}>{topLine.label}</span>
+                  <span style={VALUE}>{topLine.quotaSummary}</span>
+                </>
+              ) : (
                 <AppStatusIndicator level="off">{fallbackLabel}</AppStatusIndicator>
-              </HudRow>
-            )}
-          </div>
-
-          {footerLabel ? (
-            <>
-              <div style={{ height: 1, background: 'var(--border)' }} />
-              <div style={{ padding: 'var(--s1) 0' }}>
-                <HudRow>
-                  <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {footerLabel}
-                  </span>
-                </HudRow>
-              </div>
-            </>
-          ) : null}
-        </>
+              )}
+            </HudRow>
+          ) : sources.length === 0 ? (
+            <HudRow>
+              <AppStatusIndicator level="off">{fallbackLabel}</AppStatusIndicator>
+            </HudRow>
+          ) : sources.map((source) => (
+            <HudRow key={source.label}>
+              <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
+              <span style={NAME}>{source.label}</span>
+              <span style={VALUE}>{source.percentLabel}</span>
+              {source.resetLabel ? (
+                <span style={{ ...VALUE, color: 'var(--muted)' }}>{source.resetLabel}</span>
+              ) : null}
+            </HudRow>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
+const NAME = { flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+const VALUE = { flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' };
+
 // 20px por linha, e não AppDataRow: aquela primitiva floora em 32px mais
-// padding, e seis fontes dariam ~288px de painel -- uma janela, não um HUD.
+// padding, e seis cotas dariam ~288px de painel -- uma janela, não um HUD.
 function HudRow({ children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', height: 20, padding: '0 var(--s3)' }}>

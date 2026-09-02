@@ -35,10 +35,10 @@ function Demo() {
             { label: 'INFORMATA2 · Claude 7d', statusLabel: 'Atenção', level: 'warn', percentLabel: '41%', resetLabel: 'Sáb 11h37' },
             { label: 'OpenCode Go · Rolling', statusLabel: 'Sem projeção', level: 'off', percentLabel: '3%' }
           ]}
-          footerLabel="2 sessões ativas · $4.21 · 1,2M tok · 5h"
+          expanded
         />
         <AppHudBar level="ok" dotOnly />
-        <AppHudBar sources={[]} fallbackLabel="Carregando" />
+        <AppHudBar topLine={{ statusLabel: 'Crítico', level: 'crit', label: 'Padrão', quotaSummary: '5h 88% · 7d 9%' }} />
       </div>
     </div>
     <AppWindowFrame

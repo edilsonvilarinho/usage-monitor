@@ -620,6 +620,36 @@ internal fun compactPercentageLabel(quota: QuotaInfo): String {
     }
 }
 
+/**
+ * O rótulo da cota encurtado para a linha parada da barra HUD.
+ *
+ * É a **última palavra** do rótulo: "Claude 5h" → "5h", "Go semanal" →
+ * "semanal", "Saldo" → "Saldo". A linha parada mostra uma fonte só, então o
+ * prefixo que distingue fornecedores ("Claude", "Go", "Codex") já está dito
+ * pelo nome da conta ao lado — repeti-lo em cada cota gastaria a largura que a
+ * própria conta precisa.
+ *
+ * Regra deliberadamente burra: nenhum rótulo do app tem duas cotas da mesma
+ * fonte terminando na mesma palavra, e inventar um mapa de abreviações seria um
+ * segundo dono dos nomes de cota.
+ */
+internal fun hudQuotaShortLabel(label: String): String {
+    return label.substringAfterLast(' ')
+}
+
+/**
+ * `5h 88% · 7d 9%` — o percentual de cada cota de uma fonte, lado a lado.
+ *
+ * Existe porque a linha parada precisa dizer 5h **e** 7d: com um número só,
+ * quem olha não sabe qual das duas janelas ele está vendo. O percentual sai de
+ * [compactPercentageLabel], o mesmo do card, e a ordem é a da resposta da API.
+ */
+internal fun hudQuotaSummary(quotas: List<QuotaInfo>): String {
+    return quotas.joinToString(" · ") { quota ->
+        "${hudQuotaShortLabel(quota.label)} ${compactPercentageLabel(quota)}"
+    }
+}
+
 internal fun formatUsage(quota: QuotaInfo): String {
     if (quota.isExtraCreditsQuota) {
         return formatCreditsUsage(quota)
