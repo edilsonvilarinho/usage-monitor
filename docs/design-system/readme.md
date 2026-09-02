@@ -166,7 +166,7 @@ invented here.
 | `styles.css` | Global entry point. `@import` lines only. |
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
 | `assets/` | Monogram, light variant, lockup, tray badge states |
-| `components/core/` | AppButton · AppIconButton · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
+| `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
 | `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
 | `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |

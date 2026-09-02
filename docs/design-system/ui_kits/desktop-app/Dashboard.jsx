@@ -1,4 +1,4 @@
-const { AppWindowFrame, AppStatusBar, AppPanel, AppPanelHeader, AppPanelBody, AppSourceMark, AppDataRow, AppKey, AppValue, AppProgressTrack, AppStatusIndicator, AppIconButton, AppButton, AppBanner, AppUpdateStrip, AppMetric } = DS;
+const { AppWindowFrame, AppStatusBar, AppMenu, AppPanel, AppPanelHeader, AppPanelBody, AppSourceMark, AppDataRow, AppKey, AppValue, AppProgressTrack, AppStatusIndicator, AppIconButton, AppButton, AppBanner, AppUpdateStrip, AppMetric } = DS;
 
 const NAV = [
   { glyph: '⏱', label: 'Histórico' },
@@ -193,6 +193,8 @@ const CARDS = [
 export function Dashboard({ onOpen }) {
   const [minimized, setMinimized] = React.useState({ 'anthropic-sandbox': true });
   const toggle = (id) => setMinimized((m) => Object.assign({}, m, { [id]: !m[id] }));
+  const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
+  const [windowMode, setWindowMode] = React.useState('standard');
   return (
     <AppWindowFrame
       title="Usage Monitor"
@@ -208,6 +210,22 @@ export function Dashboard({ onOpen }) {
           }
           right={
             <React.Fragment>
+              {/* Acesso rápido às três molduras (issue #187): menu e não
+                  segmentado, porque três rótulos lado a lado não cabem numa
+                  barra de estado que já carrega as demais ações. */}
+              <AppMenu
+                open={modeMenuOpen}
+                value={windowMode}
+                options={[
+                  { id: 'standard', label: 'Padrão' },
+                  { id: 'cards', label: 'Somente os cards' },
+                  { id: 'hud', label: 'Barra HUD' }
+                ]}
+                onSelect={(id) => { setWindowMode(id); setModeMenuOpen(false); }}
+                onDismiss={() => setModeMenuOpen(false)}
+              >
+                <AppIconButton glyph="▤" label="Modo de janela" onClick={() => setModeMenuOpen(!modeMenuOpen)} />
+              </AppMenu>
               <AppButton variant="ghost">Atualizar tudo</AppButton>
               <AppButton variant="ghost" onClick={() => onOpen && onOpen(4)}>Configurações</AppButton>
             </React.Fragment>
