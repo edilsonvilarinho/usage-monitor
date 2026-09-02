@@ -694,8 +694,22 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   - **Nenhum formato novo na linha.** O percentual é `compactPercentageLabel`, o mesmo do card —
     truncado, não arredondado. O reset é `resetShortLabel`, que sai das **mesmas**
     `formatBrtDateTimeParts` da linha do card, só recortada: sem prefixo, sem fuso, sem a data do
-    dia quando a janela é intradiária. `null` ali é "não há reset a mostrar", e a coluna some em vez
-    de imprimir um traço.
+    dia quando a janela é intradiária. `null` ali é "não há reset a mostrar", e nada é impresso em
+    vez de um traço.
+  - **A hora do reinício sai só no painel expandido** (`HudQuotaChip.resetText`, issue #189). A
+    pílula parada fica na tela o tempo todo e o retângulo dela captura o clique de quem está atrás —
+    a queixa que fez a largura virar teto —, então o reset é detalhe sob demanda: o hover já é o
+    gesto que revela o resto da lista. Ele vai **ao lado da própria cota**, e não numa coluna à
+    direita da linha: a linha é por conta e as cotas são várias, e uma coluna só teria de escolher
+    qual delas descrever. Tom secundário e **sem separador impresso** — o vizinho é o percentual,
+    que é consumo, e é o tom que os separa. A coluna nasceu com a #164, sumiu quando a linha passou
+    a ser por conta e ficou meses **descrita no design system sem existir no Compose**; foi a regra
+    de precedência que decidiu quem estava errado.
+  - **O teto de largura é do estado, não do componente** (`HUD_PANEL_MAX_WIDTH`). `HUD_PILL_MAX_WIDTH`
+    foi calibrado para a linha sem a coluna de reset, e mantê-lo no painel faria a coluna nova ser
+    paga pelo nome da conta — o erro que os saltos 320 → 420 → 484 já recusaram duas vezes. O teto
+    do painel é o da pílula mais **três** colunas de reset, que é a maior contagem de cotas numa
+    fonte só (OpenCode Go), e a aritmética está afirmada no teste de contrato.
   - **O hover mora no container inteiro.** Ele só serve ao estado recolhido ao ponto — passar o
     mouse devolve a lista —, mas preso a uma linha, mover o ponteiro para dentro do painel tiraria o
     hover e a janela colapsaria debaixo dele. Colapsar espera uma passada de `AppMotion.fast`; é

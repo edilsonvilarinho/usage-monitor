@@ -290,7 +290,25 @@ private fun WindowScope.CompactTitleBarOverlay(
 internal data class HudQuotaChip(
     /** `5h 28%` — rótulo curto e percentual, montados por `hudQuotaChipText`. */
     val text: String,
-    val tone: AppTone
+    val tone: AppTone,
+    /**
+     * Quando esta cota reinicia, em forma curta — `22h59`, `Ter 21h00` (issue
+     * #189).
+     *
+     * Sai de `resetShortLabel`, a mesma função que a linha do card usa recortada:
+     * sem prefixo, sem fuso e sem a data do dia quando a janela é intradiária.
+     * Nenhum formato de data novo.
+     *
+     * **`null` é "não há reset a mostrar"** — saldo que não expira, janela sem
+     * reset conhecido — e nesse caso nada é impresso, em vez de um traço que não
+     * informa nada. É o "caso item tenha" do título da issue.
+     *
+     * **Só é desenhado com o painel expandido.** A pílula parada fica na tela o
+     * tempo todo e o retângulo dela captura o clique de quem está atrás; o reset
+     * é detalhe sob demanda, e o ponteiro em cima já é o gesto que revela o
+     * resto da lista.
+     */
+    val resetText: String? = null
 )
 
 /**
@@ -347,6 +365,14 @@ internal data class HudSourceStatus(
  * onze da manhã pode ser pior que 80% dez minutos antes do reinício, e é a
  * palavra que diz qual dos dois é o caso. Sem ela a cor informaria estado
  * sozinha, que é justamente o que este sistema visual não faz.
+ *
+ * **A hora do reinício sai só no painel expandido** (issue #189). A pílula
+ * parada fica na tela o tempo todo e o retângulo dela captura o clique de quem
+ * está atrás — a queixa que fez a largura virar teto na #164 —, então o reset é
+ * detalhe sob demanda: o ponteiro em cima já é o gesto que revela o resto da
+ * lista. Ele vai **ao lado de cada cota**, e não em coluna própria à direita da
+ * linha: a linha é por conta e as cotas são várias, e uma coluna única teria de
+ * escolher qual delas descrever.
  *
  * **O hover mora no container inteiro.** Ele só serve ao estado recolhido
  * ([dotOnly]) — passar o mouse devolve a lista —, mas preso a uma linha só,
@@ -547,6 +573,22 @@ internal fun HudBar(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1
                                 )
+                                // A hora do reinício (issue #189), só com o
+                                // ponteiro em cima. Tom secundário e sem
+                                // separador impresso: o reset não é consumo, e é
+                                // a diferença de tom que diz isso — a mesma que
+                                // a contagem regressiva usa na ponta da linha.
+                                // Um `·` entre os dois gastaria largura para
+                                // repetir o que o tom já informou.
+                                val resetText = chip.resetText
+                                if (expanded && resetText != null) {
+                                    Text(
+                                        text = resetText,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }

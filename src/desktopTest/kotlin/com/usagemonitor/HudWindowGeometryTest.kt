@@ -36,6 +36,21 @@ class HudWindowGeometryTest {
         quotas = quotas.map { (text, chipTone) -> HudQuotaChip(text = text, tone = chipTone) }
     )
 
+    /** A mesma fonte, com a hora do reinício em cada cota (issue #189). */
+    private fun sourceComReset(
+        label: String,
+        statusLabel: String,
+        tone: AppTone,
+        vararg quotas: Triple<String, AppTone, String?>
+    ) = HudSourceStatus(
+        label = label,
+        statusLabel = statusLabel,
+        tone = tone,
+        quotas = quotas.map { (text, chipTone, reset) ->
+            HudQuotaChip(text = text, tone = chipTone, resetText = reset)
+        }
+    )
+
     private val sources = listOf(
         source(
             "INFORMATA2", "Crítico", AppTone.CRITICAL,
@@ -93,6 +108,12 @@ class HudWindowGeometryTest {
         assertTrue(soAMaisEstreita.width < todas.width, "esperava ${soAMaisEstreita.width} < ${todas.width}")
     }
 
+    /**
+     * O teto que este teste afirma é o da **pílula parada**, e por isso ele mede
+     * `expanded = false`: desde a #189 o painel expandido tem teto próprio, e um
+     * teste que mede um estado afirmando o teto do outro passaria a descrever o
+     * app errado sem falhar por isso.
+     */
     @Test
     fun `rotulo longo demais para no teto`() {
         val longa = size(
@@ -104,7 +125,8 @@ class HudWindowGeometryTest {
                     "5h 92%" to AppTone.CRITICAL,
                     "7d 88%" to AppTone.CRITICAL
                 )
-            )
+            ),
+            expanded = false
         )
 
         assertEquals(HUD_PILL_MAX_WIDTH, longa.width)
@@ -236,7 +258,7 @@ class HudWindowGeometryTest {
         assertTrue(largura < HUD_PILL_MAX_WIDTH, "esperava $largura abaixo do teto")
     }
 
-    /** O teto é do painel inteiro, e a coluna nova não o fura. */
+    /** O teto é do estado inteiro, e a coluna da contagem não o fura. */
     @Test
     fun `com a contagem o rotulo longo continua preso ao teto`() {
         val longa = size(
@@ -249,10 +271,107 @@ class HudWindowGeometryTest {
                     "7d 88%" to AppTone.CRITICAL
                 )
             ),
+            expanded = false,
             showsCountdown = true
         )
 
         assertEquals(HUD_PILL_MAX_WIDTH, longa.width)
+    }
+
+    // --------------------------------------------------------- coluna do reset
+
+    /**
+     * A hora do reinício (issue #189) só é desenhada com o ponteiro em cima, e a
+     * janela é medida pelo conteúdo: medi-la também parada deixaria a pílula
+     * larga para mostrar o que ela não mostra.
+     */
+    @Test
+    fun `o reset alarga a janela so no painel expandido`() {
+        val comReset = listOf(
+            sourceComReset(
+                "INFORMATA2", "Crítico", AppTone.CRITICAL,
+                Triple("5h 28%", AppTone.OK, "22h59"),
+                Triple("7d 9%", AppTone.CRITICAL, "Ter 21h00")
+            )
+        )
+        val semReset = listOf(
+            source(
+                "INFORMATA2", "Crítico", AppTone.CRITICAL,
+                "5h 28%" to AppTone.OK,
+                "7d 9%" to AppTone.CRITICAL
+            )
+        )
+
+        assertEquals(
+            size(sources = semReset, expanded = false).width,
+            size(sources = comReset, expanded = false).width
+        )
+        assertTrue(
+            size(sources = semReset).width < size(sources = comReset).width,
+            "esperava ${size(sources = semReset).width} < ${size(sources = comReset).width}"
+        )
+    }
+
+    /**
+     * "Caso item tenha": saldo que não expira e janela sem reset conhecido
+     * chegam com `resetText` nulo, e nada é impresso — nem um traço, nem largura
+     * reservada.
+     */
+    @Test
+    fun `cota sem reset nao reserva largura nenhuma`() {
+        val nula = listOf(
+            sourceComReset(
+                "DeepSeek", "Sem projeção", AppTone.NEUTRAL,
+                Triple("Saldo \$2.27", AppTone.NEUTRAL, null)
+            )
+        )
+        val igualSemCampo = listOf(
+            source("DeepSeek", "Sem projeção", AppTone.NEUTRAL, "Saldo \$2.27" to AppTone.NEUTRAL)
+        )
+
+        assertEquals(size(sources = igualSemCampo).width, size(sources = nula).width)
+    }
+
+    /**
+     * O teto é do **estado**, não do componente: o painel expandido carrega uma
+     * coluna a mais por cota, e prendê-lo ao teto da pílula faria essa coluna ser
+     * paga pelo nome da conta — o erro que os saltos 320 → 420 → 484 recusaram
+     * duas vezes.
+     */
+    @Test
+    fun `o painel expandido tem teto proprio`() {
+        val longa = listOf(
+            sourceComReset(
+                "Anthropic — conta corporativa da empresa inteira e mais um pouco",
+                "Crítico",
+                AppTone.CRITICAL,
+                Triple("5h 92%", AppTone.CRITICAL, "22h59"),
+                Triple("7d 88%", AppTone.CRITICAL, "Ter 21h00")
+            )
+        )
+
+        assertEquals(HUD_PILL_MAX_WIDTH, size(sources = longa, expanded = false).width)
+        assertEquals(HUD_PANEL_MAX_WIDTH, size(sources = longa, expanded = true).width)
+    }
+
+    /**
+     * A conta com mais cotas do app é a do OpenCode Go, com três: é ela que o
+     * teto do painel foi dimensionado para acomodar sem truncar o nome.
+     */
+    @Test
+    fun `a conta de tres cotas cabe no painel com os resets`() {
+        val realista = listOf(
+            sourceComReset(
+                "OpenCode Go", "Sem projeção", AppTone.NEUTRAL,
+                Triple("5h 0%", AppTone.NEUTRAL, "22h59"),
+                Triple("semanal 0%", AppTone.NEUTRAL, "Sex 9h00"),
+                Triple("mensal 47%", AppTone.NEUTRAL, "Qua 21h00")
+            )
+        )
+
+        val largura = size(sources = realista, showsCountdown = true).width
+
+        assertTrue(largura < HUD_PANEL_MAX_WIDTH, "esperava $largura abaixo do teto do painel")
     }
 
     // ----------------------------------------------------------------- altura
@@ -482,5 +601,9 @@ class HudWindowGeometryTest {
         // a razão escrita junto, e ela está em `HUD_PILL_MAX_WIDTH`.
         assertEquals(484.dp, HUD_PILL_MAX_WIDTH)
         assertEquals(20.dp, HUD_SOURCE_ROW_HEIGHT)
+        // O teto do painel expandido é o da pílula mais três colunas de reset —
+        // três é a maior contagem de cotas numa fonte só (OpenCode Go). A conta
+        // fica escrita aqui para o valor não poder ser ajustado no escuro.
+        assertEquals(HUD_PILL_MAX_WIDTH + (4.dp + 64.8f.dp) * 3, HUD_PANEL_MAX_WIDTH)
     }
 }

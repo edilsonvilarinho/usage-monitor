@@ -3,6 +3,7 @@ package com.usagemonitor.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -371,6 +372,81 @@ class DesktopWindowFrameTest {
 
         assertEquals(1, clicks)
         assertTrue(events.isEmpty(), "esperava nenhum evento de arrasto, veio $events")
+    }
+
+    // ------------------------------------------------- hora do reinício (#189)
+
+    /**
+     * Uma conta com as duas janelas e uma cota sem reset a mostrar — o caso do
+     * saldo pré-pago, que é o "caso item tenha" do título da issue.
+     */
+    private val sourcesComReset = listOf(
+        HudSourceStatus(
+            label = "INFORMATA2",
+            statusLabel = "Crítico",
+            tone = AppTone.CRITICAL,
+            quotas = listOf(
+                HudQuotaChip(text = "5h 28%", tone = AppTone.OK, resetText = "22h59"),
+                HudQuotaChip(text = "7d 9%", tone = AppTone.CRITICAL, resetText = "Ter 21h00")
+            )
+        ),
+        HudSourceStatus(
+            label = "DeepSeek",
+            statusLabel = "Sem projeção",
+            tone = AppTone.NEUTRAL,
+            quotas = listOf(HudQuotaChip(text = "Saldo \$2.27", tone = AppTone.NEUTRAL))
+        )
+    )
+
+    @Composable
+    private fun hudComReset(expanded: Boolean) {
+        AppTheme(isDark = true) {
+            Box(modifier = Modifier.width(700.dp).height(200.dp)) {
+                HudBar(
+                    statusTone = AppTone.CRITICAL,
+                    sources = sourcesComReset,
+                    fallbackLabel = "Carregando",
+                    expanded = expanded,
+                    onOpenFull = {}
+                )
+            }
+        }
+    }
+
+    /** Com o ponteiro em cima, cada cota diz também quando reinicia. */
+    @Test
+    fun `o painel expandido mostra a hora do reinicio de cada cota`() = runDesktopComposeUiTest {
+        setContent { hudComReset(expanded = true) }
+
+        onNodeWithText("22h59").assertIsDisplayed()
+        onNodeWithText("Ter 21h00").assertIsDisplayed()
+    }
+
+    /**
+     * Parada, a pílula não engorda: ela é a que fica na tela o tempo todo, e a
+     * área dela é a que captura clique de quem está atrás.
+     */
+    @Test
+    fun `a barra parada nao mostra a hora do reinicio`() = runDesktopComposeUiTest {
+        setContent { hudComReset(expanded = false) }
+
+        onNodeWithText("5h 28%").assertIsDisplayed()
+        onNodeWithText("22h59").assertDoesNotExist()
+        onNodeWithText("Ter 21h00").assertDoesNotExist()
+    }
+
+    /**
+     * "Caso item tenha": saldo que não expira chega sem reset, e a linha sai com
+     * o percentual e nada mais — nem um traço no lugar.
+     */
+    @Test
+    fun `cota sem reset nao imprime nada no lugar`() = runDesktopComposeUiTest {
+        setContent { hudComReset(expanded = true) }
+
+        onNodeWithText("Saldo \$2.27").assertIsDisplayed()
+        onNodeWithText("DeepSeek").assertIsDisplayed()
+        onNodeWithText("—").assertDoesNotExist()
+        onNodeWithText("-").assertDoesNotExist()
     }
 
     /**

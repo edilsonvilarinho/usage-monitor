@@ -60,6 +60,12 @@ export function AppHudBar({
                   <span key={chip.text} style={{ display: 'flex', alignItems: 'center', gap: 'var(--s1)' }}>
                     <AppStatusDot level={chip.level} />
                     <span style={VALUE}>{chip.text}</span>
+                    {/* A hora do reinício, só no painel expandido: a pílula
+                        parada é a que fica na tela capturando clique de quem
+                        está atrás. Tom secundário e sem separador -- o vizinho
+                        é o percentual, que é consumo, e é o tom que os separa.
+                        Cota sem reset a mostrar não imprime nada no lugar. */}
+                    {expanded && chip.reset ? <span style={RESET}>{chip.reset}</span> : null}
                   </span>
                 ))}
               </span>
@@ -77,6 +83,7 @@ export function AppHudBar({
 
 const NAME = { flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 const VALUE = { flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' };
+const RESET = { ...VALUE, color: 'var(--muted)' };
 
 // A contagem até a próxima coleta. O ícone é o que diz de que tempo se trata:
 // aqui não cabe tooltip -- popup nesta plataforma é camada dentro da janela e

@@ -5,7 +5,9 @@ countdown to the next collection at the end of the first row.
 <AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
   quotas: [{ text: '5h 28%', level: 'ok' }, { text: '7d 9%', level: 'crit' }] }]} countdown="02:05" />
 <AppHudBar level="ok" dotOnly />
-<AppHudBar sources={ACCOUNTS} expanded countdown="02:05" />
+<AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
+  quotas: [{ text: '5h 28%', level: 'ok', reset: '22h59' },
+           { text: '7d 9%', level: 'crit', reset: 'Ter 21h00' }] }]} expanded countdown="02:05" />
 ```
 
 Not a new risk primitive — the dot+word is `AppStatusIndicator`, and the collapsed state reuses
@@ -55,8 +57,24 @@ which. Drop it and color would be informing state alone, which this system does 
 
 **No new formats in the row.** The percent is the card's own (truncated, never rounded). The short
 reset comes from the *same* date parts the card's line uses, just trimmed: no prefix, no timezone,
-and no day-of-month when the window is intraday. Absent means "no reset to show" — the column
-disappears rather than printing a dash.
+and no day-of-month when the window is intraday. Absent means "no reset to show" — nothing is
+printed in its place, not even a dash.
+
+**The reset is drawn only while expanded, and beside its own quota.** The resting pill sits on
+screen all the time and its rectangle captures the click of whatever is behind it — the complaint
+that turned the width into a cap in the first place — so the reset is a detail on demand, and
+hovering is already the gesture that reveals the rest of the list. It rides *inside* the quota
+block rather than in a column of its own at the end of the row: the row is one per account and the
+quotas are several, so a single reset column would have to pick which quota it describes. It is
+drawn in the secondary tone with no printed separator: its neighbour is the percentage, which is
+consumption, and the tone is what tells them apart — a middle dot between them would spend width
+repeating what the tone already said.
+
+**The width cap belongs to the state, not to the component.** The resting cap was calibrated for a
+row *without* the reset column; keeping it for the expanded panel would make the new column be paid
+for by the account name, which is the mistake the earlier cap raises already refused twice. The
+expanded cap is the resting one plus three reset columns — three being the largest quota count on a
+single source.
 
 **The countdown is drawn once, on the first row.** The polling is a single loop for the whole app,
 not one per account, so repeating it on every row would claim each account has its own collection.

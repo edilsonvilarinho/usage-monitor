@@ -12,6 +12,13 @@ someone using the app.
 
 ### Added
 
+- Hovering the HUD strip now shows, next to each quota, the time it resets — `22h59`, `Ter 21h00`.
+  With the normal window closed, a percentage alone does not say whether there is room to keep
+  working: 21% ten minutes before the reset is a different situation from 21% at the start of the
+  window. The resting pill is unchanged, since it is the one that stays on screen capturing the
+  click of whatever is behind it, and a quota with no reset to show — a prepaid balance — prints
+  nothing in its place.
+
 - A window-mode menu in the footer: one icon opens the three frames -- standard, cards only and the
   HUD strip -- with the current one marked. Until now the two reduced frames were reachable only
   through two switches buried in the Settings "System" section, two keyboard shortcuts or the tray,

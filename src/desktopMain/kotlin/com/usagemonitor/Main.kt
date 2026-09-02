@@ -1671,11 +1671,12 @@ private fun runUsageMonitor(
         val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
         val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
         val hudFallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
-        // **Uma linha por cota, não por fonte.** A versão anterior mostrava a pior
-        // cota de cada fonte, e uma conta Anthropic com janela de 5h e de 7d
-        // aparecia com uma linha só — o outro limite não existia na tela.
-        // `compactPercentageLabel` e `resetShortLabel` são os formatos que o card
-        // já usa, e nenhum dos dois é formato de data novo.
+        // **Todas as cotas, não a pior de cada fonte.** A versão anterior mostrava
+        // uma cota por fonte, e uma conta Anthropic com janela de 5h e de 7d
+        // aparecia com um limite só — o outro não existia na tela. Como elas são
+        // agrupadas em linhas está logo abaixo. `hudQuotaChipText` e
+        // `resetShortLabel` são os formatos que o card já usa, e nenhum dos dois
+        // é formato de data novo.
         val hudNow = Clock.System.now()
         val hudQuotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
         val hudNoForecastLabel = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
@@ -1705,7 +1706,14 @@ private fun runUsageMonitor(
                     quotas = entries.map { entry ->
                         HudQuotaChip(
                             text = hudQuotaChipText(entry.quota),
-                            tone = entry.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL
+                            tone = entry.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
+                            // A hora do reinício (issue #189), desenhada só com o
+                            // painel expandido. `resetShortLabel` é a linha do
+                            // card recortada — nenhum formato de data novo — e
+                            // devolve `null` para saldo que não expira e para
+                            // janela sem reset conhecido, que é o "caso item
+                            // tenha" da issue.
+                            resetText = resetShortLabel(entry.quota, language, hudNow)
                         )
                     }
                 )
