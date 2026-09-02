@@ -40,7 +40,7 @@ function Caption({ children }) {
 export function Hud() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', alignItems: 'flex-start' }}>
-      <Caption>barra HUD · painel arrastável, uma linha por fonte, teto de 420dp</Caption>
+      <Caption>barra HUD · painel arrastável, uma linha por fonte, teto de 484dp</Caption>
 
       <Caption>1 · parada — uma linha, a primeira da ordem de cards</Caption>
       <HudScreen>
@@ -71,7 +71,7 @@ export function Hud() {
         Terceiro chrome, um passo além do modo somente cards (issue #164): a mesma janela principal
         redimensionada a um painel. Três versões de conteúdo foram achadas erradas ao vivo, uma por
         vez — uma linha só com a pior fonte, depois as outras atrás de um hover, depois a lista sem
-        nenhum número de consumo. Parada, a barra mostra uma linha; com o ponteiro em cima, todas as cotas. A largura sai do conteúdo, com 420dp de teto, e o
+        nenhum número de consumo. Parada, a barra mostra uma linha; com o ponteiro em cima, todas as cotas. A largura sai do conteúdo, com 484dp de teto, e o
         painel é arrastado para onde o usuário quiser — ao soltar ele gruda na borda mais próxima da
         área útil e a posição é gravada. Três saídas: clique curto em qualquer ponto, item na bandeja
         e Ctrl+Shift+H. A linha termina com a contagem até a próxima coleta (issue #185), que sai

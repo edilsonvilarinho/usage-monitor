@@ -26,7 +26,7 @@ import type { ReactNode, CSSProperties } from 'react';
  * The component doesn't own its width: it fills whatever the host gives it, and
  * the name truncates rather than force it wider. The host measures the window
  * from these same labels (mono type makes the advance calculable), caps it at
- * 420dp, and resizes.
+ * 484dp, and resizes.
  * @startingPoint section="Shell" subtitle="HUD — one line, list on hover" viewport="700x320"
  */
 export interface AppHudBarProps {

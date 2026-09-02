@@ -41,8 +41,17 @@ import kotlin.math.abs
  * nome, treze caracteres: toda conta virava "Anthropic — I…", que é justamente
  * o que a lista existe para distinguir. Continua bem abaixo do piso da janela
  * normal (240dp de card × n).
+ *
+ * **E de 420 para 484 quando a contagem entrou** (issue #185), que é exatamente
+ * o teto anterior mais [hudCountdownWidth] — não um número escolhido por ser
+ * redondo. O 420 foi calibrado para a linha **sem** a coluna, e mantê-lo faria a
+ * coluna nova ser paga pelo nome da conta. Medido com as contas reais: sem a
+ * contagem, `Anthropic — Padrão` pedia 356,9dp e `OpenCode Go` 361,6dp, os dois
+ * abaixo do teto; com ela passavam a 420,9 e 425,6 e começavam a truncar. É a
+ * mesma razão do salto anterior, e a aritmética preserva exatamente a
+ * capacidade de nome que a barra já tinha.
  */
-internal val HUD_PILL_MAX_WIDTH = 420.dp
+internal val HUD_PILL_MAX_WIDTH = 484.dp
 
 /**
  * Distância em que a pílula solta gruda na borda da área útil.

@@ -25,7 +25,7 @@ export function AppHudBar({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        maxWidth: 420,
+        maxWidth: 484,
         border: '1px solid var(--border)',
         borderRadius: 'var(--r2)',
         boxShadow: 'var(--shadow-8)',

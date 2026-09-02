@@ -632,7 +632,11 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   reticências (`TextOverflow.Ellipsis`) que a pílula já usava. `HudBar` continua sem saber a própria
   largura — preenche o que recebe. O teto **subiu de 320 para 420** quando a linha ganhou quatro
   colunas: com 320 sobravam ~96dp para o nome, treze caracteres, e toda conta virava
-  "Anthropic — I…" — justamente o que a lista existe para distinguir.
+  "Anthropic — I…" — justamente o que a lista existe para distinguir. E **de 420 para 484** quando a
+  contagem entrou (#185), que é exatamente o teto anterior mais a largura da coluna nova, não um
+  número escolhido por ser redondo: o 420 foi calibrado para a linha **sem** ela, e mantê-lo faria a
+  coluna ser paga pelo nome da conta. Medido com as contas reais, e não deduzido —
+  `Anthropic — Padrão` pedia 356,9dp e passou a 420,9; `OpenCode Go`, 361,6 e 425,6.
 - **A largura é estimada pela métrica da fonte, nunca medida na composição** (`hudPillWidth`,
   `hudPanelWidth`). A escala `label*` deste sistema é **mono**, e é isso que torna o avanço por
   caractere calculável antes de existir composição; numa fonte proporcional este número não

@@ -217,6 +217,25 @@ class HudWindowGeometryTest {
         )
     }
 
+    /**
+     * **O caso que fez o teto subir de 420 para 484.** Medidas com as contas
+     * reais: `Anthropic — Padrão` pedia 356,9dp sem a contagem e 420,9dp com ela.
+     * Com o teto antigo, a coluna nova seria paga pelo nome — exatamente o que o
+     * salto anterior, de 320 para 420, existiu para evitar.
+     */
+    @Test
+    fun `uma conta de nome realista cabe com a contagem`() {
+        val realista = source(
+            "Anthropic — Padrão", "Atenção", AppTone.WARNING,
+            "5h 68%" to AppTone.WARNING,
+            "7d 41%" to AppTone.OK
+        )
+
+        val largura = size(sources = listOf(realista), showsCountdown = true).width
+
+        assertTrue(largura < HUD_PILL_MAX_WIDTH, "esperava $largura abaixo do teto")
+    }
+
     /** O teto é do painel inteiro, e a coluna nova não o fura. */
     @Test
     fun `com a contagem o rotulo longo continua preso ao teto`() {
@@ -458,7 +477,10 @@ class HudWindowGeometryTest {
 
     @Test
     fun `os valores de contrato continuam onde estavam`() {
-        assertEquals(420.dp, HUD_PILL_MAX_WIDTH)
+        // 484 = o teto anterior (420) mais a largura da coluna da contagem. Este
+        // teste reprovou a mudança, que é o trabalho dele: o valor só se move com
+        // a razão escrita junto, e ela está em `HUD_PILL_MAX_WIDTH`.
+        assertEquals(484.dp, HUD_PILL_MAX_WIDTH)
         assertEquals(20.dp, HUD_SOURCE_ROW_HEIGHT)
     }
 }
