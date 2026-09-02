@@ -51,6 +51,30 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # Este era o unico job do repositorio que invocava Gradle sem cache: o log
+      # do run 33680756437 mostra `Downloading gradle-8.6-bin.zip` e daemon novo
+      # a cada execucao, ou seja, o classpath do buildscript inteiro resolvido
+      # pela rede toda vez. Foi assim que um HTTP 429 do `repo.maven.apache.org`
+      # (rate limit por IP de saida, e os runners hospedados compartilham IP)
+      # derrubou a `main` sem nenhum defeito de codigo -- o job `CI` passou no
+      # mesmo commit, com o cache do Gradle Home quente.
+      #
+      # Antes do `init` de proposito: o tracer do CodeQL nao precisa enxergar a
+      # JVM da propria action. Mesma SHA ja pinada em `ci.yml` e
+      # `release-linux.yml`, entao nao e dependencia nova.
+      #
+      # Trade-off aceito: este cache e Linux e passa a disputar os 10 GB de cache
+      # do repositorio com o cache Windows do `ci.yml`. Se `gradle cache is not
+      # found` voltar a aparecer la de forma recorrente, a saida e
+      # `cache-read-only: true` aqui -- o job perde a gravacao e mantem a leitura.
+      - name: Setup Gradle
+        if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          # Mesmo criterio de `ci.yml`: cache gravado fora da `main` fica no
+          # escopo daquele ref e nenhum outro run consegue le-lo.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
@@ -62,11 +86,32 @@ jobs:
       # rodaram headless em Linux (nenhuma configuracao de xvfb no
       # repositorio). `compileKotlinDesktop` ja compila com sucesso em
       # Ubuntu hoje: e o mesmo runner do job `build-linux` do release.
+      #
+      # Retry com backoff pelo mesmo motivo do `choco install` do `ci.yml`:
+      # repositorio externo fora do ar ou com rate limit (429 do Maven Central,
+      # run 33680756437) nao e defeito deste repositorio, e derrubar a `main` por
+      # isso e ruido. Nao abre porta para "verde que nao fez nada": ha uma tarefa
+      # so, falha de configuracao nao compila nada e a tentativa seguinte compila
+      # do zero; falha de compilacao e deterministica e as tres tentativas
+      # reprovam. E se uma retentativa achasse tudo up-to-date, o passo
+      # `Perform CodeQL Analysis` reprova alto com "No source code was seen".
+      #
+      # O shell do step e `bash -e`: `./gradlew` dentro de `if` nao dispara o
+      # `-e`, entao o laco funciona sem `set +e`.
       - name: Build (java-kotlin)
         if: matrix.language == 'java-kotlin'
         run: |
           chmod +x ./gradlew
-          ./gradlew compileKotlinDesktop --console=plain
+          for attempt in 1 2 3; do
+            if ./gradlew compileKotlinDesktop --console=plain; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Tentativa $attempt falhou; nova tentativa em $((attempt * 30))s."
+              sleep $((attempt * 30))
+            fi
+          done
+          exit 1
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9

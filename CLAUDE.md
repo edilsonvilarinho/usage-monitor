@@ -925,6 +925,19 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
 - **`choco install` detecta antes de instalar e tem retry.** Um 504 da `community.chocolatey.org`
   derrubou a `main` em 25/08 sem nenhum defeito de código. O WiX não lança ao fim: sem ele o roteiro
   pula o cenário S7 com aviso, e derrubar o job custaria os outros seis.
+- **O `codeql.yml` resolvia o classpath do buildscript frio a cada run, e um 429 do Maven Central
+  derrubou a `main` por isso.** Ele era o único workflow que invocava Gradle sem
+  `gradle/actions/setup-gradle`: o log do run `33680756437` traz `Downloading gradle-8.6-bin.zip` e
+  daemon novo, e a falha é de **configuração** — `Received status code 429` em
+  `repo.maven.apache.org` para `kotlin-gradle-plugins-bom`, `kover-features-jvm` e companhia, antes
+  de compilar uma linha. Não era defeito de código: o job `CI` passou no mesmo commit, com o cache do
+  Gradle Home quente. A mitigação é dupla — a mesma action de cache dos outros dois workflows, mais
+  retry com backoff no passo de build, pelo precedente do `choco install` acima. **O retry não cria
+  "verde que não fez nada"**: há uma tarefa só, falha de configuração não compila nada e a tentativa
+  seguinte compila do zero, falha de compilação é determinística, e um build up-to-date faria
+  `Perform CodeQL Analysis` reprovar alto com *No source code was seen*. O preço aceito é o cache
+  Linux disputar os 10 GB do repositório com o cache Windows do `ci.yml`; se aquele voltar a dizer
+  `gradle cache is not found`, a saída é `cache-read-only: true` no CodeQL.
 
 ## Convenções de código
 
