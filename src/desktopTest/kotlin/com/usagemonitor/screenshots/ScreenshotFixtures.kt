@@ -1,6 +1,7 @@
 package com.usagemonitor.screenshots
 
 import com.usagemonitor.domain.entity.AnthropicQuotaLabels
+import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -15,6 +16,7 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
+import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamMemberPresence
@@ -699,6 +701,26 @@ internal object ScreenshotFixtures {
         ApiSource.ANTHROPIC,
         ApiSource.CODEX,
         ApiSource.DEEPSEEK
+    )
+
+    /** Teto de US$ 150,00 com US$ 51,20 gastos em 12 dos 31 dias do mês. */
+    val monthlyBudget = MonthlyBudgetStatus(
+        limitMicros = 150_000_000L,
+        spentMicros = 51_200_000L,
+        daysElapsed = 12,
+        daysInMonth = 31
+    )
+
+    /**
+     * Créditos de uso da conta, na linha separada do orçamento.
+     *
+     * Os mesmos US$ 190,00 de US$ 500,00 que o card do dashboard mostra: dois
+     * números diferentes para o mesmo dado confundiriam quem compara as telas.
+     */
+    val accountCredits = AccountCreditUsage(
+        usedMinorUnits = 19_000L,
+        limitMinorUnits = 50_000L,
+        currencyCode = "USD"
     )
 }
 

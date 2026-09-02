@@ -16,16 +16,25 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.MonthlyBudgetStatus
+import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.TeamUsageContent
+import com.usagemonitor.presentation.ui.components.AlertSettingsSection
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.help.HelpCatalog
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.help.HelpTopic
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
+import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import kotlinx.datetime.Instant
 import java.io.File
 
@@ -56,6 +65,10 @@ fun main(args: Array<String>) {
     recordHistory(outputDir)
     recordCliSessions(outputDir)
     recordBreakdown(outputDir)
+    recordBudget(outputDir)
+    recordAlerts(outputDir)
+    recordExport(outputDir)
+    recordTeam(outputDir)
 
     println("Demos geradas em ${outputDir.absolutePath}")
 }
@@ -210,6 +223,150 @@ private fun recordBreakdown(outputDir: File) {
     }
 }
 
+/**
+ * Orçamento mensal: o teto contra o gasto do mês, no resumo por eixo.
+ *
+ * O painel vive no resumo e não numa tela própria, então a demo mostra onde ele
+ * de fato aparece — o passo de ativação é que manda ao campo das Configurações.
+ */
+private fun recordBudget(outputDir: File) {
+    val state = DemoState(contentHeight = 700.dp)
+
+    record(outputDir, HelpTopic.BUDGET, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                CliSessionsContent(
+                    state = sessionsState(
+                        view = CliSessionsView.BREAKDOWN,
+                        breakdown = ScreenshotFixtures.cliBreakdown,
+                        budget = ScreenshotFixtures.monthlyBudget,
+                        accountCredits = ScreenshotFixtures.accountCredits
+                    ),
+                    language = AppLanguage.PT,
+                    onSelectRange = {},
+                    onOpenSession = {},
+                    onCloseDetail = {}
+                )
+            }
+        }
+
+        recorder.animate(900) {}
+        recorder.hold(1_200)
+        // O painel do orçamento fica abaixo dos baldes do eixo: com 120dp de
+        // deslocamento o quadro final parava no cabeçalho dele.
+        recorder.panTo(state, to = 300.dp, durationMillis = 700)
+        recorder.hold(1_800)
+    }
+}
+
+/**
+ * Alertas: a seção das Configurações, com um interruptor sendo ligado.
+ *
+ * É a única demo em que o clique muda o próprio controle apontado — nas demais o
+ * ponteiro aciona e a tela reage em outro lugar.
+ */
+private fun recordAlerts(outputDir: File) {
+    val state = DemoState(contentHeight = 620.dp)
+    var settings by mutableStateOf(
+        UsageAlertSettings.DEFAULT.copy(stalledSessionAlertsEnabled = false)
+    )
+
+    record(outputDir, HelpTopic.ALERTS, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                Box(modifier = Modifier.fillMaxSize().padding(AppSpacing.lg)) {
+                    AlertSettingsSection(
+                        settings = settings,
+                        language = AppLanguage.PT,
+                        onSettingsChange = {},
+                        budgetText = "150.00"
+                    )
+                }
+            }
+        }
+
+        recorder.animate(700) {}
+        recorder.hold(1_300)
+        recorder.moveCursor(state.cursor, x = 950.dp, y = 194.dp, durationMillis = 600)
+        recorder.click(state.cursor) {
+            settings = settings.copy(stalledSessionAlertsEnabled = true)
+        }
+        recorder.animate(500) {}
+        recorder.hold(1_600)
+    }
+}
+
+/**
+ * Exportação: os três botões da barra e o retorno da gravação.
+ *
+ * O clique tem de produzir reação visível — na vida real ele abre o diálogo de
+ * arquivo, que não existe numa cena offscreen. O que a demo mostra é o estado
+ * seguinte, que é o que a tela realmente exibe quando a gravação termina.
+ */
+private fun recordExport(outputDir: File) {
+    val state = DemoState(contentHeight = 460.dp)
+    var outcome by mutableStateOf<CliExportOutcome?>(null)
+
+    record(outputDir, HelpTopic.EXPORT, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                CliSessionsContent(
+                    state = sessionsState(exportOutcome = outcome),
+                    language = AppLanguage.PT,
+                    onSelectRange = {},
+                    onOpenSession = {},
+                    onCloseDetail = {}
+                )
+            }
+        }
+
+        recorder.animate(800) {}
+        recorder.hold(1_100)
+        recorder.moveCursor(state.cursor, x = 946.dp, y = 44.dp, durationMillis = 600)
+        recorder.click(state.cursor) {
+            outcome = CliExportOutcome.Saved("~/Documentos/usage-monitor-sessoes.pdf")
+        }
+        recorder.animate(400) {}
+        recorder.hold(1_800)
+    }
+}
+
+/** Visão de time: o consumo por integrante, com um deles expandido. */
+private fun recordTeam(outputDir: File) {
+    val state = DemoState(contentHeight = 560.dp)
+    var expanded by mutableStateOf(emptySet<String>())
+
+    record(outputDir, HelpTopic.TEAM, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                TeamUsageContent(
+                    state = TeamUsageUiState.Success(
+                        members = ScreenshotFixtures.teamMembers,
+                        range = CliSessionRange.LAST_5H,
+                        rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
+                        rangeAnchored = true,
+                        accountLabel = "dev@example.com — Example Org",
+                        lastChangedAt = ScreenshotFixtures.NOW,
+                        expandedMemberKeys = expanded
+                    ),
+                    language = AppLanguage.PT,
+                    onSelectRange = {},
+                    onToggleMember = {}
+                )
+            }
+        }
+
+        recorder.animate(800) {}
+        recorder.hold(1_200)
+        recorder.moveCursor(state.cursor, x = 300.dp, y = 262.dp, durationMillis = 500)
+        recorder.click(state.cursor) {
+            expanded = setOf(ScreenshotFixtures.LOCAL_DEVICE_ID)
+        }
+        recorder.animate(500) {}
+        recorder.hold(1_700)
+    }
+}
+
 // --- Máquina de gravação -----------------------------------------------------
 
 /**
@@ -283,11 +440,17 @@ private fun record(
 
 private fun sessionsState(
     view: CliSessionsView = CliSessionsView.SESSIONS,
-    breakdown: com.usagemonitor.domain.entity.CliUsageBreakdown? = null
+    breakdown: CliUsageBreakdown? = null,
+    budget: MonthlyBudgetStatus? = null,
+    accountCredits: AccountCreditUsage? = null,
+    exportOutcome: CliExportOutcome? = null
 ) = CliSessionsUiState.Success(
     sessions = ScreenshotFixtures.cliSessions,
     view = view,
     breakdown = breakdown,
+    budget = budget,
+    accountCredits = accountCredits,
+    exportOutcome = exportOutcome,
     range = CliSessionRange.LAST_5H,
     rangeEndsAt = ScreenshotFixtures.NOW.plusSeconds(2 * 3_600L),
     rangeAnchored = true,
