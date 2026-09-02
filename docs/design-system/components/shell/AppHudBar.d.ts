@@ -25,8 +25,10 @@ import type { ReactNode, CSSProperties } from 'react';
  *
  * The component doesn't own its width: it fills whatever the host gives it, and
  * the name truncates rather than force it wider. The host measures the window
- * from these same labels (mono type makes the advance calculable), caps it at
- * 484dp, and resizes.
+ * from these same labels (mono type makes the advance calculable) and resizes.
+ * The cap belongs to the **state**, not to the component: 484dp while resting,
+ * plus three reset columns while expanded — keeping the resting cap there would
+ * make the reset column be paid for by the account name.
  * @startingPoint section="Shell" subtitle="HUD — one line, list on hover" viewport="700x320"
  */
 export interface AppHudBarProps {
@@ -42,8 +44,21 @@ export interface AppHudBarProps {
     /** Word for the **worst** quota of that account — the card badge's role. */
     statusLabel: ReactNode;
     level?: 'ok' | 'warn' | 'crit' | 'off';
-    /** Every quota of that account, in the API's order. */
-    quotas?: Array<{ text: ReactNode; level?: 'ok' | 'warn' | 'crit' | 'off' }>;
+    /**
+     * Every quota of that account, in the API's order.
+     *
+     * `reset` is the short reset label — `22h59`, `Ter 21h00` — and it is drawn
+     * **only while expanded**: the resting pill is the one that sits on screen
+     * capturing the click of whatever is behind it, so the reset is a detail on
+     * demand. Absent means "no reset to show" (a balance that never expires, a
+     * window with no known reset) and nothing is printed in its place, not even
+     * a dash.
+     */
+    quotas?: Array<{
+      text: ReactNode;
+      level?: 'ok' | 'warn' | 'crit' | 'off';
+      reset?: ReactNode;
+    }>;
   }>;
   /** Word of the single line shown before the first collection lands. */
   fallbackLabel?: ReactNode;
