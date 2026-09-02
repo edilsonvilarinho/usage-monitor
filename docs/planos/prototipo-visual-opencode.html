@@ -867,6 +867,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <span class="st ok">5 fontes</span>
     <button class="btn ghost" type="button">Atualizar tudo</button>
     <button class="btn ghost" type="button">Configurações</button>
+    <button class="btn ghost" type="button">Ajuda</button>
   </div>
 </div>
 <div class="g2">
@@ -980,7 +981,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Sessão 7d</span><span class="sp"></span><span class="v">8%</span></div><div class="track ok"><i style="width:8%"></i></div></div></div></div></div>
   </div>
 </div>
-<p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
+<p class="note"><b>Três saídas, não uma.</b> Um modo que esconde o botão de fechar e a engrenagem precisa de mais de um caminho de volta: a faixa revelada no hover, o item na bandeja e <code>Ctrl+Shift+M</code>. A ajuda (§14b) segue o mesmo desenho por ser a primeira coisa a sumir com o rodapé: botão no rodapé, item na bandeja e <code>F1</code>. A faixa <b>só existe enquanto o ponteiro está nela</b> — ela carrega a área de arrasto da janela, que usa arrasto imediato, e o card usa arrasto depois de pressão longa: presente o tempo todo, ela venceria a pressão longa e reordenar o primeiro card ficaria impossível.</p>
 
 <h3>Barra HUD</h3>
 <p class="lede">Um terceiro chrome, ainda mais discreto que o modo somente cards (issue #164): a mesma janela principal encolhida a um painel de largura medida pelo conteúdo, arrastável para qualquer ponto da tela, sempre visível. Não mostra cards — cada linha é uma <b>conta</b>, com ponto e palavra da pior cota dela, o nome, e um ponto por cota ao lado do percentual. Parada mostra a <b>primeira</b> conta da ordem de cards do usuário; com o ponteiro em cima, todas, com a janela crescendo interpolada. Sem arrasto de reordenar (não há cards para reordenar), sem barra de título: um clique curto em qualquer ponto devolve a janela completa, e o arrasto o move.</p>

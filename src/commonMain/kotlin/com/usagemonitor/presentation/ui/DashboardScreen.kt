@@ -100,6 +100,8 @@ fun DashboardScreen(
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistory: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenSettings: () -> Unit,
+    /** Abre a ajuda. Default vazio pela razão de sempre: os geradores de captura não a abrem. */
+    onOpenHelp: () -> Unit = {},
     onOpenCliSessions: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
     /** Presença da conta do card — a porta do integrante comum. */
@@ -180,6 +182,7 @@ fun DashboardScreen(
                 nextRefreshAt = nextRefreshAt,
                 onRefresh = { pendingRefreshAction = { viewModel.refresh() } },
                 onOpenSettings = onOpenSettings,
+                onOpenHelp = onOpenHelp,
                 countdownUpdatesEnabled = countdownUpdatesEnabled,
                 onOpenAdminOverview = onOpenAdminOverview,
                 onOpenTeamPresence = onOpenTeamPresenceOverview
