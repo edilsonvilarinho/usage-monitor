@@ -392,6 +392,18 @@ table.dt td.num, table.dt th.num { text-align: right; }
   font-family: var(--mono); font-size: var(--t10); color: var(--muted); }
 .statusbar .sp { flex: 1; }
 
+/* Menu suspenso: uma escolha de lista curta, ancorada num controle (issue #187).
+   Abre para cima quando o controle mora na barra de estado, que é a última
+   linha da janela. A marca de seleção ocupa lugar em toda linha, senão o rótulo
+   da selecionada andaria para o lado a cada troca de opção. */
+.menu { display: inline-flex; flex-direction: column; min-width: max-content;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2);
+  box-shadow: var(--shadow-2); overflow: hidden; }
+.menu .mitem { display: flex; align-items: center; gap: var(--s2); min-height: 28px;
+  padding: var(--s1) var(--s2); font-family: var(--mono); font-size: var(--t12); color: var(--muted); }
+.menu .mitem.on { background: var(--raised); color: var(--fg); }
+.menu .mitem .mark { width: 12px; text-align: center; }
+
 /* Amostra de token */
 .swatch { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
 .swatch .chip { height: 46px; }
@@ -869,6 +881,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <span>Próxima coleta em 06:41</span>
     <span class="sp"></span>
     <span class="st ok">5 fontes</span>
+    <button class="btn icon" type="button" aria-label="Modo de janela" title="Modo de janela">&#9636;</button>
     <button class="btn ghost" type="button">Atualizar tudo</button>
     <button class="btn ghost" type="button">Configurações</button>
     <button class="btn ghost" type="button">Ajuda</button>
@@ -973,6 +986,36 @@ onde levá-la. O rodapé da janela vira <b>status bar de 30dp</b>: versão, cont
 configurações. A contagem de fontes desenhada aqui como <code>4 fontes</code> <b>não foi implementada</b>: ela afirma um
 estado agregado que o app não calcula, e com uma fonte em erro o verde mentiria — escolher o tom seria inventar
 semântica que este protótipo não define. Falha de fonte já tem o banner por alvo. Preservados: múltiplos perfis Anthropic, as seis integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
+
+<h3>Acesso rápido aos modos de janela</h3>
+<p class="lede">O rodapé ganha um ícone que abre um menu com as três molduras — padrão, somente os cards e barra HUD —, com a corrente marcada (issue #187). Antes delas só existiam duas portas escondidas: dois interruptores no meio da seção "Sistema" das Configurações e duas combinações de teclado, e os dois modos alternativos só eram descobertos por acidente.</p>
+
+<div class="cap">menu aberto — a moldura corrente marcada</div>
+<div class="win narrow" style="max-width:420px">
+  <div class="body tight">
+    <p class="dim" style="font-size:var(--t12)">grade de cards</p>
+    <div style="display:flex;justify-content:flex-end">
+      <div class="menu">
+        <div class="mitem on"><span class="mark">&#10003;</span><span>Padrão</span></div>
+        <div class="mitem"><span class="mark"></span><span>Somente os cards</span></div>
+        <div class="mitem"><span class="mark"></span><span>Barra HUD</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <span>v38.2.0</span>
+    <span>Próxima coleta em 06:41</span>
+    <span class="sp"></span>
+    <button class="btn icon" type="button" aria-label="Modo de janela" title="Modo de janela">&#9636;</button>
+    <button class="btn ghost" type="button">Atualizar tudo</button>
+    <button class="btn ghost" type="button">Configurações</button>
+  </div>
+</div>
+
+<p class="note"><b>Menu, e não um segmentado com três rótulos.</b> O segmentado mostra todas as opções o tempo todo e custa a largura das três; numa barra de estado de 30dp que já carrega até cinco ações, <code>Padrão · Somente os cards · Barra HUD</code> não cabe. O menu mostra a corrente sob demanda e continua dizendo <b>quais</b> modos existem, que é metade da queixa da issue.</p>
+<p class="note"><b>Ele abre para cima.</b> O rodapé é a última linha da janela e popup nesta plataforma é camada <b>dentro</b> dela, recortada pelos limites — um menu que só soubesse abrir para baixo nasceria fora da janela. A posição é presa aos limites nos dois eixos, e o caso está afirmado por teste numa cena de 240×320dp, que é o piso de arrasto da janela principal.</p>
+<p class="note"><b>O item selecionado carrega marca e realce, nunca só o realce</b>, e o espaço da marca é reservado em todas as linhas — sem isso o rótulo da selecionada anda para o lado a cada troca de opção. O realce é o mesmo contêiner do segmentado e do item de navegação das Configurações: não há um segundo desenho de seleção neste app.</p>
+<p class="note"><b>O menu só existe no modo padrão</b>, porque o rodapé só é composto ali. Voltar continua sendo <code>Ctrl+Shift+M</code>, <code>Ctrl+Shift+H</code>, a bandeja, a faixa de hover do modo somente cards e o clique na pílula do HUD — quatro caminhos que já existiam e nenhum deles some.</p>
 
 <h3>Modo somente cards</h3>
 <p class="lede">A mesma janela sem barra de título e sem rodapé: o app fica do tamanho do que ele informa. A moldura não some para sempre — ela volta como faixa sobreposta enquanto o mouse está nos 34px do topo.</p>
