@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.hudWindowSize
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AccountCreditUsage
@@ -647,8 +648,22 @@ private val DEMO_UPDATE = AppUpdateInfo(
     releasePageUrl = "https://github.com/edilsonvilarinho/usage-monitor/releases/tag/v38.2.0"
 )
 
-/** A pílula do HUD tem teto de 420dp; a lista aberta cresce por linha de conta. */
-private val HUD_DEMO_WIDTH = 420.dp
+/**
+ * A demo é medida pela **mesma** função que dimensiona a janela no app
+ * (`hudWindowSize`), e não por um literal.
+ *
+ * Era 420dp escrito à mão, e com a coluna de reset da issue #189 a demo passaria
+ * a truncar nomes que o app real não trunca — uma demo mostrando um defeito que
+ * não existe. Com a geometria como fonte, a próxima coluna que entrar na linha
+ * já vem contada.
+ */
+private val HUD_DEMO_WIDTH = hudWindowSize(
+    sources = ScreenshotFixtures.hudSources,
+    fallbackLabel = "Carregando",
+    dotOnly = false,
+    expanded = true,
+    showsCountdown = true
+).width
 private val HUD_DEMO_EXPANDED_HEIGHT = 76.dp
 
 /** Largura da janela no modo somente cards: uma coluna de cards ao lado do editor. */

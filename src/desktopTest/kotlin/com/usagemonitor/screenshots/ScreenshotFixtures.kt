@@ -720,8 +720,8 @@ internal object ScreenshotFixtures {
             statusLabel = "Atenção",
             tone = AppTone.WARNING,
             quotas = listOf(
-                HudQuotaChip(text = "5h 68%", tone = AppTone.WARNING),
-                HudQuotaChip(text = "7d 41%", tone = AppTone.OK)
+                HudQuotaChip(text = "5h 68%", tone = AppTone.WARNING, resetText = "22h59"),
+                HudQuotaChip(text = "7d 41%", tone = AppTone.OK, resetText = "Ter 21h00")
             )
         ),
         HudSourceStatus(
@@ -729,10 +729,12 @@ internal object ScreenshotFixtures {
             statusLabel = "Normal",
             tone = AppTone.OK,
             quotas = listOf(
-                HudQuotaChip(text = "5h 12%", tone = AppTone.OK),
-                HudQuotaChip(text = "7d 7%", tone = AppTone.OK)
+                HudQuotaChip(text = "5h 12%", tone = AppTone.OK, resetText = "1h30"),
+                HudQuotaChip(text = "7d 7%", tone = AppTone.OK, resetText = "Qui 9h00")
             )
         ),
+        // Sem `resetText`: o saldo pré-pago não expira, e a demo mostra que a
+        // linha dele sai só com o percentual — é o "caso item tenha" da #189.
         HudSourceStatus(
             label = "DeepSeek",
             statusLabel = "Normal",
