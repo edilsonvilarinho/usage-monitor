@@ -54,6 +54,33 @@ import kotlin.math.abs
 internal val HUD_PILL_MAX_WIDTH = 484.dp
 
 /**
+ * Largura de uma coluna de reset (issue #189): o vão até o percentual mais o
+ * rótulo mais longo que `resetShortLabel` imprime.
+ *
+ * O mais longo é o da janela semanal ou mensal — `Ter 21h00`, nove caracteres —,
+ * e não o da intradiária (`22h59`, cinco). A conta é a mesma de
+ * [hudCountdownWidth]: vão mais avanço mono por caractere.
+ */
+private val HUD_RESET_COLUMN_WIDTH =
+    AppSpacing.xs + (9 * LABEL_MEDIUM_FONT_SIZE * MONO_ADVANCE_RATIO).dp
+
+/**
+ * Teto da largura do painel **expandido** (issue #189).
+ *
+ * [HUD_PILL_MAX_WIDTH] foi calibrado para a linha **sem** a coluna de reset, e
+ * mantê-lo aqui faria a coluna nova ser paga pelo nome da conta — exatamente o
+ * erro que os saltos 320 → 420 → 484 já recusaram duas vezes. O painel expandido
+ * só existe enquanto o ponteiro está sobre ele, então a área que ele ocupa não é
+ * a que fica capturando clique de quem está atrás: a razão que prende a pílula
+ * parada a um teto baixo não se aplica ao painel.
+ *
+ * **A aritmética é o teto da pílula mais três colunas de reset**, e não um número
+ * escolhido por ser redondo: três é a maior contagem de cotas numa fonte só
+ * (OpenCode Go, com `5h`, `semanal` e `mensal`).
+ */
+internal val HUD_PANEL_MAX_WIDTH = HUD_PILL_MAX_WIDTH + HUD_RESET_COLUMN_WIDTH * 3
+
+/**
  * Distância em que a pílula solta gruda na borda da área útil.
  *
  * A área útil é a de [availableWindowAreaDp], que sai de `maximumWindowBounds` e
@@ -165,14 +192,26 @@ private fun hudDotOnlyWidth(): Dp = HUD_PILL_DOT_ONLY_PADDING * 2 + STATUS_DOT_S
 /**
  * Largura das cotas de uma linha: um ponto e um texto por cota, com vão entre
  * elas.
+ *
+ * [showsReset] é o estado expandido (issue #189): a hora do reinício só é
+ * desenhada com o ponteiro em cima, então medi-la sempre deixaria a pílula
+ * parada larga para mostrar o que ela não mostra. Cota sem reset a exibir —
+ * saldo que não expira, janela sem reset conhecido — chega com `resetText` nulo
+ * e não reserva nada.
  */
-private fun hudChipsWidth(quotas: List<HudQuotaChip>): Dp {
+private fun hudChipsWidth(quotas: List<HudQuotaChip>, showsReset: Boolean): Dp {
     if (quotas.isEmpty()) {
         return 0.dp
     }
 
     val chips = quotas.fold(0f) { total, chip ->
-        total + STATUS_DOT_SIZE.value + AppSpacing.xs.value + labelMediumWidth(chip.text).value
+        val reset = chip.resetText
+        val resetWidth = if (showsReset && reset != null) {
+            AppSpacing.xs.value + labelMediumWidth(reset).value
+        } else {
+            0f
+        }
+        total + STATUS_DOT_SIZE.value + AppSpacing.xs.value + labelMediumWidth(chip.text).value + resetWidth
     }
     val gaps = AppSpacing.sm.value * (quotas.size - 1)
 
@@ -186,14 +225,14 @@ private fun hudChipsWidth(quotas: List<HudQuotaChip>): Dp {
  * soma passa do teto: as outras colunas são curtas e de largura previsível, e
  * truncar um percentual não deixaria nada legível.
  */
-private fun hudSourceRowWidth(source: HudSourceStatus): Dp {
+private fun hudSourceRowWidth(source: HudSourceStatus, showsReset: Boolean): Dp {
     return HUD_PILL_PADDING * 2 +
         STATUS_INDICATOR_DOT_WIDTH +
         labelSmallWidth(source.statusLabel) +
         AppSpacing.md +
         labelMediumWidth(source.label) +
         AppSpacing.md +
-        hudChipsWidth(source.quotas) +
+        hudChipsWidth(source.quotas, showsReset) +
         HUD_TEXT_SAFETY_MARGIN
 }
 
@@ -222,6 +261,11 @@ private fun hudFallbackRowWidth(fallbackLabel: String): Dp {
  * de altura nula, que o AWT não sabe desenhar e o usuário leria como o app ter
  * sumido.
  *
+ * **A coluna de reset entra só no estado expandido** (issue #189), e com ela o
+ * teto passa a ser [HUD_PANEL_MAX_WIDTH]. Parada, a pílula mede exatamente o que
+ * media antes: ela é a que fica na tela o tempo todo, e a área dela é a que
+ * captura clique de quem está atrás.
+ *
  * **A contagem regressiva ([showsCountdown]) mede só na primeira linha.** O
  * polling é um só — dez minutos para o app inteiro, não por conta —, e repeti-la
  * em cada linha afirmaria que cada conta tem coleta própria. Recolhida ao ponto
@@ -240,25 +284,29 @@ internal fun hudWindowSize(
 
     val countdownWidth = if (showsCountdown) hudCountdownWidth() else 0.dp
     val visible = if (expanded) sources else sources.take(1)
+    // O teto é do estado, não do componente (issue #189): expandido o painel
+    // carrega uma coluna a mais por cota, e prendê-lo ao teto da pílula faria
+    // essa coluna ser paga pelo nome da conta.
+    val maxWidth = if (expanded) HUD_PANEL_MAX_WIDTH else HUD_PILL_MAX_WIDTH
 
     if (visible.isEmpty()) {
         // A linha de carregamento é a primeira linha, e enquanto nada foi
         // coletado "quando é a próxima tentativa" é o que a barra tem a dizer.
         return DpSize(
             width = (hudFallbackRowWidth(fallbackLabel) + countdownWidth)
-                .coerceAtMost(HUD_PILL_MAX_WIDTH),
+                .coerceAtMost(maxWidth),
             height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT
         )
     }
 
     val width = visible
         .mapIndexed { index, source ->
-            val row = hudSourceRowWidth(source)
+            val row = hudSourceRowWidth(source, showsReset = expanded)
             if (index == 0) (row + countdownWidth).value else row.value
         }
         .max()
         .dp
-        .coerceAtMost(HUD_PILL_MAX_WIDTH)
+        .coerceAtMost(maxWidth)
 
     return DpSize(
         width = width,

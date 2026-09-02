@@ -290,7 +290,25 @@ private fun WindowScope.CompactTitleBarOverlay(
 internal data class HudQuotaChip(
     /** `5h 28%` — rótulo curto e percentual, montados por `hudQuotaChipText`. */
     val text: String,
-    val tone: AppTone
+    val tone: AppTone,
+    /**
+     * Quando esta cota reinicia, em forma curta — `22h59`, `Ter 21h00` (issue
+     * #189).
+     *
+     * Sai de `resetShortLabel`, a mesma função que a linha do card usa recortada:
+     * sem prefixo, sem fuso e sem a data do dia quando a janela é intradiária.
+     * Nenhum formato de data novo.
+     *
+     * **`null` é "não há reset a mostrar"** — saldo que não expira, janela sem
+     * reset conhecido — e nesse caso nada é impresso, em vez de um traço que não
+     * informa nada. É o "caso item tenha" do título da issue.
+     *
+     * **Só é desenhado com o painel expandido.** A pílula parada fica na tela o
+     * tempo todo e o retângulo dela captura o clique de quem está atrás; o reset
+     * é detalhe sob demanda, e o ponteiro em cima já é o gesto que revela o
+     * resto da lista.
+     */
+    val resetText: String? = null
 )
 
 /**
