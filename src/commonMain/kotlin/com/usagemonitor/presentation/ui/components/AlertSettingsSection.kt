@@ -24,6 +24,8 @@ const val ALERT_SETTINGS_QUOTA_SWITCH_TEST_TAG = "alertSettingsQuotaSwitch"
 const val ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG = "alertSettingsSessionSwitch"
 const val ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG = "alertSettingsStalledSwitch"
 const val ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG = "alertSettingsStallThreshold"
+const val ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG = "alertSettingsSpikeSwitch"
+const val ALERT_SETTINGS_SPIKE_FACTOR_TEST_TAG = "alertSettingsSpikeFactor"
 const val ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG = "alertSettingsQuietSwitch"
 const val ALERT_SETTINGS_BUDGET_FIELD_TEST_TAG = "alertSettingsBudgetField"
 
@@ -38,6 +40,19 @@ private val OFFERED_PERCENTS = listOf(50, 75, 90, 100)
  * detector ignora pendência acima de 24h de qualquer jeito.
  */
 private val OFFERED_STALL_THRESHOLD_MINUTES = listOf(30, 60, 120, 240)
+
+/**
+ * Fatores oferecidos. Outros valores continuam válidos se já gravados.
+ *
+ * Dois é o piso útil: a variação normal entre dois dias de trabalho já chega lá
+ * sem que nada esteja errado. Cinco é para quem só quer saber do caso extremo.
+ */
+private val OFFERED_SPIKE_FACTORS = listOf(2.0, 3.0, 5.0)
+
+/** `3.0` vira `3×`: os fatores oferecidos são inteiros e a casa decimal só polui. */
+private fun spikeFactorLabel(factor: Double): String {
+    return "${factor.toInt()}×"
+}
 
 private fun stallThresholdLabel(minutes: Int): String {
     if (minutes < 60) {
@@ -175,6 +190,48 @@ fun AlertSettingsSection(
                     "The warning only says there was no reply since the last request — the app does " +
                         "not check the Claude Code process. Anything pending for over 24h counts as " +
                         "an abandoned session and raises no warning."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        AlertToggleRow(
+            label = if (isPt) {
+                "Avisar quando o consumo do dia fugir do habitual"
+            } else {
+                "Warn when the day's usage departs from the usual"
+            },
+            checked = settings.spikeAlertsEnabled,
+            testTag = ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG,
+            onCheckedChange = { checked -> onSettingsChange(settings.copy(spikeAlertsEnabled = checked)) }
+        )
+
+        if (settings.spikeAlertsEnabled) {
+            // Segmentado pela mesma razão do limiar de "sem resposta": o fator é
+            // escolha única entre alternativas. Os chips de quota logo acima
+            // respondem outra pergunta, que aceita várias respostas ao mesmo tempo.
+            val selectedFactorIndex = OFFERED_SPIKE_FACTORS
+                .indexOfFirst { factor -> factor == settings.effectiveSpikeFactor }
+            AppSegmentedControl(
+                options = OFFERED_SPIKE_FACTORS.map { factor -> AppSegment(label = spikeFactorLabel(factor)) },
+                // Valor gravado fora da lista oferecida não pode marcar o segmento
+                // errado: sem correspondência, nenhum fica selecionado.
+                selectedIndex = selectedFactorIndex,
+                onSelect = { index ->
+                    onSettingsChange(settings.copy(spikeFactor = OFFERED_SPIKE_FACTORS[index]))
+                },
+                modifier = Modifier.testTag(ALERT_SETTINGS_SPIKE_FACTOR_TEST_TAG)
+            )
+            Text(
+                text = if (isPt) {
+                    "A referência é a mediana dos últimos dias, no mesmo horário — não o limite da " +
+                        "cota. Sem pelo menos três dias medidos, ou com consumo habitual perto de " +
+                        "zero, nenhum aviso é emitido."
+                } else {
+                    "The reference is the median of the last few days, at the same time of day — not " +
+                        "the quota limit. With fewer than three measured days, or with usual " +
+                        "consumption near zero, no warning is sent."
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -248,6 +249,52 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         val target = UsageTargetKey.forSource(ApiSource.ANTHROPIC)
         val riskForTarget = state.riskSummaries[target]
         assertEquals(expectedRisk, riskForTarget?.get(QuotaSeriesKey("Tokens", PeriodType.INTERVAL)))
+        viewModel.onDestroy()
+    }
+
+    /**
+     * A anomalia sai do **mesmo** relatório que a projeção de risco, sem segunda
+     * leitura: é essa a razão de ela morar aqui e não num laço próprio.
+     */
+    @Test
+    fun `spikes are derived from the same history report`() = runTest {
+        var reportReads = 0
+        val viewModel = spikeViewModel(
+            series = spikeSeries(todayDelta = 400L),
+            onRequest = { reportReads += 1 }
+        )
+
+        viewModel.refresh()
+        awaitSettledState(viewModel)
+
+        val spikes = viewModel.spikes.value
+        assertEquals(1, spikes.size)
+        assertEquals(4.0, spikes.first().factor)
+        assertEquals(UsageTargetKey.forSource(ApiSource.ANTHROPIC), spikes.first().target)
+        assertEquals(1, reportReads)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a usual day publishes no spike`() = runTest {
+        val viewModel = spikeViewModel(series = spikeSeries(todayDelta = 120L))
+
+        viewModel.refresh()
+        awaitSettledState(viewModel)
+
+        assertTrue(viewModel.spikes.value.isEmpty())
+        viewModel.onDestroy()
+    }
+
+    /** O fator vem das preferências e é lido a cada passada, não fixado na construção. */
+    @Test
+    fun `the configured factor decides what counts as a spike`() = runTest {
+        val viewModel = spikeViewModel(series = spikeSeries(todayDelta = 400L), factor = 5.0)
+
+        viewModel.refresh()
+        awaitSettledState(viewModel)
+
+        assertTrue(viewModel.spikes.value.isEmpty())
         viewModel.onDestroy()
     }
 
@@ -1310,4 +1357,86 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         )
     }
 
+    /**
+     * Série com três dias de referência de 100 e o dia corrente com [todayDelta].
+     *
+     * Os pontos ficam todos antes das 12h, que é a hora de [fixedInstant]: o
+     * recorte da linha de referência é por hora do dia, e um ponto depois dela
+     * seria descartado.
+     */
+    private fun spikeSeries(todayDelta: Long): UsageHistorySeries {
+        val points = mutableListOf<UsageHistoryPoint>()
+        listOf("2024-12-29", "2024-12-30", "2024-12-31").forEach { day ->
+            points += spikePoint("${day}T09:00:00Z", 0L)
+            points += spikePoint("${day}T11:00:00Z", 100L)
+        }
+        points += spikePoint("2025-01-01T09:00:00Z", 0L)
+        points += spikePoint("2025-01-01T11:00:00Z", todayDelta)
+
+        return UsageHistorySeries(
+            quotaLabel = "Sessão 5h",
+            periodType = PeriodType.INTERVAL,
+            unit = UsageUnit.PERCENTAGE,
+            points = points,
+            currentDisplayUsed = todayDelta,
+            currentDisplayTotal = 1_000L,
+            deltaDisplayUsed = todayDelta,
+            averageDisplayConsumptionPerHour = 0.0,
+            currentPeriodEndAt = fixedInstant,
+            forecast = UsageForecast.InsufficientData,
+            riskSummary = null
+        )
+    }
+
+    private fun spikePoint(at: String, used: Long): UsageHistoryPoint {
+        val instant = Instant.parse(at)
+        return UsageHistoryPoint(
+            capturedAt = instant,
+            used = used,
+            total = 1_000L,
+            rawUsed = used,
+            rawTotal = 1_000L,
+            periodEndAt = instant
+        )
+    }
+
+    /** Relógio parado em [fixedInstant] e fuso UTC: o dia da anomalia tem de ser previsível. */
+    private fun spikeViewModel(
+        series: UsageHistorySeries,
+        factor: Double = 3.0,
+        onRequest: (ApiSource) -> Unit = {}
+    ): DashboardViewModel {
+        val report = ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_7_DAYS,
+            lastUpdatedAt = fixedInstant,
+            series = listOf(series)
+        )
+        return DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(object : AnthropicRepository {
+                override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+            }),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(object : MiniMaxRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getCodexUsage = GetCodexUsageUseCase(object : CodexRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(object : DeepSeekRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getUsageHistory = getUsageHistoryUseCase(
+                reportsBySource = mapOf(ApiSource.ANTHROPIC to report),
+                onRequest = onRequest
+            ),
+            spikeFactorProvider = { factor },
+            alertTimeZone = TimeZone.UTC,
+            clock = object : Clock {
+                override fun now(): Instant = fixedInstant
+            },
+            config = manualRefreshConfig()
+        )
+    }
 }

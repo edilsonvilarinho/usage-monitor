@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
+import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.presentation.ui.components.wrapHour
@@ -64,6 +65,27 @@ class UsageAlertPreferencesTest {
     fun `a stall threshold below the floor falls back to the default`() {
         assertEquals(DEFAULT_STALL_THRESHOLD_MILLIS, decodeStallThresholdMillis(5))
         assertEquals(DEFAULT_STALL_THRESHOLD_MILLIS, decodeStallThresholdMillis(-30))
+    }
+
+    @Test
+    fun `an absent spike factor falls back to the default`() {
+        assertEquals(DEFAULT_SPIKE_FACTOR, decodeSpikeFactor(null))
+    }
+
+    /** Décimos inteiros: o valor vai em claro para o registro e é editável à mão. */
+    @Test
+    fun `a spike factor survives a round trip in tenths`() {
+        assertEquals(2.0, decodeSpikeFactor(20))
+        assertEquals(5.0, decodeSpikeFactor(50))
+        assertEquals(2.5, decodeSpikeFactor(25))
+    }
+
+    /** Abaixo de 1,5 o aviso sairia em qualquer dia acima da mediana. */
+    @Test
+    fun `a spike factor below the floor falls back to the default`() {
+        assertEquals(DEFAULT_SPIKE_FACTOR, decodeSpikeFactor(10))
+        assertEquals(DEFAULT_SPIKE_FACTOR, decodeSpikeFactor(0))
+        assertEquals(DEFAULT_SPIKE_FACTOR, decodeSpikeFactor(-30))
     }
 
     @Test

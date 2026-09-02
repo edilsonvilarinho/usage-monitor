@@ -185,13 +185,20 @@ object HelpCatalog {
             description = "O ícone da bandeja carrega um ponto de risco e o app dispara notificação " +
                 "nativa quando uma cota cruza um dos limiares (75, 90 e 100% por padrão), quando uma " +
                 "sessão do CLI satura, ou quando o último pedido de uma sessão fica sem resposta " +
-                "acima do limiar escolhido. O limiar é piso: 89,9% não cruzou 90%. No período " +
-                "silenciado o aviso é adiado, não perdido — ele sai quando o silêncio terminar.",
+                "acima do limiar escolhido. O limiar é piso: 89,9% não cruzou 90%. Há ainda um " +
+                "aviso de natureza diferente: os anteriores medem distância até o teto da cota, e " +
+                "este mede distância até o seu próprio hábito — ele sai quando o consumo do dia " +
+                "passa de um múltiplo da mediana dos últimos dias, no mesmo horário. Sem pelo menos " +
+                "três dias medidos, ou com consumo habitual perto de zero, ele não é emitido. No " +
+                "período silenciado o aviso é adiado, não perdido — ele sai quando o silêncio " +
+                "terminar.",
             steps = listOf(
                 "Abra Configurações → \"Alertas\".",
                 "Ligue \"Avisar quando a quota cruzar um limiar\" e ajuste os limiares.",
                 "Ligue \"Avisar quando uma sessão CLI saturar\" e \"Avisar quando uma sessão CLI " +
                     "ficar sem resposta\", com o tempo de espera ao lado.",
+                "Ligue \"Avisar quando o consumo do dia fugir do habitual\" e escolha o múltiplo " +
+                    "(2×, 3× ou 5×) ao lado.",
                 "Use \"Silenciar num período do dia\" para o intervalo do dia em que a " +
                     "notificação não deve sair."
             ),
@@ -410,13 +417,20 @@ object HelpCatalog {
             description = "The tray icon carries a risk dot, and the app fires a native notification " +
                 "when a quota crosses one of the thresholds (75, 90 and 100% by default), when a CLI " +
                 "session saturates, or when a session's last request goes unanswered for longer than " +
-                "the chosen limit. The threshold is a floor: 89.9% has not crossed 90%. During a " +
-                "muted period the warning is postponed, not lost — it goes out once the silence ends.",
+                "the chosen limit. The threshold is a floor: 89.9% has not crossed 90%. There is " +
+                "one more warning of a different nature: the ones above measure the distance to the " +
+                "quota ceiling, and this one measures the distance to your own habit — it goes out " +
+                "when the day's usage passes a multiple of the median of the last few days, at the " +
+                "same time of day. With fewer than three measured days, or with usual consumption " +
+                "near zero, it is not sent. During a muted period the warning is postponed, not " +
+                "lost — it goes out once the silence ends.",
             steps = listOf(
                 "Open Settings → \"Alerts\".",
                 "Turn on \"Warn when a quota crosses a threshold\" and adjust the thresholds.",
                 "Turn on \"Warn when a CLI session saturates\" and \"Warn when a CLI session goes " +
                     "unanswered\", with the waiting time next to it.",
+                "Turn on \"Warn when the day's usage departs from the usual\" and pick the " +
+                    "multiple (2×, 3× or 5×) next to it.",
                 "Use \"Mute during a time range\" for the part of the day when no notification " +
                     "should go out."
             ),

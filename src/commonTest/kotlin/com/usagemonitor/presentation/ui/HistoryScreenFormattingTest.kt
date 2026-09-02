@@ -57,4 +57,24 @@ class HistoryScreenFormattingTest {
 
         assertTrue(text.contains("saldo"), "texto deveria falar de saldo, veio: $text")
     }
+
+    /**
+     * A contagem de dias entra no rótulo porque ela é a régua: `4,0×` sem dizer
+     * acima de quê não permite julgar se o número merece atenção.
+     */
+    @Test
+    fun `o rotulo da mediana diaria traz o fator e a contagem de dias`() {
+        assertEquals("4,0× (3 dias)", dailyBaselineLabel(4.0, 3, AppLanguage.PT))
+        assertEquals("4.0× (3 days)", dailyBaselineLabel(4.0, 3, AppLanguage.EN))
+        assertEquals("1,2× (6 dias)", dailyBaselineLabel(1.24, 6, AppLanguage.PT))
+    }
+
+    /** O separador decimal vem do idioma, nunca do `Locale` da máquina que roda. */
+    @Test
+    fun `o fator nao depende do locale da jvm`() {
+        assertEquals("2,6", formatSpikeFactor(2.55, AppLanguage.PT))
+        assertEquals("2.6", formatSpikeFactor(2.55, AppLanguage.EN))
+        assertEquals("10,0", formatSpikeFactor(10.0, AppLanguage.PT))
+        assertEquals("0,0", formatSpikeFactor(-1.0, AppLanguage.PT))
+    }
 }

@@ -1,6 +1,7 @@
 package com.usagemonitor.domain.entity
 
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 
 /**
  * Preferências de alerta, persistidas fora do domain.
@@ -15,8 +16,21 @@ data class UsageAlertSettings(
     /** Aviso de sessão cujo último pedido ficou sem resposta; ver [StalledCliSession]. */
     val stalledSessionAlertsEnabled: Boolean = true,
     val stallThresholdMillis: Long = DEFAULT_STALL_THRESHOLD_MILLIS,
+    /** Aviso de consumo acima do hábito do próprio usuário; ver [UsageSpike]. */
+    val spikeAlertsEnabled: Boolean = true,
+    val spikeFactor: Double = DEFAULT_SPIKE_FACTOR,
     val quietHours: QuietHours? = null
 ) {
+    /**
+     * Fator saneado, com [MIN_SPIKE_FACTOR] como piso.
+     *
+     * Mesma razão de [effectiveStallThresholdMillis]: o valor vem de armazenamento
+     * em claro, e abaixo de 1,5 o aviso sairia em qualquer dia acima da mediana —
+     * que é metade dos dias, por definição.
+     */
+    val effectiveSpikeFactor: Double
+        get() = spikeFactor.coerceAtLeast(MIN_SPIKE_FACTOR)
+
     /**
      * Limiar saneado, com [MIN_STALL_THRESHOLD_MILLIS] como piso.
      *
@@ -116,6 +130,25 @@ sealed interface UsageAlert {
         val pendingSince: Instant,
         val pendingMillis: Long
     ) : UsageAlert
+
+    /**
+     * O consumo de hoje está muito acima do hábito do próprio usuário.
+     *
+     * Pergunta diferente da de [QuotaThreshold], e por isso alerta separado: lá é
+     * "quão perto do teto", aqui é "isso é normal para mim". Um dia três vezes
+     * acima do habitual não cruza limiar nenhum enquanto estiver longe do limite.
+     */
+    data class SpendSpike(
+        val target: UsageTargetKey,
+        val targetLabel: String,
+        val quotaLabel: String,
+        val factor: Double,
+        val todayDelta: Long,
+        val baselineDelta: Long,
+        val baselineDays: Int,
+        val quotaTotal: Long,
+        val unit: UsageUnit
+    ) : UsageAlert
 }
 
 /**
@@ -127,7 +160,14 @@ sealed interface UsageAlert {
 data class UsageAlertState(
     val quotaWindows: Map<QuotaAlertScope, FiredQuotaWindow> = emptyMap(),
     val firedSessionIds: Set<String> = emptySet(),
-    val firedStalledSessionIds: Set<String> = emptySet()
+    val firedStalledSessionIds: Set<String> = emptySet(),
+    /**
+     * O último dia local em que cada cota já avisou sobre anomalia.
+     *
+     * O dia, e não a janela de cota: um dia contém quatro ou cinco janelas de 5h,
+     * e a métrica é diária. É a virada do dia que rearma o aviso.
+     */
+    val firedSpikeDays: Map<QuotaAlertScope, LocalDate> = emptyMap()
 ) {
     companion object {
         val EMPTY = UsageAlertState()
@@ -170,7 +210,8 @@ fun evaluateUsageAlerts(
     settings: UsageAlertSettings,
     now: Instant,
     currentLocalHour: Int? = null,
-    stalledSessions: List<StalledCliSession> = emptyList()
+    stalledSessions: List<StalledCliSession> = emptyList(),
+    spikes: List<UsageSpike> = emptyList()
 ): UsageAlertEvaluation {
     val silenced = currentLocalHour != null && settings.quietHours?.contains(currentLocalHour) == true
 
@@ -194,12 +235,20 @@ fun evaluateUsageAlerts(
         silenced = silenced
     )
 
+    val spikeResult = evaluateSpikeAlerts(
+        spikes = spikes,
+        previous = previous.firedSpikeDays,
+        settings = settings,
+        silenced = silenced
+    )
+
     return UsageAlertEvaluation(
-        alerts = quotaResult.alerts + sessionResult.alerts + stalledResult.alerts,
+        alerts = quotaResult.alerts + sessionResult.alerts + stalledResult.alerts + spikeResult.alerts,
         state = UsageAlertState(
             quotaWindows = quotaResult.windows,
             firedSessionIds = sessionResult.firedIds,
-            firedStalledSessionIds = stalledResult.firedIds
+            firedStalledSessionIds = stalledResult.firedIds,
+            firedSpikeDays = spikeResult.firedDays
         )
     )
 }
@@ -358,6 +407,69 @@ private fun evaluateStalledSessionAlerts(
     }
 
     return SessionAlertResult(alerts, stillKnown + pending.map { stalled -> stalled.sessionId })
+}
+
+private data class SpikeAlertResult(
+    val alerts: List<UsageAlert>,
+    val firedDays: Map<QuotaAlertScope, LocalDate>
+)
+
+/**
+ * Um aviso por cota e por dia local.
+ *
+ * Desligar zera o estado e o silêncio adia sem marcar, como nos outros três. Mas
+ * a memória tem uma diferença que não é detalhe: ela **não é podada** pelo que
+ * está na lista corrente, ao contrário de [evaluateQuotaAlerts]. O fator é
+ * `hoje / mediana` e os dois lados crescem ao longo do dia, então uma cota pode
+ * sair da lista de anomalias e voltar no mesmo dia; podando pela lista corrente,
+ * a volta seria um aviso novo sobre o mesmo dia. A entrada de cada escopo é
+ * substituída quando o dia vira, e o mapa é limitado pelo número de cotas que o
+ * app conhece.
+ */
+private fun evaluateSpikeAlerts(
+    spikes: List<UsageSpike>,
+    previous: Map<QuotaAlertScope, LocalDate>,
+    settings: UsageAlertSettings,
+    silenced: Boolean
+): SpikeAlertResult {
+    if (!settings.spikeAlertsEnabled) {
+        // Alerta desligado não deixa rastro: religá-lo tem de voltar a avisar
+        // sobre o dia corrente, não herdar disparos de quando estava ligado.
+        return SpikeAlertResult(emptyList(), emptyMap())
+    }
+
+    if (silenced) {
+        return SpikeAlertResult(emptyList(), previous)
+    }
+
+    val alerts = mutableListOf<UsageAlert>()
+    val firedDays = previous.toMutableMap()
+
+    for (spike in spikes) {
+        val scope = QuotaAlertScope(
+            target = spike.target,
+            quotaLabel = spike.quotaLabel,
+            periodType = spike.periodType
+        )
+        if (firedDays[scope] == spike.localDate) {
+            continue
+        }
+
+        alerts += UsageAlert.SpendSpike(
+            target = spike.target,
+            targetLabel = spike.targetLabel,
+            quotaLabel = spike.quotaLabel,
+            factor = spike.factor,
+            todayDelta = spike.baseline.todayDelta,
+            baselineDelta = spike.baseline.baselineDelta,
+            baselineDays = spike.baseline.completeDays,
+            quotaTotal = spike.quotaTotal,
+            unit = spike.unit
+        )
+        firedDays[scope] = spike.localDate
+    }
+
+    return SpikeAlertResult(alerts, firedDays)
 }
 
 /**

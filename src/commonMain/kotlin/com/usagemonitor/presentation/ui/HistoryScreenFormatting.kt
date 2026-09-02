@@ -5,6 +5,7 @@ import kotlin.math.roundToLong
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
@@ -166,6 +167,30 @@ internal fun deepSeekForecastText(forecast: UsageForecast, language: AppLanguage
     }
 }
 
+/**
+ * Fuso em que a tela recorta o dia da linha de referência.
+ *
+ * O mesmo que [formatInstant] imprime, e o mesmo do `ACTIVITY_TIME_ZONE_ID` do
+ * domain — um segundo fuso aqui faria a tela e o alerta discordarem sobre em que
+ * dia um consumo caiu.
+ */
+internal val HISTORY_TIME_ZONE: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
+
+/**
+ * O fator do dia contra a mediana, com a contagem de dias que a formou.
+ *
+ * A contagem entra porque ela **é** a régua: `4,0×` sem dizer acima de quê não
+ * permite julgar se o número merece atenção.
+ */
+internal fun dailyBaselineLabel(factor: Double, completeDays: Int, language: AppLanguage): String {
+    val value = formatSpikeFactor(factor, language)
+    return if (language == AppLanguage.PT) {
+        "${value}× ($completeDays dias)"
+    } else {
+        "${value}× ($completeDays days)"
+    }
+}
+
 internal fun formatInstant(instant: Instant): String {
     val local = instant.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
     return "${local.date.dayOfMonth.toString().padStart(2, '0')}/${local.date.monthNumber.toString().padStart(2, '0')} ${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')} BRT"
@@ -207,6 +232,20 @@ internal fun formatCents(cents: Long): String {
     val dollars = absCents / 100
     val remainder = absCents % 100
     return "${sign}\$${dollars}.${remainder.toString().padStart(2, '0')}"
+}
+
+/**
+ * O fator da anomalia com uma casa, sem depender do `Locale` da JVM.
+ *
+ * `"%.1f".format` usaria o separador decimal da máquina, e o mesmo valor sairia
+ * `4.0` ou `4,0` conforme quem roda — o que é aceitável na tela e inaceitável num
+ * teste. Aqui o separador vem do idioma da interface, que é a mesma decisão que o
+ * resto do texto já toma.
+ */
+internal fun formatSpikeFactor(factor: Double, language: AppLanguage): String {
+    val tenths = (factor * 10.0).roundToLong().coerceAtLeast(0L)
+    val separator = if (language == AppLanguage.PT) "," else "."
+    return "${tenths / 10}$separator${tenths % 10}"
 }
 
 internal fun trimDecimal(value: Double): String {
