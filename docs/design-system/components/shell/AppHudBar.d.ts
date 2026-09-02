@@ -1,46 +1,50 @@
 import type { ReactNode, CSSProperties } from 'react';
 
 /**
- * A 24dp-tall pill, as wide as its own content and never wider than 320dp,
- * dragged to wherever the user wants it. The third window chrome (issue #164),
- * one step past cards-only mode: no title, no card, no drag-to-reorder — just
- * the worst risk across every quota, the source that produced it, and the reset
- * countdown. A short click anywhere on the pill returns the full window; a drag
- * moves it, and on release it snaps to the nearest work-area edge.
+ * The HUD panel: one 20dp line per monitored source — state word, name, percent
+ * and reset — plus an optional footer with what the machine actually burned in
+ * the current 5h window. Dragged to wherever the user wants it; on release it
+ * snaps to the nearest work-area edge. A short click anywhere returns the full
+ * window.
  *
- * Two versions were found wrong live before this one. Full width: always-on-top
- * plus edge-to-edge covered whatever another window had in its own top 24dp. A
- * fixed 320dp corner pill: it still measured 320dp to show the word "Normal",
- * in the very corner where IDEs and browsers put controls. Desktop windows have
- * no partial click-through, so the only mitigation is to occupy less area and
- * let the user pick the corner. The component doesn't own its width: it fills
- * whatever the host gives it, and `sourceLabel`/`resetLabel` truncate rather
- * than force it wider.
- * @startingPoint section="Shell" subtitle="HUD pill — draggable, content-sized" viewport="700x260"
+ * Three content versions were found wrong live, one at a time. A single line
+ * with only the worst source: with several accounts, the others had no signal
+ * they existed. The others behind a hover tooltip: the data sat behind a
+ * gesture, and the popup flickered — a popup here is a layer *inside* the
+ * window, clipped to its bounds, and in a 24dp-tall window it landed on top of
+ * its own trigger. The list with no consumption: quota is the provider's
+ * ceiling, and what the machine spent appeared nowhere.
+ *
+ * The component doesn't own its width: it fills whatever the host gives it, and
+ * the source name truncates rather than force it wider. The host measures the
+ * window from these same labels (mono type makes the advance calculable), caps
+ * it at 420dp, and resizes.
+ * @startingPoint section="Shell" subtitle="HUD panel — one line per source" viewport="700x320"
  */
 export interface AppHudBarProps {
-  level?: 'ok' | 'warn' | 'crit';
-  /** The word next to the dot — "Normal", "Atenção", "Crítico". */
-  label?: ReactNode;
-  /** The winning source, e.g. "Anthropic · Padrão". Omitted while loading. */
-  sourceLabel?: ReactNode;
-  /** The reset countdown, e.g. "reset em 42min". Omitted while loading. */
-  resetLabel?: ReactNode;
+  /** Tone of the dot in the collapsed state; each row carries its own. */
+  level?: 'ok' | 'warn' | 'crit' | 'off';
+  /** Every monitored source, worst first. Empty renders the loading line. */
+  sources?: Array<{
+    label: ReactNode;
+    statusLabel: ReactNode;
+    level?: 'ok' | 'warn' | 'crit';
+    /** Consumption of the quota that decided the state, e.g. "92%". */
+    percentLabel: ReactNode;
+    /** Short reset, e.g. "Ter 22h59". Absent hides the column — never a dash. */
+    resetLabel?: ReactNode;
+  }>;
+  /** Word of the single line shown before the first collection lands. */
+  fallbackLabel?: ReactNode;
+  /** Session summary line; absent draws neither divider nor row. */
+  footerLabel?: ReactNode;
   /**
-   * Every source is on track: collapse to the dot alone (`AppStatusDot`).
+   * Every source on track and no pointer over it: collapse to the dot alone.
    * The data does not vanish — it stops occupying screen while it says
-   * everything is fine, and hover brings the whole pill back.
+   * everything is fine, and hover brings the whole panel back.
    */
   dotOnly?: boolean;
-  /**
-   * Hover state. The host grows the *window* rather than opening a popup: a
-   * popup on this platform is a layer inside the window, clipped to its bounds,
-   * and in a 24dp-tall window it landed on top of its own trigger and flickered.
-   */
-  expanded?: boolean;
-  /** Every monitored source, worst first. Empty means no panel is drawn. */
-  sources?: Array<{ label: ReactNode; statusLabel: ReactNode; level?: 'ok' | 'warn' | 'crit' }>;
-  /** Fires on a short click anywhere on the pill — restores the full window. */
+  /** Fires on a short click anywhere on the panel — restores the full window. */
   onOpen?: () => void;
   style?: CSSProperties;
 }

@@ -531,16 +531,19 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
   as capturas do README continuam com a moldura inteira.
 
 **Barra HUD** (`DesktopWindowFrame(hud)` + `HudBar` + `HudWindowGeometry.kt` +
-`HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
+`HudSummaryViewModel` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
 [`hud-flutuante-164-execucao.md`](docs/planos/hud-flutuante-164-execucao.md)): terceiro chrome, ainda
-mais discreto que o modo somente cards — a mesma janela principal encolhida a uma pílula de 24dp de
-altura (`AppChrome.hud`) e **largura medida pelo conteúdo**, arrastável, sempre no topo. Não mostra
-cards, só `AppStatusIndicator` com o pior risco entre todas as cotas, a fonte que o determinou
-(`UsageAlertViewModel.worstSnapshot`, ao lado de `worstRisk` — a bandeja continua lendo só o nível) e
-o tempo até o reset (`resetLabel`, a mesma função do cabeçalho expandido do card — nenhum formato de
-data novo). **Também não é valor novo em enum nenhum**: `hud` é um terceiro booleano de
-`DesktopWindowFrame`, irmão de `compact`, e a exclusão mútua entre os dois é regra de negócio dos
-setters em `Main.kt` (ligar um desliga o outro), não do tipo.
+mais discreto que o modo somente cards — a mesma janela principal encolhida a um painel de **largura
+medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: mostra **uma linha por fonte
+monitorada** (`allSourceRisks`, em `WorstQuotaSnapshot.kt`) com estado, nome, percentual e reset, e um
+rodapé com o que a máquina queimou na janela de 5h. **Também não é valor novo em enum nenhum**: `hud`
+é um terceiro booleano de `DesktopWindowFrame`, irmão de `compact`, e a exclusão mútua entre os dois é
+regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do tipo.
+- **Três versões de conteúdo foram achadas erradas ao vivo, uma por vez.** (1) Uma linha só, a da
+  fonte que perde: com várias contas, as outras não tinham sinal nenhum de que existiam. (2) As
+  outras num `HoverTooltipBox`: o dado ficou atrás de um gesto, e o popup piscava. (3) A lista sem
+  consumo: cota é o teto do fornecedor, e o que a máquina gastou não aparecia em lugar nenhum. Cada
+  correção só apareceu usando; nenhuma foi antecipada em plano.
 - **A janela muda de tamanho de verdade — não é overlay como o modo somente cards.** `alwaysOnTop`
   vira `alwaysOnTopEnabled || hudMode` (expressão recomposta a cada leitura, nunca uma gravação: a
   preferência do usuário não é sobrescrita) e `resizable = false`. Sair restaura tamanho, posição e
@@ -565,30 +568,61 @@ setters em `Main.kt` (ligar um desliga o outro), não do tipo.
   o usuário escolher onde**. `HUD_PILL_WIDTH_DP` virou `HUD_PILL_MAX_WIDTH`: teto, não largura. O
   papel que a largura fixa cumpria (não mudar de tamanho a cada coleta) passou para o teto mais as
   reticências (`TextOverflow.Ellipsis`) que a pílula já usava. `HudBar` continua sem saber a própria
-  largura — preenche o que recebe.
+  largura — preenche o que recebe. O teto **subiu de 320 para 420** quando a linha ganhou quatro
+  colunas: com 320 sobravam ~96dp para o nome, treze caracteres, e toda conta virava
+  "Anthropic — I…" — justamente o que a lista existe para distinguir.
 - **A largura é estimada pela métrica da fonte, nunca medida na composição** (`hudPillWidth`,
   `hudPanelWidth`). A escala `label*` deste sistema é **mono**, e é isso que torna o avanço por
   caractere calculável antes de existir composição; numa fonte proporcional este número não
   existiria. Medir e devolver a largura para a janela fecharia o laço `redimensionar → recompor →
   medir → redimensionar`. O preço de errar é um caractere truncado a mais, que as reticências já
   tratam.
-- **O hover cresce a própria janela; não abre `Popup`.** A lista de fontes saía por
-  `HoverTooltipBox`, e popup no Compose Desktop é camada **dentro** da janela, recortada pelos
-  limites dela — `compose.layers.type` não está definido neste projeto, e o default recorta. Numa
-  janela de 24dp, um balão com piso de 180dp de largura e uma linha por fonte não cabe: era
-  recortado sobre o próprio alvo, o ponteiro passava a estar sobre o balão, a pílula recebia `Exit`,
-  a tooltip fechava e reabria no quadro seguinte. Sem popup não há laço.
-  - **O hover mora no container inteiro, não na pílula.** Preso aos 24dp de cima, mover o ponteiro
-    para dentro da lista tiraria o hover, a janela colapsaria e o ponteiro voltaria à pílula — o
-    mesmo laço com outro nome. Colapsar espera uma passada de `AppMotion.fast`; é atraso único, não
-    animação, que travaria o `waitForIdle`.
-  - **`hudAnchor` é o canto da pílula colapsada, e toda geometria sai dele.** Recalcular a partir da
-    posição corrente faria a expansão que cresce para cima deslocar a âncora, e a pílula subiria a
-    cada passagem do mouse. A pílula tem **duas larguras** — recolhida mede o ponto, expandida volta
-    com o texto inteiro —, senão o rótulo da fonte truncaria justamente quando o usuário foi olhar.
+- **A lista é conteúdo da janela, nunca `Popup`.** Ela chegou a sair por `HoverTooltipBox`, e popup
+  no Compose Desktop é camada **dentro** da janela, recortada pelos limites dela —
+  `compose.layers.type` não está definido neste projeto, e o default recorta. Numa janela de 24dp,
+  um balão com piso de 180dp de largura e uma linha por fonte não cabe: era recortado sobre o
+  próprio alvo, o ponteiro passava a estar sobre o balão, a faixa recebia `Exit`, a tooltip fechava
+  e reabria no quadro seguinte. Sem popup não há laço.
+  - **Cada linha carrega ponto E palavra** (`AppStatusIndicator`), não só o ponto colorido. O
+    percentual ao lado descreve o **consumo**, não o risco: 40% às onze da manhã pode ser pior que
+    80% dez minutos antes do reinício, e é a palavra que diz qual dos dois é o caso. Sem ela a cor
+    informaria estado sozinha.
+  - **Nenhum formato novo na linha.** O percentual é `compactPercentageLabel`, o mesmo do card —
+    truncado, não arredondado. O reset é `resetShortLabel`, que sai das **mesmas**
+    `formatBrtDateTimeParts` da linha do card, só recortada: sem prefixo, sem fuso, sem a data do
+    dia quando a janela é intradiária. `null` ali é "não há reset a mostrar", e a coluna some em vez
+    de imprimir um traço.
+  - **O hover mora no container inteiro.** Ele só serve ao estado recolhido ao ponto — passar o
+    mouse devolve a lista —, mas preso a uma linha, mover o ponteiro para dentro do painel tiraria o
+    hover e a janela colapsaria debaixo dele. Colapsar espera uma passada de `AppMotion.fast`; é
+    atraso único, não animação, que travaria o `waitForIdle`.
+  - **`hudAnchor` descreve sempre o painel completo**, mesmo quando a janela na tela é o ponto: é ela
+    que o arrasto move e que fica gravada, e ancorar no ponto faria a janela saltar toda vez que uma
+    fonte saísse de `ON_TRACK`. `hudWindowPosition` alinha os **dois** eixos à borda mais próxima —
+    e é a simetria que mantém o ponto na mesma quina em que o painel estava, tanto crescendo quanto
+    encolhendo.
   - **A linha do painel não é `AppDataRow`** (`HUD_SOURCE_ROW_HEIGHT`, 20dp): aquela primitiva tem
     piso de 32dp mais 8dp de padding vertical, e seis fontes dariam ~288dp — uma janela, não um HUD.
     Mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp do cromo.
+- **O rodapé fala do que a máquina gastou, e não de cota** (`GetHudSessionSummaryUseCase` +
+  `HudSummaryViewModel` + `hudSessionSummaryLabel`): sessões vivas agora, custo e tokens da janela de
+  5h. As linhas acima dele descrevem o teto que o fornecedor impõe; esta descreve o consumo real.
+  - **A janela é a mesma `LAST_5H` da tela de Sessões CLI**, ancorada no fim da quota quando ele é
+    conhecido. Um corte próprio faria o rodapé e o cabeçalho daquela tela discordarem sobre o mesmo
+    gasto, sem o usuário ter como saber qual dos dois olhar. "Ativa" é o corte de 5 min do semáforo
+    (`ACTIVE_SESSION_WINDOW_MILLIS`), não um terceiro valor.
+  - **`activeSessionCount` e `windowSessionCount` são campos separados**: zero ativas **com** trabalho
+    na janela é o caso comum — ninguém digitando agora, o gasto da tarde ainda contando para a quota.
+    Colapsar os dois faria o rodapé sumir justamente quando o número interessa.
+  - **O caso de uso não sincroniza o índice.** `GetCliSessionsUseCase`, que responde a mesma pergunta
+    para a tela de Sessões CLI, começa por `syncIndex()`; ali a leitura é sob demanda do usuário.
+    Aqui o laço é de fundo e convive com o do `SessionPulseViewModel`, que já sincroniza a cada 30s.
+  - **Laço próprio, e não carona no semáforo**: aquele pergunta "que sessão precisa de atenção" e
+    publica pulsos, este pergunta "quanto foi queimado". Só lê com o HUD na tela, e ligar o modo
+    dispara leitura **imediata** — esperar até 30s faria o rodapé nascer vazio toda vez. Leitura que
+    falha mantém os números anteriores. O texto leva a janela escrita nele (`· 5h`), senão o número
+    seria lido como "hoje" ou "sempre"; turno sem tarifa marca o custo com `+`, mesma marca do resumo
+    por eixo.
 - **`HudBar` ganhou arrasto, e continua sem `WindowScope`.** A decisão anterior ("ancoragem é
   geometria de `Main.kt`, nunca gesto do usuário") foi revertida: com posição imutável não havia para
   onde tirar a pílula de cima dos controles de outra janela. Mas `WindowDraggableArea` exigiria

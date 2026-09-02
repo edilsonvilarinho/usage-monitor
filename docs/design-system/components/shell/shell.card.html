@@ -27,19 +27,18 @@ function Demo() {
   return (
     <div className="grid">
     <div>
-      <div className="cap">Barra HUD — pílula arrastável, medida pelo conteúdo, teto de 320dp (issue #164)</div>
+      <div className="cap">Barra HUD — painel arrastável, uma linha por fonte, teto de 420dp (issue #164)</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
-        <AppHudBar level="crit" label="Crítico" sourceLabel="Anthropic · Padrão" resetLabel="reset em 42min" />
-        <AppHudBar level="ok" dotOnly />
         <AppHudBar
-          level="crit" label="Crítico" sourceLabel="Anthropic · Padrão" resetLabel="reset em 42min"
-          expanded
           sources={[
-            { label: 'Anthropic — INFORMATA2', statusLabel: 'Crítico', level: 'crit' },
-            { label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn' },
-            { label: 'Codex', statusLabel: 'Normal', level: 'ok' }
+            { label: 'Anthropic — INFORMATA2', statusLabel: 'Crítico', level: 'crit', percentLabel: '92%', resetLabel: 'Ter 22h59' },
+            { label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', percentLabel: '41%', resetLabel: '4h12' },
+            { label: 'Codex', statusLabel: 'Normal', level: 'ok', percentLabel: '12%' }
           ]}
+          footerLabel="2 sessões ativas · $4.21 · 1,2M tok · 5h"
         />
+        <AppHudBar level="ok" dotOnly />
+        <AppHudBar sources={[]} fallbackLabel="Carregando" />
       </div>
     </div>
     <AppWindowFrame

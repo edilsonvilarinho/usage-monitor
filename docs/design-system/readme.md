@@ -182,13 +182,16 @@ The prototype names 17 shared primitives but does not enumerate them all. Beyond
 draws explicitly, this system adds four **chrome** components that the prototype's screens use
 without naming: `AppWindowFrame`, `AppStatusBar`, `AppToolbar`, `AppSettingsNav` — plus
 `AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados"),
-`AppColumnHeader` (its `.colhead` strip), and `AppHudBar` (its "Barra HUD" pill,
-issue #164 — a draggable pill, no wider than 320dp, that hosts nothing but an `AppStatusIndicator`
-and the winning source/reset time, and grows on hover to list every source). Two versions were found
-wrong live before this one: full width, because always-on-top plus edge-to-edge covered other
-windows' own top 24dp, and then a fixed 320dp corner pill, because it still measured 320dp to show
-the word "Normal". `AppStatusDot` is the seventh addition, extracted from `AppStatusIndicator` for
-the pill's collapsed state. Nothing else was invented.
+`AppColumnHeader` (its `.colhead` strip), and `AppHudBar` (its "Barra HUD", issue #164 — a draggable
+panel, no wider than 420dp, with one 20dp line per monitored source and a footer for what the machine
+actually burned). Five versions were found wrong live, one at a time: full width, because
+always-on-top plus edge-to-edge covered other windows' own top 24dp; a fixed 320dp corner pill,
+because it still measured 320dp to show the word "Normal"; a single line with only the worst source,
+because the other accounts had no signal they existed; those others behind a hover tooltip, because
+the popup is clipped inside a 24dp window and flickered over its own trigger; and the list with no
+consumption at all, because quota is the provider's ceiling and the spend appeared nowhere.
+`AppStatusDot` is the seventh addition, extracted from `AppStatusIndicator` for the collapsed state.
+Nothing else was invented.
 
 ### The conformance pass — 2026-08-27
 

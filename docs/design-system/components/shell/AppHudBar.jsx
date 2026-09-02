@@ -4,95 +4,89 @@ import { AppStatusDot } from '../data/AppStatusDot.jsx';
 
 export function AppHudBar({
   level = 'ok',
-  label,
-  sourceLabel,
-  resetLabel,
-  dotOnly = false,
-  expanded = false,
   sources = [],
+  fallbackLabel = 'Carregando',
+  footerLabel,
+  dotOnly = false,
   onOpen,
   style
 }) {
-  const showPanel = expanded && sources.length > 0;
+  const rows = sources.length > 0 ? sources : null;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Abrir Usage Monitor"
+      onClick={onOpen}
       style={{
         display: 'flex',
         flexDirection: 'column',
-        maxWidth: 320,
+        maxWidth: 420,
         border: '1px solid var(--border)',
         borderRadius: 'var(--r2)',
         boxShadow: 'var(--shadow-8)',
         background: 'var(--surface)',
         overflow: 'hidden',
+        cursor: 'default',
         ...style
       }}
     >
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Abrir Usage Monitor"
-        onClick={onOpen}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--s3)',
-          height: 'var(--h-hud)',
-          // A pílula recolhida ao ponto não pode carregar o padding da pílula
-          // com texto: um ponto de 6dp viraria uma janela de 38dp.
-          padding: dotOnly ? '0 var(--s2)' : '0 var(--s3)',
-          cursor: 'default',
-          flex: 'none',
-          minWidth: 0
-        }}
-      >
-        {dotOnly ? (
+      {dotOnly ? (
+        // Recolhida ao ponto: o padding da linha com texto faria um ponto de
+        // 6px virar uma janela de 38px.
+        <div style={{ display: 'flex', alignItems: 'center', height: 'var(--h-hud)', padding: '0 var(--s2)' }}>
           <AppStatusDot level={level} />
-        ) : (
-          <>
-            <AppStatusIndicator level={level}>{label}</AppStatusIndicator>
-            {sourceLabel ? (
-              <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {sourceLabel}
-              </span>
-            ) : (
-              <span style={{ flex: 1 }} />
-            )}
-            {resetLabel ? (
-              <span style={{ flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                {resetLabel}
-              </span>
-            ) : null}
-          </>
-        )}
-      </div>
-
-      {showPanel ? (
+        </div>
+      ) : (
         <>
-          <div style={{ height: 1, background: 'var(--border)' }} />
-          <div style={{ padding: 'var(--s1) var(--s3)' }}>
-            {sources.map((source) => (
-              <div
-                key={source.label}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--s3)',
-                  // 20dp: a linha do painel não é AppDataRow, que floora em
-                  // 32dp mais padding — seis fontes dariam ~288dp de painel.
-                  height: 20
-                }}
-              >
+          <div style={{ padding: 'var(--s1) 0' }}>
+            {rows ? rows.map((source) => (
+              <HudRow key={source.label}>
+                <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
                 <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {source.label}
                 </span>
-                <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
-              </div>
-            ))}
+                <span style={{ flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>
+                  {source.percentLabel}
+                </span>
+                {source.resetLabel ? (
+                  <span style={{ flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)' }}>
+                    {source.resetLabel}
+                  </span>
+                ) : null}
+              </HudRow>
+            )) : (
+              <HudRow>
+                <AppStatusIndicator level="off">{fallbackLabel}</AppStatusIndicator>
+              </HudRow>
+            )}
           </div>
+
+          {footerLabel ? (
+            <>
+              <div style={{ height: 1, background: 'var(--border)' }} />
+              <div style={{ padding: 'var(--s1) 0' }}>
+                <HudRow>
+                  <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {footerLabel}
+                  </span>
+                </HudRow>
+              </div>
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
+    </div>
+  );
+}
+
+// 20px por linha, e não AppDataRow: aquela primitiva floora em 32px mais
+// padding, e seis fontes dariam ~288px de painel -- uma janela, não um HUD.
+function HudRow({ children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', height: 20, padding: '0 var(--s3)' }}>
+      {children}
     </div>
   );
 }
