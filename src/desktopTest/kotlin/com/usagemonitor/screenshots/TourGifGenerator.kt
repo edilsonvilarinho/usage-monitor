@@ -17,15 +17,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -41,13 +37,11 @@ import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import kotlinx.datetime.Instant
-import java.awt.image.BufferedImage
 import java.io.File
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
@@ -63,22 +57,8 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
  * Rodar com `gradlew.bat generateTourGif`.
  */
 
-/** Supersampling: a cena renderiza em 2x e cada quadro é reduzido à metade. */
-private const val SCALE = 2
-
 private const val WIDTH_DP = 1_100
 private const val HEIGHT_DP = 720
-
-/** 10 quadros por segundo — o suficiente para fade e spinner não picotarem. */
-private const val FRAME_MILLIS = 100L
-
-/**
- * Quadros gravados no fim de um movimento antes da pausa longa.
- *
- * A pausa é um único quadro com espera longa; sem estes dois, a animação que
- * ainda estava assentando seria cortada no meio.
- */
-private const val SETTLE_FRAMES = 2
 
 private const val CROSSFADE_MILLIS = 280
 
@@ -88,7 +68,7 @@ fun main(args: Array<String>) {
 
     val state = TourState()
     val historyViewModel = fixedHistoryViewModel()
-    val recorder = TourRecorder()
+    val recorder = SceneRecorder(widthDp = WIDTH_DP, heightDp = HEIGHT_DP)
 
     try {
         recorder.setContent { TourContent(state, historyViewModel) }
@@ -108,7 +88,7 @@ fun main(args: Array<String>) {
 
 // --- Roteiro -----------------------------------------------------------------
 
-private fun recordTour(recorder: TourRecorder, state: TourState) {
+private fun recordTour(recorder: SceneRecorder, state: TourState) {
     // 1. Dashboard entrando: os cards têm `delay(index * 90)` + fade próprio.
     recorder.animate(1_300) {}
     recorder.hold(800)
@@ -408,74 +388,7 @@ private fun TeamSettingsTourScreen() {
 
 // --- Gravação ----------------------------------------------------------------
 
-private class TourRecorder {
-
-    val frames = mutableListOf<GifFrame>()
-
-    @OptIn(ExperimentalComposeUiApi::class)
-    private val scene = ImageComposeScene(
-        width = WIDTH_DP * SCALE,
-        height = HEIGHT_DP * SCALE,
-        density = Density(SCALE.toFloat())
-    )
-
-    private var sceneNanos = 0L
-
-    @OptIn(ExperimentalComposeUiApi::class)
-    fun setContent(content: @Composable () -> Unit) {
-        scene.setContent {
-            AppTheme(isDark = true) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    content()
-                }
-            }
-        }
-        scene.render(0L)
-    }
-
-    /**
-     * Um quadro adiante.
-     *
-     * Os dois relógios avançam juntos de propósito: os `delay` dos composables
-     * esperam **tempo real** (rodam em `Dispatchers.Unconfined`), enquanto as
-     * animações consomem o `nanoTime` passado a `render`. Avançar só um deixa a
-     * cena em branco.
-     */
-    @OptIn(ExperimentalComposeUiApi::class)
-    private fun step(): BufferedImage {
-        Thread.sleep(FRAME_MILLIS)
-        sceneNanos += FRAME_MILLIS * 1_000_000L
-        // A mutação de estado veio de fora de qualquer snapshot; sem isto o
-        // recompositor só a enxergaria no quadro seguinte, ou em nenhum.
-        Snapshot.sendApplyNotifications()
-        return scene.render(sceneNanos).toBufferedImage().downsampleByTwo()
-    }
-
-    /** Grava [durationMillis] de movimento, com [onFrame] recebendo 0..1. */
-    fun animate(durationMillis: Long, onFrame: (Float) -> Unit) {
-        val count = (durationMillis / FRAME_MILLIS).toInt().coerceAtLeast(1)
-        for (index in 1..count) {
-            onFrame(index.toFloat() / count)
-            frames += GifFrame(step(), FRAME_MILLIS.toInt())
-        }
-    }
-
-    /** Uma pausa: [SETTLE_FRAMES] quadros normais e um quadro longo. */
-    fun hold(durationMillis: Long) {
-        repeat(SETTLE_FRAMES) {
-            frames += GifFrame(step(), FRAME_MILLIS.toInt())
-        }
-        frames += GifFrame(step(), durationMillis.toInt())
-    }
-
-    @OptIn(ExperimentalComposeUiApi::class)
-    fun close() = scene.close()
-}
-
-private fun TourRecorder.moveCursor(state: TourState, x: Dp, y: Dp, durationMillis: Long) {
+private fun SceneRecorder.moveCursor(state: TourState, x: Dp, y: Dp, durationMillis: Long) {
     val fromX = state.cursor.x
     val fromY = state.cursor.y
     animate(durationMillis) { progress ->
@@ -490,7 +403,7 @@ private fun TourRecorder.moveCursor(state: TourState, x: Dp, y: Dp, durationMill
 }
 
 /** Onda do clique; [action] dispara no meio dela, não no fim. */
-private fun TourRecorder.click(state: TourState, action: () -> Unit) {
+private fun SceneRecorder.click(state: TourState, action: () -> Unit) {
     var fired = false
     animate(400) { progress ->
         if (!fired && progress >= 0.35f) {
@@ -502,7 +415,7 @@ private fun TourRecorder.click(state: TourState, action: () -> Unit) {
     state.cursor = state.cursor.copy(clickProgress = null)
 }
 
-private fun TourRecorder.pan(state: TourState, to: Dp, durationMillis: Long) {
+private fun SceneRecorder.pan(state: TourState, to: Dp, durationMillis: Long) {
     val from = state.pan
     animate(durationMillis) { progress ->
         state.pan = from + (to - from) * smoothStep(progress)
@@ -510,15 +423,13 @@ private fun TourRecorder.pan(state: TourState, to: Dp, durationMillis: Long) {
 }
 
 /** Troca de tela: o ponteiro some, porque não há o que ele esteja acionando. */
-private fun TourRecorder.fadeTo(state: TourState, screen: TourScreen, contentHeight: Dp) {
+private fun SceneRecorder.fadeTo(state: TourState, screen: TourScreen, contentHeight: Dp) {
     state.cursor = state.cursor.copy(visible = false, clickProgress = null)
     state.pan = 0.dp
     state.contentHeight = contentHeight
     state.screen = screen
     animate(CROSSFADE_MILLIS + 200L) {}
 }
-
-private fun smoothStep(progress: Float): Float = progress * progress * (3f - 2f * progress)
 
 private fun Instant.shiftedBySeconds(seconds: Long): Instant =
     Instant.fromEpochMilliseconds(toEpochMilliseconds() + seconds * 1_000L)
