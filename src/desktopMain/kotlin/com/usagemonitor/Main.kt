@@ -99,6 +99,7 @@ import com.usagemonitor.domain.usecase.GetOpenRouterUsageUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
+import com.usagemonitor.domain.usecase.GetHudSessionSummaryUseCase
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
 import com.usagemonitor.domain.usecase.GetMonthlyBudgetStatusUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamSessionDetailUseCase
@@ -134,6 +135,7 @@ import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.hudSessionSummaryLabel
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
@@ -170,6 +172,7 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.HudSummaryViewModel
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
@@ -775,6 +778,20 @@ private fun runUsageMonitor(
             breadcrumbs = breadcrumbs
         )
     }
+    // Rodapé de consumo da barra HUD (issue #164). Laço próprio, e não uma
+    // carona no semáforo acima: aquele pergunta "que sessão precisa de atenção",
+    // este pergunta "quanto foi queimado na janela". Só lê com o HUD na tela.
+    val hudModeFlow = remember { MutableStateFlow(readPersistedHudMode(settings)) }
+    val hudSummaryViewModel = remember(cliSessionRepository, hudModeFlow) {
+        HudSummaryViewModel(
+            getSummary = GetHudSessionSummaryUseCase(cliSessionRepository),
+            isEnabled = hudModeFlow
+        )
+    }
+    DisposableEffect(hudSummaryViewModel) {
+        onDispose { hudSummaryViewModel.onDestroy() }
+    }
+    val hudSessionSummary by hudSummaryViewModel.summary.collectAsState()
     val cliSessionPulses by sessionPulseViewModel.cliPulses.collectAsState()
     val teamSessionPulses by sessionPulseViewModel.teamPulses.collectAsState()
     val usageAlertViewModel = remember(viewModel, sessionPulseViewModel, alertSettingsFlow) {
@@ -1128,11 +1145,13 @@ private fun runUsageMonitor(
             persistCardsOnlyMode(settings, false)
         }
         hudMode = enabled
+        hudModeFlow.value = enabled
         persistHudMode(settings, enabled)
     }
     val setCardsOnlyMode: (Boolean) -> Unit = { enabled ->
         if (enabled) {
             hudMode = false
+            hudModeFlow.value = false
             persistHudMode(settings, false)
         }
         cardsOnlyMode = enabled
@@ -1674,7 +1693,11 @@ private fun runUsageMonitor(
         // que está tudo bem antes de saber.
         val hudDotOnly = hudSourceRisks.isNotEmpty() &&
             hudSourceRisks.all { snapshot -> snapshot.risk.level == UsageRiskLevel.ON_TRACK }
-        val hudFooterLabel: String? = null
+        // `null` antes da primeira leitura: o rodapé não é composto e a janela
+        // não reserva altura para uma linha que ainda não tem o que dizer.
+        val hudFooterLabel = hudSessionSummary?.let { summary ->
+            hudSessionSummaryLabel(summary, language)
+        }
         // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
         // pílula — a janela ficaria presa no tamanho antigo por baixo do que
         // `mainWindowState.size` pede. Precisa vir **antes** do efeito que
