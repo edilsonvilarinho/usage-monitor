@@ -3,6 +3,9 @@ package com.usagemonitor.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -197,6 +200,57 @@ class DesktopWindowFrameTest {
         assertEquals("start", events.first())
         assertEquals("end", events.last())
         assertTrue(events.contains("move"), "esperava movimento em $events")
+    }
+
+    /**
+     * O arrasto tem de sobreviver à recomposição que ele mesmo provoca: em
+     * `Main.kt` cada movimento move a âncora, que é estado, e as lambdas
+     * passadas para `HudBar` viram objetos novos.
+     *
+     * **Este teste não discrimina a estratégia de chave do `pointerInput`, e
+     * isso foi medido**: com as lambdas como chave — a versão que se suspeitava
+     * defeituosa — ele também passa, com a mesma contagem. Ele trava o
+     * comportamento observável, não a implementação; quem quiser mexer nas
+     * chaves não vai ser avisado por aqui.
+     *
+     * Cada movimento vai numa injeção própria com `waitForIdle` entre elas: um
+     * `performMouseInput` único despacha o gesto inteiro antes de a composição
+     * refazer, e aí o teste não recompõe nada durante o arrasto.
+     */
+    @Test
+    fun `o arrasto da barra HUD sobrevive a recomposicao a cada movimento`() = runDesktopComposeUiTest {
+        var moves by mutableStateOf(0)
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Crítico",
+                        statusTone = AppTone.CRITICAL,
+                        // Recompõe de verdade: o texto depende do contador.
+                        sourceLabel = "movimentos $moves",
+                        resetLabel = "reset em 42min",
+                        sources = sources,
+                        onDragMove = { moves += 1 },
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        val pill = onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION)
+        pill.performMouseInput {
+            moveTo(center)
+            press()
+        }
+        waitForIdle()
+        repeat(3) { step ->
+            pill.performMouseInput { moveTo(center + Offset(30f * (step + 1), 0f)) }
+            waitForIdle()
+        }
+        pill.performMouseInput { release() }
+        waitForIdle()
+
+        assertTrue(moves >= 3, "esperava o arrasto continuar depois de recompor, veio $moves")
     }
 
     /** Pressionar e soltar sem sair do lugar continua sendo clique. */

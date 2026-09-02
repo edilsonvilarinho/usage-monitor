@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -457,35 +458,53 @@ private fun HudSourcePanel(sources: List<HudSourceStatus>) {
  * `Main.kt` lê a posição absoluta do ponteiro na tela a cada [onDragMove], que
  * é o que o `WindowDraggableArea` do Compose também faz por dentro.
  */
+@Composable
 private fun Modifier.hudPressGesture(
     onDragStart: () -> Unit,
     onDragMove: () -> Unit,
     onDragEnd: () -> Unit,
     onClick: () -> Unit
-): Modifier = pointerInput(onDragStart, onDragMove, onDragEnd, onClick) {
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        var travelled = 0f
-        var dragging = false
+): Modifier {
+    // **A chave do `pointerInput` é `Unit`, e os callbacks entram por
+    // `rememberUpdatedState`.** `Main.kt` declara as lambdas de arrasto como
+    // objetos comuns, recriados a cada recomposição, e cada movimento recompõe
+    // (ele move a âncora, que é estado). Com elas como chave, o handler de
+    // ponteiro é desmontado e remontado a cada quadro do arrasto.
+    //
+    // **Isto não é correção de defeito, e a diferença foi medida, não deduzida**
+    // — o arrasto sobrevive à troca de chave no Compose 1.7.1: o teste de
+    // recomposição abaixo passa com as duas versões. É o padrão canônico e
+    // evita reinstalar o handler à toa; nada além disso.
+    val currentDragStart by rememberUpdatedState(onDragStart)
+    val currentDragMove by rememberUpdatedState(onDragMove)
+    val currentDragEnd by rememberUpdatedState(onDragEnd)
+    val currentClick by rememberUpdatedState(onClick)
 
-        while (true) {
-            val event = awaitPointerEvent()
-            val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
-                ?: break
+    return pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            var travelled = 0f
+            var dragging = false
 
-            if (!change.pressed) {
-                if (dragging) onDragEnd() else onClick()
-                break
-            }
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
+                    ?: break
 
-            travelled += change.positionChange().getDistance()
-            if (!dragging && travelled > viewConfiguration.touchSlop) {
-                dragging = true
-                onDragStart()
-            }
-            if (dragging) {
-                change.consume()
-                onDragMove()
+                if (!change.pressed) {
+                    if (dragging) currentDragEnd() else currentClick()
+                    break
+                }
+
+                travelled += change.positionChange().getDistance()
+                if (!dragging && travelled > viewConfiguration.touchSlop) {
+                    dragging = true
+                    currentDragStart()
+                }
+                if (dragging) {
+                    change.consume()
+                    currentDragMove()
+                }
             }
         }
     }
