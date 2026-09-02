@@ -45,9 +45,26 @@ import kotlin.test.assertTrue
 class DesktopWindowFrameTest {
 
     private val sources = listOf(
-        HudSourceStatus(label = "Anthropic · Padrão", statusLabel = "Crítico", tone = AppTone.CRITICAL),
-        HudSourceStatus(label = "Anthropic · Empresa", statusLabel = "Atenção", tone = AppTone.WARNING),
-        HudSourceStatus(label = "OpenCode Go", statusLabel = "Normal", tone = AppTone.OK)
+        HudSourceStatus(
+            label = "Anthropic · Padrão",
+            statusLabel = "Crítico",
+            tone = AppTone.CRITICAL,
+            percentLabel = "92%",
+            resetLabel = "Ter 22h59"
+        ),
+        HudSourceStatus(
+            label = "Anthropic · Empresa",
+            statusLabel = "Atenção",
+            tone = AppTone.WARNING,
+            percentLabel = "41%",
+            resetLabel = "4h12"
+        ),
+        HudSourceStatus(
+            label = "OpenCode Go",
+            statusLabel = "Normal",
+            tone = AppTone.OK,
+            percentLabel = "12%"
+        )
     )
 
     /**
@@ -109,26 +126,51 @@ class DesktopWindowFrameTest {
     }
 
     /**
-     * As cinco alturas do cromo são contrato com o design system
-     * (`tokens/spacing.css`), e a barra de título e a barra de controles têm de
-     * continuar iguais: é o que faz a janela do dashboard e a janela de sessões
-     * lerem como o mesmo produto.
-     */
-    /**
      * `HudBar` não depende de `WindowScope` — o arrasto sai daqui como
      * callback e é `Main.kt` que move a janela AWT —, e é isso que a deixa
      * exercitável inteira aqui, ao contrário do resto do cromo.
+     *
+     * **Uma linha por fonte, não só a que perde.** Mostrar apenas a pior era a
+     * queixa que abriu esta passada: com várias contas, as outras não tinham
+     * sinal nenhum de que existiam.
      */
     @Test
-    fun `a barra HUD preenche a altura do token`() = runDesktopComposeUiTest {
+    fun `a barra HUD lista todas as fontes com percentual e reset`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Crítico",
                         statusTone = AppTone.CRITICAL,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 42min",
+                        sources = sources,
+                        fallbackLabel = "Carregando",
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Anthropic · Padrão").assertIsDisplayed()
+        onNodeWithText("Anthropic · Empresa").assertIsDisplayed()
+        onNodeWithText("OpenCode Go").assertIsDisplayed()
+        onNodeWithText("92%").assertIsDisplayed()
+        onNodeWithText("41%").assertIsDisplayed()
+        onNodeWithText("Ter 22h59").assertIsDisplayed()
+    }
+
+    /**
+     * Cada linha carrega ponto **e** palavra. O percentual descreve o consumo,
+     * não o risco — 40% às onze da manhã pode ser pior que 80% dez minutos antes
+     * do reinício —, e sem a palavra a cor informaria o estado sozinha.
+     */
+    @Test
+    fun `cada linha da barra HUD carrega a palavra do estado`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
+                    HudBar(
+                        statusTone = AppTone.CRITICAL,
+                        sources = sources,
+                        fallbackLabel = "Carregando",
                         onOpenFull = {}
                     )
                 }
@@ -136,21 +178,80 @@ class DesktopWindowFrameTest {
         }
 
         onNodeWithText("Crítico").assertIsDisplayed()
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).assertHeightIsEqualTo(AppChrome.hud)
+        onNodeWithText("Atenção").assertIsDisplayed()
+        onNodeWithText("Normal").assertIsDisplayed()
     }
 
-    /** Não há botão próprio: a faixa inteira é o alvo de clique. */
+    /** Fonte sem reset conhecido não imprime traço: a coluna some. */
     @Test
-    fun `a barra HUD despacha o clique em qualquer ponto da faixa`() = runDesktopComposeUiTest {
+    fun `fonte sem reset nao desenha a coluna`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
+                    HudBar(
+                        statusTone = AppTone.OK,
+                        sources = listOf(sources[2]),
+                        fallbackLabel = "Carregando",
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("OpenCode Go").assertIsDisplayed()
+        onNodeWithText("12%").assertIsDisplayed()
+        onNodeWithText("—").assertDoesNotExist()
+    }
+
+    /** Antes da primeira coleta há uma linha só, e ela diz que está carregando. */
+    @Test
+    fun `a barra HUD sem fontes mostra a linha de carregamento`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
+                    HudBar(
+                        statusTone = AppTone.NEUTRAL,
+                        sources = emptyList(),
+                        fallbackLabel = "Carregando",
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Carregando").assertIsDisplayed()
+    }
+
+    @Test
+    fun `o rodape de sessao aparece abaixo das fontes`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(500.dp).height(240.dp)) {
+                    HudBar(
+                        statusTone = AppTone.CRITICAL,
+                        sources = sources,
+                        fallbackLabel = "Carregando",
+                        footerLabel = "2 sessões · \$4.21 · 1.2M tok",
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("2 sessões · \$4.21 · 1.2M tok").assertIsDisplayed()
+    }
+
+    /** Não há botão próprio: o painel inteiro é o alvo de clique. */
+    @Test
+    fun `a barra HUD despacha o clique em qualquer ponto do painel`() = runDesktopComposeUiTest {
         var clicks = 0
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Normal",
                         statusTone = AppTone.OK,
-                        sourceLabel = null,
-                        resetLabel = null,
+                        sources = sources,
+                        fallbackLabel = "Carregando",
                         onOpenFull = { clicks += 1 }
                     )
                 }
@@ -163,7 +264,7 @@ class DesktopWindowFrameTest {
 
     /**
      * O que separa clique de arrasto é o limiar de deslocamento, e é por isso
-     * que a pílula não usa `clickable`: aquele consumiria o `down` e o arrasto
+     * que o painel não usa `clickable`: aquele consumiria o `down` e o arrasto
      * nunca começaria. Arrastar não pode abrir a janela completa por engano.
      */
     @Test
@@ -172,13 +273,11 @@ class DesktopWindowFrameTest {
         val events = mutableListOf<String>()
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Crítico",
                         statusTone = AppTone.CRITICAL,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 42min",
                         sources = sources,
+                        fallbackLabel = "Carregando",
                         onDragStart = { events += "start" },
                         onDragMove = { events += "move" },
                         onDragEnd = { events += "end" },
@@ -210,26 +309,23 @@ class DesktopWindowFrameTest {
      * **Este teste não discrimina a estratégia de chave do `pointerInput`, e
      * isso foi medido**: com as lambdas como chave — a versão que se suspeitava
      * defeituosa — ele também passa, com a mesma contagem. Ele trava o
-     * comportamento observável, não a implementação; quem quiser mexer nas
-     * chaves não vai ser avisado por aqui.
+     * comportamento observável, não a implementação.
      *
      * Cada movimento vai numa injeção própria com `waitForIdle` entre elas: um
      * `performMouseInput` único despacha o gesto inteiro antes de a composição
-     * refazer, e aí o teste não recompõe nada durante o arrasto.
+     * refazer, e aí não há recomposição durante o arrasto para observar.
      */
     @Test
     fun `o arrasto da barra HUD sobrevive a recomposicao a cada movimento`() = runDesktopComposeUiTest {
         var moves by mutableStateOf(0)
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Crítico",
                         statusTone = AppTone.CRITICAL,
-                        // Recompõe de verdade: o texto depende do contador.
-                        sourceLabel = "movimentos $moves",
-                        resetLabel = "reset em 42min",
                         sources = sources,
+                        // Recompõe de verdade: o texto depende do contador.
+                        fallbackLabel = "movimentos $moves",
                         onDragMove = { moves += 1 },
                         onOpenFull = {}
                     )
@@ -260,13 +356,11 @@ class DesktopWindowFrameTest {
         val events = mutableListOf<String>()
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Crítico",
                         statusTone = AppTone.CRITICAL,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 42min",
                         sources = sources,
+                        fallbackLabel = "Carregando",
                         onDragStart = { events += "start" },
                         onDragEnd = { events += "end" },
                         onOpenFull = { clicks += 1 }
@@ -287,84 +381,7 @@ class DesktopWindowFrameTest {
     }
 
     /**
-     * Colapsada, a pílula mostra uma fonte só — a que perde. Carregar a lista
-     * não pode desenhá-la: é o hover que a revela, crescendo a janela.
-     */
-    @Test
-    fun `a barra HUD colapsada nao desenha as outras fontes`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
-                    HudBar(
-                        statusLabel = "Crítico",
-                        statusTone = AppTone.CRITICAL,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 42min",
-                        sources = sources,
-                        expanded = false,
-                        onOpenFull = {}
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("Anthropic · Padrão").assertIsDisplayed()
-        onNodeWithText("OpenCode Go").assertDoesNotExist()
-    }
-
-    /**
-     * A lista de fontes é conteúdo da janela, não `Popup`: o balão do Material
-     * é camada **dentro** da janela e numa faixa de 24dp saía recortado sobre o
-     * próprio alvo, com o hover piscando entre abrir e fechar.
-     */
-    @Test
-    fun `a barra HUD expandida lista todas as fontes`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(200.dp)) {
-                    HudBar(
-                        statusLabel = "Crítico",
-                        statusTone = AppTone.CRITICAL,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 42min",
-                        sources = sources,
-                        expanded = true,
-                        onOpenFull = {}
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("Anthropic · Empresa").assertIsDisplayed()
-        onNodeWithText("OpenCode Go").assertIsDisplayed()
-    }
-
-    /** Sem fonte nenhuma não há painel: expandir não desenha divisória solta. */
-    @Test
-    fun `a barra HUD expandida sem fontes nao desenha painel`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(200.dp)) {
-                    HudBar(
-                        statusLabel = "Carregando",
-                        statusTone = AppTone.NEUTRAL,
-                        sourceLabel = null,
-                        resetLabel = null,
-                        sources = emptyList(),
-                        expanded = true,
-                        onOpenFull = {}
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("Carregando").assertIsDisplayed()
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION)
-            .assertHeightIsEqualTo(AppChrome.hud)
-    }
-
-    /**
-     * Com tudo em `ON_TRACK` a pílula recolhe ao ponto: o dado para de ocupar
+     * Com tudo em `ON_TRACK` o painel recolhe ao ponto: o dado para de ocupar
      * tela enquanto diz que está tudo bem. O ponto continua lá, e é o único
      * lugar do app em que ele aparece sem palavra — a palavra está a um
      * movimento de mouse.
@@ -373,13 +390,12 @@ class DesktopWindowFrameTest {
     fun `a barra HUD recolhida ao ponto esconde o texto`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Normal",
                         statusTone = AppTone.OK,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 4h",
                         sources = sources,
+                        fallbackLabel = "Carregando",
+                        footerLabel = "2 sessões",
                         dotOnly = true,
                         onOpenFull = {}
                     )
@@ -387,9 +403,11 @@ class DesktopWindowFrameTest {
             }
         }
 
-        onNodeWithText("Normal").assertDoesNotExist()
-        onNodeWithText("Anthropic · Padrão").assertDoesNotExist()
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).assertHeightIsEqualTo(AppChrome.hud)
+        onNodeWithText("OpenCode Go").assertDoesNotExist()
+        onNodeWithText("12%").assertDoesNotExist()
+        onNodeWithText("2 sessões").assertDoesNotExist()
+        // A altura de 24dp do estado recolhido é decidida por `hudWindowSize`,
+        // que dimensiona a janela; aqui o nó raiz preenche a cena de teste.
     }
 
     /** Recolhida ao ponto, ela continua sendo o caminho para a janela completa. */
@@ -398,13 +416,11 @@ class DesktopWindowFrameTest {
         var clicks = 0
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Normal",
                         statusTone = AppTone.OK,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 4h",
                         sources = sources,
+                        fallbackLabel = "Carregando",
                         dotOnly = true,
                         onOpenFull = { clicks += 1 }
                     )
@@ -417,22 +433,20 @@ class DesktopWindowFrameTest {
     }
 
     /**
-     * É `onHoverChange` que faz `Main.kt` crescer a janela. Sem esta fiação o
-     * painel existe e nunca aparece — e o teste da lista acima passaria mesmo
-     * assim, porque ele injeta `expanded` direto.
+     * É `onHoverChange` que faz `Main.kt` desfazer o recolhimento ao ponto. Sem
+     * esta fiação o painel existe e nunca volta — e o teste do estado recolhido
+     * passaria mesmo assim, porque ele injeta `dotOnly` direto.
      */
     @Test
     fun `a barra HUD avisa quando o ponteiro entra e sai`() = runDesktopComposeUiTest {
         val reported = mutableListOf<Boolean>()
         setContent {
             AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(200.dp)) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
                     HudBar(
-                        statusLabel = "Crítico",
                         statusTone = AppTone.CRITICAL,
-                        sourceLabel = "Anthropic · Padrão",
-                        resetLabel = "reset em 42min",
                         sources = sources,
+                        fallbackLabel = "Carregando",
                         onHoverChange = { hovered -> reported += hovered },
                         onOpenFull = {}
                     )
@@ -447,26 +461,6 @@ class DesktopWindowFrameTest {
         onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput { exit(Offset(-1f, -1f)) }
         waitForIdle()
         assertEquals(false, reported.last())
-    }
-
-    /** Estado de carregamento: fonte e reset ainda não chegaram. */
-    @Test
-    fun `a barra HUD sem fonte nem reset nao quebra o layout`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
-                    HudBar(
-                        statusLabel = "Normal",
-                        statusTone = AppTone.OK,
-                        sourceLabel = null,
-                        resetLabel = null,
-                        onOpenFull = {}
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("Normal").assertIsDisplayed()
     }
 
     @Test

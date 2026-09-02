@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -259,28 +260,44 @@ private fun WindowScope.CompactTitleBarOverlay(
 internal data class HudSourceStatus(
     val label: String,
     val statusLabel: String,
-    val tone: AppTone
+    val tone: AppTone,
+    /** `compactPercentageLabel` da cota que determinou o estado — nenhum formato novo. */
+    val percentLabel: String,
+    /** `resetShortLabel` da mesma cota; `null` esconde a coluna em vez de imprimir traço. */
+    val resetLabel: String? = null
 )
 
 /**
- * Conteúdo da barra HUD (issue #164): o pior risco entre todas as cotas, a
- * fonte que o determinou e o tempo até o reset.
+ * Conteúdo da barra HUD (issue #164): uma linha por fonte monitorada, com
+ * estado, nome, percentual e reset, mais um rodapé opcional de sessão.
  *
- * **A lista de fontes é conteúdo da janela, não `Popup`.** Ela saía por
+ * **Todas as fontes, não só a pior.** A primeira versão mostrava uma linha só —
+ * a fonte que perdia — e as outras contas não tinham sinal nenhum de que
+ * existiam sem abrir a janela completa. A segunda pôs as outras num hover. Nas
+ * duas, o dado que o usuário queria estava escondido atrás de um gesto; agora a
+ * lista **é** o conteúdo.
+ *
+ * **A lista é conteúdo da janela, nunca `Popup`.** Ela saía por
  * `HoverTooltipBox` → `TooltipBox` → `Popup`, e popup no Compose Desktop é
  * camada **dentro** da janela (`compose.layers.type` não está definido neste
  * projeto, e o default recorta pelos limites): numa janela de 24dp, um balão
  * com piso de 180dp de largura e uma linha por fonte não cabe — ele era
  * recortado sobre o próprio alvo, o ponteiro passava a estar sobre o balão, a
  * faixa recebia `Exit` e a tooltip fechava, para reabrir no quadro seguinte.
- * Quem cresce agora é a janela, e sem popup não há laço.
  *
- * **O hover mora no container inteiro, não na pílula.** Preso aos 24dp de
- * cima, mover o ponteiro para dentro da lista tiraria o hover, a janela
- * colapsaria e o ponteiro voltaria à pílula — o mesmo laço com outro nome.
+ * **Cada linha carrega ponto E palavra** (`AppStatusIndicator`), e não só o
+ * ponto colorido. O percentual ao lado descreve o consumo, não o risco: 40% às
+ * onze da manhã pode ser pior que 80% dez minutos antes do reinício, e é a
+ * palavra que diz qual dos dois é o caso. Sem ela a cor informaria estado
+ * sozinha, que é justamente o que este sistema visual não faz.
  *
- * **A pílula é o alvo de clique** que devolve a janela completa — não há botão
- * próprio, e por isso a semântica vai no container dela, não só em
+ * **O hover mora no container inteiro.** Ele só serve ao estado recolhido
+ * ([dotOnly]) — passar o mouse devolve a lista —, mas preso a uma linha só,
+ * mover o ponteiro para dentro do painel tiraria o hover e a janela
+ * colapsaria debaixo dele.
+ *
+ * **O painel inteiro é o alvo de clique** que devolve a janela completa — não
+ * há botão próprio, e por isso a semântica vai no container, não só em
  * `onClickLabel` (armadilha nº2 do design system: sem
  * `Modifier.semantics { contentDescription = ... }`,
  * `onNodeWithContentDescription` não encontra o nó).
@@ -295,27 +312,25 @@ internal data class HudSourceStatus(
  * exercitável em `runDesktopComposeUiTest`, que não fornece janela nenhuma.
  *
  * **Largura de quem chama, não fixa aqui.** `Main.kt` dimensiona a janela pelo
- * conteúdo (`hudPillWidth`); `HudBar` só sabe preencher o que recebe, e por
- * isso `sourceLabel`/`resetLabel` truncam com reticências em vez de estourar o
- * container.
+ * conteúdo (`hudWindowSize`); `HudBar` só sabe preencher o que recebe, e por
+ * isso o nome da fonte trunca com reticências em vez de estourar o container.
  */
 @Composable
 internal fun HudBar(
-    statusLabel: String,
+    /** Tom do ponto no estado recolhido; nas linhas, cada fonte traz o seu. */
     statusTone: AppTone,
-    sourceLabel: String?,
-    resetLabel: String?,
-    /** Todas as fontes, pior primeiro. Vazia, o painel não é composto. */
+    /** Todas as fontes, pior primeiro. Vazia rende a linha de carregamento. */
     sources: List<HudSourceStatus> = emptyList(),
-    /** Quem decide é `Main.kt`, que é quem redimensiona a janela de verdade. */
-    expanded: Boolean = false,
+    /** Palavra da linha única enquanto nenhuma fonte foi coletada. */
+    fallbackLabel: String,
+    /** Resumo de sessão do rodapé; `null` não desenha divisória nem linha. */
+    footerLabel: String? = null,
     /**
-     * Todas as fontes em `ON_TRACK`: a pílula recolhe ao ponto.
+     * Todas as fontes em `ON_TRACK` e sem o ponteiro em cima: recolhe ao ponto.
      *
      * O dado não some — ele para de ocupar tela enquanto diz que está tudo bem,
-     * e o hover devolve a pílula inteira mais a lista. É o mesmo princípio do
-     * ponto de risco da bandeja, que não acende nada em `ON_TRACK`: sinal
-     * permanente vira decoração.
+     * e o hover devolve o painel inteiro. É o mesmo princípio do ponto de risco
+     * da bandeja, que não acende nada em `ON_TRACK`.
      */
     dotOnly: Boolean = false,
     onHoverChange: (Boolean) -> Unit = {},
@@ -337,111 +352,110 @@ internal fun HudBar(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
             .hoverable(hoverInteraction)
+            .hudPressGesture(
+                onDragStart = onDragStart,
+                onDragMove = onDragMove,
+                onDragEnd = onDragEnd,
+                onClick = onOpenFull
+            )
+            // A ação de clique é **declarada** na semântica, não instalada por
+            // `clickable`: aquele consumiria o `down` e o arrasto nunca
+            // começaria. Sem a declaração, o único caminho para a janela
+            // completa deixaria de existir para leitor de tela.
+            .semantics {
+                contentDescription = HUD_BAR_OPEN_DESCRIPTION
+                onClick(label = HUD_BAR_OPEN_DESCRIPTION) {
+                    onOpenFull()
+                    true
+                }
+            }
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(AppChrome.hud)
-                .hudPressGesture(
-                    onDragStart = onDragStart,
-                    onDragMove = onDragMove,
-                    onDragEnd = onDragEnd,
-                    onClick = onOpenFull
-                )
-                // A ação de clique é **declarada** na semântica, não instalada
-                // por `clickable`: aquele consumiria o `down` e o arrasto nunca
-                // começaria. Sem a declaração, o único caminho para a janela
-                // completa deixaria de existir para leitor de tela.
-                .semantics {
-                    contentDescription = HUD_BAR_OPEN_DESCRIPTION
-                    onClick(label = HUD_BAR_OPEN_DESCRIPTION) {
-                        onOpenFull()
-                        true
+        if (dotOnly) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(AppChrome.hud)
+                    .padding(horizontal = HUD_PILL_DOT_ONLY_PADDING),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppStatusDot(tone = statusTone)
+            }
+            return@Column
+        }
+
+        Column(modifier = Modifier.padding(vertical = HUD_PANEL_VERTICAL_PADDING)) {
+            if (sources.isEmpty()) {
+                HudPanelRow {
+                    AppStatusIndicator(label = fallbackLabel, tone = statusTone)
+                }
+            } else {
+                sources.forEach { source ->
+                    HudPanelRow {
+                        AppStatusIndicator(label = source.statusLabel, tone = source.tone)
+                        Text(
+                            text = source.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = source.percentLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
+                        if (source.resetLabel != null) {
+                            Text(
+                                text = source.resetLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
-                .padding(
-                    horizontal = if (dotOnly) HUD_PILL_DOT_ONLY_PADDING else HUD_PILL_PADDING
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
-        ) {
-            if (dotOnly) {
-                AppStatusDot(tone = statusTone)
-                return@Row
-            }
-
-            AppStatusIndicator(label = statusLabel, tone = statusTone)
-
-            if (sourceLabel != null) {
-                Text(
-                    text = sourceLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-
-            if (resetLabel != null) {
-                Text(
-                    text = resetLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
 
-        if (expanded && sources.isNotEmpty()) {
+        if (footerLabel != null) {
             AppDivider()
-            HudSourcePanel(sources = sources)
+            Column(modifier = Modifier.padding(vertical = HUD_PANEL_VERTICAL_PADDING)) {
+                HudPanelRow {
+                    Text(
+                        text = footerLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }
 
 /**
- * A lista de fontes abaixo da pílula.
+ * Uma linha do painel.
  *
- * **A linha não é `AppDataRow`**: aquela primitiva tem piso de 32dp mais 8dp de
- * padding vertical, e seis fontes dariam um painel de ~288dp — uma janela, não
- * um HUD. É a mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp
- * do cromo, e pela mesma razão: aqui não há alvo de clique nem célula de tabela,
- * só o rótulo da fonte e o estado dela.
+ * **Não é `AppDataRow`**: aquela primitiva tem piso de 32dp mais 8dp de padding
+ * vertical, e seis fontes dariam um painel de ~288dp — uma janela, não um HUD.
+ * É a mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp do
+ * cromo, e pela mesma razão: aqui não há alvo de clique por linha nem célula de
+ * tabela.
  */
 @Composable
-private fun HudSourcePanel(sources: List<HudSourceStatus>) {
-    Column(
+private fun HudPanelRow(content: @Composable RowScope.() -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                horizontal = HUD_PILL_PADDING,
-                vertical = HUD_PANEL_VERTICAL_PADDING
-            )
-    ) {
-        sources.forEach { source ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(HUD_SOURCE_ROW_HEIGHT),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
-            ) {
-                Text(
-                    text = source.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                AppStatusIndicator(label = source.statusLabel, tone = source.tone)
-            }
-        }
-    }
+            .height(HUD_SOURCE_ROW_HEIGHT)
+            .padding(horizontal = HUD_PILL_PADDING),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        content = content
+    )
 }
 
 /**

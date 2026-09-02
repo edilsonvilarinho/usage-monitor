@@ -242,6 +242,47 @@ internal fun resetLabel(quota: QuotaInfo, language: AppLanguage, now: Instant): 
     }
 }
 
+/**
+ * O reset da cota em forma curta, para a barra HUD (issue #164).
+ *
+ * [resetLabel] é a linha do card: "Reinício: Ter 22h59 BRT" tem 23 caracteres e,
+ * numa linha de HUD que já carrega estado, nome da fonte e percentual, ela
+ * sozinha mede mais que todo o resto junto.
+ *
+ * **Não é um segundo formato de data** — sai das mesmas [formatBrtDateTimeParts]
+ * que a linha do card usa, só recortada: sem prefixo, sem fuso, e sem a data do
+ * dia quando a janela é intradiária e o reset é hoje de qualquer forma. Fuso,
+ * nome de dia e ordem de campos continuam com um dono só.
+ *
+ * `null` é "não há reset a mostrar" — saldo que não expira, janela sem reset
+ * conhecido. Quem chama omite a coluna, em vez de imprimir um traço que não
+ * informa nada.
+ */
+internal fun resetShortLabel(quota: QuotaInfo, language: AppLanguage, now: Instant): String? {
+    if (quota.isExtraCreditsQuota) {
+        return if (language == AppLanguage.PT) "mensal" else "monthly"
+    }
+
+    if (quota.unit == UsageUnit.CURRENCY_USD) {
+        return null
+    }
+
+    if (quota.isExpiredAt(now)) {
+        return if (language == AppLanguage.PT) "reiniciando" else "resetting"
+    }
+
+    if (!quota.hasKnownResetAt) {
+        return null
+    }
+
+    val (dayFormatted, _, timeFormatted) = formatBrtDateTimeParts(quota.periodEndAt, language)
+
+    return when (quota.periodType) {
+        PeriodType.INTERVAL -> timeFormatted
+        PeriodType.WEEKLY, PeriodType.MONTHLY, PeriodType.REPORTED -> "$dayFormatted $timeFormatted"
+    }
+}
+
 private data class BrtDateTimeParts(val day: String, val date: String, val time: String)
 
 private fun formatBrtDateTimeParts(instant: Instant, language: AppLanguage): BrtDateTimeParts {

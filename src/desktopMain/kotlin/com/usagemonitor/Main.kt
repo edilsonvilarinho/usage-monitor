@@ -158,6 +158,8 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.compactPercentageLabel
+import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.resetLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import com.usagemonitor.presentation.ui.components.toneFor
@@ -1649,44 +1651,30 @@ private fun runUsageMonitor(
             stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName
         }
         val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
-        val hudStatusLabel = hudSnapshot?.let { snapshot -> riskLevelLabel(snapshot.risk.level, language) }
-            ?: if (language == AppLanguage.PT) "Carregando" else "Loading"
         val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
-        val hudSourceLabel = hudSnapshot?.stats?.let(hudSourceLabelOf)
-        val hudResetLabel = hudSnapshot?.let { snapshot -> resetLabel(snapshot.quota, language, Clock.System.now()) }
-        // A pílula mostra só a fonte que perde; o hover lista todas — pedido de
-        // quem tem várias contas/fontes e não quer abrir a janela completa só
-        // para saber se as outras também estão em risco (issue #164, achado
-        // testando ao vivo).
+        val hudFallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
+        // **Uma linha por fonte, não só a que perde.** Mostrar apenas a pior era
+        // a queixa que abriu esta passada: com várias contas, as outras não
+        // tinham sinal nenhum de que existiam. `compactPercentageLabel` e
+        // `resetShortLabel` são os formatos que o card já usa — o segundo é o
+        // primeiro recortado, e nenhum dos dois é formato de data novo.
+        val hudNow = Clock.System.now()
         val hudSourceRisks by usageAlertViewModel.sourceRisks.collectAsState()
         val hudSources = hudSourceRisks.map { snapshot ->
             HudSourceStatus(
                 label = hudSourceLabelOf(snapshot.stats),
                 statusLabel = riskLevelLabel(snapshot.risk.level, language),
-                tone = toneFor(snapshot.risk.level)
+                tone = toneFor(snapshot.risk.level),
+                percentLabel = compactPercentageLabel(snapshot.quota),
+                resetLabel = resetShortLabel(snapshot.quota, language, hudNow)
             )
         }
-        // Nada em risco: a pílula recolhe ao ponto e devolve a tela. Lista vazia
+        // Nada em risco: o painel recolhe ao ponto e devolve a tela. Lista vazia
         // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
         // que está tudo bem antes de saber.
         val hudDotOnly = hudSourceRisks.isNotEmpty() &&
             hudSourceRisks.all { snapshot -> snapshot.risk.level == UsageRiskLevel.ON_TRACK }
-        // Duas larguras, e não uma: recolhida ao ponto a pílula mede o ponto,
-        // mas expandida ela volta com o texto inteiro — medir o expandido pelo
-        // ponto truncaria o rótulo da fonte e o tempo até o reset justamente
-        // quando o usuário foi olhar.
-        val hudCollapsedPillWidthDp = hudPillWidth(
-            statusLabel = hudStatusLabel,
-            sourceLabel = hudSourceLabel,
-            resetLabel = hudResetLabel,
-            dotOnly = hudDotOnly
-        )
-        val hudExpandedPillWidthDp = hudPillWidth(
-            statusLabel = hudStatusLabel,
-            sourceLabel = hudSourceLabel,
-            resetLabel = hudResetLabel
-        )
-        val hudPanelWidthDp = hudPanelWidth(hudSources)
+        val hudFooterLabel: String? = null
         // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
         // pílula — a janela ficaria presa no tamanho antigo por baixo do que
         // `mainWindowState.size` pede. Precisa vir **antes** do efeito que
@@ -1737,21 +1725,29 @@ private fun runUsageMonitor(
         }
 
         val hudScale = uiScaleFactor(uiScalePercent)
-        val hudCollapsedSize = hudWindowSize(
-            pillWidth = hudCollapsedPillWidthDp,
-            panelWidth = hudPanelWidthDp,
-            sourceCount = hudSources.size,
-            expanded = false
+        // `hudExpanded` deixou de significar "mostra a lista" — a lista é
+        // permanente — e passou a significar apenas "o ponteiro está em cima",
+        // que é o que desfaz o recolhimento ao ponto.
+        val hudCollapsedToDot = hudDotOnly && !hudExpanded
+        // **A âncora descreve o painel completo, sempre**, mesmo quando a janela
+        // na tela é o ponto: é ela que o arrasto move e que fica gravada, e
+        // ancorar no ponto faria a janela saltar toda vez que uma fonte saísse
+        // de `ON_TRACK`.
+        val hudAnchorSize = hudWindowSize(
+            sources = hudSources,
+            footerLabel = hudFooterLabel,
+            fallbackLabel = hudFallbackLabel,
+            dotOnly = false
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
-        val hudTargetSize = if (hudExpanded) {
+        val hudTargetSize = if (hudCollapsedToDot) {
             hudWindowSize(
-                pillWidth = hudExpandedPillWidthDp,
-                panelWidth = hudPanelWidthDp,
-                sourceCount = hudSources.size,
-                expanded = true
+                sources = hudSources,
+                footerLabel = hudFooterLabel,
+                fallbackLabel = hudFallbackLabel,
+                dotOnly = true
             ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
         } else {
-            hudCollapsedSize
+            hudAnchorSize
         }
 
         LaunchedEffect(hudMode) {
@@ -1770,9 +1766,9 @@ private fun runUsageMonitor(
                 val stored = readPersistedHudPosition(settings)
                 val entryPosition = fitWindowPosition(
                     x = stored?.xDp?.dp
-                        ?: (screenWorkArea.x + screenWorkArea.size.width - hudCollapsedSize.width),
+                        ?: (screenWorkArea.x + screenWorkArea.size.width - hudAnchorSize.width),
                     y = stored?.yDp?.dp ?: screenWorkArea.y,
-                    size = hudCollapsedSize,
+                    size = hudAnchorSize,
                     workArea = screenWorkArea
                 )
                 hudAnchor = DpOffset(entryPosition.x, entryPosition.y)
@@ -1793,18 +1789,18 @@ private fun runUsageMonitor(
         // como o modo somente cards. Era isso ou um `Popup`, e popup no Compose
         // Desktop é camada dentro da janela: numa faixa de 24dp ele saía
         // recortado sobre o próprio alvo e a tooltip piscava.
-        LaunchedEffect(hudMode, hudAnchor, hudTargetSize, hudCollapsedSize) {
+        LaunchedEffect(hudMode, hudAnchor, hudTargetSize, hudAnchorSize) {
             val anchor = hudAnchor
             if (!hudMode || anchor == null) {
                 return@LaunchedEffect
             }
 
             mainWindowState.size = hudTargetSize
-            mainWindowState.position = hudExpandedPosition(
-                collapsedX = anchor.x,
-                collapsedY = anchor.y,
-                collapsedSize = hudCollapsedSize,
-                expandedSize = hudTargetSize,
+            mainWindowState.position = hudWindowPosition(
+                anchorX = anchor.x,
+                anchorY = anchor.y,
+                anchorSize = hudAnchorSize,
+                windowSize = hudTargetSize,
                 workArea = screenWorkArea
             )
         }
@@ -1829,7 +1825,7 @@ private fun runUsageMonitor(
                 val moved = fitWindowPosition(
                     x = anchor.x + (current.x - previous.x).dp,
                     y = anchor.y + (current.y - previous.y).dp,
-                    size = hudCollapsedSize,
+                    size = hudAnchorSize,
                     workArea = screenWorkArea
                 )
                 hudAnchor = DpOffset(moved.x, moved.y)
@@ -1841,7 +1837,7 @@ private fun runUsageMonitor(
                 val snapped = snapHudPosition(
                     x = anchor.x,
                     y = anchor.y,
-                    size = hudCollapsedSize,
+                    size = hudAnchorSize,
                     workArea = screenWorkArea
                 )
                 hudAnchor = DpOffset(snapped.x, snapped.y)
@@ -1888,13 +1884,11 @@ private fun runUsageMonitor(
                 hud = hudMode,
                 hudContent = {
                     HudBar(
-                        statusLabel = hudStatusLabel,
                         statusTone = hudStatusTone,
-                        sourceLabel = hudSourceLabel,
-                        resetLabel = hudResetLabel,
                         sources = hudSources,
-                        expanded = hudExpanded,
-                        dotOnly = hudDotOnly && !hudExpanded,
+                        fallbackLabel = hudFallbackLabel,
+                        footerLabel = hudFooterLabel,
+                        dotOnly = hudCollapsedToDot,
                         onHoverChange = { hovered -> hudHovered = hovered },
                         onDragStart = hudDragBegin,
                         onDragMove = hudDragTo,

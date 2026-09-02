@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * A geometria da barra HUD (issue #164) decide o tamanho e a posição de uma
  * janela AWT sem que exista janela nenhuma — é por isso que ela é função pura, e
  * é aqui que se afirma o que ela faz. O comportamento observável no app
- * (arrastar, grudar, expandir) é a composição destas quatro decisões.
+ * (arrastar, grudar, recolher) é a composição destas decisões.
  */
 class HudWindowGeometryTest {
 
@@ -24,134 +24,139 @@ class HudWindowGeometryTest {
     )
 
     private val sources = listOf(
-        HudSourceStatus(label = "Anthropic — pessoal", statusLabel = "Crítico", tone = AppTone.CRITICAL),
-        HudSourceStatus(label = "Anthropic — empresa", statusLabel = "Atenção", tone = AppTone.WARNING),
-        HudSourceStatus(label = "OpenCode Go", statusLabel = "Normal", tone = AppTone.OK)
+        source("Anthropic — pessoal", "Crítico", AppTone.CRITICAL, "92%", "Ter 22h59"),
+        source("Anthropic — empresa", "Atenção", AppTone.WARNING, "41%", "4h12"),
+        source("OpenCode Go", "Normal", AppTone.OK, "12%", null)
     )
 
-    // ---------------------------------------------------------------- largura
+    private fun source(
+        label: String,
+        statusLabel: String,
+        tone: AppTone,
+        percentLabel: String,
+        resetLabel: String?
+    ) = HudSourceStatus(
+        label = label,
+        statusLabel = statusLabel,
+        tone = tone,
+        percentLabel = percentLabel,
+        resetLabel = resetLabel
+    )
+
+    private fun size(
+        sources: List<HudSourceStatus> = this.sources,
+        footerLabel: String? = null,
+        fallbackLabel: String = "Carregando",
+        dotOnly: Boolean = false
+    ) = hudWindowSize(
+        sources = sources,
+        footerLabel = footerLabel,
+        fallbackLabel = fallbackLabel,
+        dotOnly = dotOnly
+    )
+
+    // ------------------------------------------------------------------ ponto
 
     @Test
-    fun `a pilula recolhida ao ponto ocupa quase nada`() {
-        val width = hudPillWidth(
-            statusLabel = "Normal",
-            sourceLabel = "Anthropic — pessoal",
-            resetLabel = "Reinício: Ter 22h59 BRT",
-            dotOnly = true
-        )
+    fun `recolhida ao ponto a janela ocupa quase nada`() {
+        val recolhida = size(dotOnly = true)
 
-        // O ponto de 6dp mais 8dp de padding de cada lado. O texto não entra:
-        // recolhido, ele não é composto.
-        assertEquals(HUD_PILL_DOT_ONLY_PADDING * 2 + 6.dp, width)
-    }
-
-    @Test
-    fun `a pilula sem fonte nem reset e mais estreita que a pilula cheia`() {
-        val loading = hudPillWidth(statusLabel = "Carregando", sourceLabel = null, resetLabel = null)
-        val full = hudPillWidth(
-            statusLabel = "Carregando",
-            sourceLabel = "Anthropic — pessoal",
-            resetLabel = "Reinício: Ter 22h59 BRT"
-        )
-
-        assertTrue(loading < full, "esperava $loading < $full")
+        assertEquals(HUD_PILL_DOT_ONLY_PADDING * 2 + 6.dp, recolhida.width)
+        assertEquals(AppChrome.hud, recolhida.height)
     }
 
     /**
      * O caso que abriu esta passada: 320dp fixos capturando clique de quem está
-     * atrás para mostrar uma palavra. Medido pelo conteúdo, "Normal" não chega
-     * perto do teto.
+     * atrás para mostrar uma palavra. Recolhida, a janela é o ponto.
      */
     @Test
-    fun `estado normal sem fonte nao chega ao teto de largura`() {
-        val width = hudPillWidth(statusLabel = "Normal", sourceLabel = null, resetLabel = null)
+    fun `recolhida ao ponto e muito menor que o painel`() {
+        assertTrue(size(dotOnly = true).width < size().width / 5)
+    }
 
-        assertTrue(width < HUD_PILL_MAX_WIDTH / 2, "esperava $width bem abaixo do teto")
+    // ---------------------------------------------------------------- largura
+
+    @Test
+    fun `a largura e a da linha mais larga, nao a da primeira`() {
+        val soAMaisEstreita = size(sources = listOf(sources[2]))
+        val todas = size()
+
+        assertTrue(soAMaisEstreita.width < todas.width, "esperava ${soAMaisEstreita.width} < ${todas.width}")
     }
 
     @Test
     fun `rotulo longo demais para no teto`() {
-        val width = hudPillWidth(
-            statusLabel = "Crítico",
-            sourceLabel = "Anthropic — conta corporativa da empresa inteira",
-            resetLabel = "Reinício: Ter 22h59 BRT"
+        val longa = size(
+            sources = listOf(
+                source(
+                    "Anthropic — conta corporativa da empresa inteira e mais um pouco",
+                    "Crítico",
+                    AppTone.CRITICAL,
+                    "92%",
+                    "Ter 22h59"
+                )
+            )
         )
 
-        assertEquals(HUD_PILL_MAX_WIDTH, width)
+        assertEquals(HUD_PILL_MAX_WIDTH, longa.width)
+    }
+
+    /**
+     * O teto subiu de 320 para 420 quando a linha passou a ter quatro colunas.
+     * Com 320, um rótulo de conta típico não cabia e toda linha truncava.
+     */
+    @Test
+    fun `uma linha tipica cabe sem truncar`() {
+        assertTrue(size().width < HUD_PILL_MAX_WIDTH, "esperava ${size().width} abaixo do teto")
     }
 
     @Test
-    fun `o painel sem fonte nenhuma nao tem largura`() {
-        assertEquals(0.dp, hudPanelWidth(emptyList()))
-    }
+    fun `o rodape alarga a janela quando e a linha mais larga`() {
+        val comRodapeCurto = size(footerLabel = "1 sessão")
+        val comRodapeLongo = size(
+            footerLabel = "3 sessões · \$12.34 · 1.2M tok · e mais um bocado de texto aqui"
+        )
 
-    @Test
-    fun `o painel e medido pela linha mais larga`() {
-        val one = hudPanelWidth(listOf(sources[2]))
-        val all = hudPanelWidth(sources)
-
-        assertTrue(one < all, "esperava $one < $all")
-        assertTrue(all <= HUD_PILL_MAX_WIDTH, "esperava $all dentro do teto")
+        assertEquals(size().width, comRodapeCurto.width)
+        assertTrue(comRodapeLongo.width > comRodapeCurto.width)
     }
 
     // ----------------------------------------------------------------- altura
 
     @Test
-    fun `colapsada a janela tem a altura do token do cromo`() {
-        val size = hudWindowSize(
-            pillWidth = 200.dp,
-            panelWidth = 280.dp,
-            sourceCount = 3,
-            expanded = false
-        )
+    fun `a janela cresce uma linha por fonte`() {
+        val duas = size(sources = sources.take(2))
+        val tres = size()
 
-        assertEquals(AppChrome.hud, size.height)
-        assertEquals(200.dp, size.width)
+        assertEquals(HUD_SOURCE_ROW_HEIGHT, tres.height - duas.height)
     }
 
     @Test
-    fun `expandida a janela cresce uma linha por fonte`() {
-        val two = hudWindowSize(pillWidth = 200.dp, panelWidth = 280.dp, sourceCount = 2, expanded = true)
-        val three = hudWindowSize(pillWidth = 200.dp, panelWidth = 280.dp, sourceCount = 3, expanded = true)
+    fun `o rodape acrescenta uma linha e a divisoria`() {
+        val semRodape = size()
+        val comRodape = size(footerLabel = "2 sessões")
 
-        assertEquals(HUD_SOURCE_ROW_HEIGHT, three.height - two.height)
-        assertTrue(three.height > AppChrome.hud)
+        assertEquals(HUD_SOURCE_ROW_HEIGHT + 1.dp, comRodape.height - semRodape.height)
     }
 
-    /**
-     * Expandir não pode estreitar a faixa que está debaixo do ponteiro, nem
-     * encolher abaixo da pílula quando o painel for mais estreito que ela.
-     */
+    /** Zero linhas dariam altura nula, que o usuário leria como o app ter sumido. */
     @Test
-    fun `expandida a largura e o maximo entre pilula e painel`() {
-        val painelLargo = hudWindowSize(pillWidth = 120.dp, panelWidth = 280.dp, sourceCount = 3, expanded = true)
-        val pilulaLarga = hudWindowSize(pillWidth = 300.dp, panelWidth = 180.dp, sourceCount = 3, expanded = true)
+    fun `sem fonte nenhuma sobra a linha de carregamento`() {
+        val vazia = size(sources = emptyList())
 
-        assertEquals(280.dp, painelLargo.width)
-        assertEquals(300.dp, pilulaLarga.width)
+        assertEquals(HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT, vazia.height)
+        assertTrue(vazia.width > 0.dp)
     }
 
-    /** Sem fonte nenhuma não há painel: expandir não muda nada. */
-    @Test
-    fun `expandida sem fontes continua colapsada`() {
-        val size = hudWindowSize(pillWidth = 120.dp, panelWidth = 0.dp, sourceCount = 0, expanded = true)
-
-        assertEquals(AppChrome.hud, size.height)
-        assertEquals(120.dp, size.width)
-    }
-
-    // --------------------------------------------------------------- expansão
+    // ------------------------------------------------------------- ancoragem
 
     @Test
-    fun `no topo da tela o painel cresce para baixo`() {
-        val collapsed = DpSize(200.dp, AppChrome.hud)
-        val expanded = DpSize(280.dp, 120.dp)
-
-        val position = hudExpandedPosition(
-            collapsedX = 400.dp,
-            collapsedY = 0.dp,
-            collapsedSize = collapsed,
-            expandedSize = expanded,
+    fun `no topo da tela a janela cresce para baixo`() {
+        val position = hudWindowPosition(
+            anchorX = 400.dp,
+            anchorY = 0.dp,
+            anchorSize = DpSize(280.dp, AppChrome.hud),
+            windowSize = DpSize(280.dp, 120.dp),
             workArea = laptop
         )
 
@@ -160,37 +165,33 @@ class HudWindowGeometryTest {
 
     /**
      * Grudada acima da barra de tarefas — o encaixe pedido —, crescer para baixo
-     * jogaria a lista para fora da tela.
+     * jogaria as linhas de baixo para fora da tela.
      */
     @Test
-    fun `na borda de baixo o painel cresce para cima`() {
-        val collapsed = DpSize(200.dp, AppChrome.hud)
-        val expanded = DpSize(280.dp, 120.dp)
-        val bottom = laptop.size.height - AppChrome.hud
+    fun `na borda de baixo a janela cresce para cima`() {
+        val anchorHeight = AppChrome.hud
+        val bottom = laptop.size.height - anchorHeight
 
-        val position = hudExpandedPosition(
-            collapsedX = 400.dp,
-            collapsedY = bottom,
-            collapsedSize = collapsed,
-            expandedSize = expanded,
+        val position = hudWindowPosition(
+            anchorX = 400.dp,
+            anchorY = bottom,
+            anchorSize = DpSize(280.dp, anchorHeight),
+            windowSize = DpSize(280.dp, 120.dp),
             workArea = laptop
         )
 
-        // O rodapé da janela expandida coincide com o rodapé da pílula.
-        assertEquals(bottom + AppChrome.hud - 120.dp, position.y)
+        assertEquals(bottom + anchorHeight - 120.dp, position.y)
     }
 
     @Test
-    fun `encostada a direita o painel alarga para a esquerda`() {
-        val collapsed = DpSize(200.dp, AppChrome.hud)
-        val expanded = DpSize(300.dp, 120.dp)
+    fun `encostada a direita a janela alarga para a esquerda`() {
         val right = laptop.size.width - 200.dp
 
-        val position = hudExpandedPosition(
-            collapsedX = right,
-            collapsedY = 0.dp,
-            collapsedSize = collapsed,
-            expandedSize = expanded,
+        val position = hudWindowPosition(
+            anchorX = right,
+            anchorY = 0.dp,
+            anchorSize = DpSize(200.dp, AppChrome.hud),
+            windowSize = DpSize(300.dp, 120.dp),
             workArea = laptop
         )
 
@@ -198,28 +199,49 @@ class HudWindowGeometryTest {
     }
 
     @Test
-    fun `encostada a esquerda o painel alarga para a direita`() {
-        val collapsed = DpSize(200.dp, AppChrome.hud)
-        val expanded = DpSize(300.dp, 120.dp)
-
-        val position = hudExpandedPosition(
-            collapsedX = 0.dp,
-            collapsedY = 0.dp,
-            collapsedSize = collapsed,
-            expandedSize = expanded,
+    fun `encostada a esquerda a janela alarga para a direita`() {
+        val position = hudWindowPosition(
+            anchorX = 0.dp,
+            anchorY = 0.dp,
+            anchorSize = DpSize(200.dp, AppChrome.hud),
+            windowSize = DpSize(300.dp, 120.dp),
             workArea = laptop
         )
 
         assertEquals(0.dp, position.x)
     }
 
+    /**
+     * Recolher ao ponto é a janela **encolhendo**, e a regra é a mesma: a quina
+     * mais próxima da borda fica onde estava. Sem isso o ponto saltaria para
+     * dentro da tela toda vez que o risco baixasse.
+     */
     @Test
-    fun `sem medida da tela a expansao nao move a janela`() {
-        val position = hudExpandedPosition(
-            collapsedX = 400.dp,
-            collapsedY = 10.dp,
-            collapsedSize = DpSize(200.dp, AppChrome.hud),
-            expandedSize = DpSize(280.dp, 120.dp),
+    fun `ao recolher no canto inferior direito o ponto fica na mesma quina`() {
+        val panel = DpSize(300.dp, 120.dp)
+        val dot = DpSize(22.dp, AppChrome.hud)
+        val anchorX = laptop.size.width - panel.width
+        val anchorY = laptop.size.height - panel.height
+
+        val position = hudWindowPosition(
+            anchorX = anchorX,
+            anchorY = anchorY,
+            anchorSize = panel,
+            windowSize = dot,
+            workArea = laptop
+        )
+
+        assertEquals(laptop.size.width - dot.width, position.x)
+        assertEquals(laptop.size.height - dot.height, position.y)
+    }
+
+    @Test
+    fun `sem medida da tela a ancoragem nao move a janela`() {
+        val position = hudWindowPosition(
+            anchorX = 400.dp,
+            anchorY = 10.dp,
+            anchorSize = DpSize(200.dp, AppChrome.hud),
+            windowSize = DpSize(280.dp, 120.dp),
             workArea = ScreenWorkArea.Unknown
         )
 
@@ -244,12 +266,10 @@ class HudWindowGeometryTest {
 
     @Test
     fun `solta perto da borda direita gruda rente a ela`() {
-        val size = DpSize(200.dp, AppChrome.hud)
-
         val position = snapHudPosition(
             x = laptop.size.width - 200.dp - 10.dp,
             y = 300.dp,
-            size = size,
+            size = DpSize(200.dp, AppChrome.hud),
             workArea = laptop
         )
 
@@ -330,8 +350,8 @@ class HudWindowGeometryTest {
     }
 
     @Test
-    fun `o teto de largura continua sendo o valor do contrato`() {
-        assertEquals(320.dp, HUD_PILL_MAX_WIDTH)
+    fun `os valores de contrato continuam onde estavam`() {
+        assertEquals(420.dp, HUD_PILL_MAX_WIDTH)
         assertEquals(20.dp, HUD_SOURCE_ROW_HEIGHT)
     }
 }
