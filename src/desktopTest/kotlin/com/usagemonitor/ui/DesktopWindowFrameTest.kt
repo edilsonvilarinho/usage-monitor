@@ -24,6 +24,7 @@ import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * O cromo das janelas não tinha teste nenhum.
@@ -111,8 +112,9 @@ class DesktopWindowFrameTest {
      * lerem como o mesmo produto.
      */
     /**
-     * `HudBar` não depende de `WindowScope` (decisão já tomada: sem arrasto),
-     * então é exercitável aqui inteiro, ao contrário do resto do cromo.
+     * `HudBar` não depende de `WindowScope` — o arrasto sai daqui como
+     * callback e é `Main.kt` que move a janela AWT —, e é isso que a deixa
+     * exercitável inteira aqui, ao contrário do resto do cromo.
      */
     @Test
     fun `a barra HUD preenche a altura do token`() = runDesktopComposeUiTest {
@@ -154,6 +156,80 @@ class DesktopWindowFrameTest {
 
         onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
         assertEquals(1, clicks)
+    }
+
+    /**
+     * O que separa clique de arrasto é o limiar de deslocamento, e é por isso
+     * que a pílula não usa `clickable`: aquele consumiria o `down` e o arrasto
+     * nunca começaria. Arrastar não pode abrir a janela completa por engano.
+     */
+    @Test
+    fun `arrastar a barra HUD nao abre a janela completa`() = runDesktopComposeUiTest {
+        var clicks = 0
+        val events = mutableListOf<String>()
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Crítico",
+                        statusTone = AppTone.CRITICAL,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 42min",
+                        sources = sources,
+                        onDragStart = { events += "start" },
+                        onDragMove = { events += "move" },
+                        onDragEnd = { events += "end" },
+                        onOpenFull = { clicks += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput {
+            moveTo(center)
+            press()
+            moveTo(center + Offset(60f, 0f))
+            release()
+        }
+        waitForIdle()
+
+        assertEquals(0, clicks)
+        assertEquals("start", events.first())
+        assertEquals("end", events.last())
+        assertTrue(events.contains("move"), "esperava movimento em $events")
+    }
+
+    /** Pressionar e soltar sem sair do lugar continua sendo clique. */
+    @Test
+    fun `clicar sem arrastar a barra HUD abre a janela completa`() = runDesktopComposeUiTest {
+        var clicks = 0
+        val events = mutableListOf<String>()
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Crítico",
+                        statusTone = AppTone.CRITICAL,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 42min",
+                        sources = sources,
+                        onDragStart = { events += "start" },
+                        onDragEnd = { events += "end" },
+                        onOpenFull = { clicks += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput {
+            moveTo(center)
+            press()
+            release()
+        }
+        waitForIdle()
+
+        assertEquals(1, clicks)
+        assertTrue(events.isEmpty(), "esperava nenhum evento de arrasto, veio $events")
     }
 
     /**

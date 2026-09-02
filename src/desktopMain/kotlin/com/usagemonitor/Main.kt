@@ -183,6 +183,7 @@ import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import io.ktor.client.request.get
 import io.ktor.http.isSuccess
+import java.awt.MouseInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1690,6 +1691,12 @@ private fun runUsageMonitor(
         var hudAnchor by remember { mutableStateOf<DpOffset?>(null) }
         var hudHovered by remember { mutableStateOf(false) }
         var hudExpanded by remember { mutableStateOf(false) }
+        // Última posição do ponteiro na tela durante o arrasto. Guardar a
+        // posição de **partida** e somar o total faria a pílula ficar presa na
+        // borda: arrastada 500px para fora e trazida 100px de volta, o total
+        // continuaria além do limite e o encaixe a manteria colada. Incremental,
+        // o excedente é descartado a cada quadro.
+        var hudDragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
 
         // Expandir é imediato; colapsar espera uma passada de `AppMotion.fast`.
         // Sem a espera, o ponteiro que cruza a divisória entre a pílula e a
@@ -1727,12 +1734,16 @@ private fun runUsageMonitor(
                     mainWindowState.placement
                 )
                 mainWindowState.placement = WindowPlacement.Floating
-                // Canto superior direito: `fitWindowPosition` prende dentro da
-                // área útil, para um monitor mais estreito que a pílula não
-                // jogar o canto esquerdo dela para fora da tela.
+                // Onde ela ficou da última vez; na estreia, o canto superior
+                // direito. `fitWindowPosition` prende dentro da área útil nos
+                // dois casos — um monitor mais estreito que a pílula jogaria o
+                // canto esquerdo dela para fora da tela, e posição gravada num
+                // monitor que já não existe descreve uma tela que sumiu.
+                val stored = readPersistedHudPosition(settings)
                 val entryPosition = fitWindowPosition(
-                    x = screenWorkArea.x + screenWorkArea.size.width - hudCollapsedSize.width,
-                    y = screenWorkArea.y,
+                    x = stored?.xDp?.dp
+                        ?: (screenWorkArea.x + screenWorkArea.size.width - hudCollapsedSize.width),
+                    y = stored?.yDp?.dp ?: screenWorkArea.y,
                     size = hudCollapsedSize,
                     workArea = screenWorkArea
                 )
@@ -1741,6 +1752,7 @@ private fun runUsageMonitor(
                 hudHovered = false
                 hudExpanded = false
                 hudAnchor = null
+                hudDragPointer = null
                 preHudWindowGeometry?.let { (size, position, placement) ->
                     mainWindowState.size = size
                     mainWindowState.position = position
@@ -1767,6 +1779,47 @@ private fun runUsageMonitor(
                 expandedSize = hudTargetSize,
                 workArea = screenWorkArea
             )
+        }
+        // Arrasto da pílula. O movimento é aplicado à **âncora**, não à janela:
+        // com isso existe um caminho só até a geometria — o efeito acima —, e a
+        // pílula expandida acompanha o ponteiro sem que a conta de "cresce para
+        // cima ou para baixo" precise ser desfeita aqui.
+        //
+        // A posição vem de `MouseInfo`, absoluta na tela, e não do
+        // `positionChange` do Compose: durante o arrasto o componente se move
+        // junto com a janela, e o deslocamento local acumularia erro. É o mesmo
+        // caminho que o `WindowDraggableArea` usa por dentro.
+        val hudDragBegin = {
+            hudDragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
+        }
+        val hudDragTo = {
+            val previous = hudDragPointer
+            val current = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
+            val anchor = hudAnchor
+            if (previous != null && current != null && anchor != null) {
+                hudDragPointer = current
+                val moved = fitWindowPosition(
+                    x = anchor.x + (current.x - previous.x).dp,
+                    y = anchor.y + (current.y - previous.y).dp,
+                    size = hudCollapsedSize,
+                    workArea = screenWorkArea
+                )
+                hudAnchor = DpOffset(moved.x, moved.y)
+            }
+        }
+        val hudDragFinish = {
+            hudDragPointer = null
+            hudAnchor?.let { anchor ->
+                val snapped = snapHudPosition(
+                    x = anchor.x,
+                    y = anchor.y,
+                    size = hudCollapsedSize,
+                    workArea = screenWorkArea
+                )
+                hudAnchor = DpOffset(snapped.x, snapped.y)
+                persistHudPosition(settings, xDp = snapped.x.value, yDp = snapped.y.value)
+            }
+            Unit
         }
         // O ACK sai daqui e nao do topo do `main()`: ele afirma que esta versao
         // subiu inteira, e o unico ponto em que isso e verdade e depois de o
@@ -1804,6 +1857,9 @@ private fun runUsageMonitor(
                         sources = hudSources,
                         expanded = hudExpanded,
                         onHoverChange = { hovered -> hudHovered = hovered },
+                        onDragStart = hudDragBegin,
+                        onDragMove = hudDragTo,
+                        onDragEnd = hudDragFinish,
                         onOpenFull = { setHudMode(false) }
                     )
                 }

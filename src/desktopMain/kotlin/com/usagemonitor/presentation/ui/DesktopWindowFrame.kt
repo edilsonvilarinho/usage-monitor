@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -39,8 +41,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -277,6 +282,15 @@ internal data class HudSourceStatus(
  * `Modifier.semantics { contentDescription = ... }`,
  * `onNodeWithContentDescription` não encontra o nó).
  *
+ * **Com [WindowScope] seria mais curto e é justamente o que não se pode
+ * fazer.** `WindowDraggableArea` arrasta a partir do `down`, e um `clickable`
+ * dentro dela consome esse `down` antes: sobraria o clique e o arrasto nunca
+ * começaria. Aqui o gesto é **um só**, e o que separa clique de arrasto é o
+ * limiar de deslocamento — abaixo dele, [onOpenFull]; acima,
+ * [onDragStart]/[onDragMove]/[onDragEnd], que `Main.kt` traduz em movimento da
+ * janela AWT. Manter o AWT fora daqui é também o que deixa esta função
+ * exercitável em `runDesktopComposeUiTest`, que não fornece janela nenhuma.
+ *
  * **Largura de quem chama, não fixa aqui.** `Main.kt` dimensiona a janela pelo
  * conteúdo (`hudPillWidth`); `HudBar` só sabe preencher o que recebe, e por
  * isso `sourceLabel`/`resetLabel` truncam com reticências em vez de estourar o
@@ -293,6 +307,9 @@ internal fun HudBar(
     /** Quem decide é `Main.kt`, que é quem redimensiona a janela de verdade. */
     expanded: Boolean = false,
     onHoverChange: (Boolean) -> Unit = {},
+    onDragStart: () -> Unit = {},
+    onDragMove: () -> Unit = {},
+    onDragEnd: () -> Unit = {},
     onOpenFull: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -313,8 +330,23 @@ internal fun HudBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(AppChrome.hud)
-                .clickable(onClickLabel = HUD_BAR_OPEN_DESCRIPTION, onClick = onOpenFull)
-                .semantics { contentDescription = HUD_BAR_OPEN_DESCRIPTION }
+                .hudPressGesture(
+                    onDragStart = onDragStart,
+                    onDragMove = onDragMove,
+                    onDragEnd = onDragEnd,
+                    onClick = onOpenFull
+                )
+                // A ação de clique é **declarada** na semântica, não instalada
+                // por `clickable`: aquele consumiria o `down` e o arrasto nunca
+                // começaria. Sem a declaração, o único caminho para a janela
+                // completa deixaria de existir para leitor de tela.
+                .semantics {
+                    contentDescription = HUD_BAR_OPEN_DESCRIPTION
+                    onClick(label = HUD_BAR_OPEN_DESCRIPTION) {
+                        onOpenFull()
+                        true
+                    }
+                }
                 .padding(horizontal = HUD_PILL_PADDING),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
@@ -388,6 +420,54 @@ private fun HudSourcePanel(sources: List<HudSourceStatus>) {
                     modifier = Modifier.weight(1f)
                 )
                 AppStatusIndicator(label = source.statusLabel, tone = source.tone)
+            }
+        }
+    }
+}
+
+/**
+ * Um gesto só para as duas ações da pílula: mover a janela e abrir a completa.
+ *
+ * `clickable` empilhado com um detector de arrasto não resolve — o `clickable`
+ * consome o `down` e o arrasto nunca começa. Aqui o `down` inicia a espera, o
+ * deslocamento acumulado decide o que o gesto é, e o `up` despacha: abaixo do
+ * limiar foi clique, acima foi arrasto que terminou.
+ *
+ * **Nenhuma coordenada sai daqui.** `positionChange` é relativo a um componente
+ * que, durante o arrasto, se move junto com a janela — como deslocamento ele
+ * acumularia erro. Serve para medir se o limiar foi cruzado, e nada mais:
+ * `Main.kt` lê a posição absoluta do ponteiro na tela a cada [onDragMove], que
+ * é o que o `WindowDraggableArea` do Compose também faz por dentro.
+ */
+private fun Modifier.hudPressGesture(
+    onDragStart: () -> Unit,
+    onDragMove: () -> Unit,
+    onDragEnd: () -> Unit,
+    onClick: () -> Unit
+): Modifier = pointerInput(onDragStart, onDragMove, onDragEnd, onClick) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var travelled = 0f
+        var dragging = false
+
+        while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
+                ?: break
+
+            if (!change.pressed) {
+                if (dragging) onDragEnd() else onClick()
+                break
+            }
+
+            travelled += change.positionChange().getDistance()
+            if (!dragging && travelled > viewConfiguration.touchSlop) {
+                dragging = true
+                onDragStart()
+            }
+            if (dragging) {
+                change.consume()
+                onDragMove()
             }
         }
     }
