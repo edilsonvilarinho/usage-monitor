@@ -52,6 +52,7 @@ import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.FooterBar
+import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
@@ -134,6 +135,15 @@ fun DashboardScreen(
      * próprio interruptor, e a bandeja continua abrindo as Configurações.
      */
     showFooter: Boolean = true,
+    /** A moldura corrente da janela — marcada no menu de modos do rodapé. */
+    windowMode: WindowMode = WindowMode.STANDARD,
+    /**
+     * Troca a moldura da janela (issue #187); `null` esconde o menu.
+     *
+     * Repassado ao rodapé sem interpretação: quem sabe que os dois modos são
+     * mutuamente exclusivos é `Main.kt`, dono das duas preferências.
+     */
+    onWindowModeChange: ((WindowMode) -> Unit)? = null,
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -185,7 +195,9 @@ fun DashboardScreen(
                 onOpenHelp = onOpenHelp,
                 countdownUpdatesEnabled = countdownUpdatesEnabled,
                 onOpenAdminOverview = onOpenAdminOverview,
-                onOpenTeamPresence = onOpenTeamPresenceOverview
+                onOpenTeamPresence = onOpenTeamPresenceOverview,
+                windowMode = windowMode,
+                onWindowModeChange = onWindowModeChange
             )
         },
         containerColor = MaterialTheme.colorScheme.background

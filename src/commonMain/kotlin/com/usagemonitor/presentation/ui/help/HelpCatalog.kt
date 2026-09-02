@@ -263,7 +263,10 @@ object HelpCatalog {
                 "primeira linha termina com quanto falta para a próxima coleta automática. Os " +
                 "dois modos são exclusivos: ligar um desliga o outro.",
             steps = listOf(
-                "Abra Configurações → \"Geral\" e use \"Somente os cards\" ou \"Barra HUD\".",
+                "No rodapé da janela, clique no ícone \"Modo de janela\" e escolha \"Padrão\", " +
+                    "\"Somente os cards\" ou \"Barra HUD\" — o menu só existe no modo padrão, " +
+                    "porque é o único com rodapé.",
+                "Pelas Configurações: abra \"Geral\" e use \"Somente os cards\" ou \"Barra HUD\".",
                 "Pelo teclado: Ctrl+Shift+M alterna o modo somente cards e Ctrl+Shift+H alterna a " +
                     "barra HUD.",
                 "O menu do ícone da bandeja tem as duas entradas — é o caminho de volta quando a " +
@@ -484,7 +487,10 @@ object HelpCatalog {
                 "row ends with how long is left until the next automatic " +
                 "collection. The two modes are mutually exclusive: turning one on turns the other off.",
             steps = listOf(
-                "Open Settings → \"General\" and use \"Cards only\" or \"HUD strip\".",
+                "In the window footer, click the \"Window mode\" icon and pick \"Standard\", " +
+                    "\"Cards only\" or \"HUD strip\" — the menu exists only in standard mode, " +
+                    "since that is the only one with a footer.",
+                "From Settings: open \"General\" and use \"Cards only\" or \"HUD strip\".",
                 "From the keyboard: Ctrl+Shift+M toggles cards only mode and Ctrl+Shift+H toggles " +
                     "the HUD strip.",
                 "The tray icon menu carries both entries — that is the way back when the window is " +

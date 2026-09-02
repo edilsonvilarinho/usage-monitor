@@ -164,6 +164,7 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.hudQuotaChipText
 import com.usagemonitor.presentation.ui.components.nextRefreshLabel
@@ -2151,7 +2152,29 @@ private fun runUsageMonitor(
                     },
                     cliSessionPulses = cliSessionPulses,
                     teamSessionPulses = teamSessionPulses,
-                    showFooter = !cardsOnlyMode
+                    showFooter = !cardsOnlyMode,
+                    // Acesso rápido às três molduras (issue #187). O menu vive no
+                    // rodapé, que só é composto no modo padrão — os caminhos de
+                    // volta continuam sendo o teclado, a bandeja, a faixa de hover
+                    // do modo somente cards e o clique na pílula do HUD.
+                    //
+                    // A exclusão mútua continua sendo dos setters: o menu escolhe
+                    // uma moldura, e são eles que desligam a outra.
+                    windowMode = when {
+                        hudMode -> WindowMode.HUD
+                        cardsOnlyMode -> WindowMode.CARDS_ONLY
+                        else -> WindowMode.STANDARD
+                    },
+                    onWindowModeChange = { mode ->
+                        when (mode) {
+                            WindowMode.STANDARD -> {
+                                setCardsOnlyMode(false)
+                                setHudMode(false)
+                            }
+                            WindowMode.CARDS_ONLY -> setCardsOnlyMode(true)
+                            WindowMode.HUD -> setHudMode(true)
+                        }
+                    }
                 )
             }
 

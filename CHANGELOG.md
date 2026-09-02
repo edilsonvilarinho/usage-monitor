@@ -19,6 +19,11 @@ someone using the app.
   click of whatever is behind it, and a quota with no reset to show — a prepaid balance — prints
   nothing in its place.
 
+- A window-mode menu in the footer: one icon opens the three frames -- standard, cards only and the
+  HUD strip -- with the current one marked. Until now the two reduced frames were reachable only
+  through two switches buried in the Settings "System" section, two keyboard shortcuts or the tray,
+  which is why they were mostly found by accident.
+
 - The HUD strip now ends with a countdown to the next automatic collection. It was already in the
   footer, but the footer is not drawn in HUD mode, so the only way to know how long was left was to
   leave the mode. It is drawn once, on the first row — the polling is a single loop for the whole

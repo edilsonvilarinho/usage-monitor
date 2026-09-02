@@ -573,6 +573,30 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
 - A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
   as capturas do README continuam com a moldura inteira.
 
+**Menu de modos no rodapé** (`WindowMode` + `AppMenu` + `FooterBar`; issue #187): o ícone que abre
+as três molduras — padrão, somente os cards e barra HUD — com a corrente marcada. Antes dele as duas
+molduras reduzidas só eram alcançadas por dois interruptores no meio da seção "Sistema" das
+Configurações, por `Ctrl+Shift+M`/`Ctrl+Shift+H` ou pela bandeja, e por isso só eram descobertas por
+acidente.
+- **`WindowMode` é enum novo, e as preferências continuam sendo dois booleanos.** `cardsOnlyMode` e
+  `hudMode` seguem separados em `PreferencesSettings`, e a exclusão mútua continua sendo regra dos
+  setters em `Main.kt`: o enum descreve o que o **controle** oferece, não como o estado é guardado.
+  Os rótulos são os **mesmos** das Configurações — dois nomes para a mesma moldura fariam o passo da
+  ajuda apontar para um controle que a tela chama de outra coisa.
+- **`AppMenu` é primitiva nova, e é `Popup` com a superfície deste sistema — não o `DropdownMenu` do
+  Material.** Aquele traz a própria superfície, o próprio raio, a própria animação de entrada e a
+  própria altura de item, e nenhum dos quatro é o deste sistema. O item selecionado carrega **marca
+  além do realce**, com o espaço da marca reservado em todas as linhas: sem isso o rótulo da
+  selecionada anda para o lado a cada troca de opção.
+- **O menu abre para cima quando não cabe abaixo**, e isso está afirmado por teste numa cena de
+  240×320dp — o piso de arrasto da janela principal. Popup no Compose Desktop é camada **dentro** da
+  janela, recortada pelos limites dela (a #164 pagou isso), e o rodapé é a última linha: um menu que
+  só soubesse abrir para baixo nasceria fora da janela.
+- **Ele existe só no modo padrão**, porque o rodapé só é composto ali. Os caminhos de volta continuam
+  sendo os quatro que já existiam, e nenhum deles some. `onWindowModeChange = null` esconde o
+  controle — mesmo padrão de `onOpenAdminOverview`, e é o que mantém os geradores de captura
+  intactos.
+
 **Barra HUD** (`DesktopWindowFrame(hud)` + `HudBar` + `HudWindowGeometry.kt` +
 `HudSummaryViewModel` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
 [`hud-flutuante-164-execucao.md`](docs/planos/hud-flutuante-164-execucao.md)): terceiro chrome, ainda
