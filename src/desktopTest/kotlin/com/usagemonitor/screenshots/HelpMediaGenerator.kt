@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -11,12 +13,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AccountCreditUsage
+import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
@@ -24,16 +29,24 @@ import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.HistoryScreen
+import com.usagemonitor.presentation.ui.AppUpdateBanner
+import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.TeamPresenceContent
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
+import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.help.HelpTopic
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
+import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
+import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import kotlinx.datetime.Instant
 import java.io.File
@@ -69,6 +82,10 @@ fun main(args: Array<String>) {
     recordAlerts(outputDir)
     recordExport(outputDir)
     recordTeam(outputDir)
+    recordPresence(outputDir)
+    recordWindowModes(outputDir)
+    recordAppearance(outputDir)
+    recordUpdates(outputDir)
 
     println("Demos geradas em ${outputDir.absolutePath}")
 }
@@ -366,6 +383,204 @@ private fun recordTeam(outputDir: File) {
         recorder.hold(1_700)
     }
 }
+
+/** Presença: quem está online e quem está de fato trabalhando agora. */
+private fun recordPresence(outputDir: File) {
+    val state = DemoState(contentHeight = 430.dp)
+
+    record(outputDir, HelpTopic.PRESENCE, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                TeamPresenceContent(
+                    state = TeamPresenceUiState.Success(
+                        entries = ScreenshotFixtures.teamPresence,
+                        accountLabel = "dev@example.com — Example Org",
+                        lastChangedAt = ScreenshotFixtures.NOW
+                    ),
+                    language = AppLanguage.PT,
+                    localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID,
+                    canManage = true
+                )
+            }
+        }
+
+        recorder.animate(800) {}
+        recorder.hold(3_400)
+    }
+}
+
+/**
+ * Modos de janela: a barra HUD recolhida e, com o ponteiro em cima, a lista.
+ *
+ * A cena mostra só a barra, sem moldura de janela em volta: ela **é** a janela
+ * inteira nesse modo, e desenhar um quadro fictício em torno dela inventaria um
+ * cromo que o modo justamente remove.
+ */
+private fun recordWindowModes(outputDir: File) {
+    val state = DemoState()
+    var expanded by mutableStateOf(false)
+
+    record(outputDir, HelpTopic.WINDOW_MODES, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    DemoDashboardBackdrop()
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(AppSpacing.lg)
+                            .width(HUD_DEMO_WIDTH)
+                            .height(if (expanded) HUD_DEMO_EXPANDED_HEIGHT else HUD_DEMO_HEIGHT)
+                    ) {
+                        HudBar(
+                            statusTone = AppTone.WARNING,
+                            sources = ScreenshotFixtures.hudSources,
+                            fallbackLabel = "Carregando",
+                            expanded = expanded,
+                            onOpenFull = {}
+                        )
+                    }
+                }
+            }
+        }
+
+        recorder.animate(600) {}
+        recorder.hold(1_300)
+        recorder.moveCursor(state.cursor, x = 700.dp, y = 30.dp, durationMillis = 600)
+        recorder.animate(200) { expanded = true }
+        recorder.hold(2_000)
+    }
+}
+
+/** Aparência: tema, idioma e escala, na aba Geral das Configurações. */
+private fun recordAppearance(outputDir: File) {
+    val state = DemoState(contentHeight = 700.dp)
+    var theme by mutableStateOf(AppThemePreset.OBSIDIANA_DARK)
+
+    record(outputDir, HelpTopic.APPEARANCE, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                SettingsDialogContent(
+                    currentTheme = theme,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = ScreenshotFixtures.enabledApis,
+                    autoStartEnabled = true,
+                    alwaysOnTopEnabled = false,
+                    windowOpacityPercent = 92,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onAlwaysOnTopChange = {},
+                    onApiToggle = { _, _ -> },
+                    anthropicProfiles = ScreenshotFixtures.anthropicProfiles
+                )
+            }
+        }
+
+        recorder.animate(800) {}
+        recorder.hold(1_400)
+        recorder.moveCursor(state.cursor, x = 770.dp, y = 254.dp, durationMillis = 600)
+        recorder.click(state.cursor) { theme = AppThemePreset.GELO_LIGHT }
+        recorder.animate(400) {}
+        recorder.hold(1_800)
+    }
+}
+
+/**
+ * Atualização automática: a faixa do dashboard nos três estados que importam.
+ *
+ * A faixa, e não o interruptor das Configurações: o interruptor é o passo de
+ * ativação, que o texto do tópico já descreve, e o que se quer mostrar é o que
+ * acontece depois de ligá-lo.
+ */
+private fun recordUpdates(outputDir: File) {
+    val state = DemoState()
+    var update by mutableStateOf<AppUpdateUiState>(
+        AppUpdateUiState.Downloading(DEMO_UPDATE, percent = 42)
+    )
+
+    record(outputDir, HelpTopic.UPDATES, state) { recorder ->
+        recorder.setContent {
+            DemoScene(state) {
+                Column(modifier = Modifier.fillMaxSize().padding(AppSpacing.lg)) {
+                    AppUpdateBanner(
+                        state = update,
+                        language = AppLanguage.PT,
+                        onOpenRelease = {},
+                        onRestartAndUpdate = {}
+                    )
+                    // `weight` e não `fillMaxSize`: dentro da coluna, um filho
+                    // que pede a altura toda mede a partir do topo dela e
+                    // transborda por cima da faixa — foi o que o quadro gerado
+                    // mostrou, com o texto da faixa impresso sobre os cards.
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = AppSpacing.md)
+                    ) {
+                        DemoDashboardBackdrop(padding = 0.dp)
+                    }
+                }
+            }
+        }
+
+        recorder.animate(600) {}
+        recorder.hold(1_500)
+        update = AppUpdateUiState.Downloading(DEMO_UPDATE, percent = 88)
+        recorder.animate(300) {}
+        recorder.hold(1_200)
+        update = AppUpdateUiState.Ready(DEMO_UPDATE)
+        recorder.animate(300) {}
+        recorder.hold(2_000)
+    }
+}
+
+/**
+ * A grade de cards por trás das duas faixas que flutuam sobre ela.
+ *
+ * A barra HUD e a faixa de atualização aparecem **sobre** o dashboard, e
+ * gravá-las num fundo vazio deixava 90% do quadro preto — o espectador não teria
+ * como saber do que elas são vizinhas.
+ */
+@Composable
+private fun DemoDashboardBackdrop(padding: Dp = AppSpacing.lg) {
+    // `clipToBounds` porque a grade é um `Layout` próprio que devolve a altura
+    // do conteúdo inteiro, e não a que recebeu: sem o recorte ela transborda a
+    // caixa e pinta por cima do que estiver acima dela — a faixa de atualização
+    // saiu impressa por baixo dos cards no primeiro quadro gerado.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .padding(padding),
+        contentAlignment = Alignment.TopStart
+    ) {
+        ResponsiveDashboardCardGrid(
+            items = ScreenshotFixtures.dashboardStats,
+            refreshingTargets = emptySet(),
+            minimizedCards = emptySet(),
+            riskSummaries = ScreenshotFixtures.dashboardRiskSummaries,
+            language = AppLanguage.PT,
+            onRefreshCard = {},
+            onMoveCardToIndex = { _, _ -> },
+            onToggleCardMinimized = {},
+            onOpenHistoryCard = { _, _ -> },
+            teamEnabledProfileIds = setOf("default"),
+            now = ScreenshotFixtures.NOW,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+private val DEMO_UPDATE = AppUpdateInfo(
+    version = "38.2.0",
+    releasePageUrl = "https://github.com/edilsonvilarinho/usage-monitor/releases/tag/v38.2.0"
+)
+
+/** A pílula do HUD tem teto de 420dp; a lista aberta cresce por linha de conta. */
+private val HUD_DEMO_WIDTH = 420.dp
+private val HUD_DEMO_HEIGHT = 24.dp
+private val HUD_DEMO_EXPANDED_HEIGHT = 76.dp
 
 // --- Máquina de gravação -----------------------------------------------------
 

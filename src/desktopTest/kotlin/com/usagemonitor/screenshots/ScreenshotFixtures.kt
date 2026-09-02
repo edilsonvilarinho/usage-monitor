@@ -32,7 +32,10 @@ import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.HudQuotaChip
+import com.usagemonitor.presentation.ui.HudSourceStatus
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
@@ -701,6 +704,41 @@ internal object ScreenshotFixtures {
         ApiSource.ANTHROPIC,
         ApiSource.CODEX,
         ApiSource.DEEPSEEK
+    )
+
+    /**
+     * As contas como a barra HUD as mostra: uma linha por conta, com a palavra
+     * da pior cota e um ponto por cota.
+     *
+     * Os percentuais são os mesmos dos cards do dashboard — a barra é a mesma
+     * coleta vista de outro jeito, e números diferentes nas duas telas fariam
+     * quem compara as demos duvidar de qual está certa.
+     */
+    val hudSources: List<HudSourceStatus> = listOf(
+        HudSourceStatus(
+            label = "Anthropic — Padrão",
+            statusLabel = "Atenção",
+            tone = AppTone.WARNING,
+            quotas = listOf(
+                HudQuotaChip(text = "5h 68%", tone = AppTone.WARNING),
+                HudQuotaChip(text = "7d 41%", tone = AppTone.OK)
+            )
+        ),
+        HudSourceStatus(
+            label = "Anthropic — Sandbox",
+            statusLabel = "Normal",
+            tone = AppTone.OK,
+            quotas = listOf(
+                HudQuotaChip(text = "5h 12%", tone = AppTone.OK),
+                HudQuotaChip(text = "7d 7%", tone = AppTone.OK)
+            )
+        ),
+        HudSourceStatus(
+            label = "DeepSeek",
+            statusLabel = "Normal",
+            tone = AppTone.OK,
+            quotas = listOf(HudQuotaChip(text = "Saldo 62%", tone = AppTone.OK))
+        )
     )
 
     /** Teto de US$ 150,00 com US$ 51,20 gastos em 12 dos 31 dias do mês. */
