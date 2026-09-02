@@ -530,11 +530,12 @@ enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `B
 - A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
   as capturas do README continuam com a moldura inteira.
 
-**Barra HUD** (`DesktopWindowFrame(hud)` + `HudBar` + `HudModePreferences.kt`; issue #164): terceiro
-chrome, ainda mais discreto que o modo somente cards — a mesma janela principal encolhida a uma
-pílula de 320×24dp (`HUD_PILL_WIDTH_DP` + `AppChrome.hud`), ancorada no **canto superior direito** da
-tela, sempre no topo. Não mostra cards, só `AppStatusIndicator` com o pior risco entre todas as
-cotas, a fonte que o determinou
+**Barra HUD** (`DesktopWindowFrame(hud)` + `HudBar` + `HudWindowGeometry.kt` +
+`HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
+[`hud-flutuante-164-execucao.md`](docs/planos/hud-flutuante-164-execucao.md)): terceiro chrome, ainda
+mais discreto que o modo somente cards — a mesma janela principal encolhida a uma pílula de 24dp de
+altura (`AppChrome.hud`) e **largura medida pelo conteúdo**, arrastável, sempre no topo. Não mostra
+cards, só `AppStatusIndicator` com o pior risco entre todas as cotas, a fonte que o determinou
 (`UsageAlertViewModel.worstSnapshot`, ao lado de `worstRisk` — a bandeja continua lendo só o nível) e
 o tempo até o reset (`resetLabel`, a mesma função do cabeçalho expandido do card — nenhum formato de
 data novo). **Também não é valor novo em enum nenhum**: `hud` é um terceiro booleano de
@@ -554,32 +555,78 @@ setters em `Main.kt` (ligar um desliga o outro), não do tipo.
   é a ordem — não o tipo — que decide qual dos dois o AWT aplica primeiro. Sem isso o piso normal
   (240×320dp) impediria a pílula de existir, e a janela ficaria presa no tamanho antigo por baixo do
   que `mainWindowState.size` pede.
-- **Largura total foi a primeira versão, e estava errada — achado testando ao vivo, não antecipado
-  no plano original.** Sempre no topo (`alwaysOnTop`) mais largura da tela inteira cobria os
-  controles de qualquer outra janela que também tivesse algo nos primeiros 24dp do topo: barra de
-  menu de IDE, atalhos de editor. O Compose Desktop não tem click-through parcial numa `Window`
-  comum — a região inteira captura o clique, visível ou não —, então a única correção viável nesta
-  arquitetura (mesma janela, sem hack de shape nativo) é reduzir a área: `HUD_PILL_WIDTH_DP` (320,
-  mesma ordem de grandeza de `NarrowCardWidthThreshold` — não o mesmo token, responde a outra
-  pergunta) ancorada só no canto superior direito via `fitWindowPosition`, que já existia para prender
-  posição persistida dentro da área útil. `HudBar` não sabe a própria largura — preenche o que
-  recebe —, e por isso `sourceLabel`/`resetLabel` truncam com reticências (`TextOverflow.Ellipsis`)
-  em vez de estourar o container.
-- **Três saídas, mesmo padrão do modo somente cards**: clique em qualquer ponto da pílula (não há
-  botão próprio — a semântica vai no container inteiro, não só em `onClickLabel`), o item na bandeja
-  e `Ctrl+Shift+H`, combinação própria sem colidir com o `Ctrl+Shift+M` do modo somente cards.
-- **`HudBar` não usa `WindowScope` nem `WindowDraggableArea`.** Decisão tomada antes de escrever
-  código: a pílula não tem cards para reordenar, então o argumento que mantém a área de arrasto fora
-  do `CompactTitleBarOverlay` (colidir com a pressão longa do drag de card) não se aplica aqui — mas
-  arrasto sempre presente também não protege nada nesta pílula. Ancoragem é geometria decidida por
-  `Main.kt`, nunca gesto do usuário.
+- **Duas versões de ocupação foram achadas erradas ao vivo, não antecipadas em plano nenhum.** A
+  primeira era a largura inteira da tela: sempre no topo (`alwaysOnTop`), cobria os controles de
+  qualquer outra janela que tivesse algo nos primeiros 24dp do topo — barra de menu de IDE, atalhos
+  de editor. A segunda reduziu para 320dp fixos no canto superior direito, e continuava medindo
+  320dp para mostrar a palavra "Normal", num canto que é exatamente onde IDE e navegador põem
+  controles. O Compose Desktop não tem click-through parcial numa `Window` comum — a região inteira
+  captura o clique, visível ou não —, então **a única mitigação viável é ocupar menos área e deixar
+  o usuário escolher onde**. `HUD_PILL_WIDTH_DP` virou `HUD_PILL_MAX_WIDTH`: teto, não largura. O
+  papel que a largura fixa cumpria (não mudar de tamanho a cada coleta) passou para o teto mais as
+  reticências (`TextOverflow.Ellipsis`) que a pílula já usava. `HudBar` continua sem saber a própria
+  largura — preenche o que recebe.
+- **A largura é estimada pela métrica da fonte, nunca medida na composição** (`hudPillWidth`,
+  `hudPanelWidth`). A escala `label*` deste sistema é **mono**, e é isso que torna o avanço por
+  caractere calculável antes de existir composição; numa fonte proporcional este número não
+  existiria. Medir e devolver a largura para a janela fecharia o laço `redimensionar → recompor →
+  medir → redimensionar`. O preço de errar é um caractere truncado a mais, que as reticências já
+  tratam.
+- **O hover cresce a própria janela; não abre `Popup`.** A lista de fontes saía por
+  `HoverTooltipBox`, e popup no Compose Desktop é camada **dentro** da janela, recortada pelos
+  limites dela — `compose.layers.type` não está definido neste projeto, e o default recorta. Numa
+  janela de 24dp, um balão com piso de 180dp de largura e uma linha por fonte não cabe: era
+  recortado sobre o próprio alvo, o ponteiro passava a estar sobre o balão, a pílula recebia `Exit`,
+  a tooltip fechava e reabria no quadro seguinte. Sem popup não há laço.
+  - **O hover mora no container inteiro, não na pílula.** Preso aos 24dp de cima, mover o ponteiro
+    para dentro da lista tiraria o hover, a janela colapsaria e o ponteiro voltaria à pílula — o
+    mesmo laço com outro nome. Colapsar espera uma passada de `AppMotion.fast`; é atraso único, não
+    animação, que travaria o `waitForIdle`.
+  - **`hudAnchor` é o canto da pílula colapsada, e toda geometria sai dele.** Recalcular a partir da
+    posição corrente faria a expansão que cresce para cima deslocar a âncora, e a pílula subiria a
+    cada passagem do mouse. A pílula tem **duas larguras** — recolhida mede o ponto, expandida volta
+    com o texto inteiro —, senão o rótulo da fonte truncaria justamente quando o usuário foi olhar.
+  - **A linha do painel não é `AppDataRow`** (`HUD_SOURCE_ROW_HEIGHT`, 20dp): aquela primitiva tem
+    piso de 32dp mais 8dp de padding vertical, e seis fontes dariam ~288dp — uma janela, não um HUD.
+    Mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp do cromo.
+- **`HudBar` ganhou arrasto, e continua sem `WindowScope`.** A decisão anterior ("ancoragem é
+  geometria de `Main.kt`, nunca gesto do usuário") foi revertida: com posição imutável não havia para
+  onde tirar a pílula de cima dos controles de outra janela. Mas `WindowDraggableArea` exigiria
+  `WindowScope` e arrasta a partir do `down`, que um `clickable` interno consumiria antes — sobraria
+  o clique e o arrasto nunca começaria. O gesto é **um só** (`hudPressGesture`), e o que separa
+  clique de arrasto é o limiar de deslocamento. A ação de clique é **declarada** na semântica
+  (`onClick`), não instalada: sem ela o único caminho de volta some para leitor de tela. Manter o AWT
+  fora de `HudBar` é também o que a deixa exercitável em `runDesktopComposeUiTest`.
+  - **Nenhuma coordenada sai de `HudBar`.** `positionChange` é relativo a um componente que, durante
+    o arrasto, se move junto com a janela; serve para medir o limiar e nada mais. `Main.kt` lê a
+    posição absoluta do ponteiro por `MouseInfo` — o mesmo caminho do `WindowDraggableArea` — e o
+    delta é **incremental**: guardar o ponto de partida e somar o total deixaria a pílula presa na
+    borda, porque o excedente de um arrasto para fora da tela nunca seria descartado.
+  - **O movimento é aplicado à âncora, nunca à janela.** Existe um caminho só até a geometria, e a
+    pílula expandida acompanha o ponteiro sem desfazer a conta de "cresce para cima ou para baixo".
+- **Onde ela para é escolha do usuário, e é gravada** (`snapHudPosition` + `HudWindowPreferences`).
+  Ao soltar, gruda na borda mais próxima da **área útil** — que sai de `maximumWindowBounds` e já
+  desconta a barra de tarefas, então a borda de baixo é "logo acima dela". Desenhar **sobre** a barra
+  (o modelo do TBH: Task Bar Hero, que o usuário trouxe como referência) ficou fora de escopo:
+  exigiria limites físicos de tela e disputa de ordem-z com uma janela que também é topmost. Leitura
+  e escrita passam sempre por `fitWindowPosition`: posição salva num monitor que já não existe
+  descreve uma tela que sumiu.
+- **Tudo em `ON_TRACK` recolhe a pílula ao ponto** (`AppStatusDot`, extraído de
+  `AppStatusIndicator`). O dado não some — para de ocupar tela enquanto diz que está tudo bem, e o
+  hover devolve a pílula inteira. É a **única** exceção a "cor nunca informa sozinha" neste sistema,
+  e só se sustenta porque a palavra está a um movimento de mouse; em lista, célula ou cabeçalho
+  continua sendo o indicador com palavra. Mesmo princípio do ponto de risco da bandeja, que não
+  acende nada em `ON_TRACK`. **Lista vazia não recolhe**: ali ainda não se coletou nada, e o ponto
+  afirmaria que está tudo bem antes de saber. Parada, a janela fica translúcida
+  (`HUD_IDLE_OPACITY_PERCENT`, aplicado como **teto** sobre a preferência do usuário — quem escolheu
+  60% não passa a ver 70 por entrar no HUD).
+- **Três saídas, mesmo padrão do modo somente cards**: clique curto em qualquer ponto da pílula, o
+  item na bandeja e `Ctrl+Shift+H`, combinação própria sem colidir com o `Ctrl+Shift+M` do modo
+  somente cards.
 - **Não é primitiva de risco nova.** `AppHudBar`/`HudBar` reusa `AppStatusIndicator` por dentro —
-  mesma relação de `AppUpdateStrip` com `AppButton` no design system.
-- **O hover lista todas as fontes, não só a vencedora** (pedido de quem tem várias contas, depois de
-  ver a pílula ao vivo). A pílula inteira é o gatilho de um `HoverTooltipBox` — o mesmo que a cota de
-  cada card já usa —, com `allSourceRisks` (`WorstQuotaSnapshot.kt`) formatado como uma
-  `TooltipMetric` por fonte, pior primeiro. `worstQuotaSnapshot` passou a ser só a primeira entrada de
-  `allSourceRisks`: duas passadas pela mesma lista divergiriam eventualmente.
+  mesma relação de `AppUpdateStrip` com `AppButton` no design system. `allSourceRisks`
+  (`WorstQuotaSnapshot.kt`) alimenta o painel, e `worstQuotaSnapshot` é só a primeira entrada dela:
+  duas passadas pela mesma lista divergiriam eventualmente.
 
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
 abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e

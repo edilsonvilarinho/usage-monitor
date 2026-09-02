@@ -168,7 +168,7 @@ invented here.
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
-| `components/data/` | AppProgressTrack · AppStatusIndicator · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
+| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
 | `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
@@ -183,9 +183,12 @@ draws explicitly, this system adds four **chrome** components that the prototype
 without naming: `AppWindowFrame`, `AppStatusBar`, `AppToolbar`, `AppSettingsNav` — plus
 `AppUpdateStrip` (the prototype's "faixa de atualização — os quatro estados"),
 `AppColumnHeader` (its `.colhead` strip), and `AppHudBar` (its "Barra HUD" pill,
-issue #164 — a 320×24dp pill docked to the top-right corner that hosts nothing but an
-`AppStatusIndicator` and the winning source/reset time; full width was the first version, found wrong
-live — always-on-top plus edge-to-edge covered other windows' own top 24dp). Nothing else was invented.
+issue #164 — a draggable pill, no wider than 320dp, that hosts nothing but an `AppStatusIndicator`
+and the winning source/reset time, and grows on hover to list every source). Two versions were found
+wrong live before this one: full width, because always-on-top plus edge-to-edge covered other
+windows' own top 24dp, and then a fixed 320dp corner pill, because it still measured 320dp to show
+the word "Normal". `AppStatusDot` is the seventh addition, extracted from `AppStatusIndicator` for
+the pill's collapsed state. Nothing else was invented.
 
 ### The conformance pass — 2026-08-27
 

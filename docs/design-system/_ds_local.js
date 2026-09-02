@@ -16,6 +16,7 @@
     'components/forms/AppSegmentedControl.jsx',
     'components/data/AppProgressTrack.jsx',
     'components/data/AppStatusIndicator.jsx',
+    'components/data/AppStatusDot.jsx',
     'components/data/AppDataRow.jsx',
     'components/data/AppDataTable.jsx',
     'components/data/AppColumnHeader.jsx',

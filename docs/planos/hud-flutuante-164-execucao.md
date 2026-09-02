@@ -75,3 +75,4 @@ cota"): popup que cobre o próprio alvo é defeito já conhecido deste app.
 | A3 | O hover cresce a janela; o `Popup` sai do HUD | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1799 testes (11 em `DesktopWindowFrameTest`, 4 novos) |
 | A4 | Arrasto da pílula, encaixe na borda e posição persistida | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1801 testes (13 em `DesktopWindowFrameTest`, 2 novos) |
 | A5 | Recolher ao ponto com tudo em `ON_TRACK` e translucidez sem hover | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1803 testes (15 em `DesktopWindowFrameTest`, 2 novos) |
+| A6 | Protótipo, design system e CLAUDE.md | inspeção do diff + balanceamento de tags do bloco HUD do protótipo (35/35 `div`, 27/27 `span`) | quatro estados no protótipo e no kit, `AppStatusDot` publicado, bloco "Barra HUD" do CLAUDE.md reescrito, cinco linhas novas na §15 |
