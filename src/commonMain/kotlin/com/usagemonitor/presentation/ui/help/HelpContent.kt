@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.AppButton
@@ -122,7 +124,15 @@ fun HelpContent(
             Column(modifier = Modifier.fillMaxHeight().weight(1f)) {
                 // A barra de rolagem mora dentro da área rolável: fora dela
                 // ficaria por cima da lista de tópicos.
-                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    // A faixa da demo cede altura antes de a seção "Como ativar"
+                    // sair da vista. Medido no app: numa área útil de 1280×752
+                    // com a escala em 115%, os 420dp fixos deixavam os passos
+                    // abaixo da dobra — e eles são a pergunta que a tela existe
+                    // para responder. A demo encolhe com `Fit` e continua
+                    // inteira; a seção some.
+                    val mediaHeight = minOf(HELP_MEDIA_HEIGHT, maxHeight * HELP_MEDIA_HEIGHT_SHARE)
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -143,6 +153,7 @@ fun HelpContent(
                                 media = media,
                                 title = entry.title,
                                 isPt = isPt,
+                                height = mediaHeight,
                                 modifier = Modifier.padding(AppSpacing.md)
                             )
                             Text(
@@ -226,12 +237,13 @@ private fun HelpMediaFrame(
     media: HelpMediaState,
     title: String,
     isPt: Boolean,
+    height: Dp,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(HELP_MEDIA_HEIGHT)
+            .height(height)
             .appSurfaceBlock(shape = AppShapes.small),
         contentAlignment = Alignment.Center
     ) {
@@ -290,12 +302,24 @@ private val HELP_NAV_WIDTH = 200.dp
 private val STEP_NUMBER_WIDTH = 20.dp
 
 /**
- * Altura da faixa da demo, igual à altura da gravação.
+ * Teto da faixa da demo, igual à altura da gravação.
  *
  * As demos são gravadas em 1000×420 porque as telas deste app têm orçamento de
  * coluna de ~1000dp — gravá-las estreitas mostraria um layout que o app não tem.
  * Exibir 1000×420 numa faixa mais baixa reduziria a demo, e reduzir texto de
  * 12px pela metade torna ilegível justamente o rótulo que ela existe para
  * apontar. Por isso a faixa tem a altura da gravação, e a janela é larga.
+ *
+ * É **teto**, não altura fixa: em janela baixa ela cede lugar para a seção
+ * "Como ativar", pela [HELP_MEDIA_HEIGHT_SHARE].
  */
 private val HELP_MEDIA_HEIGHT = 420.dp
+
+/**
+ * Fatia máxima da área rolável que a demo ocupa numa janela baixa.
+ *
+ * Acima disso o cabeçalho, a descrição e o começo dos passos não cabem juntos —
+ * e é a demo que encolhe, porque `ContentScale.Fit` a mantém inteira e legível
+ * enquanto a seção que some não tem como se encolher.
+ */
+private const val HELP_MEDIA_HEIGHT_SHARE = 0.55f

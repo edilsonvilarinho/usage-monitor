@@ -1,9 +1,12 @@
 package com.usagemonitor.screenshots
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -384,9 +387,17 @@ private fun recordTeam(outputDir: File) {
     }
 }
 
-/** Presença: quem está online e quem está de fato trabalhando agora. */
+/**
+ * Presença: quem está online e quem está trabalhando agora, e o filtro que
+ * deixa só quem está conectado.
+ *
+ * A primeira versão era a lista parada por cinco segundos — os onze quadros
+ * saíram idênticos, e `HelpMediaResourcesTest` reprovou: imagem parada vendida
+ * como demo. O filtro é o movimento que a tela de fato tem.
+ */
 private fun recordPresence(outputDir: File) {
     val state = DemoState(contentHeight = 430.dp)
+    var onlyOnline by mutableStateOf(false)
 
     record(outputDir, HelpTopic.PRESENCE, state) { recorder ->
         recorder.setContent {
@@ -395,7 +406,8 @@ private fun recordPresence(outputDir: File) {
                     state = TeamPresenceUiState.Success(
                         entries = ScreenshotFixtures.teamPresence,
                         accountLabel = "dev@example.com — Example Org",
-                        lastChangedAt = ScreenshotFixtures.NOW
+                        lastChangedAt = ScreenshotFixtures.NOW,
+                        onlyOnline = onlyOnline
                     ),
                     language = AppLanguage.PT,
                     localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID,
@@ -405,52 +417,100 @@ private fun recordPresence(outputDir: File) {
         }
 
         recorder.animate(800) {}
-        recorder.hold(3_400)
+        recorder.hold(1_600)
+        recorder.moveCursor(state.cursor, x = 420.dp, y = 30.dp, durationMillis = 600)
+        recorder.click(state.cursor) { onlyOnline = true }
+        recorder.animate(400) {}
+        recorder.hold(1_800)
     }
 }
 
 /**
- * Modos de janela: a barra HUD recolhida e, com o ponteiro em cima, a lista.
+ * Modos de janela: a mesma janela em três tamanhos, um de cada vez.
  *
- * A cena mostra só a barra, sem moldura de janela em volta: ela **é** a janela
- * inteira nesse modo, e desenhar um quadro fictício em torno dela inventaria um
- * cromo que o modo justamente remove.
+ * A primeira versão desenhava a barra HUD **por cima** da grade de cards, para
+ * a pílula não ficar sozinha num quadro vazio. Foi vista em uso e recusada: as
+ * duas exibições se misturaram — a linha do HUD parecia conteúdo de um card, e o
+ * quadro passou a mostrar um estado que o app não tem. As três aparecem agora em
+ * sequência, com fade entre elas, e o vazio em volta das duas últimas é o
+ * assunto: é a área de tela que o modo devolve.
  */
 private fun recordWindowModes(outputDir: File) {
     val state = DemoState()
-    var expanded by mutableStateOf(false)
+    var mode by mutableStateOf(WindowModeShot.NORMAL)
 
     record(outputDir, HelpTopic.WINDOW_MODES, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    DemoDashboardBackdrop()
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(AppSpacing.lg)
-                            .width(HUD_DEMO_WIDTH)
-                            .height(if (expanded) HUD_DEMO_EXPANDED_HEIGHT else HUD_DEMO_HEIGHT)
-                    ) {
-                        HudBar(
-                            statusTone = AppTone.WARNING,
-                            sources = ScreenshotFixtures.hudSources,
-                            fallbackLabel = "Carregando",
-                            expanded = expanded,
-                            onOpenFull = {}
-                        )
+                Crossfade(
+                    targetState = mode,
+                    animationSpec = tween(WINDOW_MODE_FADE_MILLIS),
+                    modifier = Modifier.fillMaxSize()
+                ) { shot ->
+                    when (shot) {
+                        WindowModeShot.NORMAL -> Column(modifier = Modifier.fillMaxSize()) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                DemoDashboardBackdrop()
+                            }
+                            FooterBar(
+                                appVersion = APP_VERSION,
+                                language = AppLanguage.PT,
+                                nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(437),
+                                onRefresh = {},
+                                onOpenSettings = {},
+                                nowProvider = { ScreenshotFixtures.NOW },
+                                countdownUpdatesEnabled = false
+                            )
+                        }
+
+                        // Sem barra de título e sem rodapé, e mais estreita: é
+                        // assim que a janela fica ao lado do editor.
+                        WindowModeShot.CARDS_ONLY -> Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(modifier = Modifier.width(CARDS_ONLY_DEMO_WIDTH).fillMaxHeight()) {
+                                DemoDashboardBackdrop(padding = AppSpacing.sm)
+                            }
+                        }
+
+                        WindowModeShot.HUD -> Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(HUD_DEMO_WIDTH)
+                                    .height(HUD_DEMO_EXPANDED_HEIGHT)
+                            ) {
+                                HudBar(
+                                    statusTone = AppTone.WARNING,
+                                    sources = ScreenshotFixtures.hudSources,
+                                    fallbackLabel = "Carregando",
+                                    expanded = true,
+                                    onOpenFull = {}
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
-        recorder.animate(600) {}
-        recorder.hold(1_300)
-        recorder.moveCursor(state.cursor, x = 700.dp, y = 30.dp, durationMillis = 600)
-        recorder.animate(200) { expanded = true }
+        recorder.animate(700) {}
+        recorder.hold(1_700)
+
+        mode = WindowModeShot.CARDS_ONLY
+        recorder.animate(WINDOW_MODE_FADE_MILLIS + 200L) {}
+        recorder.hold(1_700)
+
+        mode = WindowModeShot.HUD
+        recorder.animate(WINDOW_MODE_FADE_MILLIS + 200L) {}
         recorder.hold(2_000)
     }
 }
+
+private enum class WindowModeShot { NORMAL, CARDS_ONLY, HUD }
 
 /** Aparência: tema, idioma e escala, na aba Geral das Configurações. */
 private fun recordAppearance(outputDir: File) {
@@ -544,16 +604,17 @@ private fun recordUpdates(outputDir: File) {
  */
 @Composable
 private fun DemoDashboardBackdrop(padding: Dp = AppSpacing.lg) {
-    // `clipToBounds` porque a grade é um `Layout` próprio que devolve a altura
-    // do conteúdo inteiro, e não a que recebeu: sem o recorte ela transborda a
-    // caixa e pinta por cima do que estiver acima dela — a faixa de atualização
-    // saiu impressa por baixo dos cards no primeiro quadro gerado.
-    Box(
+    // Coluna rolável, como no dashboard de verdade — e não uma caixa qualquer.
+    // A grade é um `Layout` próprio que devolve a altura do conteúdo inteiro:
+    // fora de um contêiner rolável ela transborda a caixa, é ancorada pelo
+    // centro e o quadro começa no meio de um card. Foi o que os primeiros
+    // quadros gerados mostraram.
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .clipToBounds()
-            .padding(padding),
-        contentAlignment = Alignment.TopStart
+            .verticalScroll(rememberScrollState())
+            .padding(padding)
     ) {
         ResponsiveDashboardCardGrid(
             items = ScreenshotFixtures.dashboardStats,
@@ -579,8 +640,12 @@ private val DEMO_UPDATE = AppUpdateInfo(
 
 /** A pílula do HUD tem teto de 420dp; a lista aberta cresce por linha de conta. */
 private val HUD_DEMO_WIDTH = 420.dp
-private val HUD_DEMO_HEIGHT = 24.dp
 private val HUD_DEMO_EXPANDED_HEIGHT = 76.dp
+
+/** Largura da janela no modo somente cards: uma coluna de cards ao lado do editor. */
+private val CARDS_ONLY_DEMO_WIDTH = 420.dp
+
+private const val WINDOW_MODE_FADE_MILLIS = 300
 
 // --- Máquina de gravação -----------------------------------------------------
 
