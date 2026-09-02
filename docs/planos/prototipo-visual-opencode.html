@@ -970,6 +970,14 @@ nenhum da interface.</p>
   </div>
 </div>
 <p class="note"><b>Atividade observada.</b> OpenCode Zen Free e Kilo Free podem existir sem cotas quando já há uma fonte local configurada, mas ainda não houve uso detectado. O card vazio deve ser persistido no cache e reaparecer após reiniciar. Nas linhas expandidas, o rótulo e o valor são colunas de largura mínima; somente a barra ocupa o espaço flexível, e valores como <code>1 req.</code> e <code>17 req.</code> permanecem em uma linha mesmo em cards estreitos.</p>
+<p class="note"><b>O símbolo do saldo é o da moeda da conta, não US$</b> (issue #195). O card do DeepSeek desenhado acima
+mostra <code>US$</code> porque a conta do mockup está em dólar; a fonte devolve a moeda em
+<code>balance_infos[].currency</code> e é ela que decide o símbolo, para os dois saldos (recarregado e gratuito) — os dois
+saem da mesma entrada. O mapper lia esse campo só para escolher entre as moedas da lista e o descartava, então o default
+<code>USD</code> de <code>QuotaInfo.currencyCode</code> prevalecia: conta em yuan aparecia com o número certo e o símbolo
+errado, um fator de ~7 sem sinalização nenhuma. Moeda sem símbolo conhecido imprime o próprio código ISO
+(<code>CNY 100.00</code>) — <code>¥</code> serve CNY e JPY, e trocar um erro por uma ambiguidade não é correção. O
+<b>histórico continua em USD</b> enquanto <code>usage_snapshots</code> não tiver coluna de moeda (issue #202).</p>
 <p class="note"><b>O status do cabeçalho também é um hint.</b> Passe o cursor sobre <code>Normal</code>, <code>Atenção</code>
 ou <code>Crítico</code> para ver a cota que determinou o pior estado e a projeção que explica o rótulo. O texto do hint
 repete a regra usada no card: a cota deve resetar antes de esgotar em <code>Normal</code>; deve esgotar antes do reset em
