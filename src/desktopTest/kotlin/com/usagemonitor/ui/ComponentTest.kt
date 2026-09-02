@@ -74,6 +74,8 @@ import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_REMOVE_TEST_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
+import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_TEST_TAG
+import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
@@ -1918,6 +1920,46 @@ class ComponentTest {
     }
 
     // ── FooterBar ───────────────────────────────────────────────────────
+
+    /**
+     * O menu de modos (issue #187) mora no rodapé, e o rodapé mora na
+     * `DashboardScreen`: sem este repasse o controle existiria no `FooterBar` e
+     * nunca chegaria à tela. `null` no callback é o estado dos geradores de
+     * captura, que montam a tela sem despachar nada.
+     */
+    @Test
+    fun `DashboardScreen repassa o menu de modos de janela ao rodape`() = runDesktopComposeUiTest {
+        val enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
+        val viewModel = emptyDashboardViewModel(enabledApis)
+        viewModel.cancelCountdown()
+        val chosen = mutableListOf<WindowMode>()
+
+        setContent {
+            AppTheme(isDark = true) {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    appVersion = "7.0.0",
+                    language = AppLanguage.PT,
+                    cardOrder = emptyList(),
+                    minimizedCards = emptySet(),
+                    onMoveCardToIndex = { _, _ -> },
+                    onToggleCardMinimized = {},
+                    onOpenHistory = { _, _ -> },
+                    onOpenSettings = {},
+                    countdownUpdatesEnabled = false,
+                    windowMode = WindowMode.STANDARD,
+                    onWindowModeChange = { mode -> chosen += mode }
+                )
+            }
+        }
+
+        onNodeWithTag(FOOTER_WINDOW_MODE_TEST_TAG).performClick()
+        waitForIdle()
+        onNodeWithText("Barra HUD").performClick()
+        waitForIdle()
+
+        assertEquals(listOf(WindowMode.HUD), chosen)
+    }
 
     @Test
     fun `DashboardScreen shows refresh warning dialog and only refreshes on confirm`() = runDesktopComposeUiTest {
