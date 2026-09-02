@@ -40,6 +40,8 @@ sends prompt or response content anywhere.
 - **Desktop behaviour** — auto-start on all three platforms, light and dark themes, English and
   Portuguese, UI scale from 80% to 150%, adjustable window opacity, and self-update on Windows and
   Linux.
+- **In-app help** — twelve topics covering what each feature does, how to turn it on, and an animated
+  demo of it. Opens from the footer icon, the tray menu or `F1`.
 
 ## Supported integrations
 
@@ -120,7 +122,9 @@ Administrators see the same screen across every account:
 </details>
 
 Screenshots are rendered offscreen from the app's own components with synthetic data. No real
-account, machine or key appears in them.
+account, machine or key appears in them. The help window's demos come from the same engine
+(`gradlew.bat generateHelpMedia`) and ship inside the installer, under
+`src/desktopMain/resources/help/`.
 
 ## Installation
 
