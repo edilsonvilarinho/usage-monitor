@@ -166,6 +166,7 @@ import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.hudQuotaChipText
+import com.usagemonitor.presentation.ui.components.nextRefreshLabel
 import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.resetLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
@@ -1714,6 +1715,13 @@ private fun runUsageMonitor(
         // "está tudo bem" seria uma garantia que ninguém deu.
         val hudDotOnly = hudOrderedQuotas.isNotEmpty() &&
             hudOrderedQuotas.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
+        // Contagem até a próxima coleta (issue #185). O rodapé, que já a mostrava,
+        // não é composto em modo HUD — `DesktopWindowFrame` descarta `content()`
+        // quando `hud = true` —, e sem ela quem trabalha com a barra flutuante não
+        // tem como saber quanto falta sem sair do modo. O tique **não** mora aqui:
+        // ele recomporia `main()` inteiro a cada segundo.
+        val hudNextRefreshAt by viewModel.nextRefreshAt.collectAsState()
+        val hudCountdownDescription = nextRefreshLabel(language)
 
         // Em modo HUD o piso normal (240×320dp) impediria o AWT de aceitar a
         // barra — a janela ficaria presa no tamanho antigo por baixo do que
@@ -1777,13 +1785,15 @@ private fun runUsageMonitor(
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
             dotOnly = false,
-            expanded = false
+            expanded = false,
+            showsCountdown = true
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
         val hudTargetSize = hudWindowSize(
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
             dotOnly = hudCollapsedToDot,
-            expanded = hudExpanded
+            expanded = hudExpanded,
+            showsCountdown = true
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
 
         LaunchedEffect(hudMode) {
@@ -1974,6 +1984,8 @@ private fun runUsageMonitor(
                         fallbackLabel = hudFallbackLabel,
                         dotOnly = hudCollapsedToDot,
                         expanded = hudExpanded,
+                        nextRefreshAt = hudNextRefreshAt,
+                        countdownDescription = hudCountdownDescription,
                         onHoverChange = { hovered -> hudHovered = hovered },
                         onDragStart = hudDragBegin,
                         onDragMove = hudDragTo,
