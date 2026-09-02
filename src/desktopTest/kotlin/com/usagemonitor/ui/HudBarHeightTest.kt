@@ -63,6 +63,27 @@ class HudBarHeightTest {
         source("Codex", "Normal", AppTone.OK, "mensal 75%" to AppTone.OK)
     )
 
+    /** As mesmas fontes com a hora do reinício por cota (issue #189). */
+    private val sourcesComReset = listOf(
+        HudSourceStatus(
+            label = "INFORMATA2",
+            statusLabel = "Crítico",
+            tone = AppTone.CRITICAL,
+            quotas = listOf(
+                HudQuotaChip(text = "5h 28%", tone = AppTone.OK, resetText = "22h59"),
+                HudQuotaChip(text = "7d 9%", tone = AppTone.CRITICAL, resetText = "Ter 21h00")
+            )
+        ),
+        HudSourceStatus(
+            label = "Codex",
+            statusLabel = "Normal",
+            tone = AppTone.OK,
+            quotas = listOf(
+                HudQuotaChip(text = "mensal 75%", tone = AppTone.OK, resetText = "Qua 21h00")
+            )
+        )
+    )
+
     private fun assertMeasuredHeightMatchesGeometry(
         sources: List<HudSourceStatus>,
         expanded: Boolean,
@@ -155,6 +176,27 @@ class HudBarHeightTest {
     fun `a altura calculada bate com a composta na linha de carregamento com a contagem`() {
         assertMeasuredHeightMatchesGeometry(
             sources = emptyList(),
+            expanded = true,
+            showsCountdown = true
+        )
+    }
+
+    /**
+     * A hora do reinício (issue #189) entra na linha da cota que já existe, e
+     * portanto a altura não pode mudar. Como no caso da contagem, isso é
+     * afirmado aqui e não deduzido do código: as duas contas — a que dimensiona
+     * a janela e a que o Compose dispõe — são independentes e já divergiram uma
+     * vez.
+     */
+    @Test
+    fun `a altura calculada bate com a composta com a hora do reinicio`() {
+        assertMeasuredHeightMatchesGeometry(sources = sourcesComReset, expanded = true)
+    }
+
+    @Test
+    fun `a altura calculada bate com a composta com a hora do reinicio e a contagem`() {
+        assertMeasuredHeightMatchesGeometry(
+            sources = sourcesComReset,
             expanded = true,
             showsCountdown = true
         )

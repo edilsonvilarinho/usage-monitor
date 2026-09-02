@@ -366,6 +366,14 @@ internal data class HudSourceStatus(
  * palavra que diz qual dos dois é o caso. Sem ela a cor informaria estado
  * sozinha, que é justamente o que este sistema visual não faz.
  *
+ * **A hora do reinício sai só no painel expandido** (issue #189). A pílula
+ * parada fica na tela o tempo todo e o retângulo dela captura o clique de quem
+ * está atrás — a queixa que fez a largura virar teto na #164 —, então o reset é
+ * detalhe sob demanda: o ponteiro em cima já é o gesto que revela o resto da
+ * lista. Ele vai **ao lado de cada cota**, e não em coluna própria à direita da
+ * linha: a linha é por conta e as cotas são várias, e uma coluna única teria de
+ * escolher qual delas descrever.
+ *
  * **O hover mora no container inteiro.** Ele só serve ao estado recolhido
  * ([dotOnly]) — passar o mouse devolve a lista —, mas preso a uma linha só,
  * mover o ponteiro para dentro do painel tiraria o hover e a janela
@@ -565,6 +573,22 @@ internal fun HudBar(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1
                                 )
+                                // A hora do reinício (issue #189), só com o
+                                // ponteiro em cima. Tom secundário e sem
+                                // separador impresso: o reset não é consumo, e é
+                                // a diferença de tom que diz isso — a mesma que
+                                // a contagem regressiva usa na ponta da linha.
+                                // Um `·` entre os dois gastaria largura para
+                                // repetir o que o tom já informou.
+                                val resetText = chip.resetText
+                                if (expanded && resetText != null) {
+                                    Text(
+                                        text = resetText,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }
