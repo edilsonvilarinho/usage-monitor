@@ -80,6 +80,7 @@ import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
@@ -236,6 +237,14 @@ private const val MAIN_MIN_WINDOW_WIDTH_DP = 240
  * largura real — quem a decide é `hudPillWidth`.
  */
 private const val HUD_MIN_WINDOW_WIDTH_DP = 32
+
+/**
+ * Translucidez da pílula sem o ponteiro em cima.
+ *
+ * Entra como **teto** sobre a preferência do usuário, nunca como valor: quem já
+ * escolheu uma janela a 60% não passa a ver 70 por entrar no modo HUD.
+ */
+private const val HUD_IDLE_OPACITY_PERCENT = 70
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
@@ -1657,7 +1666,22 @@ private fun runUsageMonitor(
                 tone = toneFor(snapshot.risk.level)
             )
         }
-        val hudPillWidthDp = hudPillWidth(
+        // Nada em risco: a pílula recolhe ao ponto e devolve a tela. Lista vazia
+        // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
+        // que está tudo bem antes de saber.
+        val hudDotOnly = hudSourceRisks.isNotEmpty() &&
+            hudSourceRisks.all { snapshot -> snapshot.risk.level == UsageRiskLevel.ON_TRACK }
+        // Duas larguras, e não uma: recolhida ao ponto a pílula mede o ponto,
+        // mas expandida ela volta com o texto inteiro — medir o expandido pelo
+        // ponto truncaria o rótulo da fonte e o tempo até o reset justamente
+        // quando o usuário foi olhar.
+        val hudCollapsedPillWidthDp = hudPillWidth(
+            statusLabel = hudStatusLabel,
+            sourceLabel = hudSourceLabel,
+            resetLabel = hudResetLabel,
+            dotOnly = hudDotOnly
+        )
+        val hudExpandedPillWidthDp = hudPillWidth(
             statusLabel = hudStatusLabel,
             sourceLabel = hudSourceLabel,
             resetLabel = hudResetLabel
@@ -1714,17 +1738,21 @@ private fun runUsageMonitor(
 
         val hudScale = uiScaleFactor(uiScalePercent)
         val hudCollapsedSize = hudWindowSize(
-            pillWidth = hudPillWidthDp,
+            pillWidth = hudCollapsedPillWidthDp,
             panelWidth = hudPanelWidthDp,
             sourceCount = hudSources.size,
             expanded = false
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
-        val hudTargetSize = hudWindowSize(
-            pillWidth = hudPillWidthDp,
-            panelWidth = hudPanelWidthDp,
-            sourceCount = hudSources.size,
-            expanded = hudExpanded
-        ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
+        val hudTargetSize = if (hudExpanded) {
+            hudWindowSize(
+                pillWidth = hudExpandedPillWidthDp,
+                panelWidth = hudPanelWidthDp,
+                sourceCount = hudSources.size,
+                expanded = true
+            ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
+        } else {
+            hudCollapsedSize
+        }
 
         LaunchedEffect(hudMode) {
             if (hudMode) {
@@ -1834,8 +1862,18 @@ private fun runUsageMonitor(
                 }
             }
         }
-        LaunchedEffect(windowOpacityPercent) {
-            applyWindowOpacity(window, windowOpacityPercent)
+        // Parada, a pílula fica translúcida; com o ponteiro em cima, opaca. Ela
+        // continua capturando o clique de quem está atrás — o Compose Desktop
+        // não tem click-through parcial —, mas incomoda menos a leitura do que
+        // está por baixo. Nunca **acima** da preferência do usuário: quem já
+        // escolheu 60% não passa a ver 70 por entrar no HUD.
+        LaunchedEffect(windowOpacityPercent, hudMode, hudHovered) {
+            val effective = if (hudMode && !hudHovered) {
+                minOf(windowOpacityPercent, HUD_IDLE_OPACITY_PERCENT)
+            } else {
+                windowOpacityPercent
+            }
+            applyWindowOpacity(window, effective)
         }
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
             DesktopWindowFrame(
@@ -1856,6 +1894,7 @@ private fun runUsageMonitor(
                         resetLabel = hudResetLabel,
                         sources = hudSources,
                         expanded = hudExpanded,
+                        dotOnly = hudDotOnly && !hudExpanded,
                         onHoverChange = { hovered -> hudHovered = hovered },
                         onDragStart = hudDragBegin,
                         onDragMove = hudDragTo,

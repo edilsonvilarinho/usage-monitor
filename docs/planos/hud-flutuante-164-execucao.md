@@ -74,3 +74,4 @@ cota"): popup que cobre o próprio alvo é defeito já conhecido deste app.
 | A2 | Posição da pílula persistida em `PreferencesSettings` | `gradlew.bat desktopTest --tests "com.usagemonitor.HudWindowPreferencesTest"` | `BUILD SUCCESSFUL`, 6 testes |
 | A3 | O hover cresce a janela; o `Popup` sai do HUD | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1799 testes (11 em `DesktopWindowFrameTest`, 4 novos) |
 | A4 | Arrasto da pílula, encaixe na borda e posição persistida | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1801 testes (13 em `DesktopWindowFrameTest`, 2 novos) |
+| A5 | Recolher ao ponto com tudo em `ON_TRACK` e translucidez sem hover | `gradlew.bat allTests` | `BUILD SUCCESSFUL`, 1803 testes (15 em `DesktopWindowFrameTest`, 2 novos) |

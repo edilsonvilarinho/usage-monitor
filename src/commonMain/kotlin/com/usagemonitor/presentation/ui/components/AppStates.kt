@@ -77,12 +77,39 @@ private val STATE_PADDING = 44.dp
 private val SKELETON_HEIGHT = 10.dp
 
 /**
- * Indicador de estado: ponto e palavra.
+ * O ponto do indicador de estado, sozinho.
+ *
+ * Existe para a barra HUD (issue #164), que se recolhe ao ponto quando todas as
+ * fontes estão em `ON_TRACK`: um dado que diz "está tudo bem" não precisa ocupar
+ * tela até deixar de ser verdade. Extraído de [AppStatusIndicator], que passou a
+ * consumi-lo — duas anatomias para o mesmo ponto divergiriam.
+ *
+ * **Isto não afrouxa "cor nunca informa sozinha".** É o único lugar do app em
+ * que o ponto aparece sem palavra, e ali a palavra está a um movimento de mouse
+ * de distância: a pílula volta inteira ao passar o ponteiro. Não use em lista,
+ * célula ou cabeçalho — lá o indicador com palavra continua sendo o certo.
  *
  * [AppTone.NEUTRAL] desenha o ponto **vazado** em vez de preenchido — sem cor
  * para distinguir, o contorno é o que separa "desconectado" de "conectado" numa
  * captura em tons de cinza.
  */
+@Composable
+fun AppStatusDot(
+    tone: AppTone,
+    modifier: Modifier = Modifier
+) {
+    val color = tone.color()
+    val dot = modifier.size(STATUS_DOT_SIZE).clip(CircleShape)
+    Box(
+        modifier = if (tone == AppTone.NEUTRAL) {
+            dot.border(AppBorderWidth, color, CircleShape)
+        } else {
+            dot.background(color)
+        }
+    )
+}
+
+/** Indicador de estado: ponto e palavra. */
 @Composable
 fun AppStatusIndicator(
     label: String,
@@ -95,14 +122,7 @@ fun AppStatusIndicator(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
     ) {
-        val dot = Modifier.size(STATUS_DOT_SIZE).clip(CircleShape)
-        Box(
-            modifier = if (tone == AppTone.NEUTRAL) {
-                dot.border(AppBorderWidth, color, CircleShape)
-            } else {
-                dot.background(color)
-            }
-        )
+        AppStatusDot(tone = tone)
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,

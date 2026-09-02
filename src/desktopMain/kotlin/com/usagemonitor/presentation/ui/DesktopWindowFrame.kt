@@ -56,9 +56,11 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.usagemonitor.HUD_PANEL_VERTICAL_PADDING
+import com.usagemonitor.HUD_PILL_DOT_ONLY_PADDING
 import com.usagemonitor.HUD_PILL_PADDING
 import com.usagemonitor.HUD_SOURCE_ROW_HEIGHT
 import com.usagemonitor.presentation.ui.components.AppDivider
+import com.usagemonitor.presentation.ui.components.AppStatusDot
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
@@ -306,6 +308,15 @@ internal fun HudBar(
     sources: List<HudSourceStatus> = emptyList(),
     /** Quem decide é `Main.kt`, que é quem redimensiona a janela de verdade. */
     expanded: Boolean = false,
+    /**
+     * Todas as fontes em `ON_TRACK`: a pílula recolhe ao ponto.
+     *
+     * O dado não some — ele para de ocupar tela enquanto diz que está tudo bem,
+     * e o hover devolve a pílula inteira mais a lista. É o mesmo princípio do
+     * ponto de risco da bandeja, que não acende nada em `ON_TRACK`: sinal
+     * permanente vira decoração.
+     */
+    dotOnly: Boolean = false,
     onHoverChange: (Boolean) -> Unit = {},
     onDragStart: () -> Unit = {},
     onDragMove: () -> Unit = {},
@@ -347,10 +358,17 @@ internal fun HudBar(
                         true
                     }
                 }
-                .padding(horizontal = HUD_PILL_PADDING),
+                .padding(
+                    horizontal = if (dotOnly) HUD_PILL_DOT_ONLY_PADDING else HUD_PILL_PADDING
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
         ) {
+            if (dotOnly) {
+                AppStatusDot(tone = statusTone)
+                return@Row
+            }
+
             AppStatusIndicator(label = statusLabel, tone = statusTone)
 
             if (sourceLabel != null) {

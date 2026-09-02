@@ -310,6 +310,59 @@ class DesktopWindowFrameTest {
     }
 
     /**
+     * Com tudo em `ON_TRACK` a pílula recolhe ao ponto: o dado para de ocupar
+     * tela enquanto diz que está tudo bem. O ponto continua lá, e é o único
+     * lugar do app em que ele aparece sem palavra — a palavra está a um
+     * movimento de mouse.
+     */
+    @Test
+    fun `a barra HUD recolhida ao ponto esconde o texto`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Normal",
+                        statusTone = AppTone.OK,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 4h",
+                        sources = sources,
+                        dotOnly = true,
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Normal").assertDoesNotExist()
+        onNodeWithText("Anthropic · Padrão").assertDoesNotExist()
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).assertHeightIsEqualTo(AppChrome.hud)
+    }
+
+    /** Recolhida ao ponto, ela continua sendo o caminho para a janela completa. */
+    @Test
+    fun `a barra HUD recolhida ao ponto continua despachando o clique`() = runDesktopComposeUiTest {
+        var clicks = 0
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
+                    HudBar(
+                        statusLabel = "Normal",
+                        statusTone = AppTone.OK,
+                        sourceLabel = "Anthropic · Padrão",
+                        resetLabel = "reset em 4h",
+                        sources = sources,
+                        dotOnly = true,
+                        onOpenFull = { clicks += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
+        assertEquals(1, clicks)
+    }
+
+    /**
      * É `onHoverChange` que faz `Main.kt` crescer a janela. Sem esta fiação o
      * painel existe e nunca aparece — e o teste da lista acima passaria mesmo
      * assim, porque ele injeta `expanded` direto.
