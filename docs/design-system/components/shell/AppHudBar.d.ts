@@ -47,6 +47,27 @@ export interface AppHudBarProps {
   }>;
   /** Word of the single line shown before the first collection lands. */
   fallbackLabel?: ReactNode;
+  /**
+   * Time left until the next automatic collection, already formatted as `mm:ss`.
+   *
+   * It is drawn **once**, on the first row, and never in the collapsed state.
+   * The polling is a single loop for the whole app, not one per account, so a
+   * countdown on every row would claim each account has its own collection.
+   *
+   * This reference component only prints what it is handed. The Compose one ticks
+   * inside instead, because there the host is the window composable that builds
+   * the whole application graph and a per-second state in it would recompose all
+   * of it — see the contract note.
+   */
+  countdown?: ReactNode;
+  /**
+   * What the countdown means, spelled out — the icon's accessible name.
+   *
+   * There is no tooltip to lean on here (a popup is a layer *inside* the window
+   * and gets clipped over its own trigger), so the icon is the only thing that
+   * says which time this is, and this sentence is how a screen reader reaches it.
+   */
+  countdownLabel?: string;
   /** The pointer is over the bar: the list replaces the single line. */
   expanded?: boolean;
   /**

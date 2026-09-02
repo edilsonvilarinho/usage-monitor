@@ -44,12 +44,12 @@ export function Hud() {
 
       <Caption>1 · parada — uma linha, a primeira da ordem de cards</Caption>
       <HudScreen>
-        <AppHudBar sources={SOURCES} />
+        <AppHudBar sources={SOURCES} countdown="02:05" />
       </HudScreen>
 
-      <Caption>2 · hover — a lista de todas as cotas</Caption>
+      <Caption>2 · hover — a lista, e a contagem só na primeira linha</Caption>
       <HudScreen tall>
-        <AppHudBar sources={SOURCES} expanded />
+        <AppHudBar sources={SOURCES} expanded countdown="02:05" />
       </HudScreen>
 
       <Caption>3 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</Caption>
@@ -59,12 +59,12 @@ export function Hud() {
 
       <Caption>4 · antes da primeira coleta — uma linha, e ela diz o que está acontecendo</Caption>
       <HudScreen>
-        <AppHudBar sources={[]} fallbackLabel="Carregando" />
+        <AppHudBar sources={[]} fallbackLabel="Carregando" countdown="02:05" />
       </HudScreen>
 
       <Caption>5 · arrastado para a borda de baixo — logo acima da barra de tarefas</Caption>
       <HudScreen corner="bottom-right" tall>
-        <AppHudBar sources={SOURCES.slice(0, 2)} expanded />
+        <AppHudBar sources={SOURCES.slice(0, 2)} expanded countdown="02:05" />
       </HudScreen>
 
       <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '54ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>
@@ -74,7 +74,10 @@ export function Hud() {
         nenhum número de consumo. Parada, a barra mostra uma linha; com o ponteiro em cima, todas as cotas. A largura sai do conteúdo, com 420dp de teto, e o
         painel é arrastado para onde o usuário quiser — ao soltar ele gruda na borda mais próxima da
         área útil e a posição é gravada. Três saídas: clique curto em qualquer ponto, item na bandeja
-        e Ctrl+Shift+H.
+        e Ctrl+Shift+H. A linha termina com a contagem até a próxima coleta (issue #185), que sai
+        <b> uma vez só</b>, na primeira: o polling é do app inteiro, e uma contagem por linha diria
+        que cada conta tem coleta própria. Recolhida ao ponto ela não aparece — ali não há texto
+        nenhum, e o hover devolve o painel com ela.
       </span>
     </div>
   );

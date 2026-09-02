@@ -8,6 +8,8 @@ export function AppHudBar({
   fallbackLabel = 'Carregando',
   dotOnly = false,
   expanded = false,
+  countdown,
+  countdownLabel = 'Próxima atualização automática',
   onOpen,
   style
 }) {
@@ -43,9 +45,13 @@ export function AppHudBar({
         <div style={{ padding: 'var(--s1) 0' }}>
           {visible.length === 0 ? (
             <HudRow>
-              <AppStatusIndicator level="off">{fallbackLabel}</AppStatusIndicator>
+              {/* O flex mora no indicador, não num spacer: a linha espaça os
+                  filhos, e um terceiro filho traria um vão que a medida da
+                  janela não conta. */}
+              <AppStatusIndicator level="off" style={{ flex: 1, minWidth: 0 }}>{fallbackLabel}</AppStatusIndicator>
+              {countdown ? <HudCountdown label={countdownLabel}>{countdown}</HudCountdown> : null}
             </HudRow>
-          ) : visible.map((source) => (
+          ) : visible.map((source, index) => (
             <HudRow key={source.label}>
               <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
               <span style={NAME}>{source.label}</span>
@@ -57,6 +63,10 @@ export function AppHudBar({
                   </span>
                 ))}
               </span>
+              {/* Uma vez só, na primeira linha: o polling é do app inteiro, e
+                  uma contagem por linha diria que cada conta tem coleta
+                  própria. */}
+              {index === 0 && countdown ? <HudCountdown label={countdownLabel}>{countdown}</HudCountdown> : null}
             </HudRow>
           ))}
         </div>
@@ -67,6 +77,26 @@ export function AppHudBar({
 
 const NAME = { flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 const VALUE = { flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' };
+
+// A contagem até a próxima coleta. O ícone é o que diz de que tempo se trata:
+// aqui não cabe tooltip -- popup nesta plataforma é camada dentro da janela e
+// sai recortado sobre o próprio alvo --, e um `02:05` solto ao lado dos
+// percentuais não se explica. A frase por extenso vai no rótulo acessível.
+function HudCountdown({ label, children }) {
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      style={{ display: 'flex', alignItems: 'center', gap: 'var(--s1)', flex: 'none', color: 'var(--muted)' }}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+        <path d="M20 4v5h-5" />
+      </svg>
+      <span style={VALUE}>{children}</span>
+    </span>
+  );
+}
 
 // 20px por linha, e não AppDataRow: aquela primitiva floora em 32px mais
 // padding, e seis cotas dariam ~288px de painel -- uma janela, não um HUD.
