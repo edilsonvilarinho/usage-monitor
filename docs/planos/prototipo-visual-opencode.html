@@ -1837,7 +1837,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 <div class="win mid" style="max-width:none">
   <div class="body">
     <div class="panel"><div class="phead"><span class="ptitle">Alertas na bandeja</span><span class="sp"></span><span class="sw on"></span></div><div class="pbody flush">
-      <div class="row"><span class="v sm">Limiares de cota</span><span class="sp"></span><div class="hstack"><input class="field" value="75" style="width:56px"><input class="field" value="90" style="width:56px"><input class="field" value="100" style="width:56px"><span class="k">%</span></div></div>
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Limiares de cota</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto (DeepSeek, OpenRouter) e atividade observada não informa limite (OpenCode Zen Free, Kilo Free): nessas fontes nenhum limiar é avaliado.</span></div><div class="hstack"><input class="field" value="75" style="width:56px"><input class="field" value="90" style="width:56px"><input class="field" value="100" style="width:56px"><span class="k">%</span></div></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI saturada</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só o veredito saturado vira notificação. Atenção apareceu em 7 de 70 sessões medidas — notificar nesse patamar tornaria o alerta rotina.</span></div><span class="sw on"></span></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI sem resposta</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Houve pedido e não houve resposta no transcript acima do limiar. O app não verifica o processo do Claude Code, e o texto do aviso não afirma que ele travou.</span></div><span class="sw on"></span></div>
       <div class="row"><span class="v sm" style="flex:1">Limiar sem resposta</span><div class="seg"><button type="button">30min</button><button type="button">1h</button><button class="on" type="button">2h</button><button type="button">4h</button></div></div>
@@ -1847,6 +1847,21 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
     </div></div>
   </div>
 </div>
+<p class="note"><b>O alcance do limiar é declarado na própria tela</b> (issue #194). A aba oferecia "Avisar quando a quota
+cruzar um limiar" sem qualificação nenhuma, e <b>quatro das oito fontes nunca são alcançadas</b> — por duas mecânicas
+independentes, e as duas consequência de mapeamentos corretos. Saldo pré-pago nasce com <code>used = 0</code> e
+<code>total = saldo</code>, então <code>percentageUsed</code> é sempre zero: o saldo pode cair de US$ 20,00 para US$ 0,50
+sem cruzar limiar nenhum. É o mesmo desenho que fez a régua virar <b>tempo de autonomia</b> na issue #109 — saldo não
+reseta e não há teto contra o qual medir percentual. Atividade observada nasce com <code>total = 0</code>, porque a
+contagem local de requisições não conhece limite, e o avaliador descarta a cota no primeiro <code>if</code> do laço.
+<b>Falha silenciosa é pior que funcionalidade ausente</b>: sem a frase, quem lê a aba acredita estar protegido nas oito.
+A cobertura de fato — alerta de saldo baixo por valor e por autonomia — é a issue #196 e não é esta. O texto sai
+<b>também com o interruptor desligado</b>: ali ele é justamente o que explica o que ligar o alerta não vai cobrir. Os
+nomes das fontes não são literais na frase: saem de <code>ApiSource.displayName</code> e de um <code>when</code>
+exaustivo sem <code>else</code> (<code>quotaThresholdGap()</code>), que é o que obriga a nona fonte a declarar se o
+limiar a alcança. Sem esse erro de compilação, acrescentar uma fonte deixaria a frase incompleta em silêncio — que é o
+defeito que ela existe para corrigir. <b>OpenCode Go fica de fora da lista</b>: ele é percentual de três janelas com
+<code>resetsAt</code>, e é avaliado como qualquer cota com teto.</p>
 <p class="note"><b>O limiar é segmentado, não chip</b> (issue #177). Os limiares de cota logo acima são escolha
 múltipla — 75 e 90 podem estar ligados ao mesmo tempo — e por isso são chips de alternância; este é escolha única
 entre alternativas, que é a definição do segmentado. A faixa vai de 30min (piso: abaixo disso o aviso alcançaria

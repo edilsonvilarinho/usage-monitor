@@ -18,9 +18,13 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
 import com.usagemonitor.domain.entity.QuietHours
+import com.usagemonitor.domain.entity.QuotaThresholdGap
 import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.sourcesWithQuotaThresholdGap
 
 const val ALERT_SETTINGS_QUOTA_SWITCH_TEST_TAG = "alertSettingsQuotaSwitch"
+const val ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG = "alertSettingsQuotaCoverage"
 const val ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG = "alertSettingsSessionSwitch"
 const val ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG = "alertSettingsStalledSwitch"
 const val ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG = "alertSettingsStallThreshold"
@@ -62,6 +66,37 @@ private fun stallThresholdLabel(minutes: Int): String {
 }
 
 private val DEFAULT_QUIET_HOURS = QuietHours(22, 8)
+
+/**
+ * O recorte do limiar percentual, dito na própria tela (issue #194).
+ *
+ * A aba oferecia "Avisar quando a quota cruzar um limiar" sem qualificação
+ * nenhuma, e quatro das oito fontes nunca são alcançadas — por duas mecânicas
+ * diferentes, documentadas em [QuotaThresholdGap]. Falha silenciosa é pior que
+ * funcionalidade ausente: sem esta frase, quem lê a aba acredita estar
+ * protegido nas oito.
+ *
+ * Os nomes saem de `ApiSource.displayName` e a lista de
+ * [sourcesWithQuotaThresholdGap], nunca de literais no meio do texto: renomear
+ * uma fonte deixaria a aba apontando para um card que a tela chama de outra
+ * coisa, e acrescentar uma fonte deixaria a frase incompleta em silêncio — que
+ * é exatamente o defeito que ela existe para corrigir.
+ */
+internal fun quotaThresholdCoverageNote(language: AppLanguage): String {
+    val balance = sourcesWithQuotaThresholdGap(QuotaThresholdGap.PREPAID_BALANCE)
+        .joinToString { source -> source.displayName(language) }
+    val observed = sourcesWithQuotaThresholdGap(QuotaThresholdGap.OBSERVED_ACTIVITY)
+        .joinToString { source -> source.displayName(language) }
+
+    return if (language == AppLanguage.PT) {
+        "O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto ($balance) e " +
+            "atividade observada não informa limite ($observed): nessas fontes nenhum limiar é avaliado."
+    } else {
+        "The threshold measures a percentage against the quota ceiling. Prepaid balance has no " +
+            "ceiling ($balance) and observed activity reports no limit ($observed): on those " +
+            "sources no threshold is ever evaluated."
+    }
+}
 
 /**
  * Cartão de alertas das Configurações.
@@ -128,6 +163,15 @@ fun AlertSettingsSection(
                 )
             }
         }
+
+        // Sai com o interruptor ligado e desligado: desligado, ele é justamente
+        // o que explica o que ligar o alerta não vai cobrir.
+        Text(
+            text = quotaThresholdCoverageNote(language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag(ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG)
+        )
 
         if (settings.quotaAlertsEnabled && selected.isEmpty()) {
             Text(
