@@ -159,6 +159,9 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsField
 import com.usagemonitor.presentation.ui.components.SettingsToast
 import com.usagemonitor.presentation.ui.components.SettingsToastEvent
+import com.usagemonitor.presentation.ui.components.ApiKeyCheckStatus
+import com.usagemonitor.presentation.ui.components.ApiKeyCheckUiState
+import com.usagemonitor.presentation.ui.components.apiKeyCheckResult
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
@@ -1251,6 +1254,7 @@ private fun runUsageMonitor(
     var teamConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var teamAdminConnectionState by remember { mutableStateOf(TeamConnectionUiState()) }
     var proxyConnectionState by remember { mutableStateOf(ProxyConnectionUiState()) }
+    var apiKeyCheckState by remember { mutableStateOf(ApiKeyCheckUiState()) }
     val networkScope = rememberCoroutineScope()
 
     /**
@@ -1290,6 +1294,39 @@ private fun runUsageMonitor(
                     )
                 }
             )
+        }
+    }
+    /**
+     * "Testar chave" da aba APIs (issue #204).
+     *
+     * **Passa pelo repositório da fonte, nunca por HTTP cru.** A MiniMax responde
+     * `HTTP 200` com `status_code` de erro no corpo e o OpenCode Go traduz o
+     * `403 EntitlementError` em "sem assinatura"; só o repositório sabe disso, e
+     * um caminho próprio de teste aprovaria chave que a coleta real recusa.
+     *
+     * Client **efêmero** com o proxy corrente, mesma razão de
+     * [checkProxyConnection]: o compartilhado foi montado no arranque e não pode
+     * ser reconfigurado em runtime. Aqui o proxy sai de `resolveEffectiveProxy`
+     * sem forçar o modo manual — o teste tem de usar exatamente o que a coleta
+     * usaria, e numa máquina que depende de `HTTPS_PROXY` ignorá-lo daria falso
+     * negativo.
+     *
+     * A chave candidata não é gravada e não entra em breadcrumb.
+     */
+    val checkApiKey: (ApiSource, String) -> Unit = { source, candidateKey ->
+        val apiKey = candidateKey.takeIf { key -> key.isNotBlank() }
+            ?: apiKeySettings.value.forSource(source).orEmpty()
+        val proxy = resolveEffectiveProxy(proxySettingsFlow.value)
+        apiKeyCheckState = ApiKeyCheckUiState(status = ApiKeyCheckStatus.CHECKING)
+        networkScope.launch {
+            val testClient = buildHttpClient(proxy)
+            val result = try {
+                val dataSource = RemoteApiDataSource(httpClient = testClient)
+                testApiKeyUsage(source, dataSource) { apiKey }
+            } finally {
+                testClient.close()
+            }
+            apiKeyCheckState = apiKeyCheckResult(source, result.exceptionOrNull(), language)
         }
     }
     var isTeamKeysOpen by remember { mutableStateOf(false) }
@@ -2611,6 +2648,9 @@ private fun runUsageMonitor(
                                 }
                             )
                         },
+                        apiKeyCheck = apiKeyCheckState,
+                        onApiKeyTest = checkApiKey,
+                        onApiKeyCheckReset = { apiKeyCheckState = ApiKeyCheckUiState() },
                         anthropicProfiles = profileUiModels,
                         onAnthropicProfileToggle = { profileId, checked ->
                             profileRegistry.setEnabled(profileId, checked)

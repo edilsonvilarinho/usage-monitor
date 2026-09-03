@@ -109,6 +109,24 @@ data class UiApiError(
     val isProxyAuthIssue: Boolean
         get() = isProxyAuthMessage(message)
 
+    /**
+     * A API respondeu 401/403 — a credencial chegou e foi recusada.
+     *
+     * **Deliberadamente fora de [isConfigurationIssue]**, ao contrário dos
+     * marcadores de chave ausente. Aqueles são condições que o próprio app
+     * detecta antes de sair para a rede; este é o veredito da API, e hoje o
+     * dashboard o trata como erro genérico com toast. Incluí-lo ali mudaria o
+     * comportamento de sete fontes numa passada que existe para outra coisa.
+     *
+     * Quem o consome é o "Testar chave" das Configurações (issue #204), onde a
+     * pergunta é exatamente "essa chave serve?" e 401 é a resposta mais direta
+     * que existe. O 403 entra junto porque é a mesma família — os 403 que têm
+     * significado próprio (assinatura ausente do OpenCode Go) são testados
+     * **antes** deste, e por isso não caem aqui.
+     */
+    val isUnauthorizedIssue: Boolean
+        get() = isUnauthorizedMessage(message)
+
     val isConfigurationIssue: Boolean
         get() = isAnthropicCredentialIssue ||
             isMiniMaxApiKeyIssue ||
@@ -220,6 +238,13 @@ private val PROXY_AUTH_MARKERS = listOf(
     "Proxy Authentication Required"
 )
 
+// `requireSuccess` monta a mensagem como "<fonte> HTTP <status>: <corpo>", então
+// o status chega literal — mesmo mecanismo dos marcadores de 429/503 acima.
+private val UNAUTHORIZED_MARKERS = listOf(
+    "HTTP 401",
+    "HTTP 403"
+)
+
 private fun isAnthropicCredentialMessage(message: String): Boolean {
     return ANTHROPIC_CREDENTIAL_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }
@@ -260,4 +285,8 @@ private fun isServiceUnavailableMessage(message: String): Boolean {
 
 private fun isProxyAuthMessage(message: String): Boolean {
     return PROXY_AUTH_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
+}
+
+private fun isUnauthorizedMessage(message: String): Boolean {
+    return UNAUTHORIZED_MARKERS.any { marker -> message.contains(marker, ignoreCase = true) }
 }

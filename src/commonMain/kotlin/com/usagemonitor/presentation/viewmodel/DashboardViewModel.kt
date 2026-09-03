@@ -61,16 +61,10 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
-import java.net.ConnectException
-import java.net.NoRouteToHostException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.net.ssl.SSLHandshakeException
 
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
 
@@ -782,31 +776,6 @@ class DashboardViewModel(
         }
 
         return uiError
-    }
-
-    /**
-     * `error.cause` também é checado porque o Ktor às vezes envelopa a exceção de
-     * socket original numa própria (ex.: `HttpRequestTimeoutException` não estende
-     * `SocketTimeoutException` e não carrega a causa de rede como `cause` sempre,
-     * mas outros wrappers do client engine podem).
-     */
-    private fun isConnectivityFailure(error: Throwable): Boolean {
-        return isConnectivityException(error) || isConnectivityException(error.cause)
-    }
-
-    private fun isConnectivityException(error: Throwable?): Boolean {
-        return when (error) {
-            null -> false
-            // `ConnectTimeoutException` do Ktor estende `ConnectException`, então
-            // este branch já cobre o timeout de conexão do próprio Ktor.
-            is UnknownHostException,
-            is NoRouteToHostException,
-            is ConnectException,
-            is SocketTimeoutException,
-            is SSLHandshakeException,
-            is HttpRequestTimeoutException -> true
-            else -> false
-        }
     }
 
     private fun publishUiState(enabledTargets: Set<UsageTargetKey>) {
