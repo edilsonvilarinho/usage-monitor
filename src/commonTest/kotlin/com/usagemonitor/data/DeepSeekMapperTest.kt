@@ -44,6 +44,36 @@ class DeepSeekMapperTest {
         assertEquals(250L, gratuito.total)
         assertEquals(0L, gratuito.used)
         assertEquals(UsageUnit.CURRENCY_USD, gratuito.unit)
+
+        // Conta em dólar continua em dólar: regressão do default de QuotaInfo.
+        assertEquals("USD", saldo.currencyCode)
+        assertEquals("USD", gratuito.currencyCode)
+    }
+
+    /**
+     * Issue #195: o mapper lia `currency` só para escolher o item e o descartava,
+     * então o default "USD" prevalecia e uma conta em yuan aparecia com cifrão de
+     * dólar — o número certo com o símbolo errado, por um fator de ~7.
+     */
+    @Test
+    fun `carries the account currency into both quotas`() {
+        val response = DeepSeekBalanceResponse(
+            isAvailable = true,
+            balanceInfos = listOf(
+                DeepSeekBalanceInfoDto(
+                    currency = "CNY",
+                    totalBalance = "120.00",
+                    grantedBalance = "20.00",
+                    toppedUpBalance = "100.00"
+                )
+            )
+        )
+
+        val stats = DeepSeekMapper.toUsageStats(response)
+
+        assertEquals(2, stats.quotas.size)
+        assertEquals("CNY", stats.quotas[0].currencyCode)
+        assertEquals("CNY", stats.quotas[1].currencyCode)
     }
 
     @Test
@@ -104,6 +134,9 @@ class DeepSeekMapperTest {
         val stats = DeepSeekMapper.toUsageStats(response)
 
         assertEquals(500L, stats.quotas[0].total)
+        // A moeda exibida é a do item escolhido, nunca a do descartado: com "CNY"
+        // aqui, o valor em dólar apareceria com símbolo de yuan.
+        assertEquals("USD", stats.quotas[0].currencyCode)
     }
 
     @Test

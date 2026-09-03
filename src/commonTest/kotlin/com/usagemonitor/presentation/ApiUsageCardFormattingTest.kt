@@ -142,6 +142,10 @@ class ApiUsageCardFormattingTest {
         assertEquals("$3.85", formatCents(385L))
         assertEquals("-R$1.50", formatCurrencyAmount(-150L, "BRL"))
         assertEquals("JPY 5.00", formatCents(500L, "JPY"))
+        // O saldo do DeepSeek em yuan (issue #195) fica no fallback de propósito:
+        // `¥` é compartilhado por CNY e JPY, e trocar um erro de fator 7 por uma
+        // ambiguidade de fator 20 não é correção. O código ISO é inequívoco.
+        assertEquals("CNY 100.00", formatCents(10_000L, "CNY"))
     }
 
     // ------------------------------------------------------------------

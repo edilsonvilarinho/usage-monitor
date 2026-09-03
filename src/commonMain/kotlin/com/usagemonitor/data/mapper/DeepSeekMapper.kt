@@ -24,6 +24,14 @@ object DeepSeekMapper {
         val toppedUpCents = parseToCents(balanceInfo.toppedUpBalance)
         val grantedCents = parseToCents(balanceInfo.grantedBalance)
 
+        // A moeda é a do item escolhido acima, e vale para as duas cotas: os dois
+        // saldos saem da mesma entrada de `balance_infos`. Sem propagá-la, o
+        // default "USD" de QuotaInfo prevalecia e uma conta em yuan aparecia com
+        // cifrão de dólar — erro de fator ~7 sem sinalização nenhuma (issue #195).
+        // Isto também tira o silêncio da escolha "USD ou o primeiro": ela continua
+        // decidindo qual saldo exibir, mas agora a tela diz qual.
+        val currency = balanceInfo.currency
+
         val quotas = buildList {
             add(
                 QuotaInfo(
@@ -35,7 +43,8 @@ object DeepSeekMapper {
                     periodEndAt = Instant.DISTANT_FUTURE,
                     hasKnownResetAt = false,
                     periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.CURRENCY_USD
+                    unit = UsageUnit.CURRENCY_USD,
+                    currencyCode = currency
                 )
             )
             if (grantedCents > 0L) {
@@ -49,7 +58,8 @@ object DeepSeekMapper {
                         periodEndAt = Instant.DISTANT_FUTURE,
                         hasKnownResetAt = false,
                         periodType = PeriodType.INTERVAL,
-                        unit = UsageUnit.CURRENCY_USD
+                        unit = UsageUnit.CURRENCY_USD,
+                        currencyCode = currency
                     )
                 )
             }

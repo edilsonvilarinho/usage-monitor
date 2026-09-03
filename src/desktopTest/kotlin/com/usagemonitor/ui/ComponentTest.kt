@@ -698,6 +698,44 @@ class ComponentTest {
         onNodeWithText("Saldo não expira").assertIsDisplayed()
     }
 
+    /**
+     * Issue #195: conta em yuan aparecia com cifrão de dólar porque o mapper
+     * descartava `balance_infos[].currency`. O símbolo cai no código ISO de
+     * propósito — `¥` é compartilhado por CNY e JPY.
+     */
+    @Test
+    fun `ApiUsageCard prints the balance in the account currency`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.DEEPSEEK,
+                    apiName = "DeepSeek",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Saldo",
+                            used = 0L,
+                            total = 10_000L,
+                            periodEndAt = Instant.parse("2026-04-28T15:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.CURRENCY_USD,
+                            rawUsed = 10_000L,
+                            rawTotal = 10_000L,
+                            currencyCode = "CNY"
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("CNY 100.00").assertIsDisplayed()
+    }
+
     /** Mesmo desenho de saldo pré-pago do DeepSeek — fonte e acento diferentes. */
     @Test
     fun `ApiUsageCard renders OpenRouter balance`() = runDesktopComposeUiTest {
