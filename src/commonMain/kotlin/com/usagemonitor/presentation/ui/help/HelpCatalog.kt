@@ -191,7 +191,10 @@ object HelpCatalog {
                 "passa de um múltiplo da mediana dos últimos dias, no mesmo horário. Sem pelo menos " +
                 "três dias medidos, ou com consumo habitual perto de zero, ele não é emitido. No " +
                 "período silenciado o aviso é adiado, não perdido — ele sai quando o silêncio " +
-                "terminar.",
+                "terminar. O limiar de cota não alcança as fontes de saldo pré-pago (DeepSeek, " +
+                "OpenRouter), que não têm teto contra o qual medir percentual, nem as de atividade " +
+                "observada (Kilo Free, OpenCode Zen Free), que não informam limite: nelas nenhum " +
+                "limiar é avaliado. Os outros três avisos continuam valendo.",
             steps = listOf(
                 "Abra Configurações → \"Alertas\".",
                 "Ligue \"Avisar quando a quota cruzar um limiar\" e ajuste os limiares.",
@@ -423,7 +426,11 @@ object HelpCatalog {
                 "when the day's usage passes a multiple of the median of the last few days, at the " +
                 "same time of day. With fewer than three measured days, or with usual consumption " +
                 "near zero, it is not sent. During a muted period the warning is postponed, not " +
-                "lost — it goes out once the silence ends.",
+                "lost — it goes out once the silence ends. The quota threshold does not reach " +
+                "prepaid balance sources (DeepSeek, OpenRouter), which have no ceiling to measure a " +
+                "percentage against, nor observed activity ones (Kilo Free, OpenCode Zen Free), " +
+                "which report no limit: on those, no threshold is ever evaluated. The other three " +
+                "warnings still apply.",
             steps = listOf(
                 "Open Settings → \"Alerts\".",
                 "Turn on \"Warn when a quota crosses a threshold\" and adjust the thresholds.",

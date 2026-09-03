@@ -10,6 +10,9 @@ import com.usagemonitor.domain.entity.MIN_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.QuotaThresholdGap
+import com.usagemonitor.domain.entity.quotaThresholdGap
+import com.usagemonitor.domain.entity.sourcesWithQuotaThresholdGap
 import com.usagemonitor.domain.entity.MIN_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.StalledCliSession
@@ -25,6 +28,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -602,6 +606,73 @@ class UsageAlertTest {
         assertTrue(off.state.firedSpikeDays.isEmpty())
     }
 
+    // ------------------------------------------------------------------
+    // Alcance do limiar percentual (issue #194)
+    // ------------------------------------------------------------------
+
+    /**
+     * Saldo pré-pago nasce com `used = 0` e `total = saldo`, então
+     * `percentageUsed` é sempre zero e nenhum limiar é cruzado — nem com o saldo
+     * caindo de US$ 20,00 para US$ 0,50. É o comportamento correto para o que o
+     * avaliador mede, e é ele que a frase da aba Alertas descreve.
+     */
+    @Test
+    fun `a prepaid balance never crosses a threshold`() {
+        val almostEmpty = prepaidBalanceStats(balanceCents = 50L)
+
+        val result = evaluateUsageAlerts(
+            stats = listOf(prepaidBalanceStats(balanceCents = 2_000L), almostEmpty),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW
+        )
+
+        assertTrue(result.alerts.filterIsInstance<UsageAlert.QuotaThreshold>().isEmpty())
+    }
+
+    /**
+     * Atividade observada nasce com `total = 0`: a contagem local de requisições
+     * não conhece limite, e `evaluateQuotaAlerts` descarta a cota no primeiro
+     * `if` do laço. Sem teto não há percentual a comparar.
+     */
+    @Test
+    fun `observed activity never crosses a threshold`() {
+        val result = evaluateUsageAlerts(
+            stats = listOf(observedActivityStats(requests = 4_000L)),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = UsageAlertSettings.DEFAULT,
+            now = NOW
+        )
+
+        assertTrue(result.alerts.filterIsInstance<UsageAlert.QuotaThreshold>().isEmpty())
+    }
+
+    /**
+     * A classificação e o silêncio precisam concordar: a frase da tela cita
+     * exatamente as fontes que este teste prova serem inalcançáveis, e as quatro
+     * restantes continuam com limiar avaliado normalmente.
+     */
+    @Test
+    fun `the declared gap matches the sources the evaluator skips`() {
+        assertEquals(
+            listOf(ApiSource.DEEPSEEK, ApiSource.OPENROUTER),
+            sourcesWithQuotaThresholdGap(QuotaThresholdGap.PREPAID_BALANCE)
+        )
+        assertEquals(
+            listOf(ApiSource.OPENCODE, ApiSource.KILO),
+            sourcesWithQuotaThresholdGap(QuotaThresholdGap.OBSERVED_ACTIVITY)
+        )
+
+        // OpenCode Go é percentual de três janelas com `resetsAt`, exatamente a
+        // forma da Anthropic: quem não tem teto é o Zen gratuito, que é outra fonte.
+        assertNull(ApiSource.OPENCODE_GO.quotaThresholdGap())
+        assertNull(ApiSource.ANTHROPIC.quotaThresholdGap())
+        assertNull(ApiSource.CODEX.quotaThresholdGap())
+        assertNull(ApiSource.MINIMAX.quotaThresholdGap())
+    }
+
     /** O valor vem de armazenamento em claro; abaixo do piso ele não vale. */
     @Test
     fun `the spike factor has a floor`() {
@@ -609,6 +680,46 @@ class UsageAlertTest {
         assertEquals(5.0, UsageAlertSettings.DEFAULT.copy(spikeFactor = 5.0).effectiveSpikeFactor)
         assertEquals(DEFAULT_SPIKE_FACTOR, UsageAlertSettings.DEFAULT.effectiveSpikeFactor)
     }
+}
+
+/** A forma exata de `DeepSeekMapper`/`OpenRouterMapper`: `used = 0`, sem reset. */
+private fun prepaidBalanceStats(balanceCents: Long): ApiUsageStats {
+    return ApiUsageStats(
+        source = ApiSource.DEEPSEEK,
+        apiName = "DeepSeek",
+        quotas = listOf(
+            QuotaInfo(
+                label = "Saldo",
+                used = 0L,
+                total = balanceCents,
+                rawUsed = balanceCents,
+                rawTotal = balanceCents,
+                periodEndAt = Instant.DISTANT_FUTURE,
+                hasKnownResetAt = false,
+                periodType = PeriodType.INTERVAL,
+                unit = UsageUnit.CURRENCY_USD
+            )
+        )
+    )
+}
+
+/** A forma exata de `KiloRepositoryImpl`/`OpenCodeRepositoryImpl`: `total = 0`. */
+private fun observedActivityStats(requests: Long): ApiUsageStats {
+    return ApiUsageStats(
+        source = ApiSource.KILO,
+        apiName = "Kilo Free",
+        quotas = listOf(
+            QuotaInfo(
+                label = "Kilo 5h",
+                used = requests,
+                total = 0L,
+                periodEndAt = NOW,
+                hasKnownResetAt = false,
+                periodType = PeriodType.INTERVAL,
+                unit = UsageUnit.REQUESTS
+            )
+        )
+    )
 }
 
 private fun stats(

@@ -64,6 +64,15 @@ export function Settings() {
                 <AppTextField label="Crítico" value="90" style={{ width: 90 }} />
                 <AppTextField label="Esgotado" value="100" style={{ width: 90 }} />
               </div>
+              {/* O alcance é declarado na tela (issue #194): saldo pré-pago nasce com
+                  used = 0 e atividade observada com total = 0, então nessas quatro
+                  fontes nenhum limiar é avaliado. A frase sai sempre, inclusive com o
+                  alerta desligado — ali ela explica o que ligar não vai cobrir. */}
+              <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)' }}>
+                O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto
+                (DeepSeek, OpenRouter) e atividade observada não informa limite
+                (OpenCode Zen Free, Kilo Free): nessas fontes nenhum limiar é avaliado.
+              </span>
               <AppSwitch checked label="Alertar quando uma sessão CLI saturar" />
               <AppSwitch checked label="Notificação nativa do sistema" />
               {/* Mede distância até o hábito do usuário, não até o teto da cota: um dia

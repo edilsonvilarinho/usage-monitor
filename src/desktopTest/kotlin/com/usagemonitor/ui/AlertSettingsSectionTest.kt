@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_SPIKE_FACTOR_TEST_TAG
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
@@ -80,6 +81,52 @@ class AlertSettingsSectionTest {
             "A referência é a mediana dos últimos dias, no mesmo horário — não o limite da " +
                 "cota. Sem pelo menos três dias medidos, ou com consumo habitual perto de " +
                 "zero, nenhum aviso é emitido."
+        ).assertIsDisplayed()
+    }
+
+    // ------------------------------------------------------------------
+    // Alcance do limiar percentual (issue #194)
+    // ------------------------------------------------------------------
+
+    /**
+     * A aba oferecia o limiar sem qualificação e quatro das oito fontes nunca são
+     * alcançadas — por duas mecânicas diferentes. Sem esta frase, quem lê a tela
+     * acredita estar protegido nas oito, que é a falha silenciosa da issue.
+     */
+    @Test
+    fun `the quota threshold declares which sources it does not reach`() = runDesktopComposeUiTest {
+        showSection(UsageAlertSettings.DEFAULT.copy(quotaAlertsEnabled = true))
+
+        onNodeWithTag(ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG).assertIsDisplayed()
+        onNodeWithText(
+            "O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto " +
+                "(DeepSeek, OpenRouter) e atividade observada não informa limite " +
+                "(OpenCode Zen Free, Kilo Free): nessas fontes nenhum limiar é avaliado."
+        ).assertIsDisplayed()
+    }
+
+    /**
+     * Desligado, o texto é justamente o que explica o que ligar o interruptor não
+     * vai cobrir — esconder ali seria devolver o silêncio.
+     */
+    @Test
+    fun `the coverage note stays with the alert turned off`() = runDesktopComposeUiTest {
+        showSection(UsageAlertSettings.DEFAULT.copy(quotaAlertsEnabled = false))
+
+        onNodeWithTag(ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `english translates the coverage note`() = runDesktopComposeUiTest {
+        showSection(
+            settings = UsageAlertSettings.DEFAULT.copy(quotaAlertsEnabled = true),
+            language = AppLanguage.EN
+        )
+
+        onNodeWithText(
+            "The threshold measures a percentage against the quota ceiling. Prepaid balance has " +
+                "no ceiling (DeepSeek, OpenRouter) and observed activity reports no limit " +
+                "(OpenCode Zen Free, Kilo Free): on those sources no threshold is ever evaluated."
         ).assertIsDisplayed()
     }
 
