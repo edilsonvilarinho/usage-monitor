@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -78,6 +79,8 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 const val SETTINGS_TOAST_HOST_TEST_TAG = "settingsToastHost"
 const val API_KEY_DIALOG_FIELD_TEST_TAG = "apiKeyDialogField"
 const val API_KEY_DIALOG_REMOVE_TEST_TAG = "apiKeyDialogRemove"
+const val API_KEY_DIALOG_TEST_TEST_TAG = "apiKeyDialogTest"
+const val API_KEY_DIALOG_RESULT_TEST_TAG = "apiKeyDialogResult"
 const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 
 /** Mesma razão da tag de opacidade: "115%" também é rótulo de chip no cartão de alertas. */
@@ -184,6 +187,15 @@ fun SettingsDialogContent(
      * `false` mantém a tela aberta com o aviso de falha.
      */
     onApiKeyRemove: (ApiSource) -> Boolean = { false },
+    /**
+     * Veredito do "Testar chave" (issue #204). Um estado só, e não um por fonte:
+     * o diálogo é modal e só existe uma fonte em edição de cada vez.
+     */
+    apiKeyCheck: ApiKeyCheckUiState = ApiKeyCheckUiState(),
+    /** Recebe a fonte e a chave candidata — a digitada, ou vazia para usar a guardada. */
+    onApiKeyTest: (ApiSource, String) -> Unit = { _, _ -> },
+    /** Apaga o veredito: ele descreve a chave anterior, não a que está no campo agora. */
+    onApiKeyCheckReset: () -> Unit = {},
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
     onAnthropicProfileRename: (String, String) -> Unit = { _, _ -> },
@@ -326,7 +338,10 @@ fun SettingsDialogContent(
                         configuredApiKeys = configuredApiKeys,
                         onApiToggle = onApiToggle,
                         onApiKeySave = onApiKeySave,
-                        onApiKeyRemove = onApiKeyRemove
+                        onApiKeyRemove = onApiKeyRemove,
+                        apiKeyCheck = apiKeyCheck,
+                        onApiKeyTest = onApiKeyTest,
+                        onApiKeyCheckReset = onApiKeyCheckReset
                     )
 
                     SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
@@ -598,7 +613,10 @@ private fun MonitoredApisTab(
     configuredApiKeys: Set<ApiSource>,
     onApiToggle: (ApiSource, Boolean) -> Unit,
     onApiKeySave: (ApiSource, String) -> Boolean,
-    onApiKeyRemove: (ApiSource) -> Boolean
+    onApiKeyRemove: (ApiSource) -> Boolean,
+    apiKeyCheck: ApiKeyCheckUiState,
+    onApiKeyTest: (ApiSource, String) -> Unit,
+    onApiKeyCheckReset: () -> Unit
 ) {
     var pendingApiKeySource by remember { mutableStateOf<ApiSource?>(null) }
 
@@ -620,6 +638,7 @@ private fun MonitoredApisTab(
             language = currentLanguage,
             onToggle = { api, checked ->
                 if (checked && api.requiresApiKey() && api !in configuredApiKeys) {
+                    onApiKeyCheckReset()
                     pendingApiKeySource = api
                 } else {
                     onApiToggle(api, checked)
@@ -628,7 +647,11 @@ private fun MonitoredApisTab(
             // Pelo lápis o diálogo abre com a fonte já configurada, que é o
             // caminho que não existia: até aqui a chave só era pedida ao
             // **ligar** uma fonte sem chave, e depois disso era definitiva.
-            onEditApiKey = { api -> pendingApiKeySource = api }
+            onEditApiKey = { api ->
+                // O veredito que sobrou da fonte anterior descreveria outra chave.
+                onApiKeyCheckReset()
+                pendingApiKeySource = api
+            }
         )
     }
 
@@ -662,7 +685,14 @@ private fun MonitoredApisTab(
             } else {
                 null
             },
-            onDismiss = { pendingApiKeySource = null }
+            hasStoredKey = source in configuredApiKeys,
+            checkState = apiKeyCheck,
+            onTest = { candidateKey -> onApiKeyTest(source, candidateKey) },
+            onCheckReset = onApiKeyCheckReset,
+            onDismiss = {
+                onApiKeyCheckReset()
+                pendingApiKeySource = null
+            }
         )
     }
 }
@@ -698,6 +728,15 @@ private fun ApiKeyDialog(
      * botão de remover não teria o que remover.
      */
     onRemove: (() -> Unit)?,
+    /**
+     * Há chave guardada para esta fonte. Só isso torna possível testar com o
+     * campo vazio — sem chave nenhuma o botão não teria o que enviar.
+     */
+    hasStoredKey: Boolean,
+    checkState: ApiKeyCheckUiState,
+    /** Recebe o texto digitado; vazio significa "use a chave já guardada". */
+    onTest: (String) -> Unit,
+    onCheckReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val isPt = language == AppLanguage.PT
@@ -705,6 +744,8 @@ private fun ApiKeyDialog(
     var revealed by remember(source) { mutableStateOf(false) }
     var showError by remember(source) { mutableStateOf(false) }
     val sourceName = source.displayName(language)
+    val isChecking = checkState.status == ApiKeyCheckStatus.CHECKING
+    val hasCandidateKey = apiKey.isNotBlank() || hasStoredKey
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -739,6 +780,9 @@ private fun ApiKeyDialog(
                         onValueChange = {
                             apiKey = it
                             showError = false
+                            // Mesma regra do `showError`: o veredito descreve o
+                            // texto anterior e deixa de valer no primeiro toque.
+                            onCheckReset()
                         },
                         visualTransformation = if (revealed) {
                             VisualTransformation.None
@@ -769,6 +813,33 @@ private fun ApiKeyDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
+                }
+
+                // O veredito fica junto do campo que ele descreve, e não no
+                // rodapé junto do botão: a pergunta é sobre o que está digitado
+                // ali. Ponto E palavra, como todo estado deste sistema visual.
+                val checkMessage = checkState.message
+                if (isChecking || checkMessage != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+                    ) {
+                        if (isChecking) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                        if (checkMessage != null) {
+                            AppStatusIndicator(
+                                label = checkMessage,
+                                tone = checkState.tone,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag(API_KEY_DIALOG_RESULT_TEST_TAG)
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -806,6 +877,16 @@ private fun ApiKeyDialog(
                     label = if (isPt) "Cancelar" else "Cancel",
                     tone = AppButtonTone.GHOST,
                     onClick = onDismiss
+                )
+                // `GHOST` e não `PRIMARY`: primária é uma por tela e é o
+                // "Salvar", que é o que o diálogo propõe. Fica encostado nele
+                // porque a sequência natural é testar e então salvar.
+                AppButton(
+                    label = if (isPt) "Testar chave" else "Test key",
+                    tone = AppButtonTone.GHOST,
+                    onClick = { onTest(apiKey.trim()) },
+                    enabled = hasCandidateKey && !isChecking,
+                    modifier = Modifier.testTag(API_KEY_DIALOG_TEST_TEST_TAG)
                 )
             }
         }

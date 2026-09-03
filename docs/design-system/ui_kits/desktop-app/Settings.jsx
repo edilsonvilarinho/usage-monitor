@@ -107,6 +107,30 @@ export function Settings() {
             </AppPanel>
           ) : null}
 
+          {/* O diálogo da chave, aberto pelo lápis da linha ou ao ligar uma fonte
+              sem chave. Não é primitiva própria: é painel sobre o modal do
+              sistema. "Testar chave" faz a coleta real pelo repositório da fonte
+              (issue #204) e o veredito sai como AppStatusIndicator junto do
+              campo — nunca toast, que some antes de ser lido. Âmbar é o terceiro
+              veredito: chave válida com plano/assinatura ausente, e também 429 e
+              503, em que não houve veredito nenhum sobre a chave. */}
+          {sec === 'APIs' ? (
+            <AppPanel style={{ maxWidth: 520 }}>
+              <AppPanelHeader title="Configurar MiniMax" subtitle="diálogo do lápis · chave nunca vem pré-preenchida" />
+              <AppPanelBody>
+                <AppKey>A chave é gravada localmente com acesso restrito ao dono.</AppKey>
+                <AppTextField label="API key" value="••••••••••••••••" />
+                <AppStatusIndicator level="warn">Chave válida, sem plano ativo na MiniMax.</AppStatusIndicator>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--s2)' }}>
+                  <AppButton variant="ghost">Remover chave</AppButton>
+                  <AppButton variant="ghost">Cancelar</AppButton>
+                  <AppButton variant="ghost">Testar chave</AppButton>
+                  <AppButton>Salvar</AppButton>
+                </div>
+              </AppPanelBody>
+            </AppPanel>
+          ) : null}
+
           {sec === 'Contas' ? (
             <React.Fragment>
               <AppBanner level="warn" title="1 perfil detectado aguardando confirmação">

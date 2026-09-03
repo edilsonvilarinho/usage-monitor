@@ -100,6 +100,8 @@ object HelpCatalog {
                 "Abra as Configurações pela engrenagem do rodapé e vá à aba \"APIs\".",
                 "Ligue as integrações em uso. MiniMax, DeepSeek, OpenCode Go e OpenRouter " +
                     "pedem a chave da API ali mesmo; ela é gravada em ~/.usage-monitor/api-keys.json.",
+                "No mesmo diálogo, \"Testar chave\" faz a coleta de verdade e diz o motivo quando ela " +
+                    "não passa — chave recusada, plano ausente, proxy ou falta de conexão.",
                 "Anthropic e Codex leem a credencial que o próprio CLI já gravou na máquina — não há " +
                     "nada a preencher.",
                 "Atrás de proxy corporativo, configure-o na aba \"Rede\" e reinicie o app: o cliente " +
@@ -336,6 +338,8 @@ object HelpCatalog {
                 "Open Settings from the footer gear and go to the \"APIs\" tab.",
                 "Enable the integrations in use. MiniMax, DeepSeek, OpenCode Go and OpenRouter ask " +
                     "for the API key right there; it is stored in ~/.usage-monitor/api-keys.json.",
+                "In the same dialog, \"Test key\" runs the real collection and states why it failed — " +
+                    "key rejected, missing plan, proxy, or no connection.",
                 "Anthropic and Codex read the credential the CLI already wrote on this machine — " +
                     "there is nothing to fill in.",
                 "Behind a corporate proxy, set it up in the \"Network\" tab and restart the app: the " +

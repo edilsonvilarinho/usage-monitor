@@ -1918,11 +1918,29 @@ direita só existe na que depende de chave.</p>
   <div class="body"><div class="panel">
     <div class="phead"><span class="ptitle">Chave da API</span></div>
     <div class="pbody">
-      <div class="stack"><span class="k">Informe a API key para habilitar esta integração. A chave será armazenada localmente com acesso restrito.</span><div class="hstack"><input class="field" type="password" value="" placeholder="Cole a chave nova" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div></div>
-      <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Remover chave</button><button class="btn ghost" type="button">Cancelar</button><button class="btn" type="button">Salvar</button></div>
+      <div class="stack"><span class="k">Informe a API key para habilitar esta integração. A chave será armazenada localmente com acesso restrito.</span><div class="hstack"><input class="field" type="password" value="" placeholder="Cole a chave nova" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div><span class="st warn">Chave válida, sem plano ativo na MiniMax.</span></div>
+      <div class="hstack" style="justify-content:flex-end"><button class="btn ghost" type="button">Remover chave</button><button class="btn ghost" type="button">Cancelar</button><button class="btn ghost" type="button">Testar chave</button><button class="btn" type="button">Salvar</button></div>
     </div>
   </div></div>
 </div>
+<p class="note"><b>"Testar chave" faz a coleta de verdade</b> (issue #204). Antes dele, quem colava a chave errada
+descobria na coleta seguinte, num banner do dashboard — outra tela, minutos depois, sem dizer o motivo. O teste
+monta um cliente HTTP <b>efêmero</b> com o proxy corrente e chama o <b>repositório da fonte</b>, não um endpoint
+próprio de teste nem um <code>GET</code> cru: a MiniMax responde <code>HTTP 200</code> com <code>status_code</code>
+de erro no corpo, e só o repositório sabe traduzir isso. Endpoint separado poderia passar enquanto a coleta real
+falha.</p>
+<p class="note"><b>O veredito é texto na própria tela, junto do campo que ele descreve</b> — nunca um toast, que
+some antes de ser lido, e nunca no rodapé junto do botão, porque a pergunta é sobre o que está digitado ali.
+Ponto <b>e</b> palavra, como todo estado deste sistema. Ele deixa de valer no primeiro caractere digitado e ao trocar
+de fonte: descreveria uma chave que não está mais no campo.</p>
+<p class="note"><b>Três tons, não dois.</b> Verde para chave válida; vermelho para 401/403, 407 e falha de conexão —
+os casos em que há o que corrigir; <b>âmbar</b> para "chave válida, sem assinatura Go" e "sem plano ativo", e também
+para 429 e 503, em que o texto diz explicitamente que <b>não houve veredito sobre a chave</b>. Marcar um limite
+temporário como vermelho mandaria trocar uma credencial que está correta.</p>
+<p class="note"><b>É <code>ghost</code>, encostado no "Salvar"</b>: primário é um por tela e continua sendo o Salvar,
+que é o que o diálogo propõe; a sequência natural é testar e então salvar. Fica desabilitado durante a checagem e
+quando não há chave nenhuma — nem digitada, nem guardada. <b>Com o campo vazio ele testa a chave guardada</b>, que é
+o caso da chave que expirou, em que não há uma nova para digitar.</p>
 
 <h2 id="cfg-contas">12d · Configurações — Contas</h2>
 <div class="win mid" style="max-width:none">
