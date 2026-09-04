@@ -6,6 +6,14 @@ const PREV = [9, 14, 13, 21, 24, 22, 33, 39, 36, 44, 49, 46, 53, 51, 55, 59, 56,
 function Chart({ data, prev }) {
   const W = 900, H = 150, max = 100;
   const pt = (arr) => arr.map((v, i) => (i / (arr.length - 1)) * W + ',' + (H - (v / max) * H)).join(' ');
+  // Massa sob a curva principal: preenchimento chapado (color-mix com o acento
+  // da fonte, opacidade fixa via mistura com "transparent"), nunca gradiente —
+  // mesma técnica da grade de atividade (CliSessions.jsx), estendida pro
+  // gráfico de linha. A linha tracejada do período anterior fica sem
+  // preenchimento: a massa é só da série que está sendo lida agora.
+  const area = data.length > 0
+    ? 'M0,' + H + ' L' + pt(data).replace(/ /g, ' L') + ' L' + W + ',' + H + ' Z'
+    : '';
   return (
     <svg viewBox={'0 0 ' + W + ' ' + H} style={{ display: 'block', width: '100%', height: 'auto' }} role="img" aria-label="Consumo ao longo de 7 dias">
       {[0.25, 0.5, 0.75].map((g) => (
@@ -14,6 +22,7 @@ function Chart({ data, prev }) {
       {[6, 12, 18].map((i) => (
         <line key={i} x1={(i / 23) * W} x2={(i / 23) * W} y1="0" y2={H} stroke="var(--border)" strokeWidth="1" strokeDasharray="2 4" />
       ))}
+      <path d={area} fill="color-mix(in srgb, var(--anthropic) 14%, transparent)" stroke="none" />
       <polyline points={pt(prev)} fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeDasharray="4 4" />
       <polyline points={pt(data)} fill="none" stroke="var(--anthropic)" strokeWidth="2" />
     </svg>
