@@ -14,6 +14,7 @@ import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.datetime.Instant
@@ -88,14 +89,16 @@ class HudBarHeightTest {
         sources: List<HudSourceStatus>,
         expanded: Boolean,
         dotOnly: Boolean = false,
-        showsCountdown: Boolean = false
+        showsCountdown: Boolean = false,
+        hasUpdateIndicator: Boolean = false
     ) = runDesktopComposeUiTest {
         val expected = hudWindowSize(
             sources = sources,
             fallbackLabel = "Carregando",
             dotOnly = dotOnly,
             expanded = expanded,
-            showsCountdown = showsCountdown
+            showsCountdown = showsCountdown,
+            hasUpdateIndicator = hasUpdateIndicator
         ).height
 
         setContent {
@@ -109,6 +112,11 @@ class HudBarHeightTest {
                         fallbackLabel = "Carregando",
                         dotOnly = dotOnly,
                         expanded = expanded,
+                        updateIndicator = if (hasUpdateIndicator) {
+                            HudUpdateIndicator(tone = AppTone.OK, description = "Versão pronta")
+                        } else {
+                            null
+                        },
                         nextRefreshAt = if (showsCountdown) NEXT_REFRESH_AT else null,
                         countdownDescription = if (showsCountdown) "Próxima coleta" else null,
                         nowProvider = { NOW },
@@ -199,6 +207,38 @@ class HudBarHeightTest {
             sources = sourcesComReset,
             expanded = true,
             showsCountdown = true
+        )
+    }
+
+    /**
+     * O indicador de atualização (issue #225) entra na linha que já existe,
+     * então a altura não pode mudar — afirmado por medição, como os casos da
+     * contagem e do reset acima.
+     */
+    @Test
+    fun `a altura calculada bate com a composta com o indicador de atualizacao`() {
+        assertMeasuredHeightMatchesGeometry(
+            sources = sources,
+            expanded = false,
+            hasUpdateIndicator = true
+        )
+    }
+
+    @Test
+    fun `a altura calculada bate com a composta aberta com o indicador de atualizacao`() {
+        assertMeasuredHeightMatchesGeometry(
+            sources = sources,
+            expanded = true,
+            hasUpdateIndicator = true
+        )
+    }
+
+    @Test
+    fun `a altura calculada bate com a composta na linha de carregamento com o indicador de atualizacao`() {
+        assertMeasuredHeightMatchesGeometry(
+            sources = emptyList(),
+            expanded = true,
+            hasUpdateIndicator = true
         )
     }
 

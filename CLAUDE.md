@@ -819,6 +819,20 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   mesma relação de `AppUpdateStrip` com `AppButton` no design system. `allSourceRisks`
   (`WorstQuotaSnapshot.kt`) alimenta o painel, e `worstQuotaSnapshot` é só a primeira entrada dela:
   duas passadas pela mesma lista divergiriam eventualmente.
+- **Indicador de atualização pendente, sem clique próprio** (`HudUpdateIndicator` +
+  `HudUpdateBadge`, issue #225): `AppUpdateBanner` nunca é composto em modo HUD — `content()` é
+  descartado inteiro —, e a pílula recolhida ao ponto não sobrava sinal nenhum de que havia versão
+  pronta. O ícone (`Icons.Rounded.SystemUpdate`, tingido por `AppTone`) entra na primeira linha, entre
+  as cotas e a contagem — os dois são informação do app, não da conta —, e a frase inteira vai na
+  semântica (`indicator.description`, o mesmo título de `updateBannerContent`): não cabe tooltip aqui.
+  **Não tem zona de clique própria.** `hudPressGesture` ignora consumo de filhos de propósito, então
+  o ícone fica dentro do mesmo alvo que já abre a janela padrão — onde `AppUpdateBanner` oferece
+  "Reiniciar e atualizar agora" — sem precisar de matemática de posição nova. Uma ação de reiniciar
+  direto da HUD faria um clique de rotina na pílula reiniciar o app sem aviso sempre que uma
+  atualização estivesse pronta, risco pior que a falta de indicador. **`dotOnly` também para de
+  recolher** enquanto há atualização pendente (`Main.kt`, `hudDotOnly`), mesma regra da cota sem
+  projeção: "está tudo bem" é garantia que a barra não pode dar com uma versão esperando para ser
+  aplicada. `hudWindowSize` ganhou `hasUpdateIndicator`, mesmo tratamento de `showsCountdown`.
 
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
 abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e

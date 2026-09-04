@@ -137,6 +137,8 @@ import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
 import com.usagemonitor.presentation.ui.HudBar
 import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.HudUpdateIndicator
+import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.ui.orderedByCardOrder
 import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.DashboardScreen
@@ -1712,6 +1714,17 @@ private fun runUsageMonitor(
         val hudSnapshot by usageAlertViewModel.worstSnapshot.collectAsState()
         val hudStatusTone = hudSnapshot?.let { snapshot -> toneFor(snapshot.risk.level) } ?: AppTone.NEUTRAL
         val hudFallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
+        // Indicador de atualização pendente na barra HUD (issue #225): a faixa
+        // padrão (`AppUpdateBanner`) nunca é composta em modo HUD —
+        // `DesktopWindowFrame` descarta `content()` quando `hud = true` —, e a
+        // pílula recolhia ao ponto sem sinal nenhum de que havia algo para ver.
+        // Reaproveita `updateBannerContent`, o mesmo texto e o mesmo tom que o
+        // modo padrão usa: nenhuma cópia PT/EN nova.
+        val hudAppUpdateState by viewModel.appUpdateState.collectAsState()
+        val hudUpdateIndicator = hudAppUpdateState?.let { state ->
+            val content = updateBannerContent(state = state, language = language)
+            HudUpdateIndicator(tone = content.tone, description = content.title)
+        }
         // **Todas as cotas, não a pior de cada fonte.** A versão anterior mostrava
         // uma cota por fonte, e uma conta Anthropic com janela de 5h e de 7d
         // aparecia com um limite só — o outro não existia na tela. Como elas são
@@ -1762,8 +1775,12 @@ private fun runUsageMonitor(
         // Nada em risco: a barra recolhe ao ponto e devolve a tela. Lista vazia
         // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
         // que está tudo bem antes de saber. Cota sem projeção também não recolhe:
-        // "está tudo bem" seria uma garantia que ninguém deu.
-        val hudDotOnly = hudOrderedQuotas.isNotEmpty() &&
+        // "está tudo bem" seria uma garantia que ninguém deu. **Atualização
+        // pendente também não recolhe** (issue #225), pela mesma razão: é um
+        // dado novo, e a barra não pode dizer "está tudo bem" enquanto uma
+        // versão espera para ser aplicada.
+        val hudDotOnly = hudAppUpdateState == null &&
+            hudOrderedQuotas.isNotEmpty() &&
             hudOrderedQuotas.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
         // Contagem até a próxima coleta (issue #185). O rodapé, que já a mostrava,
         // não é composto em modo HUD — `DesktopWindowFrame` descarta `content()`
@@ -1836,14 +1853,16 @@ private fun runUsageMonitor(
             fallbackLabel = hudFallbackLabel,
             dotOnly = false,
             expanded = false,
-            showsCountdown = true
+            showsCountdown = true,
+            hasUpdateIndicator = hudUpdateIndicator != null
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
         val hudTargetSize = hudWindowSize(
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
             dotOnly = hudCollapsedToDot,
             expanded = hudExpanded,
-            showsCountdown = true
+            showsCountdown = true,
+            hasUpdateIndicator = hudUpdateIndicator != null
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
 
         LaunchedEffect(hudMode) {
@@ -2055,6 +2074,7 @@ private fun runUsageMonitor(
                         fallbackLabel = hudFallbackLabel,
                         dotOnly = hudCollapsedToDot,
                         expanded = hudExpanded,
+                        updateIndicator = hudUpdateIndicator,
                         nextRefreshAt = hudNextRefreshAt,
                         countdownDescription = hudCountdownDescription,
                         onHoverChange = { hovered -> hudHovered = hovered },

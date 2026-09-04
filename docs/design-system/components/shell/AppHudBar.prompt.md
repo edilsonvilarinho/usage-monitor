@@ -1,5 +1,6 @@
-One 20dp row per account: dot and word for its worst quota, then one dot per quota, and the
-countdown to the next collection at the end of the first row.
+One 20dp row per account: dot and word for its worst quota, then one dot per quota, an icon-only
+update badge when one is pending, and the countdown to the next collection — in that order, at the
+end of the first row.
 
 ```jsx
 <AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
@@ -8,6 +9,9 @@ countdown to the next collection at the end of the first row.
 <AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
   quotas: [{ text: '5h 28%', level: 'ok', reset: '22h59' },
            { text: '7d 9%', level: 'crit', reset: 'Ter 21h00' }] }]} expanded countdown="02:05" />
+<AppHudBar sources={[{ label: 'Padrão', statusLabel: 'Normal', level: 'ok',
+  quotas: [{ text: '5h 12%', level: 'ok' }] }]}
+  update={{ level: 'ok', label: 'Versão 40.0.0 pronta — será aplicada ao fechar' }} countdown="02:05" />
 ```
 
 Not a new risk primitive — the dot+word is `AppStatusIndicator`, and the collapsed state reuses
@@ -137,6 +141,19 @@ character, against real accounts on a real machine (the 320 → 420 → 484 hist
 discipline), and this is one more column that measurement never accounted for. Wiring it needs the
 same treatment the countdown column got in issue #185 — measured against real accounts, not
 estimated from this mockup.
+
+**The update badge has no click of its own, and that is deliberate (issue #225).** The bar's `content()`
+is never composed while `hud=true`, so the standard mode's update strip — "Restart and update now" —
+was simply unreachable from here; a resting HUD with every quota on track collapsed straight to the
+dot with no signal at all that a version was ready. The fix is display only: an icon-only badge,
+level and label already resolved by the host (same treatment as `countdown`), drawn once on the first
+row. It sits inside the same `role="button"` the whole bar already is — a short click anywhere,
+including on the badge, opens the full window, where the strip the user already knows offers the same
+restart button. Giving the badge its own action instead would make a routine click on the bar restart
+the app without warning whenever an update happened to be ready — a worse failure than the missing
+indicator. `dotOnly` also stops collapsing while an update is pending, same reasoning as a quota with
+no forecast: "everything is fine" is a guarantee the bar cannot make while a version is waiting to be
+applied.
 
 **The secondary click switches straight to Cards-only, and it is not a menu (issue #215).** The bar
 had no way to reach the other reduced chrome without first returning to Standard — every exit landed
