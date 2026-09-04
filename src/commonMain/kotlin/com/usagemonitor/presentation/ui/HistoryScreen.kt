@@ -645,7 +645,8 @@ private fun DeepSeekHistoryCard(
                     chartSelectionKey = chartSelectionKey,
                     tooltipTitle = title,
                     tooltipSubtitle = subtitle,
-                    accentColor = accentColor
+                    accentColor = accentColor,
+                    previousPoints = series.previousWindowPoints
                 )
 
                 Text(
@@ -716,7 +717,8 @@ private fun OpenCodeHistoryCard(
                         periodType = modelReport.chartSeries.periodType,
                         language = language
                     ),
-                    accentColor = accentColor
+                    accentColor = accentColor,
+                    previousPoints = modelReport.chartSeries.previousWindowPoints
                 )
 
                 HistoryMetricTable(
@@ -823,7 +825,8 @@ private fun HistorySeriesCard(
                     chartSelectionKey = chartSelectionKey,
                     tooltipTitle = title,
                     tooltipSubtitle = subtitle,
-                    accentColor = accentColor
+                    accentColor = accentColor,
+                    previousPoints = series.previousWindowPoints
                 )
 
                 if (weeklySummary != null) {

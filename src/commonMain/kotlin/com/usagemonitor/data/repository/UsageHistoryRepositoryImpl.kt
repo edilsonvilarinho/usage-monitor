@@ -148,7 +148,11 @@ class UsageHistoryRepositoryImpl(
                 // já corrigir uma série cujas linhas antigas não tinham a coluna.
                 hasKnownResetAt = currentPoint.hasKnownResetAt
             ),
-            comparison = buildComparison(deltaDisplayUsed, previousRecords, unit)
+            comparison = buildComparison(deltaDisplayUsed, previousRecords, unit),
+            // Mesmos registros que já alimentam a comparação, só que crus: o
+            // gráfico é quem decide como desenhar, este repositório só para
+            // de descartá-los depois de calcular o delta.
+            previousWindowPoints = previousRecords.map(::toHistoryPoint)
         )
     }
 

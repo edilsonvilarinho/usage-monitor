@@ -250,7 +250,18 @@ data class UsageHistorySeries(
     val forecast: UsageForecast,
     val riskSummary: QuotaRiskSummary?,
     /** Esta janela contra a anterior; `null` em "Total" ou sem dado anterior. */
-    val comparison: UsagePeriodComparison? = null
+    val comparison: UsagePeriodComparison? = null,
+    /**
+     * Pontos crus da janela **anterior**, de mesma duração (issue #215).
+     *
+     * Vazio em "Total" e sempre que não há dado anterior — mesma condição de
+     * [comparison] ser `null`, e pela mesma razão: a leitura já ia até
+     * `previousWindowStart` para calcular o delta, e até esta entrada esses
+     * pontos eram descartados depois de servir só a esse número. O gráfico os
+     * usa para desenhar a linha de referência tracejada; nenhuma consulta
+     * nova ao banco.
+     */
+    val previousWindowPoints: List<UsageHistoryPoint> = emptyList()
 ) {
     val seriesKey: QuotaSeriesKey
         get() = QuotaSeriesKey(label = quotaLabel, periodType = periodType)
