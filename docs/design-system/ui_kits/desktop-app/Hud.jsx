@@ -9,28 +9,28 @@ const { AppHudBar } = DS;
 // no lugar.
 const SOURCES = [
   {
-    label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
+    label: 'INFORMATA2', source: 'anthropic', statusLabel: 'Crítico', level: 'crit',
     quotas: [
       { text: '5h 28%', level: 'ok', reset: '22h59' },
       { text: '7d 9%', level: 'crit', reset: 'Ter 21h00' }
     ]
   },
   {
-    label: 'Padrão', statusLabel: 'Atenção', level: 'warn',
+    label: 'Padrão', source: 'anthropic', statusLabel: 'Atenção', level: 'warn',
     quotas: [
       { text: '5h 88%', level: 'warn', reset: '1h30' },
       { text: '7d 41%', level: 'ok', reset: 'Qui 9h00' }
     ]
   },
   {
-    label: 'OpenCode Go', statusLabel: 'Sem projeção', level: 'off',
+    label: 'OpenCode Go', source: 'opencode', statusLabel: 'Sem projeção', level: 'off',
     quotas: [
       { text: '5h 0%', level: 'off', reset: '22h59' },
       { text: 'mensal 47%', level: 'off', reset: 'Qua 21h00' }
     ]
   },
   {
-    label: 'DeepSeek', statusLabel: 'Sem projeção', level: 'off',
+    label: 'DeepSeek', source: 'deepseek', statusLabel: 'Sem projeção', level: 'off',
     quotas: [{ text: 'Saldo $2.27', level: 'off' }]
   }
 ];
@@ -96,7 +96,11 @@ export function Hud() {
         <b> uma vez só</b>, na primeira: o polling é do app inteiro, e uma contagem por linha diria
         que cada conta tem coleta própria. Recolhida ao ponto ela não aparece — ali não há texto
         nenhum, e o hover devolve o painel com ela. Cota sem reset a mostrar — o saldo que não
-        expira — sai com o percentual e nada no lugar, nem um traço.
+        expira — sai com o percentual e nada no lugar, nem um traço. O ponto de 6dp antes do nome é
+        <b> proposta</b> (issue #223): esta faixa não tem a barra de 2dp que o card tem, e o nome
+        sozinho não diz de que fornecedor é a conta. Ainda não fiado no Compose — o teto de largura
+        aqui é medido caractere a caractere contra as contas reais de uma máquina, e a coluna nova
+        pede a mesma medição que a contagem regressiva recebeu na issue #185.
       </span>
     </div>
   );

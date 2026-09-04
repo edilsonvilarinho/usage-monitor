@@ -15,7 +15,9 @@ export function AppDataRow({ children, mark, onClick, indent = 0, guide = false,
         paddingLeft: indent ? 'calc(var(--s3) + ' + indent + 'px)' : 'var(--s3)',
         marginLeft: guide ? 24 : 0,
         borderLeft: guide ? 'var(--mark-w) solid var(--border)' : 'none',
-        background: guide ? 'var(--bg)' : (hoverable && hover ? 'var(--raised)' : 'transparent'),
+        background: guide
+          ? (hoverable && hover ? 'var(--raised)' : 'var(--surface)')
+          : (hoverable && hover ? 'var(--raised)' : 'transparent'),
         borderBottom: last ? 'none' : '1px solid var(--border)',
         minWidth: 0,
         transition: 'background var(--dur-hover) var(--ease)',
@@ -40,9 +42,9 @@ export function AppValue({ children, size = 'md', dim = false, style }) {
       style={{
         fontFamily: 'var(--mono)',
         fontVariantNumeric: 'tabular-nums',
-        fontSize: size === 'lg' ? 'var(--t20)' : size === 'sm' ? 'var(--t12)' : 'var(--t14)',
-        fontWeight: size === 'lg' ? 500 : 400,
-        letterSpacing: size === 'lg' ? 'var(--ls-title)' : 'normal',
+        fontSize: size === 'lg' ? 'var(--t20)' : size === 'primary' ? 'var(--t16)' : size === 'sm' ? 'var(--t12)' : 'var(--t14)',
+        fontWeight: size === 'lg' || size === 'primary' ? 500 : 400,
+        letterSpacing: size === 'lg' || size === 'primary' ? 'var(--ls-title)' : 'normal',
         color: dim ? 'var(--muted)' : 'inherit',
         whiteSpace: 'nowrap',
         overflow: 'hidden',

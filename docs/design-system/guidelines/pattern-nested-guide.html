@@ -1,11 +1,11 @@
-<!-- @dsCard group="Patterns" viewport="700x200" name="Nested group guide" subtitle="Children of an expanded row are siblings in the list — the 2dp stroke says they belong to it" -->
+<!-- @dsCard group="Patterns" viewport="700x260" name="Nested group guide" subtitle="Children of an expanded row are siblings in the list — the 2dp stroke says they belong to it" -->
 <!DOCTYPE html>
 <html lang="pt-BR" data-app-theme="dark">
 <head>
 <meta charset="utf-8">
 <link rel="stylesheet" href="../styles.css">
 <style>
-  body { padding: 16px; width: 700px; height: 168px; overflow: hidden; }
+  body { padding: 16px; width: 700px; height: 228px; overflow: hidden; }
   .g { display: grid; gap: 8px; }
   .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
@@ -29,15 +29,16 @@
     <span style="flex:1"></span><span style="font-family:var(--mono);font-size:var(--t12);font-variant-numeric:tabular-nums">US$ 4,8120</span>
   </div>
   
-  <div style="display:flex;align-items:center;gap:12px;padding:8px 12px 8px 38px;margin-left:24px;border-left:2px solid var(--border);background:var(--bg);border-bottom:1px solid var(--border)">
+  <div style="display:flex;align-items:center;gap:12px;padding:8px 12px 8px 38px;margin-left:24px;border-left:2px solid var(--border);background:var(--surface);border-bottom:1px solid var(--border)">
     <div style="display:flex;flex-direction:column"><span style="font-family:var(--mono);font-size:var(--t12)">7c4a1f92</span><span class="k">api-gateway · 48 turnos</span></div>
     <span style="flex:1"></span><span style="font-family:var(--mono);font-size:var(--t12);font-variant-numeric:tabular-nums">US$ 3,1841</span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;padding:8px 12px 8px 38px;margin-left:24px;border-left:2px solid var(--border);background:var(--bg);">
+  <div style="display:flex;align-items:center;gap:12px;padding:8px 12px 8px 38px;margin-left:24px;border-left:2px solid var(--border);background:var(--surface);">
     <div style="display:flex;flex-direction:column"><span style="font-family:var(--mono);font-size:var(--t12)">b81e35c0</span><span class="k">checkout-web · 26 turnos</span></div>
     <span style="flex:1"></span><span style="font-family:var(--mono);font-size:var(--t12);font-variant-numeric:tabular-nums">US$ 1,6279</span>
   </div>
 </div>
 <div class="k" style="margin-top:8px">traço desenhado por item · sai contínuo porque a lista não tem vão · drawBehind, não Modifier.border</div>
+<div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:8px;max-width:640px">Fundo <code style="border:0;background:none;padding:0;color:var(--fg)">--surface</code>, nunca <code style="border:0;background:none;padding:0;color:var(--fg)">--bg</code> — o rung que <code style="border:0;background:none;padding:0;color:var(--fg)">Modifier.appNestedGroupItem</code> usa de verdade. <code style="border:0;background:none;padding:0;color:var(--fg)">--bg</code> é o fundo da janela por trás de tudo; usá-lo aqui apagaria o degrau que a guia existe para marcar. Esta é a regra para <b>filhos de uma linha-pai que já é linha de dado completa</b> (uma sessão que expande em turnos) — pergunta diferente da que <code style="border:0;background:none;padding:0;color:var(--fg)">AppGroupBand</code> responde: aquele rotula um grupo sem linha própria (uma conta, acima dos integrantes dela).</div>
 </body>
 </html>

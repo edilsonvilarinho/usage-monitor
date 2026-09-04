@@ -35,7 +35,7 @@ export function Settings() {
 
   return (
     <AppWindowFrame title="Configurações" style={{ width: 900 }}>
-      <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--r3)', overflow: 'hidden', background: 'var(--surface)', minHeight: 420 }}>
+      <AppPanel style={{ flexDirection: 'row', overflow: 'hidden', minHeight: 420 }}>
         <AppSettingsNav items={['Geral', 'Alertas', 'APIs', 'Contas', 'Time']} value={sec} onChange={setSec} />
         <div style={{ flex: 1, padding: 'var(--s4)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)', minWidth: 0 }}>
           {sec === 'Geral' ? (
@@ -173,7 +173,7 @@ export function Settings() {
             </React.Fragment>
           ) : null}
         </div>
-      </div>
+      </AppPanel>
     </AppWindowFrame>
   );
 }

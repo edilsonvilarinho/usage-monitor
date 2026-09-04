@@ -346,9 +346,15 @@ internal fun UsageHistoryLineChart(
                         fillPath.close()
 
                         clipRect(right = size.width * revealFraction) {
-                            if (unit == UsageUnit.CURRENCY_USD) {
-                                drawPath(path = fillPath, color = fillColor)
-                            }
+                            // Massa sob a curva principal (issue #223): o
+                            // preenchimento chapado nasceu só pro saldo do
+                            // DeepSeek e nunca foi generalizado — a leitura
+                            // percentual (a mais vista da tela) ficava só no
+                            // traço de 1-2px sobre a grade. `fillColor` já é
+                            // opacidade fixa sobre `accentColor`, sem
+                            // gradiente; geometria de `fillPath` já era
+                            // unit-agnostic, só o desenho estava condicionado.
+                            drawPath(path = fillPath, color = fillColor)
                             drawPath(
                                 path = path,
                                 color = lineColor,

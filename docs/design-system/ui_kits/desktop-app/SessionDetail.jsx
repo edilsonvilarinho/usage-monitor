@@ -5,9 +5,13 @@ const TURNS = [8, 14, 21, 26, 34, 41, 47, 52, 58, 63, 69, 74, 79, 83, 88, 92];
 function ContextChart() {
   const W = 880, H = 130, max = 100;
   const pts = TURNS.map((v, i) => (i / (TURNS.length - 1)) * W + ',' + (H - (v / max) * H)).join(' ');
+  // Mesma massa sob a curva do gráfico de histórico: color-mix chapado com o
+  // acento da fonte, sem gradiente.
+  const area = 'M0,' + H + ' L' + pts.replace(/ /g, ' L') + ' L' + W + ',' + H + ' Z';
   return (
     <svg viewBox={'0 0 ' + W + ' ' + H} style={{ display: 'block', width: '100%', height: 'auto' }} role="img" aria-label="Crescimento do contexto por turno">
       <line x1="0" x2={W} y1={H * 0.1} y2={H * 0.1} stroke="var(--crit)" strokeWidth="1" strokeDasharray="4 4" />
+      <path d={area} fill="color-mix(in srgb, var(--anthropic) 14%, transparent)" stroke="none" />
       <polyline points={pts} fill="none" stroke="var(--anthropic)" strokeWidth="2" />
       {TURNS.map((v, i) => (
         <circle key={i} cx={(i / (TURNS.length - 1)) * W} cy={H - (v / max) * H} r="2.5" fill="var(--anthropic)" />

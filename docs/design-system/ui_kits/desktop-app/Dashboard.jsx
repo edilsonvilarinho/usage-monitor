@@ -14,7 +14,7 @@ function Quota({ label, value, percent, level, reset, last }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
           <AppKey>{label}</AppKey>
           <span style={{ flex: 1 }} />
-          <AppValue>{value}</AppValue>
+          <AppValue size="primary">{value}</AppValue>
         </div>
         <AppProgressTrack percent={percent} level={level} label={label} />
         {reset ? <AppKey dim>{reset}</AppKey> : null}

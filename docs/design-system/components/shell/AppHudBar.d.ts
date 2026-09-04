@@ -41,6 +41,20 @@ export interface AppHudBarProps {
   sources?: Array<{
     /** Profile or source name, without any quota label. */
     label: ReactNode;
+    /**
+     * Vendor key for the second identity reinforcement (`AppSourceDot`,
+     * 6dp) drawn before the name — `anthropic`, `codex`, `deepseek`, etc.
+     * Absent draws no dot, same as today. This bar has no `AppSourceMark`
+     * (the card's 2dp bar): a row with several accounts of different
+     * providers reads as plain text with no vendor signal at all until this
+     * lands. **Proposed here only** (issue #223) — not wired into the
+     * Compose bar yet: the panel's width caps (`HUD_PILL_MAX_WIDTH`,
+     * `HUD_PANEL_MAX_WIDTH`) are measured per character against the real
+     * accounts on a machine, and this adds a column that measurement never
+     * accounted for. Wiring it needs the same treatment issue #185 gave the
+     * countdown column — measured against real accounts, not estimated.
+     */
+    source?: string;
     /** Word for the **worst** quota of that account — the card badge's role. */
     statusLabel: ReactNode;
     level?: 'ok' | 'warn' | 'crit' | 'off';

@@ -128,6 +128,16 @@ and a z-order fight with a window that is also topmost. The anchor always descri
 even while the dot is what is on screen; anchoring on the dot would make the window jump every time
 a source left the on-track state.
 
+**Second vendor-identity reinforcement — proposed, not wired into Compose (issue #223).** The card
+has the 2dp `AppSourceMark` bar; this panel has none, and with several accounts from different
+providers the name alone carries no vendor signal. `source` on each row draws a 6dp `AppSourceDot`
+before the name, reusing the same vendor color map — never a new accent. It stops short of the
+Compose bar deliberately: `HUD_PILL_MAX_WIDTH`/`HUD_PANEL_MAX_WIDTH` are measured, character by
+character, against real accounts on a real machine (the 320 → 420 → 484 history is exactly that
+discipline), and this is one more column that measurement never accounted for. Wiring it needs the
+same treatment the countdown column got in issue #185 — measured against real accounts, not
+estimated from this mockup.
+
 **The secondary click switches straight to Cards-only, and it is not a menu (issue #215).** The bar
 had no way to reach the other reduced chrome without first returning to Standard — every exit landed
 there. A dropdown listing all three modes is not an option here: it is a `Popup`, and a popup on this

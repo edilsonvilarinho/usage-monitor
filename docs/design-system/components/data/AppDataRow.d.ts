@@ -16,6 +16,11 @@ export interface AppDataRowProps {
    * Draws the 2dp nested-group guide: this row is a sibling in the list but
    * belongs to the row above it. Children of an expanded row are siblings,
    * never a nested list — nesting breaks LazyColumn scrolling and item reuse.
+   * Rests on `--surface`, one rung above the window's `--bg` — matches
+   * `Modifier.appNestedGroupItem`, the real Compose implementation. Hover
+   * still lifts to `--raised` when `hoverable`; `guide` changes the resting
+   * color, never the interaction (fixed 2026-09-04, issue #223 — it used to
+   * pin the row to `--bg` and disable hover outright).
    */
   guide?: boolean;
   last?: boolean;
@@ -24,7 +29,23 @@ export interface AppDataRowProps {
 }
 
 export interface AppKeyProps { children?: ReactNode; dim?: boolean; style?: CSSProperties; }
-export interface AppValueProps { children?: ReactNode; size?: 'sm' | 'md' | 'lg'; dim?: boolean; style?: CSSProperties; }
+export interface AppValueProps {
+  children?: ReactNode;
+  /**
+   * `sm` (12) and `md` (14, default) are for a value sitting beside its own
+   * key in a row. `primary` (16, weight 500) is `--t16` — the token's own
+   * comment calls it "primary metric value": the number a row exists to
+   * show, like a quota's percentage. `lg` (20) is for a value standing
+   * alone, no key beside it (an `AppMetric` block, a card's minimized
+   * summary). Matches `MaterialTheme.typography.titleMedium` (16sp) /
+   * `titleLarge` (20sp) in Compose — `ApiUsageCard.kt` already renders the
+   * quota percentage at `titleMedium`; `primary` closes the gap this kit
+   * had against it (issue #223).
+   */
+  size?: 'sm' | 'md' | 'primary' | 'lg';
+  dim?: boolean;
+  style?: CSSProperties;
+}
 
 export function AppDataRow(props: AppDataRowProps): JSX.Element;
 export function AppKey(props: AppKeyProps): JSX.Element;
