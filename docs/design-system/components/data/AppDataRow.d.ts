@@ -16,6 +16,11 @@ export interface AppDataRowProps {
    * Draws the 2dp nested-group guide: this row is a sibling in the list but
    * belongs to the row above it. Children of an expanded row are siblings,
    * never a nested list — nesting breaks LazyColumn scrolling and item reuse.
+   * Rests on `--surface`, one rung above the window's `--bg` — matches
+   * `Modifier.appNestedGroupItem`, the real Compose implementation. Hover
+   * still lifts to `--raised` when `hoverable`; `guide` changes the resting
+   * color, never the interaction (fixed 2026-09-04, issue #223 — it used to
+   * pin the row to `--bg` and disable hover outright).
    */
   guide?: boolean;
   last?: boolean;

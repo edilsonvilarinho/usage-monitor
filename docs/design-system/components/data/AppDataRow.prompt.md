@@ -12,4 +12,4 @@ A line of data. Put them directly inside `<AppPanelBody flush>`.
 </AppDataRow>
 ```
 
-Use `guide` for the child rows of an expanded team member or project — the 2dp stroke sits in the middle of the indent, drawn per row.
+Use `guide` for the child rows of an expanded team member or project — the 2dp stroke sits in the middle of the indent, drawn per row. It rests on `--surface`, never `--bg` — see `guidelines/pattern-nested-guide.html`. `guide` only changes the resting color; a clickable nested row still lifts to `--raised` on hover.

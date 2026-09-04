@@ -15,7 +15,9 @@ export function AppDataRow({ children, mark, onClick, indent = 0, guide = false,
         paddingLeft: indent ? 'calc(var(--s3) + ' + indent + 'px)' : 'var(--s3)',
         marginLeft: guide ? 24 : 0,
         borderLeft: guide ? 'var(--mark-w) solid var(--border)' : 'none',
-        background: guide ? 'var(--bg)' : (hoverable && hover ? 'var(--raised)' : 'transparent'),
+        background: guide
+          ? (hoverable && hover ? 'var(--raised)' : 'var(--surface)')
+          : (hoverable && hover ? 'var(--raised)' : 'transparent'),
         borderBottom: last ? 'none' : '1px solid var(--border)',
         minWidth: 0,
         transition: 'background var(--dur-hover) var(--ease)',
