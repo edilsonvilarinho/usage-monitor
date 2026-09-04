@@ -57,6 +57,6 @@ superfície e já congelado.
 | # | Atividade | Status | Commit | Resultado |
 |---|---|---|---|---|
 | 1 | Plano + issue | Concluída | (este commit) | doc criado, issue aberta |
-| 2 | 5 temas escuros | Pendente | — | — |
+| 2 | 5 temas escuros | Concluída | (este commit) | `AppThemePresetTest`/`AppAccentsContrastTest` verdes (21 entries, 13 dark, 8 light) |
 | 3 | 5 temas claros | Pendente | — | — |
 | 4 | Fechamento | Pendente | — | — |
