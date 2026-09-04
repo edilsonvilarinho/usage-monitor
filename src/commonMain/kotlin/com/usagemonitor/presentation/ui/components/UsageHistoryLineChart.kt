@@ -96,7 +96,21 @@ internal fun UsageHistoryLineChart(
      * linha `primary` — a cor que o card do dashboard usa para distingui-los não
      * chegava até aqui.
      */
-    accentColor: Color = MaterialTheme.colorScheme.primary
+    accentColor: Color = MaterialTheme.colorScheme.primary,
+    /**
+     * Pontos da janela **anterior**, de mesma duração (issue #215). Vazio
+     * some com a linha de referência — mesma condição de
+     * `UsageHistorySeries.comparison` ser `null`.
+     *
+     * **Desenhada só sem zoom.** O zoom recorta [points] por fração de
+     * índice; aplicar o mesmo recorte aqui exigiria os dois pontos terem a
+     * mesma densidade de amostragem, que não é garantida — a leitura de cada
+     * janela é independente. Sem essa garantia, a linha tracejada poderia
+     * descrever um trecho de tempo diferente do que a corrente mostra
+     * ampliada, e um comparativo que compara períodos diferentes é pior que
+     * nenhum. "Ver tudo" devolve a comparação.
+     */
+    previousPoints: List<UsageHistoryPoint> = emptyList()
 ) {
     val lineColor = accentColor
     val fillColor = accentColor.copy(alpha = 0.12f)
@@ -152,6 +166,21 @@ internal fun UsageHistoryLineChart(
             axis = valueAxis,
             horizontalInsetPx = plotInset
         )
+    }
+    val previousRenderPoints = remember(previousPoints, unit) { filteredPoints(previousPoints, unit) }
+    // Só sem zoom — ver o comentário de `previousPoints`.
+    val previousPlotPoints = remember(previousRenderPoints, valueAxis, plotSize, zoomRange) {
+        if (zoomRange != 0f..1f) {
+            emptyList()
+        } else {
+            buildPlotPoints(
+                points = previousRenderPoints,
+                chartWidth = plotSize.width.toFloat(),
+                chartHeight = plotSize.height.toFloat(),
+                axis = valueAxis,
+                horizontalInsetPx = plotInset
+            )
+        }
     }
     val rangeAnnotations = remember(windowedPoints, unit) {
         detectHistoryRangeAnnotations(windowedPoints, unit)
@@ -268,6 +297,33 @@ internal fun UsageHistoryLineChart(
                             strokeWidth = gridStroke * 1.5f,
                             pathEffect = resetPathEffect
                         )
+                    }
+
+                    // Linha de referência do período anterior (issue #215):
+                    // tracejada e em tom neutro — nunca a cor de acento —,
+                    // porque ela não é a série que a tela está medindo, é só
+                    // contexto para ler a corrente contra ela. Desenhada
+                    // antes da linha atual para ficar atrás dela.
+                    if (previousPlotPoints.size > 1) {
+                        val previousPath = Path()
+                        previousPlotPoints.forEachIndexed { index, point ->
+                            if (index == 0) {
+                                previousPath.moveTo(point.x, point.y)
+                            } else {
+                                previousPath.lineTo(point.x, point.y)
+                            }
+                        }
+                        clipRect(right = size.width * revealFraction) {
+                            drawPath(
+                                path = previousPath,
+                                color = gridColor,
+                                style = Stroke(
+                                    width = strokeWidth,
+                                    cap = StrokeCap.Round,
+                                    pathEffect = resetPathEffect
+                                )
+                            )
+                        }
                     }
 
                     if (plotPoints.size > 1) {
@@ -460,6 +516,21 @@ internal fun UsageHistoryLineChart(
                     )
                 }
             }
+        }
+
+        // A cor não basta para dizer "isto é o período anterior" — o
+        // traçado sozinho não carrega a legenda, e por escrito é a mesma
+        // regra que já vale para todo estado deste sistema.
+        if (previousPlotPoints.size > 1) {
+            Text(
+                text = if (language == AppLanguage.PT) {
+                    "Tracejado: mesmo ponto do período anterior"
+                } else {
+                    "Dashed: same point last period"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = axisTextColor
+            )
         }
     }
 }

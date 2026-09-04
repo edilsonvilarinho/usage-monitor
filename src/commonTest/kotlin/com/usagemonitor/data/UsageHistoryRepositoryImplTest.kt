@@ -98,6 +98,54 @@ class UsageHistoryRepositoryImplTest {
         assertEquals(200.0, report.series.single().averageDisplayConsumptionPerHour)
     }
 
+    // ------------------------------------- linha de referência (issue #215)
+
+    /**
+     * A leitura já ia até `previousWindowStart` para calcular
+     * `comparison.previousDelta`; estes pontos existiam e eram descartados
+     * antes de chegar à série — agora ficam em `previousWindowPoints`.
+     */
+    @Test
+    fun `previous window points are exposed for the chart overlay`() = kotlinx.coroutines.test.runTest {
+        // now = 2026-04-28T18:00, LAST_24_HOURS começa em 2026-04-27T18:00.
+        val records = listOf(
+            record("Codex 5h", ApiSource.CODEX, "2026-04-27T10:00:00Z", 100, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-27T20:00:00Z", 200, 1000),
+            record("Codex 5h", ApiSource.CODEX, "2026-04-28T17:00:00Z", 400, 1000)
+        )
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        val series = report.series.single()
+        assertEquals(2, series.points.size)
+        assertEquals(1, series.previousWindowPoints.size)
+        assertEquals(
+            Instant.parse("2026-04-27T10:00:00Z"),
+            series.previousWindowPoints.single().capturedAt
+        )
+    }
+
+    /** "Total" não tem período anterior — inventar um daria número sem significado. */
+    @Test
+    fun `TOTAL range never exposes previous window points`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(steadyGrowthRecords()))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.TOTAL, now)
+
+        assertEquals(emptyList(), report.series.single().previousWindowPoints)
+    }
+
+    /** Sem ponto antes do início da janela corrente, não há o que desenhar. */
+    @Test
+    fun `previous window points are empty without data before the current window`() = kotlinx.coroutines.test.runTest {
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(steadyGrowthRecords()))
+
+        val report = repository.getHistoryReport(ApiSource.CODEX, HistoryRange.LAST_24_HOURS, now)
+
+        assertEquals(emptyList(), report.series.single().previousWindowPoints)
+    }
+
     @Test
     fun `forecast returns InsufficientData when fewer than 3 points`() = kotlinx.coroutines.test.runTest {
         val twoPoints = listOf(
