@@ -42,9 +42,9 @@ export function AppValue({ children, size = 'md', dim = false, style }) {
       style={{
         fontFamily: 'var(--mono)',
         fontVariantNumeric: 'tabular-nums',
-        fontSize: size === 'lg' ? 'var(--t20)' : size === 'sm' ? 'var(--t12)' : 'var(--t14)',
-        fontWeight: size === 'lg' ? 500 : 400,
-        letterSpacing: size === 'lg' ? 'var(--ls-title)' : 'normal',
+        fontSize: size === 'lg' ? 'var(--t20)' : size === 'primary' ? 'var(--t16)' : size === 'sm' ? 'var(--t12)' : 'var(--t14)',
+        fontWeight: size === 'lg' || size === 'primary' ? 500 : 400,
+        letterSpacing: size === 'lg' || size === 'primary' ? 'var(--ls-title)' : 'normal',
         color: dim ? 'var(--muted)' : 'inherit',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
