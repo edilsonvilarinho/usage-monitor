@@ -1211,6 +1211,9 @@ private fun CompactQuotaBadge(
             risk = risk,
             density = density,
             now = now,
+            // Sem popup para explicar o semáforo, a explicação vira texto: ver
+            // `CompactQuotaBadgeContent.showRiskSummaryLine`.
+            showRiskSummaryLine = true,
             modifier = modifier.testTag(quotaBlockTag(quota.label))
         )
 
@@ -1244,6 +1247,14 @@ private fun CompactQuotaBadgeContent(
     risk: QuotaRiskSummary?,
     density: ApiUsageCardDensity,
     now: Instant,
+    /**
+     * Card estreito (issue #215): sem tooltip para explicar o semáforo — o
+     * popup cobriria o card inteiro, `shouldShowQuotaTooltip` —, a mesma
+     * frase de `riskDotTooltipSubtitle` vira uma linha de texto sempre
+     * visível, truncada com reticências em vez de omitida. Mesma saída que
+     * já resolveu o problema análogo na barra HUD: texto no fluxo, não popup.
+     */
+    showRiskSummaryLine: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isExpired = quota.isExpiredAt(now)
@@ -1310,6 +1321,18 @@ private fun CompactQuotaBadgeContent(
                 text = detailText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        if (showRiskSummaryLine && risk != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = riskDotTooltipSubtitle(risk = risk, language = language),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
@@ -1392,6 +1415,9 @@ private fun QuotaRow(
             language = language,
             risk = risk,
             now = now,
+            // Sem popup para explicar o semáforo, a explicação vira texto —
+            // ver `CompactQuotaBadgeContent.showRiskSummaryLine`, mesma saída.
+            showRiskSummaryLine = true,
             modifier = modifier.testTag(quotaBlockTag(quota.label))
         )
 
@@ -1423,6 +1449,7 @@ private fun QuotaRowContent(
     language: AppLanguage,
     risk: QuotaRiskSummary?,
     now: Instant,
+    showRiskSummaryLine: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isExpired = quota.isExpiredAt(now)
@@ -1492,6 +1519,16 @@ private fun QuotaRowContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2
         )
+
+        if (showRiskSummaryLine && risk != null) {
+            Text(
+                text = riskDotTooltipSubtitle(risk = risk, language = language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

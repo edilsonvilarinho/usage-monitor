@@ -92,8 +92,13 @@ internal val QuotaTooltipMinCardWidth = 320.dp
  * 180dp mais cinco a seis linhas de métrica. Ali ele esconde justamente o número que
  * o ponteiro estava apontando.
  *
- * O preço é conhecido e aceito: em card estreito não há caminho visual para a
- * projeção de uso. Ela volta abrindo a janela.
+ * O card estreito **não perde a explicação** (issue #215): abaixo do piso, a
+ * mesma frase de `riskDotTooltipSubtitle` sai como texto sempre visível — uma
+ * linha truncada com reticências, nunca omitida —, em vez de dentro de um
+ * popup que não cabe. Mesma saída que já resolveu o problema análogo na
+ * barra HUD: texto no fluxo, não popup. Só a lista de métricas completa
+ * (tokens usados, total, taxa de queima) continua exclusiva do popup — essa
+ * não caberia numa linha sem virar parede de texto.
  */
 internal fun shouldShowQuotaTooltip(cardWidth: Dp): Boolean {
     return cardWidth >= QuotaTooltipMinCardWidth

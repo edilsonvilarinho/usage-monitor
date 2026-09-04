@@ -101,6 +101,7 @@ import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.UsageArcChart
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
 import com.usagemonitor.presentation.ui.components.quotaBlockTag
+import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
 import com.usagemonitor.presentation.ui.historyAccountChipTag
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -1127,6 +1128,82 @@ class ComponentTest {
         // A `testTag` do bloco saiu do `HoverTooltipBox` e desceu para o conteúdo:
         // sem isso o nó sumiria da árvore junto com a tooltip.
         onNodeWithTag(quotaBlockTag("Claude 5h"), useUnmergedTree = true).assertExists()
+    }
+
+    /**
+     * Card estreito (issue #215): sem tooltip para explicar o semáforo, a
+     * mesma frase do rodapé da tooltip vira texto sempre visível — a
+     * explicação não some, só o popup.
+     */
+    @Test
+    fun `ApiUsageCard shows the risk summary as text on a narrow compact card`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 7d",
+            used = 90L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.TOKENS
+        )
+        val risk = QuotaRiskSummary(level = UsageRiskLevel.WILL_EXCEED, estimatedExhaustionAt = null)
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(240.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(quota),
+                        riskByQuotaKey = mapOf(QuotaSeriesKey(quota.label, quota.periodType) to risk),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        isMinimized = true,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {},
+                        now = Instant.parse("2026-04-28T10:00:00Z")
+                    )
+                }
+            }
+        }
+
+        onNodeWithText(riskDotTooltipSubtitle(risk = risk, language = AppLanguage.PT)).assertIsDisplayed()
+    }
+
+    /** Mesma explicação, agora no card expandido (uma linha por cota). */
+    @Test
+    fun `ApiUsageCard shows the risk summary as text on a narrow expanded card`() = runDesktopComposeUiTest {
+        val quota = QuotaInfo(
+            label = "Claude 7d",
+            used = 90L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.TOKENS
+        )
+        val risk = QuotaRiskSummary(level = UsageRiskLevel.WILL_EXCEED, estimatedExhaustionAt = null)
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(240.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = listOf(quota),
+                        riskByQuotaKey = mapOf(QuotaSeriesKey(quota.label, quota.periodType) to risk),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        isMinimized = false,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {},
+                        now = Instant.parse("2026-04-28T10:00:00Z")
+                    )
+                }
+            }
+        }
+
+        onNodeWithText(riskDotTooltipSubtitle(risk = risk, language = AppLanguage.PT)).assertIsDisplayed()
     }
 
     /**
