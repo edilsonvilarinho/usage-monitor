@@ -2016,6 +2016,27 @@ private fun runUsageMonitor(
             applyWindowOpacity(window, windowOpacityPercent)
         }
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            // Acesso rápido às três molduras (issues #187 e #215). Um `val` só,
+            // partilhado pelo menu do rodapé (modo padrão) e pelo da faixa
+            // revelada do modo somente cards — dois donos da mesma conta
+            // divergiriam no primeiro modo novo. A exclusão mútua continua
+            // sendo dos setters: o menu escolhe uma moldura, e são eles que
+            // desligam a outra.
+            val windowMode = when {
+                hudMode -> WindowMode.HUD
+                cardsOnlyMode -> WindowMode.CARDS_ONLY
+                else -> WindowMode.STANDARD
+            }
+            val onWindowModeChange: (WindowMode) -> Unit = { mode ->
+                when (mode) {
+                    WindowMode.STANDARD -> {
+                        setCardsOnlyMode(false)
+                        setHudMode(false)
+                    }
+                    WindowMode.CARDS_ONLY -> setCardsOnlyMode(true)
+                    WindowMode.HUD -> setHudMode(true)
+                }
+            }
             DesktopWindowFrame(
                 title = "Usage Monitor",
                 iconPainter = iconImage,
@@ -2039,9 +2060,18 @@ private fun runUsageMonitor(
                         onDragStart = hudDragBegin,
                         onDragMove = hudDragTo,
                         onDragEnd = hudDragFinish,
-                        onOpenFull = { setHudMode(false) }
+                        onOpenFull = { setHudMode(false) },
+                        // Botão direito (issue #215): troca direto para
+                        // "Somente cards", sem passar pelo Padrão primeiro.
+                        onSwitchToCardsOnly = { setCardsOnlyMode(true) }
                     )
-                }
+                },
+                language = language,
+                windowMode = windowMode,
+                // Só no modo somente cards a faixa revelada compõe o menu — em
+                // Padrão o rodapé já o tem, e repeti-lo na barra de título
+                // seria cromo em dobro.
+                onWindowModeChange = if (cardsOnlyMode) onWindowModeChange else null
             ) {
                 DashboardScreen(
                     viewModel = viewModel,
@@ -2193,28 +2223,14 @@ private fun runUsageMonitor(
                     cliSessionPulses = cliSessionPulses,
                     teamSessionPulses = teamSessionPulses,
                     showFooter = !cardsOnlyMode,
-                    // Acesso rápido às três molduras (issue #187). O menu vive no
-                    // rodapé, que só é composto no modo padrão — os caminhos de
-                    // volta continuam sendo o teclado, a bandeja, a faixa de hover
-                    // do modo somente cards e o clique na pílula do HUD.
-                    //
-                    // A exclusão mútua continua sendo dos setters: o menu escolhe
-                    // uma moldura, e são eles que desligam a outra.
-                    windowMode = when {
-                        hudMode -> WindowMode.HUD
-                        cardsOnlyMode -> WindowMode.CARDS_ONLY
-                        else -> WindowMode.STANDARD
-                    },
-                    onWindowModeChange = { mode ->
-                        when (mode) {
-                            WindowMode.STANDARD -> {
-                                setCardsOnlyMode(false)
-                                setHudMode(false)
-                            }
-                            WindowMode.CARDS_ONLY -> setCardsOnlyMode(true)
-                            WindowMode.HUD -> setHudMode(true)
-                        }
-                    }
+                    // Acesso rápido às três molduras (issues #187 e #215): o
+                    // mesmo `val` de cima, partilhado com a faixa do modo
+                    // somente cards. O menu do rodapé só é composto no modo
+                    // padrão — os caminhos de volta continuam sendo o teclado,
+                    // a bandeja, a faixa de hover do modo somente cards e o
+                    // clique (ou botão direito) na pílula do HUD.
+                    windowMode = windowMode,
+                    onWindowModeChange = onWindowModeChange
                 )
             }
 

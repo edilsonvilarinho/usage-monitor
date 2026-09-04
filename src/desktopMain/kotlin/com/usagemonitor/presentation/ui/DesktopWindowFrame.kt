@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -46,6 +45,9 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -71,10 +73,13 @@ import com.usagemonitor.HUD_PANEL_VERTICAL_PADDING
 import com.usagemonitor.HUD_PILL_DOT_ONLY_PADDING
 import com.usagemonitor.HUD_PILL_PADDING
 import com.usagemonitor.HUD_SOURCE_ROW_HEIGHT
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppStatusDot
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.WindowMode
+import com.usagemonitor.presentation.ui.components.WindowModeMenuButton
 import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -144,6 +149,21 @@ fun WindowScope.DesktopWindowFrame(
     hud: Boolean = false,
     /** Conteúdo da barra HUD; ignorado quando [hud] é `false`. */
     hudContent: (@Composable () -> Unit)? = null,
+    /**
+     * Idioma do menu de modos revelado no modo "Somente cards"
+     * ([onWindowModeChange]). Sem efeito quando ele é `null`.
+     */
+    language: AppLanguage = AppLanguage.PT,
+    /** A moldura em que a janela está agora — marcada no menu, quando existe. */
+    windowMode: WindowMode = WindowMode.STANDARD,
+    /**
+     * Troca de moldura direto da faixa revelada do modo "Somente cards", sem
+     * passar pelo Padrão primeiro (issue #215).
+     *
+     * `null` esconde o controle — mesmo padrão de [onExitCompact]: os
+     * geradores de captura montam a moldura sem despachar nada.
+     */
+    onWindowModeChange: ((WindowMode) -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
@@ -205,6 +225,9 @@ fun WindowScope.DesktopWindowFrame(
                         windowState = windowState,
                         onCloseRequest = onCloseRequest,
                         onExitCompact = onExitCompact,
+                        language = language,
+                        windowMode = windowMode,
+                        onWindowModeChange = onWindowModeChange,
                         modifier = Modifier.align(Alignment.TopStart)
                     )
                 }
@@ -234,6 +257,9 @@ private fun WindowScope.CompactTitleBarOverlay(
     windowState: WindowState,
     onCloseRequest: () -> Unit,
     onExitCompact: (() -> Unit)?,
+    language: AppLanguage,
+    windowMode: WindowMode,
+    onWindowModeChange: ((WindowMode) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val hoverInteraction = remember { MutableInteractionSource() }
@@ -262,7 +288,10 @@ private fun WindowScope.CompactTitleBarOverlay(
                 iconPainter = iconPainter,
                 windowState = windowState,
                 onCloseRequest = onCloseRequest,
-                onExitCompact = onExitCompact
+                onExitCompact = onExitCompact,
+                language = language,
+                windowMode = windowMode,
+                onWindowModeChange = onWindowModeChange
             )
         }
     }
@@ -440,6 +469,19 @@ internal fun HudBar(
     onDragMove: () -> Unit = {},
     onDragEnd: () -> Unit = {},
     onOpenFull: () -> Unit,
+    /**
+     * Botão direito na barra: troca direto para "Somente cards", sem passar
+     * pelo Padrão primeiro (issue #215).
+     *
+     * Não há popup aqui — a razão é a mesma que já tirou a lista de fontes de
+     * um `HoverTooltipBox`: um menu de opções seria recortado pelos limites
+     * desta janela, que mal tem altura para si mesma. O botão esquerdo já leva
+     * ao Padrão (de onde os três modos são alcançáveis pelo rodapé); faltava
+     * só o atalho direto ao outro modo reduzido, e é só isso que o direito
+     * oferece. `{}` por default: quem monta a barra sem trocar de modo (os
+     * geradores de captura, os testes) não precisa saber que o botão existe.
+     */
+    onSwitchToCardsOnly: () -> Unit = {},
     modifier: Modifier = Modifier,
     /** Injetáveis pela mesma razão do `FooterBar`: afirmar o decremento sem esperar segundos reais. */
     nowProvider: () -> Instant = { Clock.System.now() },
@@ -477,7 +519,8 @@ internal fun HudBar(
                 onDragStart = onDragStart,
                 onDragMove = onDragMove,
                 onDragEnd = onDragEnd,
-                onClick = onOpenFull
+                onClick = onOpenFull,
+                onSecondaryClick = onSwitchToCardsOnly
             )
             // A ação de clique é **declarada** na semântica, não instalada por
             // `clickable`: aquele consumiria o `down` e o arrasto nunca
@@ -687,12 +730,23 @@ private fun HudPanelRow(content: @Composable RowScope.() -> Unit) {
 }
 
 /**
- * Um gesto só para as duas ações da pílula: mover a janela e abrir a completa.
+ * Um gesto só para as três ações da pílula: mover a janela, abrir a completa e
+ * — botão direito, issue #215 — trocar direto para "Somente cards".
  *
  * `clickable` empilhado com um detector de arrasto não resolve — o `clickable`
  * consome o `down` e o arrasto nunca começa. Aqui o `down` inicia a espera, o
  * deslocamento acumulado decide o que o gesto é, e o `up` despacha: abaixo do
  * limiar foi clique, acima foi arrasto que terminou.
+ *
+ * **O botão direito é ramo à parte, decidido no próprio `down`, e nunca chega
+ * ao clique/arrasto de esquerda.** Um `AppMenu` aqui seria um `Popup`, e popup
+ * no Compose Desktop é recortado pelos limites da própria janela — numa faixa
+ * de 24-200dp o menu de três opções saía cortado sobre o próprio alvo, o mesmo
+ * problema que já descartou a tooltip nesta barra (issue #164). Sem popup não
+ * há o que desenhar: o botão direito despacha [onSecondaryClick] direto, sem
+ * confirmação nem lista — a única troca que faz sentido sem menu é a que já
+ * está a um clique de distância pelo caminho normal (clicar abre o Padrão), e
+ * o que faltava era ir direto ao outro modo reduzido.
  *
  * **Nenhuma coordenada sai daqui.** `positionChange` é relativo a um componente
  * que, durante o arrasto, se move junto com a janela — como deslocamento ele
@@ -705,7 +759,8 @@ private fun Modifier.hudPressGesture(
     onDragStart: () -> Unit,
     onDragMove: () -> Unit,
     onDragEnd: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onSecondaryClick: () -> Unit = {}
 ): Modifier {
     // **A chave do `pointerInput` é `Unit`, e os callbacks entram por
     // `rememberUpdatedState`.** `Main.kt` declara as lambdas de arrasto como
@@ -721,10 +776,39 @@ private fun Modifier.hudPressGesture(
     val currentDragMove by rememberUpdatedState(onDragMove)
     val currentDragEnd by rememberUpdatedState(onDragEnd)
     val currentClick by rememberUpdatedState(onClick)
+    val currentSecondaryClick by rememberUpdatedState(onSecondaryClick)
 
     return pointerInput(Unit) {
         awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
+            // `awaitFirstDown` não serve aqui: por contrato ela só reage ao
+            // botão primário do mouse ("If it was down caused by
+            // PointerType.Mouse, this function reacts only on primary
+            // button") e um `down` de botão direito nunca a satisfaria — ela
+            // ficaria esperando para sempre, e o botão direito não dispararia
+            // nada. O laço abaixo é o mesmo, sem esse filtro.
+            var down: PointerInputChange
+            while (true) {
+                val event = awaitPointerEvent()
+                val candidate = event.changes.firstOrNull { it.changedToDownIgnoreConsumed() }
+                if (candidate != null) {
+                    down = candidate
+                    break
+                }
+            }
+
+            if (currentEvent.buttons.isSecondaryPressed) {
+                down.consume()
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
+                        ?: break
+                    change.consume()
+                    if (!change.pressed) break
+                }
+                currentSecondaryClick()
+                return@awaitEachGesture
+            }
+
             var travelled = 0f
             var dragging = false
 
@@ -834,7 +918,14 @@ private fun WindowScope.DesktopTitleBar(
     windowState: WindowState,
     onCloseRequest: () -> Unit,
     /** Presente só na faixa do modo somente cards. */
-    onExitCompact: (() -> Unit)? = null
+    onExitCompact: (() -> Unit)? = null,
+    /**
+     * Os três a seguir existem só para o menu de modos (issue #215) — sem
+     * efeito na barra de título normal, que não os recebe.
+     */
+    language: AppLanguage = AppLanguage.PT,
+    windowMode: WindowMode = WindowMode.STANDARD,
+    onWindowModeChange: ((WindowMode) -> Unit)? = null
 ) {
     WindowDraggableArea {
         Row(
@@ -873,6 +964,17 @@ private fun WindowScope.DesktopTitleBar(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Primeiro do grupo, mesmo lugar do rodapé: as demais agem
+                // sobre o conteúdo da janela, esta troca a moldura dela — e é
+                // a saída direta para a Barra HUD que a issue #215 pedia (sem
+                // o botão ▣ ao lado, a única volta seria pelo Padrão).
+                if (onWindowModeChange != null) {
+                    WindowModeMenuButton(
+                        language = language,
+                        windowMode = windowMode,
+                        onWindowModeChange = onWindowModeChange
+                    )
+                }
                 if (onExitCompact != null) {
                     TitleBarButton(
                         label = "▣",

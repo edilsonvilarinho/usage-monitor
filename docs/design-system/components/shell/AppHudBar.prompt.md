@@ -127,3 +127,14 @@ above it". Drawing over the taskbar is deliberately out of scope: it needs physi
 and a z-order fight with a window that is also topmost. The anchor always describes the full panel,
 even while the dot is what is on screen; anchoring on the dot would make the window jump every time
 a source left the on-track state.
+
+**The secondary click switches straight to Cards-only, and it is not a menu (issue #215).** The bar
+had no way to reach the other reduced chrome without first returning to Standard — every exit landed
+there. A dropdown listing all three modes is not an option here: it is a `Popup`, and a popup on this
+platform is clipped to its own window's bounds, exactly the constraint that already ruled out a
+hover tooltip for this same bar. So the right button dispatches one action, immediately, with no
+list to render — the left button already reaches Standard (from where the footer's own three-way
+menu is one click away), and the one thing missing was a direct path to the sibling reduced mode.
+Cards-only's revealed title bar has room for the real three-way menu instead, because it is a normal
+34px bar, not a 24-200px strip — it carries the same component the footer uses, so the two modes
+never diverge on labels.

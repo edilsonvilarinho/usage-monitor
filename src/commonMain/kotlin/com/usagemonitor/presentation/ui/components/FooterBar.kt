@@ -372,16 +372,22 @@ private fun FooterActionGroup(
  * modos existem, que é metade da queixa da issue: os dois modos alternativos
  * só eram descobertos por acidente.
  *
- * **Ele existe só no modo padrão**, porque o rodapé só é composto ali
- * (`DashboardScreen(showFooter)`). Voltar continua sendo `Ctrl+Shift+M` /
- * `Ctrl+Shift+H`, a bandeja, a faixa de hover do modo somente cards e o clique
- * na pílula do HUD — quatro caminhos que já existiam e nenhum deles some.
+ * **`internal`, e não mais `private` deste arquivo.** A outra metade da
+ * queixa — trocar direto entre os dois modos reduzidos, sem passar pelo
+ * Padrão — reaproveita este mesmo botão na faixa revelada do modo "Somente
+ * cards" (`DesktopTitleBar`, em `desktopMain`): dois menus com rótulo e
+ * comportamento próprios divergiriam o primeiro dia que alguém traduzisse só
+ * um dos dois. A barra HUD **não** reaproveita este componente: um `AppMenu`
+ * é um `Popup`, e popup no Compose Desktop é recortado pelos limites da
+ * própria janela — numa faixa de 24-200dp o menu saía cortado sobre o próprio
+ * alvo, o mesmo problema que já descartou a tooltip ali. A saída de lá é o
+ * clique com o botão direito, sem popup nenhum (ver `HudBar`).
  *
  * O estado de aberto/fechado mora aqui: nenhuma outra parte do app precisa
- * saber que um menu está aberto no rodapé.
+ * saber que um menu está aberto.
  */
 @Composable
-private fun WindowModeMenuButton(
+internal fun WindowModeMenuButton(
     language: AppLanguage,
     windowMode: WindowMode,
     onWindowModeChange: (WindowMode) -> Unit
