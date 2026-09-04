@@ -77,6 +77,29 @@ export interface AppHudBarProps {
   /** Word of the single line shown before the first collection lands. */
   fallbackLabel?: ReactNode;
   /**
+   * A pending app update, if any (issue #225).
+   *
+   * Icon only, no visible text — the sentence rides entirely in `label`,
+   * the icon's accessible name, same treatment as `countdownLabel`: there is
+   * no tooltip to lean on inside this window. Drawn once, on the first row,
+   * right after the quotas and before the countdown — both are app-wide
+   * signals, not account ones, so they follow the quotas rather than sit
+   * among them. `absent` means no update pending: auto-update off, or the
+   * installed version is already current.
+   *
+   * **No click of its own.** The badge sits inside the same `onOpen` target
+   * as the rest of the bar — a short click anywhere, including the badge,
+   * returns the full window, where the standard update strip already offers
+   * "Restart and update now". A dedicated restart action here would make a
+   * routine click on the bar restart the app without warning whenever an
+   * update happened to be ready — worse than the missing indicator this
+   * prop fixes.
+   */
+  update?: {
+    level: 'ok' | 'warn' | 'crit' | 'info';
+    label: string;
+  };
+  /**
    * Time left until the next automatic collection, already formatted as `mm:ss`.
    *
    * It is drawn **once**, on the first row, and never in the collapsed state.

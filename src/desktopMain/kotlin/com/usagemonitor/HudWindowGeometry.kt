@@ -153,6 +153,22 @@ private fun hudCountdownWidth(): Dp {
 }
 
 /**
+ * Largura do indicador de atualização disponível (issue #225): o vão que o
+ * separa das cotas, mais o ícone — sem texto, o mesmo desenho do ponto de
+ * risco (`STATUS_DOT_SIZE`), redimido pela sua própria frase na semântica, e
+ * não por rótulo visível.
+ *
+ * **Reaproveita o tamanho do ícone da contagem** ([HUD_COUNTDOWN_ICON_SIZE]):
+ * os dois vivem na mesma linha de 20dp, e um segundo tamanho de ícone ali
+ * seria decisão nova sem motivo novo. Fica na frente da contagem — cotas →
+ * indicador de atualização → contagem — porque os dois últimos são
+ * informação do app inteiro, não da conta, e vêm depois das cotas.
+ */
+private fun hudUpdateIndicatorWidth(): Dp {
+    return AppSpacing.md + HUD_COUNTDOWN_ICON_SIZE
+}
+
+/**
  * Avanço de caractere da IBM Plex Mono, em fração do corpo.
  *
  * A escala `label*` deste sistema é **mono** (`AppTheme.kt`), e é isso que torna
@@ -270,19 +286,28 @@ private fun hudFallbackRowWidth(fallbackLabel: String): Dp {
  * polling é um só — dez minutos para o app inteiro, não por conta —, e repeti-la
  * em cada linha afirmaria que cada conta tem coleta própria. Recolhida ao ponto
  * ela não existe: ali não há texto nenhum.
+ *
+ * **O indicador de atualização ([hasUpdateIndicator], issue #225) segue a
+ * mesma regra da contagem**: mede só na primeira linha, inclusive na linha de
+ * carregamento, e não existe recolhido ao ponto — quem chama (`Main.kt`)
+ * garante isso impedindo `dotOnly` enquanto há atualização pendente, e não é
+ * responsabilidade desta função impor.
  */
 internal fun hudWindowSize(
     sources: List<HudSourceStatus>,
     fallbackLabel: String,
     dotOnly: Boolean,
     expanded: Boolean,
-    showsCountdown: Boolean = false
+    showsCountdown: Boolean = false,
+    hasUpdateIndicator: Boolean = false
 ): DpSize {
     if (dotOnly) {
         return DpSize(hudDotOnlyWidth(), AppChrome.hud)
     }
 
+    val updateIndicatorWidth = if (hasUpdateIndicator) hudUpdateIndicatorWidth() else 0.dp
     val countdownWidth = if (showsCountdown) hudCountdownWidth() else 0.dp
+    val firstRowExtra = updateIndicatorWidth + countdownWidth
     val visible = if (expanded) sources else sources.take(1)
     // O teto é do estado, não do componente (issue #189): expandido o painel
     // carrega uma coluna a mais por cota, e prendê-lo ao teto da pílula faria
@@ -293,7 +318,7 @@ internal fun hudWindowSize(
         // A linha de carregamento é a primeira linha, e enquanto nada foi
         // coletado "quando é a próxima tentativa" é o que a barra tem a dizer.
         return DpSize(
-            width = (hudFallbackRowWidth(fallbackLabel) + countdownWidth)
+            width = (hudFallbackRowWidth(fallbackLabel) + firstRowExtra)
                 .coerceAtMost(maxWidth),
             height = HUD_PANEL_VERTICAL_PADDING * 2 + HUD_SOURCE_ROW_HEIGHT
         )
@@ -302,7 +327,7 @@ internal fun hudWindowSize(
     val width = visible
         .mapIndexed { index, source ->
             val row = hudSourceRowWidth(source, showsReset = expanded)
-            if (index == 0) (row + countdownWidth).value else row.value
+            if (index == 0) (row + firstRowExtra).value else row.value
         }
         .max()
         .dp

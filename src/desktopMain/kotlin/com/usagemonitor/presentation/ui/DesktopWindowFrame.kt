@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -78,6 +79,7 @@ import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppStatusDot
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.WindowModeMenuButton
 import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
@@ -106,6 +108,9 @@ internal const val HUD_BAR_OPEN_DESCRIPTION = "Abrir Usage Monitor"
  * o Compose mede com o que `hudWindowSize` calcula.
  */
 internal const val HUD_CONTENT_TEST_TAG = "hudContent"
+
+/** Marca do ícone de atualização pendente na barra HUD (issue #225). */
+internal const val HUD_UPDATE_INDICATOR_TAG = "hudUpdateIndicator"
 
 /**
  * Altura da barra de título das seis janelas.
@@ -359,6 +364,21 @@ internal data class HudSourceStatus(
 )
 
 /**
+ * O indicador de atualização pendente da barra HUD (issue #225).
+ *
+ * `HudBar` não resolve idioma — recebe [tone] e [description] já prontos,
+ * mesma regra de [HudSourceStatus]/[HudQuotaChip]. `description` é a frase
+ * **inteira** (o mesmo título que `AppUpdateBanner` mostra no modo padrão,
+ * via `updateBannerContent`): não cabe tooltip aqui, e o ícone é o único
+ * portador de significado — a frase vai na semântica, que é o caminho de
+ * leitor de tela e dos testes, mesmo desenho de [HudCountdown].
+ */
+internal data class HudUpdateIndicator(
+    val tone: AppTone,
+    val description: String
+)
+
+/**
  * Conteúdo da barra HUD (issue #164): **uma linha parada, a lista inteira no
  * hover**.
  *
@@ -448,6 +468,16 @@ internal fun HudBar(
      * da bandeja, que não acende nada em `ON_TRACK`.
      */
     dotOnly: Boolean = false,
+    /**
+     * Atualização pendente, se houver (issue #225).
+     *
+     * `null` esconde o ícone inteiro — é o estado de quem não tem atualização
+     * automática ativa ou está com a versão em dia. Quem chama (`Main.kt`)
+     * também garante que a barra não recolhe ao ponto ([dotOnly]) enquanto
+     * isto for não nulo: um dado novo não pode desaparecer atrás de "está tudo
+     * bem".
+     */
+    updateIndicator: HudUpdateIndicator? = null,
     /**
      * Quando a próxima coleta automática acontece (issue #185).
      *
@@ -584,6 +614,7 @@ internal fun HudBar(
                         tone = statusTone,
                         modifier = Modifier.weight(1f)
                     )
+                    updateIndicator?.let { indicator -> HudUpdateBadge(indicator) }
                     countdown?.invoke()
                 }
                 return@Column
@@ -637,12 +668,43 @@ internal fun HudBar(
                     }
 
                     if (index == 0) {
+                        updateIndicator?.let { indicator -> HudUpdateBadge(indicator) }
                         countdown?.invoke()
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * O ícone de atualização pendente da barra HUD (issue #225).
+ *
+ * **Só ícone, sem texto** — mesmo porte do ícone da contagem, tingido pelo
+ * tom do estado (`Available`/`Downloading` = `INFO`, `Ready` = `OK`,
+ * `Failed` = `WARNING`, os mesmos tons de `AppUpdateBanner`). A frase inteira
+ * vive na semântica, não numa tooltip: aqui não cabe popup, pela mesma razão
+ * que já tirou a lista de fontes e a contagem de um balão — um popup no
+ * Compose Desktop é recortado pelos limites da própria janela.
+ *
+ * **Nenhuma ação de clique própria.** O ícone está dentro da `Column` que já
+ * dispara `onOpenFull` em qualquer clique — `hudPressGesture` ignora consumo
+ * de filhos de propósito —, e é isso que leva ao mesmo `AppUpdateBanner` do
+ * modo padrão, com o botão de reiniciar já ali. Uma zona de clique própria
+ * aqui (reiniciar direto da HUD) faria um clique de rotina na pílula
+ * reiniciar o app sem aviso sempre que uma atualização estivesse pronta —
+ * risco pior que o problema que esta issue resolve.
+ */
+@Composable
+private fun HudUpdateBadge(indicator: HudUpdateIndicator) {
+    Icon(
+        imageVector = Icons.Rounded.SystemUpdate,
+        contentDescription = indicator.description,
+        modifier = Modifier
+            .size(HUD_COUNTDOWN_ICON_SIZE)
+            .testTag(HUD_UPDATE_INDICATOR_TAG),
+        tint = indicator.tone.color()
+    )
 }
 
 /**

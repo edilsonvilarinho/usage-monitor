@@ -9,6 +9,7 @@ export function AppHudBar({
   fallbackLabel = 'Carregando',
   dotOnly = false,
   expanded = false,
+  update,
   countdown,
   countdownLabel = 'Próxima atualização automática',
   onOpen,
@@ -50,6 +51,7 @@ export function AppHudBar({
                   filhos, e um terceiro filho traria um vão que a medida da
                   janela não conta. */}
               <AppStatusIndicator level="off" style={{ flex: 1, minWidth: 0 }}>{fallbackLabel}</AppStatusIndicator>
+              {update ? <HudUpdateBadge update={update} /> : null}
               {countdown ? <HudCountdown label={countdownLabel}>{countdown}</HudCountdown> : null}
             </HudRow>
           ) : visible.map((source, index) => (
@@ -78,9 +80,10 @@ export function AppHudBar({
                   </span>
                 ))}
               </span>
-              {/* Uma vez só, na primeira linha: o polling é do app inteiro, e
-                  uma contagem por linha diria que cada conta tem coleta
-                  própria. */}
+              {/* Uma vez só, na primeira linha: atualização e contagem são
+                  informação do app inteiro, não da conta -- um por linha
+                  diria que cada conta tem a sua própria. */}
+              {index === 0 && update ? <HudUpdateBadge update={update} /> : null}
               {index === 0 && countdown ? <HudCountdown label={countdownLabel}>{countdown}</HudCountdown> : null}
             </HudRow>
           ))}
@@ -93,6 +96,28 @@ export function AppHudBar({
 const NAME = { flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 const VALUE = { flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' };
 const RESET = { ...VALUE, color: 'var(--muted)' };
+const UPDATE_LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info: 'var(--info)' };
+
+// Atualização pendente (issue #225). Só ícone, sem texto -- a frase inteira
+// vai no rótulo acessível, mesmo desenho da contagem, e o tom vem do estado
+// da faixa padrão (Available/Downloading = info, Ready = ok, Failed = warn).
+// **Sem clique próprio**: o ícone vive dentro do `role="button"` que já abre
+// a janela padrão -- é lá, não aqui, que "Reiniciar e atualizar agora" mora.
+function HudUpdateBadge({ update }) {
+  const color = UPDATE_LEVELS[update.level] || UPDATE_LEVELS.info;
+  return (
+    <span
+      title={update.label}
+      aria-label={update.label}
+      style={{ display: 'flex', alignItems: 'center', flex: 'none', color }}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M12 3v12m0 0-4-4m4 4 4-4" />
+        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+      </svg>
+    </span>
+  );
+}
 
 // A contagem até a próxima coleta. O ícone é o que diz de que tempo se trata:
 // aqui não cabe tooltip -- popup nesta plataforma é camada dentro da janela e
