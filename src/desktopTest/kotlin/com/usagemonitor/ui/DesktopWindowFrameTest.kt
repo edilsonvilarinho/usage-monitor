@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -371,6 +372,74 @@ class DesktopWindowFrameTest {
         waitForIdle()
 
         assertEquals(1, clicks)
+        assertTrue(events.isEmpty(), "esperava nenhum evento de arrasto, veio $events")
+    }
+
+    // -------------------------- troca direta de modo pelo botão direito (#215)
+
+    /**
+     * Sem popup — um `AppMenu` aqui seria recortado pelos limites da própria
+     * janela, do mesmo jeito que já descartou a tooltip nesta barra (#164) —,
+     * o botão direito despacha [onSwitchToCardsOnly] direto, sem passar pelo
+     * clique esquerdo que abre o Padrão.
+     */
+    @Test
+    fun `botao direito na barra HUD troca direto para somente cards`() = runDesktopComposeUiTest {
+        var opens = 0
+        var switches = 0
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
+                    HudBar(
+                        statusTone = AppTone.CRITICAL,
+                        sources = sources,
+                        fallbackLabel = "Carregando",
+                        onOpenFull = { opens += 1 },
+                        onSwitchToCardsOnly = { switches += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput {
+            moveTo(center)
+            press(MouseButton.Secondary)
+            release(MouseButton.Secondary)
+        }
+        waitForIdle()
+
+        assertEquals(1, switches)
+        assertEquals(0, opens, "botao direito nao pode abrir a janela completa")
+    }
+
+    /** O botão direito não dispara arrasto: nenhum evento de arrasto é emitido. */
+    @Test
+    fun `botao direito na barra HUD nao dispara arrasto`() = runDesktopComposeUiTest {
+        val events = mutableListOf<String>()
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
+                    HudBar(
+                        statusTone = AppTone.CRITICAL,
+                        sources = sources,
+                        fallbackLabel = "Carregando",
+                        onDragStart = { events += "start" },
+                        onDragMove = { events += "move" },
+                        onDragEnd = { events += "end" },
+                        onOpenFull = {},
+                        onSwitchToCardsOnly = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput {
+            moveTo(center)
+            press(MouseButton.Secondary)
+            release(MouseButton.Secondary)
+        }
+        waitForIdle()
+
         assertTrue(events.isEmpty(), "esperava nenhum evento de arrasto, veio $events")
     }
 
