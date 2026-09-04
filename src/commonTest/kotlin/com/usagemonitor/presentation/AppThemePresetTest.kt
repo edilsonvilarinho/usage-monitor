@@ -13,10 +13,10 @@ import kotlin.test.assertTrue
 class AppThemePresetTest {
 
     @Test
-    fun `registry has thirteen dark and eight light presets`() {
-        assertEquals(21, AppThemePreset.entries.size)
+    fun `registry has thirteen dark and thirteen light presets`() {
+        assertEquals(26, AppThemePreset.entries.size)
         assertEquals(13, AppThemePreset.dark.size)
-        assertEquals(8, AppThemePreset.light.size)
+        assertEquals(13, AppThemePreset.light.size)
     }
 
     @Test

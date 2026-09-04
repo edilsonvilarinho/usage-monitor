@@ -126,6 +126,31 @@ enum class AppThemePreset(
         false, "Areia", "Sand",
         Color(0xFFFAF7EF), Color(0xFFFFFDF8), Color(0xFFF1E9D6),
         Color(0xFFDED2B8), Color(0xFF252117), Color(0xFF756B57), Color(0xFF7B5A00)
+    ),
+    AMBAR_LIGHT(
+        false, "Âmbar", "Amber",
+        Color(0xFFFFF8EC), Color(0xFFFFFCF5), Color(0xFFF5E9D0),
+        Color(0xFFE0CFA6), Color(0xFF241C12), Color(0xFF78684A), Color(0xFF8A5A00)
+    ),
+    RUBI_LIGHT(
+        false, "Rubi", "Ruby",
+        Color(0xFFFFF2F2), Color(0xFFFFF7F7), Color(0xFFF7E2E3),
+        Color(0xFFE4BEC1), Color(0xFF2A1416), Color(0xFF7A5457), Color(0xFFB3273F)
+    ),
+    JADE_LIGHT(
+        false, "Jade", "Jade",
+        Color(0xFFEEFBF5), Color(0xFFF5FFFB), Color(0xFFDDF2E9),
+        Color(0xFFB9DED0), Color(0xFF0F241D), Color(0xFF4F7568), Color(0xFF00795A)
+    ),
+    ROSA_LIGHT(
+        false, "Rosa", "Rose",
+        Color(0xFFFFF0F8), Color(0xFFFFF6FB), Color(0xFFF7DEEF),
+        Color(0xFFE3BBD8), Color(0xFF291423), Color(0xFF7A566E), Color(0xFFA02A72)
+    ),
+    OLIVA_LIGHT(
+        false, "Oliva", "Olive",
+        Color(0xFFF7FAEC), Color(0xFFFBFDF2), Color(0xFFEEF0DA),
+        Color(0xFFD4D8B4), Color(0xFF20250F), Color(0xFF5C6640), Color(0xFF5C6F00)
     );
 
     val storageName: String

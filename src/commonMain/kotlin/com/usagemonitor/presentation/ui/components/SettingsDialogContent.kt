@@ -489,9 +489,9 @@ private fun GeneralSettingsTab(
                 )
                 Text(
                     text = if (isPt) {
-                        "Escolha uma das oito paletas claras ou oito escuras."
+                        "Escolha uma das treze paletas claras ou treze escuras."
                     } else {
-                        "Choose one of eight light or eight dark palettes."
+                        "Choose one of thirteen light or thirteen dark palettes."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1061,7 +1061,7 @@ private fun AnthropicProfileRow(
 }
 
 /**
- * Grade responsiva com as dezesseis paletas disponíveis.
+ * Grade responsiva com as paletas disponíveis (`AppThemePreset.entries`).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

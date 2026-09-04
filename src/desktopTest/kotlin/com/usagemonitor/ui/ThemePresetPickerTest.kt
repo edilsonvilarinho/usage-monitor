@@ -25,7 +25,7 @@ import kotlin.test.assertEquals
 class ThemePresetPickerTest {
 
     @Test
-    fun `picker renders all sixteen presets`() = runDesktopComposeUiTest {
+    fun `picker renders all presets`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(preset = AppThemePreset.OBSIDIANA_DARK) {
                 Box(modifier = Modifier.width(700.dp).height(560.dp)) {
