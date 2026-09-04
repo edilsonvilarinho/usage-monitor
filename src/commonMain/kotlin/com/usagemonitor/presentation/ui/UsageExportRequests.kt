@@ -6,6 +6,7 @@ import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.data.export.UsageExporter
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
+import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
@@ -78,6 +79,26 @@ fun reportRequest(
     return UsageExportRequest(
         suggestedFileName = reportFileName(range, now, timeZone),
         payload = UsageExportPayload.Report(document)
+    )
+}
+
+/**
+ * Retrato do Dashboard: todas as cotas de todas as fontes, na coleta corrente
+ * (issue #215). Sempre CSV — o rodapé oferece um clique, não uma escolha de
+ * formato — e sem janela no nome, ao contrário de [exportRequestForSessions]:
+ * o Dashboard não tem intervalo selecionável, é sempre "agora".
+ */
+fun exportRequestForDashboard(
+    stats: List<ApiUsageStats>,
+    now: Instant,
+    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
+): UsageExportRequest {
+    val local = now.toLocalDateTime(timeZone).date
+    val month = local.monthNumber.toString().padStart(2, '0')
+    val day = local.dayOfMonth.toString().padStart(2, '0')
+    return UsageExportRequest(
+        suggestedFileName = "usage-monitor-dashboard-${local.year}-$month-$day.csv",
+        payload = UsageExportPayload.Text(UsageExporter.exportDashboardSnapshot(stats, now))
     )
 }
 
