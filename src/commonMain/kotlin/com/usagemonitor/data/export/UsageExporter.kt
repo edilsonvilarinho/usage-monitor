@@ -1,10 +1,13 @@
 package com.usagemonitor.data.export
 
+import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.MICROS_PER_USD
+import com.usagemonitor.domain.entity.QuotaInfo
+import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -52,6 +55,53 @@ object UsageExporter {
             UsageExportFormat.CSV -> breakdownCsv(breakdown)
             UsageExportFormat.JSON -> json.encodeToString(breakdown.toDto())
         }
+    }
+
+    /**
+     * Retrato do Dashboard: uma linha por cota, na coleta corrente.
+     *
+     * Só CSV — diferente das exportações acima, não há aba/janela para
+     * escolher: um clique no rodapé é a exportação inteira, e um segundo
+     * formato sem chamador nenhum seria caminho morto e não testado.
+     *
+     * [capturedAt] entra como coluna igual em toda linha, não no nome do
+     * arquivo: quem abre isto numa planilha depois de somar dois retratos
+     * salvos em dias diferentes precisa da data junto do dado, não só do
+     * nome do arquivo que pode ter sido renomeado.
+     */
+    fun exportDashboardSnapshot(stats: List<ApiUsageStats>, capturedAt: Instant): String {
+        val header = listOf(
+            "captured_at", "source", "account", "quota", "unit", "period_type",
+            "used", "total", "percentage_used", "has_known_reset_at", "reset_at",
+            "currency"
+        )
+        val rows = stats.flatMap { source ->
+            source.quotas.map { quota -> dashboardSnapshotRow(capturedAt, source, quota) }
+        }
+        return csvOf(header, rows)
+    }
+
+    private fun dashboardSnapshotRow(
+        capturedAt: Instant,
+        source: ApiUsageStats,
+        quota: QuotaInfo
+    ): List<String> {
+        return listOf(
+            capturedAt.toString(),
+            source.apiName,
+            source.accountContext?.displayLabel.orEmpty(),
+            quota.label,
+            quota.unit.name,
+            quota.periodType.name,
+            quota.used.toString(),
+            quota.total.toString(),
+            quota.percentageUsed.toString(),
+            quota.hasKnownResetAt.toString(),
+            // Vazio, e não uma data inventada: sem reset conhecido não há o
+            // que escrever aqui, e a coluna anterior já diz por quê.
+            if (quota.hasKnownResetAt) quota.periodEndAt.toString() else "",
+            quota.currencyCode
+        )
     }
 
     private fun sessionsCsv(sessions: List<CliSessionSummary>): String {

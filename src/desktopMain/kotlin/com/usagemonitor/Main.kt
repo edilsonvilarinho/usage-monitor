@@ -148,6 +148,7 @@ import com.usagemonitor.presentation.ui.TeamKeysAdminScreen
 import com.usagemonitor.presentation.ui.TeamPresenceScreen
 import com.usagemonitor.presentation.ui.TeamUsageScreen
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
+import com.usagemonitor.presentation.ui.exportRequestForDashboard
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
@@ -2230,7 +2231,12 @@ private fun runUsageMonitor(
                     // a bandeja, a faixa de hover do modo somente cards e o
                     // clique (ou botão direito) na pílula do HUD.
                     windowMode = windowMode,
-                    onWindowModeChange = onWindowModeChange
+                    onWindowModeChange = onWindowModeChange,
+                    // Retrato do Dashboard (issue #215): mesmo `usageExportWriter`
+                    // que Sessões CLI e Time já usam, um diálogo de arquivo só.
+                    onExportSnapshot = { stats ->
+                        usageExportWriter.write(exportRequestForDashboard(stats, Clock.System.now()))
+                    }
                 )
             }
 
