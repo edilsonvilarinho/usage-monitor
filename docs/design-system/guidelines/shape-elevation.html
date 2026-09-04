@@ -1,11 +1,11 @@
-<!-- @dsCard group="Patterns" viewport="700x150" name="Elevation" subtitle="0 for data surfaces; 2 rarely; 8 reserved for dialog, menu and overlay" -->
+<!-- @dsCard group="Patterns" viewport="700x210" name="Elevation" subtitle="0 for data surfaces; 2 rarely; 8 reserved for dialog, menu and overlay" -->
 <!DOCTYPE html>
 <html lang="pt-BR" data-app-theme="dark">
 <head>
 <meta charset="utf-8">
 <link rel="stylesheet" href="../styles.css">
 <style>
-  body { padding: 16px; width: 700px; height: 118px; overflow: hidden; }
+  body { padding: 16px; width: 700px; height: 178px; overflow: hidden; }
   .g { display: grid; gap: 8px; }
   .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
@@ -23,8 +23,9 @@
 
 <div class="r" style="gap:20px">
   <div style="text-align:center"><div class="box" style="width:150px;height:56px;border-radius:var(--r3)"><span class="k">elev 0</span></div><div class="k" style="margin-top:6px">painel de dados</div></div>
-  <div style="text-align:center"><div class="box" style="width:150px;height:56px;border-radius:var(--r3);box-shadow:var(--shadow-2)"><span class="k">elev 2</span></div><div class="k" style="margin-top:6px">flutuante leve</div></div>
+  <div style="text-align:center"><div class="box" style="width:150px;height:56px;border-radius:var(--r3);box-shadow:var(--shadow-2)"><span class="k">elev 2</span></div><div class="k" style="margin-top:6px">tooltip, menu</div></div>
   <div style="text-align:center"><div class="box" style="width:150px;height:56px;border-radius:var(--r4);box-shadow:var(--shadow-8)"><span class="k">elev 8</span></div><div class="k" style="margin-top:6px">janela, diálogo, menu</div></div>
 </div>
+<div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:12px;max-width:640px">Auditado 2026-09-04 (issue #223): os dois consumidores reais de <code style="border:0;background:none;padding:0;color:var(--fg)">--shadow-2</code> são <code style="border:0;background:none;padding:0;color:var(--fg)">AppTooltipSurface</code> (a bolha de tooltip e do popover de projeção de cota) e <code style="border:0;background:none;padding:0;color:var(--fg)">AppMenu</code>. Os dois já usam o token certo — a lacuna estava só na demonstração: nenhum kit renderiza um popup aberto por padrão, então o degrau nunca aparecia numa captura estática.</div>
 </body>
 </html>
