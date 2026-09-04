@@ -166,7 +166,7 @@ invented here.
 | `styles.css` | Global entry point. `@import` lines only. |
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
 | `assets/` | Monogram, light variant, lockup, tray badge states |
-| `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric |
+| `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
 | `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
 | `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
@@ -203,7 +203,7 @@ extensions or token objects that have no counterpart here, and are listed for th
 | --- | --- | --- |
 | `AppGroupBand` | Component, `components/data/` | The quiet account sub-band. Team usage and presence both drew it by hand — it is the third step of the surface ladder the prototype draws but does not name. **Not** the panel header: that one speaks loud (`--t12` on `--fg`), this one speaks low (`--t10` on `--muted`), and swapping them inverts the hierarchy. |
 | `AppSettingsNav` | Component, `components/shell/` | Already published here; the Compose side had it as two private functions inside the dialog, under another name. The names now match. |
-| `AppTooltipSurface` | Component | The bubble anatomy — `--raised`, radius 6, 1px border, the short 2dp overlay — was written out in four places, which is what let two tooltips over the same chart float at different heights. |
+| `AppTooltipSurface` | Component, `components/core/` | The bubble anatomy — `--raised`, radius 6, 1px border, the short 2dp overlay — was written out in four places, which is what let two tooltips over the same chart float at different heights. Published 2026-09-04 (issue #223): the Compose primitive existed since the conformance pass, this system only described it in prose. |
 | `Modifier.appNestedGroupItem` | Compose-only | Surface + 2dp guide + indent, per list item. It cannot be the panel: that one clips and rounds, and applied per row it would box every child and cut the guide, which stays continuous only because the list has no gap. |
 | `Modifier.appSurfaceBlock` | Compose-only | Clip + fill + 1px border with no layout. It is what removed the product's last Material `Card`. Colour is a parameter because hover in this system **is** a neutral-surface swap. |
 | `AppChrome` | Compose-only token object | The five fixed heights `tokens/spacing.css` publishes. They lived as three private constants across two files plus a literal in the desktop frame — four owners for one value. |
