@@ -59,4 +59,4 @@ superfície e já congelado.
 | 1 | Plano + issue | Concluída | (este commit) | doc criado, issue aberta |
 | 2 | 5 temas escuros | Concluída | (este commit) | `AppThemePresetTest`/`AppAccentsContrastTest` verdes (21 entries, 13 dark, 8 light) |
 | 3 | 5 temas claros | Concluída | (este commit) | `allTests` verde (26 entries, 13 dark, 13 light). Achado no caminho: fix de teste `ComponentTest > emits the cards only mode change` faltando `performScrollTo()` (a grade de temas ficou mais alta) e copy desatualizada "oito paletas" na aba Geral |
-| 4 | Fechamento | Pendente | — | — |
+| 4 | Fechamento | Concluída | (este commit) | PR [#228](https://github.com/edilsonvilarinho/usage-monitor/pull/228) aberto, issue [#227](https://github.com/edilsonvilarinho/usage-monitor/issues/227) comentada; fecha ao mergear |
