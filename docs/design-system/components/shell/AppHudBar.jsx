@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppStatusIndicator } from '../data/AppStatusIndicator.jsx';
 import { AppStatusDot } from '../data/AppStatusDot.jsx';
+import { AppSourceDot } from '../core/AppSourceMark.jsx';
 
 export function AppHudBar({
   level = 'ok',
@@ -54,6 +55,14 @@ export function AppHudBar({
           ) : visible.map((source, index) => (
             <HudRow key={source.label}>
               <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
+              {/* Segundo ponto de reforço da identidade de vendor (issue
+                  #223): a barra de 2dp de AppSourceMark não existe neste
+                  cromo, e o nome sozinho não diz de que fornecedor é a
+                  conta. Proposta de design system, ainda não fiada no
+                  Compose — ver AppHudBar.prompt.md. */}
+              {source.source ? (
+                <AppSourceDot source={source.source} size={6} style={{ flex: 'none' }} />
+              ) : null}
               <span style={NAME}>{source.label}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
                 {(source.quotas || []).map((chip) => (
