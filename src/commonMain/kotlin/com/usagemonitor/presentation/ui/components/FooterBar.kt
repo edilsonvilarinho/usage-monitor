@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Sensors
@@ -54,6 +55,9 @@ const val FOOTER_WINDOW_MODE_TEST_TAG = "footerWindowMode"
 
 /** Prefixo da marca de cada opção do menu de modos: `footerWindowMode-HUD`. */
 const val FOOTER_WINDOW_MODE_OPTION_TAG_PREFIX = "footerWindowMode-"
+
+/** Gatilho da exportação do retrato do Dashboard (issue #215). */
+const val FOOTER_EXPORT_SNAPSHOT_TEST_TAG = "footerExportSnapshot"
 
 /**
  * As três molduras da janela principal (issue #187).
@@ -146,7 +150,17 @@ fun FooterBar(
      * geradores de captura montam o rodapé sem despachar nada, e um menu que
      * não troca coisa alguma seria decoração.
      */
-    onWindowModeChange: ((WindowMode) -> Unit)? = null
+    onWindowModeChange: ((WindowMode) -> Unit)? = null,
+    /**
+     * Exporta o retrato corrente das cotas em CSV (issue #215).
+     *
+     * `null` esconde o botão, mesma razão de [onOpenAdminOverview]: os
+     * geradores de captura montam o rodapé sem escrever em disco. Sem escolha
+     * de formato ou de janela — o Dashboard não tem aba nem intervalo, é
+     * sempre "agora" — diferente da tela de Sessões CLI, que oferece CSV,
+     * JSON e PDF porque tem o quê escolher.
+     */
+    onExportSnapshot: (() -> Unit)? = null
 ) {
     val initialRemaining = (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt()
     var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(initialRemaining) }
@@ -184,7 +198,8 @@ fun FooterBar(
             onOpenTeamPresence = onOpenTeamPresence,
             onOpenHelp = onOpenHelp,
             windowMode = windowMode,
-            onWindowModeChange = onWindowModeChange
+            onWindowModeChange = onWindowModeChange,
+            onExportSnapshot = onExportSnapshot
         )
     }
 }
@@ -262,7 +277,8 @@ private fun FooterActionGroup(
     onOpenTeamPresence: (() -> Unit)? = null,
     onOpenHelp: () -> Unit = {},
     windowMode: WindowMode = WindowMode.STANDARD,
-    onWindowModeChange: ((WindowMode) -> Unit)? = null
+    onWindowModeChange: ((WindowMode) -> Unit)? = null,
+    onExportSnapshot: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier,
@@ -314,6 +330,27 @@ private fun FooterActionGroup(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Groups,
+                    contentDescription = null,
+                    modifier = Modifier.size(FOOTER_ICON_SIZE),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Exportar é ocasional, não diário — fica entre as ações de time e as
+        // duas de todo dia (atualizar, configurar), nunca antes delas.
+        if (onExportSnapshot != null) {
+            FooterIconActionButton(
+                label = if (language == AppLanguage.PT) {
+                    "Exportar cotas atuais (CSV)"
+                } else {
+                    "Export current quotas (CSV)"
+                },
+                onClick = onExportSnapshot,
+                testTag = FOOTER_EXPORT_SNAPSHOT_TEST_TAG
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.FileDownload,
                     contentDescription = null,
                     modifier = Modifier.size(FOOTER_ICON_SIZE),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant

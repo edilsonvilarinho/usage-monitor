@@ -21,6 +21,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.FOOTER_ADMIN_OVERVIEW_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_COUNTDOWN_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_EXPORT_SNAPSHOT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_HELP_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_TEAM_PRESENCE_TEST_TAG
@@ -206,6 +207,59 @@ class FooterBarTest {
         assertEquals(1, opened)
     }
 
+
+    // ------------------------------------- retrato do Dashboard (issue #215)
+
+    @Test
+    fun `FooterBar esconde a exportacao sem o callback`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
+                    )
+                }
+            }
+        }
+
+        // Os geradores de captura montam o rodapé sem escrever em disco.
+        onAllNodesWithTag(FOOTER_EXPORT_SNAPSHOT_TEST_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun `FooterBar mostra e aciona a exportacao do retrato`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+        var exported = 0
+
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = "1.1.0",
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false,
+                        onExportSnapshot = { exported += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(FOOTER_EXPORT_SNAPSHOT_TEST_TAG).performClick()
+
+        assertEquals(1, exported)
+    }
 
     // --------------------------------------------- modos de janela (issue #187)
 

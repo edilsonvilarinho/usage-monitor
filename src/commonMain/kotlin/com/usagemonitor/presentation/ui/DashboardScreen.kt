@@ -32,11 +32,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import com.usagemonitor.domain.entity.ApiSource
@@ -67,6 +69,9 @@ import com.usagemonitor.presentation.viewmodel.UiState
  * O reset da fonte não é instantâneo; acordar no milissegundo exato não ajuda.
  */
 private const val QUOTA_EXPIRY_MARGIN_MILLIS = 1_000L
+
+/** Mesmo texto de reserva das demais falhas assíncronas sem mensagem própria. */
+private const val UNKNOWN_ERROR_MESSAGE = "erro desconhecido"
 
 /**
  * Próximo `periodEndAt` ainda no futuro entre as cotas na tela.
@@ -144,6 +149,14 @@ fun DashboardScreen(
      * mutuamente exclusivos é `Main.kt`, dono das duas preferências.
      */
     onWindowModeChange: ((WindowMode) -> Unit)? = null,
+    /**
+     * Exporta o retrato corrente das cotas (issue #215). Recebe a lista que já
+     * está na tela — o mesmo `uiState.data` — e devolve o caminho gravado, ou
+     * `null` quando o usuário cancelou o diálogo. `null` aqui (o parâmetro,
+     * não o retorno) esconde o botão, mesma razão de [onOpenAdminOverview]:
+     * os geradores de captura não escrevem em disco.
+     */
+    onExportSnapshot: (suspend (List<ApiUsageStats>) -> String?)? = null,
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -153,7 +166,33 @@ fun DashboardScreen(
     val toastMessage by viewModel.toastMessage.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     var pendingRefreshAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    // Fecha sobre `uiState`/`onExportSnapshot` correntes: o clique no rodapé
+    // não carrega o retrato consigo, e um card atualizado entre a composição
+    // do botão e o clique não pode exportar o congelado.
+    //
+    // Cancelar o diálogo devolve `null` e não mostra nada — mesma regra da
+    // exportação da tela de Sessões CLI: não é sucesso nem erro.
+    val handleExportSnapshot: (() -> Unit)? = onExportSnapshot?.let { exportAction ->
+        {
+            val stats = (uiState as? UiState.Success)?.data
+            if (stats != null) {
+                coroutineScope.launch {
+                    val message = runCatching { exportAction(stats) }.fold(
+                        onSuccess = { path -> path?.let { ExportLabels.exportSaved(it, language) } },
+                        onFailure = { error ->
+                            ExportLabels.exportFailed(error.message ?: UNKNOWN_ERROR_MESSAGE, language)
+                        }
+                    )
+                    if (message != null) {
+                        snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Long)
+                    }
+                }
+            }
+        }
+    }
 
     // O vencimento de uma janela de cota é uma virada de relógio, não de dados:
     // sem este laço o card repetiria o reset já passado como se fosse futuro até
@@ -197,7 +236,8 @@ fun DashboardScreen(
                 onOpenAdminOverview = onOpenAdminOverview,
                 onOpenTeamPresence = onOpenTeamPresenceOverview,
                 windowMode = windowMode,
-                onWindowModeChange = onWindowModeChange
+                onWindowModeChange = onWindowModeChange,
+                onExportSnapshot = handleExportSnapshot
             )
         },
         containerColor = MaterialTheme.colorScheme.background
