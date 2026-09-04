@@ -2630,7 +2630,7 @@ class ComponentTest {
             }
         }
 
-        onNodeWithTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG).performClick()
+        onNodeWithTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG).performScrollTo().performClick()
 
         assertEquals(true, enabled)
     }
