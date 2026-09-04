@@ -21,7 +21,6 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.theme.darkAppAccents
 
 internal data class OpenCodeModelSummary(
     val modelName: String,
@@ -122,14 +121,15 @@ internal fun cardContainerColor(): Color {
 /**
  * Cor de identidade da fonte.
  *
- * [accents] tem default escuro porque este card ainda não migrou para o token por
- * tema — trocar o default mudaria a renderização do dashboard inteiro, que está
- * fora desta rodada. O que a mudança resolve é a duplicação: esta tabela e a do
- * histórico eram duas cópias literais da mesma paleta.
+ * [accents] é sem default de propósito: as duas telas que a usavam sem passar o
+ * tema em vigor (histórico e o card antes desta correção) davam 2,64:1 no tema
+ * claro contra os 4,5:1 exigidos — a tabela em si estava certa, o que faltava era
+ * o chamador entregar `AppAccents.current`. Sem default o compilador obriga isso
+ * em qualquer call site novo.
  */
 internal fun accentColorFor(
     source: ApiSource,
-    accents: AppAccents = darkAppAccents
+    accents: AppAccents
 ): Color {
     return when (source) {
         ApiSource.ANTHROPIC -> accents.anthropic

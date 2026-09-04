@@ -14,6 +14,7 @@ import kotlin.math.floor
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.presentation.ui.healthColor
+import com.usagemonitor.presentation.ui.theme.AppAccents
 
 /** Duração de um passo do pisca — o tempo em cena de cada severidade. */
 const val SESSION_PULSE_STEP_MILLIS = 1_200
@@ -99,8 +100,14 @@ internal fun rememberSessionPulseFrame(pulse: SessionPulse): SessionPulseFrame? 
     return sessionPulseFrame(phase, severities)
 }
 
-/** Cor da severidade em cena; a mesma paleta de saúde dos modais de sessão. */
-internal fun SessionPulseFrame.color(): Color = healthColor(health)
+/**
+ * Cor da severidade em cena; a mesma paleta de saúde dos modais de sessão.
+ *
+ * [accents] sem default: sem ele esta função ficava presa à paleta escura mesmo
+ * no tema claro (2,64:1 medido) — o único caminho seguro é o chamador, que está
+ * em composição, entregar `AppAccents.current`.
+ */
+internal fun SessionPulseFrame.color(accents: AppAccents): Color = healthColor(health, accents)
 
 /**
  * Fundo do botão no quadro atual, ou [resting] quando não há pulso.
@@ -108,11 +115,11 @@ internal fun SessionPulseFrame.color(): Color = healthColor(health)
  * É o fundo que respira, não o ícone: um ícone piscando sozinho lê como falha de
  * renderização, enquanto o botão inteiro mudando de cor lê como aviso.
  */
-internal fun sessionPulseContainerColor(frame: SessionPulseFrame?, resting: Color): Color {
+internal fun sessionPulseContainerColor(frame: SessionPulseFrame?, resting: Color, accents: AppAccents): Color {
     if (frame == null) {
         return resting
     }
-    return frame.color().copy(
+    return frame.color(accents).copy(
         alpha = SESSION_PULSE_CONTAINER_MIN_OPACITY + SESSION_PULSE_CONTAINER_RANGE * frame.alpha
     )
 }

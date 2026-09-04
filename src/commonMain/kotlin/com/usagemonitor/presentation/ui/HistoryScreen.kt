@@ -65,6 +65,7 @@ import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
+import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
@@ -221,7 +222,10 @@ fun HistoryScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 } else {
-                                    val accentColor = accentColorForHistorySource(current.report.source)
+                                    val accentColor = accentColorForHistorySource(
+                                        source = current.report.source,
+                                        accents = AppAccents.current
+                                    )
                                     if (current.report.source == ApiSource.DEEPSEEK) {
                                         DeepSeekHistoryContent(
                                             report = current.report,
