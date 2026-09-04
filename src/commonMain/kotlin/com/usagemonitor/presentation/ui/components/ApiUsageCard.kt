@@ -1069,12 +1069,14 @@ private fun CardIconActionButton(
     // texto seria remontado sessenta vezes por segundo sem nunca mudar.
     val hint = remember(pulse, language) { sessionPulseHint(pulse, language) }
     val description = remember(label, hint) { if (hint == null) label else "$label — $hint" }
-    val tint = frame?.color() ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val accents = AppAccents.current
+    val tint = frame?.color(accents) ?: MaterialTheme.colorScheme.onSurfaceVariant
     // Em repouso o botão é a própria superfície do card: o contêiner tonal do
     // Material acrescentava um segundo tom de fundo por botão, e são até seis.
     val containerColor = sessionPulseContainerColor(
         frame = frame,
-        resting = Color.Transparent
+        resting = Color.Transparent,
+        accents = accents
     )
 
     HoverTooltipBox(

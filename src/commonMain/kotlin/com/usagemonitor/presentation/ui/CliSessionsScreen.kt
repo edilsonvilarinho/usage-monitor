@@ -83,27 +83,21 @@ import com.usagemonitor.presentation.ui.components.TurnSeriesChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
-import com.usagemonitor.presentation.ui.theme.darkAppAccents
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 
-// A paleta inteira é `internal` porque a tela de time usa a mesma codificação de
-// cor: custo em azul, tokens em verde, cache gravado em laranja, economia em
-// ciano. Duas paletas para o mesmo significado fariam o usuário reaprender a ler
-// ao trocar de janela — e o painel de detalhe agora é o mesmo nas duas.
-//
-// Os valores em si mudaram de casa: moram em `theme/AppAccents.kt`, que tem uma
-// variante por tema. Estes nomes continuam aqui, amarrados à variante **escura**,
-// para as telas que ainda não migraram (`ApiUsageCard`, `HistoryScreen`, charts)
-// renderizarem exatamente como hoje. Código novo lê `AppAccents.current`.
-internal val INPUT_COLOR = darkAppAccents.input
-internal val OUTPUT_COLOR = darkAppAccents.output
-internal val CACHE_READ_COLOR = darkAppAccents.cacheRead
-internal val CACHE_WRITE_COLOR = darkAppAccents.cacheWrite
-internal val SAVINGS_COLOR = darkAppAccents.savings
+// A codificação de cor (custo em azul, tokens em verde, cache gravado em
+// laranja, economia em ciano) é a mesma da tela de time — o painel de detalhe é
+// compartilhado entre as duas — e vive em `AppAccents`, com uma variante por
+// tema. Esta tela lia `INPUT_COLOR`/`OUTPUT_COLOR`/`CACHE_READ_COLOR`/
+// `CACHE_WRITE_COLOR`/`SAVINGS_COLOR`, constantes de topo de arquivo amarradas à
+// variante escura — resolvidas uma vez por processo, não pelo tema em vigor.
+// Contra a `surface` clara, `#4CAF50` (cache/tokens) dava 2,64:1, abaixo dos
+// 4,5:1 exigidos (`AppAccentsContrastTest`). Todo uso nesta tela agora lê
+// `AppAccents.current` em vez das constantes cruas.
 
 /** Faixa reservada à barra de rolagem, que flutua sobre o conteúdo. */
 internal val SCROLLBAR_GUTTER = 12.dp
@@ -980,9 +974,10 @@ internal fun CliSessionDetailSections(
     SessionSummaryRow(summary = summary, analytics = analytics, language = language)
 
     if (missingTurnsNotice == null) {
+        val accents = AppAccents.current
         DetailSection(
             title = CliSessionsLabels.contextPerTurnChart(language),
-            accent = CACHE_READ_COLOR,
+            accent = accents.cacheRead,
             // Duas dúvidas de uma vez: o que a curva mede e o que o ▼ marca.
             help = listOf(GlossaryTerm.CONTEXT_PER_TURN, GlossaryTerm.COMPACTION),
             language = language
@@ -992,7 +987,7 @@ internal fun CliSessionDetailSections(
                     TurnSeries(
                         label = CliSessionsLabels.chartContextLegend(language),
                         values = analytics.contextPerTurn,
-                        color = CACHE_READ_COLOR,
+                        color = accents.cacheRead,
                         binMode = BinMode.LAST
                     )
                 ),
@@ -1034,6 +1029,7 @@ internal fun SessionSummaryRow(
     analytics: CliSessionAnalytics,
     language: AppLanguage
 ) {
+    val accents = AppAccents.current
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1046,28 +1042,28 @@ internal fun SessionSummaryRow(
         MetricCard(
             label = CliSessionsLabels.columnCost(language),
             value = formatMicrosUsd(summary.costMicros),
-            accent = INPUT_COLOR,
+            accent = accents.input,
             help = GlossaryTerm.ESTIMATED_COST,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.columnTokens(language),
             value = formatQuantity(summary.totalTokens),
-            accent = CACHE_READ_COLOR,
+            accent = accents.cacheRead,
             help = GlossaryTerm.TOTAL_TOKENS,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.cacheHitRate(language),
             value = formatPercent(analytics.cacheHitRate),
-            accent = CACHE_READ_COLOR,
+            accent = accents.cacheRead,
             help = GlossaryTerm.CACHE_HIT_RATE,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.saturation(language),
             value = analytics.contextSaturation?.let { value -> formatPercent(value) } ?: "—",
-            accent = healthColor(analytics.health),
+            accent = healthColor(analytics.health, accents),
             help = GlossaryTerm.CONTEXT_WINDOW,
             language = language
         )
@@ -1077,7 +1073,7 @@ internal fun SessionSummaryRow(
             MetricCard(
                 label = CliSessionsLabels.activeTime(language),
                 value = formatActiveTime(analytics.activeTimeMillis),
-                accent = OUTPUT_COLOR,
+                accent = accents.output,
                 language = language
             )
         }
@@ -1092,6 +1088,7 @@ internal fun SessionAdvancedSections(
     analytics: CliSessionAnalytics,
     language: AppLanguage
 ) {
+    val accents = AppAccents.current
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1100,26 +1097,26 @@ internal fun SessionAdvancedSections(
         MetricCard(
             label = CliSessionsLabels.input(language),
             value = formatQuantity(summary.inputTokens),
-            accent = INPUT_COLOR,
+            accent = accents.input,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.output(language),
             value = formatQuantity(summary.outputTokens),
-            accent = OUTPUT_COLOR,
+            accent = accents.output,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.cacheRead(language),
             value = formatQuantity(summary.cacheReadTokens),
-            accent = CACHE_READ_COLOR,
+            accent = accents.cacheRead,
             help = GlossaryTerm.CACHE_READ,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.cacheWrite(language),
             value = formatQuantity(summary.cacheWriteTokens),
-            accent = CACHE_WRITE_COLOR,
+            accent = accents.cacheWrite,
             help = GlossaryTerm.CACHE_WRITE,
             language = language
         )
@@ -1127,7 +1124,7 @@ internal fun SessionAdvancedSections(
 
     DetailSection(
         title = CliSessionsLabels.cacheHitRate(language),
-        accent = CACHE_READ_COLOR,
+        accent = accents.cacheRead,
         trailing = formatPercent(analytics.cacheHitRate),
         help = listOf(GlossaryTerm.CACHE_HIT_RATE),
         language = language
@@ -1137,7 +1134,7 @@ internal fun SessionAdvancedSections(
 
     DetailSection(
         title = CliSessionsLabels.costDistribution(language),
-        accent = INPUT_COLOR,
+        accent = accents.input,
         trailing = formatMicrosUsd(analytics.costBreakdown.totalMicros),
         help = listOf(GlossaryTerm.COST_DISTRIBUTION),
         language = language
@@ -1149,7 +1146,7 @@ internal fun SessionAdvancedSections(
 
     DetailSection(
         title = CliSessionsLabels.savings(language),
-        accent = SAVINGS_COLOR,
+        accent = accents.savings,
         trailing = formatMicrosUsd(analytics.cacheSavingsMicros),
         help = listOf(GlossaryTerm.SAVINGS),
         language = language
@@ -1165,21 +1162,21 @@ internal fun SessionAdvancedSections(
         MetricCard(
             label = CliSessionsLabels.averageContext(language),
             value = formatQuantity(analytics.averageContextPerTurn),
-            accent = CACHE_READ_COLOR,
+            accent = accents.cacheRead,
             help = GlossaryTerm.AVERAGE_CONTEXT,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.liveContext(language),
             value = formatQuantity(analytics.liveContextTokens),
-            accent = CACHE_READ_COLOR,
+            accent = accents.cacheRead,
             help = GlossaryTerm.LIVE_CONTEXT,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.nextInteraction(language),
             value = formatMicrosUsd(analytics.nextInteractionCostMicros),
-            accent = INPUT_COLOR,
+            accent = accents.input,
             help = GlossaryTerm.NEXT_INTERACTION,
             language = language
         )
@@ -1187,14 +1184,14 @@ internal fun SessionAdvancedSections(
 
     DetailSection(
         title = CliSessionsLabels.cacheWritePerTurnChart(language),
-        accent = CACHE_WRITE_COLOR,
+        accent = accents.cacheWrite,
         help = listOf(GlossaryTerm.CACHE_WRITE_PER_TURN),
         language = language
     ) {
         TurnSeriesChart(
             series = listOf(
-                TurnSeries("5m", analytics.cacheWrite5mPerTurn, CACHE_WRITE_COLOR, BinMode.SUM),
-                TurnSeries("1h", analytics.cacheWrite1hPerTurn, OUTPUT_COLOR, BinMode.SUM)
+                TurnSeries("5m", analytics.cacheWrite5mPerTurn, accents.cacheWrite, BinMode.SUM),
+                TurnSeries("1h", analytics.cacheWrite1hPerTurn, accents.output, BinMode.SUM)
             ),
             stacked = true,
             height = DETAIL_CHART_HEIGHT,
@@ -1204,7 +1201,7 @@ internal fun SessionAdvancedSections(
 
     DetailSection(
         title = CliSessionsLabels.costVersusSavingsChart(language),
-        accent = SAVINGS_COLOR,
+        accent = accents.savings,
         help = listOf(GlossaryTerm.COST_VERSUS_SAVINGS),
         language = language
     ) {
@@ -1213,13 +1210,13 @@ internal fun SessionAdvancedSections(
                 TurnSeries(
                     label = CliSessionsLabels.chartCostLegend(language),
                     values = analytics.cumulativeCostMicros,
-                    color = INPUT_COLOR,
+                    color = accents.input,
                     binMode = BinMode.MAX
                 ),
                 TurnSeries(
                     label = CliSessionsLabels.chartSavingsLegend(language),
                     values = analytics.cumulativeSavingsMicros,
-                    color = SAVINGS_COLOR,
+                    color = accents.savings,
                     binMode = BinMode.MAX
                 )
             ),
@@ -1362,10 +1359,11 @@ internal fun healthTallyColor(tally: CliSessionHealthTally): Color? {
 @Composable
 internal fun HealthTallyText(tally: CliSessionHealthTally, language: AppLanguage) {
     val label = CliSessionsLabels.healthTally(tally, language) ?: return
+    val accents = AppAccents.current
     val accent = if (tally.saturated > 0) {
-        healthColor(CliSessionHealth.SATURATED)
+        healthColor(CliSessionHealth.SATURATED, accents)
     } else {
-        healthColor(CliSessionHealth.ATTENTION)
+        healthColor(CliSessionHealth.ATTENTION, accents)
     }
 
     Text(
@@ -1379,13 +1377,14 @@ internal fun HealthTallyText(tally: CliSessionHealthTally, language: AppLanguage
 /**
  * Cor do veredito de saúde.
  *
- * [accents] tem default escuro para as telas que ainda não migraram continuarem
- * compilando com a cor de hoje. Quem está dentro de uma composição deve passar
- * `AppAccents.current` — é o que faz o veredito continuar legível no tema claro.
+ * [accents] sem default: a versão anterior caía para `darkAppAccents` sempre que
+ * um chamador esquecesse o parâmetro, e foi assim que este veredito ficou preso
+ * à paleta escura no tema claro (2,64:1 medido contra a `surface` clara). Quem
+ * está dentro de uma composição passa `AppAccents.current`.
  */
 internal fun healthColor(
     health: CliSessionHealth,
-    accents: AppAccents = darkAppAccents
+    accents: AppAccents
 ): Color {
     return when (health) {
         CliSessionHealth.HEALTHY -> accents.cacheRead
@@ -1627,6 +1626,7 @@ internal fun GlossaryPanel(
 @Composable
 internal fun CostDistributionBar(analytics: CliSessionAnalytics) {
     val breakdown = analytics.costBreakdown
+    val accents = AppAccents.current
 
     Row(
         modifier = Modifier
@@ -1635,7 +1635,7 @@ internal fun CostDistributionBar(analytics: CliSessionAnalytics) {
             .clip(AppShapes.small)
             .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        for ((value, color) in costSegments(analytics)) {
+        for ((value, color) in costSegments(analytics, accents)) {
             val weight = breakdown.fractionOf(value).toFloat()
             if (weight <= 0f) {
                 continue
@@ -1656,6 +1656,7 @@ internal fun CostDistributionBar(analytics: CliSessionAnalytics) {
 @Composable
 internal fun CostDistributionLegend(analytics: CliSessionAnalytics, language: AppLanguage) {
     val breakdown = analytics.costBreakdown
+    val accents = AppAccents.current
     val labels = listOf(
         CliSessionsLabels.input(language),
         CliSessionsLabels.output(language),
@@ -1668,7 +1669,7 @@ internal fun CostDistributionLegend(analytics: CliSessionAnalytics, language: Ap
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        costSegments(analytics).forEachIndexed { index, (value, color) ->
+        costSegments(analytics, accents).forEachIndexed { index, (value, color) ->
             Row(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -1684,12 +1685,12 @@ internal fun CostDistributionLegend(analytics: CliSessionAnalytics, language: Ap
     }
 }
 
-private fun costSegments(analytics: CliSessionAnalytics): List<Pair<Long, Color>> {
+private fun costSegments(analytics: CliSessionAnalytics, accents: AppAccents): List<Pair<Long, Color>> {
     val breakdown = analytics.costBreakdown
     return listOf(
-        breakdown.inputMicros to INPUT_COLOR,
-        breakdown.outputMicros to OUTPUT_COLOR,
-        breakdown.cacheReadMicros to CACHE_READ_COLOR,
-        breakdown.cacheWriteMicros to CACHE_WRITE_COLOR
+        breakdown.inputMicros to accents.input,
+        breakdown.outputMicros to accents.output,
+        breakdown.cacheReadMicros to accents.cacheRead,
+        breakdown.cacheWriteMicros to accents.cacheWrite
     )
 }

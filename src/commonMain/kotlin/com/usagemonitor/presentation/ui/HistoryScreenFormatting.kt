@@ -18,13 +18,17 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.accentColorFor
+import com.usagemonitor.presentation.ui.theme.AppAccents
 
 /**
  * Delega para [accentColorFor]: a mesma fonte tem de ter a mesma cor no card e no
  * gráfico do histórico. Antes eram duas tabelas idênticas copiadas à mão.
+ *
+ * [accents] sem default: chamava [accentColorFor] sem tema em vigor, e por isso o
+ * histórico ficava preso à paleta escura no tema claro (2,64:1 medido).
  */
-internal fun accentColorForHistorySource(source: ApiSource): Color {
-    return accentColorFor(source)
+internal fun accentColorForHistorySource(source: ApiSource, accents: AppAccents): Color {
+    return accentColorFor(source, accents)
 }
 
 internal fun rangeLabel(range: HistoryRange, language: AppLanguage): String {
