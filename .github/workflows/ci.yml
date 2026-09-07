@@ -76,7 +76,7 @@ jobs:
       # tambem no ramo em que a suite nao roda, que e justamente o que ele tem de
       # anunciar. Sao ~5 s.
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Guarda de paridade entre a tabela de precos do domain Kotlin e a que o
       # servidor publica. Ela roda AQUI e no `ci-server.yml` porque os filtros de
@@ -215,7 +215,7 @@ jobs:
         # `fatal: ...: no merge base` -- o passo falha, o job falha, e os cenarios
         # NUNCA rodam. Aconteceu de verdade: o CI do PR #85 ficou vermelho por
         # isto, e o defeito ja estava catalogado como P1-09 na contra-auditoria.
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -396,7 +396,7 @@ jobs:
         # filtro usa diff de tres pontos, que precisa de base comum, e com o
         # checkout raso o git responde `no merge base` -- o passo falha, o job
         # falha, e os cenarios NUNCA rodam.
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
