@@ -45,6 +45,7 @@ import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
+import com.usagemonitor.data.datasource.LocalCodexCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
@@ -66,6 +67,7 @@ import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
 import com.usagemonitor.data.repository.OpenRouterRepositoryImpl
 import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
+import com.usagemonitor.data.repository.CodexCliSessionRepositoryImpl
 import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
@@ -93,6 +95,8 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
+import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
+import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
@@ -143,6 +147,7 @@ import com.usagemonitor.presentation.ui.orderedByCardOrder
 import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.CliSessionsScreen
+import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.HelpWindow
 import com.usagemonitor.presentation.ui.ReleaseNotesWindow
@@ -184,6 +189,7 @@ import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
+import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
@@ -257,6 +263,7 @@ private const val HUD_MIN_WINDOW_WIDTH_DP = 32
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 private const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
+private const val CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
 
 /**
  * Cadência da janela de sessões aberta. As sessões descrevem o Claude Code
@@ -546,6 +553,8 @@ private fun runUsageMonitor(
             }
         )
     }
+    // Índice separado: rollouts do Codex não entram nas tabelas `cli_*` do Claude.
+    val codexCliSessionDataSource = remember { LocalCodexCliSessionDataSource() }
     // Mesma conexão do índice de sessões, não uma segunda para o mesmo arquivo:
     // `useConnection` é sincronizado, então o envio espera a indexação terminar
     // em vez de disputar a escrita e receber `SQLITE_BUSY`.
@@ -601,6 +610,9 @@ private fun runUsageMonitor(
     }
     val cliSessionRepository = remember(cliSessionDataSource) {
         CliSessionRepositoryImpl(cliSessionDataSource)
+    }
+    val codexCliSessionRepository = remember(codexCliSessionDataSource) {
+        CodexCliSessionRepositoryImpl(codexCliSessionDataSource)
     }
     val dashboardCacheRepository = remember(dashboardCacheDataSource) {
         DashboardCacheRepositoryImpl(dashboardCacheDataSource)
@@ -733,6 +745,21 @@ private fun runUsageMonitor(
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS,
             breadcrumbs = breadcrumbs
         )
+    }
+    val codexCliSessionsViewModel = remember(codexCliSessionRepository) {
+        CodexCliSessionsViewModel(
+            getSessions = GetCodexCliSessionsUseCase(codexCliSessionRepository),
+            getDetail = GetCodexCliSessionDetailUseCase(codexCliSessionRepository),
+            autoLoad = false
+        )
+    }
+    // O índice local continua sendo atualizado com a janela fechada. A operação
+    // já muda para Dispatchers.IO no datasource; o laço não bloqueia a UI.
+    LaunchedEffect(codexCliSessionDataSource) {
+        while (isActive) {
+            codexCliSessionDataSource.syncIndex()
+            delay(CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS)
+        }
     }
     val teamUsageViewModel = remember(teamUsageRepository, teamAdminRepository) {
         TeamUsageViewModel(
@@ -926,6 +953,15 @@ private fun runUsageMonitor(
         persistedState = persistedCliSessionsWindowState,
         uiScalePercent = uiScalePercent,
         workArea = screenWorkArea
+    )
+    val codexCliSessionsWindowState = rememberWindowState(
+        size = fitWindowSize(
+            DpSize(
+                width = 980.dp * uiScaleFactor(uiScalePercent),
+                height = 640.dp * uiScaleFactor(uiScalePercent)
+            ),
+            screenWorkArea
+        )
     )
     val teamUsageWindowState = rememberPersistedTeamUsageWindowState(
         persistedState = persistedTeamUsageWindowState,
@@ -1242,6 +1278,8 @@ private fun runUsageMonitor(
     var cliSessionsOpenGeneration by remember { mutableStateOf(0) }
     var cliSessionsProfileLabel by remember { mutableStateOf<String?>(null) }
     var cliSessionsProfileId by remember { mutableStateOf<String?>(null) }
+    var isCodexCliSessionsOpen by remember { mutableStateOf(false) }
+    var codexCliSessionsOpenGeneration by remember { mutableStateOf(0) }
     var isTeamUsageOpen by remember { mutableStateOf(false) }
     var teamUsageOpenGeneration by remember { mutableStateOf(0) }
     var teamUsageAccountLabel by remember { mutableStateOf<String?>(null) }
@@ -1481,12 +1519,13 @@ private fun runUsageMonitor(
             teamUsageViewModel.setQuotaWindows(teamUsageQuotaWindows)
         }
     }
-    val shutdownApplication = remember(viewModel, historyViewModel, httpClient, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
+    val shutdownApplication = remember(viewModel, historyViewModel, cliSessionsViewModel, codexCliSessionsViewModel, httpClient, usageHistoryDataSource, cliSessionDataSource, codexCliSessionDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
                 historyViewModel.onDestroy()
                 cliSessionsViewModel.onDestroy()
+                codexCliSessionsViewModel.onDestroy()
                 teamUsageViewModel.onDestroy()
                 teamPresenceViewModel.onDestroy()
                 sessionPulseViewModel.onDestroy()
@@ -1496,6 +1535,7 @@ private fun runUsageMonitor(
                 httpClient.close()
                 usageHistoryDataSource.close()
                 cliSessionDataSource.close()
+                codexCliSessionDataSource.close()
                 openCodeUsageDataSource.close()
                 kiloUsageDataSource.close()
                 singleInstanceGuard.close()
@@ -2140,6 +2180,12 @@ private fun runUsageMonitor(
                         breadcrumbs.recordScreenOpened("Ajuda")
                         isHelpDialogOpen = true
                     },
+                    onOpenCodexCliSessions = {
+                        breadcrumbs.recordScreenOpened("sessões Codex CLI")
+                        isCodexCliSessionsOpen = true
+                        codexCliSessionsOpenGeneration++
+                        codexCliSessionsViewModel.openWindow()
+                    },
                     // Só quem administra recebe o botão; `null` esconde. A conta
                     // não entra na condição de propósito: administrar o servidor
                     // não exige participar de nenhum time.
@@ -2350,6 +2396,46 @@ private fun runUsageMonitor(
                 ) {
                     CliSessionsScreen(
                         viewModel = cliSessionsViewModel,
+                        language = language
+                    )
+                }
+            }
+        }
+    }
+
+    if (isCodexCliSessionsOpen) {
+        val codexCliSessionsTitle = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI sessions"
+        val closeCodexCliSessions = {
+            isCodexCliSessionsOpen = false
+            codexCliSessionsViewModel.closeWindow()
+        }
+        Window(
+            onCloseRequest = closeCodexCliSessions,
+            title = codexCliSessionsTitle,
+            icon = iconImage,
+            state = codexCliSessionsWindowState,
+            resizable = true,
+            undecorated = true
+        ) {
+            LaunchedEffect(codexCliSessionsOpenGeneration) {
+                activateWindow(window)
+            }
+            ApplyWindowMinimumSize(
+                window = window,
+                widthDp = 820,
+                heightDp = 520,
+                uiScalePercent = uiScalePercent,
+                workArea = screenWorkArea
+            )
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+                DesktopDialogFrame(
+                    title = codexCliSessionsTitle,
+                    iconPainter = iconImage,
+                    windowState = codexCliSessionsWindowState,
+                    onCloseRequest = closeCodexCliSessions
+                ) {
+                    CodexCliSessionsScreen(
+                        viewModel = codexCliSessionsViewModel,
                         language = language
                     )
                 }
