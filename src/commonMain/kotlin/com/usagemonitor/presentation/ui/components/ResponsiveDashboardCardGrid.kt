@@ -63,6 +63,7 @@ internal fun ResponsiveDashboardCardGrid(
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
+    onOpenCodexCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamPresenceCard: (UsageTargetKey) -> Unit = {},
     /**
@@ -143,6 +144,11 @@ internal fun ResponsiveDashboardCardGrid(
                             onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
                             onOpenCliSessions = if (stats.source == ApiSource.ANTHROPIC) {
                                 { onOpenCliSessionsCard(stats.targetKey) }
+                            } else {
+                                null
+                            },
+                            onOpenCodexCliSessions = if (stats.source == ApiSource.CODEX) {
+                                { onOpenCodexCliSessionsCard(stats.targetKey) }
                             } else {
                                 null
                             },

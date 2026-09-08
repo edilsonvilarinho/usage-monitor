@@ -109,6 +109,7 @@ fun DashboardScreen(
     /** Abre a ajuda. Default vazio pela razão de sempre: os geradores de captura não a abrem. */
     onOpenHelp: () -> Unit = {},
     onOpenCliSessions: (UsageTargetKey) -> Unit = {},
+    onOpenCodexCliSessions: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
     /** Presença da conta do card — a porta do integrante comum. */
     onOpenTeamPresence: (UsageTargetKey) -> Unit = {},
@@ -311,6 +312,7 @@ fun DashboardScreen(
                                     onToggleCardMinimized = onToggleCardMinimized,
                                     onOpenHistoryCard = onOpenHistory,
                                     onOpenCliSessionsCard = onOpenCliSessions,
+                                    onOpenCodexCliSessionsCard = onOpenCodexCliSessions,
                                     onOpenTeamUsageCard = onOpenTeamUsage,
                                     onOpenTeamPresenceCard = onOpenTeamPresence,
                                     teamEnabledProfileIds = teamEnabledProfileIds,
@@ -470,6 +472,7 @@ private fun SuccessContent(
     onToggleCardMinimized: (UsageTargetKey) -> Unit,
     onOpenHistoryCard: (ApiSource, UsageAccountKey?) -> Unit,
     onOpenCliSessionsCard: (UsageTargetKey) -> Unit = {},
+    onOpenCodexCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamPresenceCard: (UsageTargetKey) -> Unit = {},
     teamEnabledProfileIds: Set<String> = emptySet(),
@@ -544,6 +547,7 @@ private fun SuccessContent(
                 onToggleCardMinimized = onToggleCardMinimized,
                 onOpenHistoryCard = onOpenHistoryCard,
                 onOpenCliSessionsCard = onOpenCliSessionsCard,
+                onOpenCodexCliSessionsCard = onOpenCodexCliSessionsCard,
                 onOpenTeamUsageCard = onOpenTeamUsageCard,
                 onOpenTeamPresenceCard = onOpenTeamPresenceCard,
                 teamEnabledProfileIds = teamEnabledProfileIds,

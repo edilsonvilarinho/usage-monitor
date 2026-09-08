@@ -164,6 +164,8 @@ fun ApiUsageCard(
     onOpenHistory: () -> Unit = {},
     /** Só os cards Anthropic recebem: sessões do Claude Code pertencem a uma conta. */
     onOpenCliSessions: (() -> Unit)? = null,
+    /** O card Codex recebe as sessões do Codex CLI da conta exibida nele. */
+    onOpenCodexCliSessions: (() -> Unit)? = null,
     /**
      * Só os cards Anthropic de contas marcadas como parte do time recebem, e só
      * com a integração ligada. Nulo esconde o botão — quem não usa a integração
@@ -567,22 +569,37 @@ fun ApiUsageCard(
                     )
                 }
 
-                    if (onOpenCliSessions != null) {
-                        CardIconActionButton(
-                            label = cliSessionsActionLabel(language = language),
-                            onClick = onOpenCliSessions,
-                            buttonSize = density.actionButtonSize,
-                            pulse = cliSessionPulse,
-                            language = language
-                        ) { tint ->
-                            Icon(
-                                imageVector = Icons.Rounded.Terminal,
-                                contentDescription = null,
-                                modifier = Modifier.size(density.actionIconSize),
-                                tint = tint
-                            )
-                        }
+                if (onOpenCodexCliSessions != null) {
+                    CardIconActionButton(
+                        label = codexCliSessionsActionLabel(language = language),
+                        onClick = onOpenCodexCliSessions,
+                        buttonSize = density.actionButtonSize
+                    ) { tint ->
+                        Icon(
+                            imageVector = Icons.Rounded.Terminal,
+                            contentDescription = null,
+                            modifier = Modifier.size(density.actionIconSize),
+                            tint = tint
+                        )
                     }
+                }
+
+                if (onOpenCliSessions != null) {
+                    CardIconActionButton(
+                        label = cliSessionsActionLabel(language = language),
+                        onClick = onOpenCliSessions,
+                        buttonSize = density.actionButtonSize,
+                        pulse = cliSessionPulse,
+                        language = language
+                    ) { tint ->
+                        Icon(
+                            imageVector = Icons.Rounded.Terminal,
+                            contentDescription = null,
+                            modifier = Modifier.size(density.actionIconSize),
+                            tint = tint
+                        )
+                    }
+                }
 
                     // Só chega não-nulo quando a integração está ligada e esta
                     // conta foi marcada como parte do time nas Configurações.

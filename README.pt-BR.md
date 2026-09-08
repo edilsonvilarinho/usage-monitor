@@ -30,6 +30,8 @@ envia conteúdo de prompt ou de resposta para lugar nenhum.
   por integração, cards reordenáveis e minimizáveis. Se uma fonte falhar, as outras continuam.
 - **Custo das sessões do Claude Code** — uma linha por sessão, lida dos transcripts locais, com custo
   estimado, veredito de saúde da sessão e atualização ao vivo.
+- **Sessões locais do Codex CLI** — resumo de tokens por sessão e resposta a partir dos rollouts
+  locais, com modelo/projeto, detalhe, atualização e exportação CSV/JSON. Nenhum custo em USD é inferido.
 - **Resumo por eixo** — a mesma janela recortada por projeto, modelo, branch e ferramenta, com ritmo
   de queima em USD/h e tokens/h, grade de atividade dia da semana × hora, e tempo ativo que descarta
   as pausas maiores que cinco minutos.
@@ -53,6 +55,7 @@ envia conteúdo de prompt ou de resposta para lugar nenhum.
 |---|---|---|---|
 | Anthropic | Remota | `GET /api/oauth/usage` | `~/.claude/.credentials.json` |
 | Codex | Remota | `GET /backend-api/wham/usage` | `~/.codex/auth.json` e `~/.codex/cap_sid` |
+| Sessões Codex CLI | Local | lê `<CODEX_HOME>/sessions/**/*.jsonl` | rollouts locais do CLI; não exige autenticação |
 | MiniMax | Remota | `GET /v1/token_plan/remains` | chave informada em **Configurações > APIs** |
 | DeepSeek | Remota | `GET /user/balance` | chave informada em **Configurações > APIs** |
 | OpenCode Zen Free | Local | lê `~/.local/share/opencode/opencode.db` | base local do OpenCode existente |
@@ -220,6 +223,10 @@ com `launchctl`.
 - **OpenCode Zen Free e Kilo Free não precisam de nada** — leem as bases locais que essas ferramentas
   já mantêm.
 - Histórico, índice de sessões e diagnósticos ficam em `~/.usage-monitor/`.
+- O índice local do Codex CLI fica em `~/.usage-monitor/codex-cli-history.db` e lê
+  `$CODEX_HOME/sessions` quando `CODEX_HOME` está definido; sem isso usa `~/.codex/sessions`.
+- O índice local do Codex guarda somente metadados e contadores de tokens. Não guarda prompts,
+  respostas, texto de raciocínio, entradas de ferramentas ou credenciais, e nunca apaga os rollouts originais.
 - O dashboard atualiza a cada 10 minutos. Fechar a janela encerra a aplicação; não existe minimizar
   para a bandeja.
 

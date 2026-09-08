@@ -961,7 +961,9 @@ class ComponentTest {
     }
 
     @Test
-    fun `ApiUsageCard hides the CLI action for non Anthropic sources`() = runDesktopComposeUiTest {
+    fun `ApiUsageCard opens Codex CLI sessions from the Codex card`() = runDesktopComposeUiTest {
+        var opened = false
+
         setContent {
             AppTheme(isDark = true) {
                 ApiUsageCard(
@@ -981,12 +983,14 @@ class ComponentTest {
                     isRefreshing = false,
                     language = AppLanguage.PT,
                     animationDelayMillis = 0,
-                    onRefresh = {}
+                    onRefresh = {},
+                    onOpenCodexCliSessions = { opened = true }
                 )
             }
         }
 
-        onAllNodesWithContentDescription("Sessões CLI desta conta").assertCountEquals(0)
+        onNodeWithContentDescription("Sessões Codex CLI desta conta").performClick()
+        assertEquals(true, opened)
     }
 
     @Test
