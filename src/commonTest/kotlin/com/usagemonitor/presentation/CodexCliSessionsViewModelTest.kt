@@ -1,0 +1,129 @@
+package com.usagemonitor.presentation
+
+import com.usagemonitor.domain.entity.CodexCliSessionDetail
+import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
+import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.domain.entity.CodexCliSessionTurn
+import com.usagemonitor.domain.repository.CodexCliSessionRepository
+import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
+import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
+import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Instant
+import kotlinx.coroutines.CoroutineDispatcher
+
+class CodexCliSessionsViewModelTest {
+    @Test
+    fun `refresh exposes list and index warning without failing the screen`() = runTest {
+        val repository = FakeRepository(indexFailure = IllegalStateException("partial index"))
+        val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
+
+        viewModel.refresh()
+        testScheduler.runCurrent()
+
+        val state = assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals(listOf("session-1"), state.sessions.map { session -> session.sessionId })
+        assertEquals("partial index", state.indexWarning)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `range selection reloads with the selected cutoff`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
+
+        viewModel.setRange(CodexCliSessionRange.ALL)
+        testScheduler.runCurrent()
+
+        assertEquals(null, repository.lastSince)
+        assertEquals(CodexCliSessionRange.ALL, assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `detail opens and closes without losing the list`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
+
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        viewModel.openSession("session-1")
+        testScheduler.runCurrent()
+
+        assertEquals("response-1", assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).detail?.turns?.single()?.responseId)
+        viewModel.closeDetail()
+        assertEquals(null, assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).detail)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `repository read failure reaches error state`() = runTest {
+        val repository = FakeRepository(readFailure = IllegalStateException("read failed"))
+        val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
+
+        viewModel.refresh()
+        testScheduler.runCurrent()
+
+        assertEquals("read failed", assertIs<CodexCliSessionsUiState.Error>(viewModel.uiState.value).message)
+        viewModel.onDestroy()
+    }
+
+    private fun viewModel(repository: FakeRepository, dispatcher: CoroutineDispatcher): CodexCliSessionsViewModel {
+        return CodexCliSessionsViewModel(
+            getSessions = GetCodexCliSessionsUseCase(repository),
+            getDetail = GetCodexCliSessionDetailUseCase(repository),
+            dispatcher = dispatcher,
+            autoLoad = false
+        )
+    }
+
+    private class FakeRepository(
+        private val indexFailure: Throwable? = null,
+        private val readFailure: Throwable? = null
+    ) : CodexCliSessionRepository {
+        var lastSince: Long? = Long.MIN_VALUE
+
+        override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> {
+            return indexFailure?.let { failure -> Result.failure(failure) }
+                ?: Result.success(CodexCliSessionIndexReport(scannedFiles = 1))
+        }
+
+        override suspend fun getSessions(sinceEpochMillis: Long?): Result<List<CodexCliSessionSummary>> {
+            lastSince = sinceEpochMillis
+            return readFailure?.let { failure -> Result.failure(failure) }
+                ?: Result.success(listOf(summary()))
+        }
+
+        override suspend fun getSessionDetail(sessionId: String): Result<CodexCliSessionDetail?> {
+            return Result.success(if (sessionId == "session-1") detail() else null)
+        }
+
+        private fun summary(): CodexCliSessionSummary {
+            return CodexCliSessionSummary(
+                sessionId = "session-1",
+                filePath = "rollout.jsonl",
+                firstTs = Instant.parse("2026-09-08T12:00:00Z"),
+                lastTs = Instant.parse("2026-09-08T12:00:01Z"),
+                responseCount = 1,
+                turnCount = 1
+            )
+        }
+
+        private fun detail(): CodexCliSessionDetail {
+            val turn = CodexCliSessionTurn(
+                sessionId = "session-1",
+                turnId = "turn-1",
+                responseId = "response-1",
+                seq = 0,
+                ts = Instant.parse("2026-09-08T12:00:01Z")
+            )
+            return CodexCliSessionDetail(summary(), listOf(turn))
+        }
+    }
+}
