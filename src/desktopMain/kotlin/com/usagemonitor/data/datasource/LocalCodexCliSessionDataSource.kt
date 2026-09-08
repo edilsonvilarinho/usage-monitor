@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.parser.CodexCliRolloutMetadata
 import com.usagemonitor.data.parser.CodexCliRolloutParser
+import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.domain.entity.CodexCliRolloutSource
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
@@ -19,7 +20,7 @@ import java.sql.Connection
 
 /** Índice SQLite isolado dos rollouts locais do Codex CLI. */
 class LocalCodexCliSessionDataSource(
-    private val codexHomeProvider: () -> File = { defaultCodexHome() },
+    private val codexHomeProvider: () -> File = { CodexCliHomeProvider.resolve() },
     databaseFile: File = defaultDatabaseFile()
 ) : CodexCliSessionDataSource, AutoCloseable {
 
@@ -516,12 +517,6 @@ class LocalCodexCliSessionDataSource(
     )
 
     companion object {
-        fun defaultCodexHome(): File {
-            val configured = System.getenv("CODEX_HOME")?.takeIf { value -> value.isNotBlank() }
-            val home = configured ?: File(System.getProperty("user.home"), ".codex").absolutePath
-            return File(home)
-        }
-
         fun defaultDatabaseFile(): File {
             val home = System.getProperty("user.home")
                 ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
