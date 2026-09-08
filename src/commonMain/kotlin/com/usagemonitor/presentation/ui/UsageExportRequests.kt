@@ -5,12 +5,15 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.data.export.UsageExporter
+import com.usagemonitor.data.export.CodexCliUsageExporter
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
 import com.usagemonitor.presentation.ui.report.UsageReportDocument
 
 /**
@@ -60,6 +63,27 @@ fun exportRequestForBreakdown(
     return UsageExportRequest(
         suggestedFileName = exportFileName("breakdown", range, format, now, timeZone),
         payload = UsageExportPayload.Text(UsageExporter.exportBreakdown(breakdown, format))
+    )
+}
+
+fun exportRequestForCodexCliSessions(
+    sessions: List<CodexCliSessionSummary>,
+    range: CodexCliSessionRange,
+    format: UsageExportFormat,
+    now: Instant,
+    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
+): UsageExportRequest {
+    val local = now.toLocalDateTime(timeZone).date
+    val month = local.monthNumber.toString().padStart(2, '0')
+    val day = local.dayOfMonth.toString().padStart(2, '0')
+    val rangeSlug = when (range) {
+        CodexCliSessionRange.LAST_5H -> "5h"
+        CodexCliSessionRange.LAST_7D -> "7d"
+        CodexCliSessionRange.ALL -> "total"
+    }
+    return UsageExportRequest(
+        suggestedFileName = "usage-monitor-codex-cli-$rangeSlug-${local.year}-$month-$day.${format.extension}",
+        payload = UsageExportPayload.Text(CodexCliUsageExporter.exportSessions(sessions, format))
     )
 }
 

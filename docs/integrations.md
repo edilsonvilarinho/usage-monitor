@@ -7,6 +7,7 @@ For the short version, see the table in the [README](../README.md#supported-inte
 |---|---|---|---|
 | Anthropic | Remote | `GET https://api.anthropic.com/api/oauth/usage` | `~/.claude/.credentials.json` |
 | Codex | Remote | `GET https://chatgpt.com/backend-api/wham/usage` | `~/.codex/auth.json` and `~/.codex/cap_sid` |
+| Codex CLI sessions | Local | reads `<CODEX_HOME>/sessions/**/*.jsonl` | local rollouts; no authentication required |
 | MiniMax | Remote | `GET https://www.minimax.io/v1/token_plan/remains` | API key entered in **Settings > APIs** |
 | DeepSeek | Remote | `GET https://api.deepseek.com/user/balance` | API key entered in **Settings > APIs** |
 | OpenCode Zen Free | Local | reads `~/.local/share/opencode/opencode.db` | an existing local OpenCode database |
@@ -70,6 +71,25 @@ from the same terminal.
   source of truth for the `5h` and `7d` quotas.
 - Snapshots are only accepted and stored when **both** quotas are present. An incomplete collection
   keeps the last valid reading in cache and flags the source as unstable.
+
+### Codex CLI local sessions
+
+- This is a separate local source from the remote Codex quota card. It reads rollout files below
+  `$CODEX_HOME/sessions`; when the variable is absent, the default is `~/.codex/sessions`.
+- Reading does not open `auth.json`, `cap_sid`, API keys, or any login flow. The local index is
+  stored separately in `~/.usage-monitor/codex-cli-history.db` and does not alter Claude tables.
+- The parser consumes only `session_meta`, `turn_context`, and `token_usage_record`. Prompt,
+  response, reasoning text and tool payloads are ignored. `usage` is treated as a per-response
+  delta; `turn_token_usage` and `thread_token_usage` are cumulative and are never added as deltas.
+- The index is incremental and tolerates incomplete final lines, malformed/unknown records and
+  file truncation. Unknown data is counted as a warning instead of aborting the dashboard.
+- The rollout schema is internal and may change without notice. `source` is classified from the
+  observed metadata and falls back to `UNKNOWN`; it is not inferred from the directory alone.
+- The screen offers sliding 5-hour, 7-day and total views and exports the displayed summary as
+  CSV/JSON. Export contains metadata and token counters only. There is no USD cost column because
+  ChatGPT plan consumption cannot be converted safely to an API price without a verified tariff.
+- Usage Monitor never deletes or rewrites the original rollout files. Closing the app does not
+  remove the local aggregate index; deleting that database is the manual reset operation.
 
 ## MiniMax
 

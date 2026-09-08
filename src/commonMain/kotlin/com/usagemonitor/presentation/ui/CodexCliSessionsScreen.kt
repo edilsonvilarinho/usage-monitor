@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -33,6 +34,7 @@ import com.usagemonitor.presentation.ui.components.AppToolbar
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.presentation.viewmodel.CodexCliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 
@@ -66,6 +68,16 @@ fun CodexCliSessionsScreen(
                 label = if (language == AppLanguage.PT) "Atualizar" else "Refresh",
                 onClick = viewModel::refresh,
                 tone = AppButtonTone.PRIMARY
+            )
+            AppButton(
+                label = "CSV",
+                onClick = { viewModel.exportCurrent(UsageExportFormat.CSV) },
+                tone = AppButtonTone.GHOST
+            )
+            AppButton(
+                label = "JSON",
+                onClick = { viewModel.exportCurrent(UsageExportFormat.JSON) },
+                tone = AppButtonTone.GHOST
             )
         }
 
@@ -115,6 +127,23 @@ private fun CodexCliSessionContent(
     onOpenSession: (String) -> Unit,
     onCloseDetail: () -> Unit
 ) {
+    if (state.exportOutcome != null) {
+        val outcome = state.exportOutcome
+        AppBanner(
+            title = when (outcome) {
+                is CodexCliExportOutcome.Saved -> if (language == AppLanguage.PT) "Exportação concluída" else "Export complete"
+                is CodexCliExportOutcome.Failed -> if (language == AppLanguage.PT) "Falha na exportação" else "Export failed"
+            },
+            description = when (outcome) {
+                is CodexCliExportOutcome.Saved -> outcome.path
+                is CodexCliExportOutcome.Failed -> outcome.message
+            },
+            tone = when (outcome) {
+                is CodexCliExportOutcome.Saved -> AppTone.OK
+                is CodexCliExportOutcome.Failed -> AppTone.CRITICAL
+            }
+        )
+    }
     if (state.indexWarning != null) {
         AppBanner(
             title = if (language == AppLanguage.PT) "Índice parcial" else "Partial index",

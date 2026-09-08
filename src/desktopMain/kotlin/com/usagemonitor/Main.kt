@@ -746,10 +746,11 @@ private fun runUsageMonitor(
             breadcrumbs = breadcrumbs
         )
     }
-    val codexCliSessionsViewModel = remember(codexCliSessionRepository) {
+    val codexCliSessionsViewModel = remember(codexCliSessionRepository, usageExportWriter) {
         CodexCliSessionsViewModel(
             getSessions = GetCodexCliSessionsUseCase(codexCliSessionRepository),
             getDetail = GetCodexCliSessionDetailUseCase(codexCliSessionRepository),
+            exportWriter = usageExportWriter,
             autoLoad = false
         )
     }

@@ -27,6 +27,8 @@ sends prompt or response content anywhere.
   integration, reorderable and collapsible cards. If one source fails the others keep working.
 - **Claude Code session costs** — one row per session, read from local transcripts, with estimated
   cost, a session health verdict and live updates.
+- **Codex CLI local sessions** — session and response token summaries from local rollouts, with
+  model/project filters, detail, refresh and CSV/JSON export. No USD cost is inferred.
 - **Usage breakdown** — the same window sliced by project, model, branch and tool, with burn rate in
   USD/h and tokens/h, a weekday × hour activity grid, and active time that discards gaps longer than
   five minutes.
@@ -49,6 +51,7 @@ sends prompt or response content anywhere.
 |---|---|---|---|
 | Anthropic | Remote | `GET /api/oauth/usage` | `~/.claude/.credentials.json` |
 | Codex | Remote | `GET /backend-api/wham/usage` | `~/.codex/auth.json` and `~/.codex/cap_sid` |
+| Codex CLI sessions | Local | reads `<CODEX_HOME>/sessions/**/*.jsonl` | local Codex CLI rollouts; authentication not required |
 | MiniMax | Remote | `GET /v1/token_plan/remains` | API key, entered in **Settings > APIs** |
 | DeepSeek | Remote | `GET /user/balance` | API key, entered in **Settings > APIs** |
 | OpenCode Zen Free | Local | reads `~/.local/share/opencode/opencode.db` | an existing OpenCode database |
@@ -215,6 +218,10 @@ with `launchctl`.
 - **OpenCode Zen Free and Kilo Free need nothing** — they read the local databases those tools
   already keep.
 - History, the session index and diagnostics live in `~/.usage-monitor/`.
+- Codex CLI session summaries use `~/.usage-monitor/codex-cli-history.db` and are read from
+  `$CODEX_HOME/sessions` when `CODEX_HOME` is set, otherwise `~/.codex/sessions`.
+- The Codex CLI local index stores only metadata and token counters. It does not store prompts,
+  responses, reasoning text, tool inputs or credentials, and it never deletes the original rollouts.
 - The dashboard refreshes every 10 minutes. Closing the window quits the app; there is no
   minimise-to-tray.
 

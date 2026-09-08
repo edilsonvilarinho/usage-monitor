@@ -1,10 +1,12 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
+import com.usagemonitor.presentation.ui.exportRequestForCodexCliSessions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,13 +40,20 @@ sealed interface CodexCliSessionsUiState {
         val indexWarning: String? = null,
         val detail: CodexCliSessionDetail? = null,
         val detailLoading: Boolean = false,
-        val isRefreshing: Boolean = false
+        val isRefreshing: Boolean = false,
+        val exportOutcome: CodexCliExportOutcome? = null
     ) : CodexCliSessionsUiState
+}
+
+sealed interface CodexCliExportOutcome {
+    data class Saved(val path: String) : CodexCliExportOutcome
+    data class Failed(val message: String) : CodexCliExportOutcome
 }
 
 class CodexCliSessionsViewModel(
     private val getSessions: GetCodexCliSessionsUseCase,
     private val getDetail: GetCodexCliSessionDetailUseCase,
+    private val exportWriter: UsageExportWriter? = null,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: Clock = Clock.System,
     private val liveIntervalMillis: Long? = null,
@@ -54,6 +63,7 @@ class CodexCliSessionsViewModel(
     private var loadJob: Job? = null
     private var detailJob: Job? = null
     private var liveJob: Job? = null
+    private var exportJob: Job? = null
     private var range = CodexCliSessionRange.LAST_5H
 
     private val _uiState = MutableStateFlow<CodexCliSessionsUiState>(CodexCliSessionsUiState.Loading)
@@ -122,6 +132,26 @@ class CodexCliSessionsViewModel(
         _uiState.value = current.copy(detail = null, detailLoading = false)
     }
 
+    fun exportCurrent(format: UsageExportFormat) {
+        val writer = exportWriter ?: return
+        val current = _uiState.value as? CodexCliSessionsUiState.Success ?: return
+        val request = exportRequestForCodexCliSessions(
+            sessions = current.sessions,
+            range = current.range,
+            format = format,
+            now = clock.now()
+        )
+        exportJob?.cancel()
+        exportJob = scope.launch {
+            val outcome = runCatching { writer.write(request) }.fold(
+                onSuccess = { path -> path?.let { saved -> CodexCliExportOutcome.Saved(saved) } },
+                onFailure = { error -> CodexCliExportOutcome.Failed(error.message ?: "Falha ao exportar.") }
+            ) ?: return@launch
+            val latest = _uiState.value as? CodexCliSessionsUiState.Success ?: return@launch
+            _uiState.value = latest.copy(exportOutcome = outcome)
+        }
+    }
+
     fun openWindow() {
         refresh()
         if (liveIntervalMillis == null || liveJob != null) return
@@ -140,6 +170,7 @@ class CodexCliSessionsViewModel(
     }
 
     fun onDestroy() {
+        exportJob?.cancel()
         scope.cancel()
     }
 
