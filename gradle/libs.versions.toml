@@ -9,7 +9,7 @@ multiplatform-settings = "1.2.0"
 sqlite-jdbc = "3.53.4.0"
 pdfbox = "3.0.7"
 commons-compress = "1.27.1"
-kover = "0.9.8"
+kover = "0.9.9"
 
 [libraries]
 # Ktor — cliente HTTP multiplataforma
