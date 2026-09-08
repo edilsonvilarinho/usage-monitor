@@ -1,0 +1,4 @@
+interface:
+  display_name: "Usage Monitor Design"
+  short_description: "Apply the Usage Monitor design system consistently"
+  default_prompt: "Apply the Usage Monitor design system to this screen or visual surface."

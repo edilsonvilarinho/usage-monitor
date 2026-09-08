@@ -5,7 +5,7 @@ description: Safely stage, commit, and push intended changes in the usage-monito
 
 # Usage Monitor Commit Push
 
-Commit only the intended files, use the repository's temporary `codex` git identity, and restore the original local git author config before finishing.
+Commit only the intended files, use a temporary agent git identity, and restore the original local git author config before finishing.
 
 ## Workflow
 
@@ -27,7 +27,7 @@ Commit only the intended files, use the repository's temporary `codex` git ident
 
 ## Script
 
-Use the bundled PowerShell helper to stage only the requested files, temporarily switch git identity to `codex`, restore the previous identity, and optionally skip the push.
+Use the bundled PowerShell helper to stage only the requested files, temporarily switch the git identity, restore the previous identity, and optionally skip the push.
 
 Example:
 
@@ -41,7 +41,9 @@ powershell -ExecutionPolicy Bypass -File `
   -TempUserEmail codex@openai.com
 ```
 
-Use `-SkipPush` when the user asked only for a local commit.
+Use `-SkipPush` when the user asked only for a local commit. Use `-DryRun` to preview the staging plan without touching the index.
+
+The identity is restored in the script's `finally` block, so it is restored even when the commit or the push fails.
 
 ## Guardrails
 
@@ -49,3 +51,4 @@ Use `-SkipPush` when the user asked only for a local commit.
 - Do not stage unrelated changes.
 - Do not force-push unless the user explicitly asks for it.
 - Keep commit messages focused on the actual change scope.
+- Do not modify another agent's uncommitted work in order to make a verification pass. Stop and report instead.
