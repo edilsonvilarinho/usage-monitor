@@ -8,23 +8,23 @@ plugins {
     alias(libs.plugins.kover)
 }
 
-version = "39.3.0"
+version = "39.4.0"
 
 val appVersion = version.toString()
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
 
 kotlin {
-    // ÃƒÆ’Ã…Â¡nico alvo: Desktop JVM.
+    // ÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â¡nico alvo: Desktop JVM.
     // O nome "desktop" define o source set desktopMain/desktopTest.
     jvm("desktop")
 
-    // Java 17 ÃƒÆ’Ã‚Â© o mÃƒÆ’Ã‚Â­nimo recomendado para Compose Multiplatform Desktop
+    // Java 17 ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© o mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­nimo recomendado para Compose Multiplatform Desktop
     jvmToolchain(17)
 
     sourceSets {
 
         // --- commonMain ---
-        // CÃƒÆ’Ã‚Â³digo compartilhado: domain, data e presentation.
+        // CÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³digo compartilhado: domain, data e presentation.
         // Depende apenas de bibliotecas multiplataforma.
         val commonMain by getting {
             dependencies {
@@ -36,13 +36,13 @@ kotlin {
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
                 implementation(compose.components.resources)
 
-                // Ktor ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â cliente HTTP (engine vem no desktopMain)
+                // Ktor ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â cliente HTTP (engine vem no desktopMain)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.json)
                 implementation(libs.ktor.client.logging)
 
-                // SerializaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o e utilitÃƒÆ’Ã‚Â¡rios KMP
+                // SerializaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o e utilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡rios KMP
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.coroutines.core)
@@ -51,7 +51,7 @@ kotlin {
         }
 
         // --- desktopMain ---
-        // CÃƒÆ’Ã‚Â³digo especÃƒÆ’Ã‚Â­fico da plataforma Desktop (JVM):
+        // CÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³digo especÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­fico da plataforma Desktop (JVM):
         // - engine OkHttp do Ktor
         // - leitura de ficheiros com java.io.File
         // - entry point da janela Compose
@@ -80,7 +80,7 @@ kotlin {
         }
 
         // --- commonTest ---
-        // Testes unitÃƒÆ’Ã‚Â¡rios: domain, mappers, ViewModel
+        // Testes unitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡rios: domain, mappers, ViewModel
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlin.test)
@@ -101,7 +101,7 @@ kotlin {
     }
 }
 
-// ConfiguraÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o da aplicaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o Desktop
+// ConfiguraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da aplicaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o Desktop
 compose.desktop {
     application {
         mainClass = "com.usagemonitor.MainKt"
@@ -118,7 +118,7 @@ compose.desktop {
             // `java.logging` cobre o commons-logging que o PDFBox traz: hoje ele
             // acha o SLF4J que o Ktor ja poe no classpath, mas o fallback dele e o
             // `Jdk14Logger`, de `java.util.logging`. Modulo faltando no runtime
-            // image so aparece no app empacotado, nunca no `gradlew run` — por isso
+            // image so aparece no app empacotado, nunca no `gradlew run` â€” por isso
             // vai declarado, e nao descoberto no primeiro relatorio que falhar.
             modules("java.sql", "java.logging")
 
@@ -257,7 +257,7 @@ tasks.register<JavaExec>("generateHelpMedia") {
     args(layout.projectDirectory.dir("src/desktopMain/resources/help").asFile.absolutePath)
 }
 
-// Adicionar manifest ao desktopJar para tornÃƒÆ’Ã‚Â¡-lo executÃƒÆ’Ã‚Â¡vel
+// Adicionar manifest ao desktopJar para tornÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡-lo executÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡vel
 tasks.named<Jar>("desktopJar") {
     manifest {
         attributes(
