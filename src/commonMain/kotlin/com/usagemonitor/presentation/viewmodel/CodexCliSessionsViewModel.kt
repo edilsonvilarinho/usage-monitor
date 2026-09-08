@@ -163,6 +163,17 @@ class CodexCliSessionsViewModel(
     }
 
     fun openWindow() {
+        // A janela sempre começa no recorte operacional padrão, mesmo quando
+        // o ViewModel foi reutilizado depois de uma seleção anterior.
+        range = CodexCliSessionRange.LAST_5H
+        val current = _uiState.value
+        if (current is CodexCliSessionsUiState.Success) {
+            _uiState.value = current.copy(
+                range = CodexCliSessionRange.LAST_5H,
+                isRefreshing = true,
+                detail = null
+            )
+        }
         refresh()
         if (liveIntervalMillis == null || liveJob != null) return
         liveJob = scope.launch {

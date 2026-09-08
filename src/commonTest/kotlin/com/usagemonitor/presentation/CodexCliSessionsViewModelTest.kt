@@ -74,6 +74,34 @@ class CodexCliSessionsViewModelTest {
     }
 
     @Test
+    fun `opening the window always resets to the five hour range`() = runTest {
+        val repository = FakeRepository()
+        val now = Instant.parse("2026-09-08T15:00:00Z")
+        val viewModel = viewModel(
+            repository = repository,
+            dispatcher = StandardTestDispatcher(testScheduler),
+            clock = object : Clock {
+                override fun now(): Instant = now
+            }
+        )
+
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        viewModel.setRange(CodexCliSessionRange.ALL)
+        testScheduler.runCurrent()
+        viewModel.openWindow()
+        testScheduler.runCurrent()
+
+        val expectedCutoff = now.toEpochMilliseconds() - 5L * 60L * 60L * 1000L
+        assertEquals(expectedCutoff, repository.lastSince)
+        assertEquals(
+            CodexCliSessionRange.LAST_5H,
+            assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range
+        )
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `detail opens and closes without losing the list`() = runTest {
         val repository = FakeRepository()
         val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
