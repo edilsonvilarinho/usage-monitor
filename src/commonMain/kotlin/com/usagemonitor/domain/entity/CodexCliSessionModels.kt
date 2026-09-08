@@ -61,6 +61,7 @@ data class CodexCliSessionSummary(
     val firstTs: Instant,
     val lastTs: Instant,
     val primaryModel: String? = null,
+    val originator: String? = null,
     val source: CodexCliRolloutSource = CodexCliRolloutSource.UNKNOWN,
     val rawSource: String? = null,
     val threadSource: String? = null,

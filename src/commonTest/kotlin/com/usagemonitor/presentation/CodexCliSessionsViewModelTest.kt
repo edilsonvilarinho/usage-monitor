@@ -14,11 +14,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.coroutines.CoroutineDispatcher
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class CodexCliSessionsViewModelTest {
     @Test
     fun `refresh exposes list and index warning without failing the screen`() = runTest {
@@ -102,6 +105,54 @@ class CodexCliSessionsViewModelTest {
     }
 
     @Test
+    fun `refreshes automatically while the window is open and stops after close`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(
+            repository = repository,
+            dispatcher = StandardTestDispatcher(testScheduler),
+            liveIntervalMillis = 5_000L
+        )
+
+        viewModel.openWindow()
+        testScheduler.runCurrent()
+        val callsAfterOpen = repository.syncCalls
+
+        advanceTimeBy(5_000L)
+        testScheduler.runCurrent()
+        assertEquals(callsAfterOpen + 1, repository.syncCalls)
+
+        viewModel.closeWindow()
+        advanceTimeBy(5_000L)
+        testScheduler.runCurrent()
+        assertEquals(callsAfterOpen + 1, repository.syncCalls)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `automatic refresh preserves and reloads the open detail`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(
+            repository = repository,
+            dispatcher = StandardTestDispatcher(testScheduler),
+            liveIntervalMillis = 5_000L
+        )
+
+        viewModel.openWindow()
+        testScheduler.runCurrent()
+        viewModel.openSession("session-1")
+        testScheduler.runCurrent()
+        val detailCallsAfterOpen = repository.detailCalls
+
+        advanceTimeBy(5_000L)
+        testScheduler.runCurrent()
+
+        val state = assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value)
+        assertEquals("response-1", state.detail?.turns?.single()?.responseId)
+        assertEquals(detailCallsAfterOpen + 1, repository.detailCalls)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `detail opens and closes without losing the list`() = runTest {
         val repository = FakeRepository()
         val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
@@ -132,13 +183,15 @@ class CodexCliSessionsViewModelTest {
     private fun viewModel(
         repository: FakeRepository,
         dispatcher: CoroutineDispatcher,
-        clock: Clock = Clock.System
+        clock: Clock = Clock.System,
+        liveIntervalMillis: Long? = null
     ): CodexCliSessionsViewModel {
         return CodexCliSessionsViewModel(
             getSessions = GetCodexCliSessionsUseCase(repository),
             getDetail = GetCodexCliSessionDetailUseCase(repository),
             dispatcher = dispatcher,
             clock = clock,
+            liveIntervalMillis = liveIntervalMillis,
             autoLoad = false
         )
     }
@@ -148,8 +201,11 @@ class CodexCliSessionsViewModelTest {
         private val readFailure: Throwable? = null
     ) : CodexCliSessionRepository {
         var lastSince: Long? = Long.MIN_VALUE
+        var syncCalls: Int = 0
+        var detailCalls: Int = 0
 
         override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> {
+            syncCalls++
             return indexFailure?.let { failure -> Result.failure(failure) }
                 ?: Result.success(CodexCliSessionIndexReport(scannedFiles = 1))
         }
@@ -161,6 +217,7 @@ class CodexCliSessionsViewModelTest {
         }
 
         override suspend fun getSessionDetail(sessionId: String): Result<CodexCliSessionDetail?> {
+            detailCalls++
             return Result.success(if (sessionId == "session-1") detail() else null)
         }
 

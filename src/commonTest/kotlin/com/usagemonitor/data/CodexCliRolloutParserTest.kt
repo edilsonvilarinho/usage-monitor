@@ -11,7 +11,7 @@ class CodexCliRolloutParserTest {
     fun `parses metadata turn context and usage delta without response content`() {
         val parsed = CodexCliRolloutParser().parse(
             listOf(
-                """{"type":"session_meta","payload":{"session_id":"s-1","cwd":"C:/work","cli_version":"0.153.4","source":"exec","thread_source":"user"}}""",
+                """{"type":"session_meta","payload":{"session_id":"s-1","cwd":"C:/work","originator":"Codex Desktop","cli_version":"0.153.4","source":"exec","thread_source":"user"}}""",
                 """{"type":"turn_context","timestamp":"2026-09-08T12:00:00Z","payload":{"turn_id":"t-1","cwd":"C:/work","model":"gpt-test"}}""",
                 """{"type":"response_item","payload":{"type":"message","content":[{"text":"do not retain"}]}}""",
                 """{"type":"token_usage_record","timestamp":"2026-09-08T12:00:01Z","payload":{"session_id":"s-1","turn_id":"t-1","response_id":"r-1","usage":{"input_tokens":100,"cached_input_tokens":40,"cache_write_input_tokens":5,"output_tokens":20,"reasoning_output_tokens":7,"total_tokens":132},"turn_token_usage":{"total_tokens":999}}}"""
@@ -19,6 +19,7 @@ class CodexCliRolloutParserTest {
         )
 
         assertEquals("s-1", parsed.metadata?.sessionId)
+        assertEquals("Codex Desktop", parsed.metadata?.originator)
         assertEquals(CodexCliRolloutSource.EXEC, parsed.metadata?.source)
         assertEquals(1, parsed.turns.size)
         assertEquals("gpt-test", parsed.turns.single().model)

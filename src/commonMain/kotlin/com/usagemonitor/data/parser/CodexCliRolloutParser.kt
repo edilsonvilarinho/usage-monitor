@@ -16,6 +16,7 @@ import kotlinx.serialization.json.contentOrNull
 data class CodexCliRolloutMetadata(
     val sessionId: String,
     val cwd: String? = null,
+    val originator: String? = null,
     val source: CodexCliRolloutSource = CodexCliRolloutSource.UNKNOWN,
     val rawSource: String? = null,
     val threadSource: String? = null,
@@ -75,6 +76,7 @@ class CodexCliRolloutParser(
                         metadata = CodexCliRolloutMetadata(
                             sessionId = sessionId,
                             cwd = payload.cwd,
+                            originator = payload.originator,
                             source = CodexCliRolloutSource.fromRaw(rawSource),
                             rawSource = rawSource,
                             threadSource = payload.threadSource,

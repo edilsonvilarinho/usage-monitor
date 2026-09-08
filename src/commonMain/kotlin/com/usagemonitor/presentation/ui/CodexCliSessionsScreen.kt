@@ -79,8 +79,31 @@ fun CodexCliSessionsScreen(
                 else -> true
             }
             if (showStatusBar) {
+                when (val current = state) {
+                    is CodexCliSessionsUiState.Success -> {
+                        if (current.isRefreshing) {
+                            Text(
+                                text = if (language == AppLanguage.PT) "Atualizando…" else "Refreshing…",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                text = if (language == AppLanguage.PT) {
+                                    "Atualizado ${formatInstant(current.readAt)}"
+                                } else {
+                                    "Updated ${formatInstant(current.readAt)}"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    else -> Unit
+                }
+                Spacer(modifier = Modifier.weight(1f))
                 AppStatusIndicator(
-                    label = if (language == AppLanguage.PT) "Fonte local: Codex CLI" else "Local source: Codex CLI",
+                    label = if (language == AppLanguage.PT) "Fonte local: Codex" else "Local source: Codex",
                     tone = AppTone.INFO
                 )
             }
@@ -93,10 +116,11 @@ fun CodexCliSessionsScreen(
         if (showSessionToolbar) {
             AppToolbar(spacing = AppSpacing.sm) {
                 Text(
-                    text = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI sessions",
+                    text = if (language == AppLanguage.PT) "Sessões Codex" else "Codex sessions",
                     style = MaterialTheme.typography.titleMedium
                 )
                 Spacer(modifier = Modifier.weight(1f))
+                LiveBadge(language = language)
                 AppSegmentedControl(
                     options = listOf(
                         AppSegment("5h"),
@@ -194,7 +218,7 @@ private fun CodexCliSessionContent(
     }
     if (state.sessions.isEmpty()) {
         AppEmptyState(
-            message = if (language == AppLanguage.PT) "Nenhuma sessão Codex CLI encontrada." else "No Codex CLI sessions found.",
+            message = if (language == AppLanguage.PT) "Nenhuma sessão Codex encontrada." else "No Codex sessions found.",
             detail = if (language == AppLanguage.PT) "A origem é local e não depende de login." else "The source is local and does not require login.",
             modifier = modifier
         )
@@ -323,7 +347,7 @@ private fun CodexCliSessionRow(
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                AppStatusIndicator(label = "Codex CLI", tone = AppTone.INFO)
+                AppStatusIndicator(label = codexApplicationLabel(session), tone = AppTone.INFO)
                 Text(
                     text = listOfNotNull(session.source.name.lowercase(), session.cliVersion).joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
@@ -365,7 +389,7 @@ private fun CodexCliSessionDetailContent(
         ) {
             AppSectionHeader(
                 title = summary.projectName ?: if (language == AppLanguage.PT) "Projeto desconhecido" else "Unknown project",
-                subtitle = "Codex CLI · ${summary.source.name.lowercase()}"
+                subtitle = "${codexApplicationLabel(summary)} · ${summary.source.name.lowercase()}"
             )
             FlowRow(
                 modifier = Modifier
@@ -502,6 +526,15 @@ private fun CodexMetadataValue(label: String, value: String) {
 
 private fun shortCodexId(value: String, maxLength: Int = 8): String {
     return if (value.length <= maxLength) value else "${value.take(maxLength)}…"
+}
+
+private fun codexApplicationLabel(session: CodexCliSessionSummary): String {
+    return when (session.originator?.trim()?.lowercase()) {
+        "codex desktop" -> "Codex Desktop"
+        "codex-tui", "codex tui" -> "Codex CLI"
+        null, "" -> "Codex CLI"
+        else -> session.originator.trim()
+    }
 }
 
 private fun codexCacheFraction(session: CodexCliSessionSummary): Float {

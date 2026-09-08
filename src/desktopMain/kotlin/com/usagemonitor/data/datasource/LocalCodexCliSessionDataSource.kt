@@ -105,6 +105,7 @@ class LocalCodexCliSessionDataSource(
     override suspend fun readSessions(sinceEpochMillis: Long?): List<CodexCliSessionSummary> {
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
+                refreshMissingOriginators(connection)
                 readSessionIds(connection).mapNotNull { sessionId ->
                     val turns = readTurns(connection, sessionId, sinceEpochMillis)
                     if (turns.isEmpty()) null else buildSummary(connection, sessionId, turns)
@@ -116,6 +117,7 @@ class LocalCodexCliSessionDataSource(
     override suspend fun readSession(sessionId: String): CodexCliSessionDetail? {
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
+                refreshMissingOriginators(connection)
                 val turns = readTurns(connection, sessionId, null)
                 if (turns.isEmpty()) return@useConnection null
                 CodexCliSessionDetail(
@@ -252,6 +254,7 @@ class LocalCodexCliSessionDataSource(
                 )
                 """.trimIndent()
             )
+            ensureColumn(connection, "codex_cli_sessions", "originator", "TEXT")
             statement.execute("CREATE INDEX IF NOT EXISTS idx_codex_cli_turns_session_ts ON codex_cli_turns(session_id, ts)")
             statement.execute("CREATE INDEX IF NOT EXISTS idx_codex_cli_sessions_last_file ON codex_cli_sessions(file_path)")
         }
@@ -274,6 +277,26 @@ class LocalCodexCliSessionDataSource(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    private fun ensureColumn(
+        connection: Connection,
+        tableName: String,
+        columnName: String,
+        definition: String
+    ) {
+        val exists = connection.prepareStatement("PRAGMA table_info($tableName)").use { statement ->
+            statement.executeQuery().use { rows ->
+                generateSequence {
+                    if (rows.next()) rows.getString("name") else null
+                }.any { name -> name == columnName }
+            }
+        }
+        if (!exists) {
+            connection.createStatement().use { statement ->
+                statement.executeUpdate("ALTER TABLE $tableName ADD COLUMN $columnName $definition")
             }
         }
     }
@@ -327,11 +350,12 @@ class LocalCodexCliSessionDataSource(
     ) {
         connection.prepareStatement(
             """
-            INSERT INTO codex_cli_sessions(session_id, file_path, cwd, source, raw_source, thread_source, cli_version)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO codex_cli_sessions(session_id, file_path, cwd, originator, source, raw_source, thread_source, cli_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id) DO UPDATE SET
               file_path = excluded.file_path,
               cwd = COALESCE(excluded.cwd, codex_cli_sessions.cwd),
+              originator = COALESCE(excluded.originator, codex_cli_sessions.originator),
               source = COALESCE(excluded.source, codex_cli_sessions.source),
               raw_source = COALESCE(excluded.raw_source, codex_cli_sessions.raw_source),
               thread_source = COALESCE(excluded.thread_source, codex_cli_sessions.thread_source),
@@ -341,10 +365,11 @@ class LocalCodexCliSessionDataSource(
             statement.setString(1, sessionId)
             statement.setString(2, filePath)
             statement.setString(3, metadata?.cwd)
-            statement.setString(4, metadata?.source?.name)
-            statement.setString(5, metadata?.rawSource)
-            statement.setString(6, metadata?.threadSource)
-            statement.setString(7, metadata?.cliVersion)
+            statement.setString(4, metadata?.originator)
+            statement.setString(5, metadata?.source?.name)
+            statement.setString(6, metadata?.rawSource)
+            statement.setString(7, metadata?.threadSource)
+            statement.setString(8, metadata?.cliVersion)
             statement.executeUpdate()
         }
     }
@@ -391,6 +416,25 @@ class LocalCodexCliSessionDataSource(
         connection.prepareStatement("DELETE FROM codex_cli_session_files WHERE path = ?").use { statement ->
             statement.setString(1, path)
             statement.executeUpdate()
+        }
+    }
+
+    private fun refreshMissingOriginators(connection: Connection) {
+        val missing = connection.prepareStatement(
+            "SELECT session_id, file_path FROM codex_cli_sessions WHERE originator IS NULL OR TRIM(originator) = ''"
+        ).use { statement ->
+            statement.executeQuery().use { rows ->
+                buildList {
+                    while (rows.next()) {
+                        add(rows.getString("session_id") to rows.getString("file_path"))
+                    }
+                }
+            }
+        }
+        for ((sessionId, filePath) in missing) {
+            val metadata = readMetadata(File(filePath)) ?: continue
+            if (metadata.originator.isNullOrBlank()) continue
+            upsertSession(connection, sessionId, filePath, metadata)
         }
     }
 
@@ -451,7 +495,7 @@ class LocalCodexCliSessionDataSource(
         turns: List<CodexCliSessionTurn>
     ): CodexCliSessionSummary {
         val sessionMetadata = connection.prepareStatement(
-            "SELECT file_path, cwd, source, raw_source, thread_source, cli_version FROM codex_cli_sessions WHERE session_id = ?"
+            "SELECT file_path, cwd, originator, source, raw_source, thread_source, cli_version FROM codex_cli_sessions WHERE session_id = ?"
         ).use { statement ->
             statement.setString(1, sessionId)
             statement.executeQuery().use { rows ->
@@ -459,6 +503,7 @@ class LocalCodexCliSessionDataSource(
                 SessionMetadata(
                     filePath = rows.getString("file_path"),
                     cwd = rows.getString("cwd"),
+                    originator = rows.getString("originator"),
                     source = rows.getString("source"),
                     rawSource = rows.getString("raw_source"),
                     threadSource = rows.getString("thread_source"),
@@ -478,6 +523,7 @@ class LocalCodexCliSessionDataSource(
             firstTs = turns.minOf { turn -> turn.ts },
             lastTs = turns.maxOf { turn -> turn.ts },
             primaryModel = turns.firstNotNullOfOrNull { turn -> turn.model },
+            originator = sessionMetadata?.originator,
             source = source,
             rawSource = sessionMetadata?.rawSource ?: first.rawSource,
             threadSource = sessionMetadata?.threadSource ?: first.threadSource,
@@ -510,6 +556,7 @@ class LocalCodexCliSessionDataSource(
     private data class SessionMetadata(
         val filePath: String,
         val cwd: String?,
+        val originator: String?,
         val source: String?,
         val rawSource: String?,
         val threadSource: String?,

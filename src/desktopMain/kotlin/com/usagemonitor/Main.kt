@@ -751,6 +751,7 @@ private fun runUsageMonitor(
             getSessions = GetCodexCliSessionsUseCase(codexCliSessionRepository),
             getDetail = GetCodexCliSessionDetailUseCase(codexCliSessionRepository),
             exportWriter = usageExportWriter,
+            liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS,
             autoLoad = false
         )
     }

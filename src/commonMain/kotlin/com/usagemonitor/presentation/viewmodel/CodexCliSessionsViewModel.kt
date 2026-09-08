@@ -78,7 +78,7 @@ class CodexCliSessionsViewModel(
         val requestedRange = range
         val current = _uiState.value
         if (current is CodexCliSessionsUiState.Success) {
-            _uiState.value = current.copy(isRefreshing = true, detail = null)
+            _uiState.value = current.copy(isRefreshing = true)
         } else {
             _uiState.value = CodexCliSessionsUiState.Loading
         }
@@ -90,12 +90,16 @@ class CodexCliSessionsViewModel(
             if (range != requestedRange) return@launch
             result.fold(
                 onSuccess = { loaded ->
+                    val latest = _uiState.value as? CodexCliSessionsUiState.Success
                     _uiState.value = CodexCliSessionsUiState.Success(
                         sessions = loaded.sessions,
                         range = requestedRange,
                         readAt = loaded.readAt,
                         indexReport = loaded.indexReport,
                         indexWarning = loaded.indexError?.message,
+                        detail = latest?.detail,
+                        detailLoading = latest?.detailLoading ?: false,
+                        exportOutcome = latest?.exportOutcome,
                         isRefreshing = false
                     )
                 },
@@ -112,7 +116,7 @@ class CodexCliSessionsViewModel(
         this.range = range
         val current = _uiState.value
         if (current is CodexCliSessionsUiState.Success) {
-            _uiState.value = current.copy(range = range, isRefreshing = true, detail = null)
+            _uiState.value = current.copy(range = range, isRefreshing = true, detail = null, detailLoading = false)
         }
         refresh()
     }
@@ -180,6 +184,8 @@ class CodexCliSessionsViewModel(
             while (true) {
                 delay(liveIntervalMillis)
                 refresh()
+                loadJob?.join()
+                reloadOpenDetail()
             }
         }
     }
@@ -191,8 +197,22 @@ class CodexCliSessionsViewModel(
     }
 
     fun onDestroy() {
+        loadJob?.cancel()
+        detailJob?.cancel()
+        liveJob?.cancel()
         exportJob?.cancel()
         scope.cancel()
+    }
+
+    private suspend fun reloadOpenDetail() {
+        val current = _uiState.value as? CodexCliSessionsUiState.Success ?: return
+        val detail = current.detail ?: return
+        val reloaded = getDetail(detail.summary.sessionId)
+        val loaded = reloaded.getOrNull() ?: return
+        val latest = _uiState.value as? CodexCliSessionsUiState.Success ?: return
+        if (latest.detail?.summary?.sessionId == detail.summary.sessionId) {
+            _uiState.value = latest.copy(detail = loaded)
+        }
     }
 
     private fun cutoffFor(range: CodexCliSessionRange): Long? {

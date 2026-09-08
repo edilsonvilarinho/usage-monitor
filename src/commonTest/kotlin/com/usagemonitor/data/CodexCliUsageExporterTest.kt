@@ -15,6 +15,7 @@ class CodexCliUsageExporterTest {
         val csv = CodexCliUsageExporter.exportSessions(listOf(summary()), UsageExportFormat.CSV)
 
         assertTrue(csv.startsWith("session_id,project,cwd"))
+        assertTrue(csv.contains("Codex Desktop"))
         assertTrue(csv.contains("reasoning_output_tokens"))
         assertTrue(csv.contains("132"))
         assertFalse(csv.contains("cost_usd"))
@@ -38,6 +39,7 @@ class CodexCliUsageExporterTest {
             firstTs = Instant.parse("2026-09-08T12:00:00Z"),
             lastTs = Instant.parse("2026-09-08T12:00:01Z"),
             primaryModel = "gpt-test",
+            originator = "Codex Desktop",
             source = CodexCliRolloutSource.EXEC,
             rawSource = "exec",
             threadSource = "user",
