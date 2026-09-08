@@ -75,6 +75,7 @@ class CodexCliSessionsViewModel(
 
     fun refresh() {
         loadJob?.cancel()
+        val requestedRange = range
         val current = _uiState.value
         if (current is CodexCliSessionsUiState.Success) {
             _uiState.value = current.copy(isRefreshing = true, detail = null)
@@ -82,12 +83,16 @@ class CodexCliSessionsViewModel(
             _uiState.value = CodexCliSessionsUiState.Loading
         }
         loadJob = scope.launch {
-            val result = getSessions(cutoffFor(range))
+            val result = getSessions(cutoffFor(requestedRange))
+            // A datasource may be inside a non-cancellable IO section when a
+            // second range is selected. Never let that older response replace
+            // the result requested most recently by the user.
+            if (range != requestedRange) return@launch
             result.fold(
                 onSuccess = { loaded ->
                     _uiState.value = CodexCliSessionsUiState.Success(
                         sessions = loaded.sessions,
-                        range = range,
+                        range = requestedRange,
                         readAt = loaded.readAt,
                         indexReport = loaded.indexReport,
                         indexWarning = loaded.indexError?.message,
@@ -95,6 +100,7 @@ class CodexCliSessionsViewModel(
                     )
                 },
                 onFailure = { error ->
+                    if (range != requestedRange) return@fold
                     _uiState.value = CodexCliSessionsUiState.Error(error.message ?: "Falha ao ler sessões do Codex CLI.")
                 }
             )
@@ -104,6 +110,10 @@ class CodexCliSessionsViewModel(
     fun setRange(range: CodexCliSessionRange) {
         if (this.range == range) return
         this.range = range
+        val current = _uiState.value
+        if (current is CodexCliSessionsUiState.Success) {
+            _uiState.value = current.copy(range = range, isRefreshing = true, detail = null)
+        }
         refresh()
     }
 

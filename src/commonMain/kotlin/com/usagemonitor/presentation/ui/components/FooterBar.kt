@@ -50,8 +50,6 @@ const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
 
 const val FOOTER_HELP_TEST_TAG = "footerHelp"
 
-const val FOOTER_CODEX_CLI_TEST_TAG = "footerCodexCli"
-
 /** Gatilho do menu de modos de janela (issue #187). */
 const val FOOTER_WINDOW_MODE_TEST_TAG = "footerWindowMode"
 
@@ -143,7 +141,6 @@ fun FooterBar(
      * depende de configuração nenhuma.
      */
     onOpenHelp: () -> Unit = {},
-    onOpenCodexCliSessions: (() -> Unit)? = null,
     /** A moldura em que a janela está agora — marcada no menu de modos. */
     windowMode: WindowMode = WindowMode.STANDARD,
     /**
@@ -200,7 +197,6 @@ fun FooterBar(
             onOpenAdminOverview = onOpenAdminOverview,
             onOpenTeamPresence = onOpenTeamPresence,
             onOpenHelp = onOpenHelp,
-            onOpenCodexCliSessions = onOpenCodexCliSessions,
             windowMode = windowMode,
             onWindowModeChange = onWindowModeChange,
             onExportSnapshot = onExportSnapshot
@@ -280,7 +276,6 @@ private fun FooterActionGroup(
     onOpenAdminOverview: (() -> Unit)? = null,
     onOpenTeamPresence: (() -> Unit)? = null,
     onOpenHelp: () -> Unit = {},
-    onOpenCodexCliSessions: (() -> Unit)? = null,
     windowMode: WindowMode = WindowMode.STANDARD,
     onWindowModeChange: ((WindowMode) -> Unit)? = null,
     onExportSnapshot: (() -> Unit)? = null
@@ -335,21 +330,6 @@ private fun FooterActionGroup(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Groups,
-                    contentDescription = null,
-                    modifier = Modifier.size(FOOTER_ICON_SIZE),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        if (onOpenCodexCliSessions != null) {
-            FooterIconActionButton(
-                label = if (language == AppLanguage.PT) "Abrir sessões Codex CLI" else "Open Codex CLI sessions",
-                onClick = onOpenCodexCliSessions,
-                testTag = FOOTER_CODEX_CLI_TEST_TAG
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Wysiwyg,
                     contentDescription = null,
                     modifier = Modifier.size(FOOTER_ICON_SIZE),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant

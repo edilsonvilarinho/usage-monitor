@@ -15,6 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.coroutines.CoroutineDispatcher
 
@@ -47,6 +48,32 @@ class CodexCliSessionsViewModelTest {
     }
 
     @Test
+    fun `seven day selection uses a seven day cutoff and publishes the selected range`() = runTest {
+        val repository = FakeRepository()
+        val now = Instant.parse("2026-09-08T15:00:00Z")
+        val viewModel = viewModel(
+            repository = repository,
+            dispatcher = StandardTestDispatcher(testScheduler),
+            clock = object : Clock {
+                override fun now(): Instant = now
+            }
+        )
+
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        viewModel.setRange(CodexCliSessionRange.LAST_7D)
+        testScheduler.runCurrent()
+
+        val expectedCutoff = now.toEpochMilliseconds() - 7L * 24L * 60L * 60L * 1000L
+        assertEquals(expectedCutoff, repository.lastSince)
+        assertEquals(
+            CodexCliSessionRange.LAST_7D,
+            assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range
+        )
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `detail opens and closes without losing the list`() = runTest {
         val repository = FakeRepository()
         val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
@@ -74,11 +101,16 @@ class CodexCliSessionsViewModelTest {
         viewModel.onDestroy()
     }
 
-    private fun viewModel(repository: FakeRepository, dispatcher: CoroutineDispatcher): CodexCliSessionsViewModel {
+    private fun viewModel(
+        repository: FakeRepository,
+        dispatcher: CoroutineDispatcher,
+        clock: Clock = Clock.System
+    ): CodexCliSessionsViewModel {
         return CodexCliSessionsViewModel(
             getSessions = GetCodexCliSessionsUseCase(repository),
             getDetail = GetCodexCliSessionDetailUseCase(repository),
             dispatcher = dispatcher,
+            clock = clock,
             autoLoad = false
         )
     }

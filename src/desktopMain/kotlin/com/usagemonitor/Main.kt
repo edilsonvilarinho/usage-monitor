@@ -2181,7 +2181,7 @@ private fun runUsageMonitor(
                         breadcrumbs.recordScreenOpened("Ajuda")
                         isHelpDialogOpen = true
                     },
-                    onOpenCodexCliSessions = {
+                    onOpenCodexCliSessions = { _ ->
                         breadcrumbs.recordScreenOpened("sessões Codex CLI")
                         isCodexCliSessionsOpen = true
                         codexCliSessionsOpenGeneration++
