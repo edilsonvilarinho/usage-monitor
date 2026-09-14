@@ -132,34 +132,6 @@ class HudBarCountdownTest {
     }
 
     /**
-     * Recolhida ao ponto não há texto nenhum — é o estado em que a barra para de
-     * ocupar tela enquanto diz que está tudo bem. O hover devolve o painel, e com
-     * ele a contagem.
-     */
-    @Test
-    fun `recolhida ao ponto a contagem nao aparece`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(500.dp).height(400.dp)) {
-                    HudBar(
-                        statusTone = AppTone.OK,
-                        sources = sources,
-                        fallbackLabel = "Carregando",
-                        dotOnly = true,
-                        nextRefreshAt = now + 2.minutes + 5.seconds,
-                        countdownDescription = description,
-                        nowProvider = { now },
-                        countdownUpdatesEnabled = false,
-                        onOpenFull = {}
-                    )
-                }
-            }
-        }
-
-        onAllNodesWithText("02:05").assertCountEquals(0)
-    }
-
-    /**
      * Enquanto nada foi coletado, "quando é a próxima tentativa" é a informação
      * mais útil que a barra tem — e a linha de carregamento é a primeira linha.
      */

@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * A geometria da barra HUD (issue #164) decide o tamanho e a posição de uma
  * janela AWT sem que exista janela nenhuma — é por isso que ela é função pura, e
  * é aqui que se afirma o que ela faz. O comportamento observável no app
- * (arrastar, grudar, recolher) é a composição destas decisões.
+ * (arrastar, grudar, expandir) é a composição destas decisões.
  */
 class HudWindowGeometryTest {
 
@@ -68,35 +68,14 @@ class HudWindowGeometryTest {
     private fun size(
         sources: List<HudSourceStatus> = this.sources,
         fallbackLabel: String = "Carregando",
-        dotOnly: Boolean = false,
         expanded: Boolean = true,
         showsCountdown: Boolean = false
     ) = hudWindowSize(
         sources = sources,
         fallbackLabel = fallbackLabel,
-        dotOnly = dotOnly,
         expanded = expanded,
         showsCountdown = showsCountdown
     )
-
-    // ------------------------------------------------------------------ ponto
-
-    @Test
-    fun `recolhida ao ponto a janela ocupa quase nada`() {
-        val recolhida = size(dotOnly = true)
-
-        assertEquals(HUD_PILL_DOT_ONLY_PADDING * 2 + 6.dp, recolhida.width)
-        assertEquals(AppChrome.hud, recolhida.height)
-    }
-
-    /**
-     * O caso que abriu esta passada: 320dp fixos capturando clique de quem está
-     * atrás para mostrar uma palavra. Recolhida, a janela é o ponto.
-     */
-    @Test
-    fun `recolhida ao ponto e muito menor que o painel`() {
-        assertTrue(size(dotOnly = true).width < size().width / 5)
-    }
 
     // ---------------------------------------------------------------- largura
 
@@ -228,15 +207,6 @@ class HudWindowGeometryTest {
         val com = size(sources = emptyList(), showsCountdown = true)
 
         assertTrue(sem.width < com.width, "esperava ${sem.width} < ${com.width}")
-    }
-
-    /** Recolhida ao ponto não há texto nenhum, e portanto não há o que reservar. */
-    @Test
-    fun `recolhida ao ponto a contagem nao muda nada`() {
-        assertEquals(
-            size(dotOnly = true, showsCountdown = false),
-            size(dotOnly = true, showsCountdown = true)
-        )
     }
 
     /**
@@ -454,30 +424,6 @@ class HudWindowGeometryTest {
         )
 
         assertEquals(0.dp, position.x)
-    }
-
-    /**
-     * Recolher ao ponto é a janela **encolhendo**, e a regra é a mesma: a quina
-     * mais próxima da borda fica onde estava. Sem isso o ponto saltaria para
-     * dentro da tela toda vez que o risco baixasse.
-     */
-    @Test
-    fun `ao recolher no canto inferior direito o ponto fica na mesma quina`() {
-        val panel = DpSize(300.dp, 120.dp)
-        val dot = DpSize(22.dp, AppChrome.hud)
-        val anchorX = laptop.size.width - panel.width
-        val anchorY = laptop.size.height - panel.height
-
-        val position = hudWindowPosition(
-            anchorX = anchorX,
-            anchorY = anchorY,
-            anchorSize = panel,
-            windowSize = dot,
-            workArea = laptop
-        )
-
-        assertEquals(laptop.size.width - dot.width, position.x)
-        assertEquals(laptop.size.height - dot.height, position.y)
     }
 
     @Test

@@ -7,7 +7,6 @@ export function AppHudBar({
   level = 'ok',
   sources = [],
   fallbackLabel = 'Carregando',
-  dotOnly = false,
   expanded = false,
   update,
   countdown,
@@ -37,14 +36,7 @@ export function AppHudBar({
         ...style
       }}
     >
-      {dotOnly ? (
-        // Recolhida ao ponto: o padding da linha com texto faria um ponto de
-        // 6px virar uma janela de 38px.
-        <div style={{ display: 'flex', alignItems: 'center', height: 'var(--h-hud)', padding: '0 var(--s2)' }}>
-          <AppStatusDot level={level} />
-        </div>
-      ) : (
-        <div style={{ padding: 'var(--s1) 0' }}>
+      <div style={{ padding: 'var(--s1) 0' }}>
           {visible.length === 0 ? (
             <HudRow>
               {/* O flex mora no indicador, não num spacer: a linha espaça os
@@ -87,8 +79,7 @@ export function AppHudBar({
               {index === 0 && countdown ? <HudCountdown label={countdownLabel}>{countdown}</HudCountdown> : null}
             </HudRow>
           ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

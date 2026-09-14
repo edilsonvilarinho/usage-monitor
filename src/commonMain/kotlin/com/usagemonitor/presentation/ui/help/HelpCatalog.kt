@@ -268,8 +268,8 @@ object HelpCatalog {
             description = "O modo somente cards tira a barra de título e o rodapé e deixa a grade de " +
                 "cards; a faixa de título volta enquanto o ponteiro está sobre o topo da janela. A " +
                 "barra HUD vai mais longe: encolhe a janela a um painel de uma linha por conta, " +
-                "sempre no topo das outras, arrastável e que gruda na borda mais próxima. Com tudo " +
-                "normal ela se recolhe a um ponto; o ponteiro em cima devolve a lista inteira e " +
+                "sempre no topo das outras, arrastável e que gruda na borda mais próxima. Parada, " +
+                "ela mostra a primeira conta; o ponteiro em cima devolve a lista inteira e " +
                 "acrescenta, ao lado de cada cota, a hora em que ela reinicia — a cota que não " +
                 "tem reset a mostrar, como um saldo pré-pago, sai só com o percentual. A " +
                 "primeira linha termina com quanto falta para a próxima coleta automática. Os " +

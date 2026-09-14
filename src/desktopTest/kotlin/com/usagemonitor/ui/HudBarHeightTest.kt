@@ -88,14 +88,12 @@ class HudBarHeightTest {
     private fun assertMeasuredHeightMatchesGeometry(
         sources: List<HudSourceStatus>,
         expanded: Boolean,
-        dotOnly: Boolean = false,
         showsCountdown: Boolean = false,
         hasUpdateIndicator: Boolean = false
     ) = runDesktopComposeUiTest {
         val expected = hudWindowSize(
             sources = sources,
             fallbackLabel = "Carregando",
-            dotOnly = dotOnly,
             expanded = expanded,
             showsCountdown = showsCountdown,
             hasUpdateIndicator = hasUpdateIndicator
@@ -110,7 +108,6 @@ class HudBarHeightTest {
                         statusTone = AppTone.CRITICAL,
                         sources = sources,
                         fallbackLabel = "Carregando",
-                        dotOnly = dotOnly,
                         expanded = expanded,
                         updateIndicator = if (hasUpdateIndicator) {
                             HudUpdateIndicator(tone = AppTone.OK, description = "Versão pronta")
@@ -149,11 +146,6 @@ class HudBarHeightTest {
     @Test
     fun `a altura calculada bate com a composta na linha de carregamento`() {
         assertMeasuredHeightMatchesGeometry(sources = emptyList(), expanded = true)
-    }
-
-    @Test
-    fun `a altura calculada bate com a composta recolhida ao ponto`() {
-        assertMeasuredHeightMatchesGeometry(sources = sources, expanded = false, dotOnly = true)
     }
 
     /**

@@ -7,7 +7,6 @@ import androidx.compose.ui.window.WindowPosition
 import com.usagemonitor.presentation.ui.HudSourceStatus
 import com.usagemonitor.presentation.ui.HudQuotaChip
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
-import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.abs
 
@@ -105,14 +104,6 @@ internal val HUD_SOURCE_ROW_HEIGHT = 20.dp
 /** Padding horizontal da pílula com texto. */
 internal val HUD_PILL_PADDING = AppSpacing.md
 
-/**
- * Padding horizontal da pílula recolhida ao ponto.
- *
- * Com `AppSpacing.md` dos dois lados, um ponto de 6dp viraria uma janela de
- * 38dp — quase seis vezes o que ela mostra.
- */
-internal val HUD_PILL_DOT_ONLY_PADDING = AppSpacing.sm
-
 /** Padding vertical do painel expandido, acima e abaixo da lista. */
 internal val HUD_PANEL_VERTICAL_PADDING = AppSpacing.xs
 
@@ -197,15 +188,6 @@ private const val LABEL_MEDIUM_FONT_SIZE = 12f
 private val STATUS_INDICATOR_DOT_WIDTH = STATUS_DOT_SIZE + AppSpacing.xs
 
 /**
- * Largura da janela recolhida ao ponto.
- *
- * [dotOnly] é o estado em que todas as fontes estão em `ON_TRACK`: some o texto
- * e resta o ponto, porque um dado que diz "está tudo bem" não precisa ocupar
- * tela até deixar de ser verdade.
- */
-private fun hudDotOnlyWidth(): Dp = HUD_PILL_DOT_ONLY_PADDING * 2 + STATUS_DOT_SIZE
-
-/**
  * Largura das cotas de uma linha: um ponto e um texto por cota, com vão entre
  * elas.
  *
@@ -284,27 +266,19 @@ private fun hudFallbackRowWidth(fallbackLabel: String): Dp {
  *
  * **A contagem regressiva ([showsCountdown]) mede só na primeira linha.** O
  * polling é um só — dez minutos para o app inteiro, não por conta —, e repeti-la
- * em cada linha afirmaria que cada conta tem coleta própria. Recolhida ao ponto
- * ela não existe: ali não há texto nenhum.
+ * em cada linha afirmaria que cada conta tem coleta própria.
  *
  * **O indicador de atualização ([hasUpdateIndicator], issue #225) segue a
  * mesma regra da contagem**: mede só na primeira linha, inclusive na linha de
- * carregamento, e não existe recolhido ao ponto — quem chama (`Main.kt`)
- * garante isso impedindo `dotOnly` enquanto há atualização pendente, e não é
- * responsabilidade desta função impor.
+ * carregamento.
  */
 internal fun hudWindowSize(
     sources: List<HudSourceStatus>,
     fallbackLabel: String,
-    dotOnly: Boolean,
     expanded: Boolean,
     showsCountdown: Boolean = false,
     hasUpdateIndicator: Boolean = false
 ): DpSize {
-    if (dotOnly) {
-        return DpSize(hudDotOnlyWidth(), AppChrome.hud)
-    }
-
     val updateIndicatorWidth = if (hasUpdateIndicator) hudUpdateIndicatorWidth() else 0.dp
     val countdownWidth = if (showsCountdown) hudCountdownWidth() else 0.dp
     val firstRowExtra = updateIndicatorWidth + countdownWidth
@@ -342,18 +316,16 @@ internal fun hudWindowSize(
 /**
  * Posição da janela, a partir da âncora.
  *
- * A âncora é o canto superior esquerdo do painel **completo** — a forma normal
- * da janela. Ela é o que o arrasto move e o que fica gravado; o estado
- * recolhido ao ponto é derivado dela, nunca o contrário. Guardar a âncora do
- * ponto faria a janela saltar toda vez que uma fonte saísse de `ON_TRACK`.
+ * A âncora é o canto superior esquerdo do painel — a forma normal da janela.
+ * Ela é o que o arrasto move e o que fica gravado; a primeira linha parada e o
+ * painel expandido derivam dela.
  *
  * **Nos dois eixos, o lado que fica preso é o mais próximo da borda da tela.**
  * Encostado à direita, alargar a partir do `x` empurraria a janela para fora;
  * quem tem de andar é a borda esquerda. Encostado embaixo — o encaixe pedido,
  * logo acima da barra de tarefas — crescer para baixo jogaria as linhas de
- * baixo para fora da tela. A regra vale igual quando a janela **encolhe** (o
- * recolhimento ao ponto), e é ela que mantém o ponto na mesma quina em que o
- * painel estava.
+ * baixo para fora da tela. A regra vale igual quando a janela muda entre a
+ * primeira linha e o painel completo, mantendo a HUD na mesma quina.
  */
 internal fun hudWindowPosition(
     anchorX: Dp,

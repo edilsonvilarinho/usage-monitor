@@ -68,17 +68,12 @@ export function Hud() {
         <AppHudBar sources={SOURCES} expanded countdown="02:05" />
       </HudScreen>
 
-      <Caption>3 · tudo em ON_TRACK e sem o ponteiro — recolhido ao ponto</Caption>
-      <HudScreen>
-        <AppHudBar level="ok" dotOnly />
-      </HudScreen>
-
-      <Caption>4 · antes da primeira coleta — uma linha, e ela diz o que está acontecendo</Caption>
+      <Caption>3 · antes da primeira coleta — uma linha, e ela diz o que está acontecendo</Caption>
       <HudScreen>
         <AppHudBar sources={[]} fallbackLabel="Carregando" countdown="02:05" />
       </HudScreen>
 
-      <Caption>5 · arrastado para a borda de baixo — logo acima da barra de tarefas</Caption>
+      <Caption>4 · arrastado para a borda de baixo — logo acima da barra de tarefas</Caption>
       <HudScreen corner="bottom-right" tall>
         <AppHudBar sources={SOURCES.slice(0, 2)} expanded countdown="02:05" />
       </HudScreen>

@@ -736,15 +736,11 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
     paga pelo nome da conta — o erro que os saltos 320 → 420 → 484 já recusaram duas vezes. O teto
     do painel é o da pílula mais **três** colunas de reset, que é a maior contagem de cotas numa
     fonte só (OpenCode Go), e a aritmética está afirmada no teste de contrato.
-  - **O hover mora no container inteiro.** Ele só serve ao estado recolhido ao ponto — passar o
-    mouse devolve a lista —, mas preso a uma linha, mover o ponteiro para dentro do painel tiraria o
-    hover e a janela colapsaria debaixo dele. Colapsar espera uma passada de `AppMotion.fast`; é
-    atraso único, não animação, que travaria o `waitForIdle`.
-  - **`hudAnchor` descreve sempre o painel completo**, mesmo quando a janela na tela é o ponto: é ela
-    que o arrasto move e que fica gravada, e ancorar no ponto faria a janela saltar toda vez que uma
-    fonte saísse de `ON_TRACK`. `hudWindowPosition` alinha os **dois** eixos à borda mais próxima —
-    e é a simetria que mantém o ponto na mesma quina em que o painel estava, tanto crescendo quanto
-    encolhendo.
+  - **O hover mora no container inteiro.** Ele revela as demais fontes sem popup — preso a uma
+    linha, mover o ponteiro para dentro do painel tiraria o hover e a janela colapsaria debaixo dele.
+  - **`hudAnchor` descreve sempre o painel completo** e `hudWindowPosition` alinha os **dois** eixos
+    à borda mais próxima. Assim, a primeira linha parada e o painel expandido crescem para o lado
+    correto sem deslocar a âncora gravada.
   - **A linha do painel não é `AppDataRow`** (`HUD_SOURCE_ROW_HEIGHT`, 20dp): aquela primitiva tem
     piso de 32dp mais 8dp de padding vertical, e seis cotas dariam ~288dp — uma janela, não um HUD.
     Mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp do cromo.
@@ -782,13 +778,10 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   exigiria limites físicos de tela e disputa de ordem-z com uma janela que também é topmost. Leitura
   e escrita passam sempre por `fitWindowPosition`: posição salva num monitor que já não existe
   descreve uma tela que sumiu.
-- **Tudo em `ON_TRACK` recolhe a barra ao ponto** (`AppStatusDot`, extraído de
-  `AppStatusIndicator`). O dado não some — para de ocupar tela enquanto diz que está tudo bem, e o
-  hover devolve a barra inteira. É a **única** exceção a "cor nunca informa sozinha" neste sistema, e
-  só se sustenta porque a palavra está a um movimento de mouse; em lista, célula ou cabeçalho
-  continua sendo o indicador com palavra. Mesmo princípio do ponto de risco da bandeja, que não
-  acende nada em `ON_TRACK`. **Lista vazia não recolhe**: ali ainda não se coletou nada, e o ponto
-  afirmaria que está tudo bem antes de saber.
+- **A HUD nunca recolhe ao ponto.** Parada, ela mostra uma linha da primeira fonte na ordem dos
+  cards; com hover, mostra todas. Isso mantém nome, estado e percentual legíveis mesmo em escala de
+  interface baixa. `AppStatusDot` continua existindo para os pontos das cotas, mas nunca informa o
+  estado da HUD sozinho.
 - **A barra não tem translucidez própria.** Ela chegou a ficar translúcida parada, para incomodar
   menos a leitura do que está atrás; na prática deixou o texto mais difícil de ler sem devolver a
   área, porque a janela continua capturando o clique de qualquer jeito. Quem decide a opacidade é só
@@ -797,7 +790,7 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   tela informava que ela é arrastável — a pergunta "como eu consigo mover?" veio de quem já estava
   com ela na tela. `PointerIcon(Cursor.MOVE_CURSOR)` é a afordância que o cromo de janela normalmente
   dá de graça.
-- **A contagem até a próxima coleta sai uma vez só, na primeira linha** (`HudCountdown`, issue #185).
+  - **A contagem até a próxima coleta sai uma vez só, na primeira linha** (`HudCountdown`, issue #185).
   O rodapé, que já a mostrava, não é composto em modo HUD, e sem ela não havia como saber quanto
   falta sem sair do modo. O polling é um laço **único** de 10 min para o app inteiro, não um por
   conta: repeti-la em cada linha afirmaria que cada conta tem coleta própria. Recolhida ao ponto ela
@@ -827,9 +820,9 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   mesma relação de `AppUpdateStrip` com `AppButton` no design system. `allSourceRisks`
   (`WorstQuotaSnapshot.kt`) alimenta o painel, e `worstQuotaSnapshot` é só a primeira entrada dela:
   duas passadas pela mesma lista divergiriam eventualmente.
-- **Indicador de atualização pendente, sem clique próprio** (`HudUpdateIndicator` +
+  - **Indicador de atualização pendente, sem clique próprio** (`HudUpdateIndicator` +
   `HudUpdateBadge`, issue #225): `AppUpdateBanner` nunca é composto em modo HUD — `content()` é
-  descartado inteiro —, e a pílula recolhida ao ponto não sobrava sinal nenhum de que havia versão
+    descartado inteiro —, e a primeira linha precisa continuar visível para sinalizar que havia versão
   pronta. O ícone (`Icons.Rounded.SystemUpdate`, tingido por `AppTone`) entra na primeira linha, entre
   as cotas e a contagem — os dois são informação do app, não da conta —, e a frase inteira vai na
   semântica (`indicator.description`, o mesmo título de `updateBannerContent`): não cabe tooltip aqui.
@@ -837,10 +830,9 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   o ícone fica dentro do mesmo alvo que já abre a janela padrão — onde `AppUpdateBanner` oferece
   "Reiniciar e atualizar agora" — sem precisar de matemática de posição nova. Uma ação de reiniciar
   direto da HUD faria um clique de rotina na pílula reiniciar o app sem aviso sempre que uma
-  atualização estivesse pronta, risco pior que a falta de indicador. **`dotOnly` também para de
-  recolher** enquanto há atualização pendente (`Main.kt`, `hudDotOnly`), mesma regra da cota sem
-  projeção: "está tudo bem" é garantia que a barra não pode dar com uma versão esperando para ser
-  aplicada. `hudWindowSize` ganhou `hasUpdateIndicator`, mesmo tratamento de `showsCountdown`.
+    atualização estivesse pronta, risco pior que a falta de indicador. O indicador permanece na
+    primeira linha normal e `hudWindowSize` continua tratando-o como coluna adicional, junto de
+    `showsCountdown`.
 
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
 abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e

@@ -5,7 +5,6 @@ end of the first row.
 ```jsx
 <AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
   quotas: [{ text: '5h 28%', level: 'ok' }, { text: '7d 9%', level: 'crit' }] }]} countdown="02:05" />
-<AppHudBar level="ok" dotOnly />
 <AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
   quotas: [{ text: '5h 28%', level: 'ok', reset: '22h59' },
            { text: '7d 9%', level: 'crit', reset: 'Ter 21h00' }] }]} expanded countdown="02:05" />
@@ -14,7 +13,7 @@ end of the first row.
   update={{ level: 'ok', label: 'Versão 40.0.0 pronta — será aplicada ao fechar' }} countdown="02:05" />
 ```
 
-Not a new risk primitive — the dot+word is `AppStatusIndicator`, and the collapsed state reuses
+Not a new risk primitive — the dot+word is `AppStatusIndicator`, and quota details reuse
 `AppStatusDot`; this panel is only the shell that carries them.
 
 **Five content versions, four corrected after using it.** (1) A single line with the worst
@@ -106,10 +105,10 @@ makes the placeholder honest — every value the strip prints has the same width
 **No new format.** The countdown is the footer's own `mm:ss`, and the sentence behind the icon has a
 single owner shared with it: the same countdown said twice would drift apart at the first correction.
 
-**`dotOnly` is the idle state, for when every source is on track.** The data does not vanish — it
-stops occupying screen while it says everything is fine, and hover brings the whole panel back. This
-is the one place in the system where a dot appears without its word, and only because the word is
-one mouse movement away.
+**The idle state keeps one summary row.** When every source is on track, the first source remains
+visible with its status word and quota values. Hover reveals the remaining sources. A colored dot
+never replaces the status word, especially at a reduced interface scale where a dot-only window is
+too small to explain what it represents.
 
 **The panel row is not `AppDataRow`.** That primitive floors at 32dp plus 8dp of vertical padding,
 and six sources would build a ~288dp panel — a window, not a HUD. Same exception `--h-hud` already
@@ -144,16 +143,15 @@ estimated from this mockup.
 
 **The update badge has no click of its own, and that is deliberate (issue #225).** The bar's `content()`
 is never composed while `hud=true`, so the standard mode's update strip — "Restart and update now" —
-was simply unreachable from here; a resting HUD with every quota on track collapsed straight to the
-dot with no signal at all that a version was ready. The fix is display only: an icon-only badge,
+was simply unreachable from here; the first normal row must remain visible so an icon-only badge
+can signal that a version is ready. The fix is display only: an icon-only badge,
 level and label already resolved by the host (same treatment as `countdown`), drawn once on the first
 row. It sits inside the same `role="button"` the whole bar already is — a short click anywhere,
 including on the badge, opens the full window, where the strip the user already knows offers the same
 restart button. Giving the badge its own action instead would make a routine click on the bar restart
 the app without warning whenever an update happened to be ready — a worse failure than the missing
-indicator. `dotOnly` also stops collapsing while an update is pending, same reasoning as a quota with
-no forecast: "everything is fine" is a guarantee the bar cannot make while a version is waiting to be
-applied.
+indicator. The first normal row remains visible while an update is pending, so the badge stays part
+of the HUD context.
 
 **The secondary click switches straight to Cards-only, and it is not a menu (issue #215).** The bar
 had no way to reach the other reduced chrome without first returning to Standard — every exit landed

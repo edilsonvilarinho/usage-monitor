@@ -669,7 +669,6 @@ private val DEMO_UPDATE = AppUpdateInfo(
 private val HUD_DEMO_WIDTH = hudWindowSize(
     sources = ScreenshotFixtures.hudSources,
     fallbackLabel = "Carregando",
-    dotOnly = false,
     expanded = true,
     showsCountdown = true
 ).width

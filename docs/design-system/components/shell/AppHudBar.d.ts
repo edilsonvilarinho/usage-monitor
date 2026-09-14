@@ -122,12 +122,6 @@ export interface AppHudBarProps {
   countdownLabel?: string;
   /** The pointer is over the bar: the list replaces the single line. */
   expanded?: boolean;
-  /**
-   * Every quota on track and no pointer over it: collapse to the dot alone.
-   * The data does not vanish — it stops occupying screen while it says
-   * everything is fine, and hover brings the panel back.
-   */
-  dotOnly?: boolean;
   /** Fires on a short click anywhere — restores the full window. */
   onOpen?: () => void;
   style?: CSSProperties;

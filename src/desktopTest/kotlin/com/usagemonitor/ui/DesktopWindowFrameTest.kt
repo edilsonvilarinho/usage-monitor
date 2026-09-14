@@ -518,62 +518,7 @@ class DesktopWindowFrameTest {
         onNodeWithText("-").assertDoesNotExist()
     }
 
-    /**
-     * Com tudo em `ON_TRACK` o painel recolhe ao ponto: o dado para de ocupar
-     * tela enquanto diz que está tudo bem. O ponto continua lá, e é o único
-     * lugar do app em que ele aparece sem palavra — a palavra está a um
-     * movimento de mouse.
-     */
-    @Test
-    fun `a barra HUD recolhida ao ponto esconde o texto`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
-                    HudBar(
-                        statusTone = AppTone.OK,
-                        sources = sources,
-                        fallbackLabel = "Carregando",
-                        dotOnly = true,
-                        onOpenFull = {}
-                    )
-                }
-            }
-        }
-
-        onNodeWithText("INFORMATA2").assertDoesNotExist()
-        onNodeWithText("5h 28%").assertDoesNotExist()
-        onNodeWithText("Crítico").assertDoesNotExist()
-        // A altura de 24dp do estado recolhido é decidida por `hudWindowSize`,
-        // que dimensiona a janela; aqui o nó raiz preenche a cena de teste.
-    }
-
-    /** Recolhida ao ponto, ela continua sendo o caminho para a janela completa. */
-    @Test
-    fun `a barra HUD recolhida ao ponto continua despachando o clique`() = runDesktopComposeUiTest {
-        var clicks = 0
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(500.dp).height(200.dp)) {
-                    HudBar(
-                        statusTone = AppTone.OK,
-                        sources = sources,
-                        fallbackLabel = "Carregando",
-                        dotOnly = true,
-                        onOpenFull = { clicks += 1 }
-                    )
-                }
-            }
-        }
-
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
-        assertEquals(1, clicks)
-    }
-
-    /**
-     * É `onHoverChange` que faz `Main.kt` desfazer o recolhimento ao ponto. Sem
-     * esta fiação o painel existe e nunca volta — e o teste do estado recolhido
-     * passaria mesmo assim, porque ele injeta `dotOnly` direto.
-     */
+    /** O hover ainda alterna entre a primeira linha e a lista completa. */
     @Test
     fun `a barra HUD avisa quando o ponteiro entra e sai`() = runDesktopComposeUiTest {
         val reported = mutableListOf<Boolean>()

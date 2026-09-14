@@ -79,14 +79,12 @@ private val SKELETON_HEIGHT = 10.dp
 /**
  * O ponto do indicador de estado, sozinho.
  *
- * Existe para a barra HUD (issue #164), que se recolhe ao ponto quando todas as
- * fontes estão em `ON_TRACK`: um dado que diz "está tudo bem" não precisa ocupar
- * tela até deixar de ser verdade. Extraído de [AppStatusIndicator], que passou a
- * consumi-lo — duas anatomias para o mesmo ponto divergiriam.
+ * Existe para os pontos das cotas na barra HUD (issue #164). Extraído de
+ * [AppStatusIndicator], que passou a consumi-lo — duas anatomias para o mesmo
+ * ponto divergiriam.
  *
- * **Isto não afrouxa "cor nunca informa sozinha".** É o único lugar do app em
- * que o ponto aparece sem palavra, e ali a palavra está a um movimento de mouse
- * de distância: a pílula volta inteira ao passar o ponteiro. Não use em lista,
+ * **Isto não afrouxa "cor nunca informa sozinha".** Na HUD, o ponto é sempre
+ * acompanhado pela palavra da linha ou pelo rótulo da cota. Não use em lista,
  * célula ou cabeçalho — lá o indicador com palavra continua sendo o certo.
  *
  * [AppTone.NEUTRAL] desenha o ponto **vazado** em vez de preenchido — sem cor

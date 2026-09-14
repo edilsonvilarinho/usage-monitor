@@ -85,7 +85,6 @@ import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
-import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetActiveCliSessionPulsesUseCase
@@ -1758,8 +1757,8 @@ private fun runUsageMonitor(
         val hudFallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
         // Indicador de atualização pendente na barra HUD (issue #225): a faixa
         // padrão (`AppUpdateBanner`) nunca é composta em modo HUD —
-        // `DesktopWindowFrame` descarta `content()` quando `hud = true` —, e a
-        // pílula recolhia ao ponto sem sinal nenhum de que havia algo para ver.
+        // `DesktopWindowFrame` descarta `content()` quando `hud = true` —, e o
+        // indicador precisa ocupar a primeira linha normal para permanecer visível.
         // Reaproveita `updateBannerContent`, o mesmo texto e o mesmo tom que o
         // modo padrão usa: nenhuma cópia PT/EN nova.
         val hudAppUpdateState by viewModel.appUpdateState.collectAsState()
@@ -1814,16 +1813,6 @@ private fun runUsageMonitor(
                     }
                 )
             }
-        // Nada em risco: a barra recolhe ao ponto e devolve a tela. Lista vazia
-        // **não** é isso — ali ainda não se coletou nada, e o ponto afirmaria
-        // que está tudo bem antes de saber. Cota sem projeção também não recolhe:
-        // "está tudo bem" seria uma garantia que ninguém deu. **Atualização
-        // pendente também não recolhe** (issue #225), pela mesma razão: é um
-        // dado novo, e a barra não pode dizer "está tudo bem" enquanto uma
-        // versão espera para ser aplicada.
-        val hudDotOnly = hudAppUpdateState == null &&
-            hudOrderedQuotas.isNotEmpty() &&
-            hudOrderedQuotas.all { entry -> entry.risk?.level == UsageRiskLevel.ON_TRACK }
         // Contagem até a próxima coleta (issue #185). O rodapé, que já a mostrava,
         // não é composto em modo HUD — `DesktopWindowFrame` descarta `content()`
         // quando `hud = true` —, e sem ela quem trabalha com a barra flutuante não
@@ -1882,10 +1871,6 @@ private fun runUsageMonitor(
         }
 
         val hudScale = uiScaleFactor(uiScalePercent)
-        // `hudExpanded` deixou de significar "mostra a lista" — a lista é
-        // permanente — e passou a significar apenas "o ponteiro está em cima",
-        // que é o que desfaz o recolhimento ao ponto.
-        val hudCollapsedToDot = hudDotOnly && !hudExpanded
         // **A âncora descreve o painel completo, sempre**, mesmo quando a janela
         // na tela é o ponto: é ela que o arrasto move e que fica gravada, e
         // ancorar no ponto faria a janela saltar toda vez que uma fonte saísse
@@ -1893,7 +1878,6 @@ private fun runUsageMonitor(
         val hudAnchorSize = hudWindowSize(
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
-            dotOnly = false,
             expanded = false,
             showsCountdown = true,
             hasUpdateIndicator = hudUpdateIndicator != null
@@ -1901,7 +1885,6 @@ private fun runUsageMonitor(
         val hudTargetSize = hudWindowSize(
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
-            dotOnly = hudCollapsedToDot,
             expanded = hudExpanded,
             showsCountdown = true,
             hasUpdateIndicator = hudUpdateIndicator != null
@@ -2114,7 +2097,6 @@ private fun runUsageMonitor(
                         statusTone = hudStatusTone,
                         sources = hudSources,
                         fallbackLabel = hudFallbackLabel,
-                        dotOnly = hudCollapsedToDot,
                         expanded = hudExpanded,
                         updateIndicator = hudUpdateIndicator,
                         nextRefreshAt = hudNextRefreshAt,

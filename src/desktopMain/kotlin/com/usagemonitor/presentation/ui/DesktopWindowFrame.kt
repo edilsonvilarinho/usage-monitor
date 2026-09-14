@@ -71,7 +71,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import com.usagemonitor.HUD_COUNTDOWN_ICON_SIZE
 import com.usagemonitor.HUD_PANEL_VERTICAL_PADDING
-import com.usagemonitor.HUD_PILL_DOT_ONLY_PADDING
 import com.usagemonitor.HUD_PILL_PADDING
 import com.usagemonitor.HUD_SOURCE_ROW_HEIGHT
 import com.usagemonitor.domain.entity.AppLanguage
@@ -423,10 +422,9 @@ internal data class HudUpdateIndicator(
  * linha: a linha é por conta e as cotas são várias, e uma coluna única teria de
  * escolher qual delas descrever.
  *
- * **O hover mora no container inteiro.** Ele só serve ao estado recolhido
- * ([dotOnly]) — passar o mouse devolve a lista —, mas preso a uma linha só,
- * mover o ponteiro para dentro do painel tiraria o hover e a janela
- * colapsaria debaixo dele.
+ * **O hover mora no container inteiro.** Ele revela as demais fontes; preso a
+ * uma linha só, mover o ponteiro para dentro do painel tiraria o hover e a
+ * janela colapsaria debaixo dele.
  *
  * **O painel inteiro é o alvo de clique** que devolve a janela completa — não
  * há botão próprio, e por isso a semântica vai no container, não só em
@@ -461,21 +459,12 @@ internal fun HudBar(
     /** O ponteiro está sobre a barra: as demais fontes aparecem abaixo da primeira. */
     expanded: Boolean = false,
     /**
-     * Todas as fontes em `ON_TRACK` e sem o ponteiro em cima: recolhe ao ponto.
-     *
-     * O dado não some — ele para de ocupar tela enquanto diz que está tudo bem,
-     * e o hover devolve o painel inteiro. É o mesmo princípio do ponto de risco
-     * da bandeja, que não acende nada em `ON_TRACK`.
-     */
-    dotOnly: Boolean = false,
-    /**
      * Atualização pendente, se houver (issue #225).
      *
      * `null` esconde o ícone inteiro — é o estado de quem não tem atualização
      * automática ativa ou está com a versão em dia. Quem chama (`Main.kt`)
-     * também garante que a barra não recolhe ao ponto ([dotOnly]) enquanto
-     * isto for não nulo: um dado novo não pode desaparecer atrás de "está tudo
-     * bem".
+     * isto for não nulo: um dado novo não pode desaparecer atrás de uma
+     * indicação incompleta.
      */
     updateIndicator: HudUpdateIndicator? = null,
     /**
@@ -564,20 +553,6 @@ internal fun HudBar(
                 }
             }
     ) {
-        if (dotOnly) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(AppChrome.hud)
-                    .padding(horizontal = HUD_PILL_DOT_ONLY_PADDING)
-                    .testTag(HUD_CONTENT_TEST_TAG),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AppStatusDot(tone = statusTone)
-            }
-            return@Column
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxWidth()

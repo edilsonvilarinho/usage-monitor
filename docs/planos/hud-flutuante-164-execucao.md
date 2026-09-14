@@ -59,9 +59,8 @@ cota"): popup que cobre o próprio alvo é defeito já conhecido deste app.
 5. **A largura é estimada por métrica de fonte, não medida na composição.** A escala `label*` é mono,
    então o avanço por caractere é determinístico. Medir e devolver a largura para a janela fecharia o
    laço `redimensionar → recompor → medir → redimensionar`.
-6. **Opacidade quando parado e recolher ao ponto quando tudo estiver Normal.** As duas reduzem
-   ocupação sem esconder o dado que importa: o ponto continua lá, e qualquer fonte fora de `ON_TRACK`
-   devolve o texto.
+6. **Opacidade quando parado, sem recolher o conteúdo ao ponto.** A linha resumida continua visível
+   mesmo quando tudo está Normal; o hover revela as demais fontes sem esconder o dado que importa.
 7. **A linha do painel não é `AppDataRow`.** Aquela primitiva tem piso de 32dp mais 8dp de padding, e
    seis fontes dariam ~288dp de painel — uma janela, não um HUD. Mesma exceção que `AppChrome.hud` já
    abre ao furar o piso de 28dp do cromo.
