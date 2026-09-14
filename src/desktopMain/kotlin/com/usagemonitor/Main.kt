@@ -940,6 +940,9 @@ private fun runUsageMonitor(
     // tem moldura do sistema, então nascer maior que o monitor é nascer sem botão
     // de fechar.
     val screenWorkArea = remember { availableWindowAreaDp() }
+    // A HUD pode ocupar a faixa da barra de tarefas; as demais janelas continuam
+    // presas à área útil para manter seus controles recuperáveis.
+    val hudScreenArea = remember { fullScreenAreaDp() }
     val mainWindowState = rememberPersistedMainWindowState(
         persistedState = persistedMainWindowState,
         uiScalePercent = uiScalePercent,
@@ -1849,6 +1852,7 @@ private fun runUsageMonitor(
         var hudAnchor by remember { mutableStateOf<DpOffset?>(null) }
         var hudHovered by remember { mutableStateOf(false) }
         var hudExpanded by remember { mutableStateOf(false) }
+        var hudDragging by remember { mutableStateOf(false) }
         // Última posição do ponteiro na tela durante o arrasto. Guardar a
         // posição de **partida** e somar o total faria a barra ficar presa na
         // borda: arrastada 500px para fora e trazida 100px de volta, o total
@@ -1861,12 +1865,14 @@ private fun runUsageMonitor(
         // gerar um `Exit` de um quadro, e a janela encolheria debaixo dele. Não
         // é animação: é um atraso único, e animação infinita travaria o
         // `waitForIdle` dos testes de componente.
-        LaunchedEffect(hudHovered) {
-            if (hudHovered) {
+        LaunchedEffect(hudHovered, hudDragging) {
+            if (hudHovered && !hudDragging) {
                 hudExpanded = true
-            } else {
+            } else if (!hudDragging) {
                 delay(AppMotion.fast.toLong())
-                hudExpanded = false
+                if (!hudDragging && !hudHovered) {
+                    hudExpanded = false
+                }
             }
         }
 
@@ -1885,7 +1891,7 @@ private fun runUsageMonitor(
         val hudTargetSize = hudWindowSize(
             sources = hudSources,
             fallbackLabel = hudFallbackLabel,
-            expanded = hudExpanded,
+            expanded = hudExpanded && !hudDragging,
             showsCountdown = true,
             hasUpdateIndicator = hudUpdateIndicator != null
         ).let { size -> DpSize(size.width * hudScale, size.height * hudScale) }
@@ -1906,15 +1912,16 @@ private fun runUsageMonitor(
                 val stored = readPersistedHudPosition(settings)
                 val entryPosition = fitWindowPosition(
                     x = stored?.xDp?.dp
-                        ?: (screenWorkArea.x + screenWorkArea.size.width - hudAnchorSize.width),
-                    y = stored?.yDp?.dp ?: screenWorkArea.y,
+                        ?: (hudScreenArea.x + hudScreenArea.size.width - hudAnchorSize.width),
+                    y = stored?.yDp?.dp ?: hudScreenArea.y,
                     size = hudAnchorSize,
-                    workArea = screenWorkArea
+                    workArea = hudScreenArea
                 )
                 hudAnchor = DpOffset(entryPosition.x, entryPosition.y)
             } else {
                 hudHovered = false
                 hudExpanded = false
+                hudDragging = false
                 hudAnchor = null
                 hudDragPointer = null
                 preHudWindowGeometry?.let { (size, position, placement) ->
@@ -1935,7 +1942,7 @@ private fun runUsageMonitor(
         // correndo atrás do mouse.
         var hudAppliedSize by remember { mutableStateOf<DpSize?>(null) }
 
-        LaunchedEffect(hudMode, hudAnchor, hudTargetSize, hudAnchorSize) {
+        LaunchedEffect(hudMode, hudAnchor, hudTargetSize, hudAnchorSize, hudDragging) {
             val anchor = hudAnchor
             if (!hudMode || anchor == null) {
                 hudAppliedSize = null
@@ -1947,10 +1954,16 @@ private fun runUsageMonitor(
                 anchorY = anchor.y,
                 anchorSize = hudAnchorSize,
                 windowSize = hudTargetSize,
-                workArea = screenWorkArea
+                workArea = hudScreenArea
             )
             val fromSize = hudAppliedSize
             val fromPosition = mainWindowState.position
+            if (hudDragging) {
+                mainWindowState.size = hudTargetSize
+                mainWindowState.position = targetPosition
+                hudAppliedSize = hudTargetSize
+                return@LaunchedEffect
+            }
             val animatable = fromSize != null &&
                 fromSize != hudTargetSize &&
                 fromPosition.x.value.isFinite() &&
@@ -2007,6 +2020,8 @@ private fun runUsageMonitor(
         // junto com a janela, e o deslocamento local acumularia erro. É o mesmo
         // caminho que o `WindowDraggableArea` usa por dentro.
         val hudDragBegin = {
+            hudDragging = true
+            hudExpanded = false
             hudDragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
         }
         val hudDragTo = {
@@ -2026,15 +2041,19 @@ private fun runUsageMonitor(
         }
         val hudDragFinish = {
             hudDragPointer = null
+            hudDragging = false
             hudAnchor?.let { anchor ->
                 val snapped = snapHudPosition(
                     x = anchor.x,
                     y = anchor.y,
                     size = hudAnchorSize,
-                    workArea = screenWorkArea
+                    workArea = hudScreenArea
                 )
                 hudAnchor = DpOffset(snapped.x, snapped.y)
                 persistHudPosition(settings, xDp = snapped.x.value, yDp = snapped.y.value)
+            }
+            if (hudHovered) {
+                hudExpanded = true
             }
             Unit
         }
@@ -2097,7 +2116,8 @@ private fun runUsageMonitor(
                         statusTone = hudStatusTone,
                         sources = hudSources,
                         fallbackLabel = hudFallbackLabel,
-                        expanded = hudExpanded,
+                        expanded = hudExpanded && !hudDragging,
+                        dragging = hudDragging,
                         updateIndicator = hudUpdateIndicator,
                         nextRefreshAt = hudNextRefreshAt,
                         countdownDescription = hudCountdownDescription,

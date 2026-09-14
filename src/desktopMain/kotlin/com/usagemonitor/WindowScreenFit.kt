@@ -69,6 +69,26 @@ internal fun availableWindowAreaDp(): ScreenWorkArea {
 }
 
 /**
+ * Limites físicos do monitor padrão, incluindo a área ocupada pela barra de
+ * tarefas ou pelo dock.
+ *
+ * Só a HUD usa estes limites. Janelas normais continuam usando
+ * [availableWindowAreaDp], porque seus controles precisam permanecer fora da
+ * barra do sistema.
+ */
+internal fun fullScreenAreaDp(): ScreenWorkArea {
+    return runCatching {
+        val bounds = GraphicsEnvironment.getLocalGraphicsEnvironment()
+            .defaultScreenDevice.defaultConfiguration.bounds
+        ScreenWorkArea(
+            x = bounds.x.dp,
+            y = bounds.y.dp,
+            size = DpSize(bounds.width.dp, bounds.height.dp)
+        )
+    }.getOrDefault(ScreenWorkArea.Unknown)
+}
+
+/**
  * Tamanho inicial de janela que cabe na tela.
  *
  * Todas as janelas do app são `undecorated` com barra de título própria: uma janela

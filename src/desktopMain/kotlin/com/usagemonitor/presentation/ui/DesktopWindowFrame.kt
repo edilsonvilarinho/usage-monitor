@@ -458,6 +458,8 @@ internal fun HudBar(
     fallbackLabel: String,
     /** O ponteiro está sobre a barra: as demais fontes aparecem abaixo da primeira. */
     expanded: Boolean = false,
+    /** Arrasto ativo: mantém a janela na geometria de uma linha. */
+    dragging: Boolean = false,
     /**
      * Atualização pendente, se houver (issue #225).
      *
@@ -518,6 +520,7 @@ internal fun HudBar(
 ) {
     val hoverInteraction = remember { MutableInteractionSource() }
     val isHovered by hoverInteraction.collectIsHoveredAsState()
+    val visibleExpanded = expanded && !dragging
 
     LaunchedEffect(isHovered) {
         onHoverChange(isHovered)
@@ -559,7 +562,7 @@ internal fun HudBar(
                 .testTag(HUD_CONTENT_TEST_TAG)
                 .padding(vertical = HUD_PANEL_VERTICAL_PADDING)
         ) {
-            val visible = if (expanded) sources else sources.take(1)
+            val visible = if (visibleExpanded) sources else sources.take(1)
             // A contagem é do app inteiro — o polling é um só —, então ela sai
             // **uma vez**, na primeira linha. Uma por linha afirmaria que cada
             // conta tem coleta própria.
@@ -630,7 +633,7 @@ internal fun HudBar(
                                 // Um `·` entre os dois gastaria largura para
                                 // repetir o que o tom já informou.
                                 val resetText = chip.resetText
-                                if (expanded && resetText != null) {
+                                if (visibleExpanded && resetText != null) {
                                     Text(
                                         text = resetText,
                                         style = MaterialTheme.typography.labelMedium,

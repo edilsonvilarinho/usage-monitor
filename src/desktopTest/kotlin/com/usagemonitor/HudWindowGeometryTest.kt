@@ -24,6 +24,12 @@ class HudWindowGeometryTest {
         size = DpSize(1366.dp, 728.dp)
     )
 
+    private val physicalLaptop = ScreenWorkArea(
+        x = 0.dp,
+        y = 0.dp,
+        size = DpSize(1366.dp, 768.dp)
+    )
+
     private fun source(
         label: String,
         statusLabel: String,
@@ -484,6 +490,20 @@ class HudWindowGeometryTest {
         )
 
         assertEquals(bottom, position.y)
+    }
+
+    /** No modo HUD os limites físicos permitem ocupar a faixa da taskbar. */
+    @Test
+    fun `HUD pode ser encaixada sobre a barra de tarefas`() {
+        val size = DpSize(200.dp, AppChrome.hud)
+        val position = snapHudPosition(
+            x = 400.dp,
+            y = physicalLaptop.size.height - size.height - 8.dp,
+            size = size,
+            workArea = physicalLaptop
+        )
+
+        assertEquals(physicalLaptop.size.height - size.height, position.y)
     }
 
     @Test

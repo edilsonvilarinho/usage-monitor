@@ -216,6 +216,29 @@ class DesktopWindowFrameTest {
         onNodeWithText("Codex").assertDoesNotExist()
     }
 
+    /** Durante o arrasto o hover não pode redimensionar a janela sob o ponteiro. */
+    @Test
+    fun `durante o arrasto a barra HUD permanece em uma linha`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(500.dp).height(240.dp)) {
+                    HudBar(
+                        statusTone = AppTone.CRITICAL,
+                        sources = sources,
+                        fallbackLabel = "Carregando",
+                        expanded = true,
+                        dragging = true,
+                        onOpenFull = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("INFORMATA2").assertIsDisplayed()
+        onNodeWithText("Padrão").assertDoesNotExist()
+        onNodeWithText("Codex").assertDoesNotExist()
+    }
+
     /** Antes da primeira coleta há uma linha só, e ela diz que está carregando. */
     @Test
     fun `a barra HUD sem fontes mostra a linha de carregamento`() = runDesktopComposeUiTest {
