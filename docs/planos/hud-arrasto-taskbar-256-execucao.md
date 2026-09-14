@@ -14,7 +14,7 @@ ocupe a região da barra de tarefas.
 | A07 | Validação Windows | `./gradlew.bat allTests` + revisão do diff | concluída |
 | A08 | Validação Linux/macOS | ambientes não disponíveis nesta máquina Windows | não executada |
 | A09 | Rastreamento da issue | comentário rastreador atualizado | concluída |
-| A10 | Suíte final e encerramento | `allTests`, `git diff --check` | em andamento |
+| A10 | Suíte final e encerramento | `allTests`, `git diff --check` | concluída |
 
 ## Decisões
 
