@@ -125,9 +125,8 @@ reads the pointer's absolute screen position, because during a drag the componen
 with the window and a local delta would accumulate error.
 
 **Where the panel parks is the user's choice, and it is remembered.** On release it snaps to the
-nearest edge of the *work area* — which already excludes the taskbar, so the bottom edge means "just
-above it". Drawing over the taskbar is deliberately out of scope: it needs physical screen bounds
-and a z-order fight with a window that is also topmost. The anchor always describes the full panel,
+nearest edge of the monitor's *physical bounds*. The HUD may occupy the taskbar region; ordinary
+windows continue using the work area, which excludes it. The anchor always describes the full panel,
 even while the dot is what is on screen; anchoring on the dot would make the window jump every time
 a source left the on-track state.
 

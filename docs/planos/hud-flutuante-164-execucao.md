@@ -50,9 +50,8 @@ cota"): popup que cobre o próprio alvo é defeito já conhecido deste app.
 2. **O hover cresce a própria janela**, e o `Popup` sai. O hover mora no container raiz, não na
    pílula: preso aos 24dp de cima, mover o ponteiro para dentro da lista tiraria o hover e a janela
    colapsaria — o mesmo laço com outro nome.
-3. **Acima da barra de tarefas, não sobre ela.** A área útil de `availableWindowAreaDp()` sai de
-   `maximumWindowBounds` e já desconta a barra. Sobrepô-la exigiria limites físicos de tela e
-   disputa de ordem-z com uma janela que também é topmost — fora de escopo, declaradamente.
+3. **A HUD pode ocupar a barra de tarefas.** O posicionamento da HUD usa os limites físicos do
+   monitor; as demais janelas continuam usando `maximumWindowBounds`, que desconta a barra.
 4. **`HUD_PILL_WIDTH_DP` (320) vira teto, não largura.** A pílula mede o conteúdo. O papel que a
    largura fixa cumpria — não mudar de tamanho a cada coleta — passa a ser cumprido pelo teto mais as
    reticências que a faixa já usava.

@@ -772,10 +772,9 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   - **O movimento é aplicado à âncora, nunca à janela.** Existe um caminho só até a geometria, e a
     pílula expandida acompanha o ponteiro sem desfazer a conta de "cresce para cima ou para baixo".
 - **Onde ela para é escolha do usuário, e é gravada** (`snapHudPosition` + `HudWindowPreferences`).
-  Ao soltar, gruda na borda mais próxima da **área útil** — que sai de `maximumWindowBounds` e já
-  desconta a barra de tarefas, então a borda de baixo é "logo acima dela". Desenhar **sobre** a barra
-  (o modelo do TBH: Task Bar Hero, que o usuário trouxe como referência) ficou fora de escopo:
-  exigiria limites físicos de tela e disputa de ordem-z com uma janela que também é topmost. Leitura
+  Ao soltar, gruda na borda mais próxima dos **limites físicos do monitor**, que permitem ocupar a
+  região da barra de tarefas. Janelas normais continuam usando `maximumWindowBounds` e ficam acima
+  dela. Leitura
   e escrita passam sempre por `fitWindowPosition`: posição salva num monitor que já não existe
   descreve uma tela que sumiu.
 - **A HUD nunca recolhe ao ponto.** Parada, ela mostra uma linha da primeira fonte na ordem dos

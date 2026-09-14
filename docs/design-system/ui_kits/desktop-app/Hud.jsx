@@ -73,7 +73,7 @@ export function Hud() {
         <AppHudBar sources={[]} fallbackLabel="Carregando" countdown="02:05" />
       </HudScreen>
 
-      <Caption>4 · arrastado para a borda de baixo — logo acima da barra de tarefas</Caption>
+      <Caption>4 · arrastado para a borda de baixo — sobre a barra de tarefas</Caption>
       <HudScreen corner="bottom-right" tall>
         <AppHudBar sources={SOURCES.slice(0, 2)} expanded countdown="02:05" />
       </HudScreen>
@@ -85,12 +85,14 @@ export function Hud() {
         nenhum número de consumo. Parada, a barra mostra uma linha; com o ponteiro em cima, todas as cotas, cada uma com a hora em que reinicia (issue #189) — a pílula parada não a
         mostra, porque é ela que fica capturando o clique de quem está atrás. A largura sai do
         conteúdo, com teto por estado: 484dp parada, mais três colunas de reset expandida, e o
-        painel é arrastado para onde o usuário quiser — ao soltar ele gruda na borda mais próxima da
-        área útil e a posição é gravada. Três saídas: clique curto em qualquer ponto, item na bandeja
+        painel é arrastado para onde o usuário quiser — durante o arrasto ele permanece em uma linha
+        fixa; ao soltar ele gruda na borda mais próxima dos limites físicos do monitor e a posição é
+        gravada. A HUD pode ocupar a barra de tarefas; janelas comuns continuam acima dela. Três saídas:
+        clique curto em qualquer ponto, item na bandeja
         e Ctrl+Shift+H. A linha termina com a contagem até a próxima coleta (issue #185), que sai
         <b> uma vez só</b>, na primeira: o polling é do app inteiro, e uma contagem por linha diria
-        que cada conta tem coleta própria. Recolhida ao ponto ela não aparece — ali não há texto
-        nenhum, e o hover devolve o painel com ela. Cota sem reset a mostrar — o saldo que não
+        que cada conta tem coleta própria. A barra permanece visível fora do hover e continua em uma
+        linha quando parada. Cota sem reset a mostrar — o saldo que não
         expira — sai com o percentual e nada no lugar, nem um traço. O ponto de 6dp antes do nome é
         <b> proposta</b> (issue #223): esta faixa não tem a barra de 2dp que o card tem, e o nome
         sozinho não diz de que fornecedor é a conta. Ainda não fiado no Compose — o teto de largura
