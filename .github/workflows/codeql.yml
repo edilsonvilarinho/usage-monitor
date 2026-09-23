@@ -71,8 +71,9 @@ jobs:
         if: matrix.language == 'java-kotlin'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
-          # Mesmo criterio de `ci.yml`: cache gravado fora da `main` fica no
-          # escopo daquele ref e nenhum outro run consegue le-lo.
+          # Mesmo criterio de `ci.yml`: um cache no ref de uma PR pode ser
+          # reutilizado por reexecucoes da mesma PR, mas nao por outras PRs nem
+          # pela branch base; PRs ainda podem restaurar o cache da `main`.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Initialize CodeQL

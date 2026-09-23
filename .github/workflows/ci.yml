@@ -115,9 +115,9 @@ jobs:
         if: steps.filter.outputs.relevant == 'true'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
-          # So a `main` escreve. Cache gravado num run de PR fica com o escopo
-          # daquele PR e nenhum outro run consegue le-lo: seria pagar a gravacao
-          # sem nunca cobrar o proveito.
+          # So a `main` grava. Um cache no ref de uma PR pode ser reutilizado
+          # por reexecucoes da mesma PR, mas nao por outras PRs nem pela branch
+          # base; PRs ainda podem restaurar o cache da `main`.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # MINIMAX_API_KEY fica deliberadamente indefinida: os testes injetam o
