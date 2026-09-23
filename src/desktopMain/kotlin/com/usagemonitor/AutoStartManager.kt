@@ -4,10 +4,13 @@ import com.usagemonitor.update.normalizePosixPath
 import com.usagemonitor.update.resolveLinuxInstallRoot
 import com.usagemonitor.update.resolveLinuxStableLauncherPath
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 object AutoStartManager {
 
     private const val WINDOWS_RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    private const val WINDOWS_RUN_KEY_REG_FILE = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
     private const val WINDOWS_UNINSTALL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Usage Monitor"
     private const val WINDOWS_VALUE_NAME = "UsageMonitor"
     private const val WINDOWS_INSTALL_LOCATION_VALUE = "InstallLocation"
@@ -29,17 +32,17 @@ object AutoStartManager {
         }
     }
 
-    fun setAutoStart(enabled: Boolean): Boolean {
+    fun setAutoStart(enabled: Boolean): AutoStartResult {
         return when (currentPlatform()) {
             Platform.WINDOWS -> setWindowsAutoStart(enabled)
             Platform.LINUX -> setLinuxAutoStart(enabled)
             Platform.MACOS -> setMacAutoStart(enabled)
-            Platform.OTHER -> false
+            Platform.OTHER -> AutoStartResult.Failure("plataforma não compatível")
         }
     }
 
     fun syncFromPreference(enabled: Boolean): Boolean {
-        return setAutoStart(enabled)
+        return setAutoStart(enabled).isSuccess
     }
 
     /**
@@ -51,12 +54,13 @@ object AutoStartManager {
      * por autostart seria registrado como manual. A migracao acontece por baixo,
      * sem acao de quem usa.
      *
-     * Devolve `true` quando a entrada esta atualizada ao fim -- inclusive quando
-     * ja estava.
+     * Devolve `Success` quando a entrada está atualizada ao fim, inclusive quando
+     * já estava; `null` significa que a preferência está desligada e não há nada
+     * a migrar. `Failure` preserva o motivo seguro da falha.
      */
-    fun ensureAutoStartCommandCurrent(): Boolean {
+    fun ensureAutoStartCommandCurrent(): AutoStartResult? {
         if (!isAutoStartEnabled()) {
-            return false
+            return null
         }
 
         val currentCommand = readAutoStartCommand()
@@ -68,7 +72,7 @@ object AutoStartManager {
             (isLinux && linuxEntryPointsIntoVersionedTree(currentCommand)) ||
             (isLinux && linuxAutoStartNeedsRepair(currentCommand))
         if (!needsMigration) {
-            return true
+            return AutoStartResult.Success
         }
 
         return setAutoStart(enabled = true)
@@ -163,6 +167,78 @@ object AutoStartManager {
     }
 
     /**
+     * Conteúdo `.reg` em UTF-16LE para persistir o comando completo sem deixar
+     * que o parser de `reg add /d` trate os argumentos após o caminho citado
+     * como opções adicionais.
+     */
+    internal fun windowsAutoStartRegistryFileContents(executablePath: String): String {
+        val command = windowsAutoStartCommand(executablePath)
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        return buildString {
+            appendLine("Windows Registry Editor Version 5.00")
+            appendLine()
+            appendLine("[$WINDOWS_RUN_KEY_REG_FILE]")
+            append('"')
+            append(WINDOWS_VALUE_NAME)
+            append("\"=\"")
+            append(command)
+            appendLine("\"")
+        }
+    }
+
+    internal fun windowsAutoStartRegistryFileBytes(executablePath: String): ByteArray {
+        val contents = windowsAutoStartRegistryFileContents(executablePath)
+            .toByteArray(StandardCharsets.UTF_16LE)
+        return byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + contents
+    }
+
+    private fun importWindowsAutoStartEntry(
+        executablePath: String,
+        commandRunner: (List<String>) -> AutoStartCommandResult
+    ): AutoStartResult {
+        val importFile = try {
+            Files.createTempFile("usage-monitor-autostart-", ".reg")
+        } catch (error: Exception) {
+            return error.toAutoStartFailure("preparar importação do Registro")
+        }
+
+        var commandResult: AutoStartCommandResult? = null
+        var commandFailure: Exception? = null
+        try {
+            Files.write(importFile, windowsAutoStartRegistryFileBytes(executablePath))
+            commandResult = commandRunner(listOf("reg", "import", importFile.toAbsolutePath().toString()))
+        } catch (error: Exception) {
+            commandFailure = error
+        }
+
+        var cleanupFailure: Exception? = null
+        try {
+            Files.deleteIfExists(importFile)
+        } catch (error: Exception) {
+            importFile.toFile().deleteOnExit()
+            cleanupFailure = error
+        }
+
+        if (commandFailure != null) {
+            if (cleanupFailure != null) {
+                commandFailure.addSuppressed(cleanupFailure)
+            }
+            return commandFailure.toAutoStartFailure("reg.exe import")
+        }
+
+        val result = commandResult ?: return AutoStartResult.Failure("reg.exe import não retornou resultado")
+        if (cleanupFailure != null && result.exitCode == 0) {
+            return AutoStartResult.Failure(
+                "reg.exe import concluiu, mas não foi possível remover o arquivo temporário: " +
+                    com.usagemonitor.domain.entity.breadcrumbFailureReasonOf(cleanupFailure)
+            )
+        }
+
+        return result.toAutoStartResult("reg.exe import")
+    }
+
+    /**
      * Entrada ausente nao migra: nao ha o que reescrever.
      *
      * A procura e por fronteira e nao por token separado por espaco, porque o
@@ -198,80 +274,82 @@ object AutoStartManager {
         return result.exitCode == 0
     }
 
-    private fun setWindowsAutoStart(enabled: Boolean): Boolean {
+    internal fun setWindowsAutoStart(
+        enabled: Boolean,
+        executablePathProvider: () -> String? = ::resolveExecutablePath,
+        commandRunner: (List<String>) -> AutoStartCommandResult = ::runCommand,
+        enabledNow: () -> Boolean = ::isWindowsAutoStartEnabled
+    ): AutoStartResult {
         if (enabled) {
-            val executablePath = resolveExecutablePath() ?: return false
-            val command = windowsAutoStartCommand(executablePath)
-            val result = runCommand(
-                listOf(
-                    "reg",
-                    "add",
-                    WINDOWS_RUN_KEY,
-                    "/v",
-                    WINDOWS_VALUE_NAME,
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    command,
-                    "/f"
-                )
-            )
-            return result.exitCode == 0
+            val executablePath = executablePathProvider()
+                ?: return AutoStartResult.Failure("executável do aplicativo não localizado")
+            return importWindowsAutoStartEntry(executablePath, commandRunner)
         }
 
-        val result = runCommand(
+        val result = commandRunner(
             listOf("reg", "delete", WINDOWS_RUN_KEY, "/v", WINDOWS_VALUE_NAME, "/f")
         )
-        return result.exitCode == 0 || !isWindowsAutoStartEnabled()
+        if (result.exitCode == 0 || !enabledNow()) {
+            return AutoStartResult.Success
+        }
+        return result.toAutoStartResult("reg.exe delete")
     }
 
-    private fun setLinuxAutoStart(enabled: Boolean): Boolean {
+    private fun setLinuxAutoStart(enabled: Boolean): AutoStartResult {
         val autostartFile = linuxAutostartFile()
 
         if (!enabled) {
-            return !autostartFile.exists() || autostartFile.delete()
+            if (!autostartFile.exists() || autostartFile.delete()) {
+                return AutoStartResult.Success
+            }
+            return AutoStartResult.Failure("não foi possível remover o arquivo de inicialização")
         }
 
         val executablePath = linuxAutoStartExecutablePath(
             stableLauncherPath = resolveLinuxStableLauncherPath(),
             fallback = ::resolveExecutablePath
-        ) ?: return false
-        val parentDir = File(executablePath).parentFile?.absolutePath ?: return false
+        ) ?: return AutoStartResult.Failure("executável do aplicativo não localizado")
+        val parentDir = File(executablePath).parentFile?.absolutePath
+            ?: return AutoStartResult.Failure("diretório do executável não localizado")
         val desktopEntry = buildLinuxDesktopEntry(executablePath, parentDir)
 
-        return runCatching {
+        val failure = runCatching {
             autostartFile.parentFile.mkdirs()
             autostartFile.writeText(desktopEntry)
-            true
-        }.getOrDefault(false)
+        }.exceptionOrNull()
+        return if (failure == null) AutoStartResult.Success else failure.toAutoStartFailure("gravação do autostart")
     }
 
-    private fun setMacAutoStart(enabled: Boolean): Boolean {
+    private fun setMacAutoStart(enabled: Boolean): AutoStartResult {
         val launchAgentFile = macAutostartFile()
 
         if (!enabled) {
             if (!launchAgentFile.exists()) {
-                return true
+                return AutoStartResult.Success
             }
             // O unload é best effort: o que define o estado é a presença do plist.
             runCommand(listOf("launchctl", "unload", "-w", launchAgentFile.absolutePath))
-            return launchAgentFile.delete()
+            return if (launchAgentFile.delete()) {
+                AutoStartResult.Success
+            } else {
+                AutoStartResult.Failure("não foi possível remover o arquivo de inicialização")
+            }
         }
 
-        val executablePath = resolveExecutablePath() ?: return false
+        val executablePath = resolveExecutablePath()
+            ?: return AutoStartResult.Failure("executável do aplicativo não localizado")
 
-        val written = runCatching {
+        val writeFailure = runCatching {
             launchAgentFile.parentFile.mkdirs()
             launchAgentFile.writeText(buildLaunchAgentPlist(executablePath))
-            true
-        }.getOrDefault(false)
+        }.exceptionOrNull()
 
-        if (!written) {
-            return false
+        if (writeFailure != null) {
+            return writeFailure.toAutoStartFailure("gravação do autostart")
         }
 
         runCommand(listOf("launchctl", "load", "-w", launchAgentFile.absolutePath))
-        return true
+        return AutoStartResult.Success
     }
 
     /**
@@ -615,18 +693,21 @@ object AutoStartManager {
         return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
     }
 
-    private fun runCommand(command: List<String>): CommandResult {
+    private fun runCommand(command: List<String>): AutoStartCommandResult {
         return runCatching {
             val process = ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .start()
             val output = process.inputStream.bufferedReader().use { it.readText() }
-            CommandResult(
+            AutoStartCommandResult(
                 exitCode = process.waitFor(),
                 output = output
             )
         }.getOrElse {
-            CommandResult(exitCode = -1, output = it.message.orEmpty())
+            AutoStartCommandResult(
+                exitCode = -1,
+                output = "falha ao iniciar ${command.firstOrNull() ?: "processo"}: ${it::class.simpleName}: ${it.message.orEmpty()}"
+            )
         }
     }
 
@@ -677,8 +758,48 @@ object AutoStartManager {
         }
     }
 
-    private data class CommandResult(
-        val exitCode: Int,
-        val output: String
+}
+
+sealed interface AutoStartResult {
+    data object Success : AutoStartResult
+
+    data class Failure(
+        val reason: String,
+        val exitCode: Int? = null
+    ) : AutoStartResult
+
+    val isSuccess: Boolean
+        get() = this is Success
+}
+
+internal data class AutoStartCommandResult(
+    val exitCode: Int,
+    val output: String
+)
+
+private fun AutoStartCommandResult.toAutoStartResult(operation: String): AutoStartResult {
+    if (exitCode == 0) {
+        return AutoStartResult.Success
+    }
+    return AutoStartResult.Failure(
+        reason = buildString {
+            append(operation)
+            append(" retornou código ")
+            append(exitCode)
+            val outputSummary = output.lineSequence()
+                .map(String::trim)
+                .firstOrNull(String::isNotBlank)
+            if (outputSummary != null) {
+                append(": ")
+                append(com.usagemonitor.domain.entity.sanitizeBreadcrumbErrorMessage(outputSummary))
+            }
+        },
+        exitCode = exitCode
+    )
+}
+
+private fun Throwable.toAutoStartFailure(operation: String): AutoStartResult.Failure {
+    return AutoStartResult.Failure(
+        reason = "$operation: ${com.usagemonitor.domain.entity.breadcrumbFailureReasonOf(this)}"
     )
 }

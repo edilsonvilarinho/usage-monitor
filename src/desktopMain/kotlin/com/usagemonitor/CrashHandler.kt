@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
 import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -144,11 +145,7 @@ class CrashHandler(
         runCatching {
             breadcrumbs.record(
                 BreadcrumbCategory.CRASH,
-                listOfNotNull(
-                    "$exceptionName em ${thread.name}",
-                    error.message,
-                    stackTop.firstOrNull()
-                ).joinToString(separator = " | ")
+                "thread=${thread.name}: ${breadcrumbFailureReasonOf(error)}"
             )
         }
 

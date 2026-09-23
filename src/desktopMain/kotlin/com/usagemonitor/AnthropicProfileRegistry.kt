@@ -5,6 +5,10 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
+import com.usagemonitor.presentation.viewmodel.recordFailure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,7 +64,8 @@ internal class AnthropicProfileRegistry(
     private val homeDirProvider: () -> File = {
         File(System.getProperty("user.home") ?: error("Propriedade 'user.home' não disponível"))
     },
-    private val environmentProvider: (String) -> String? = System::getenv
+    private val environmentProvider: (String) -> String? = System::getenv,
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val profilesNode = preferences.node(PREFERENCES_NODE)
     private val json = Json { ignoreUnknownKeys = true }
@@ -70,6 +75,7 @@ internal class AnthropicProfileRegistry(
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pendingLabelJob: Job? = null
     private var pendingLabelWrite: AnthropicProfileRecord? = null
+    private val lastInspectionFailures = mutableMapOf<String, String>()
 
     init {
         rescan()
@@ -190,6 +196,7 @@ internal class AnthropicProfileRegistry(
     fun inspect(record: AnthropicProfileRecord): AnthropicProfileInspection {
         val location = locationFor(record)
         if (!location.credentialsFile.isFile || !location.identityFile.isFile) {
+            lastInspectionFailures.remove(record.id)
             val missing = buildList {
                 if (!location.credentialsFile.isFile) add(location.credentialsFile.name)
                 if (!location.identityFile.isFile) add(location.identityFile.name)
@@ -217,6 +224,7 @@ internal class AnthropicProfileRegistry(
                 ?.takeIf { it.isNotBlank() }
             val organizationName = account["organizationName"]?.jsonPrimitive?.contentOrNull
                 ?.takeIf { it.isNotBlank() }
+            lastInspectionFailures.remove(record.id)
             AnthropicProfileInspection(
                 status = AnthropicProfileInspectionStatus.READY,
                 accountContext = UsageAccountContext(
@@ -226,6 +234,11 @@ internal class AnthropicProfileRegistry(
                 )
             )
         } catch (error: Throwable) {
+            val reason = breadcrumbFailureReasonOf(error)
+            if (lastInspectionFailures[record.id] != reason) {
+                lastInspectionFailures[record.id] = reason
+                breadcrumbs.recordFailure("validar perfil Anthropic", error)
+            }
             AnthropicProfileInspection(
                 status = AnthropicProfileInspectionStatus.INVALID,
                 detail = error.message ?: "Identidade Anthropic inválida"

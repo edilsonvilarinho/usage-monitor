@@ -7,6 +7,7 @@ import com.usagemonitor.presentation.ui.crashPrefillDescription
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private class CapturingRecorder : BreadcrumbRecorder {
@@ -22,7 +23,7 @@ private class CapturingRecorder : BreadcrumbRecorder {
 class CrashHandlerTest {
 
     @Test
-    fun `a crash writes a breadcrumb with the class, the message and the stack top`() {
+    fun `a crash writes the class and safe message without a stack frame`() {
         withTempFile { marker ->
             val recorder = CapturingRecorder()
             val handler = CrashHandler(breadcrumbs = recorder, markerFile = marker)
@@ -33,7 +34,8 @@ class CrashHandlerTest {
             assertEquals(BreadcrumbCategory.CRASH, step.first)
             assertTrue(step.second.contains("IllegalStateException"), step.second)
             assertTrue(step.second.contains("índice indisponível"), step.second)
-            assertTrue(step.second.contains("CrashHandlerTest"), step.second)
+            assertTrue(step.second.contains("thread="), step.second)
+            assertFalse(step.second.contains("CrashHandlerTest"), step.second)
         }
     }
 

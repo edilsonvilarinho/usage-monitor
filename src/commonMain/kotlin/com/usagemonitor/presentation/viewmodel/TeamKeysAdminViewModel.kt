@@ -2,6 +2,8 @@ package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.ListBlockedTeamAccountsUseCase
@@ -71,7 +73,8 @@ class TeamKeysAdminViewModel(
     private val deleteAccount: DeleteTeamAccountUseCase,
     private val listBlockedAccounts: ListBlockedTeamAccountsUseCase,
     private val unblockAccount: UnblockTeamAccountUseCase,
-    dispatcher: CoroutineDispatcher = Dispatchers.Default
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -169,6 +172,7 @@ class TeamKeysAdminViewModel(
         viewModelScope.launch {
             val error = block().exceptionOrNull()
             if (error != null) {
+                breadcrumbs.recordFailure("executar ação administrativa de chave do time", error)
                 val latest = _uiState.value as? TeamKeysUiState.Success
                 if (latest == null) {
                     _uiState.value = TeamKeysUiState.Error(error.message ?: UNKNOWN_ERROR_MESSAGE)
@@ -195,6 +199,7 @@ class TeamKeysAdminViewModel(
                 _uiState.value = TeamKeysUiState.Success(keys = keys, blockedAccounts = blocked)
             },
             onFailure = { error ->
+                breadcrumbs.recordFailure("carregar chaves administrativas do time", error)
                 val message = error.message ?: UNKNOWN_ERROR_MESSAGE
                 val current = _uiState.value as? TeamKeysUiState.Success
                 // Com lista na tela a falha vira aviso: o admin continua vendo as

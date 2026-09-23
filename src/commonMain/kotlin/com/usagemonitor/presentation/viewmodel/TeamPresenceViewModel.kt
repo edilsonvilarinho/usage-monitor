@@ -1,6 +1,9 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.TeamMemberPresence
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.usecase.DeleteTeamAccountUseCase
 import com.usagemonitor.domain.usecase.GetAdminTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
@@ -61,7 +64,8 @@ class TeamPresenceViewModel(
     private val deleteTeamAccount: DeleteTeamAccountUseCase? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val liveIntervalMillis: Long = DEFAULT_LIVE_INTERVAL_MILLIS,
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -83,10 +87,14 @@ class TeamPresenceViewModel(
 
     /** `true` enquanto a janela mostra todas as contas do servidor. */
     private var adminOverview: Boolean = false
+    private var lastLoadFailureKey: String? = null
 
     /** Aponta a janela para uma conta Anthropic e liga o tempo real. */
     fun openForAccount(accountKey: String, accountLabel: String?) {
         val scopeChanged = this.accountKey != accountKey || adminOverview
+        if (scopeChanged) {
+            lastLoadFailureKey = null
+        }
         this.accountKey = accountKey
         this.accountLabel = accountLabel
         this.adminOverview = false
@@ -114,6 +122,9 @@ class TeamPresenceViewModel(
         }
 
         val scopeChanged = !adminOverview
+        if (scopeChanged) {
+            lastLoadFailureKey = null
+        }
         this.accountKey = null
         this.accountLabel = null
         this.adminOverview = true
@@ -257,6 +268,7 @@ class TeamPresenceViewModel(
     private suspend fun runAction(block: suspend () -> Result<Unit>) {
         val error = block().exceptionOrNull()
         if (error != null) {
+            breadcrumbs.recordFailure("executar ação administrativa de presença do time", error)
             _actionError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
             return
         }
@@ -291,6 +303,7 @@ class TeamPresenceViewModel(
 
             (fetchScope() ?: return@withLock).fold(
                 onSuccess = { result ->
+                    lastLoadFailureKey = null
                     if (scopeAccount != accountKey || scopeOverview != adminOverview) {
                         return@fold
                     }
@@ -325,6 +338,11 @@ class TeamPresenceViewModel(
                     )
                 },
                 onFailure = { error ->
+                    val failureKey = breadcrumbFailureReasonOf(error)
+                    if (failureKey != lastLoadFailureKey) {
+                        lastLoadFailureKey = failureKey
+                        breadcrumbs.recordFailure("carregar presença do time", error)
+                    }
                     // Falha intermitente com dados na tela não apaga o que o
                     // usuário está lendo.
                     if (current != null) {

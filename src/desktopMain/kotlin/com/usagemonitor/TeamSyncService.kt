@@ -5,8 +5,12 @@ import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamMemberIdentity
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.usecase.PushTeamUsageUseCase
 import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
+import com.usagemonitor.presentation.viewmodel.recordFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -155,7 +159,8 @@ internal class TeamSyncService(
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
     private val maxBatchesPerPass: Int = DEFAULT_MAX_BATCHES_PER_PASS,
     private val clock: Clock = Clock.System,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val passMutex = Mutex()
@@ -181,6 +186,7 @@ internal class TeamSyncService(
      * nunca acontecia. O time inteiro ficava sem conseguir ler.
      */
     private val confirmedIdentityByAccount = mutableMapOf<String, ConfirmedIdentity>()
+    private var lastRecordedFailureKey: String? = null
 
     private val _syncStatus = MutableStateFlow(TeamSyncStatus())
 
@@ -301,15 +307,22 @@ internal class TeamSyncService(
         val now = clock.now()
         val current = _syncStatus.value
         _syncStatus.value = if (report.hasFailure) {
+            val failure = report.failures.first()
+            val failureKey = breadcrumbFailureReasonOf(failure)
+            if (failureKey != lastRecordedFailureKey) {
+                lastRecordedFailureKey = failureKey
+                breadcrumbs.recordFailure("sincronizar uso com o servidor do time", failure)
+            }
             current.copy(
                 lastFailureAt = now,
-                lastFailureMessage = report.failures.first().message ?: UNKNOWN_FAILURE_MESSAGE,
+                lastFailureMessage = failure.message ?: UNKNOWN_FAILURE_MESSAGE,
                 // Substitui, não acumula: a conta que deixou de ser recusada — o
                 // usuário a desmarcou, ou o admin corrigiu o rótulo — precisa
                 // sumir do aviso, e a passada corrente é quem sabe disso.
                 rejectedProfiles = rejections
             )
         } else {
+            lastRecordedFailureKey = null
             // Passada limpa apaga a falha: o aviso é sobre o estado atual, e uma
             // mensagem que sobrevive ao conserto manda o usuário atrás de um
             // problema que já não existe.

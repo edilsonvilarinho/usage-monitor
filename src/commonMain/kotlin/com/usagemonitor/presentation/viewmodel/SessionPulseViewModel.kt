@@ -1,7 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
-import com.usagemonitor.domain.entity.BreadcrumbCategory
-import com.usagemonitor.domain.entity.breadcrumbReasonOf
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.ApiSource
@@ -109,6 +108,9 @@ class SessionPulseViewModel(
      */
     val stalledSessions: StateFlow<List<StalledCliSession>> = _stalledSessions.asStateFlow()
 
+    /** Deduplica falha por conta; um polling de 30s não pode lotar o relatório. */
+    private val lastTeamPulseFailures = mutableMapOf<String, String>()
+
     init {
         if (autoStart) {
             start()
@@ -179,13 +181,10 @@ class SessionPulseViewModel(
         if (failure == null) {
             lastCliPulseFailure = null
         } else {
-            val reason = breadcrumbReasonOf(failure)
+            val reason = breadcrumbFailureReasonOf(failure)
             if (reason != lastCliPulseFailure) {
                 lastCliPulseFailure = reason
-                breadcrumbs.record(
-                    BreadcrumbCategory.ERROR,
-                    "semáforo de sessões não pôde ser lido: $reason"
-                )
+                breadcrumbs.recordFailure("ler semáforo de sessões", failure)
             }
         }
 
@@ -217,13 +216,10 @@ class SessionPulseViewModel(
         if (failure == null) {
             lastStalledFailure = null
         } else {
-            val reason = breadcrumbReasonOf(failure)
+            val reason = breadcrumbFailureReasonOf(failure)
             if (reason != lastStalledFailure) {
                 lastStalledFailure = reason
-                breadcrumbs.record(
-                    BreadcrumbCategory.ERROR,
-                    "sessões sem resposta não puderam ser lidas: $reason"
-                )
+                breadcrumbs.recordFailure("ler sessões sem resposta", failure)
             }
         }
 
@@ -238,6 +234,8 @@ class SessionPulseViewModel(
 
     private suspend fun refreshTeamPulses(now: Instant) {
         val targets = teamTargetsProvider()
+        val activeAccounts = targets.mapTo(mutableSetOf()) { target -> target.accountKey }
+        lastTeamPulseFailures.keys.retainAll(activeAccounts)
         if (targets.isEmpty()) {
             if (_teamPulses.value.isNotEmpty()) {
                 _teamPulses.value = emptyMap()
@@ -249,7 +247,18 @@ class SessionPulseViewModel(
         val updated = mutableMapOf<UsageTargetKey, SessionPulse>()
         for (target in targets) {
             val key = UsageTargetKey(ApiSource.ANTHROPIC, target.profileId)
-            val pulse = getTeamPulse(target.accountKey).getOrElse { previous[key] ?: SessionPulse.EMPTY }
+            val result = getTeamPulse(target.accountKey)
+            val failure = result.exceptionOrNull()
+            if (failure == null) {
+                lastTeamPulseFailures.remove(target.accountKey)
+            } else {
+                val reason = breadcrumbFailureReasonOf(failure)
+                if (reason != lastTeamPulseFailures[target.accountKey]) {
+                    lastTeamPulseFailures[target.accountKey] = reason
+                    breadcrumbs.recordFailure("ler semáforo de sessões do time", failure)
+                }
+            }
+            val pulse = result.getOrNull() ?: previous[key] ?: SessionPulse.EMPTY
             updated[key] = pulse
         }
         _teamPulses.value = updated.prunedAt(now)

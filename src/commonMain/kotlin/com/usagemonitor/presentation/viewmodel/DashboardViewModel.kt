@@ -17,7 +17,8 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.BreadcrumbCategory
-import com.usagemonitor.domain.entity.breadcrumbReasonOf
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
+import com.usagemonitor.domain.entity.sanitizeBreadcrumbErrorMessage
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.repository.AppUpdateInstaller
@@ -223,6 +224,7 @@ class DashboardViewModel(
     private val cachedStatsByTarget = mutableMapOf<UsageTargetKey, ApiUsageStats>()
     private val cachedErrorsByTarget = mutableMapOf<UsageTargetKey, UiApiError>()
     private val cachedRiskByTarget = mutableMapOf<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>()
+    private var lastUpdateCheckFailureKey: String? = null
     private val cachedSpikeByTarget = mutableMapOf<UsageTargetKey, List<UsageSpike>>()
     private val sourceFetchSemaphore = Semaphore(config.maxConcurrentSourceFetches.coerceAtLeast(1))
     private val pollWakeUpSignal = Channel<Unit>(capacity = Channel.CONFLATED)
@@ -301,10 +303,7 @@ class DashboardViewModel(
             // a primeira coleta -- indistinguível de "a coleta está demorando".
             // Uma vez por arranque, então não há risco de encher a trilha.
             cacheResult.exceptionOrNull()?.let { error ->
-                breadcrumbs.record(
-                    BreadcrumbCategory.ERROR,
-                    "cache do dashboard não pôde ser lido: ${breadcrumbReasonOf(error)}"
-                )
+                breadcrumbs.recordFailure("ler cache do dashboard", error)
             }
             val cachedStats = cacheResult.getOrNull().orEmpty()
             if (cachedStats.isEmpty()) {
@@ -679,6 +678,7 @@ class DashboardViewModel(
         val update = _appUpdateState.value?.update ?: return
         appUpdateReleaseOpener.open(update.releasePageUrl)
             .onFailure { error ->
+                breadcrumbs.recordFailure("abrir página da versão", error)
                 _toastMessage.value = DashboardToast.ReleasePageError(
                     error.message ?: "Unknown error"
                 )
@@ -747,7 +747,10 @@ class DashboardViewModel(
         // Vai a mensagem **saneada**, a mesma que a tela mostra, e nunca a crua:
         // `sanitizeUiErrorMessage` já é o filtro que decide o que pode aparecer
         // para o usuário, e o relatório é ainda mais público que a tela dele.
-        breadcrumbs.record(BreadcrumbCategory.API_CALL, "${source.name}: falhou — $message")
+        breadcrumbs.record(
+            BreadcrumbCategory.API_CALL,
+            "${source.name}: falhou — ${error::class.simpleName ?: "falha"}: ${sanitizeBreadcrumbErrorMessage(message)}"
+        )
 
         val uiError = UiApiError(target = target, message = message, rawMessage = rawMessage, targetLabel = targetLabel)
 
@@ -945,6 +948,7 @@ class DashboardViewModel(
         updateMutex.withLock {
             updateUseCase(currentAppVersion)
                 .onSuccess { update ->
+                    lastUpdateCheckFailureKey = null
                     if (update == null) {
                         forgetPendingUpdate()
                         _appUpdateState.value = null
@@ -953,8 +957,13 @@ class DashboardViewModel(
 
                     onUpdateAnnounced(update)
                 }
-                .onFailure {
+                .onFailure { error ->
                     // Falha silenciosa: UI mantém estado anterior; próxima janela de poll tenta de novo.
+                    val failureKey = breadcrumbFailureReasonOf(error)
+                    if (failureKey != lastUpdateCheckFailureKey) {
+                        lastUpdateCheckFailureKey = failureKey
+                        breadcrumbs.recordFailure("consultar atualização do app", error)
+                    }
                 }
         }
     }
@@ -1042,7 +1051,8 @@ class DashboardViewModel(
                     updateBackoff = null
                     _appUpdateState.value = AppUpdateUiState.Ready(update)
                 }
-                .onFailure {
+                .onFailure { error ->
+                    breadcrumbs.recordFailure("baixar atualização do app", error)
                     registerUpdateFailure(update, AppUpdateFailureReason.DOWNLOAD)
                 }
         }
@@ -1128,6 +1138,7 @@ class DashboardViewModel(
         // instalador não roda, não escreve recibo, e o usuário vê o app fechar e
         // não voltar — sem uma linha no disco explicando.
         installer.schedule(preparation).onFailure { error ->
+            breadcrumbs.recordFailure("agendar instalação da atualização", error)
             val reason = error.message?.takeIf { it.isNotBlank() }
                 ?: error::class.simpleName
                 ?: "unknown"

@@ -7,7 +7,10 @@ import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
 import com.usagemonitor.domain.entity.ReleaseNotes
+import com.usagemonitor.domain.entity.Breadcrumb
+import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.AppUpdateRepository
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.persistReleaseNotesSeenVersion
 import com.usagemonitor.readPersistedReleaseNotesSeenVersion
@@ -117,11 +120,31 @@ class ReleaseNotesControllerTest {
     @Test
     fun `a network failure does not mark`() {
         // A espera acabou sem resposta: a abertura seguinte tenta de novo.
-        val repository = FakeAppUpdateRepository(Result.failure(IllegalStateException("GitHub HTTP 503")))
+        val repository = FakeAppUpdateRepository(
+            Result.failure(IllegalStateException("GitHub HTTP 503: {\"token\":\"private\"}"))
+        )
+        val breadcrumbs = object : BreadcrumbRecorder {
+            val events = mutableListOf<Pair<BreadcrumbCategory, String>>()
 
-        withController(seenVersion = "38.0.1", receipt = null, repository = repository) { controller, settings ->
+            override fun record(category: BreadcrumbCategory, message: String) {
+                events += category to message
+            }
+
+            override fun read(limit: Int): List<Breadcrumb> = emptyList()
+        }
+
+        withController(
+            seenVersion = "38.0.1",
+            receipt = null,
+            repository = repository,
+            breadcrumbs = breadcrumbs
+        ) { controller, settings ->
             assertNull(controller.notes)
             assertEquals("38.0.1", readPersistedReleaseNotesSeenVersion(settings))
+            assertEquals(
+                listOf(BreadcrumbCategory.ERROR to "buscar notas da versão falhou: IllegalStateException: GitHub HTTP 503: [corpo omitido]"),
+                breadcrumbs.events
+            )
         }
     }
 
@@ -158,6 +181,7 @@ class ReleaseNotesControllerTest {
         receipt: AppUpdateReceipt?,
         repository: FakeAppUpdateRepository,
         currentVersion: String = "38.0.2",
+        breadcrumbs: BreadcrumbRecorder = com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder,
         assertions: (ReleaseNotesController, PreferencesSettings) -> Unit
     ) {
         val nodeName = "com.usagemonitor.tests.${UUID.randomUUID()}"
@@ -175,7 +199,8 @@ class ReleaseNotesControllerTest {
                         settings = settings,
                         getReleaseNotes = GetReleaseNotesUseCase(repository),
                         receipt = receipt,
-                        currentVersion = currentVersion
+                        currentVersion = currentVersion,
+                        breadcrumbs = breadcrumbs
                     )
                 }
                 waitForIdle()

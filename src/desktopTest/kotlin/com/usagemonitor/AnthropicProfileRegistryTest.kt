@@ -1,5 +1,8 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.Breadcrumb
+import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import java.io.File
 import java.util.UUID
 import java.util.prefs.Preferences
@@ -155,6 +158,39 @@ class AnthropicProfileRegistryTest {
 
         assertEquals(AnthropicProfileInspectionStatus.INCOMPLETE, inspection.status)
         assertTrue(inspection.detail.orEmpty().contains(".claude.json"))
+    }
+
+    @Test
+    fun `records invalid profile inspection once with a useful sanitized reason`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        File(defaultDir, ".credentials.json").writeText("not-json")
+        val recorder = object : BreadcrumbRecorder {
+            val events = mutableListOf<Pair<BreadcrumbCategory, String>>()
+
+            override fun record(category: BreadcrumbCategory, message: String) {
+                events += category to message
+            }
+
+            override fun read(limit: Int): List<Breadcrumb> = emptyList()
+        }
+        val registry = AnthropicProfileRegistry(
+            preferences = preferences,
+            defaultEnabled = true,
+            homeDirProvider = { tempDir },
+            environmentProvider = { null },
+            breadcrumbs = recorder
+        )
+        registries += registry
+        val record = registry.profiles.value.single()
+
+        repeat(3) { registry.inspect(record) }
+
+        assertEquals(1, recorder.events.size)
+        assertEquals(BreadcrumbCategory.ERROR, recorder.events.single().first)
+        assertTrue(recorder.events.single().second.startsWith("validar perfil Anthropic falhou: "))
+        assertFalse(recorder.events.single().second.contains(tempDir.absolutePath))
+        assertFalse(recorder.events.single().second.contains("default@example.com"))
     }
 
     @Test

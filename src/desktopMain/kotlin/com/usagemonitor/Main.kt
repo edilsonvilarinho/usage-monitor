@@ -160,6 +160,7 @@ import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
 import com.usagemonitor.presentation.ui.usageAlertMessage
+import com.usagemonitor.presentation.viewmodel.recordFailure
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
@@ -466,7 +467,8 @@ private fun runUsageMonitor(
     val profileRegistry = remember(preferencesNode) {
         AnthropicProfileRegistry(
             preferences = preferencesNode,
-            defaultEnabled = ApiSource.ANTHROPIC in persistedApis
+            defaultEnabled = ApiSource.ANTHROPIC in persistedApis,
+            breadcrumbs = breadcrumbs
         )
     }
     val profileRecords by profileRegistry.profiles.collectAsState()
@@ -644,7 +646,8 @@ private fun runUsageMonitor(
     val releaseNotes = rememberReleaseNotesController(
         settings = settings,
         getReleaseNotes = GetReleaseNotesUseCase(appUpdateRepository),
-        receipt = autoUpdate.lastReceipt
+        receipt = autoUpdate.lastReceipt,
+        breadcrumbs = breadcrumbs
     )
 
     val recordUsageSnapshot = remember(usageHistoryRepository) {
@@ -703,7 +706,8 @@ private fun runUsageMonitor(
     val historyViewModel = remember(getUsageHistory, enabledApis) {
         HistoryViewModel(
             getUsageHistory = getUsageHistory,
-            enabledApis = enabledApis
+            enabledApis = enabledApis,
+            breadcrumbs = breadcrumbs
         )
     }
     // A indexação corre em background desde o arranque, em `Dispatchers.IO`: o
@@ -751,7 +755,8 @@ private fun runUsageMonitor(
             getDetail = GetCodexCliSessionDetailUseCase(codexCliSessionRepository),
             exportWriter = usageExportWriter,
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS,
-            autoLoad = false
+            autoLoad = false,
+            breadcrumbs = breadcrumbs
         )
     }
     // O índice local continua sendo atualizado com a janela fechada. A operação
@@ -785,7 +790,8 @@ private fun runUsageMonitor(
             ),
             removeTeamMember = RemoveAdminTeamMemberUseCase(teamAdminRepository),
             deleteTeamAccount = DeleteTeamAccountUseCase(teamAdminRepository),
-            liveIntervalMillis = TEAM_PRESENCE_LIVE_INTERVAL_MILLIS
+            liveIntervalMillis = TEAM_PRESENCE_LIVE_INTERVAL_MILLIS,
+            breadcrumbs = breadcrumbs
         )
     }
     // Semáforo dos botões dos cards: lê o índice local de todas as contas e, para
@@ -833,7 +839,8 @@ private fun runUsageMonitor(
             unclaimAccount = UnclaimTeamKeyAccountUseCase(teamAdminRepository),
             deleteAccount = DeleteTeamAccountUseCase(teamAdminRepository),
             listBlockedAccounts = ListBlockedTeamAccountsUseCase(teamAdminRepository),
-            unblockAccount = UnblockTeamAccountUseCase(teamAdminRepository)
+            unblockAccount = UnblockTeamAccountUseCase(teamAdminRepository),
+            breadcrumbs = breadcrumbs
         )
     }
     val validateAdminToken = remember(teamAdminRepository) {
@@ -857,7 +864,8 @@ private fun runUsageMonitor(
             // O heartbeat que alimenta a janela de presença. Sai em toda passada,
             // inclusive quando não há turno novo — é o que separa "app aberto" de
             // "houve consumo".
-            touchTeamPresence = TouchTeamPresenceUseCase(teamUsageRepository)
+            touchTeamPresence = TouchTeamPresenceUseCase(teamUsageRepository),
+            breadcrumbs = breadcrumbs
         )
     }
     LaunchedEffect(teamSyncService, teamSettings.isActive) {
@@ -1147,8 +1155,18 @@ private fun runUsageMonitor(
             // Migracao por baixo: instalacao anterior a esta versao tem a entrada
             // de inicializacao sem o argumento de origem, e sem ele todo arranque
             // por autostart seria registrado como manual.
-            withContext(Dispatchers.IO) {
-                AutoStartManager.ensureAutoStartCommandCurrent()
+            val migrationResult = runCatching {
+                withContext(Dispatchers.IO) {
+                    AutoStartManager.ensureAutoStartCommandCurrent()
+                }
+            }.onFailure { error ->
+                breadcrumbs.recordFailure("atualizar comando de inicialização", error)
+            }.getOrNull()
+            if (migrationResult is AutoStartResult.Failure) {
+                breadcrumbs.recordFailure(
+                    "atualizar comando de inicialização",
+                    migrationResult.reason
+                )
             }
         }
         // Mesmo motivo do reparo do autostart acima, para a entrada de MENU
@@ -1313,9 +1331,14 @@ private fun runUsageMonitor(
         val manualProxy = resolveEffectiveProxy(proxySettingsFlow.value.copy(useEnvironmentProxy = false))
         proxyConnectionState = ProxyConnectionUiState(ProxyConnectionUiStatus.CHECKING)
         networkScope.launch {
-            val testClient = buildHttpClient(manualProxy)
-            val result = Result.runCatching { testClient.get("https://api.github.com/zen") }
-            testClient.close()
+            val result = Result.runCatching {
+                val testClient = buildHttpClient(manualProxy)
+                try {
+                    testClient.get("https://api.github.com/zen")
+                } finally {
+                    testClient.close()
+                }
+            }
 
             proxyConnectionState = result.fold(
                 onSuccess = { response ->
@@ -1325,6 +1348,10 @@ private fun runUsageMonitor(
                             message = if (language == AppLanguage.PT) "Conexão OK." else "Connection OK."
                         )
                     } else {
+                        breadcrumbs.recordFailure(
+                            "testar conexão do proxy",
+                            "HTTP ${response.status.value}"
+                        )
                         ProxyConnectionUiState(
                             status = ProxyConnectionUiStatus.FAILED,
                             message = "HTTP ${response.status.value}"
@@ -1332,6 +1359,7 @@ private fun runUsageMonitor(
                     }
                 },
                 onFailure = { error ->
+                    breadcrumbs.recordFailure("testar conexão do proxy", error)
                     ProxyConnectionUiState(
                         status = ProxyConnectionUiStatus.FAILED,
                         message = error.message
@@ -1364,14 +1392,23 @@ private fun runUsageMonitor(
         val proxy = resolveEffectiveProxy(proxySettingsFlow.value)
         apiKeyCheckState = ApiKeyCheckUiState(status = ApiKeyCheckStatus.CHECKING)
         networkScope.launch {
-            val testClient = buildHttpClient(proxy)
-            val result = try {
-                val dataSource = RemoteApiDataSource(httpClient = testClient)
-                testApiKeyUsage(source, dataSource) { apiKey }
-            } finally {
-                testClient.close()
+            val result = runCatching {
+                val testClient = buildHttpClient(proxy)
+                try {
+                    val dataSource = RemoteApiDataSource(httpClient = testClient)
+                    testApiKeyUsage(source, dataSource) { apiKey }
+                } finally {
+                    testClient.close()
+                }
+            }.fold(
+                onSuccess = { probe -> probe },
+                onFailure = { error -> Result.failure(error) }
+            )
+            val error = result.exceptionOrNull()
+            if (error != null) {
+                breadcrumbs.recordFailure("testar chave da API ${source.name}", error)
             }
-            apiKeyCheckState = apiKeyCheckResult(source, result.exceptionOrNull(), language)
+            apiKeyCheckState = apiKeyCheckResult(source, error, language)
         }
     }
     var isTeamKeysOpen by remember { mutableStateOf(false) }
@@ -1391,6 +1428,7 @@ private fun runUsageMonitor(
         teamScope.launch {
             val healthError = teamUsageRepository.checkConnection().exceptionOrNull()
             if (healthError != null) {
+                breadcrumbs.recordFailure("testar conexão do time", healthError)
                 teamConnectionState = TeamConnectionUiState(
                     status = TeamConnectionUiStatus.FAILED,
                     message = healthError.message
@@ -1426,8 +1464,13 @@ private fun runUsageMonitor(
                 val result = claimTeamKeyForAccount(target.accountKey, target.accountEmail)
                 val error = result.exceptionOrNull()
                 if (error != null) {
+                    breadcrumbs.recordFailure("validar vínculo de conta com a chave do time", error)
                     failures += "$label: ${error.message.orEmpty()}"
                 } else if (result.getOrNull()?.authorized != true) {
+                    breadcrumbs.recordFailure(
+                        "validar vínculo de conta com a chave do time",
+                        "servidor recusou o vínculo da conta"
+                    )
                     failures += if (language == AppLanguage.PT) {
                         "$label: a chave não cobre esta conta."
                     } else {
@@ -1463,11 +1506,17 @@ private fun runUsageMonitor(
         settingsToastGeneration += 1
         settingsToastEvent = SettingsToastEvent(id = settingsToastGeneration, toast = toast)
     }
-    /** Traduz o resultado da gravação no aviso correspondente. */
-    val reportSettingsSave: (SettingsField, Boolean) -> Unit = { field, saved ->
+    /** Traduz e registra o resultado da gravação no limite que o apresenta. */
+    fun reportSettingsSave(field: SettingsField, saved: Boolean, failureDetail: String? = null) {
         showSettingsToast(
             if (saved) SettingsToast.Saved(field) else SettingsToast.SaveFailed(field)
         )
+        if (!saved) {
+            breadcrumbs.recordFailure(
+                "salvar configuração ${field.name}",
+                failureDetail ?: "gravação recusada sem exceção retornada"
+            )
+        }
     }
     // A opacidade é gravada pelo coletor com debounce declarado acima, que roda
     // fora do diálogo; o aviso é emitido aqui, onde `showSettingsToast` existe.
@@ -2306,6 +2355,9 @@ private fun runUsageMonitor(
                     // que Sessões CLI e Time já usam, um diálogo de arquivo só.
                     onExportSnapshot = { stats ->
                         usageExportWriter.write(exportRequestForDashboard(stats, Clock.System.now()))
+                    },
+                    onExportFailure = { error ->
+                        breadcrumbs.recordFailure("exportar retrato do dashboard", error)
                     }
                 )
             }
@@ -2319,6 +2371,7 @@ private fun runUsageMonitor(
                     writer = bugReportWriter,
                     issueOpener = bugReportIssueOpener,
                     screenshots = bugReportCapturer,
+                    breadcrumbs = breadcrumbs,
                     language = language,
                     crashPrefill = pendingCrash?.let { crash ->
                         crashPrefillDescription(
@@ -2672,7 +2725,8 @@ private fun runUsageMonitor(
                             // O registro do Windows pode recusar a escrita; nesse
                             // caso o estado volta ao que o sistema realmente tem e
                             // o aviso precisa dizer que falhou.
-                            val applied = AutoStartManager.setAutoStart(enabled)
+                            val result = AutoStartManager.setAutoStart(enabled)
+                            val applied = result.isSuccess
                             val updatedState = if (applied) {
                                 enabled
                             } else {
@@ -2680,7 +2734,11 @@ private fun runUsageMonitor(
                             }
                             autoStartEnabled = updatedState
                             settings.putBoolean(AUTO_START_KEY, updatedState)
-                            reportSettingsSave(SettingsField.AUTO_START, applied)
+                            reportSettingsSave(
+                                SettingsField.AUTO_START,
+                                applied,
+                                failureDetail = (result as? AutoStartResult.Failure)?.reason
+                            )
                         },
                         onAlwaysOnTopChange = { enabled ->
                             alwaysOnTopEnabled = enabled
@@ -2745,7 +2803,8 @@ private fun runUsageMonitor(
                                     showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
                                     true
                                 },
-                                onFailure = {
+                                onFailure = { error ->
+                                    breadcrumbs.recordFailure("salvar chave de API", error)
                                     showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
                                     false
                                 }
@@ -2774,7 +2833,8 @@ private fun runUsageMonitor(
                                     showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
                                     true
                                 },
-                                onFailure = {
+                                onFailure = { error ->
+                                    breadcrumbs.recordFailure("remover chave de API", error)
                                     showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
                                     false
                                 }
@@ -2940,6 +3000,7 @@ private fun runUsageMonitor(
                                         }
                                     )
                                 } else {
+                                    breadcrumbs.recordFailure("validar token administrativo do time", error)
                                     TeamConnectionUiState(
                                         status = TeamConnectionUiStatus.FAILED,
                                         message = error.message

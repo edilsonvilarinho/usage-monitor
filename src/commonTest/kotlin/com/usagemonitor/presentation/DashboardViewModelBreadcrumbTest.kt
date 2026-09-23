@@ -73,8 +73,8 @@ class DashboardViewModelBreadcrumbTest : DashboardViewModelTestSupport() {
         }
 
         val failures = recorder.steps.filter { it.first == BreadcrumbCategory.API_CALL }.map { it.second }
-        assertTrue(failures.any { it.startsWith("ANTHROPIC: falhou — ") }, failures.toString())
-        assertTrue(failures.any { it.startsWith("MINIMAX: falhou — ") }, failures.toString())
+        assertTrue(failures.any { it.startsWith("ANTHROPIC: falhou — Exception: Token inválido") }, failures.toString())
+        assertTrue(failures.any { it.startsWith("MINIMAX: falhou — Exception: API Key não configurada") }, failures.toString())
         viewModel.onDestroy()
     }
 

@@ -5,6 +5,8 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.requiresUsageAccount
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +20,8 @@ import kotlinx.coroutines.launch
 
 class HistoryViewModel(
     private val getUsageHistory: GetUsageHistoryUseCase,
-    private val enabledApis: StateFlow<Set<ApiSource>>
+    private val enabledApis: StateFlow<Set<ApiSource>>,
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loadJob: Job? = null
@@ -129,6 +132,7 @@ class HistoryViewModel(
                 )
             )
         } catch (error: Throwable) {
+            breadcrumbs.recordFailure("carregar histórico de uso", error)
             publishIfLatest(
                 requestId,
                 HistoryUiState.Error(

@@ -4,6 +4,9 @@ import com.usagemonitor.data.export.UsageExportFormat
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
 import com.usagemonitor.presentation.ui.exportRequestForCodexCliSessions
@@ -57,7 +60,8 @@ class CodexCliSessionsViewModel(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: Clock = Clock.System,
     private val liveIntervalMillis: Long? = null,
-    autoLoad: Boolean = true
+    autoLoad: Boolean = true,
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private var loadJob: Job? = null
@@ -65,6 +69,9 @@ class CodexCliSessionsViewModel(
     private var liveJob: Job? = null
     private var exportJob: Job? = null
     private var range = CodexCliSessionRange.LAST_5H
+    private var lastSessionsFailureKey: String? = null
+    private var lastIndexFailureKey: String? = null
+    private var lastDetailFailureKey: String? = null
 
     private val _uiState = MutableStateFlow<CodexCliSessionsUiState>(CodexCliSessionsUiState.Loading)
     val uiState: StateFlow<CodexCliSessionsUiState> = _uiState.asStateFlow()
@@ -90,6 +97,17 @@ class CodexCliSessionsViewModel(
             if (range != requestedRange) return@launch
             result.fold(
                 onSuccess = { loaded ->
+                    lastSessionsFailureKey = null
+                    val indexError = loaded.indexError
+                    if (indexError == null) {
+                        lastIndexFailureKey = null
+                    } else {
+                        val failureKey = breadcrumbFailureReasonOf(indexError)
+                        if (failureKey != lastIndexFailureKey) {
+                            lastIndexFailureKey = failureKey
+                            breadcrumbs.recordFailure("indexar sessões do Codex CLI", indexError)
+                        }
+                    }
                     val latest = _uiState.value as? CodexCliSessionsUiState.Success
                     _uiState.value = CodexCliSessionsUiState.Success(
                         sessions = loaded.sessions,
@@ -105,6 +123,11 @@ class CodexCliSessionsViewModel(
                 },
                 onFailure = { error ->
                     if (range != requestedRange) return@fold
+                    val failureKey = breadcrumbFailureReasonOf(error)
+                    if (failureKey != lastSessionsFailureKey) {
+                        lastSessionsFailureKey = failureKey
+                        breadcrumbs.recordFailure("carregar sessões do Codex CLI", error)
+                    }
                     _uiState.value = CodexCliSessionsUiState.Error(error.message ?: "Falha ao ler sessões do Codex CLI.")
                 }
             )
@@ -128,10 +151,16 @@ class CodexCliSessionsViewModel(
         detailJob = scope.launch {
             getDetail(sessionId).fold(
                 onSuccess = { detail ->
+                    lastDetailFailureKey = null
                     val state = _uiState.value as? CodexCliSessionsUiState.Success ?: return@fold
                     _uiState.value = state.copy(detail = detail, detailLoading = false)
                 },
                 onFailure = { error ->
+                    val failureKey = breadcrumbFailureReasonOf(error)
+                    if (failureKey != lastDetailFailureKey) {
+                        lastDetailFailureKey = failureKey
+                        breadcrumbs.recordFailure("carregar detalhe de sessão do Codex CLI", error)
+                    }
                     val state = _uiState.value as? CodexCliSessionsUiState.Success ?: return@fold
                     _uiState.value = state.copy(detailLoading = false, indexWarning = error.message)
                 }
@@ -159,7 +188,10 @@ class CodexCliSessionsViewModel(
         exportJob = scope.launch {
             val outcome = runCatching { writer.write(request) }.fold(
                 onSuccess = { path -> path?.let { saved -> CodexCliExportOutcome.Saved(saved) } },
-                onFailure = { error -> CodexCliExportOutcome.Failed(error.message ?: "Falha ao exportar.") }
+                onFailure = { error ->
+                    breadcrumbs.recordFailure("exportar sessões do Codex CLI", error)
+                    CodexCliExportOutcome.Failed(error.message ?: "Falha ao exportar.")
+                }
             ) ?: return@launch
             val latest = _uiState.value as? CodexCliSessionsUiState.Success ?: return@launch
             _uiState.value = latest.copy(exportOutcome = outcome)

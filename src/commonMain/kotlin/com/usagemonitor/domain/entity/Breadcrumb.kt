@@ -106,7 +106,38 @@ data class Breadcrumb(
  * o teto nunca chegaria perto da parte que identifica a pessoa.
  */
 fun sanitizeBreadcrumbMessage(message: String): String {
-    return normalizeBreadcrumbMessage(redactBreadcrumbIdentity(message))
+    return normalizeBreadcrumbMessage(redactBreadcrumbIdentity(redactBreadcrumbSecrets(message)))
+}
+
+/**
+ * Sanitização para texto de erro antes de ele entrar num relatório público.
+ * Além de identidade e credenciais, corta stack frames e corpos estruturados de
+ * resposta. Status HTTP e código da exceção continuam úteis; o payload não.
+ */
+fun sanitizeBreadcrumbErrorMessage(message: String): String {
+    val stackStart = STACK_FRAME.find(message)?.range?.first ?: message.length
+    var safe = message.substring(0, stackStart)
+    safe = HTTP_RESPONSE_BODY.replace(safe) { match ->
+        "${match.groupValues[1]}: [corpo omitido]"
+    }
+    safe = NAMED_RESPONSE_BODY.replace(safe) { match ->
+        "${match.groupValues[1]} [corpo omitido]"
+    }
+    safe = STRUCTURED_RESPONSE_BODY.replace(safe) { match ->
+        "${match.groupValues[1]} [corpo omitido]"
+    }
+    if (safe.trimStart().startsWith("{") || safe.trimStart().startsWith("[")) {
+        safe = "corpo estruturado de erro omitido"
+    }
+    safe = HTML_ERROR_BODY.replace(safe) { match ->
+        "${match.groupValues[1]} [documento HTML omitido]"
+    }
+    if (safe.trimStart().startsWith("<html", ignoreCase = true) ||
+        safe.trimStart().startsWith("<!doctype", ignoreCase = true)
+    ) {
+        safe = "página HTML de erro omitida"
+    }
+    return sanitizeBreadcrumbMessage(safe)
 }
 
 /**
@@ -189,6 +220,17 @@ fun breadcrumbReasonOf(error: Throwable): String {
     return error::class.simpleName ?: "falha desconhecida"
 }
 
+/** Classe e mensagem curta, com os mesmos limites de privacidade do relatório. */
+fun breadcrumbFailureReasonOf(error: Throwable): String {
+    val type = breadcrumbReasonOf(error)
+    val message = error.message
+        ?.takeIf { it.isNotBlank() }
+        ?.let(::sanitizeBreadcrumbErrorMessage)
+        ?.takeIf { it.isNotBlank() }
+        ?: return type
+    return "$type: $message"
+}
+
 /** ASCII puro: o texto atravessa uma URL e um arquivo, e não vale um caractere a explicar. */
 private const val TRUNCATION_MARKER = "..."
 
@@ -214,3 +256,24 @@ private val ABSOLUTE_PATH = Regex(
 private const val SENTENCE_PUNCTUATION = ".,;:!?)"
 
 private val EMAIL = Regex("""[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}""")
+
+private val BEARER_CREDENTIAL = Regex("""(?i)Bearer\s+[^\s,;]+""")
+private val SECRET_ASSIGNMENT = Regex(
+    """(?i)\b(access_token|refresh_token|id_token|cap_sid|api[ _-]?key|client_secret|password|token)\b\s*[\"']?\s*[:=]\s*[\"']?([^\"'\s,;}\]]+)"""
+)
+private val STACK_FRAME = Regex("""(?m)^\s*at\s+[^\r\n]+""")
+private val HTTP_RESPONSE_BODY = Regex("""(?is)(\bHTTP\s+\d{3}\b)[^\r\n]{0,120}:\s*.*$""")
+private val NAMED_RESPONSE_BODY = Regex(
+    """(?is)([\"']?\b(?:response body|response payload|request body|request payload|prompt|body|payload|corpo da resposta|corpo da requisição|resposta)\b[\"']?\s*[:=]).*$"""
+)
+private val STRUCTURED_RESPONSE_BODY = Regex("""(?is)(:\s*)(?:\{|\[)\s*\".*$""")
+private val HTML_ERROR_BODY = Regex("""(?is)(\bHTTP\s+\d{3}\b[^\r\n]*?)(?:<!doctype\s+html|<html\b).*$""")
+
+private fun redactBreadcrumbSecrets(message: String): String {
+    return BEARER_CREDENTIAL.replace(message, "Bearer [REDACTED]")
+        .let { withoutBearer ->
+            SECRET_ASSIGNMENT.replace(withoutBearer) { match ->
+                "${match.groupValues[1]}=[REDACTED]"
+            }
+        }
+}

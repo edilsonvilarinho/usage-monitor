@@ -2054,6 +2054,8 @@ O app fechou inesperadamente.
 
 <p class="note"><b>Por que <code>PRIMARY</code> é "Salvar arquivo".</b> A ordem do fluxo é salvar e depois anexar: o botão que abre o navegador antes de existir arquivo levaria o usuário a publicar uma issue sem o pacote, que é exatamente o caso que este formulário existe para evitar. E <code>PRIMARY</code> é uma por tela — a aba Geral não tinha nenhuma antes de "Reportar um bug".</p>
 
+<p class="note"><b>Retorno das ações.</b> O modal fecha somente quando o navegador confirma a abertura da issue. Se gerar, salvar ou abrir falhar, ele continua disponível para nova tentativa e mostra o erro. A falha sanitizada entra na trilha local e aparece no próximo pacote de diagnóstico gerado.</p>
+
 <p class="note"><b>A prévia nasce recolhida</b> porque o corpo da issue tem milhares de caracteres e, aberto de saída, empurraria o campo de descrição para fora da janela. Ela entra e sai da composição <b>sem transição</b>: animação infinita trava o <code>waitForIdle</code> da suíte, e uma finita não acrescenta nada a um bloco de texto.</p>
 
 <p class="note"><b>A caixa da captura some quando não há captura.</b> Sem tela — ambiente headless, janela ainda não mapeada — a imagem não vem, e um interruptor marcado prometeria algo que não acontece. A captura enquadra <b>só a janela do app</b>, nunca a tela inteira: o pacote vira o corpo de uma issue pública, e a tela inteira traria o que mais estivesse aberto.</p>

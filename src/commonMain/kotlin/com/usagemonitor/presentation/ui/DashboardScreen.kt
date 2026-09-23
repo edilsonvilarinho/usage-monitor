@@ -158,6 +158,8 @@ fun DashboardScreen(
      * os geradores de captura não escrevem em disco.
      */
     onExportSnapshot: (suspend (List<ApiUsageStats>) -> String?)? = null,
+    /** Registra a exceção de exportação no relatório de diagnóstico. */
+    onExportFailure: (Throwable) -> Unit = {},
     modifier: Modifier = Modifier,
     countdownUpdatesEnabled: Boolean = true
 ) {
@@ -184,6 +186,7 @@ fun DashboardScreen(
                     val message = runCatching { exportAction(stats) }.fold(
                         onSuccess = { path -> path?.let { ExportLabels.exportSaved(it, language) } },
                         onFailure = { error ->
+                            onExportFailure(error)
                             ExportLabels.exportFailed(error.message ?: UNKNOWN_ERROR_MESSAGE, language)
                         }
                     )

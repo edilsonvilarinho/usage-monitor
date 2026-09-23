@@ -2,7 +2,9 @@ package com.usagemonitor.domain
 
 import com.usagemonitor.domain.entity.Breadcrumb
 import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.entity.normalizeBreadcrumbMessage
+import com.usagemonitor.domain.entity.sanitizeBreadcrumbErrorMessage
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -143,5 +145,34 @@ class BreadcrumbTest {
         // está gravado esconderia uma linha adulterada em vez de mostrá-la.
         val read = Breadcrumb(at, BreadcrumbCategory.NAVIGATION, "abriu\na janela")
         assertEquals("abriu\na janela", read.message)
+    }
+
+    @Test
+    fun `error details redact credentials paths e-mails and response bodies`() {
+        val message = sanitizeBreadcrumbErrorMessage(
+            "Falha HTTP 403: {\"error\":\"Bearer secret-token\",\"path\":\"C:\\\\Users\\\\dev\\\\app.json\"} " +
+                "cap_sid=cookie refresh_token=refresh-secret dev@example.com"
+        )
+
+        assertTrue(message.contains("HTTP 403"), message)
+        assertTrue(message.contains("corpo omitido"), message)
+        assertFalse(message.contains("secret-token"), message)
+        assertFalse(message.contains("cookie"), message)
+        assertFalse(message.contains("refresh-secret"), message)
+        assertFalse(message.contains("C:\\Users\\dev"), message)
+        assertFalse(message.contains("dev@example.com"), message)
+        assertTrue(message.length <= Breadcrumb.MAX_MESSAGE_LENGTH, message)
+    }
+
+    @Test
+    fun `failure reason retains exception type and safe message without stack frames`() {
+        val reason = breadcrumbFailureReasonOf(
+            IllegalStateException("Acesso negado para C:\\Users\\dev\\state.json\n at Example.run(Example.kt:1)")
+        )
+
+        assertTrue(reason.startsWith("IllegalStateException: Acesso negado"), reason)
+        assertTrue("<caminho>/state.json" in reason, reason)
+        assertFalse("dev" in reason, reason)
+        assertFalse("Example.run" in reason, reason)
     }
 }

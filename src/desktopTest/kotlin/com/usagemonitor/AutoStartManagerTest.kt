@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import java.io.File
+import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -118,6 +119,96 @@ class AutoStartManagerTest {
         val command = AutoStartManager.windowsAutoStartCommand("""C:\Program Files\Usage Monitor\Usage Monitor.exe""")
 
         assertEquals(""""C:\Program Files\Usage Monitor\Usage Monitor.exe" --autostart""", command)
+    }
+
+    @Test
+    fun `windows activation imports a registry file and succeeds when reg exits zero`() {
+        var command: List<String>? = null
+        var importFileContents = ""
+        var importFilePath: String? = null
+        val result = AutoStartManager.setWindowsAutoStart(
+            enabled = true,
+            executablePathProvider = { "C:\\Program Files\\Usage Monitor\\Usage Monitor.exe" },
+            commandRunner = { actual ->
+                command = actual
+                importFilePath = actual.lastOrNull()
+                importFileContents = importFilePath?.let { path ->
+                    String(File(path).readBytes(), StandardCharsets.UTF_16LE).removePrefix("\uFEFF")
+                }.orEmpty()
+                AutoStartCommandResult(exitCode = 0, output = "The operation completed successfully.")
+            }
+        )
+
+        assertEquals(AutoStartResult.Success, result)
+        assertTrue(command.orEmpty().firstOrNull() == "reg")
+        assertEquals("import", command.orEmpty().getOrNull(1))
+        assertTrue(importFileContents.startsWith("Windows Registry Editor Version 5.00"))
+        assertTrue(importFileContents.contains("[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run]"))
+        assertTrue(importFileContents.contains("\"UsageMonitor\""))
+        assertTrue(importFileContents.contains("C:\\\\Program Files"))
+        assertTrue(importFileContents.contains("--autostart"))
+        assertFalse(importFilePath?.let { path -> File(path).exists() } ?: true)
+    }
+
+    @Test
+    fun `windows activation reports a missing executable without running reg`() {
+        var commandWasRun = false
+        val result = AutoStartManager.setWindowsAutoStart(
+            enabled = true,
+            executablePathProvider = { null },
+            commandRunner = {
+                commandWasRun = true
+                AutoStartCommandResult(exitCode = 0, output = "")
+            }
+        )
+
+        assertFalse(result.isSuccess)
+        assertTrue(result is AutoStartResult.Failure)
+        assertTrue((result as AutoStartResult.Failure).reason.contains("executável"))
+        assertFalse(commandWasRun)
+    }
+
+    @Test
+    fun `windows activation reports process launch failure`() {
+        val result = AutoStartManager.setWindowsAutoStart(
+            enabled = true,
+            executablePathProvider = { "C:\\Program Files\\Usage Monitor\\Usage Monitor.exe" },
+            commandRunner = {
+                AutoStartCommandResult(
+                    exitCode = -1,
+                    output = "falha ao iniciar reg.exe: IOException: CreateProcess error=2"
+                )
+            }
+        )
+
+        assertTrue(result is AutoStartResult.Failure)
+        val failure = result as AutoStartResult.Failure
+        assertEquals(-1, failure.exitCode)
+        assertTrue(failure.reason.contains("falha ao iniciar reg.exe"), failure.reason)
+        assertTrue(failure.reason.contains("código -1"), failure.reason)
+    }
+
+    @Test
+    fun `windows activation preserves nonzero reg status and redacts process output`() {
+        val result = AutoStartManager.setWindowsAutoStart(
+            enabled = true,
+            executablePathProvider = { "C:\\Program Files\\Usage Monitor\\Usage Monitor.exe" },
+            commandRunner = {
+                AutoStartCommandResult(
+                    exitCode = 5,
+                    output = "ERROR: Access denied for C:\\Users\\Alice\\state.json; api_key=private-key"
+                )
+            }
+        )
+
+        assertTrue(result is AutoStartResult.Failure)
+        val failure = result as AutoStartResult.Failure
+        assertEquals(5, failure.exitCode)
+        assertTrue(failure.reason.contains("código 5"), failure.reason)
+        assertTrue(failure.reason.contains("Access denied"), failure.reason)
+        assertTrue(failure.reason.contains("<caminho>/state.json"), failure.reason)
+        assertFalse(failure.reason.contains("Alice"), failure.reason)
+        assertFalse(failure.reason.contains("private-key"), failure.reason)
     }
 
     @Test

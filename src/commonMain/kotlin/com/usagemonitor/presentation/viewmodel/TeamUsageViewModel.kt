@@ -1,7 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
-import com.usagemonitor.domain.entity.BreadcrumbCategory
-import com.usagemonitor.domain.entity.breadcrumbReasonOf
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.AppLanguage
@@ -125,6 +124,8 @@ class TeamUsageViewModel(
 
     /** `true` enquanto a janela mostra todas as contas do servidor. */
     private var adminOverview: Boolean = false
+    private var lastUsageFailureKey: String? = null
+    private var lastDetailFailureKey: String? = null
 
     /** Aponta a janela para uma conta Anthropic e liga o tempo real. */
     fun openForAccount(
@@ -133,6 +134,10 @@ class TeamUsageViewModel(
         quotaWindows: CliQuotaWindows = CliQuotaWindows()
     ) {
         val scopeChanged = this.accountKey != accountKey || adminOverview
+        if (scopeChanged) {
+            lastUsageFailureKey = null
+            lastDetailFailureKey = null
+        }
         this.accountKey = accountKey
         this.accountLabel = accountLabel
         this.quotaWindows = quotaWindows
@@ -163,6 +168,10 @@ class TeamUsageViewModel(
         }
 
         val scopeChanged = !adminOverview
+        if (scopeChanged) {
+            lastUsageFailureKey = null
+            lastDetailFailureKey = null
+        }
         this.accountKey = null
         this.accountLabel = null
         // Sem âncora de reset: cada conta reseta numa hora, e escolher uma delas
@@ -235,7 +244,10 @@ class TeamUsageViewModel(
             val outcome = runCatching { writer.write(request) }.fold(
                 // Cancelar o diálogo não é sucesso nem erro: nada é publicado.
                 onSuccess = { path -> path?.let { saved -> CliExportOutcome.Saved(saved) } },
-                onFailure = { error -> CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE) }
+                onFailure = { error ->
+                    breadcrumbs.recordFailure("exportar relatório de uso do time", error)
+                    CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE)
+                }
             ) ?: return@launch
 
             val latest = _uiState.value as? TeamUsageUiState.Success ?: return@launch
@@ -317,6 +329,7 @@ class TeamUsageViewModel(
             val result = remover(accountKey = targetAccountKey, deviceId = member.deviceId)
             val error = result.exceptionOrNull()
             if (error != null) {
+                breadcrumbs.recordFailure("remover integrante do time", error)
                 _removalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
                 return@launch
             }
@@ -354,6 +367,7 @@ class TeamUsageViewModel(
             )
             val error = result.exceptionOrNull()
             if (error != null) {
+                breadcrumbs.recordFailure("remover sessão do time", error)
                 _sessionRemovalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
                 return@launch
             }
@@ -591,10 +605,7 @@ class TeamUsageViewModel(
             // como separar rota ausente de servidor fora do ar. Uma leitura por
             // abertura de janela, fora do laço de 5s.
             result.exceptionOrNull()?.let { error ->
-                breadcrumbs.record(
-                    BreadcrumbCategory.ERROR,
-                    "tendência do time não pôde ser lida: ${breadcrumbReasonOf(error)}"
-                )
+                breadcrumbs.recordFailure("carregar tendência do time", error)
             }
             val trend = result.getOrNull() ?: return@launch
             val current = _uiState.value as? TeamUsageUiState.Success ?: return@launch
@@ -608,6 +619,7 @@ class TeamUsageViewModel(
 
             (fetchScope() ?: return@withLock).fold(
                 onSuccess = { result ->
+                    lastUsageFailureKey = null
                     val members = result.members
                     // Ler o estado somente depois da consulta evita que o
                     // resultado de um refresh sobrescreva uma expansão feita
@@ -662,6 +674,11 @@ class TeamUsageViewModel(
                     )
                 },
                 onFailure = { error ->
+                    val failureKey = breadcrumbFailureReasonOf(error)
+                    if (failureKey != lastUsageFailureKey) {
+                        lastUsageFailureKey = failureKey
+                        breadcrumbs.recordFailure("carregar uso do time", error)
+                    }
                     // Falha intermitente com dados na tela não apaga o que o
                     // usuário está lendo: o erro vira aviso e a lista fica. Mas o
                     // "Atualizando…" tem de sair, senão a tela avisaria para sempre
@@ -740,6 +757,7 @@ class TeamUsageViewModel(
 
         return result.fold(
             onSuccess = { loaded ->
+                lastDetailFailureKey = null
                 if (loaded == null) {
                     // Servidor sem a rota de detalhe, ou sessão fora da retenção.
                     aggregatedDetail(deviceId, sessionId, scopedAccountKey)
@@ -753,6 +771,11 @@ class TeamUsageViewModel(
                 }
             },
             onFailure = { error ->
+                val failureKey = breadcrumbFailureReasonOf(error)
+                if (failureKey != lastDetailFailureKey) {
+                    lastDetailFailureKey = failureKey
+                    breadcrumbs.recordFailure("carregar detalhe da sessão do time", error)
+                }
                 TeamSessionDetailUiState.Error(
                     deviceId = deviceId,
                     sessionId = sessionId,

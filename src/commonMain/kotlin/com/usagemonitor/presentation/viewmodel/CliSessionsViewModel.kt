@@ -1,12 +1,11 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.data.export.UsageExportFormat
-import com.usagemonitor.domain.entity.BreadcrumbCategory
-import com.usagemonitor.domain.entity.breadcrumbReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
@@ -106,6 +105,12 @@ class CliSessionsViewModel(
     private var profileId: String? = null
     private var profileLabel: String? = null
     private var budgetLimitMicros: Long = 0L
+    private var lastSessionsFailureKey: String? = null
+    private var lastIndexFailureKey: String? = null
+    private var lastDetailFailureKey: String? = null
+    private var lastBreakdownFailureKey: String? = null
+    private var lastBudgetFailureKey: String? = null
+    private var lastStalledFailureKey: String? = null
 
     init {
         if (autoLoad) {
@@ -275,7 +280,10 @@ class CliSessionsViewModel(
             // Cancelar o diálogo devolve `null` e não publica resultado: não é
             // sucesso nem erro, e anunciá-lo seria ruído.
             onSuccess = { path -> path?.let { saved -> CliExportOutcome.Saved(saved) } },
-            onFailure = { error -> CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE) }
+            onFailure = { error ->
+                breadcrumbs.recordFailure("exportar sessões CLI", error)
+                CliExportOutcome.Failed(error.message ?: UNKNOWN_ERROR_MESSAGE)
+            }
         ) ?: return
 
         val latest = _uiState.value as? CliSessionsUiState.Success ?: return
@@ -319,11 +327,15 @@ class CliSessionsViewModel(
             // O cartão some sem nada dizer quando esta leitura falha, e o usuário
             // reporta "o orçamento não aparece". Carga por abertura de janela, não
             // por tique: não há risco de encher a trilha.
-            result.exceptionOrNull()?.let { error ->
-                breadcrumbs.record(
-                    BreadcrumbCategory.ERROR,
-                    "orçamento mensal não pôde ser lido: ${breadcrumbReasonOf(error)}"
-                )
+            val error = result.exceptionOrNull()
+            if (error == null) {
+                lastBudgetFailureKey = null
+            } else {
+                val failureKey = breadcrumbFailureReasonOf(error)
+                if (failureKey != lastBudgetFailureKey) {
+                    lastBudgetFailureKey = failureKey
+                    breadcrumbs.recordFailure("carregar orçamento mensal de sessões CLI", error)
+                }
             }
             val status = result.getOrNull()
             val latest = _uiState.value as? CliSessionsUiState.Success ?: return@launch
@@ -425,6 +437,7 @@ class CliSessionsViewModel(
 
         useCase(profileId = profileId, range = range, windows = quotaWindows).fold(
             onSuccess = { breakdown ->
+                lastBreakdownFailureKey = null
                 breakdownReloadPending = false
                 val latest = _uiState.value as? CliSessionsUiState.Success ?: return
                 _uiState.value = latest.copy(
@@ -434,6 +447,11 @@ class CliSessionsViewModel(
                 )
             },
             onFailure = { error ->
+                val failureKey = breadcrumbFailureReasonOf(error)
+                if (failureKey != lastBreakdownFailureKey) {
+                    lastBreakdownFailureKey = failureKey
+                    breadcrumbs.recordFailure("carregar resumo de uso das sessões CLI", error)
+                }
                 // O aviso sai mesmo na falha: ele diz "estou esperando", e a
                 // espera acabou — o que resta é o erro, que tem linha própria.
                 breakdownReloadPending = false
@@ -502,10 +520,18 @@ class CliSessionsViewModel(
     private suspend fun loadStalledSessions(previous: Map<String, Long>): Map<String, Long> {
         val useCase = getStalledCliSessions ?: return emptyMap()
 
-        return useCase(stallThresholdProvider())
-            .getOrNull()
-            ?.associate { stalled -> stalled.sessionId to stalled.pendingMillis }
-            ?: previous
+        val result = useCase(stallThresholdProvider())
+        val error = result.exceptionOrNull()
+        if (error == null) {
+            lastStalledFailureKey = null
+        } else {
+            val failureKey = breadcrumbFailureReasonOf(error)
+            if (failureKey != lastStalledFailureKey) {
+                lastStalledFailureKey = failureKey
+                breadcrumbs.recordFailure("carregar sessões CLI sem resposta", error)
+            }
+        }
+        return result.getOrNull()?.associate { stalled -> stalled.sessionId to stalled.pendingMillis } ?: previous
     }
 
     private suspend fun loadSessions() {
@@ -515,6 +541,17 @@ class CliSessionsViewModel(
 
         getCliSessions(profileId = profileId, range = range, windows = quotaWindows).fold(
             onSuccess = { result ->
+                lastSessionsFailureKey = null
+                val indexError = result.indexError
+                if (indexError == null) {
+                    lastIndexFailureKey = null
+                } else {
+                    val failureKey = breadcrumbFailureReasonOf(indexError)
+                    if (failureKey != lastIndexFailureKey) {
+                        lastIndexFailureKey = failureKey
+                        breadcrumbs.recordFailure("indexar sessões CLI", indexError)
+                    }
+                }
                 val contentChanged = current == null ||
                     current.sessions != result.sessions ||
                     current.indexWarning != result.indexError?.message ||
@@ -554,6 +591,11 @@ class CliSessionsViewModel(
                 )
             },
             onFailure = { error ->
+                val failureKey = breadcrumbFailureReasonOf(error)
+                if (failureKey != lastSessionsFailureKey) {
+                    lastSessionsFailureKey = failureKey
+                    breadcrumbs.recordFailure("carregar sessões CLI", error)
+                }
                 _uiState.value = CliSessionsUiState.Error(
                     message = error.message ?: UNKNOWN_ERROR_MESSAGE,
                     range = range,
@@ -581,6 +623,7 @@ class CliSessionsViewModel(
     private suspend fun loadDetailState(sessionId: String): CliSessionDetailUiState {
         return getCliSessionDetail(sessionId).fold(
             onSuccess = { loaded ->
+                lastDetailFailureKey = null
                 if (loaded == null) {
                     CliSessionDetailUiState.Error(sessionId, "Sessão não encontrada no índice.")
                 } else {
@@ -588,6 +631,11 @@ class CliSessionsViewModel(
                 }
             },
             onFailure = { error ->
+                val failureKey = breadcrumbFailureReasonOf(error)
+                if (failureKey != lastDetailFailureKey) {
+                    lastDetailFailureKey = failureKey
+                    breadcrumbs.recordFailure("carregar detalhe de sessão CLI", error)
+                }
                 CliSessionDetailUiState.Error(sessionId, error.message ?: UNKNOWN_ERROR_MESSAGE)
             }
         )

@@ -13,9 +13,12 @@ import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.ReleaseNotesDecision
 import com.usagemonitor.domain.entity.releaseNotesDecision
 import com.usagemonitor.domain.entity.releaseNotesPreviousVersion
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.persistReleaseNotesSeenVersion
 import com.usagemonitor.readPersistedReleaseNotesSeenVersion
+import com.usagemonitor.presentation.viewmodel.recordFailure
 
 /**
  * Decide, busca e lembra: tudo que a janela de novidades precisa.
@@ -46,7 +49,8 @@ internal fun rememberReleaseNotesController(
      * antigo tira o subtítulo exato do caminho automático do Windows.
      */
     receipt: AppUpdateReceipt?,
-    currentVersion: String = CURRENT_APP_VERSION
+    currentVersion: String = CURRENT_APP_VERSION,
+    breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ): ReleaseNotesController {
     var notes by remember(currentVersion) { mutableStateOf<ReleaseNotes?>(null) }
 
@@ -92,7 +96,10 @@ internal fun rememberReleaseNotesController(
         //   perpétua por uma resposta que não vai mudar.
         // - falha de rede: NÃO marca. A espera acabou sem resposta, e a abertura
         //   seguinte tenta de novo.
-        val fetched = result.getOrElse { return@LaunchedEffect }
+        val fetched = result.getOrElse { error ->
+            breadcrumbs.recordFailure("buscar notas da versão", error)
+            return@LaunchedEffect
+        }
 
         persistReleaseNotesSeenVersion(settings, currentVersion)
         notes = fetched

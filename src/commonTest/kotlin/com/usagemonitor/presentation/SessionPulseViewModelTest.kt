@@ -160,11 +160,13 @@ class SessionPulseViewModelTest {
                 )
             )
         )
+        val recorder = RecordingBreadcrumbRecorder()
         val viewModel = buildViewModel(
             repository = FakePulseCliRepository(),
             teamRepository = teamRepository,
             teamTargets = listOf(TeamPulseTarget(profileId = "conta2", accountKey = "acc-uuid")),
-            clock = clock
+            clock = clock,
+            breadcrumbs = recorder
         )
 
         viewModel.refreshOnce()
@@ -174,6 +176,18 @@ class SessionPulseViewModelTest {
         clock.current = NOW + 1.minutes
         viewModel.refreshOnce()
         assertTrue(viewModel.teamPulses.value.containsKey(CONTA2))
+        assertEquals(
+            listOf("ler semáforo de sessões do time falhou: IllegalStateException: servidor fora do ar"),
+            recorder.messages
+        )
+
+        teamRepository.fetchResult = Result.success(TeamUsageSnapshot())
+        clock.current = NOW + 2.minutes
+        viewModel.refreshOnce()
+        teamRepository.fetchResult = Result.failure(IllegalStateException("servidor fora do ar"))
+        clock.current = NOW + 3.minutes
+        viewModel.refreshOnce()
+        assertEquals(2, recorder.messages.size)
 
         clock.current = NOW + 6.minutes
         viewModel.refreshOnce()
@@ -248,7 +262,7 @@ class SessionPulseViewModelTest {
         repeat(4) { viewModel.refreshOnce() }
 
         assertEquals(
-            listOf("semáforo de sessões não pôde ser lido: IllegalStateException"),
+            listOf("ler semáforo de sessões falhou: IllegalStateException: banco travado"),
             recorder.messages
         )
         viewModel.onDestroy()
