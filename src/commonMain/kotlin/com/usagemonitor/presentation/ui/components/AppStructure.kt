@@ -41,6 +41,13 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import com.usagemonitor.presentation.ui.theme.AppDepth
+import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.appTween
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -333,17 +340,36 @@ fun AppSettingsNav(
                 modifier = Modifier.padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs)
             )
         }
-        items.forEachIndexed { index, item ->
-            AppSettingsNavItem(
-                label = item.label,
-                selected = index == selectedIndex,
-                onClick = { onSelect(index) },
-                modifier = if (item.testTag == null) {
-                    Modifier
-                } else {
-                    Modifier.testTag(item.testTag)
+        // O realce é um bloco só, que desliza entre as seções, desenhado atrás
+        // da coluna de itens -- mesma origem das posições que eles publicam.
+        val indicator = rememberSlidingIndicatorState()
+        val span = animatedIndicatorSpan(indicator, selectedIndex)
+        val density = LocalDensity.current
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (span != null) {
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(0, span.start.roundToInt()) }
+                        .fillMaxWidth()
+                        .height(with(density) { span.size.toDp() })
+                        .clip(AppShapes.small)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                items.forEachIndexed { index, item ->
+                    AppSettingsNavItem(
+                        label = item.label,
+                        selected = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                        modifier = if (item.testTag == null) {
+                            Modifier.reportIndicatorSpan(indicator, index, vertical = true)
+                        } else {
+                            Modifier.testTag(item.testTag).reportIndicatorSpan(indicator, index, vertical = true)
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 }
@@ -355,22 +381,22 @@ private fun AppSettingsNavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val container = if (selected) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        Color.Transparent
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // O fundo do selecionado é o bloco deslizante do [AppSettingsNav]; aqui só
+    // a cor do texto acompanha.
+    val content by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appSettingsNavContent"
+    )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(AppShapes.small)
-            .background(container)
             .selectable(selected = selected, onClick = onClick)
             .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm)
     ) {
@@ -888,6 +914,11 @@ fun AppDivider(modifier: Modifier = Modifier) {
  *
  * Recebe rótulos e índice: quem guarda a escolha é a tela, como em todo o resto
  * deste arquivo.
+ *
+ * O sublinhado é **um só** e desliza de uma aba para a outra
+ * ([animatedIndicatorSpan]), em vez de apagar numa e acender na outra no mesmo
+ * quadro. Ele mora num `Box` que embrulha só a fileira de abas: é a mesma origem
+ * das posições que cada aba publica.
  */
 @Composable
 fun AppTabs(
@@ -896,19 +927,39 @@ fun AppTabs(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val indicator = rememberSlidingIndicatorState()
+    val span = animatedIndicatorSpan(indicator, selectedIndex)
+    val density = LocalDensity.current
     Column(modifier = modifier) {
-        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-            tabs.forEachIndexed { index, tab ->
-                AppTabItem(
-                    tab = tab,
-                    selected = index == selectedIndex,
-                    onClick = { onSelect(index) }
+        Box {
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                tabs.forEachIndexed { index, tab ->
+                    AppTabItem(
+                        tab = tab,
+                        selected = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                        modifier = Modifier.reportIndicatorSpan(indicator, index)
+                    )
+                }
+            }
+            if (span != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset { IntOffset(span.start.roundToInt(), 0) }
+                        .width(with(density) { span.size.toDp() })
+                        .height(TAB_UNDERLINE_THICKNESS)
+                        .background(MaterialTheme.colorScheme.onSurface)
+                        .testTag(APP_TABS_INDICATOR_TEST_TAG)
                 )
             }
         }
         AppDivider()
     }
 }
+
+/** O sublinhado deslizante; os testes medem onde ele parou. */
+const val APP_TABS_INDICATOR_TEST_TAG = "appTabsIndicator"
 
 /** Uma aba: rótulo e a `testTag` que a tela usa para encontrá-la. */
 data class AppTab(
@@ -917,25 +968,28 @@ data class AppTab(
 )
 
 /**
- * O sublinhado é desenhado sob o rótulo, **não** é um `Box` abaixo dele.
- *
- * Um `Box(Modifier.fillMaxWidth())` dentro de uma `Column` filha de `Row` faz a
- * coluna inteira esticar até a largura disponível: a primeira aba cobria as
- * outras duas e todo clique caía nela. `drawBehind` mede o que o texto mede.
+ * O sublinhado **não** é filho da aba. Um `Box(Modifier.fillMaxWidth())` dentro
+ * de uma `Column` filha de `Row` faz a coluna inteira esticar até a largura
+ * disponível: a primeira aba cobria as outras duas e todo clique caía nela. Por
+ * isso ele é desenhado pelo [AppTabs], com a largura que a aba publica.
  */
 @Composable
 private fun AppTabItem(
     tab: AppTab,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val underline = if (selected) contentColor else Color.Transparent
-    val tagged = if (tab.testTag != null) Modifier.testTag(tab.testTag) else Modifier
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appTabContent"
+    )
+    val tagged = if (tab.testTag != null) modifier.testTag(tab.testTag) else modifier
 
     Text(
         text = tab.label,
@@ -944,14 +998,6 @@ private fun AppTabItem(
         maxLines = 1,
         modifier = tagged
             .selectable(selected = selected, onClick = onClick)
-            .drawBehind {
-                val thickness = TAB_UNDERLINE_THICKNESS.toPx()
-                drawRect(
-                    color = underline,
-                    topLeft = Offset(0f, size.height - thickness),
-                    size = Size(size.width, thickness)
-                )
-            }
             .padding(horizontal = AppSpacing.xs, vertical = AppSpacing.sm)
     )
 }

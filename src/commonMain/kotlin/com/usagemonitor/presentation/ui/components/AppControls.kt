@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import kotlin.math.roundToInt
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -414,27 +415,48 @@ fun AppSegmentedControl(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    Row(
+    // O fundo do segmento escolhido é um polegar só, que desliza por trás dos
+    // rótulos: trocar de "5h" para "30 dias" mostra o caminho entre os dois em
+    // vez de apagar um e acender o outro no mesmo quadro.
+    val indicator = rememberSlidingIndicatorState()
+    val span = animatedIndicatorSpan(indicator, selectedIndex)
+    val density = LocalDensity.current
+    val alpha = if (enabled) 1f else DISABLED_ALPHA
+    val thumb = MaterialTheme.colorScheme.surfaceVariant
+    Box(
         modifier = modifier
             .clip(AppShapes.small)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = alpha))
             .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
             .height(CONTROL_HEIGHT)
     ) {
-        options.forEachIndexed { index, option ->
-            if (index > 0) {
-                Box(
-                    modifier = Modifier
-                        .width(AppBorderWidth)
-                        .height(CONTROL_HEIGHT)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
+        if (span != null) {
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(span.start.roundToInt(), 0) }
+                    .width(with(density) { span.size.toDp() })
+                    .fillMaxHeight()
+                    .background(thumb.copy(alpha = thumb.alpha * alpha))
+            )
+        }
+        Row(modifier = Modifier.fillMaxHeight()) {
+            options.forEachIndexed { index, option ->
+                if (index > 0) {
+                    Box(
+                        modifier = Modifier
+                            .width(AppBorderWidth)
+                            .height(CONTROL_HEIGHT)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    )
+                }
+                AppSegmentItem(
+                    option = option,
+                    selected = index == selectedIndex,
+                    enabled = enabled,
+                    onClick = { onSelect(index) },
+                    modifier = Modifier.reportIndicatorSpan(indicator, index)
                 )
             }
-            AppSegmentItem(
-                option = option,
-                selected = index == selectedIndex,
-                enabled = enabled,
-                onClick = { onSelect(index) }
-            )
         }
     }
 }
@@ -455,21 +477,33 @@ fun AppToggleChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val container = if (selected) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val border = if (selected) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val container by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.surfaceVariant
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appToggleChipContainer"
+    )
+    val border by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appToggleChipBorder"
+    )
+    val content by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appToggleChipContent"
+    )
     val alpha = if (enabled) 1f else DISABLED_ALPHA
 
     Box(
@@ -502,21 +536,22 @@ private fun AppSegmentItem(
     option: AppSegment,
     selected: Boolean,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val alpha = if (enabled) 1f else DISABLED_ALPHA
-    val container = if (selected) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // O fundo do escolhido é o polegar deslizante do [AppSegmentedControl].
+    val content by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appSegmentContent"
+    )
 
-    val tagged = if (option.testTag != null) Modifier.testTag(option.testTag) else Modifier
+    val tagged = if (option.testTag != null) modifier.testTag(option.testTag) else modifier
     Box(
         modifier = tagged
             // Preenche a altura do controle, como os divisores já fazem. Sem isto o
@@ -524,7 +559,6 @@ private fun AppSegmentItem(
             // da borda e o canto arredondado do clip do `Row` come o último
             // segmento — que na tela se lê como botão cortado.
             .fillMaxHeight()
-            .background(container.copy(alpha = container.alpha * alpha))
             .selectable(selected = selected, enabled = enabled, onClick = onClick)
             .padding(horizontal = AppSpacing.sm),
         contentAlignment = Alignment.Center

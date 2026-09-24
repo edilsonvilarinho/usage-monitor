@@ -8,3 +8,7 @@ The Settings dialog's left rail. Sections: Geral, Alertas, APIs, Contas, Time.
 ```
 
 Mount only the selected section.
+
+**Motion.** The selected background is one block sliding vertically between sections on the
+`SNAPPY` spring; the labels crossfade. The content pane still swaps (only the chosen section is
+mounted).

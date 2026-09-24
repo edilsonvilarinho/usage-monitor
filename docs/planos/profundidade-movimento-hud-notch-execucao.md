@@ -29,7 +29,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 |---|---|---|
 | C1 | Tokens de motion, `AppMotionPolicy` e "Reduzir animações" | feito |
 | C2 | Profundidade: `AppDepth`, `AppSurfaceLadder`, brilho e highlight | feito |
-| C3 | Seleção animada: aba, segmentado, navegação lateral, chip | pendente |
+| C3 | Seleção animada: aba, segmentado, navegação lateral, chip | feito |
 | C4 | Overlays que entram e saem: menu, tooltip, diálogo | pendente |
 | C5 | Estados de interação: foco, hover em camada, pressão | pendente |
 | C6 | Números animados e recarga do card | pendente |
@@ -51,6 +51,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 |---|---|---|---|---|
 | 2026-09-24 | C1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.theme.*" --tests "com.usagemonitor.ReducedMotionPreferencesTest" --tests "com.usagemonitor.ui.AppStatesTest" --tests "com.usagemonitor.ui.ComponentTest"` | Verde. Primeira passada teve 2 falhas nos testes novos de bitmap da barra: diferiam só os 4 pixels de canto do recorte arredondado, cujo alfa de antialiasing varia com o número de quadros compostos. O teste passou a ignorar os cantos; a largura do preenchimento não passa por eles. |
 | 2026-09-24 | C2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*"` + `gradlew.bat generateScreenshots` | Verde. A primeira captura saiu praticamente igual à anterior: sombra preta sobre `#131010` não aparece (sonda: 10dp escurecem o fundo em 3/255) e o brilho, desenhado por baixo do conteúdo, era coberto pelo fundo do cabeçalho do card. Brilho passou para cima do conteúdo, com teto de 56dp, e a borda ganhou gradiente claro no topo. |
+| 2026-09-24 | C3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o sublinhado desliza ate a aba escolhida` (indicador termina com `left` e largura iguais aos da aba nova). |
 
 ## C1 · Tokens de motion e política
 
@@ -81,3 +82,13 @@ cápsula, marcador de ritmo, "Next update in 2m").
 - `AppMenu` em `OVERLAY`; `AppTooltipSurface` em `RAISED` pela sombra do sistema (a do Material saiu,
   o `tonalElevation` de 2dp ficou para não mudar o tom da bolha).
 - Diálogos não entram: são janelas do SO, com a sombra do SO.
+
+## C3 · Seleção animada
+
+- `AppSlidingIndicator.kt`: cada opção publica `(início, tamanho)` com `onPlaced`/`positionInParent`
+  e o contêiner desenha **um** indicador, animado por mola `SNAPPY`. A primeira posição é salto.
+- `AppTabs`: sublinhado num `Box` que embrulha só a fileira (mesma origem das posições), com
+  `APP_TABS_INDICATOR_TEST_TAG` para o teste medir onde ele parou.
+- `AppSegmentedControl`: polegar atrás dos rótulos, divisores por cima.
+- `AppSettingsNav`: bloco vertical atrás da coluna de itens.
+- `AppToggleChip` e os rótulos das três primitivas: cor por tween de 180ms.
