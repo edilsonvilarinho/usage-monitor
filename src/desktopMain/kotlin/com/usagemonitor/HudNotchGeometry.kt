@@ -92,7 +92,13 @@ internal data class HudNotchSizes(
     val collapsed: DpSize,
     val expanded: DpSize,
     /** O balão maior, com a cauda; é o teto de todos. */
-    val balloon: DpSize = DpSize(0.dp, 0.dp)
+    val balloon: DpSize = DpSize(0.dp, 0.dp),
+    /**
+     * O notch com as duas alças, uma além de cada ponta. É o tamanho da janela
+     * **durante o arrasto**: simétrico ao longo da borda, o centro da janela
+     * continua sendo o centro do notch, que é o que o encaixe lê.
+     */
+    val withHandles: DpSize = collapsed
 )
 
 /**
@@ -118,17 +124,33 @@ internal fun hudNotchSizes(
     } else {
         verticalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator)
     }
+    val handlesReach = (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2
+    val withHandles = if (edge.isHorizontal) {
+        DpSize(collapsed.width + handlesReach, collapsed.height)
+    } else {
+        DpSize(collapsed.width, collapsed.height + handlesReach)
+    }
     val tallest = accounts.maxOfOrNull { account -> hudBalloonHeight(account) }
-        ?: return HudNotchSizes(collapsed = collapsed, expanded = collapsed)
+        ?: return HudNotchSizes(collapsed = collapsed, expanded = withHandles, withHandles = withHandles)
     // O balão não gira com a borda: é texto, e fica sempre de pé.
     val balloon = DpSize(HUD_BALLOON_WIDTH, tallest)
     val expanded = if (edge.isHorizontal) {
-        DpSize(maxOf(collapsed.width, balloon.width), collapsed.height + HUD_BALLOON_GAP + balloon.height)
+        DpSize(maxOf(withHandles.width, balloon.width), collapsed.height + HUD_BALLOON_GAP + balloon.height)
     } else {
-        DpSize(collapsed.width + HUD_BALLOON_GAP + balloon.width, maxOf(collapsed.height, balloon.height))
+        DpSize(collapsed.width + HUD_BALLOON_GAP + balloon.width, maxOf(withHandles.height, balloon.height))
     }
-    return HudNotchSizes(collapsed = collapsed, expanded = expanded, balloon = balloon)
+    return HudNotchSizes(collapsed = collapsed, expanded = expanded, balloon = balloon, withHandles = withHandles)
 }
+
+/**
+ * As alças do notch aberto, uma além de cada ponta, como o `MoveHandle` e o
+ * `SettingsOrb` do Codenotch: a mão na ponta de perto (em cima, à esquerda) e a
+ * engrenagem na de longe. Um disco de 32dp é o alvo de clique que o resto do app
+ * já usa; paradas elas são só um arco na margem da sombra, que a janela recolhida
+ * já tem, e não custam área de clique engolida.
+ */
+internal val HUD_HANDLE_SIZE = 32.dp
+internal val HUD_HANDLE_GAP = 6.dp
 
 /** Largura do balão: o teto do card do Codenotch (246px), com folga para "Reinicia ter 21h00". */
 internal val HUD_BALLOON_WIDTH = 264.dp
@@ -294,15 +316,22 @@ internal data class HudWindowBounds(
  *
  * A borda da janela que encosta na tela **não** tem margem — o notch é reto ali
  * e rente —; as outras três têm [HUD_SHADOW_MARGIN] para a sombra. Perto de um
- * canto a janela é presa dentro da tela e o notch desliza para dentro dela, e é
- * por isso que o centro volta junto: quem compõe o posiciona por ele.
+ * canto o centro do notch é preso para que [reserveAlong] caiba inteiro na tela,
+ * e a janela desliza em volta dele; é por isso que o centro volta junto: quem
+ * compõe o posiciona por ele.
+ *
+ * [reserveAlong] é o que precisa caber em volta do centro. Parado e aberto ele é
+ * o notch **com as alças** (`HudNotchSizes.withHandles`): com o mesmo recorte
+ * nos dois estados o notch não anda na tela ao abrir, e as alças nunca ficam
+ * fora dela.
  */
 internal fun hudWindowBounds(
     edge: HudEdge,
     offsetFraction: Float,
     contentSize: DpSize,
     area: ScreenWorkArea,
-    margin: Dp = HUD_SHADOW_MARGIN
+    margin: Dp = HUD_SHADOW_MARGIN,
+    reserveAlong: Dp = if (edge.isHorizontal) contentSize.width else contentSize.height
 ): HudWindowBounds {
     val fraction = offsetFraction.coerceIn(0f, 1f)
     val alongContent = if (edge.isHorizontal) contentSize.width else contentSize.height
@@ -312,13 +341,13 @@ internal fun hudWindowBounds(
 
     val areaStart = if (edge.isHorizontal) area.x else area.y
     val areaLength = if (edge.isHorizontal) area.size.width else area.size.height
-    val center = areaStart + areaLength * fraction
+    val lowest = areaStart + margin + reserveAlong / 2
+    val highest = (areaStart + areaLength - margin - reserveAlong / 2).coerceAtLeast(lowest)
+    val center = (areaStart + areaLength * fraction).coerceIn(lowest, highest)
     val start = (center - alongWindow / 2)
         .coerceAtMost(areaStart + areaLength - alongWindow)
         .coerceAtLeast(areaStart)
-    val centerInWindow = (center - start)
-        .coerceAtLeast(margin + alongContent / 2)
-        .coerceAtMost(alongWindow - margin - alongContent / 2)
+    val centerInWindow = center - start
 
     return when (edge) {
         HudEdge.TOP -> HudWindowBounds(start, area.y, DpSize(alongWindow, acrossWindow), centerInWindow)
@@ -332,33 +361,29 @@ internal fun hudWindowBounds(
     }
 }
 
+/** A janela parada: só o notch, com o centro preso como o da aberta. */
+internal fun hudRestWindowBounds(
+    edge: HudEdge,
+    offsetFraction: Float,
+    sizes: HudNotchSizes,
+    area: ScreenWorkArea
+): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.collapsed, area, reserveAlong = sizes.handlesAlong(edge))
+
 /**
  * A janela aberta, com o notch **no mesmo ponto da tela** em que estava parado.
  *
- * A área aberta é maior que o notch, e centrá-la na fração gravada faria o notch
- * andar ao abrir sempre que ela fosse presa perto de um canto. Aqui a janela
- * aberta é calculada como sempre e o centro do notch dentro dela é refeito a
- * partir da posição **na tela** do notch parado; quem se ajusta ao canto é o
+ * As duas prendem o centro do notch pela mesma reserva — o notch com as alças —,
+ * então abrir perto de um canto não o faz andar; quem se ajusta ao canto é o
  * balão, que o composable prende dentro da janela.
  */
 internal fun hudOpenWindowBounds(
     edge: HudEdge,
     offsetFraction: Float,
     sizes: HudNotchSizes,
-    area: ScreenWorkArea,
-    margin: Dp = HUD_SHADOW_MARGIN
-): HudWindowBounds {
-    val closed = hudWindowBounds(edge, offsetFraction, sizes.collapsed, area, margin)
-    val open = hudWindowBounds(edge, offsetFraction, sizes.expanded, area, margin)
-    val closedStart = if (edge.isHorizontal) closed.x else closed.y
-    val openStart = if (edge.isHorizontal) open.x else open.y
-    val openAlong = if (edge.isHorizontal) open.size.width else open.size.height
-    val notchAlong = if (edge.isHorizontal) sizes.collapsed.width else sizes.collapsed.height
-    val center = (closedStart + closed.notchCenterInWindow - openStart)
-        .coerceAtLeast(margin + notchAlong / 2)
-        .coerceAtMost(openAlong - margin - notchAlong / 2)
-    return open.copy(notchCenterInWindow = center)
-}
+    area: ScreenWorkArea
+): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.expanded, area, reserveAlong = sizes.handlesAlong(edge))
+
+private fun HudNotchSizes.handlesAlong(edge: HudEdge): Dp = if (edge.isHorizontal) withHandles.width else withHandles.height
 
 /** Uma posição de notch gravada: a borda e o centro ao longo dela, em fração da tela. */
 internal data class HudPlacement(val edge: HudEdge, val offsetFraction: Float) {

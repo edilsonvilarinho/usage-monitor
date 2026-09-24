@@ -52,6 +52,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_COUNTDOWN_GAP
 import com.usagemonitor.HUD_COUNTDOWN_ICON
+import com.usagemonitor.HUD_HANDLE_GAP
 import com.usagemonitor.HUD_ITEM_GAP
 import com.usagemonitor.HUD_NOTCH_PADDING_ACROSS
 import com.usagemonitor.HUD_NOTCH_PADDING_ALONG
@@ -162,24 +164,35 @@ internal fun HudNotch(
     onDragEnd: () -> Unit = {},
     onOpenFull: () -> Unit,
     onSwitchToCardsOnly: () -> Unit = {},
+    /** O clique na engrenagem, a alça da ponta de longe. */
+    onGearClick: () -> Unit = {},
+    gearDescription: String = "",
     modifier: Modifier = Modifier,
     nowProvider: () -> Instant = { Clock.System.now() },
     waitNextTick: suspend () -> Unit = { delay(1_000L) },
     /** O interruptor do `FooterBar`: sob o relógio dos testes o laço giraria para sempre. */
     countdownUpdatesEnabled: Boolean = true
 ) {
-    // O ponteiro "está no notch" enquanto estiver no corpo **ou** no balão: sair
-    // de um para o outro atravessa a cauda, que é do balão.
+    // O ponteiro "está no notch" enquanto estiver no corpo, no balão ou numa
+    // alça: sair do anel para o balão atravessa a cauda, que é do balão, e
+    // chegar a uma alça passa rente à ponta do notch.
     val notchHover = remember { MutableInteractionSource() }
     val balloonHover = remember { MutableInteractionSource() }
+    val moveHover = remember { MutableInteractionSource() }
+    val gearHover = remember { MutableInteractionSource() }
     val notchHovered by notchHover.collectIsHoveredAsState()
     val balloonHovered by balloonHover.collectIsHoveredAsState()
-    val hovered = notchHovered || balloonHovered
+    val moveHovered by moveHover.collectIsHoveredAsState()
+    val gearHovered by gearHover.collectIsHoveredAsState()
+    val hovered = notchHovered || balloonHovered || moveHovered || gearHovered
     LaunchedEffect(hovered) {
         onHoverChange(hovered)
     }
 
     val open = expanded && !dragging
+    // As alças ficam durante o arrasto: é a mão que está sendo carregada, e
+    // tirá-la da composição cancelaria o gesto no meio.
+    val showHandles = open || dragging
     // A conta do balão é a do último anel sob o ponteiro. Fechado, ela é
     // esquecida: a próxima abertura começa pelo anel em que o ponteiro entrar.
     var balloonIndex by remember { mutableStateOf(initialBalloonIndex) }
@@ -277,6 +290,39 @@ internal fun HudNotch(
                     }
                 )
             }
+            for ((part, atStart) in listOf(HudNotchPart.HINT_START to true, HudNotchPart.HINT_END to false)) {
+                AnimatedVisibility(
+                    visible = !showHandles,
+                    modifier = Modifier.layoutId(part),
+                    enter = fadeIn(appTween(AppMotion.normal, delayMillis = HINT_RETURN_DELAY_MS)),
+                    exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
+                ) {
+                    HudHandleHint(edge = edge, atStart = atStart)
+                }
+            }
+            AnimatedVisibility(
+                visible = showHandles,
+                modifier = Modifier.layoutId(HudNotchPart.MOVE),
+                enter = handleEnter(),
+                exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
+            ) {
+                HudMoveHandle(
+                    language = language,
+                    carrying = dragging,
+                    onDragStart = onDragStart,
+                    onDragMove = onDragMove,
+                    onDragEnd = onDragEnd,
+                    interaction = moveHover
+                )
+            }
+            AnimatedVisibility(
+                visible = showHandles,
+                modifier = Modifier.layoutId(HudNotchPart.GEAR),
+                enter = handleEnter(),
+                exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
+            ) {
+                HudGearHandle(description = gearDescription, onClick = onGearClick, interaction = gearHover)
+            }
             AnimatedVisibility(
                 visible = open && shownIndex != null,
                 modifier = Modifier.layoutId(HudNotchPart.BALLOON),
@@ -310,6 +356,10 @@ internal fun HudNotch(
             .measure(Constraints())
         val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
             ?.measure(Constraints())
+        val extras = listOf(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR)
+            .associateWith { part ->
+                measurables.firstOrNull { measurable -> measurable.layoutId == part }?.measure(Constraints())
+            }
         val width = if (constraints.hasBoundedWidth) constraints.maxWidth else notch.width
         val height = if (constraints.hasBoundedHeight) constraints.maxHeight else notch.height
         val alongLength = if (edge.isHorizontal) width else height
@@ -339,12 +389,30 @@ internal fun HudNotch(
             }
         }
 
+        val notchAcross = if (edge.isHorizontal) notch.height else notch.width
+        val handleGap = HUD_HANDLE_GAP.roundToPx()
+
         layout(width, height) {
-            when (edge) {
-                HudEdge.TOP -> notch.place(notchStart, 0)
-                HudEdge.BOTTOM -> notch.place(notchStart, height - notch.height)
-                HudEdge.LEFT -> notch.place(0, notchStart)
-                HudEdge.RIGHT -> notch.place(width - notch.width, notchStart)
+            // (ao longo, a partir da borda da tela) → posição na caixa de cada borda.
+            fun Placeable.placeAt(along: Int, across: Int) {
+                val acrossSize = if (edge.isHorizontal) this.height else this.width
+                when (edge) {
+                    HudEdge.TOP -> place(along, across)
+                    HudEdge.BOTTOM -> place(along, height - across - acrossSize)
+                    HudEdge.LEFT -> place(across, along)
+                    HudEdge.RIGHT -> place(width - across - acrossSize, along)
+                }
+            }
+            notch.placeAt(notchStart, 0)
+            val notchEnd = notchStart + notchAlong
+            extras[HudNotchPart.HINT_START]?.let { hint -> hint.placeAt(notchStart - hint.alongSize(edge), 0) }
+            extras[HudNotchPart.HINT_END]?.let { hint -> hint.placeAt(notchEnd, 0) }
+            // As alças centradas na espessura do notch, uma além de cada ponta.
+            extras[HudNotchPart.MOVE]?.let { handle ->
+                handle.placeAt(notchStart - handleGap - handle.alongSize(edge), (notchAcross - handle.acrossSize(edge)) / 2)
+            }
+            extras[HudNotchPart.GEAR]?.let { handle ->
+                handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2)
             }
             if (balloon != null) {
                 when (edge) {
@@ -358,7 +426,21 @@ internal fun HudNotch(
     }
 }
 
-private enum class HudNotchPart { NOTCH, BALLOON }
+private enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
+
+private fun Placeable.alongSize(edge: HudEdge): Int = if (edge.isHorizontal) width else height
+
+private fun Placeable.acrossSize(edge: HudEdge): Int = if (edge.isHorizontal) height else width
+
+/** As alças entram depois de a janela crescer, pela mola com rebote, como os discos do Codenotch. */
+@Composable
+private fun handleEnter() = fadeIn(appTween(AppMotion.normal, AppMotion.emphasizedEasing)) +
+    scaleIn(appSpring<Float>(AppMotion.Springs.EXPRESSIVE), initialScale = HANDLE_ENTER_SCALE)
+
+private const val HANDLE_ENTER_SCALE = 0.86f
+
+/** O arco parado volta depois de as alças saírem, não por cima delas. */
+private const val HINT_RETURN_DELAY_MS = 120
 
 /**
  * Onde o balão foi posto nesta abertura. Não é estado de composição: é lido e

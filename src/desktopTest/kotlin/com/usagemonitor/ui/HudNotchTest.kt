@@ -10,6 +10,8 @@ import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudOpenWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_GEAR_HANDLE_TAG
+import com.usagemonitor.presentation.ui.HUD_MOVE_HANDLE_TAG
 import com.usagemonitor.presentation.ui.hudBalloonBoxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -78,6 +80,7 @@ class HudNotchTest {
     private companion object {
         const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · 5h 28% · 7d 9%"
         const val DEEPSEEK_RING = "DeepSeek · Sem projeção · Saldo \$2.27"
+        const val GEAR = "Configurações"
     }
     private val countdown = "Próxima atualização automática"
 
@@ -109,7 +112,9 @@ class HudNotchTest {
         onDragMove: () -> Unit = {},
         onDragEnd: () -> Unit = {},
         onOpenFull: () -> Unit = {},
-        onSwitchToCardsOnly: () -> Unit = {}
+        onSwitchToCardsOnly: () -> Unit = {},
+        dragging: Boolean = false,
+        onGearClick: () -> Unit = {}
     ) {
         AppTheme(isDark = true) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
@@ -130,7 +135,10 @@ class HudNotchTest {
                     onDragMove = onDragMove,
                     onDragEnd = onDragEnd,
                     onOpenFull = onOpenFull,
-                    onSwitchToCardsOnly = onSwitchToCardsOnly
+                    onSwitchToCardsOnly = onSwitchToCardsOnly,
+                    dragging = dragging,
+                    onGearClick = onGearClick,
+                    gearDescription = GEAR
                 )
             }
         }
@@ -259,6 +267,13 @@ class HudNotchTest {
                     )
                     val column = onNodeWithTag(HUD_BALLOON_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
                     assertEquals(hudBalloonHeight(account) - HUD_BALLOON_PADDING * 2, column.height, "$edge conta $index: linhas do balão")
+                    for (tag in listOf(HUD_MOVE_HANDLE_TAG, HUD_GEAR_HANDLE_TAG)) {
+                        val handle = onNodeWithTag(tag).getUnclippedBoundsInRoot()
+                        assertTrue(
+                            handle.left >= 0.dp && handle.top >= 0.dp && handle.right <= window.size.width && handle.bottom <= window.size.height,
+                            "$edge: alça $tag fora da janela ($handle em ${window.size})"
+                        )
+                    }
                     // Aberto, o notch continua do mesmo tamanho e no mesmo lugar.
                     assertEquals(notchBounds, onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot(), "$edge: o notch mudou")
                 }
@@ -364,6 +379,78 @@ class HudNotchTest {
         onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput { exit(Offset(-1f, -1f)) }
         waitForIdle()
         assertEquals(false, reported.last())
+    }
+
+    // ------------------------------------------------------------ alças (rodada 3)
+
+    @Test
+    fun `as alcas aparecem so com o notch aberto`() = runDesktopComposeUiTest {
+        var open by mutableStateOf(false)
+        setContent { notch(expanded = open) }
+
+        onNodeWithTag(HUD_MOVE_HANDLE_TAG).assertDoesNotExist()
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).assertDoesNotExist()
+        open = true
+        waitForIdle()
+        onNodeWithContentDescription("Mover a barra HUD").assertIsDisplayed()
+        onNodeWithContentDescription(GEAR).assertIsDisplayed()
+    }
+
+    /** A mão é o jeito descobrível de mover: arrastar por ela move e não abre nada. */
+    @Test
+    fun `arrastar pela mao move o notch`() = runDesktopComposeUiTest {
+        var opens = 0
+        val events = mutableListOf<String>()
+        setContent {
+            notch(
+                expanded = true,
+                onDragStart = { events += "start" },
+                onDragMove = { events += "move" },
+                onDragEnd = { events += "end" },
+                onOpenFull = { opens += 1 }
+            )
+        }
+
+        onNodeWithTag(HUD_MOVE_HANDLE_TAG).performMouseInput {
+            moveTo(center)
+            press()
+            moveTo(center + Offset(0f, 80f))
+            release()
+        }
+        waitForIdle()
+
+        assertEquals(0, opens)
+        assertEquals("start", events.first())
+        assertEquals("end", events.last())
+    }
+
+    /** Carregando, a mão continua na tela: tirá-la da composição cancelaria o gesto. */
+    @Test
+    fun `durante o arrasto a mao continua e o balao some`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = false, dragging = true) }
+
+        onNodeWithTag(HUD_MOVE_HANDLE_TAG).assertIsDisplayed()
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a engrenagem chama a acao dela`() = runDesktopComposeUiTest {
+        var gears = 0
+        setContent { notch(expanded = true, onGearClick = { gears += 1 }) }
+
+        onNodeWithContentDescription(GEAR).performClick()
+        assertEquals(1, gears)
+    }
+
+    /** Ir do notch até uma alça não pode fechar o notch: a alça conta como "em cima". */
+    @Test
+    fun `o ponteiro sobre uma alca conta como sobre o notch`() = runDesktopComposeUiTest {
+        val reported = mutableListOf<Boolean>()
+        setContent { notch(expanded = true, onHoverChange = { hovered -> reported += hovered }) }
+
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(true, reported.last())
     }
 
     // ------------------------------------------------------------ contagem (#185)

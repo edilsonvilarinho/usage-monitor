@@ -86,11 +86,16 @@ class HudNotchGeometryTest {
         for (edge in HudEdge.entries) {
             for (fraction in listOf(0f, 0.02f, 0.5f, 0.98f, 1f)) {
                 val sizes = hudNotchSizes(accounts, edge, "", true, false)
-                val closed = hudWindowBounds(edge, fraction, sizes.collapsed, screen)
+                val closed = hudRestWindowBounds(edge, fraction, sizes, screen)
                 val open = hudOpenWindowBounds(edge, fraction, sizes, screen)
                 val closedCenter = (if (edge.isHorizontal) closed.x else closed.y) + closed.notchCenterInWindow
                 val openCenter = (if (edge.isHorizontal) open.x else open.y) + open.notchCenterInWindow
                 assertEquals(closedCenter, openCenter, "$edge em $fraction")
+                // As alças cabem na janela aberta, mesmo no canto.
+                val openAlong = if (edge.isHorizontal) open.size.width else open.size.height
+                val handlesHalf = (if (edge.isHorizontal) sizes.withHandles.width else sizes.withHandles.height) / 2
+                assertTrue(open.notchCenterInWindow - handlesHalf >= 0.dp, "$edge em $fraction: mão fora")
+                assertTrue(open.notchCenterInWindow + handlesHalf <= openAlong, "$edge em $fraction: engrenagem fora")
             }
         }
     }
@@ -129,7 +134,10 @@ class HudNotchGeometryTest {
     fun `sem contas sobra a linha de carregamento`() {
         val sizes = hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
         assertTrue(sizes.collapsed.width > HUD_RING_SIZE)
-        assertEquals(sizes.collapsed, sizes.expanded)
+        // Sem conta não há balão, mas as alças continuam: a engrenagem é a saída.
+        assertEquals(sizes.withHandles, sizes.expanded)
+        assertEquals(sizes.collapsed.height, sizes.withHandles.height)
+        assertEquals(sizes.collapsed.width + (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2, sizes.withHandles.width)
     }
 
     @Test

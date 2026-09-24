@@ -78,6 +78,7 @@ internal fun HudWindowHost(
     onOpenFull: () -> Unit,
     onSwitchToCardsOnly: () -> Unit,
     onOpenHelp: () -> Unit,
+    onOpenSettings: () -> Unit,
     onCloseRequest: () -> Unit,
     /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
     activeTargets: StateFlow<Set<UsageTargetKey>>? = null
@@ -154,10 +155,12 @@ internal fun HudWindowHost(
     )
     // Aberta, a janela ganha o espaço do balão e o notch fica no mesmo ponto da
     // tela (`hudOpenWindowBounds`); quem se ajusta a um canto é o balão.
-    val bounds = if (windowOpen && !dragging) {
-        hudOpenWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
-    } else {
-        hudWindowBounds(placement.edge, placement.offsetFraction, sizes.collapsed, composedArea)
+    // Carregando, a janela é o notch com as alças — simétrico ao longo da borda,
+    // então o centro dela continua sendo o do notch, que é o que o encaixe lê.
+    val bounds = when {
+        dragging -> hudWindowBounds(placement.edge, placement.offsetFraction, sizes.withHandles, composedArea)
+        windowOpen -> hudOpenWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
+        else -> hudRestWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     }
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
@@ -268,6 +271,9 @@ internal fun HudWindowHost(
                     onOpenFull = onOpenFull,
                     // Botão direito (issue #215): direto para "Somente cards".
                     onSwitchToCardsOnly = onSwitchToCardsOnly,
+                    // A engrenagem da ponta de longe, o `SettingsOrb` do Codenotch.
+                    onGearClick = onOpenSettings,
+                    gearDescription = if (language == AppLanguage.PT) "Configurações" else "Settings",
                     modifier = Modifier.fillMaxSize()
                 )
             }

@@ -71,7 +71,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | E1 | Timer cortado: folga de arredondamento de pixel na estimativa de texto | feito |
 | E2 | Modelo do balão: usado/restante, origem, rótulo e grupo da cota | feito |
 | E3 | Balão por anel com cauda, no lugar do painel de todas as contas | feito |
-| E4 | Alças: mão (mover) e engrenagem | pendente |
+| E4 | Alças: mão (mover) e engrenagem | feito |
 | E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | pendente |
 | E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | pendente |
 | E7 | Documentação, design system, protótipo, ajuda, capturas | pendente |
@@ -104,6 +104,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTextFitTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.HudNotchGeometryTest"` | Primeira passada do teste novo **vermelha**, reproduzindo o defeito: em toda escala fracionária (105%–200%) o texto desenhado passava a estimativa em até 0,8dp — o Skia arredonda a largura da linha para cima em pixel inteiro. Na faixa as diferenças somavam e a contagem, último item, quebrava. Com 1dp de folga por texto: verde. |
 | 2026-09-24 | E2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest"` | Verde, com cinco casos novos: usado/restante nos dois idiomas, "<1" nas duas pontas, saldo e atividade observada sem a linha, rodapé de plano + origem, grupo e título do Antigravity. |
 | 2026-09-24 | E3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.Hud*"` | Verde: 19 casos do notch (balão só da conta do anel sob o ponteiro; costura de tamanho do notch e do balão nas 4 bordas) e os novos de geometria (notch parado na tela ao abrir em 5 frações × 4 bordas, balão da conta mais alta, grupos). Renderização descartável nas 4 bordas: cauda no anel certo e a contagem inteira ("04:50"). |
+| 2026-09-24 | E4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*"` | Verde: 24 casos do notch (alças só abertas, arrasto pela mão sem abrir nada, mão presente durante o arrasto, engrenagem, hover na alça conta como no notch, alças dentro da janela aberta nas 4 bordas) e 13 de geometria (notch parado na tela e alças dentro da janela até na fração 0 e 1). A renderização em fração 0,9 reprovou a primeira versão: engrenagem fora da janela. |
 
 ## C1 · Tokens de motion e política
 
@@ -414,3 +415,27 @@ na borda da sombra e CPU da rotação contínua.
 - Teste de costura reescrito: nas quatro bordas o notch tem o tamanho recolhido parado e aberto, o
   balão de cada conta tem a caixa de `hudBalloonBoxSize`, cabe inteiro na janela aberta, e a coluna
   de linhas mede exatamente `hudBalloonHeight` menos o padding.
+
+## E4 · Alças: mão e engrenagem
+
+- `HudHandles.kt`: o `MoveHandle` e o `SettingsOrb` do Codenotch. A **mão** fica na ponta de perto
+  (em cima ou à esquerda) e a **engrenagem** na de longe, cada uma um disco de 32dp em `RAISED`,
+  centrado na espessura do notch e 6dp além da ponta. Entram com o notch aberto (fade e escala 0,86 → 1
+  pela mola `EXPRESSIVE`); o hover acende o glifo e a pressão encolhe o disco.
+- **A mão move**: é o mesmo `hudPressGesture` do corpo, com o clique vazio, e o host continua lendo o
+  ponteiro na tela. Carregando, a mão **fica na composição** — tirá-la cancelaria o gesto no meio — e
+  ganha a borda de informação de 2dp. O arrasto pelo corpo do notch continua.
+- **A engrenagem abre as Configurações** neste passo, como o orbe do Codenotch; o E5 a troca pelo balão
+  de ações. `HudWindowHost` ganhou `onOpenSettings`.
+- Parado, cada alça é um **arco de um quarto** (`HudHandleHint`) rente à borda da tela, dentro da
+  margem de sombra de 16dp que a janela recolhida já tem: nenhuma área nova engolindo clique. Na cor
+  `outline` — a borda de luz do notch sumia contra fundo escuro, e a renderização mostrou isso.
+- O hover do notch passou a ser a união de corpo, balão **e alças**.
+- **Geometria**: `HudNotchSizes.withHandles` (o notch mais as duas alças). A área aberta reserva as
+  alças ao longo da borda, e durante o arrasto a janela tem o tamanho `withHandles` — simétrico, então o
+  centro da janela continua sendo o do notch, que é o que `nearestHudPlacement` lê.
+- **O centro do notch é preso pela reserva com as alças, parado e aberto** (`reserveAlong` em
+  `hudWindowBounds`, `hudRestWindowBounds`). A primeira renderização em fração 0,9 mostrou a
+  engrenagem fora da janela: o centro era preso contando só o notch. Com a mesma reserva nos dois
+  estados o notch continua sem andar ao abrir, e as alças cabem na tela até no canto — o preço é o notch
+  parar 38dp mais longe do canto que antes.

@@ -2311,6 +2311,11 @@ private fun runUsageMonitor(
                 breadcrumbs.recordScreenOpened("Ajuda (F1)")
                 isHelpDialogOpen = true
             },
+            onOpenSettings = {
+                breadcrumbs.recordScreenOpened("Configurações (HUD)")
+                isSettingsDialogOpen = true
+                settingsOpenGeneration++
+            },
             onCloseRequest = { shutdownApplication() },
             activeTargets = sessionPulseViewModel.activeTargets
         )
