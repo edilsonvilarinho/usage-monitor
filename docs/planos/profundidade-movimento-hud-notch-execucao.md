@@ -74,7 +74,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | E4 | Alças: mão (mover) e engrenagem | feito |
 | E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | feito |
 | E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | feito |
-| E7 | Documentação, design system, protótipo, ajuda, capturas | pendente |
+| E7 | Documentação, design system, protótipo, ajuda, capturas | feito |
 | E8 | Verificação | pendente |
 
 ## Pontos de situação
@@ -107,6 +107,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*"` | Verde: 24 casos do notch (alças só abertas, arrasto pela mão sem abrir nada, mão presente durante o arrasto, engrenagem, hover na alça conta como no notch, alças dentro da janela aberta nas 4 bordas) e 13 de geometria (notch parado na tela e alças dentro da janela até na fração 0 e 1). A renderização em fração 0,9 reprovou a primeira versão: engrenagem fora da janela. |
 | 2026-09-24 | E5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.ui.FooterBar*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde: 28 casos do notch (engrenagem abre e fecha o balão; ações do rodapé pelas mesmas descrições; modos com o corrente marcado; anel troca para a conta; altura do balão com e sem atualização) e as suítes do rodapé e de componentes sem mudança. Renderização descartável: cauda na engrenagem nas bordas de cima e da direita. |
 | 2026-09-24 | E6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.ComponentTest" --tests "com.usagemonitor.ui.*Card*"` | Verde: 30 casos do notch (clique no anel atualiza só aquela conta, fora dos anéis nada; ação declarada na semântica do anel; botões do card no balão; indicador de atualização sem clique próprio), `CardActionsTest` (3) e o `ComponentTest` (99) sem mudança na barra do card. Renderização descartável: fileira histórico · sessões · time · presença · atualizar no balão. |
+| 2026-09-24 | E7 | Claude Opus 5.5 | `gradlew.bat generateScreenshots + gradlew.bat generateHelpMedia + desktopTest --tests "*Help*"` | Verde. Capturas do README idênticas às anteriores (a barra do card não mudou); demo de modos de janela com o balão e os botões do card — a primeira passada saiu com a fileira vazia, porque o gerador não passava `accountActions`; quatro demos atualizadas pelo selo do plano do D3. |
 
 ## C1 · Tokens de motion e política
 
@@ -486,3 +487,21 @@ na borda da sombra e CPU da rotação contínua.
 - **O clique deixou de abrir a janela padrão.** Ela continua a um gesto: "Padrão" no balão da
   engrenagem, "Abrir" na bandeja, `Ctrl+Shift+H`; e o botão direito continua indo a "Somente cards"
   (#215). `HUD_BAR_OPEN_DESCRIPTION` virou `HUD_NOTCH_DESCRIPTION`, sem ação de clique.
+
+## E7 · Documentação
+
+- `CLAUDE.md`, seção "Barra HUD — notch": balão por anel, "usado · restante" e origem, `cardActionsFor`,
+  `AppShellActions`, alças, clique no anel = atualizar, folga de 1dp por texto, centro preso pela
+  reserva com as alças, saídas para a janela padrão.
+- Design system: `AppHudBar` (contrato, `.d.ts` com `balloon` no lugar de `expanded`, `.jsx`), kit
+  `Hud.jsx` com as pranchas do balão de conta, da lateral e da engrenagem, e o parágrafo da HUD no
+  `readme.md` — sem primitiva nova: o balão reaproveita `CardActionButton` e a fileira do rodapé.
+- Protótipo: as pranchas 2 e 3 da seção "Barra HUD — notch" (o painel de todas as contas) viraram o
+  balão por anel com as alças, e entrou a 3b, a engrenagem; notas de balão, alças, geometria e gestos.
+- Ajuda, tópico "Modos de janela" (PT/EN): o balão, o clique que atualiza, a mão que move e a
+  engrenagem como caminho de volta ao Padrão — o passo "um clique curto devolve a janela ao Padrão"
+  deixou de ser verdade.
+- Demos regeneradas. A de modos de janela mostra o balão com os botões do card (o gerador passa
+  `accountActions` pela mesma `cardActionsFor`). As de dashboard, histórico, time e atualizações
+  mudaram por outro motivo: o selo do plano ao lado do nome do card, correção do D3 que ainda não tinha
+  chegado a elas. As capturas do README saíram idênticas — a barra do card não mudou.

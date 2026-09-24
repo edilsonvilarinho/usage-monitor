@@ -694,8 +694,9 @@ acidente.
   controle — mesmo padrão de `onOpenAdminOverview`, e é o que mantém os geradores de captura
   intactos.
 
-**Barra HUD — notch** (`HudWindow.kt` + `HudNotch.kt` + `HudNotchGeometry.kt` + `HudModel.kt` +
-`AppUsageRing` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, redesenhada no plano
+**Barra HUD — notch** (`HudWindow.kt` + `HudNotch.kt` + `HudBalloon.kt` + `HudHandles.kt` +
+`HudNotchGeometry.kt` + `HudModel.kt` + `AppShellActions.kt` + `CardActions.kt` + `AppUsageRing` +
+`HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, redesenhada no plano
 [`profundidade-movimento-hud-notch-execucao.md`](docs/planos/profundidade-movimento-hud-notch-execucao.md)):
 terceiro chrome, ainda mais discreto que o modo somente cards. A janela principal fica **escondida**
 (`visible = !hudMode`), com a geometria intacta, e sobra um **notch colado numa borda da tela** numa
@@ -709,16 +710,32 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   risco, depois maior percentual — `HudAccount.focusIndex`) e a **palavra do estado, sempre**: no
   notch recolhido não existe mais nada na tela, e cor nunca informa sozinha. Cota sem projeção tem a
   trilha **tracejada**.
-- **Aberto** (ponteiro em cima), o notch se desdobra pela mola `EXPRESSIVE` para dentro da tela: um
-  bloco por conta (ponto + palavra, nome) e uma linha de 20dp por cota — rótulo curto, barra,
-  percentual, hora do reinício (#189). Cota sem reset não imprime nada no lugar. O painel entra 60ms
-  depois de o notch começar a crescer, para o texto não nascer espremido.
+- **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
+  Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
+  **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
+  título e estado; por cota o título do card ("Sessão 5h") e "Reinicia 22h59" (#189), barra e
+  **"68% usado · 32% restante"** (`hudUsedLeftText`: usado truncado como o anel, restante derivado
+  do usado exibido, "<1%" nas duas pontas, nada para saldo e atividade observada); cotas do mesmo grupo
+  (Antigravity, Cursor) numa caixa sob o nome dele; o rodapé **"Plus · via Codex"** — plano e origem da
+  leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
+  (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
+  mola `GENTLE` com crossfade do conteúdo.
+- **Os botões do card têm dona única** (`cardActionsFor`): histórico sempre, sessões CLI na Anthropic,
+  sessões Codex CLI no Codex, uso e presença do time na conta marcada. A barra do card e o balão compõem
+  o mesmo `CardActionButton`; o balão acrescenta "atualizar só esta conta". As ações moram em
+  `AppShellActions`, montadas **uma vez** em `main()` e consumidas pelo `DashboardScreen` e pelo host.
+- **Alças nas pontas** (`HudHandles.kt`), o `MoveHandle` e o `SettingsOrb` do Codenotch: com o notch
+  aberto, a **mão** (ponta de perto) move — arrastar por ela, ou pelo corpo — e a **engrenagem** (ponta
+  de longe) abre o balão com **tudo o que o rodapé oferece**: contagem, os três modos de janela em
+  linhas (o menu do rodapé é `Popup` e seria recortado pela janela) e o próprio `FooterActionGroup`.
+  Paradas, as alças são um arco de um quarto na margem de sombra que a janela já tem — nenhuma área
+  nova engolindo clique. Carregando, a mão **fica na composição**: tirá-la cancelaria o gesto.
 - **Identificação, como no Codenotch e no ai-usagebar**: a **marca do fornecedor** (`AppProviderMark`)
   no miolo de cada anel, na cor do texto — em volta dela os arcos já carregam a cor de risco —, e no
-  cabeçalho do bloco aberto no acento da fonte. O rótulo da conta é o **título do card**
+  cabeçalho do balão no acento da fonte. O rótulo da conta é o **título do card**
   (`ApiUsageStats.displayTitle`, dono único: "Anthropic — Padrão"); a HUD mostrava só "Padrão" e
-  escondia de quem era a conta. O **plano** ("Max 20x", "ChatGPT Plus") vem ao lado do nome no
-  painel aberto e na descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo.
+  escondia de quem era a conta. O **plano** ("Max 20x", "ChatGPT Plus") vem no rodapé do balão e na
+  descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo.
 - **Resumo na bandeja** (`hudTraySummary`): o tooltip do ícone lista cada conta com o percentual em
   foco — "Usage Monitor — Anthropic — Padrão 87% · Codex 0%" —, cortado com reticências nos 127
   caracteres do `szTip` do Windows.
@@ -732,37 +749,52 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
 - **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
   `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela tem o tamanho do notch parado mais a margem
   de sombra de 16dp nos três lados de dentro, e só cresce quando o ponteiro entra: **de uma vez** (a
-  área nova é transparente, o salto não se vê), com a mola rodando **dentro** dela; ao sair, o
-  conteúdo recolhe (150ms de espera contra o `Exit` de um quadro na divisa) e a janela encolhe **depois**
-  de a mola assentar (450ms). **Nenhum redimensionamento AWT por quadro** — era o tranco da barra
-  anterior, que interpolava a janela.
+  área nova é transparente, o salto não se vê), com o balão entrando **dentro** dela; ao sair, o balão
+  some (150ms de espera contra o `Exit` de um quadro na divisa) e a janela encolhe **depois** (200ms).
+  **Nenhum redimensionamento AWT por quadro** — era o tranco da barra anterior, que interpolava a
+  janela. O hover é a **união** de corpo, balão e alças: o caminho do anel ao balão passa pela cauda,
+  que é opaca e do balão.
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
   estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número
-  calculável. O contêiner composto usa **os mesmos números** (`requiredSize`), e `HudNotchTest` afirma
-  que o disposto é exatamente eles nas quatro bordas, parado e aberto: é a costura que a barra antiga
-  quebrou quando o padding que a geometria não contava cortou o texto ao meio. A largura parada é o
-  maior entre percentual e palavra, e uma coleta que troca `9%` por `88%` não mexe na janela.
+  calculável. O notch e o balão usam **os mesmos números** (`requiredSize`; o balão por
+  `hudBalloonHeight`/`hudAppBalloonHeight`, linhas de altura fixa), e `HudNotchTest` afirma nas quatro
+  bordas que o notch tem o tamanho recolhido parado e aberto, que o balão de cada conta cabe inteiro na
+  janela aberta e que a coluna dele mede o que a geometria soma: é a costura que a barra antiga quebrou
+  quando o padding que a geometria não contava cortou o texto ao meio. A área aberta reserva o balão
+  **mais alto** — trocar de anel não redimensiona a janela. A largura parada é o maior entre
+  percentual e palavra, e uma coleta que troca `9%` por `88%` não mexe na janela.
+  - **Cada texto leva 1dp de folga** (`charWidth`): o Skia arredonda a linha para cima em pixel
+    inteiro, e em densidade fracionária (115% sobre 125% do Windows) as diferenças somavam e a
+    contagem, último item da faixa, quebrava em "04:5". Em densidade 1 — a dos testes de componente —
+    as contas batem, e por isso só `HudNotchTextFitTest`, que varre 100%–200%, pega.
+  - **O centro do notch é preso reservando as alças, parado e aberto** (`reserveAlong`,
+    `hudRestWindowBounds`/`hudOpenWindowBounds`): com o mesmo recorte nos dois estados o notch não anda
+    na tela ao abrir perto de um canto, e as alças nunca ficam fora da tela. Durante o arrasto a janela
+    é `withHandles`, simétrica, e o centro dela continua sendo o do notch.
 - **Posição é borda + fração** (`HudPlacement`, chaves `hudEdge`/`hudEdgeOffset`): sobrevive a troca
   de resolução e de monitor. Arrastar solta o notch da borda; ao soltar, `nearestHudPlacement` o gruda
   na borda mais próxima do **centro** dele, na tela inteira (pode ficar sobre a barra de tarefas). A
   posição da pílula antiga (`hudWindowX/Y`) migra uma vez e as chaves velhas são apagadas. Estreia no
   topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.
-- **Um gesto só** (`hudPressGesture`): clique curto abre a janela padrão; botão direito vai direto a
-  "Somente cards" (sem popup — seria recortado dentro desta janela); arrasto além do limiar move. A
-  ação de clique é **declarada** na semântica, não instalada por `clickable`, que consumiria o `down`.
-  Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por `MouseInfo`, incremental.
-  Cursor de mover no hover. Três saídas: clique, bandeja, `Ctrl+Shift+H`; "Abrir" da bandeja e a
-  segunda instância saem da HUD antes de ativar a janela.
+- **Um gesto só** (`hudPressGesture`): **clique num anel recoleta aquela conta** (decisão da rodada 3,
+  como o `refreshRing` do Codenotch — o gesto entrega a posição do `down` e o notch acha o anel pela
+  caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; botão
+  direito vai direto a "Somente cards" (sem popup — seria recortado dentro desta janela); arrasto além
+  do limiar move. A ação de cada anel é **declarada** na semântica, não instalada por `clickable`, que
+  consumiria o `down`. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
+  `MouseInfo`, incremental. Saídas para a janela padrão: "Padrão" no balão da engrenagem, bandeja,
+  `Ctrl+Shift+H`; "Abrir" da bandeja e a segunda instância saem da HUD antes de ativar a janela.
 - **Contagem até a próxima coleta uma vez só, no fim da faixa** (#185): o polling é do app inteiro. O
   tique mora no composable e tem o interruptor `countdownUpdatesEnabled`, porque sob o relógio dos
-  testes o laço giraria para sempre. **Atualização pendente é só ícone, sem clique próprio** (#225):
-  o notch inteiro já abre a janela padrão, onde a faixa oferece o reinício.
+  testes o laço giraria para sempre; o balão da engrenagem a repete no título. **Atualização pendente
+  é só ícone, sem clique próprio** (#225): a frase está no balão da engrenagem e o reinício é
+  oferecido na janela padrão.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira por
   dentro do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
   fica parado e o pulso some; a palavra continua dizendo o estado.
-- **O que a barra de linhas ensinou e continua valendo**: a lista é conteúdo da janela, nunca `Popup`
+- **O que a barra de linhas ensinou e continua valendo**: o balão é conteúdo da janela, nunca `Popup`
   (popup aqui é camada **dentro** da janela e saía recortado sobre o próprio alvo); a HUD não tem
   translucidez própria (a opacidade é só a preferência do usuário); cota sem projeção continua na HUD
   (o percentual é fato medido); nenhum formato novo — percentual de `compactPercentageLabel`, reset de

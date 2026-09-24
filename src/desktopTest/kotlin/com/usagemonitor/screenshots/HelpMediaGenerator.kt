@@ -1,5 +1,10 @@
 package com.usagemonitor.screenshots
 
+import com.usagemonitor.HUD_BALLOON_ACTIONS
+import com.usagemonitor.presentation.ui.components.CardActionButton
+import com.usagemonitor.presentation.ui.components.CardIconActionButton
+import com.usagemonitor.presentation.ui.components.RefreshGlyph
+import com.usagemonitor.presentation.ui.components.cardActionsFor
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -500,6 +505,16 @@ private fun recordWindowModes(outputDir: File) {
                                 fallbackLabel = "Carregando",
                                 expanded = true,
                                 initialBalloonIndex = 0,
+                                // Os botões do card da conta, pela mesma regra do card
+                                // (conta do time marcada, como na captura do dashboard).
+                                accountActions = { account ->
+                                    cardActionsFor(account.targetKey, setOf("padrao")).forEach { action ->
+                                        CardActionButton(action, AppLanguage.PT, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
+                                    }
+                                    CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
+                                        RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
+                                    }
+                                },
                                 // A contagem (#185) é parte do notch. O laço vai
                                 // desligado: o gravador dorme em tempo real e um
                                 // relógio andando mudaria cada passada.

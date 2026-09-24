@@ -2,13 +2,14 @@ const { AppHudBar } = DS;
 
 // Uma conta por anel, um arco por cota. A palavra é a da pior cota, e o
 // percentual ao lado é o da cota em foco (pior risco, depois maior percentual).
-// `reset` só aparece aberto; o saldo pré-pago não tem e nada é impresso.
+// `reset` só aparece no balão; o saldo pré-pago não tem e nada é impresso.
 const ACCOUNTS = [
   {
     label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', active: true,
+    detail: 'Max 20x · via Claude Code',
     quotas: [
-      { short: '5h', percent: '68%', fraction: 0.68, level: 'warn', reset: '22h59' },
-      { short: '7d', percent: '41%', fraction: 0.41, level: 'ok', reset: 'Ter 21h00' }
+      { short: '5h', title: 'Sessão 5h', percent: '68%', fraction: 0.68, level: 'warn', reset: '22h59', usedLeft: '68% usado · 32% restante' },
+      { short: '7d', title: 'Semanal', percent: '41%', fraction: 0.41, level: 'ok', reset: 'Ter 21h00', usedLeft: '41% usado · 59% restante' }
     ]
   },
   {
@@ -57,14 +58,19 @@ export function Hud() {
         <AppHudBar accounts={ACCOUNTS} countdown="02:05" />
       </Screen>
 
-      <Caption>2 · hover — desdobra pela mola, uma linha por cota com barra e reinício</Caption>
+      <Caption>2 · ponteiro no primeiro anel — balão só daquela conta, alças nas pontas</Caption>
       <Screen tall>
-        <AppHudBar accounts={ACCOUNTS} expanded countdown="02:05" />
+        <AppHudBar accounts={ACCOUNTS} balloon={0} countdown="02:05" actions={['⟲', '▣', '⚇', '◉']} />
       </Screen>
 
-      <Caption>3 · colado na lateral direita — coluna de anéis, o painel abre para dentro</Caption>
+      <Caption>3 · colado na lateral direita — o balão abre para dentro, a cauda no anel</Caption>
       <Screen edge="right" tall>
-        <AppHudBar accounts={ACCOUNTS} edge="right" expanded countdown="02:05" />
+        <AppHudBar accounts={ACCOUNTS} edge="right" balloon={0} countdown="02:05" />
+      </Screen>
+
+      <Caption>3b · engrenagem — o que o rodapé oferece: contagem, modos, ações</Caption>
+      <Screen tall>
+        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" />
       </Screen>
 
       <Caption>4 · antes da primeira coleta, com atualização pendente</Caption>
@@ -74,13 +80,15 @@ export function Hud() {
 
       <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '58ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>
         Janela própria, transparente e sempre no topo; a janela principal fica escondida com a
-        geometria intacta. Clique em pixel transparente é engolido no Windows (medido), então a
-        janela só tem o tamanho do painel enquanto o ponteiro está no notch: cresce de uma vez ao
-        entrar, a mola roda dentro dela, e encolhe depois de o conteúdo recolher. Arraste e solte
-        perto de qualquer borda: ele gruda na mais próxima e a posição é gravada como borda +
-        fração. Clique abre a janela; botão direito vai direto a "Somente cards"; Ctrl+Shift+H e a
-        bandeja também saem. O arco fino de sessão ativa gira e o anel de fora pulsa em atenção só
-        com a animação contínua ligada — nunca em testes nem capturas.
+        geometria intacta. O notch não cresce: o detalhe é o balão de uma conta, a do anel sob o
+        ponteiro. Clique em pixel transparente é engolido no Windows (medido), então a janela só
+        tem o tamanho da área aberta enquanto o ponteiro está no notch: cresce de uma vez ao
+        entrar e encolhe depois de o balão sair, sem mover o notch. A mão move (solte perto de
+        qualquer borda: ele gruda na mais próxima, gravado como borda + fração); a engrenagem abre
+        as ações do rodapé. Clique num anel atualiza aquela conta; botão direito vai direto a
+        "Somente cards"; "Padrão" na engrenagem, Ctrl+Shift+H e a bandeja voltam à janela. O arco
+        fino de sessão ativa gira e o anel de fora pulsa em atenção só com a animação contínua
+        ligada — nunca em testes nem capturas.
       </span>
     </div>
   );

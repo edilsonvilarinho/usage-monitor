@@ -231,7 +231,11 @@ because an account with a 5h and a 7d window still showed one limit; and one row
 visible, because ten rows on screen said what fits in one. `AppStatusDot` is the seventh addition,
 extracted from `AppStatusIndicator` for the collapsed state. **The depth-and-motion pass replaced the
 strip with a notch** docked to a screen edge (see `AppHudBar.prompt.md`) and added `AppUsageRing`,
-the eighth: one arc per quota, never a ring per vendor. Nothing else was invented.
+the eighth: one arc per quota, never a ring per vendor. Its third round stopped the notch from
+growing: hovering a ring opens a **balloon for that account only**, with the card's own buttons, and
+a move hand and a gear sit past its ends — the gear holding everything the footer offers. No new
+primitive: the balloon reuses the card's `CardActionButton` and the footer's action row. Nothing else
+was invented.
 
 ### The conformance pass — 2026-08-27
 
