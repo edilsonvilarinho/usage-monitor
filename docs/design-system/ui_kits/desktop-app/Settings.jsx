@@ -19,7 +19,10 @@ const APIS = [
   { nome: 'OpenCode Zen Free', source: 'opencode', origem: 'leitura local de opencode.db', req: 'base local do OpenCode', on: true },
   { nome: 'OpenCode Go', source: 'opencode', origem: 'GET opencode.ai/zen/go/v1/usage', req: 'chave da API do OpenCode', on: true },
   { nome: 'Kilo Free', source: 'kilo', origem: 'leitura local de kilo.db', req: 'base local do Kilo', on: false },
-  { nome: 'OpenRouter', source: 'openrouter', origem: 'GET openrouter.ai/api/v1/credits', req: 'chave da API do OpenRouter', on: true }
+  { nome: 'OpenRouter', source: 'openrouter', origem: 'GET openrouter.ai/api/v1/credits', req: 'chave da API do OpenRouter', on: true },
+  { nome: 'Gemini CLI', source: 'gemini', origem: 'leitura local de ~/.gemini/tmp/*/chats/*.jsonl', req: 'sessões existentes; tokens não representam quota', on: false },
+  { nome: 'Cursor', source: 'cursor', origem: 'GET cursor.com/api/usage-summary (rota pessoal sem contrato público)', req: 'sessão existente em state.vscdb', on: false },
+  { nome: 'Antigravity CLI', source: 'gemini', origem: 'agy --print /usage (respondido pelo CLI, sem turno de modelo)', req: 'agy 1.2.9+ instalado e autenticado', on: false }
 ];
 
 export function Settings() {
@@ -65,13 +68,14 @@ export function Settings() {
                 <AppTextField label="Esgotado" value="100" style={{ width: 90 }} />
               </div>
               {/* O alcance é declarado na tela (issue #194): saldo pré-pago nasce com
-                  used = 0 e atividade observada com total = 0, então nessas quatro
-                  fontes nenhum limiar é avaliado. A frase sai sempre, inclusive com o
-                  alerta desligado — ali ela explica o que ligar não vai cobrir. */}
+                  used = 0 e atividade observada com total = 0, então nessas cinco
+                  fontes nenhum limiar é avaliado. Antigravity e Cursor são cotas e
+                  entram (issue #267). A frase sai sempre, inclusive com o alerta
+                  desligado — ali ela explica o que ligar não vai cobrir. */}
               <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)' }}>
                 O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto
                 (DeepSeek, OpenRouter) e atividade observada não informa limite
-                (OpenCode Zen Free, Kilo Free): nessas fontes nenhum limiar é avaliado.
+                (OpenCode Zen Free, Kilo Free, Gemini CLI): nessas fontes nenhum limiar é avaliado.
               </span>
               <AppSwitch checked label="Alertar quando uma sessão CLI saturar" />
               <AppSwitch checked label="Notificação nativa do sistema" />

@@ -71,10 +71,10 @@ private val DEFAULT_QUIET_HOURS = QuietHours(22, 8)
  * O recorte do limiar percentual, dito na própria tela (issue #194).
  *
  * A aba oferecia "Avisar quando a quota cruzar um limiar" sem qualificação
- * nenhuma, e quatro das oito fontes nunca são alcançadas — por duas mecânicas
+ * nenhuma, e cinco das onze fontes nunca são alcançadas — por duas mecânicas
  * diferentes, documentadas em [QuotaThresholdGap]. Falha silenciosa é pior que
  * funcionalidade ausente: sem esta frase, quem lê a aba acredita estar
- * protegido nas oito.
+ * protegido nas onze.
  *
  * Os nomes saem de `ApiSource.displayName` e a lista de
  * [sourcesWithQuotaThresholdGap], nunca de literais no meio do texto: renomear

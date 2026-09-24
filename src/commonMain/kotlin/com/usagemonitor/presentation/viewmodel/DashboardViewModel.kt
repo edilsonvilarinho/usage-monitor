@@ -25,6 +25,9 @@ import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdatePreparation
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.repository.KiloRepository
+import com.usagemonitor.domain.repository.GeminiRepository
+import com.usagemonitor.domain.repository.CursorRepository
+import com.usagemonitor.domain.repository.AntigravityRepository
 import com.usagemonitor.domain.repository.OpenCodeGoRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
 import com.usagemonitor.domain.repository.OpenRouterRepository
@@ -33,6 +36,9 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
+import com.usagemonitor.domain.usecase.GetGeminiUsageUseCase
+import com.usagemonitor.domain.usecase.GetCursorUsageUseCase
+import com.usagemonitor.domain.usecase.GetAntigravityUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeGoUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
@@ -68,6 +74,14 @@ import kotlinx.datetime.TimeZone
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
+
+/**
+ * Fontes locais (issue #267) cuja última leitura sobrevive a uma falha, como a do
+ * Codex. O dado guardado leva [ApiUsageNotice.SOURCE_UNSTABLE]: sem a marca o card
+ * mostrava números congelados — janelas deslizantes de 5h/7d que não andam mais —
+ * como se fossem da coleta corrente.
+ */
+private val LOCAL_SESSION_CACHE_SOURCES = setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY)
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
@@ -123,6 +137,27 @@ class DashboardViewModel(
                         "Chave da API OpenRouter não configurada. Abra Configurações > APIs e informe a chave."
                     )
                 )
+            }
+        }
+    ),
+    private val getGeminiUsage: GetGeminiUsageUseCase = GetGeminiUsageUseCase(
+        object : GeminiRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Gemini CLI local usage is unavailable"))
+            }
+        }
+    ),
+    private val getCursorUsage: GetCursorUsageUseCase = GetCursorUsageUseCase(
+        object : CursorRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Cursor local session usage is unavailable"))
+            }
+        }
+    ),
+    private val getAntigravityUsage: GetAntigravityUsageUseCase = GetAntigravityUsageUseCase(
+        object : AntigravityRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Antigravity CLI usage is unavailable"))
             }
         }
     ),
@@ -593,12 +628,14 @@ class DashboardViewModel(
                             target.source == ApiSource.CODEX &&
                                 existingStats != null &&
                                 isPersistableDashboardStats(existingStats)
+                        val canPreserveLocalIntegrationCache =
+                            target.source in LOCAL_SESSION_CACHE_SOURCES && existingStats != null
                         val shouldRemoveData =
-                            (!preserveDataOnFailure && !canPreserveCodexCache) ||
+                            (!preserveDataOnFailure && !canPreserveCodexCache && !canPreserveLocalIntegrationCache) ||
                                 target !in cachedStatsByTarget
                         if (shouldRemoveData) {
                             cachedStatsByTarget.remove(target)
-                        } else if (canPreserveCodexCache) {
+                        } else if (canPreserveCodexCache || canPreserveLocalIntegrationCache) {
                             cachedStatsByTarget[target] = existingStats!!.copy(
                                 notices = existingStats.notices + ApiUsageNotice.SOURCE_UNSTABLE
                             )
@@ -637,6 +674,7 @@ class DashboardViewModel(
         // explica a falha. O que interessa aqui é a ação que o usuário vai
         // descrever ("cliquei em atualizar e...").
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de todas as fontes pedida")
+        invalidateAntigravityReadingIfRequested(ApiSource.ANTIGRAVITY)
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = enabledTargets())
@@ -650,6 +688,7 @@ class DashboardViewModel(
         }
 
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${source.name} pedida")
+        invalidateAntigravityReadingIfRequested(source)
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(
@@ -666,9 +705,22 @@ class DashboardViewModel(
         // O alvo carrega `profileId`, que é interno do app e não identifica
         // ninguém; o apelido do perfil, que é o e-mail digitado, fica de fora.
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${target.source.name} pedida")
+        invalidateAntigravityReadingIfRequested(target.source)
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = setOf(target), preserveDataOnFailure = true)
+        }
+    }
+
+    /**
+     * O Antigravity guarda a última leitura por alguns minutos para o despertar por
+     * reset de outra fonte não abrir um processo do CLI a cada vez. O clique do
+     * usuário é o único gatilho que pede um número novo, então só ele descarta a
+     * leitura guardada.
+     */
+    private fun invalidateAntigravityReadingIfRequested(source: ApiSource) {
+        if (source == ApiSource.ANTIGRAVITY) {
+            getAntigravityUsage.invalidateCachedReading()
         }
     }
 
@@ -713,6 +765,9 @@ class DashboardViewModel(
             ApiSource.OPENCODE_GO -> getOpenCodeGoUsage()
             ApiSource.KILO -> getKiloUsage()
             ApiSource.OPENROUTER -> getOpenRouterUsage()
+            ApiSource.GEMINI -> getGeminiUsage()
+            ApiSource.CURSOR -> getCursorUsage()
+            ApiSource.ANTIGRAVITY -> getAntigravityUsage()
         }
     }
 

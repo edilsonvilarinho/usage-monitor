@@ -35,6 +35,8 @@
   --oc:         #7BD389;
   --kilo:       #E6D84E;
   --openrouter: #FF6FA8;
+  --gemini:     #E2A5E9;
+  --cursor:     #C7E9A5;
 
   --input:     #4C8DFF;
   --output:    #B07CFF;
@@ -70,7 +72,7 @@
 
     --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
     --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
-    --openrouter:#B23368;
+    --openrouter:#B23368; --gemini:#7C1D87; --cursor:#477915;
 
     --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
     --cwrite:#8A5000; --savings:#00697A;
@@ -95,7 +97,7 @@
 
   --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
   --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
-  --openrouter:#B23368;
+  --openrouter:#B23368; --gemini:#7C1D87; --cursor:#477915;
 
   --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
   --cwrite:#8A5000; --savings:#00697A;
@@ -110,6 +112,7 @@
   --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --info:#4C8DFF;
   --anthropic:#4F8CFF; --codex:#27BFA3; --deepseek:#C084FC;
   --minimax:#FF8A3D; --oc:#7BD389; --kilo:#E6D84E; --openrouter:#FF6FA8;
+  --gemini:#E2A5E9; --cursor:#C7E9A5;
   --input:#4C8DFF; --output:#B07CFF; --cread:#4CAF50;
   --cwrite:#FFA726; --savings:#26C6DA;
   --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
@@ -482,6 +485,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#dash-estados">Dashboard · estados</a>
   <a href="#atualizacao">Faixa de atualização</a>
   <a href="#novidades">Novidades da versão</a>
+  <a href="#integracoes-267">Gemini, Cursor e Antigravity</a>
   <a href="#historico">Histórico</a>
   <a href="#sessoes">Sessões CLI</a>
   <a href="#detalhe">Detalhe de sessão</a>
@@ -544,7 +548,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
 </div>
 <p class="note">Todo estado carrega <b>ponto + palavra</b>. A cor reforça, não informa sozinha — é o que mantém a tela legível para quem não distingue as matizes.</p>
 
-<h3>Identidade das sete integrações</h3>
+<h3>Identidade dos fornecedores monitorados</h3>
 <div class="legend" style="margin-bottom:var(--s2)">
   <span><i style="background:var(--anthropic)"></i>Anthropic</span>
   <span><i style="background:var(--codex)"></i>Codex</span>
@@ -553,8 +557,10 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <span><i style="background:var(--oc)"></i>OpenCode</span>
   <span><i style="background:var(--kilo)"></i>Kilo</span>
   <span><i style="background:var(--openrouter)"></i>OpenRouter</span>
+  <span><i style="background:var(--gemini)"></i>Google · Gemini CLI e Antigravity</span>
+  <span><i style="background:var(--cursor)"></i>Cursor</span>
 </div>
-<p class="note">Os acentos são os que já passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre si). <b>Não mudam.</b> O que muda é a área: de fundo de card inteiro para um marcador de 2px, linha de gráfico e texto de valor. E a cor <code>opencode</code> continua sendo a da <b>integração</b> monitorada — não vira a cor da marca do app.</p>
+<p class="note">Os acentos são os que já passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre si). <b>Não mudam sem decisão registrada</b> no <code>readme.md</code> do design system — foi assim que <code>--gemini</code> (~294°) e <code>--cursor</code> (~90°) entraram na issue #267. Nove acentos cobrem onze fontes: <code>--oc</code> é do OpenCode (Zen Free e Go) e <code>--gemini</code> é do Google (Gemini CLI e Antigravity). O que muda é a área: de fundo de card inteiro para um marcador de 2px, linha de gráfico e texto de valor. E a cor <code>opencode</code> continua sendo a da <b>integração</b> monitorada — não vira a cor da marca do app.</p>
 
 <h3 id="temas">Presets configuráveis — 8 claros e 8 escuros</h3>
 <p class="lede">O seletor da aplicação apresenta a mesma grade abaixo em Configurações → Geral. Cada cartão expõe a família de superfícies e seu acento estrutural; a seleção persistida vale para todas as janelas. Os marcadores de sucesso, atenção, erro e as cores das integrações permanecem semânticos.</p>
@@ -1000,7 +1006,7 @@ atenção: …"), que é a razão de o semáforo existir e o que os testes de co
 onde levá-la. O rodapé da janela vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e
 configurações. A contagem de fontes desenhada aqui como <code>4 fontes</code> <b>não foi implementada</b>: ela afirma um
 estado agregado que o app não calcula, e com uma fonte em erro o verde mentiria — escolher o tom seria inventar
-semântica que este protótipo não define. Falha de fonte já tem o banner por alvo. Preservados: múltiplos perfis Anthropic, as seis integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
+semântica que este protótipo não define. Falha de fonte já tem o banner por alvo. Preservados: múltiplos perfis Anthropic, todas as integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
 
 <h3>Acesso rápido aos modos de janela</h3>
 <p class="lede">O rodapé ganha um ícone que abre um menu com as três molduras — padrão, somente os cards e barra HUD —, com a corrente marcada (issue #187). Antes delas só existiam duas portas escondidas: dois interruptores no meio da seção "Sistema" das Configurações e duas combinações de teclado, e os dois modos alternativos só eram descobertos por acidente.</p>
@@ -1265,6 +1271,55 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 <p class="note"><b>O recibo do instalador não é o gatilho</b>, e chegou a ser (issue #127). No Windows o instalador o grava <b>antes</b> de relançar o app; no Linux o script só o grava <b>depois do ACK</b>, que é escrito pelo app novo já em execução — quando ele lê o arquivo, ele ainda descreve a atualização anterior. Com o recibo como condição, a janela não aparecia no Linux, em instalação manual nem no macOS, que não tem instalador automático. Ele continua dizendo <span class="v sm">Atualizado de 37.0.0</span> quando descreve a troca que trouxe o binário em execução; fora disso quem responde é a própria marca.</p>
 
 <p class="note"><b>Dois silêncios, e os dois gravam a marca.</b> <b>Instalação nova</b> — sem marca e sem recibo — não abre janela nenhuma: "novidades" para quem não tem versão anterior não descreve mudança. <b>Retrocesso</b> também não abre: anunciar a 38.0.1 vindo da 38.0.2 seria falso, e é esse ramo que reconcilia a marca depois de um rollback do updater. Nos dois casos não há requisição — pedir a release de uma versão que não vamos anunciar é rede gasta por nada.</p>
+
+<!-- ═══════════════════════════════ ISSUE #267 ═══════════════════════ -->
+<h2 id="integracoes-267">4e · Gemini CLI, Cursor e Antigravity</h2>
+<p class="lede">Três integrações com três naturezas de dado diferentes, e o card de cada uma diz qual é. Nenhuma inventa número que a fonte não informou.</p>
+<div class="g2">
+  <div>
+    <div class="cap">Gemini CLI · atividade observada</div>
+    <div class="panel">
+      <div class="phead"><span class="srcmark" style="background:var(--gemini)"></span><div class="stack" style="gap:0"><span class="ptitle">Gemini CLI</span><span class="psub">sessões locais · tokens observados</span></div><span class="sp"></span><span class="st ok">Uso local</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
+      <div class="pbody flush">
+        <div class="row"><span class="k">gemini-2.5-pro</span><span class="sp"></span><span class="v">18,4 mil tok</span></div>
+        <div class="row"><span class="k">5h</span><span class="track info" style="flex:1"><i style="width:22%"></i></span><span class="v" style="white-space:nowrap;min-width:42px">18,4 mil</span></div>
+        <div class="row"><span class="k">7d</span><span class="track info" style="flex:1"><i style="width:100%"></i></span><span class="v" style="white-space:nowrap;min-width:42px">82,6 mil</span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="cap">Cursor · franquias do ciclo</div>
+    <div class="panel">
+      <div class="phead"><span class="srcmark" style="background:var(--cursor)"></span><div class="stack" style="gap:0"><span class="ptitle">Cursor</span><span class="psub">sessão local do editor</span></div><span class="sp"></span><span class="st ok">Normal</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
+      <div class="pbody flush">
+        <div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Auto · Mensal</span><span class="sp"></span><span class="v">34%</span></div><div class="track ok"><i style="width:34%"></i></div><span class="k dim">Reinício: Qui 01/10 00h00 BRT</span></div></div>
+        <div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">API · Mensal</span><span class="sp"></span><span class="v">11%</span></div><div class="track ok"><i style="width:11%"></i></div></div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="cap">Antigravity CLI · um limite semanal por grupo de modelos</div>
+    <div class="panel">
+      <div class="phead"><span class="srcmark" style="background:var(--gemini)"></span><div class="stack" style="gap:0"><span class="ptitle">Antigravity CLI</span><span class="psub">agy --print /usage</span></div><span class="sp"></span><span class="st ok">Normal</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
+      <div class="pbody flush">
+        <div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Gemini · Semanal</span><span class="sp"></span><span class="v">5%</span></div><div class="track ok"><i style="width:5%"></i></div><span class="k dim">Reinício: Qua 30/09 18h57 BRT</span></div></div>
+        <div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Claude/GPT · Semanal</span><span class="sp"></span><span class="v">0%</span></div><div class="track"><i style="width:0%"></i></div></div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="cap">Configuração pendente — banner sem "Tentar novamente"</div>
+    <div class="panel">
+      <div class="phead"><span class="srcmark" style="background:var(--gemini)"></span><span class="ptitle">Antigravity CLI</span><span class="sp"></span><span class="st off">Indisponível</span></div>
+      <div class="pbody">
+        <div class="banner warn"><span class="bar"></span><span class="bd"><b>Antigravity CLI não encontrado</b><br>Instale o Antigravity CLI (agy) ou desative esta integração em Configurações &gt; APIs. O monitor procura o executável agy em %LOCALAPPDATA%\agy\bin e no PATH, nunca um atalho .cmd ou .bat.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note"><b>Gemini CLI é atividade observada</b>, com o mesmo desenho do OpenCode Zen Free e do Kilo: tokens por modelo em 5h e 7d, sem barra de percentual contra teto, porque contagem local não conhece limite da conta Google. Sem <code>~/.gemini/tmp</code> o card mostra o estado vazio e <b>não</b> um banner — o Gemini CLI nunca rodou na máquina.</p>
+<p class="note"><b>Cursor e Antigravity são cotas</b>, e por isso entram em histórico, limiar, projeção e HUD. As duas fontes têm mais de uma cota do mesmo <code>periodType</code> — franquias do mesmo ciclo mensal, um limite semanal por grupo de modelos —, e o título do bloco leva o nome da franquia ou do grupo antes da janela: sem isso, dois blocos diriam "Semanal". A janela intacta do Antigravity (<code>Claude/GPT</code> em 0%) <b>não mostra reinício</b>: o CLI informa "agora + 7 dias", que anda a cada chamada.</p>
+<p class="note"><b>Falha que não se resolve tentando de novo é configuração.</b> Não instalado, versão do CLI anterior à verificada, sessão ausente ou recusada, plano do Cursor sem nada medido e a coleta do Antigravity pausada pelo disjuntor saem como banner sem botão e sem toast a cada coleta. Quando a coleta falha depois de uma leitura boa, o card mantém os números com o aviso de exclamação no cabeçalho: "A coleta mais recente falhou. Os números são da última leitura válida e podem estar desatualizados."</p>
 
 <!-- ═══════════════════════════════ HISTÓRICO ═════════════════════════ -->
 <h2 id="historico">5 · Histórico</h2>
@@ -1907,6 +1962,9 @@ caso que a detecção existe para pegar. <b>Desligado o interruptor, o segmentad
     <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode Go</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--openrouter)"></span><span class="v sm" style="flex:1">OpenRouter</span><span class="st ok">Chave configurada</span><button class="btn ghost icon" type="button" aria-label="Gerenciar chave">✎</button><span class="sw on"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo Free</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--gemini)"></span><span class="v sm" style="flex:1">Gemini CLI</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--cursor)"></span><span class="v sm" style="flex:1">Cursor</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--gemini)"></span><span class="v sm" style="flex:1">Antigravity CLI</span><span class="st off">Desativada</span><span class="sw"></span></div>
   </div></div></div>
 </div>
 <p class="note"><b>Ativação de MiniMax, DeepSeek, OpenCode Go e OpenRouter.</b> Ao ligar uma dessas integrações sem chave cadastrada, o interruptor não é persistido imediatamente: abre-se o diálogo abaixo. A chave é mascarada por padrão, pode ser revelada pelo olho e só habilita a integração depois de <b>Salvar</b>. Ela fica em armazenamento local protegido; variáveis de ambiente não são lidas.</p>
@@ -2177,6 +2235,8 @@ O app fechou inesperadamente.
 <!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
 <h2 id="checklist">15 · O que este protótipo não decide</h2>
 <div class="panel"><div class="pbody flush">
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">O Cursor usa <code>cursor.com/api/usage-summary</code>, rota <b>não documentada</b>. Formato novo vira falha que preserva a última leitura, nunca consumo zero — mas só fixtures cobrem o Cursor: ele não está instalado na máquina de desenvolvimento</span><span class="k">issue #267</span></div>
+  <div class="row"><span class="st warn">Decisão registrada</span><span class="v sm" style="flex:1">O Antigravity lê <code>agy --print /usage</code>, que a doc oficial diz ser respondido pelo próprio CLI; a issue vetava <code>-p</code> por consumo. O portão é a versão medida (1.2.9) e o disjuntor exige <code>num_turns = 0</code> e <code>total_tokens = 0</code> no envelope</span><span class="k">issue #267</span></div>
   <div class="row"><span class="st warn">A verificar</span><span class="v sm" style="flex:1">Assinatura exata da API de carregamento de fonte no Compose Desktop 1.7.1</span><span class="k">commit C3</span></div>
   <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>.icns</code> só é validável no job <code>build-macos</code> do release</span><span class="k">commit J2</span></div>
   <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Fonte embutida no PDFBox recalcula largura de todas as colunas</span><span class="k">commit K1</span></div>

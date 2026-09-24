@@ -3,6 +3,9 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
+import com.usagemonitor.domain.repository.CursorUsageFailureKind
+import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,6 +14,74 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DashboardScreenWarningsTest {
+
+    @Test
+    fun unreadableGeminiMetadataGetsItsOwnLocalizedWarning() {
+        val warning = warningFor(
+            error = UiApiError(
+                source = ApiSource.GEMINI,
+                message = GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage
+            ),
+            language = AppLanguage.PT
+        )
+
+        assertNotNull(warning)
+        assertEquals("Histórico local do Gemini CLI indisponível", warning.title)
+        assertTrue(warning.description.contains("registros de uso reconhecidos"))
+        assertNull(warning.actionLabel)
+    }
+
+    /**
+     * Instalar, atualizar, autenticar ou reiniciar: nenhum dos casos se resolve
+     * tentando de novo, então nenhum oferece o botão, e todos contam como
+     * configuração — sem toast a cada coleta de 10 minutos.
+     */
+    @Test
+    fun `Antigravity setup failures are configuration warnings without retry`() {
+        AntigravityUsageFailureKind.entries.forEach { kind ->
+            val error = UiApiError(source = ApiSource.ANTIGRAVITY, message = kind.safeMessage)
+
+            assertEquals(kind, error.antigravityFailureKind)
+            assertTrue(error.isConfigurationIssue)
+            listOf(AppLanguage.PT, AppLanguage.EN).forEach { language ->
+                val warning = warningFor(error, language)
+                assertNotNull(warning, "$kind/$language")
+                assertNull(warning.actionLabel, "$kind/$language")
+            }
+        }
+        assertEquals(
+            "Coleta do Antigravity pausada",
+            warningFor(
+                UiApiError(ApiSource.ANTIGRAVITY, AntigravityUsageFailureKind.COLLECTION_PAUSED.safeMessage),
+                AppLanguage.PT
+            )?.title
+        )
+    }
+
+    /**
+     * Cursor ausente ou deslogado virava toast e linha vermelha a cada coleta de 10
+     * minutos; agora é configuração, com um banner por causa.
+     */
+    @Test
+    fun `Cursor setup failures are configuration warnings without retry`() {
+        CursorUsageFailureKind.entries.forEach { kind ->
+            val error = UiApiError(source = ApiSource.CURSOR, message = kind.safeMessage)
+
+            assertEquals(kind, error.cursorFailureKind)
+            assertTrue(error.isConfigurationIssue)
+            assertNull(warningFor(error, AppLanguage.PT)?.actionLabel)
+            assertNotNull(warningFor(error, AppLanguage.EN))
+        }
+        assertNull(UiApiError(ApiSource.CURSOR, "Cursor usage request failed (HTTP 500)").cursorFailureKind)
+    }
+
+    @Test
+    fun `an Antigravity timeout stays an ordinary failure`() {
+        val error = UiApiError(source = ApiSource.ANTIGRAVITY, message = "Antigravity CLI /usage timed out")
+
+        assertNull(error.antigravityFailureKind)
+        assertTrue(!error.isConfigurationIssue)
+    }
 
     // ── Identificação do alvo ────────────────────────────────────────────
     // Com várias contas Anthropic falhando ao mesmo tempo, dois banners de

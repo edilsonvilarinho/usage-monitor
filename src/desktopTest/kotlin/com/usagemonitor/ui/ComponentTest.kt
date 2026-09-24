@@ -39,6 +39,8 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ActiveSessionAlert
+import com.usagemonitor.domain.entity.AntigravityQuotaLabels
+import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
@@ -2410,6 +2412,40 @@ class ComponentTest {
         onAllNodesWithText("Configurar OpenCode Zen Free").assertCountEquals(0)
     }
 
+    @Test
+    fun `SettingsDialogContent enables local integrations without API keys`() = runDesktopComposeUiTest {
+        val enabledSources = mutableSetOf<ApiSource>()
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { source, checked ->
+                        if (checked) enabledSources += source
+                    },
+                    onApiKeySave = { _, _ -> true },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        listOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY).forEach { source ->
+            onNodeWithTag(apiSelectorSwitchTestTag(source)).performScrollTo().performClick()
+        }
+
+        assertEquals(setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY), enabledSources)
+        onAllNodesWithText("Configurar Gemini CLI").assertCountEquals(0)
+        onAllNodesWithText("Configurar Cursor").assertCountEquals(0)
+        onAllNodesWithText("Configurar Antigravity CLI").assertCountEquals(0)
+    }
+
     /**
      * Issue #125: o caminho que não existia. Até esta passada o diálogo só abria
      * ao **ligar** uma fonte sem chave; cadastrada uma vez, ela era definitiva
@@ -2715,6 +2751,9 @@ class ComponentTest {
         onNodeWithText("OpenCode Zen Free").performScrollTo().assertIsDisplayed()
         onNodeWithText("OpenCode Go").performScrollTo().assertIsDisplayed()
         onNodeWithText("Kilo Free").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Gemini CLI").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Cursor").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Antigravity CLI").performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(settingsTabTestTag(SettingsTab.ACCOUNTS)).performClick()
         onNodeWithText("Anthropic accounts").assertIsDisplayed()
@@ -3115,6 +3154,99 @@ class ComponentTest {
         onNodeWithText("Últimas 5h").assertIsDisplayed()
         onNodeWithText("7d: 31").assertIsDisplayed()
         onAllNodesWithText("0%").assertCountEquals(0)
+    }
+
+    /**
+     * Fora do Codex, `SOURCE_UNSTABLE` é a marca da última leitura guardada depois
+     * de uma falha (issue #267). A frase do contrato do Codex não pode aparecer no
+     * card do Cursor, e cada franquia do ciclo tem o nome no título.
+     */
+    @Test
+    fun `Cursor card names each allowance and explains a stale reading`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CURSOR,
+                    apiName = "Cursor",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = CursorQuotaLabels.AUTO,
+                            used = 34L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-10-01T00:00:00Z"),
+                            periodType = PeriodType.MONTHLY,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = CursorQuotaLabels.API,
+                            used = 11L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-10-01T00:00:00Z"),
+                            periodType = PeriodType.MONTHLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    notices = setOf(ApiUsageNotice.SOURCE_UNSTABLE),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-09-24T10:00:00Z")
+                )
+            }
+        }
+
+        onNodeWithText("Auto · Mensal").assertIsDisplayed()
+        onNodeWithText("API · Mensal").assertIsDisplayed()
+        onNodeWithContentDescription("última leitura válida", substring = true).assertIsDisplayed()
+        onAllNodesWithContentDescription("Codex", substring = true).assertCountEquals(0)
+    }
+
+    /**
+     * O Antigravity tem um limite semanal **por grupo de modelos**. O título do
+     * bloco sai do `periodType`, e sem o grupo os dois blocos diriam "Semanal".
+     */
+    @Test
+    fun `Antigravity card renders one percentage quota per model group`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTIGRAVITY,
+                    apiName = "Antigravity CLI",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = AntigravityQuotaLabels.label("Gemini", "7d"),
+                            used = 4L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-09-30T21:57:08Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = AntigravityQuotaLabels.label("Claude/GPT", "7d"),
+                            used = 0L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2100-01-01T00:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Antigravity CLI").assertIsDisplayed()
+        onNodeWithText("Gemini · Semanal").assertIsDisplayed()
+        onNodeWithText("Claude/GPT · Semanal").assertIsDisplayed()
+        onNodeWithText("4%").assertIsDisplayed()
+        onAllNodesWithText("Semanal").assertCountEquals(0)
     }
 
     @Test

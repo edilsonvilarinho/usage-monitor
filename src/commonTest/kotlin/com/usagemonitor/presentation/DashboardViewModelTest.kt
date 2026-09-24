@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.usecase.GetCursorUsageUseCase
+import com.usagemonitor.domain.repository.CursorRepository
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
@@ -1082,6 +1085,66 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         assertEquals(listOf(23L, 11L), codex.quotas.map { it.used })
         assertEquals(listOf("Codex 5h", "Codex 7d"), codex.quotas.map { it.label })
         assertTrue(ApiUsageNotice.SOURCE_UNSTABLE in codex.notices)
+        viewModel.onDestroy()
+    }
+
+    /**
+     * Issue #267: as fontes locais já guardavam a última leitura depois de uma
+     * falha, mas sem marca — o card mostrava números congelados como se fossem da
+     * coleta corrente.
+     */
+    @Test
+    fun `failed Cursor refresh keeps the last reading and marks it unstable`() = runTest {
+        var cursorCalls = 0
+        val cursorStats = ApiUsageStats(
+            source = ApiSource.CURSOR,
+            apiName = "Cursor",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Cursor Auto",
+                    used = 34L,
+                    total = 100L,
+                    periodEndAt = fixedInstant + with(kotlin.time.Duration.Companion) { 10.days },
+                    periodType = PeriodType.MONTHLY,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            )
+        )
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(failingAnthropicRepository()),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(failingMiniMaxRepository()),
+            getCodexUsage = GetCodexUsageUseCase(object : CodexRepository {
+                override suspend fun getUsage(): Result<ApiUsageStats> =
+                    Result.failure(IllegalStateException("unused"))
+            }),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(failingDeepSeekRepository()),
+            getCursorUsage = GetCursorUsageUseCase(object : CursorRepository {
+                override suspend fun getUsage(): Result<ApiUsageStats> {
+                    cursorCalls += 1
+                    return Result.failure(IllegalStateException("Cursor usage request failed (HTTP 500)"))
+                }
+            }),
+            enabledApis = MutableStateFlow(setOf(ApiSource.CURSOR)),
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getCachedDashboardStats = cachedStatsUseCase(listOf(cursorStats)),
+            clock = Clock.System,
+            config = manualRefreshConfig(),
+            persistedNextRefreshAt = fixedInstant + with(kotlin.time.Duration.Companion) { 5.minutes }
+        )
+
+        awaitCondition { viewModel.uiState.value is UiState.Success }
+        viewModel.refresh(UsageTargetKey.forSource(ApiSource.CURSOR))
+        awaitCondition {
+            cursorCalls == 1 &&
+                (viewModel.uiState.value as? UiState.Success)
+                    ?.data
+                    ?.singleOrNull()
+                    ?.notices
+                    ?.contains(ApiUsageNotice.SOURCE_UNSTABLE) == true
+        }
+
+        val cursor = (viewModel.uiState.value as UiState.Success).data.single()
+        assertEquals(listOf(34L), cursor.quotas.map { it.used })
         viewModel.onDestroy()
     }
 

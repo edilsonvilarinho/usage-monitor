@@ -4,7 +4,7 @@ Visual system for **Usage Monitor**, a Kotlin Multiplatform + Compose Desktop ap
 tracks consumption, balance and quotas of AI tools and APIs in one panel.
 
 The product monitors remote and local integrations (Anthropic, Codex, MiniMax, DeepSeek,
-OpenCode Zen Free, OpenCode Go, Kilo Free, OpenRouter), keeps history in SQLite, auto-refreshes every 10 minutes,
+OpenCode Zen Free, OpenCode Go, Kilo Free, OpenRouter, Gemini CLI, Cursor, Antigravity CLI), keeps history in SQLite, auto-refreshes every 10 minutes,
 supports card reorder/minimize, light/dark theme, PT/EN, auto-start on Windows/Linux/macOS,
 and update checks through GitHub Releases. Optional self-hosted team server aggregates the
 same Anthropic account across machines.
@@ -69,20 +69,26 @@ the media query alone, because the app owns a theme switch that must win.
 Depth comes from the **1dp border and from spacing** — not from shadow, not from gradient.
 No accent glow on top of surfaces, no tinted cards, no colored card backgrounds.
 
-**Color area.** The seven integration accents are fixed (AA 4.5:1 on both surfaces, hue preserved
+**Color area.** The nine integration accents are fixed (AA 4.5:1 on both surfaces, hue preserved
 across themes, ≥20° apart). What changed from the old UI is the **area**: from whole-card fill
 to a 2px marker, a chart line, and value text. `--oc` is the color of the monitored OpenCode
 integration — never the app's brand color.
 
-**Seven accents, eight sources.** The accent is the identity of the *vendor*, not of one card:
+**Nine accents, eleven sources.** The accent is the identity of the *vendor*, not of one card:
 OpenCode Zen Free (read from the local SQLite) and OpenCode Go (the paid subscription, read over
-HTTP) are two sources that both wear `--oc`. Adding a seventh hue would have to clear AA on both
-surfaces and stay ≥20° from the other six — a real cost, paid to distinguish two plans of the same
+HTTP) are two sources that both wear `--oc`. Adding a hue would have to clear AA on both
+surfaces and stay ≥20° from all the others — a real cost, paid to distinguish two plans of the same
 product. What separates the two cards is the title, and "colour never informs alone" already
-guarantees that is enough. `--openrouter` is the eighth accent and does **not** reuse any of the
-other seven: OpenRouter is not the vendor of any source already monitored, so sharing a hue would
-visually associate two unrelated companies. Rose/magenta (~335°) fills the only empty arc in the
-hue wheel, between `--deepseek` (270°) and `--minimax` (24°).
+guarantees that is enough. `--openrouter` does **not** reuse any other accent: OpenRouter is not the
+vendor of any source already monitored, so sharing a hue would visually associate two unrelated
+companies. Rose/magenta (~336°) fills the arc between `--deepseek` (270°) and `--minimax` (24°).
+
+`--gemini` and `--cursor` came with issue #267 under the same two rules. **Gemini CLI and
+Antigravity share `--gemini`**: both are Google tools, exactly the OpenCode case. `--gemini` is
+orchid at ~294° — 24° from `--deepseek` and 42° from `--openrouter`. **Cursor gets `--cursor`**:
+it is the vendor of no other source. Lime at ~90° sits 36° from `--kilo` (54°) and 40° from `--oc`
+(130°). Both keep their hue in the light variant (`#7C1D87`, `#477915`) and are checked by
+`AppAccentsContrastTest` like the other seven.
 
 **Type.** Two families. **IBM Plex Mono** for titles, labels, numbers, tables and window chrome
 (tabular alignment); **IBM Plex Sans** for explanatory prose only. Weights 400/500/600. Six sizes:

@@ -42,6 +42,9 @@ import com.usagemonitor.data.datasource.LocalAnthropicCreditsDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
+import com.usagemonitor.data.datasource.LocalGeminiUsageDataSource
+import com.usagemonitor.data.datasource.LocalCursorSessionDataSource
+import com.usagemonitor.data.datasource.LocalAntigravityUsageDataSource
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
@@ -61,6 +64,10 @@ import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.data.repository.DashboardCacheRepositoryImpl
 import com.usagemonitor.data.repository.DeepSeekRepositoryImpl
 import com.usagemonitor.data.repository.KiloRepositoryImpl
+import com.usagemonitor.data.repository.GeminiRepositoryImpl
+import com.usagemonitor.data.datasource.RemoteCursorUsageApiDataSource
+import com.usagemonitor.data.repository.CursorRepositoryImpl
+import com.usagemonitor.data.repository.AntigravityRepositoryImpl
 import com.usagemonitor.data.repository.MiniMaxRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeGoRepositoryImpl
 import com.usagemonitor.data.repository.OpenCodeRepositoryImpl
@@ -98,6 +105,9 @@ import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
+import com.usagemonitor.domain.usecase.GetGeminiUsageUseCase
+import com.usagemonitor.domain.usecase.GetCursorUsageUseCase
+import com.usagemonitor.domain.usecase.GetAntigravityUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeGoUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
@@ -426,6 +436,9 @@ private fun runUsageMonitor(
     val effectiveProxy = remember { resolveEffectiveProxy(proxySettingsFlow.value) }
 
     val httpClient = remember { buildHttpClient(effectiveProxy) }
+    // A requisição do Cursor carrega uma sessão em cookie. Redirects ficam
+    // desativados neste cliente para nunca encaminhar a sessão a outro host.
+    val cursorHttpClient = remember { buildHttpClient(effectiveProxy, followRedirects = false) }
 
     val preferencesNode = remember { Preferences.userRoot().node("com.usagemonitor") }
     val settings = remember(preferencesNode) { PreferencesSettings(preferencesNode) }
@@ -566,6 +579,8 @@ private fun runUsageMonitor(
     val dashboardCacheDataSource = remember { LocalDashboardCacheDataSource() }
     val openCodeUsageDataSource = remember { LocalOpenCodeUsageDataSource() }
     val kiloUsageDataSource = remember { LocalKiloUsageDataSource() }
+    val geminiUsageDataSource = remember { LocalGeminiUsageDataSource() }
+    val cursorSessionDataSource = remember { LocalCursorSessionDataSource() }
 
     val anthropicRepository = remember(credentialDataSource, remoteApiDataSource) {
         AnthropicRepositoryImpl(credentialDataSource, remoteApiDataSource)
@@ -605,6 +620,22 @@ private fun runUsageMonitor(
     }
     val kiloRepository = remember(kiloUsageDataSource) {
         KiloRepositoryImpl(kiloUsageDataSource)
+    }
+    val cursorRemoteApiDataSource = remember(cursorHttpClient) {
+        RemoteApiDataSource(httpClient = cursorHttpClient)
+    }
+    val geminiRepository = remember(geminiUsageDataSource) {
+        GeminiRepositoryImpl(geminiUsageDataSource)
+    }
+    val cursorUsageApiDataSource = remember(cursorRemoteApiDataSource) {
+        RemoteCursorUsageApiDataSource(cursorRemoteApiDataSource)
+    }
+    val cursorRepository = remember(cursorSessionDataSource, cursorUsageApiDataSource) {
+        CursorRepositoryImpl(cursorSessionDataSource, cursorUsageApiDataSource)
+    }
+    val antigravityUsageDataSource = remember { LocalAntigravityUsageDataSource() }
+    val antigravityRepository = remember(antigravityUsageDataSource) {
+        AntigravityRepositoryImpl(antigravityUsageDataSource)
     }
     val usageHistoryRepository = remember(usageHistoryDataSource) {
         UsageHistoryRepositoryImpl(usageHistoryDataSource)
@@ -673,13 +704,16 @@ private fun runUsageMonitor(
     // além do limiar de sessão sem resposta lido pelo semáforo e pela tela de
     // Sessões CLI.
     val alertSettingsFlow = remember(settings) { MutableStateFlow(readPersistedAlertSettings(settings)) }
-    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, openCodeGoRepository, openRouterRepository, kiloRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
+    val viewModel = remember(anthropicRepository, minimaxRepository, codexRepository, deepSeekRepository, openCodeRepository, openCodeGoRepository, openRouterRepository, kiloRepository, geminiRepository, cursorRepository, antigravityRepository, enabledApis, enabledAnthropicProfiles, recordUsageSnapshot, getUsageHistory, saveDashboardCache, getCachedDashboardStats, isAppVisible) {
         DashboardViewModel(
             getAnthropicUsage = GetAnthropicUsageUseCase(anthropicRepository),
             getMiniMaxUsage = GetMiniMaxUsageUseCase(minimaxRepository),
             getCodexUsage = GetCodexUsageUseCase(codexRepository),
             getDeepSeekUsage = GetDeepSeekUsageUseCase(deepSeekRepository),
             getKiloUsage = GetKiloUsageUseCase(kiloRepository),
+            getGeminiUsage = GetGeminiUsageUseCase(geminiRepository),
+            getCursorUsage = GetCursorUsageUseCase(cursorRepository),
+            getAntigravityUsage = GetAntigravityUsageUseCase(antigravityRepository),
             getOpenCodeUsage = GetOpenCodeUsageUseCase(openCodeRepository),
             getOpenCodeGoUsage = GetOpenCodeGoUsageUseCase(openCodeGoRepository),
             getOpenRouterUsage = GetOpenRouterUsageUseCase(openRouterRepository),
@@ -877,7 +911,7 @@ private fun runUsageMonitor(
     }
 
     val shutdownStarted = remember { AtomicBoolean(false) }
-    DisposableEffect(viewModel, historyViewModel, httpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource, profileRegistry) {
+    DisposableEffect(viewModel, historyViewModel, httpClient, cursorHttpClient, singleInstanceGuard, usageHistoryDataSource, openCodeUsageDataSource, kiloUsageDataSource, profileRegistry) {
         val shutdownHook = Thread {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
@@ -891,6 +925,7 @@ private fun runUsageMonitor(
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
+                cursorHttpClient.close()
                 usageHistoryDataSource.close()
                 cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
@@ -922,6 +957,7 @@ private fun runUsageMonitor(
                 teamSyncService.onDestroy()
                 profileRegistry.close()
                 httpClient.close()
+                cursorHttpClient.close()
                 usageHistoryDataSource.close()
                 cliSessionDataSource.close()
                 openCodeUsageDataSource.close()
@@ -1572,7 +1608,7 @@ private fun runUsageMonitor(
             teamUsageViewModel.setQuotaWindows(teamUsageQuotaWindows)
         }
     }
-    val shutdownApplication = remember(viewModel, historyViewModel, cliSessionsViewModel, codexCliSessionsViewModel, httpClient, usageHistoryDataSource, cliSessionDataSource, codexCliSessionDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
+    val shutdownApplication = remember(viewModel, historyViewModel, cliSessionsViewModel, codexCliSessionsViewModel, httpClient, cursorHttpClient, usageHistoryDataSource, cliSessionDataSource, codexCliSessionDataSource, openCodeUsageDataSource, kiloUsageDataSource) {
         {
             if (shutdownStarted.compareAndSet(false, true)) {
                 viewModel.onDestroy()
@@ -1586,6 +1622,7 @@ private fun runUsageMonitor(
                 teamKeysViewModel.onDestroy()
                 teamSyncService.onDestroy()
                 httpClient.close()
+                cursorHttpClient.close()
                 usageHistoryDataSource.close()
                 cliSessionDataSource.close()
                 codexCliSessionDataSource.close()

@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.Color
  * próximo.
  *
  * A refatoração visual trocou as superfícies (`#1B1818` / `#FFFCFC`) e **não**
- * tocou nestes treze valores: as novas são respectivamente mais escura e mais
+ * tocou nos valores da paleta: as novas são respectivamente mais escura e mais
  * clara que as antigas, então cada acento ganhou contraste. O que mudou foi a
  * área que eles ocupam — de fundo de card inteiro para marcador de 2dp, linha de
  * gráfico e texto de valor.
@@ -59,13 +59,17 @@ data class AppAccents(
     val kilo: Color,
     /**
      * Identidade própria — OpenRouter não é o mesmo fornecedor de nenhuma das
-     * outras seis, então reusar um acento existente associaria visualmente
+     * outras fontes, então reusar um acento existente associaria visualmente
      * duas empresas sem relação (diferente de [opencode], dividido de
      * propósito entre Zen Free e Go). Matiz ~335° preenche o único vão vazio
      * da roda entre [deepseek] (270°) e [minimax] (24°) — validado em
      * `AppAccentsContrastTest` como as demais.
      */
-    val openrouter: Color
+    val openrouter: Color,
+    /** Identidade compartilhada das ferramentas Google Gemini monitoradas. */
+    val gemini: Color,
+    /** Identidade própria do editor Cursor. */
+    val cursor: Color
 ) {
     companion object {
         /** Acentos do tema em vigor. Ler daqui, nunca das constantes cruas. */
@@ -97,7 +101,9 @@ val darkAppAccents = AppAccents(
     deepseek   = Color(0xFFC084FC),
     opencode   = Color(0xFF7BD389),
     kilo       = Color(0xFFE6D84E),
-    openrouter = Color(0xFFFF6FA8)
+    openrouter = Color(0xFFFF6FA8),
+    gemini    = Color(0xFFE2A5E9),
+    cursor    = Color(0xFFC7E9A5)
 )
 
 /**
@@ -122,7 +128,9 @@ val lightAppAccents = AppAccents(
     deepseek   = Color(0xFF7B3FC4),
     opencode   = Color(0xFF2E7D32),
     kilo       = Color(0xFF5F5500),
-    openrouter = Color(0xFFB23368)
+    openrouter = Color(0xFFB23368),
+    gemini    = Color(0xFF7C1D87),
+    cursor    = Color(0xFF477915)
 )
 
 /**

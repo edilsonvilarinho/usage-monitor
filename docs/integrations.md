@@ -14,6 +14,9 @@ For the short version, see the table in the [README](../README.md#supported-inte
 | OpenCode Go | Remote | `GET https://opencode.ai/zen/go/v1/usage` | API key entered in **Settings > APIs** |
 | Kilo Free | Local | reads `~/.local/share/kilo/kilo.db` | an existing local Kilo database |
 | OpenRouter | Remote | `GET https://openrouter.ai/api/v1/credits` | API key entered in **Settings > APIs** |
+| Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/*.jsonl` | local Gemini CLI session history; token activity only |
+| Cursor | Remote | `GET https://cursor.com/api/usage-summary` | existing signed-in Cursor editor session; undocumented personal route |
+| Antigravity CLI | Local | `agy --output-format json --print /usage` | Antigravity CLI 1.2.9+ installed and already authenticated |
 
 Usage Monitor **only reads** these files. It never runs a login or logout flow, and it never deletes
 a credential file.
@@ -30,6 +33,9 @@ a credential file.
 | `~/.usage-monitor/api-keys.json` | MiniMax, DeepSeek, OpenCode Go and OpenRouter keys — atomic write, owner-only permissions |
 | `~/.local/share/opencode/opencode.db` | OpenCode local activity |
 | `~/.local/share/kilo/kilo.db` | Kilo local activity |
+| `~/.gemini/tmp/<project>/chats/*.jsonl` | Gemini CLI session metadata and token counts; prompt/response content is not retained |
+| `%APPDATA%/Cursor/User/globalStorage/state.vscdb` (Windows), `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` (macOS), or `~/.config/Cursor/User/globalStorage/state.vscdb` (Linux) | Cursor session values read from SQLite in read-only mode |
+| `%LOCALAPPDATA%gyingy.exe` (Windows) or `agy` on `PATH` | Antigravity CLI; Usage Monitor runs `/usage` against its existing authenticated session |
 
 Environment variables are never read for API keys.
 
@@ -150,3 +156,95 @@ as distinct rows in **Settings > APIs**.
 - A prepaid balance does not reset, so it is **not** measured against the time-to-reset ruler used
   by windowed quotas. It uses an absolute runway instead, same as DeepSeek: critical under 7 days,
   warning under 14.
+
+## Gemini CLI local usage
+
+- Reads Gemini CLI session files from `~/.gemini/tmp/<project>/chats/*.jsonl` on Windows, macOS and
+  Linux. The path and session retention behavior are described in the
+  [official session-management guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/session-management.md).
+- Session files are append-only JSONL. They contain prompts, responses, tool calls and other private
+  content. The parser uses only the session/message IDs, timestamps, model names and token counters;
+  it does not persist or log conversation content.
+- Reports observed token counts per model over rolling 5-hour and 7-day windows. A token count is not
+  an account quota: no limit, percentage or cost is inferred from it. `tokens.total` is used; it
+  already includes the cached input, so cached tokens are not added a second time.
+- Each call is written twice with the same `id` — without `tokens` when the turn starts and with them
+  when the usage arrives. Only the write with tokens counts, and a later tokenless write never erases
+  it. `{"$set": …}` patches, which the CLI appends after every message, do not change the count.
+  `{"$rewindTo": …}` undoes the conversation, not the bill: the rewound call stays counted.
+- Google account quota is a separate source. Gemini CLI documents `/stats model` as an interactive
+  view of model token counts and quota information, but this integration has no stable
+  machine-readable quota contract. No Google quota card is created until a verifiable source is
+  available.
+- No `~/.gemini/tmp` directory means Gemini CLI never ran on this machine: the card shows its empty
+  state, with no warning. Recent session files that exist but none of which is readable are a
+  failure that preserves the last valid reading; a corrupt file among valid ones is skipped.
+- Files last modified before the 7-day window are not read, and unchanged files are served from an
+  in-memory cache keyed by path, size and modification time.
+
+## Cursor
+
+The official Cursor Admin API is team-scoped. Cursor documents team analytics for Team and
+Enterprise customers, while API access to analytics is limited to Enterprise and requires a team
+API key. That contract does not cover a personal account's own usage without team administration.
+See [Cursor Analytics](https://cursor.com/docs/account/teams/analytics) and the
+[Cursor Admin API](https://prod.cursor.com/docs/account/teams/admin-api).
+
+For personal usage, this integration follows the individual-account source referenced by
+[Codenotch](https://github.com/vinzdg/codenotch/blob/main/Sources/Providers/CursorLocalProvider.swift):
+
+- Reads the active session from Cursor's local `state.vscdb`, using a read-only SQLite connection.
+  Default paths are:
+  - Windows: `%APPDATA%/Cursor/User/globalStorage/state.vscdb`
+  - macOS: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
+  - Linux: `~/.config/Cursor/User/globalStorage/state.vscdb`
+- Uses the existing `cursorAuth/accessToken` and account identifier to construct the
+  `WorkosCursorSessionToken` cookie for `GET https://cursor.com/api/usage-summary`. The token is
+  read for each request, sent only to `cursor.com`, and never written to Usage Monitor storage or
+  logs. Usage Monitor does not start a login flow.
+- The route is not part of Cursor's documented public API. The response can change without notice;
+  unknown or incomplete shapes are source failures and preserve the last valid reading.
+- The response comes in two shapes. Personal plans (free/pro) carry `individualUsage.plan` with
+  `autoPercentUsed`, `apiPercentUsed` and `totalPercentUsed`; on a free plan `used`/`limit` stay at zero
+  even while the allowance is being spent, so only the percentages count there. Enterprise and team
+  plans carry no percentages and meter `individualUsage.overall` in `used`/`limit` instead.
+- Windows shown, all for the billing cycle: **Auto** (`autoPercentUsed`, the main allowance), **API**
+  (only above zero), **On-demand** (when enabled with a positive limit), **Included** (the enterprise
+  `overall` ceiling) and **Team on-demand** (only once something was spent). `totalPercentUsed` is a
+  blend of Auto and API and is not a row: as a third quota it fired the same alert twice.
+- Percentages are truncated like every other percentage in the app. A value above 100 means the
+  allowance was exceeded and saturates at 100 instead of failing the card. Without `billingCycleEnd`
+  the window has no known reset — the capture instant would make every refresh look like a new cycle.
+- Cursor not installed, signed out, a rejected session and a plan with nothing to meter are
+  configuration states: a banner without "Retry" and no toast on every refresh. A plan with nothing
+  to meter is not reported as zero usage. Network failures keep their type, so a proxy problem shows
+  the connectivity banner.
+- Collection follows the app's normal 10-minute dashboard refresh. The source is opt-in in
+  **Settings > APIs**.
+
+## Antigravity
+
+- Runs `agy --sandbox --print-timeout 30s --output-format json --print /usage` in an empty working
+  directory (`~/.usage-monitor/antigravity-work/`). The
+  [official headless reference](https://antigravity.google/docs/cli/headless) states that `/usage`
+  and `/model` are *"answered by the CLI itself"* and should be run *"as their own `--print`
+  invocation"*: they produce a report without a model turn. Measured against agy 1.2.9 on Windows,
+  the JSON envelope comes back with `num_turns: 0` and `usage.total_tokens: 0`, and three consecutive
+  runs left the remaining fraction unchanged.
+- **Guard rails.** The CLI is only called when `agy --version` is 1.2.9 or newer, the version the
+  envelope was measured against. The argument reaches `agy` as its own process argument, never
+  through a shell: through Git Bash (MSYS), `/usage` is rewritten into a Windows path and reaches the
+  model as a prompt, so `.cmd`/`.bat` launchers are refused. Every envelope must carry
+  `command.name == "usage"`, `num_turns == 0` and `total_tokens == 0`; if it does not, collection
+  pauses until the app restarts instead of repeating a call that could spend model quota.
+- Each bucket of `command.data.groups[].buckets[]` becomes a percentage quota:
+  used = 100 − `remaining_fraction` × 100 (truncated), with `reset_time` as the reset. The quotas
+  take part in history, threshold alerts, forecasts and the HUD like any other windowed quota. A
+  window that has not been touched (`remaining_fraction` = 1) reports "now + 7 days" as its reset,
+  which moves on every call, so it is shown without a known reset.
+- CLI absence, an old version, a signed-out session and a paused collection are configuration
+  states: a banner without "Retry" and no toast on every refresh. Timeout, a non-JSON answer or an
+  answer with no quota window are failures that keep the last valid reading.
+- The CLI is called at most once every 5 minutes; the reset wake-up of another source reuses the
+  last reading. A refresh requested by the user always calls it again.
+- The collector does not call undocumented IDE RPCs and never stores or logs the CLI output.

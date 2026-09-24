@@ -23,10 +23,12 @@
   --info:      #4C8DFF;
 
   /* integration identity — AA 4.5:1 on both surfaces, hue preserved across
-     themes, >=20 degrees apart from each other. These do not change.
-     Seven accents cover eight sources: --oc is the OpenCode vendor, worn by
-     both the free Zen card and the paid Go card. --openrouter is its own
-     identity — OpenRouter is not the vendor of any other source here. */
+     themes, >=20 degrees apart from each other. These do not change without a
+     recorded decision in readme.md. Nine accents cover eleven sources: --oc is
+     the OpenCode vendor, worn by both the free Zen card and the paid Go card,
+     and --gemini is Google's, worn by Gemini CLI and Antigravity. --openrouter
+     and --cursor are their own identities — neither is the vendor of any
+     other source here. */
   --anthropic:  #4F8CFF;
   --codex:      #27BFA3;
   --deepseek:   #C084FC;
@@ -34,6 +36,8 @@
   --oc:         #7BD389;
   --kilo:       #E6D84E;
   --openrouter: #FF6FA8;
+  --gemini:     #E2A5E9;
+  --cursor:     #C7E9A5;
 
   /* token/cost composition series (charts, stacked bars, legends) */
   --input:     #4C8DFF;
@@ -64,6 +68,8 @@
     --oc:         #2E7D32;
     --kilo:       #5F5500;
     --openrouter: #B23368;
+    --gemini:     #7C1D87;
+    --cursor:     #477915;
 
     --input:   #1565C0;
     --output:  #6A3FB5;
@@ -93,6 +99,8 @@
   --oc:         #2E7D32;
   --kilo:       #5F5500;
   --openrouter: #B23368;
+  --gemini:     #7C1D87;
+  --cursor:     #477915;
 
   --input:   #1565C0;
   --output:  #6A3FB5;
@@ -121,6 +129,8 @@
   --oc:         #7BD389;
   --kilo:       #E6D84E;
   --openrouter: #FF6FA8;
+  --gemini:     #E2A5E9;
+  --cursor:     #C7E9A5;
 
   --input:   #4C8DFF;
   --output:  #B07CFF;

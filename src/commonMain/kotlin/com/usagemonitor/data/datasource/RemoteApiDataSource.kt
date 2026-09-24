@@ -21,6 +21,7 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 
 private const val CLAUDE_USER_AGENT = "claude-code/1.0.0"
@@ -240,6 +241,51 @@ open class RemoteApiDataSource(
         )
 
         return response.body()
+    }
+
+    /**
+     * Endpoint de uso individual do Cursor, sem documentação pública.
+     *
+     * O cookie é montado em memória e enviado somente a `cursor.com`. A resposta
+     * HTTP não é anexada a erros: tanto corpo quanto cabeçalho podem conter
+     * material ligado à sessão local.
+     */
+    open suspend fun fetchCursorUsageSummary(accountId: String, accessToken: String): JsonElement {
+        if (listOf(accountId, accessToken).any { value ->
+                value.isBlank() || value.any { character ->
+                    character.isWhitespace() || character == ';' || character == '\r' || character == '\n'
+                }
+            }
+        ) {
+            throw CursorUsageApiException(0, CursorUsageApiFailureKind.AUTHENTICATION_REJECTED)
+        }
+
+        val cookie = "WorkosCursorSessionToken=$accountId::$accessToken"
+        val response = httpClient.get("https://cursor.com/api/usage-summary") {
+            header("Cookie", cookie)
+            header("Accept", "application/json")
+        }
+
+        when (response.status.value) {
+            401, 403 -> throw CursorUsageApiException(
+                statusCode = response.status.value,
+                kind = CursorUsageApiFailureKind.AUTHENTICATION_REJECTED
+            )
+            in 200..299 -> Unit
+            else -> throw CursorUsageApiException(
+                statusCode = response.status.value,
+                kind = CursorUsageApiFailureKind.HTTP_STATUS
+            )
+        }
+
+        val payload = response.bodyAsText()
+        return runCatching { diagnosticsJson.parseToJsonElement(payload) }
+            .getOrElse {
+                throw CursorUsageApiException(
+                    statusCode = response.status.value,
+                    kind = CursorUsageApiFailureKind.INVALID_RESPONSE
+                )
+            }
     }
 
     /**

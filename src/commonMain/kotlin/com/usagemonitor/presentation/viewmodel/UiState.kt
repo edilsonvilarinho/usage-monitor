@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
+import com.usagemonitor.domain.repository.CursorUsageFailureKind
+import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -90,6 +93,36 @@ data class UiApiError(
     val isKiloLocalIssue: Boolean
         get() = source == ApiSource.KILO && isKiloLocalMessage(message)
 
+    val isGeminiSessionHistoryUnreadable: Boolean
+        get() = source == ApiSource.GEMINI &&
+            message.contains(GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage, ignoreCase = true)
+
+    val isGeminiLocalIssue: Boolean
+        get() = isGeminiSessionHistoryUnreadable
+
+    /** Qual das falhas de configuração do Cursor é esta, ou `null` para falha comum. */
+    val cursorFailureKind: CursorUsageFailureKind?
+        get() = if (source == ApiSource.CURSOR) {
+            CursorUsageFailureKind.entries.firstOrNull { kind ->
+                message.contains(kind.safeMessage, ignoreCase = true)
+            }
+        } else {
+            null
+        }
+
+    /**
+     * Qual das falhas de configuração do Antigravity é esta, ou `null` para falha
+     * comum (timeout, saída ilegível), que continua pedindo "Tentar novamente".
+     */
+    val antigravityFailureKind: AntigravityUsageFailureKind?
+        get() = if (source == ApiSource.ANTIGRAVITY) {
+            AntigravityUsageFailureKind.entries.firstOrNull { kind ->
+                message.contains(kind.safeMessage, ignoreCase = true)
+            }
+        } else {
+            null
+        }
+
     val isRateLimitIssue: Boolean
         get() = isRateLimitMessage(message)
 
@@ -135,6 +168,9 @@ data class UiApiError(
             isOpenCodeGoApiKeyIssue ||
             isOpenCodeGoSubscriptionIssue ||
             isKiloLocalIssue ||
+            isGeminiLocalIssue ||
+            antigravityFailureKind != null ||
+            cursorFailureKind != null ||
             isProxyAuthIssue
 }
 

@@ -89,9 +89,9 @@ class AlertSettingsSectionTest {
     // ------------------------------------------------------------------
 
     /**
-     * A aba oferecia o limiar sem qualificação e quatro das oito fontes nunca são
+     * A aba oferecia o limiar sem qualificação e cinco das onze fontes nunca são
      * alcançadas — por duas mecânicas diferentes. Sem esta frase, quem lê a tela
-     * acredita estar protegido nas oito, que é a falha silenciosa da issue.
+     * acredita estar protegido nas onze, que é a falha silenciosa da issue.
      */
     @Test
     fun `the quota threshold declares which sources it does not reach`() = runDesktopComposeUiTest {
@@ -101,7 +101,7 @@ class AlertSettingsSectionTest {
         onNodeWithText(
             "O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto " +
                 "(DeepSeek, OpenRouter) e atividade observada não informa limite " +
-                "(OpenCode Zen Free, Kilo Free): nessas fontes nenhum limiar é avaliado."
+                "(OpenCode Zen Free, Kilo Free, Gemini CLI): nessas fontes nenhum limiar é avaliado."
         ).assertIsDisplayed()
     }
 
@@ -126,7 +126,7 @@ class AlertSettingsSectionTest {
         onNodeWithText(
             "The threshold measures a percentage against the quota ceiling. Prepaid balance has " +
                 "no ceiling (DeepSeek, OpenRouter) and observed activity reports no limit " +
-                "(OpenCode Zen Free, Kilo Free): on those sources no threshold is ever evaluated."
+                "(OpenCode Zen Free, Kilo Free, Gemini CLI): on those sources no threshold is ever evaluated."
         ).assertIsDisplayed()
     }
 

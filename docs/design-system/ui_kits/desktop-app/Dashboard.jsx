@@ -23,8 +23,24 @@ function Quota({ label, value, percent, level, reset, last }) {
   );
 }
 
+function ReportedMetric({ label, value, detail, last }) {
+  return (
+    <AppDataRow last={last} hoverable={false}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+          <AppKey>{label}</AppKey>
+          <span style={{ flex: 1 }} />
+          <AppValue size="primary">{value}</AppValue>
+        </div>
+        {detail ? <AppKey dim>{detail}</AppKey> : null}
+      </div>
+    </AppDataRow>
+  );
+}
+
 function Card({ card, onOpen, minimized, onToggle }) {
   const nav = NAV.slice(0, card.nav);
+  const quotas = card.quotas || [];
   return (
     <AppPanel>
       <AppPanelHeader
@@ -42,7 +58,7 @@ function Card({ card, onOpen, minimized, onToggle }) {
       {minimized ? (
         <AppPanelBody dense>
           <div style={{ display: 'flex', gap: 'var(--s2)' }}>
-            {card.quotas.slice(0, 3).map((q) => (
+            {(card.reported || quotas).slice(0, 3).map((q) => (
               <AppMetric key={q.label} label={q.label} value={q.value} size="lg" align="center" style={{ flex: 1 }} />
             ))}
           </div>
@@ -51,8 +67,10 @@ function Card({ card, onOpen, minimized, onToggle }) {
       ) : (
         <React.Fragment>
           <AppPanelBody flush>
-            {card.quotas.map((q, i) => (
-              <Quota key={q.label} {...q} last={i === card.quotas.length - 1} />
+            {card.reported ? card.reported.map((metric, i) => (
+              <ReportedMetric key={metric.label} {...metric} last={i === card.reported.length - 1} />
+            )) : quotas.map((q, i) => (
+              <Quota key={q.label} {...q} last={i === quotas.length - 1} />
             ))}
           </AppPanelBody>
           {card.banner ? (
@@ -187,10 +205,52 @@ const CARDS = [
     quotas: [
       { label: 'MiniMax-M2', value: '82%', percent: 82, level: 'warn', reset: 'Reinício: Qui 14/08 00h00 BRT' }
     ]
+  },
+  {
+    id: 'gemini-cli',
+    source: 'gemini',
+    title: 'Gemini CLI',
+    subtitle: 'sessões locais · tokens observados',
+    level: 'ok',
+    status: 'Atividade local',
+    tooltip: 'Tokens locais observados. A quota da conta Google é uma medida separada.',
+    nav: 0,
+    reported: [
+      { label: 'Gemini 3.1 Pro · tokens (5h)', value: '18,4 mil', detail: 'Tokens locais; quota da conta separada' },
+      { label: 'Gemini 3.1 Pro · tokens (7d)', value: '142 mil' }
+    ]
+  },
+  {
+    id: 'cursor',
+    source: 'cursor',
+    title: 'Cursor',
+    subtitle: 'sessão existente · plano Pro',
+    level: 'ok',
+    status: 'Normal',
+    tooltip: 'Percentuais fornecidos pela sessão do Cursor; rota pessoal sem contrato público.',
+    nav: 0,
+    quotas: [
+      { label: 'Auto · Mensal', value: '38%', percent: 38, level: 'ok', reset: 'Fim do ciclo: 01/10/2026' },
+      { label: 'API · Mensal', value: '11%', percent: 11, level: 'ok', reset: 'Fim do ciclo: 01/10/2026' }
+    ]
+  },
+  {
+    id: 'antigravity',
+    source: 'gemini',
+    title: 'Antigravity CLI',
+    subtitle: 'agy --print /usage · um limite semanal por grupo de modelos',
+    level: 'ok',
+    status: 'Normal',
+    tooltip: 'Cota por grupo de modelos, lida do /usage que o próprio CLI responde, sem turno de modelo.',
+    nav: 0,
+    quotas: [
+      { label: 'Gemini · Semanal', value: '5%', percent: 5, level: 'ok', reset: 'Reinício: Qua 30/09 18h57 BRT' },
+      { label: 'Claude/GPT · Semanal', value: '0%', percent: 0, level: 'neutral', reset: 'Janela de reset ainda não disponível' }
+    ]
   }
 ];
 
-export function Dashboard({ onOpen }) {
+export function Dashboard({ onOpen, warnings = [] }) {
   const [minimized, setMinimized] = React.useState({ 'anthropic-sandbox': true });
   const toggle = (id) => setMinimized((m) => Object.assign({}, m, { [id]: !m[id] }));
   const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
@@ -238,6 +298,11 @@ export function Dashboard({ onOpen }) {
         message="38.3.0 pronta para instalar"
         action={<AppButton variant="ghost">Reiniciar e atualizar agora</AppButton>}
       />
+      {warnings.map((warning) => (
+        <AppBanner key={warning.title} level={warning.level || 'warn'} title={warning.title}>
+          {warning.body}
+        </AppBanner>
+      ))}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s3)', alignItems: 'start' }}>
         {CARDS.map((c) => (
           <Card key={c.id} card={c} minimized={!!minimized[c.id]} onToggle={() => toggle(c.id)} onOpen={onOpen} />

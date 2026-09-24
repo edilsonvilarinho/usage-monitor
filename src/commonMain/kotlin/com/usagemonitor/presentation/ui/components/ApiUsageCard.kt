@@ -383,6 +383,7 @@ fun ApiUsageCard(
                         if (notices.isNotEmpty()) {
                             CardNoticeHint(
                                 notices = notices,
+                                source = source,
                                 language = language,
                                 iconSize = density.actionIconSize
                             )
@@ -512,7 +513,7 @@ fun ApiUsageCard(
                         vertical = density.contentVerticalPadding
                     )
                     if (source.isObservedActivitySource()) {
-                        OpenCodeUsageSummary(
+                        ObservedUsageSummary(
                             source = source,
                             quotas = orderedQuotas,
                             language = language,
@@ -712,16 +713,17 @@ private fun AccountIdentityLabel(
 @Composable
 private fun CardNoticeHint(
     notices: Set<ApiUsageNotice>,
+    source: ApiSource,
     language: AppLanguage,
     iconSize: Dp,
     modifier: Modifier = Modifier
 ) {
     // Mesma ordem estável dos banners que este hint substituiu.
-    val texts = remember(notices, language) {
+    val texts = remember(notices, source, language) {
         notices
             .toList()
             .sortedBy { notice -> notice.ordinal }
-            .map { notice -> noticeText(notice = notice, language = language) }
+            .map { notice -> noticeText(notice = notice, source = source, language = language) }
     }
     if (texts.isEmpty()) return
 
@@ -765,7 +767,7 @@ private fun noticeHintTitle(count: Int, language: AppLanguage): String {
     }
 }
 
-private fun noticeText(notice: ApiUsageNotice, language: AppLanguage): String {
+private fun noticeText(notice: ApiUsageNotice, source: ApiSource, language: AppLanguage): String {
     return when (notice) {
         ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE -> {
             if (language == AppLanguage.PT) {
@@ -774,7 +776,15 @@ private fun noticeText(notice: ApiUsageNotice, language: AppLanguage): String {
                 "7d quota unavailable in Codex weekly source"
             }
         }
-        ApiUsageNotice.SOURCE_UNSTABLE -> {
+        // Fora do Codex a marca é posta pelo painel quando guarda a última leitura
+        // depois de uma falha (issue #267): a frase do contrato do Codex não se aplica.
+        ApiUsageNotice.SOURCE_UNSTABLE -> if (source != ApiSource.CODEX) {
+            if (language == AppLanguage.PT) {
+                "A coleta mais recente falhou. Os números são da última leitura válida e podem estar desatualizados."
+            } else {
+                "The latest refresh failed. These numbers are from the last valid reading and may be out of date."
+            }
+        } else {
             if (language == AppLanguage.PT) {
                 "Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar."
             } else {
@@ -792,14 +802,14 @@ private fun noticeText(notice: ApiUsageNotice, language: AppLanguage): String {
 }
 
 @Composable
-private fun OpenCodeUsageSummary(
+private fun ObservedUsageSummary(
     source: ApiSource,
     quotas: List<QuotaInfo>,
     language: AppLanguage,
     compact: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val modelSummaries = remember(quotas) { buildOpenCodeModelSummaries(quotas) }
+    val modelSummaries = remember(quotas) { buildObservedUsageSummaries(quotas) }
 
     if (modelSummaries.isEmpty()) {
         // Superfície neutra com borda, como todo bloco de dado do sistema. O
@@ -815,12 +825,22 @@ private fun OpenCodeUsageSummary(
             verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
         ) {
             Text(
-                text = if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected",
+                text = if (source == ApiSource.GEMINI) {
+                    if (language == AppLanguage.PT) "Nenhum token registrado" else "No tokens recorded"
+                } else {
+                    if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected"
+                },
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (language == AppLanguage.PT) {
+                text = if (source == ApiSource.GEMINI) {
+                    if (language == AppLanguage.PT) {
+                        "O uso aparece quando o Gemini CLI registra sessões locais com contagem de tokens."
+                    } else {
+                        "Usage appears when Gemini CLI records local sessions with token counts."
+                    }
+                } else if (language == AppLanguage.PT) {
                     "Abra o ${source.displayName(language)} e use um modelo free para começar a preencher este card."
                 } else {
                     "Use a free ${source.displayName(language)} model to start populating this card."
@@ -838,7 +858,7 @@ private fun OpenCodeUsageSummary(
         verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
     ) {
         modelSummaries.forEach { summary ->
-            OpenCodeModelRow(
+            ObservedUsageModelRow(
                 source = source,
                 summary = summary,
                 language = language,
@@ -849,9 +869,9 @@ private fun OpenCodeUsageSummary(
 }
 
 @Composable
-private fun OpenCodeModelRow(
+private fun ObservedUsageModelRow(
     source: ApiSource,
-    summary: OpenCodeModelSummary,
+    summary: ObservedUsageModelSummary,
     language: AppLanguage,
     compact: Boolean,
     modifier: Modifier = Modifier
@@ -862,10 +882,10 @@ private fun OpenCodeModelRow(
         HoverTooltipBox(
             title = summary.modelName,
             subtitle = if (language == AppLanguage.PT) "Atividade observada" else "Observed activity",
-            metrics = buildOpenCodeTooltipMetrics(summary = summary, language = language),
+            metrics = buildObservedUsageTooltipMetrics(summary = summary, language = language),
             modifier = modifier
         ) {
-            OpenCodeModelRowContent(
+            ObservedUsageModelRowContent(
                 source = source,
                 summary = summary,
                 language = language,
@@ -877,7 +897,7 @@ private fun OpenCodeModelRow(
         return
     }
 
-    OpenCodeModelRowContent(
+    ObservedUsageModelRowContent(
         source = source,
         summary = summary,
         language = language,
@@ -887,9 +907,9 @@ private fun OpenCodeModelRow(
 }
 
 @Composable
-private fun OpenCodeModelRowContent(
+private fun ObservedUsageModelRowContent(
     source: ApiSource,
-    summary: OpenCodeModelSummary,
+    summary: ObservedUsageModelSummary,
     language: AppLanguage,
     compact: Boolean,
     modifier: Modifier = Modifier
@@ -922,7 +942,11 @@ private fun OpenCodeModelRowContent(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (language == AppLanguage.PT) "Limite oficial indisponível" else "Official limit unavailable",
+                    text = if (source == ApiSource.GEMINI) {
+                        if (language == AppLanguage.PT) "Métrica local; cota da conta separada" else "Local metric; account quota is separate"
+                    } else {
+                        if (language == AppLanguage.PT) "Limite oficial indisponível" else "Official limit unavailable"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -932,18 +956,23 @@ private fun OpenCodeModelRowContent(
             Spacer(modifier = Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = localizedRequestCount(summary.requestsFiveHours, language),
+                    text = localizedObservedCount(summary.amountFiveHours, summary.unit, language),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = openCodePrimaryWindowLabel(language),
+                    text = observedPrimaryWindowLabel(language),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = openCodeSecondaryWindowLabel(summary.requestsSevenDays, language),
+                    text = observedSecondaryWindowLabel(
+                        value = summary.amountSevenDays,
+                        source = source,
+                        unit = summary.unit,
+                        language = language
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -951,7 +980,7 @@ private fun OpenCodeModelRowContent(
         }
 
         if (!compact) {
-            OpenCodeInlineComparisonChart(
+            ObservedUsageInlineComparisonChart(
                 source = source,
                 summary = summary,
                 language = language
@@ -962,13 +991,13 @@ private fun OpenCodeModelRowContent(
 
 
 @Composable
-private fun OpenCodeInlineComparisonChart(
+private fun ObservedUsageInlineComparisonChart(
     source: ApiSource,
-    summary: OpenCodeModelSummary,
+    summary: ObservedUsageModelSummary,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
-    val maxValue = maxOf(summary.requestsFiveHours, summary.requestsSevenDays, 1L).toFloat()
+    val maxValue = maxOf(summary.amountFiveHours, summary.amountSevenDays, 1L).toFloat()
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -984,29 +1013,32 @@ private fun OpenCodeInlineComparisonChart(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        OpenCodeInlineBar(
+        ObservedUsageInlineBar(
             modelName = summary.modelName,
             label = "5h",
-            value = summary.requestsFiveHours,
-            fraction = summary.requestsFiveHours / maxValue,
+            value = summary.amountFiveHours,
+            fraction = summary.amountFiveHours / maxValue,
+            unit = summary.unit,
             language = language
         )
-        OpenCodeInlineBar(
+        ObservedUsageInlineBar(
             modelName = summary.modelName,
             label = "7d",
-            value = summary.requestsSevenDays,
-            fraction = summary.requestsSevenDays / maxValue,
+            value = summary.amountSevenDays,
+            fraction = summary.amountSevenDays / maxValue,
+            unit = summary.unit,
             language = language
         )
     }
 }
 
 @Composable
-private fun OpenCodeInlineBar(
+private fun ObservedUsageInlineBar(
     modelName: String,
     label: String,
     value: Long,
     fraction: Float,
+    unit: UsageUnit,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
@@ -1034,8 +1066,12 @@ private fun OpenCodeInlineBar(
                     value = label
                 ),
                 TooltipMetric(
-                    label = if (language == AppLanguage.PT) "Requisições" else "Requests",
-                    value = value.toString()
+                    label = when {
+                        unit == UsageUnit.TOKENS -> "Tokens"
+                        language == AppLanguage.PT -> "Requisições"
+                        else -> "Requests"
+                    },
+                    value = localizedObservedCount(value, unit, language)
                 )
             ),
             modifier = Modifier.weight(1f)
@@ -1050,7 +1086,7 @@ private fun OpenCodeInlineBar(
         }
 
         Text(
-            text = if (language == AppLanguage.PT) "$value req." else "$value req.",
+            text = compactObservedCount(value, unit),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
