@@ -71,10 +71,10 @@ private val DEFAULT_QUIET_HOURS = QuietHours(22, 8)
  * O recorte do limiar percentual, dito na própria tela (issue #194).
  *
  * A aba oferecia "Avisar quando a quota cruzar um limiar" sem qualificação
- * nenhuma, e quatro das oito fontes nunca são alcançadas — por duas mecânicas
+ * nenhuma, e várias fontes nunca são alcançadas — por duas mecânicas
  * diferentes, documentadas em [QuotaThresholdGap]. Falha silenciosa é pior que
  * funcionalidade ausente: sem esta frase, quem lê a aba acredita estar
- * protegido nas oito.
+ * protegido em todas.
  *
  * Os nomes saem de `ApiSource.displayName` e a lista de
  * [sourcesWithQuotaThresholdGap], nunca de literais no meio do texto: renomear
@@ -89,12 +89,12 @@ internal fun quotaThresholdCoverageNote(language: AppLanguage): String {
         .joinToString { source -> source.displayName(language) }
 
     return if (language == AppLanguage.PT) {
-        "O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto ($balance) e " +
-            "atividade observada não informa limite ($observed): nessas fontes nenhum limiar é avaliado."
+        "O limiar mede percentual contra cotas normalizadas. Saldo pré-pago não tem teto ($balance); " +
+            "atividade observada ou métricas fora do modelo de cotas ($observed) não passam por essa avaliação."
     } else {
-        "The threshold measures a percentage against the quota ceiling. Prepaid balance has no " +
-            "ceiling ($balance) and observed activity reports no limit ($observed): on those " +
-            "sources no threshold is ever evaluated."
+        "The threshold is evaluated against normalized quotas. Prepaid balances have no ceiling " +
+            "($balance); observed activity and metrics outside the quota model ($observed) do not " +
+            "go through this evaluation."
     }
 }
 

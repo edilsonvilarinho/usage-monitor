@@ -22,8 +22,12 @@ import okhttp3.Credentials
  * proxy (host/porta/autenticador) é a parte nova e arriscada, e mora aqui
  * isolada da criação do client em si.
  */
-fun buildHttpClient(effectiveProxy: ProxyEnvironmentConfig?): HttpClient {
+fun buildHttpClient(
+    effectiveProxy: ProxyEnvironmentConfig?,
+    followRedirects: Boolean = true
+): HttpClient {
     return HttpClient(OkHttp) {
+        this.followRedirects = followRedirects
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true

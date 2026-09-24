@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,6 +12,43 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DashboardScreenWarningsTest {
+
+    @Test
+    fun missingGeminiSessionsGetsLocalizedProfileGuidanceWithoutPath() {
+        val error = UiApiError(
+            source = ApiSource.GEMINI,
+            message = GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage
+        )
+
+        val portuguese = warningFor(error, AppLanguage.PT)
+        val english = warningFor(error, AppLanguage.EN)
+
+        assertNotNull(portuguese)
+        assertEquals("Gemini CLI sem histórico local", portuguese.title)
+        assertTrue(portuguese.description.contains("Use o Gemini CLI neste perfil"))
+        assertTrue(!portuguese.description.contains("C:\\"))
+        assertNull(portuguese.actionLabel)
+
+        assertNotNull(english)
+        assertEquals("Gemini CLI has no local session history", english.title)
+        assertTrue(english.description.contains("Use Gemini CLI in this profile"))
+    }
+
+    @Test
+    fun unreadableGeminiMetadataGetsItsOwnLocalizedWarning() {
+        val warning = warningFor(
+            error = UiApiError(
+                source = ApiSource.GEMINI,
+                message = GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage
+            ),
+            language = AppLanguage.PT
+        )
+
+        assertNotNull(warning)
+        assertEquals("Histórico local do Gemini CLI indisponível", warning.title)
+        assertTrue(warning.description.contains("registros de uso reconhecidos"))
+        assertNull(warning.actionLabel)
+    }
 
     // ── Identificação do alvo ────────────────────────────────────────────
     // Com várias contas Anthropic falhando ao mesmo tempo, dois banners de

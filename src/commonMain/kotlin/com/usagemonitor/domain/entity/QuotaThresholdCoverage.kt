@@ -12,15 +12,16 @@ package com.usagemonitor.domain.entity
  *   de tempo de autonomia existirem (issue #109): saldo não reseta, e não há
  *   teto de janela contra o qual medir percentual.
  * - [OBSERVED_ACTIVITY]: atividade observada nasce com `total = 0`
- *   (`KiloRepositoryImpl`, `OpenCodeRepositoryImpl`), porque a contagem local de
- *   requisições não conhece limite nenhum. `evaluateQuotaAlerts` descarta essas
- *   cotas no primeiro `if` do laço.
+ *   (`KiloRepositoryImpl`, `OpenCodeRepositoryImpl`, `GeminiRepositoryImpl`),
+ *   porque a contagem observada não conhece limite de conta. As métricas do
+ *   Antigravity ficam em `ReportedModelQuota`, fora do modelo normalizado que o
+ *   avaliador de limiar consome. `evaluateQuotaAlerts` ignora essas fontes.
  *
  * O defeito da issue #194 não é o silêncio do avaliador: é a aba Alertas
- * oferecer o limiar sem dizer que quatro das oito fontes ficam de fora dele.
+ * oferecer o limiar sem dizer quais fontes ficam de fora dele.
  *
  * O `when` de [quotaThresholdGap] é **exaustivo e sem `else`** de propósito: é
- * o erro de compilação que obriga a nona fonte a declarar se o limiar a alcança,
+ * o erro de compilação que obriga cada nova fonte a declarar se o limiar a alcança,
  * e é a única garantia de que o texto da tela continua verdadeiro depois dela.
  */
 enum class QuotaThresholdGap {
@@ -40,11 +41,13 @@ enum class QuotaThresholdGap {
 fun ApiSource.quotaThresholdGap(): QuotaThresholdGap? {
     return when (this) {
         ApiSource.DEEPSEEK, ApiSource.OPENROUTER -> QuotaThresholdGap.PREPAID_BALANCE
-        ApiSource.OPENCODE, ApiSource.KILO -> QuotaThresholdGap.OBSERVED_ACTIVITY
+        ApiSource.OPENCODE, ApiSource.KILO, ApiSource.GEMINI, ApiSource.ANTIGRAVITY ->
+            QuotaThresholdGap.OBSERVED_ACTIVITY
         ApiSource.ANTHROPIC,
         ApiSource.CODEX,
         ApiSource.MINIMAX,
-        ApiSource.OPENCODE_GO -> null
+        ApiSource.OPENCODE_GO,
+        ApiSource.CURSOR -> null
     }
 }
 

@@ -25,6 +25,9 @@ import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdatePreparation
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.repository.KiloRepository
+import com.usagemonitor.domain.repository.GeminiRepository
+import com.usagemonitor.domain.repository.CursorRepository
+import com.usagemonitor.domain.repository.AntigravityRepository
 import com.usagemonitor.domain.repository.OpenCodeGoRepository
 import com.usagemonitor.domain.repository.OpenCodeRepository
 import com.usagemonitor.domain.repository.OpenRouterRepository
@@ -33,6 +36,9 @@ import com.usagemonitor.domain.usecase.GetAnthropicUsageUseCase
 import com.usagemonitor.domain.usecase.GetCodexUsageUseCase
 import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetKiloUsageUseCase
+import com.usagemonitor.domain.usecase.GetGeminiUsageUseCase
+import com.usagemonitor.domain.usecase.GetCursorUsageUseCase
+import com.usagemonitor.domain.usecase.GetAntigravityUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeGoUsageUseCase
 import com.usagemonitor.domain.usecase.GetOpenCodeUsageUseCase
@@ -123,6 +129,27 @@ class DashboardViewModel(
                         "Chave da API OpenRouter não configurada. Abra Configurações > APIs e informe a chave."
                     )
                 )
+            }
+        }
+    ),
+    private val getGeminiUsage: GetGeminiUsageUseCase = GetGeminiUsageUseCase(
+        object : GeminiRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Gemini CLI local usage is unavailable"))
+            }
+        }
+    ),
+    private val getCursorUsage: GetCursorUsageUseCase = GetCursorUsageUseCase(
+        object : CursorRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Cursor local session usage is unavailable"))
+            }
+        }
+    ),
+    private val getAntigravityUsage: GetAntigravityUsageUseCase = GetAntigravityUsageUseCase(
+        object : AntigravityRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                return Result.failure(IllegalStateException("Antigravity CLI usage is unavailable"))
             }
         }
     ),
@@ -593,8 +620,11 @@ class DashboardViewModel(
                             target.source == ApiSource.CODEX &&
                                 existingStats != null &&
                                 isPersistableDashboardStats(existingStats)
+                        val canPreserveLocalIntegrationCache =
+                            target.source in setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY) &&
+                                existingStats != null
                         val shouldRemoveData =
-                            (!preserveDataOnFailure && !canPreserveCodexCache) ||
+                            (!preserveDataOnFailure && !canPreserveCodexCache && !canPreserveLocalIntegrationCache) ||
                                 target !in cachedStatsByTarget
                         if (shouldRemoveData) {
                             cachedStatsByTarget.remove(target)
@@ -713,6 +743,9 @@ class DashboardViewModel(
             ApiSource.OPENCODE_GO -> getOpenCodeGoUsage()
             ApiSource.KILO -> getKiloUsage()
             ApiSource.OPENROUTER -> getOpenRouterUsage()
+            ApiSource.GEMINI -> getGeminiUsage()
+            ApiSource.CURSOR -> getCursorUsage()
+            ApiSource.ANTIGRAVITY -> getAntigravityUsage()
         }
     }
 

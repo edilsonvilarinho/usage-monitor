@@ -96,6 +96,7 @@ fun main(args: Array<String>) {
     val generator = ScreenshotGenerator(outputDir)
 
     generator.dashboard()
+    generator.newIntegrations()
     generator.history()
     generator.settings()
     generator.themePresets()
@@ -197,6 +198,29 @@ private class ScreenshotGenerator(private val outputDir: File) {
                 // O contador só precisa do valor inicial; o laço de um segundo
                 // por tique só produziria frames diferentes a cada execução.
                 countdownUpdatesEnabled = false
+            )
+        }
+    }
+
+    fun newIntegrations() = capture("new-integrations", widthDp = 1_040, heightDp = 570) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            ResponsiveDashboardCardGrid(
+                items = ScreenshotFixtures.newIntegrationStats,
+                refreshingTargets = emptySet(),
+                minimizedCards = emptySet(),
+                riskSummaries = emptyMap(),
+                language = AppLanguage.PT,
+                onRefreshCard = {},
+                onMoveCardToIndex = { _, _ -> },
+                onToggleCardMinimized = {},
+                onOpenHistoryCard = { _, _ -> },
+                teamEnabledProfileIds = emptySet(),
+                now = ScreenshotFixtures.NOW,
+                modifier = Modifier.fillMaxSize()
             )
         }
     }

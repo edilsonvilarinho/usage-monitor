@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.ReportedModelQuota
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.QuotaSeriesKey
@@ -193,6 +194,74 @@ internal object ScreenshotFixtures {
                     hasKnownResetAt = false,
                     periodType = PeriodType.INTERVAL,
                     unit = UsageUnit.CURRENCY_USD
+                )
+            )
+        )
+    )
+
+    /** Captura isolada das três integrações da issue #267, com dados sintéticos. */
+    val newIntegrationStats: List<ApiUsageStats> = listOf(
+        ApiUsageStats(
+            source = ApiSource.GEMINI,
+            apiName = "Gemini CLI",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Gemini 2.5 Pro 5h",
+                    used = 18_420L,
+                    total = 0L,
+                    periodEndAt = NOW,
+                    hasKnownResetAt = false,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.TOKENS
+                ),
+                QuotaInfo(
+                    label = "Gemini 2.5 Pro 7d",
+                    used = 82_610L,
+                    total = 0L,
+                    periodEndAt = NOW,
+                    hasKnownResetAt = false,
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.TOKENS
+                )
+            )
+        ),
+        ApiUsageStats(
+            source = ApiSource.CURSOR,
+            apiName = "Cursor",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Cursor Auto",
+                    used = 34L,
+                    total = 100L,
+                    periodEndAt = NOW.plusHours(24 * 12),
+                    periodType = PeriodType.MONTHLY,
+                    unit = UsageUnit.PERCENTAGE
+                ),
+                QuotaInfo(
+                    label = "Cursor Included total",
+                    used = 22L,
+                    total = 100L,
+                    periodEndAt = NOW.plusHours(24 * 12),
+                    periodType = PeriodType.MONTHLY,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            )
+        ),
+        ApiUsageStats(
+            source = ApiSource.ANTIGRAVITY,
+            apiName = "Antigravity CLI",
+            quotas = emptyList(),
+            reportedModelQuotas = listOf(
+                ReportedModelQuota(
+                    modelName = "Gemini models",
+                    remainingPercent = 99.49,
+                    unit = UsageUnit.PERCENTAGE,
+                    resetDescription = "167h 58m"
+                ),
+                ReportedModelQuota(
+                    modelName = "Claude and GPT models",
+                    remainingPercent = 100.0,
+                    unit = UsageUnit.PERCENTAGE
                 )
             )
         )

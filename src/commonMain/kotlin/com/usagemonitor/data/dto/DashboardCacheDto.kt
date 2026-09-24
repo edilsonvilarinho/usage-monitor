@@ -26,7 +26,20 @@ data class ApiUsageStatsCacheDto(
     val accountEmail: String? = null,
     val accountWorkspaceName: String? = null,
     val profileLabel: String? = null,
-    val notices: List<String> = emptyList()
+    val notices: List<String> = emptyList(),
+    val reportedModelQuotas: List<ReportedModelQuotaCacheDto> = emptyList()
+)
+
+@Serializable
+data class ReportedModelQuotaCacheDto(
+    val modelName: String,
+    val used: Long? = null,
+    val remaining: Long? = null,
+    val limit: Long? = null,
+    val usedPercent: Double? = null,
+    val remainingPercent: Double? = null,
+    val unit: String,
+    val resetDescription: String? = null
 )
 
 @Serializable

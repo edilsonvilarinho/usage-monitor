@@ -67,6 +67,9 @@ kotlin {
                 // Coroutines com suporte ao dispatcher Swing (UI thread do Desktop)
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.sqlite.jdbc)
+                // Antigravity /usage e uma TUI interativa: captura por PTY,
+                // inclusive no Windows empacotado.
+                implementation(libs.pty4j)
 
                 // PDFBox: relatorio PDF das telas de sessoes. E JVM-only, entao o
                 // modelo do documento fica em commonMain e so a renderizacao aqui.

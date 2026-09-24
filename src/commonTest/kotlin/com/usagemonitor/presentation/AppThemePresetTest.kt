@@ -67,7 +67,10 @@ class AppThemePresetTest {
         "codex" to accents.codex,
         "deepseek" to accents.deepseek,
         "opencode" to accents.opencode,
-        "kilo" to accents.kilo
+        "kilo" to accents.kilo,
+        "openrouter" to accents.openrouter,
+        "gemini" to accents.gemini,
+        "cursor" to accents.cursor
     )
 
     private fun contrastRatio(a: Color, b: Color): Double {

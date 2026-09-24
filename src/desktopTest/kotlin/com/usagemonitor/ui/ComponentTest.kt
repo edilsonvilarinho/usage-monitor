@@ -49,6 +49,7 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.OpenCodeGoQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.ReportedModelQuota
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageForecast
@@ -2410,6 +2411,40 @@ class ComponentTest {
         onAllNodesWithText("Configurar OpenCode Zen Free").assertCountEquals(0)
     }
 
+    @Test
+    fun `SettingsDialogContent enables local integrations without API keys`() = runDesktopComposeUiTest {
+        val enabledSources = mutableSetOf<ApiSource>()
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = emptySet(),
+                    configuredApiKeys = emptySet(),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { source, checked ->
+                        if (checked) enabledSources += source
+                    },
+                    onApiKeySave = { _, _ -> true },
+                    initialTab = SettingsTab.APIS
+                )
+            }
+        }
+
+        listOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY).forEach { source ->
+            onNodeWithTag(apiSelectorSwitchTestTag(source)).performScrollTo().performClick()
+        }
+
+        assertEquals(setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY), enabledSources)
+        onAllNodesWithText("Configurar Gemini CLI").assertCountEquals(0)
+        onAllNodesWithText("Configurar Cursor").assertCountEquals(0)
+        onAllNodesWithText("Configurar Antigravity CLI").assertCountEquals(0)
+    }
+
     /**
      * Issue #125: o caminho que não existia. Até esta passada o diálogo só abria
      * ao **ligar** uma fonte sem chave; cadastrada uma vez, ela era definitiva
@@ -2715,6 +2750,9 @@ class ComponentTest {
         onNodeWithText("OpenCode Zen Free").performScrollTo().assertIsDisplayed()
         onNodeWithText("OpenCode Go").performScrollTo().assertIsDisplayed()
         onNodeWithText("Kilo Free").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Gemini CLI").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Cursor").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Antigravity CLI").performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(settingsTabTestTag(SettingsTab.ACCOUNTS)).performClick()
         onNodeWithText("Anthropic accounts").assertIsDisplayed()
@@ -3115,6 +3153,82 @@ class ComponentTest {
         onNodeWithText("Últimas 5h").assertIsDisplayed()
         onNodeWithText("7d: 31").assertIsDisplayed()
         onAllNodesWithText("0%").assertCountEquals(0)
+    }
+
+    @Test
+    fun `Antigravity card shows reported counts without derived percentage`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTIGRAVITY,
+                    apiName = "Antigravity CLI",
+                    quotas = emptyList(),
+                    reportedModelQuotas = listOf(
+                        ReportedModelQuota(
+                            modelName = "Gemini 3.1 Pro",
+                            remaining = 400L,
+                            limit = 1_000L,
+                            unit = UsageUnit.TOKENS,
+                            resetDescription = "2h 15m"
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Antigravity CLI").assertIsDisplayed()
+        onNodeWithText("Gemini 3.1 Pro").assertIsDisplayed()
+        onNodeWithText("Restante").assertIsDisplayed()
+        onNodeWithText("400 tokens").assertIsDisplayed()
+        onNodeWithText("Limite informado").assertIsDisplayed()
+        onNodeWithText("1000 tokens").assertIsDisplayed()
+        onNodeWithText("Reinício informado: 2h 15m").assertIsDisplayed()
+        onAllNodesWithText("40%").assertCountEquals(0)
+        onAllNodesWithTag("quotaProgress:Gemini 3.1 Pro").assertCountEquals(0)
+    }
+
+    @Test
+    fun antigravityCardPreservesFractionalWeeklyRemainingPercentage() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTIGRAVITY,
+                    apiName = "Antigravity CLI",
+                    quotas = emptyList(),
+                    reportedModelQuotas = listOf(
+                        ReportedModelQuota(
+                            modelName = "Gemini models",
+                            remainingPercent = 99.49,
+                            unit = UsageUnit.PERCENTAGE,
+                            resetDescription = "167h 58m"
+                        ),
+                        ReportedModelQuota(
+                            modelName = "Claude and GPT models",
+                            remainingPercent = 100.0,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    showUsageDetails = true,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {}
+                )
+            }
+        }
+
+        onNodeWithText("Modelos Gemini").assertIsDisplayed()
+        onAllNodesWithText("Limite semanal restante").assertCountEquals(2)
+        onNodeWithText("99,49%").assertIsDisplayed()
+        onNodeWithText("Reinício informado: 167h 58m").assertIsDisplayed()
+        onNodeWithText("Claude e GPT").assertIsDisplayed()
+        onAllNodesWithText("100%").assertCountEquals(1)
+        onAllNodesWithTag("quotaProgress:Modelos Gemini").assertCountEquals(0)
     }
 
     @Test

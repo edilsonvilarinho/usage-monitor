@@ -8,6 +8,8 @@ const SOURCES = {
   opencode: 'var(--oc)',
   kilo: 'var(--kilo)',
   openrouter: 'var(--openrouter)',
+  gemini: 'var(--gemini)',
+  cursor: 'var(--cursor)',
   neutral: 'var(--muted)'
 };
 

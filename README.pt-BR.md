@@ -15,11 +15,11 @@
 
 ![Tour da aplicação](img/tour.gif)
 
-O Usage Monitor acompanha oito fontes ao mesmo tempo — Claude Code, Codex, MiniMax, DeepSeek,
-OpenCode Zen Free, OpenCode Go, Kilo Free e OpenRouter — e mostra cota, saldo e horário de reinício
-de cada uma numa tela só. Ele também lê os **transcripts locais do Claude Code** para abrir o custo por sessão,
-projeto, branch e modelo, guarda histórico em SQLite para tendência e previsão, e pode enviar o
-consumo agregado para um servidor de time que você mesmo hospeda.
+O Usage Monitor acompanha onze integrações ao mesmo tempo — Claude Code, Codex, MiniMax, DeepSeek,
+OpenCode Zen Free, OpenCode Go, Kilo Free, OpenRouter, Gemini CLI, Cursor e Antigravity CLI — e mostra
+as métricas de uso disponíveis numa tela só. Ele também lê os **transcripts locais do Claude Code**
+para abrir o custo por sessão, projeto, branch e modelo, guarda histórico em SQLite para tendência e
+previsão, e pode enviar o consumo agregado para um servidor de time que você mesmo hospeda.
 
 É uma aplicação desktop para Windows, Linux e macOS. Ela lê credenciais que você já tem, e nunca
 envia conteúdo de prompt ou de resposta para lugar nenhum.
@@ -62,6 +62,9 @@ envia conteúdo de prompt ou de resposta para lugar nenhum.
 | OpenCode Go | Remota | `GET /zen/go/v1/usage` | chave informada em **Configurações > APIs** |
 | Kilo Free | Local | lê `~/.local/share/kilo/kilo.db` | base local do Kilo existente |
 | OpenRouter | Remota | `GET /api/v1/credits` | chave informada em **Configurações > APIs** |
+| Gemini CLI | Local | lê `~/.gemini/tmp/*/chats/session-*.jsonl` | histórico local do Gemini CLI; somente atividade de tokens |
+| Cursor | Remota | `GET https://cursor.com/api/usage-summary` | sessão existente do editor Cursor; rota pessoal sem contrato público |
+| Antigravity CLI | Local | PTY interativo `agy` com comando `/usage` | CLI Antigravity no `PATH` e já autenticado |
 
 Endpoints completos, caminhos de credencial e limites de cada integração:
 [`docs/integrations.md`](docs/integrations.md) (em inglês).
@@ -72,6 +75,11 @@ Endpoints completos, caminhos de credencial e limites de cada integração:
 
 Um card por conta ou integração. O card Anthropic mostra as três cotas — sessão de 5h, semanal e
 créditos de uso — com o semáforo de risco na cota em perigo.
+
+As novas fontes locais e CLI mantêm separados os tokens observados, o resumo pessoal do Cursor e as
+métricas de modelo informadas pelo Antigravity:
+
+![Cards do Gemini CLI, Cursor e Antigravity CLI](img/new-integrations.png)
 
 ![Sessões do Claude Code](img/cli-sessions.png)
 

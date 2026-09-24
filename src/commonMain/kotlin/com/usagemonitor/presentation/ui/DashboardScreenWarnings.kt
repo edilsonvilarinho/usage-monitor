@@ -53,6 +53,9 @@ internal fun warningActionFor(
         ApiSource.OPENCODE_GO -> null
         ApiSource.KILO -> null
         ApiSource.OPENROUTER -> null
+        ApiSource.GEMINI -> null
+        ApiSource.CURSOR -> null
+        ApiSource.ANTIGRAVITY -> null
     }
 }
 
@@ -284,6 +287,42 @@ internal fun warningFor(
                 target = error.target,
                 title = "OpenCode Go has no active subscription",
                 description = "The key is valid, but the account has no Go plan. Subscribe to Go at opencode.ai or disable this integration under Settings > APIs. The paid Zen balance is not exposed by any API and is not read here.",
+                actionLabel = null
+            )
+        }
+    }
+
+    if (error.isGeminiSessionDirectoryMissing) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                target = error.target,
+                title = "Gemini CLI sem histórico local",
+                description = "Nenhuma sessão local foi encontrada para este perfil. Use o Gemini CLI neste perfil e atualize o monitor novamente.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                target = error.target,
+                title = "Gemini CLI has no local session history",
+                description = "No local sessions were found for this profile. Use Gemini CLI in this profile, then refresh Usage Monitor.",
+                actionLabel = null
+            )
+        }
+    }
+
+    if (error.isGeminiSessionHistoryUnreadable) {
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                target = error.target,
+                title = "Histórico local do Gemini CLI indisponível",
+                description = "Os arquivos de sessão locais não contêm registros de uso reconhecidos. Verifique se o histórico foi gerado pelo Gemini CLI e atualize novamente.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                target = error.target,
+                title = "Gemini CLI local history is unavailable",
+                description = "The local session files contain no recognized usage records. Check that Gemini CLI generated the history, then refresh.",
                 actionLabel = null
             )
         }

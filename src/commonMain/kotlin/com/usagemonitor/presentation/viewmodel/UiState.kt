@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -90,6 +91,17 @@ data class UiApiError(
     val isKiloLocalIssue: Boolean
         get() = source == ApiSource.KILO && isKiloLocalMessage(message)
 
+    val isGeminiSessionDirectoryMissing: Boolean
+        get() = source == ApiSource.GEMINI &&
+            message.contains(GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage, ignoreCase = true)
+
+    val isGeminiSessionHistoryUnreadable: Boolean
+        get() = source == ApiSource.GEMINI &&
+            message.contains(GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage, ignoreCase = true)
+
+    val isGeminiLocalIssue: Boolean
+        get() = isGeminiSessionDirectoryMissing || isGeminiSessionHistoryUnreadable
+
     val isRateLimitIssue: Boolean
         get() = isRateLimitMessage(message)
 
@@ -135,6 +147,7 @@ data class UiApiError(
             isOpenCodeGoApiKeyIssue ||
             isOpenCodeGoSubscriptionIssue ||
             isKiloLocalIssue ||
+            isGeminiLocalIssue ||
             isProxyAuthIssue
 }
 

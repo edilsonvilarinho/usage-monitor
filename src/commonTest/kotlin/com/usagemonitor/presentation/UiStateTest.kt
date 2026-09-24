@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,6 +9,28 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class UiStateTest {
+
+    @Test
+    fun geminiLocalHistoryFailuresClassifyOnlyForGemini() {
+        val missing = UiApiError(
+            source = ApiSource.GEMINI,
+            message = GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage
+        )
+        val unreadable = UiApiError(
+            source = ApiSource.GEMINI,
+            message = GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage
+        )
+        val otherSource = UiApiError(
+            source = ApiSource.CURSOR,
+            message = GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage
+        )
+
+        assertTrue(missing.isGeminiSessionDirectoryMissing)
+        assertTrue(missing.isConfigurationIssue)
+        assertTrue(unreadable.isGeminiSessionHistoryUnreadable)
+        assertTrue(unreadable.isConfigurationIssue)
+        assertFalse(otherSource.isGeminiLocalIssue)
+    }
 
     @Test
     fun `isAnthropicCredentialIssue true for PT not-found message`() {

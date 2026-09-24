@@ -34,6 +34,9 @@
   --minimax:   #FF8A3D;
   --oc:        #7BD389;
   --kilo:      #E6D84E;
+  --openrouter:#FF6FA8;
+  --gemini:    #E2A5E9;
+  --cursor:    #C7E9A5;
 
   --input:     #4C8DFF;
   --output:    #B07CFF;
@@ -69,6 +72,7 @@
 
     --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
     --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
+    --openrouter:#B23368; --gemini:#7C1D87; --cursor:#477915;
 
     --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
     --cwrite:#8A5000; --savings:#00697A;
@@ -93,6 +97,7 @@
 
   --anthropic:#1565C0; --codex:#00695C; --deepseek:#7B3FC4;
   --minimax:  #9A4A00; --oc:   #2E7D32; --kilo:    #5F5500;
+  --openrouter:#B23368; --gemini:#7C1D87; --cursor:#477915;
 
   --input:#1565C0; --output:#6A3FB5; --cread:#2E7D32;
   --cwrite:#8A5000; --savings:#00697A;
@@ -107,6 +112,7 @@
   --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --info:#4C8DFF;
   --anthropic:#4F8CFF; --codex:#27BFA3; --deepseek:#C084FC;
   --minimax:#FF8A3D; --oc:#7BD389; --kilo:#E6D84E;
+  --openrouter:#FF6FA8; --gemini:#E2A5E9; --cursor:#C7E9A5;
   --input:#4C8DFF; --output:#B07CFF; --cread:#4CAF50;
   --cwrite:#FFA726; --savings:#26C6DA;
   --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
@@ -450,7 +456,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
 </div>
 <p class="note">Todo estado carrega <b>ponto + palavra</b>. A cor reforça, não informa sozinha — é o que mantém a tela legível para quem não distingue as matizes.</p>
 
-<h3>Identidade das seis integrações</h3>
+<h3>Identidade dos fornecedores monitorados</h3>
 <div class="legend" style="margin-bottom:var(--s2)">
   <span><i style="background:var(--anthropic)"></i>Anthropic</span>
   <span><i style="background:var(--codex)"></i>Codex</span>
@@ -458,8 +464,11 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <span><i style="background:var(--minimax)"></i>MiniMax</span>
   <span><i style="background:var(--oc)"></i>OpenCode</span>
   <span><i style="background:var(--kilo)"></i>Kilo</span>
+  <span><i style="background:var(--openrouter)"></i>OpenRouter</span>
+  <span><i style="background:var(--gemini)"></i>Google · Gemini CLI e Antigravity</span>
+  <span><i style="background:var(--cursor)"></i>Cursor</span>
 </div>
-<p class="note">Os acentos são os que já passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre si). <b>Não mudam.</b> O que muda é a área: de fundo de card inteiro para um marcador de 2px, linha de gráfico e texto de valor. E a cor <code>opencode</code> continua sendo a da <b>integração</b> monitorada — não vira a cor da marca do app.</p>
+<p class="note">Os acentos passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre fornecedores). Gemini CLI e Antigravity compartilham a identidade Google; OpenCode Go e Zen Free compartilham <code>--oc</code>. O acento identifica a integração e não substitui o nome da fonte.</p>
 
 <h3>Tipografia</h3>
 <div class="panel"><div class="pbody">
@@ -540,6 +549,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <div class="phead"><span class="ptitle">AppBanner</span></div>
     <div class="pbody">
       <div class="banner warn"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Anthropic — Padrão</span><span class="bd">Limite de requisições atingido. Aguarde antes de tentar de novo.</span></div><span class="sp"></span><button class="btn ghost" type="button">Tentar de novo</button></div>
+      <div class="banner warn"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Gemini CLI sem histórico local</span><span class="bd">Nenhuma sessão local foi encontrada para este perfil. Use o Gemini CLI neste perfil e atualize o monitor novamente.</span></div></div>
       <div class="banner crit"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Créditos de uso indisponíveis</span><span class="bd">A resposta veio sem limite mensal. A linha de créditos não é exibida nesta coleta.</span></div></div>
       <div class="banner info"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Versão 36.0.0 disponível</span></div><span class="sp"></span><button class="btn ghost" type="button">Ver release</button></div>
     </div>
@@ -733,6 +743,24 @@ table.dt td.num, table.dt th.num { text-align: right; }
         <div class="statusbar"><button class="btn icon" type="button" aria-label="Histórico" title="Histórico">⏱</button></div>
       </div>
 
+      <!-- Gemini CLI · métrica local, separada da quota da conta -->
+      <div class="panel">
+        <div class="phead"><span class="srcmark" style="background:var(--gemini)"></span><div class="stack" style="gap:0"><span class="ptitle">Gemini CLI</span><span class="psub">sessões locais · tokens observados</span></div><span class="sp"></span><span class="st ok">Atividade local</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
+        <div class="pbody"><div class="row"><div class="stack" style="gap:var(--s1);flex:1"><span class="v sm">Gemini 3.1 Pro</span><span class="k">Últimas 5h · 18,4 mil tokens</span><span class="k">Últimos 7d · 142 mil tokens</span><span class="k dim">Métrica local; quota da conta Google separada</span></div></div></div>
+      </div>
+
+      <!-- Cursor · sessão pessoal existente -->
+      <div class="panel">
+        <div class="phead"><span class="srcmark" style="background:var(--cursor)"></span><span class="ptitle">Cursor</span><span class="sp"></span><span class="st ok">Normal</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
+        <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Auto</span><span class="sp"></span><span class="v">38%</span></div><div class="track ok"><i style="width:38%"></i></div><span class="k dim">Fim do ciclo informado: 01/10/2026</span></div></div><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">API</span><span class="sp"></span><span class="v">11%</span></div><div class="track ok"><i style="width:11%"></i></div></div></div></div>
+      </div>
+
+      <!-- Antigravity CLI · campos textuais explícitos de /usage -->
+      <div class="panel">
+        <div class="phead"><span class="srcmark" style="background:var(--gemini)"></span><div class="stack" style="gap:0"><span class="ptitle">Antigravity CLI</span><span class="psub">painel oficial /usage</span></div><span class="sp"></span><span class="st ok">Informado pelo CLI</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
+        <div class="pbody flush"><div class="row"><div class="stack" style="gap:var(--s1);flex:1"><span class="v sm">Modelos Gemini</span><span class="k">Limite semanal restante · 99,49%</span><span class="k dim">Reinício informado · 167h 58m</span></div></div><div class="row"><div class="stack" style="gap:var(--s1);flex:1"><span class="v sm">Claude e GPT</span><span class="k">Limite semanal restante · 100%</span></div></div></div>
+      </div>
+
     </div>
   </div>
   <div class="statusbar">
@@ -759,7 +787,7 @@ atenção: …"), que é a razão de o semáforo existir e o que os testes de co
 onde levá-la. O rodapé da janela vira <b>status bar de 30dp</b>: versão, contagem regressiva, refresh global e
 configurações. A contagem de fontes desenhada aqui como <code>4 fontes</code> <b>não foi implementada</b>: ela afirma um
 estado agregado que o app não calcula, e com uma fonte em erro o verde mentiria — escolher o tom seria inventar
-semântica que este protótipo não define. Falha de fonte já tem o banner por alvo. Preservados: múltiplos perfis Anthropic, as seis integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
+semântica que este protótipo não define. Falha de fonte já tem o banner por alvo. Preservados: múltiplos perfis Anthropic, todas as integrações, refresh individual, histórico, sessões CLI, uso do time, presença, minimização, reordenação, semáforo de risco, avisos persistentes, atualização disponível e sucesso parcial.</p>
 
 <h3>Modo somente cards</h3>
 <p class="lede">A mesma janela sem barra de título e sem rodapé: o app fica do tamanho do que ele informa. A moldura não some para sempre — ela volta como faixa sobreposta enquanto o mouse está nos 34px do topo.</p>
@@ -812,7 +840,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="k">Atualizando…</span>
         <button class="btn icon" type="button" disabled aria-label="Atualizando">↻</button>
       </div>
-      <div class="pbody flush">
+  <div class="pbody flush">
         <div class="row"><div class="stack" style="gap:3px;flex:1;opacity:.5">
           <div class="hstack"><span class="k">Codex atual</span><span class="sp"></span><span class="v">23%</span></div>
           <div class="track"><i style="width:23%"></i></div>
@@ -1489,6 +1517,10 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="row"><span class="srcmark" style="background:var(--minimax)"></span><span class="v sm" style="flex:1">MiniMax</span><span class="st crit">MINIMAX_API_KEY ausente</span><span class="sw"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--oc)"></span><span class="v sm" style="flex:1">OpenCode</span><span class="st off">Desativada</span><span class="sw"></span></div>
     <div class="row"><span class="srcmark" style="background:var(--kilo)"></span><span class="v sm" style="flex:1">Kilo</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--openrouter)"></span><span class="v sm" style="flex:1">OpenRouter</span><span class="st ok">Chave salva</span><span class="sw on"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--gemini)"></span><span class="v sm" style="flex:1">Gemini CLI · uso local</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--cursor)"></span><span class="v sm" style="flex:1">Cursor · sessão local</span><span class="st off">Desativada</span><span class="sw"></span></div>
+    <div class="row"><span class="srcmark" style="background:var(--gemini)"></span><span class="v sm" style="flex:1">Antigravity CLI · /usage</span><span class="st off">Desativada</span><span class="sw"></span></div>
   </div></div></div>
 </div>
 

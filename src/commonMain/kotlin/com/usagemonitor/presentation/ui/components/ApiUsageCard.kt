@@ -79,6 +79,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.ReportedModelQuota
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
@@ -149,6 +150,7 @@ fun ApiUsageCard(
     source: ApiSource,
     apiName: String,
     quotas: List<QuotaInfo>,
+    reportedModelQuotas: List<ReportedModelQuota> = emptyList(),
     accountContext: UsageAccountContext? = null,
     notices: Set<ApiUsageNotice> = emptySet(),
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary> = emptyMap(),
@@ -511,8 +513,15 @@ fun ApiUsageCard(
                         horizontal = density.contentHorizontalPadding,
                         vertical = density.contentVerticalPadding
                     )
-                    if (source.isObservedActivitySource()) {
-                        OpenCodeUsageSummary(
+                    if (source == ApiSource.ANTIGRAVITY) {
+                        AntigravityUsageSummary(
+                            quotas = reportedModelQuotas,
+                            language = language,
+                            compact = minimized,
+                            modifier = blockPadding
+                        )
+                    } else if (source.isObservedActivitySource()) {
+                        ObservedUsageSummary(
                             source = source,
                             quotas = orderedQuotas,
                             language = language,
@@ -644,6 +653,92 @@ fun ApiUsageCard(
             }
             }
         }
+    }
+}
+
+@Composable
+private fun AntigravityUsageSummary(
+    quotas: List<ReportedModelQuota>,
+    language: AppLanguage,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compact) AppSpacing.xs else AppSpacing.sm)
+    ) {
+        quotas.forEach { quota ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .appSurfaceBlock()
+                    .padding(horizontal = AppSpacing.md, vertical = if (compact) AppSpacing.sm else AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+            ) {
+                Text(
+                    text = antigravityGroupDisplayName(quota.modelName, language),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val unitLabel = if (quota.unit == UsageUnit.TOKENS) "tokens" else if (language == AppLanguage.PT) "requisições" else "requests"
+                quota.usedPercent?.let { value ->
+                    AntigravityMetricLine(
+                        label = if (language == AppLanguage.PT) "Uso informado" else "Reported usage",
+                        value = formatReportedPercent(value, language)
+                    )
+                }
+                quota.remainingPercent?.let { value ->
+                    AntigravityMetricLine(
+                        label = if (quota.unit == UsageUnit.PERCENTAGE) {
+                            if (language == AppLanguage.PT) "Limite semanal restante" else "Weekly limit remaining"
+                        } else {
+                            if (language == AppLanguage.PT) "Restante informado" else "Reported remaining"
+                        },
+                        value = formatReportedPercent(value, language)
+                    )
+                }
+                quota.used?.let { value ->
+                    AntigravityMetricLine(
+                        label = if (language == AppLanguage.PT) "Usado" else "Used",
+                        value = "$value $unitLabel"
+                    )
+                }
+                quota.remaining?.let { value ->
+                    AntigravityMetricLine(
+                        label = if (language == AppLanguage.PT) "Restante" else "Remaining",
+                        value = "$value $unitLabel"
+                    )
+                }
+                quota.limit?.let { value ->
+                    AntigravityMetricLine(
+                        label = if (language == AppLanguage.PT) "Limite informado" else "Reported limit",
+                        value = "$value $unitLabel"
+                    )
+                }
+                quota.resetDescription?.let { value ->
+                    Text(
+                        text = if (language == AppLanguage.PT) "Reinício informado: $value" else "Reported reset: $value",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AntigravityMetricLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -792,14 +887,14 @@ private fun noticeText(notice: ApiUsageNotice, language: AppLanguage): String {
 }
 
 @Composable
-private fun OpenCodeUsageSummary(
+private fun ObservedUsageSummary(
     source: ApiSource,
     quotas: List<QuotaInfo>,
     language: AppLanguage,
     compact: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val modelSummaries = remember(quotas) { buildOpenCodeModelSummaries(quotas) }
+    val modelSummaries = remember(quotas) { buildObservedUsageSummaries(quotas) }
 
     if (modelSummaries.isEmpty()) {
         // Superfície neutra com borda, como todo bloco de dado do sistema. O
@@ -815,12 +910,22 @@ private fun OpenCodeUsageSummary(
             verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
         ) {
             Text(
-                text = if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected",
+                text = if (source == ApiSource.GEMINI) {
+                    if (language == AppLanguage.PT) "Nenhum token registrado" else "No tokens recorded"
+                } else {
+                    if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected"
+                },
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (language == AppLanguage.PT) {
+                text = if (source == ApiSource.GEMINI) {
+                    if (language == AppLanguage.PT) {
+                        "O uso aparece quando o Gemini CLI registra sessões locais com contagem de tokens."
+                    } else {
+                        "Usage appears when Gemini CLI records local sessions with token counts."
+                    }
+                } else if (language == AppLanguage.PT) {
                     "Abra o ${source.displayName(language)} e use um modelo free para começar a preencher este card."
                 } else {
                     "Use a free ${source.displayName(language)} model to start populating this card."
@@ -838,7 +943,7 @@ private fun OpenCodeUsageSummary(
         verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
     ) {
         modelSummaries.forEach { summary ->
-            OpenCodeModelRow(
+            ObservedUsageModelRow(
                 source = source,
                 summary = summary,
                 language = language,
@@ -849,9 +954,9 @@ private fun OpenCodeUsageSummary(
 }
 
 @Composable
-private fun OpenCodeModelRow(
+private fun ObservedUsageModelRow(
     source: ApiSource,
-    summary: OpenCodeModelSummary,
+    summary: ObservedUsageModelSummary,
     language: AppLanguage,
     compact: Boolean,
     modifier: Modifier = Modifier
@@ -862,10 +967,10 @@ private fun OpenCodeModelRow(
         HoverTooltipBox(
             title = summary.modelName,
             subtitle = if (language == AppLanguage.PT) "Atividade observada" else "Observed activity",
-            metrics = buildOpenCodeTooltipMetrics(summary = summary, language = language),
+            metrics = buildObservedUsageTooltipMetrics(summary = summary, language = language),
             modifier = modifier
         ) {
-            OpenCodeModelRowContent(
+            ObservedUsageModelRowContent(
                 source = source,
                 summary = summary,
                 language = language,
@@ -877,7 +982,7 @@ private fun OpenCodeModelRow(
         return
     }
 
-    OpenCodeModelRowContent(
+    ObservedUsageModelRowContent(
         source = source,
         summary = summary,
         language = language,
@@ -887,9 +992,9 @@ private fun OpenCodeModelRow(
 }
 
 @Composable
-private fun OpenCodeModelRowContent(
+private fun ObservedUsageModelRowContent(
     source: ApiSource,
-    summary: OpenCodeModelSummary,
+    summary: ObservedUsageModelSummary,
     language: AppLanguage,
     compact: Boolean,
     modifier: Modifier = Modifier
@@ -922,7 +1027,11 @@ private fun OpenCodeModelRowContent(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (language == AppLanguage.PT) "Limite oficial indisponível" else "Official limit unavailable",
+                    text = if (source == ApiSource.GEMINI) {
+                        if (language == AppLanguage.PT) "Métrica local; cota da conta separada" else "Local metric; account quota is separate"
+                    } else {
+                        if (language == AppLanguage.PT) "Limite oficial indisponível" else "Official limit unavailable"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -932,18 +1041,29 @@ private fun OpenCodeModelRowContent(
             Spacer(modifier = Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = localizedRequestCount(summary.requestsFiveHours, language),
+                    text = localizedObservedCount(
+                        summary.amountFiveHours,
+                        summary.unit,
+                        language,
+                        summary.modelName.endsWith(" sessions")
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = openCodePrimaryWindowLabel(language),
+                    text = observedPrimaryWindowLabel(language),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = openCodeSecondaryWindowLabel(summary.requestsSevenDays, language),
+                    text = observedSecondaryWindowLabel(
+                        value = summary.amountSevenDays,
+                        source = source,
+                        unit = summary.unit,
+                        language = language,
+                        isSessionCount = summary.modelName.endsWith(" sessions")
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -951,7 +1071,7 @@ private fun OpenCodeModelRowContent(
         }
 
         if (!compact) {
-            OpenCodeInlineComparisonChart(
+            ObservedUsageInlineComparisonChart(
                 source = source,
                 summary = summary,
                 language = language
@@ -962,13 +1082,13 @@ private fun OpenCodeModelRowContent(
 
 
 @Composable
-private fun OpenCodeInlineComparisonChart(
+private fun ObservedUsageInlineComparisonChart(
     source: ApiSource,
-    summary: OpenCodeModelSummary,
+    summary: ObservedUsageModelSummary,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
-    val maxValue = maxOf(summary.requestsFiveHours, summary.requestsSevenDays, 1L).toFloat()
+    val maxValue = maxOf(summary.amountFiveHours, summary.amountSevenDays, 1L).toFloat()
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -984,29 +1104,35 @@ private fun OpenCodeInlineComparisonChart(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        OpenCodeInlineBar(
+        ObservedUsageInlineBar(
             modelName = summary.modelName,
             label = "5h",
-            value = summary.requestsFiveHours,
-            fraction = summary.requestsFiveHours / maxValue,
+            value = summary.amountFiveHours,
+            fraction = summary.amountFiveHours / maxValue,
+            unit = summary.unit,
+            isSessionCount = summary.modelName.endsWith(" sessions"),
             language = language
         )
-        OpenCodeInlineBar(
+        ObservedUsageInlineBar(
             modelName = summary.modelName,
             label = "7d",
-            value = summary.requestsSevenDays,
-            fraction = summary.requestsSevenDays / maxValue,
+            value = summary.amountSevenDays,
+            fraction = summary.amountSevenDays / maxValue,
+            unit = summary.unit,
+            isSessionCount = summary.modelName.endsWith(" sessions"),
             language = language
         )
     }
 }
 
 @Composable
-private fun OpenCodeInlineBar(
+private fun ObservedUsageInlineBar(
     modelName: String,
     label: String,
     value: Long,
     fraction: Float,
+    unit: UsageUnit,
+    isSessionCount: Boolean,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
@@ -1034,8 +1160,15 @@ private fun OpenCodeInlineBar(
                     value = label
                 ),
                 TooltipMetric(
-                    label = if (language == AppLanguage.PT) "Requisições" else "Requests",
-                    value = value.toString()
+                    label = when {
+                        isSessionCount && language == AppLanguage.PT -> "Sessões"
+                        isSessionCount -> "Sessions"
+                        unit == UsageUnit.TOKENS && language == AppLanguage.PT -> "Tokens"
+                        unit == UsageUnit.TOKENS -> "Tokens"
+                        language == AppLanguage.PT -> "Requisições"
+                        else -> "Requests"
+                    },
+                    value = localizedObservedCount(value, unit, language, isSessionCount)
                 )
             ),
             modifier = Modifier.weight(1f)
@@ -1050,7 +1183,7 @@ private fun OpenCodeInlineBar(
         }
 
         Text(
-            text = if (language == AppLanguage.PT) "$value req." else "$value req.",
+            text = compactObservedCount(value, unit),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,

@@ -22,50 +22,98 @@ import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.presentation.ui.theme.AppAccents
 
-internal data class OpenCodeModelSummary(
+internal data class ObservedUsageModelSummary(
     val modelName: String,
-    val requestsFiveHours: Long,
-    val requestsSevenDays: Long
+    val amountFiveHours: Long,
+    val amountSevenDays: Long,
+    val unit: UsageUnit
 )
 
-internal fun localizedRequestCount(value: Long, language: AppLanguage): String {
-    return if (language == AppLanguage.PT) {
-        "$value requisições"
-    } else {
-        "$value requests"
+internal fun localizedObservedCount(
+    value: Long,
+    unit: UsageUnit,
+    language: AppLanguage,
+    isSessionCount: Boolean = false
+): String {
+    val noun = when {
+        isSessionCount && language == AppLanguage.PT -> if (value == 1L) "sessão" else "sessões"
+        isSessionCount -> if (value == 1L) "session" else "sessions"
+        unit == UsageUnit.TOKENS && language == AppLanguage.PT -> "tokens"
+        unit == UsageUnit.TOKENS -> "tokens"
+        language == AppLanguage.PT -> if (value == 1L) "requisição" else "requisições"
+        else -> if (value == 1L) "request" else "requests"
+    }
+    val amount = if (unit == UsageUnit.TOKENS) abbreviate(value) else value.toString()
+    return "$amount $noun"
+}
+
+internal fun compactObservedCount(value: Long, unit: UsageUnit): String {
+    return when (unit) {
+        UsageUnit.REQUESTS -> "${abbreviate(value)} req."
+        UsageUnit.TOKENS -> "${abbreviate(value)} tok"
+        else -> value.toString()
     }
 }
 
-internal fun openCodePrimaryWindowLabel(language: AppLanguage): String {
+internal fun formatReportedPercent(value: Double, language: AppLanguage): String {
+    val number = value.toString().removeSuffix(".0")
+    val localizedNumber = if (language == AppLanguage.PT) number.replace('.', ',') else number
+    return "$localizedNumber%"
+}
+
+internal fun antigravityGroupDisplayName(value: String, language: AppLanguage): String {
+    if (language == AppLanguage.PT) {
+        return when (value.lowercase()) {
+            "gemini models" -> "Modelos Gemini"
+            "claude and gpt models" -> "Claude e GPT"
+            else -> value
+        }
+    }
+    return when (value.lowercase()) {
+        "gemini models" -> "Gemini models"
+        "claude and gpt models" -> "Claude and GPT models"
+        else -> value
+    }
+}
+
+internal fun observedPrimaryWindowLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Últimas 5h" else "Last 5h"
 }
 
-internal fun openCodeSecondaryWindowLabel(value: Long, language: AppLanguage): String {
-    return if (language == AppLanguage.PT) {
-        "7d: $value"
+internal fun observedSecondaryWindowLabel(
+    value: Long,
+    source: ApiSource,
+    unit: UsageUnit,
+    language: AppLanguage,
+    isSessionCount: Boolean
+): String {
+    val displayValue = if (source == ApiSource.GEMINI) {
+        localizedObservedCount(value, unit, language, isSessionCount)
     } else {
-        "7d: $value"
+        value.toString()
     }
+    return "7d: $displayValue"
 }
 
-internal fun buildOpenCodeTooltipMetrics(
-    summary: OpenCodeModelSummary,
+internal fun buildObservedUsageTooltipMetrics(
+    summary: ObservedUsageModelSummary,
     language: AppLanguage
 ): List<TooltipMetric> {
+    val isSessionCount = summary.modelName.endsWith(" sessions")
     return listOf(
         TooltipMetric(
-            label = openCodePrimaryWindowLabel(language),
-            value = "${summary.requestsFiveHours} req."
+            label = observedPrimaryWindowLabel(language),
+            value = localizedObservedCount(summary.amountFiveHours, summary.unit, language, isSessionCount)
         ),
         TooltipMetric(
             label = if (language == AppLanguage.PT) "Últimos 7d" else "Last 7d",
-            value = "${summary.requestsSevenDays} req."
+            value = localizedObservedCount(summary.amountSevenDays, summary.unit, language, isSessionCount)
         )
     )
 }
 
-internal fun buildOpenCodeModelSummaries(quotas: List<QuotaInfo>): List<OpenCodeModelSummary> {
-    val grouped = linkedMapOf<String, OpenCodeModelSummary>()
+internal fun buildObservedUsageSummaries(quotas: List<QuotaInfo>): List<ObservedUsageModelSummary> {
+    val grouped = linkedMapOf<String, ObservedUsageModelSummary>()
 
     quotas.forEach { quota ->
         val modelName = when {
@@ -74,14 +122,15 @@ internal fun buildOpenCodeModelSummaries(quotas: List<QuotaInfo>): List<OpenCode
             else -> quota.label
         }
 
-        val existing = grouped[modelName] ?: OpenCodeModelSummary(
+        val existing = grouped[modelName] ?: ObservedUsageModelSummary(
             modelName = modelName,
-            requestsFiveHours = 0L,
-            requestsSevenDays = 0L
+            amountFiveHours = 0L,
+            amountSevenDays = 0L,
+            unit = quota.unit
         )
         grouped[modelName] = when {
-            quota.label.endsWith(" 5h") -> existing.copy(requestsFiveHours = quota.used)
-            quota.label.endsWith(" 7d") -> existing.copy(requestsSevenDays = quota.used)
+            quota.label.endsWith(" 5h") -> existing.copy(amountFiveHours = quota.used)
+            quota.label.endsWith(" 7d") -> existing.copy(amountSevenDays = quota.used)
             else -> existing
         }
     }
@@ -136,13 +185,16 @@ internal fun accentColorFor(
         ApiSource.MINIMAX -> accents.minimax
         ApiSource.CODEX -> accents.codex
         ApiSource.DEEPSEEK -> accents.deepseek
-        // Go e Zen Free são planos da mesma integração e dividem o acento: o
-        // sistema visual fixa seis identidades de fonte e diz que elas não mudam.
+        // Go e Zen Free são planos da mesma integração e dividem o acento, como
+        // ferramentas do mesmo fornecedor compartilham identidade visual.
         // O que separa os dois cards é o título, e a regra "cor nunca informa
         // sozinha" já garante que isso basta.
         ApiSource.OPENCODE, ApiSource.OPENCODE_GO -> accents.opencode
         ApiSource.KILO -> accents.kilo
         ApiSource.OPENROUTER -> accents.openrouter
+        ApiSource.GEMINI -> accents.gemini
+        ApiSource.CURSOR -> accents.cursor
+        ApiSource.ANTIGRAVITY -> accents.gemini
     }
 }
 

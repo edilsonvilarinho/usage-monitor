@@ -99,7 +99,9 @@ object HelpCatalog {
             steps = listOf(
                 "Abra as Configurações pela engrenagem do rodapé e vá à aba \"APIs\".",
                 "Ligue as integrações em uso. MiniMax, DeepSeek, OpenCode Go e OpenRouter " +
-                    "pedem a chave da API ali mesmo; ela é gravada em ~/.usage-monitor/api-keys.json.",
+                    "pedem chave em Configurações → APIs, salva em ~/.usage-monitor/api-keys.json. " +
+                    "Gemini CLI lê sessões locais; Cursor usa a sessão local existente para buscar " +
+                    "o resumo pessoal; Antigravity consulta /usage no CLI já autenticado.",
                 "No mesmo diálogo, \"Testar chave\" faz a coleta de verdade e diz o motivo quando ela " +
                     "não passa — chave recusada, plano ausente, proxy ou falta de conexão.",
                 "Anthropic e Codex leem a credencial que o próprio CLI já gravou na máquina — não há " +
@@ -194,9 +196,10 @@ object HelpCatalog {
                 "três dias medidos, ou com consumo habitual perto de zero, ele não é emitido. No " +
                 "período silenciado o aviso é adiado, não perdido — ele sai quando o silêncio " +
                 "terminar. O limiar de cota não alcança as fontes de saldo pré-pago (DeepSeek, " +
-                "OpenRouter), que não têm teto contra o qual medir percentual, nem as de atividade " +
-                "observada (Kilo Free, OpenCode Zen Free), que não informam limite: nelas nenhum " +
-                "limiar é avaliado. Os outros três avisos continuam valendo.",
+                "OpenRouter), que não têm teto contra o qual medir percentual, nem as fontes de " +
+                "atividade ou métricas fora do modelo de cotas (Antigravity CLI, Gemini CLI, Kilo " +
+                "Free, OpenCode Zen Free): nelas nenhum limiar é avaliado. Os outros três avisos " +
+                "continuam valendo.",
             steps = listOf(
                 "Abra Configurações → \"Alertas\".",
                 "Ligue \"Avisar quando a quota cruzar um limiar\" e ajuste os limiares.",
@@ -340,7 +343,9 @@ object HelpCatalog {
             steps = listOf(
                 "Open Settings from the footer gear and go to the \"APIs\" tab.",
                 "Enable the integrations in use. MiniMax, DeepSeek, OpenCode Go and OpenRouter ask " +
-                    "for the API key right there; it is stored in ~/.usage-monitor/api-keys.json.",
+                    "for the API key right there; it is stored in ~/.usage-monitor/api-keys.json. " +
+                    "Gemini CLI reads local sessions; Cursor uses its existing local session to fetch " +
+                    "the personal summary; Antigravity reads /usage from the already authenticated CLI.",
                 "In the same dialog, \"Test key\" runs the real collection and states why it failed — " +
                     "key rejected, missing plan, proxy, or no connection.",
                 "Anthropic and Codex read the credential the CLI already wrote on this machine — " +
@@ -435,9 +440,9 @@ object HelpCatalog {
                 "near zero, it is not sent. During a muted period the warning is postponed, not " +
                 "lost — it goes out once the silence ends. The quota threshold does not reach " +
                 "prepaid balance sources (DeepSeek, OpenRouter), which have no ceiling to measure a " +
-                "percentage against, nor observed activity ones (Kilo Free, OpenCode Zen Free), " +
-                "which report no limit: on those, no threshold is ever evaluated. The other three " +
-                "warnings still apply.",
+                "percentage against, nor activity or metrics outside the quota model (Antigravity " +
+                "CLI, Gemini CLI, Kilo Free, OpenCode Zen Free): those sources are not evaluated by " +
+                "this threshold. The other three warnings still apply.",
             steps = listOf(
                 "Open Settings → \"Alerts\".",
                 "Turn on \"Warn when a quota crosses a threshold\" and adjust the thresholds.",

@@ -63,7 +63,7 @@ class AppAccentsContrastTest {
     }
 
     /**
-     * As seis cores de fonte são um conjunto categórico: se duas ficarem perto
+     * As cores de fonte são um conjunto categórico: se duas ficarem perto
      * demais, o gráfico do histórico deixa de distinguir as séries.
      */
     @Test
@@ -113,7 +113,10 @@ class AppAccentsContrastTest {
             "codex" to palette.codex,
             "deepseek" to palette.deepseek,
             "opencode" to palette.opencode,
-            "kilo" to palette.kilo
+            "kilo" to palette.kilo,
+            "openrouter" to palette.openrouter,
+            "gemini" to palette.gemini,
+            "cursor" to palette.cursor
         )
     }
 

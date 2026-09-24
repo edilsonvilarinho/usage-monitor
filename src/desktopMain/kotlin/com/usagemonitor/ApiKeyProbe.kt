@@ -40,7 +40,12 @@ internal suspend fun testApiKeyUsage(
         ApiSource.ANTHROPIC,
         ApiSource.CODEX,
         ApiSource.OPENCODE,
-        ApiSource.KILO -> Result.failure(
+        ApiSource.KILO,
+        ApiSource.GEMINI,
+        ApiSource.CURSOR -> Result.failure(
+            IllegalStateException("${source.name} não usa chave de API local e não tem o que testar.")
+        )
+        ApiSource.ANTIGRAVITY -> Result.failure(
             IllegalStateException("${source.name} não usa chave de API local e não tem o que testar.")
         )
     }

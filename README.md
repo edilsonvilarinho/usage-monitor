@@ -12,11 +12,11 @@ English · [Português (Brasil)](README.pt-BR.md)
 
 ![Usage Monitor tour](img/tour.gif)
 
-Usage Monitor watches eight sources at once — Claude Code, Codex, MiniMax, DeepSeek, OpenCode Zen
-Free, OpenCode Go, Kilo Free and OpenRouter — and shows quota, balance and reset time for each one on
-a single screen. It also reads your **local Claude Code transcripts** to break down cost per session, project,
-branch and model, keeps history in SQLite for trends and forecasts, and can push aggregated usage to
-a team server you host yourself.
+Usage Monitor watches eleven integrations at once — Claude Code, Codex, MiniMax, DeepSeek, OpenCode
+Zen Free, OpenCode Go, Kilo Free, OpenRouter, Gemini CLI, Cursor and Antigravity CLI — and shows
+their available usage metrics on a single screen. It also reads your **local Claude Code transcripts**
+to break down cost per session, project, branch and model, keeps history in SQLite for trends and
+forecasts, and can push aggregated usage to a team server you host yourself.
 
 It is a desktop app for Windows, Linux and macOS. It reads credentials you already have; it never
 sends prompt or response content anywhere.
@@ -58,6 +58,9 @@ sends prompt or response content anywhere.
 | OpenCode Go | Remote | `GET /zen/go/v1/usage` | API key, entered in **Settings > APIs** |
 | Kilo Free | Local | reads `~/.local/share/kilo/kilo.db` | an existing Kilo database |
 | OpenRouter | Remote | `GET /api/v1/credits` | API key, entered in **Settings > APIs** |
+| Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/session-*.jsonl` | local Gemini CLI session history; token activity only |
+| Cursor | Remote | `GET https://cursor.com/api/usage-summary` | an existing signed-in Cursor editor session; undocumented personal route |
+| Antigravity CLI | Local | interactive `agy` PTY and `/usage` command | Antigravity CLI installed on `PATH` and already authenticated |
 
 Full endpoints, credential paths and per-integration limits:
 [`docs/integrations.md`](docs/integrations.md).
@@ -68,6 +71,11 @@ Full endpoints, credential paths and per-integration limits:
 
 One card per account or integration. The Anthropic card shows all three quotas — 5-hour session,
 weekly, and usage credits — with a risk indicator on whichever one is in danger.
+
+The additional local and CLI sources keep observed tokens, Cursor's personal usage summary, and
+Antigravity's explicitly reported model metrics distinct:
+
+![Gemini CLI, Cursor and Antigravity CLI cards](img/new-integrations.png)
 
 ![Claude Code sessions](img/cli-sessions.png)
 
