@@ -1,5 +1,10 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.MutableTransitionState
 import kotlin.math.roundToInt
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -608,6 +613,15 @@ data class AppMenuOption(
  * baixo nasceria fora dela. Popup no Compose Desktop é camada **dentro** da
  * janela, recortada pelos limites dela — a #164 pagou isso —, e por isso a
  * posição é presa à janela nos dois eixos.
+ *
+ * **Entra e sai.** A primeira versão recusava animação de entrada ("menu não é
+ * lugar de transição avulsa"), e o menu surgia e sumia num quadro — o que mais
+ * contribuía para a tela ler como sem fluidez, justo no controle que o usuário
+ * aciona para trocar a janela inteira de modo. Entrada: escala de 0,96 a 1 pela
+ * mola `EXPRESSIVE` mais fade, **a partir da borda que encosta na âncora** —
+ * menu que abre para cima cresce de baixo. Saída: só fade, em 90ms. O `Popup`
+ * continua composto até a saída terminar; antes disso ele sumia junto com o
+ * `expanded`, e não havia saída para animar.
  */
 @Composable
 fun AppMenu(
@@ -619,10 +633,19 @@ fun AppMenu(
     modifier: Modifier = Modifier,
     anchor: @Composable () -> Unit
 ) {
+    val visibility = remember { MutableTransitionState(false) }
+    visibility.targetState = expanded
+    val enterAlpha = appTween<Float>(AppMotion.fast)
+    val exitAlpha = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+    val enterScale = appSpring<Float>(AppMotion.Springs.EXPRESSIVE, visibilityThreshold = 0.001f)
+    val exitScale = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+
     Box(modifier = modifier) {
         anchor()
 
-        if (!expanded) {
+        // Fechado e parado: nada composto. Fechando, o popup fica até a saída
+        // terminar.
+        if (!visibility.currentState && !visibility.targetState) {
             return@Box
         }
 
@@ -634,8 +657,29 @@ fun AppMenu(
             onDismissRequest = onDismissRequest,
             properties = PopupProperties(focusable = true)
         ) {
+            val transition = rememberTransition(visibility, label = "appMenu")
+            val alpha by transition.animateFloat(
+                transitionSpec = { if (targetState) enterAlpha else exitAlpha },
+                label = "appMenuAlpha"
+            ) { shown -> if (shown) 1f else 0f }
+            val scale by transition.animateFloat(
+                transitionSpec = { if (targetState) enterScale else exitScale },
+                label = "appMenuScale"
+            ) { shown -> if (shown) 1f else MENU_ENTER_SCALE }
             Column(
                 modifier = Modifier
+                    .graphicsLayer {
+                        this.alpha = alpha
+                        scaleX = scale
+                        scaleY = scale
+                        // Cresce a partir da borda que encosta na âncora. A
+                        // posição é resolvida no layout do popup, antes deste
+                        // desenho, e por isso a leitura aqui já é a do quadro.
+                        transformOrigin = TransformOrigin(
+                            0.5f,
+                            if (positionProvider.opensUpward) 1f else 0f
+                        )
+                    }
                     .appDepth(AppDepth.OVERLAY, AppShapes.small)
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.surface)
@@ -727,7 +771,18 @@ private val MENU_MARK_SIZE = 12.dp
  * limites da janela nos dois eixos: popup aqui é camada dentro dela, e o que
  * passar do limite não é rolado, é recortado.
  */
+/** Escala de partida da entrada: o bastante para ler como "saiu da âncora". */
+private const val MENU_ENTER_SCALE = 0.96f
+
 private class AppMenuPositionProvider(private val gapPx: Int) : PopupPositionProvider {
+    /**
+     * Para que lado o menu abriu na última posição calculada. Campo comum, não
+     * estado: é lido no desenho do mesmo quadro, depois do layout que o escreve,
+     * e como estado ele recomporia o menu a cada posicionamento.
+     */
+    var opensUpward: Boolean = false
+        private set
+
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -738,7 +793,8 @@ private class AppMenuPositionProvider(private val gapPx: Int) : PopupPositionPro
             .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
         val above = anchorBounds.top - popupContentSize.height - gapPx
         val below = anchorBounds.bottom + gapPx
-        val y = if (above >= 0) {
+        opensUpward = above >= 0
+        val y = if (opensUpward) {
             above
         } else {
             below.coerceAtMost((windowSize.height - popupContentSize.height).coerceAtLeast(0))

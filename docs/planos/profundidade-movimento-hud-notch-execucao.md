@@ -30,7 +30,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C1 | Tokens de motion, `AppMotionPolicy` e "Reduzir animações" | feito |
 | C2 | Profundidade: `AppDepth`, `AppSurfaceLadder`, brilho e highlight | feito |
 | C3 | Seleção animada: aba, segmentado, navegação lateral, chip | feito |
-| C4 | Overlays que entram e saem: menu, tooltip, diálogo | pendente |
+| C4 | Overlays que entram e saem: menu, tooltip, diálogo | feito |
 | C5 | Estados de interação: foco, hover em camada, pressão | pendente |
 | C6 | Números animados e recarga do card | pendente |
 | C7 | `AppStateCrossfade` e o bug do `AnimatedContent` | pendente |
@@ -52,6 +52,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.theme.*" --tests "com.usagemonitor.ReducedMotionPreferencesTest" --tests "com.usagemonitor.ui.AppStatesTest" --tests "com.usagemonitor.ui.ComponentTest"` | Verde. Primeira passada teve 2 falhas nos testes novos de bitmap da barra: diferiam só os 4 pixels de canto do recorte arredondado, cujo alfa de antialiasing varia com o número de quadros compostos. O teste passou a ignorar os cantos; a largura do preenchimento não passa por eles. |
 | 2026-09-24 | C2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*"` + `gradlew.bat generateScreenshots` | Verde. A primeira captura saiu praticamente igual à anterior: sombra preta sobre `#131010` não aparece (sonda: 10dp escurecem o fundo em 3/255) e o brilho, desenhado por baixo do conteúdo, era coberto pelo fundo do cabeçalho do card. Brilho passou para cima do conteúdo, com teto de 56dp, e a borda ganhou gradiente claro no topo. |
 | 2026-09-24 | C3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o sublinhado desliza ate a aba escolhida` (indicador termina com `left` e largura iguais aos da aba nova). |
+| 2026-09-24 | C4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o menu some da arvore depois da saida` e os testes de "abre para cima" do `FooterBarTest`. A saída da janela de diálogo não tem teste de componente (a moldura exige `WindowScope`); fica para a verificação manual do C17. |
 
 ## C1 · Tokens de motion e política
 
@@ -92,3 +93,14 @@ cápsula, marcador de ritmo, "Next update in 2m").
 - `AppSegmentedControl`: polegar atrás dos rótulos, divisores por cima.
 - `AppSettingsNav`: bloco vertical atrás da coluna de itens.
 - `AppToggleChip` e os rótulos das três primitivas: cor por tween de 180ms.
+
+## C4 · Overlays que entram e saem
+
+- `AppMenu`: `MutableTransitionState` + `rememberTransition`; o `Popup` fica composto até a saída
+  terminar. Entrada por escala 0,96 → 1 (`EXPRESSIVE`) e fade; saída por fade de 90ms. A origem da
+  escala é a borda que encosta na âncora — `AppMenuPositionProvider.opensUpward`, campo comum lido no
+  desenho do mesmo quadro.
+- `AppTooltip` fica como está: o `TooltipBox` do Material já entra e sai com fade.
+- `DesktopDialogFrame`: o botão de fechar esmaece a **janela** AWT em 140ms e só então pede o
+  fechamento, restaurando a opacidade depois. Sem translucidez de janela ou com movimento reduzido,
+  fecha na hora. Fechar pelo sistema (Alt+F4) continua imediato.

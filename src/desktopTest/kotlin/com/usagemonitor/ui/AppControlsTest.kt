@@ -4,6 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.usagemonitor.presentation.ui.components.AppMenu
+import com.usagemonitor.presentation.ui.components.AppMenuOption
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHeightIsEqualTo
@@ -233,6 +238,43 @@ class AppControlsTest {
 
         onNodeWithTag("segment-5h").assertHeightIsEqualTo(SEGMENT_CONTROL_HEIGHT)
         onNodeWithTag("segment-total").assertHeightIsEqualTo(SEGMENT_CONTROL_HEIGHT)
+    }
+
+    /**
+     * O menu tem saída animada, e por isso o `Popup` fica composto enquanto ela
+     * roda. Depois do idle ele tem de ter ido embora de verdade: um popup que
+     * ficasse composto com alfa zero seguiria capturando o clique da janela.
+     */
+    @Test
+    fun `o menu some da arvore depois da saida`() = runDesktopComposeUiTest {
+        var expanded by mutableStateOf(true)
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(300.dp)) {
+                    AppMenu(
+                        expanded = expanded,
+                        options = listOf(AppMenuOption("Padrão"), AppMenuOption("Barra HUD")),
+                        selectedIndex = 0,
+                        onSelect = {},
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        Text("Âncora")
+                    }
+                }
+            }
+        }
+
+        onNodeWithText("Barra HUD").assertExists()
+
+        expanded = false
+        waitForIdle()
+
+        onNodeWithText("Barra HUD").assertDoesNotExist()
+
+        expanded = true
+        waitForIdle()
+
+        onNodeWithText("Barra HUD").assertExists()
     }
 }
 
