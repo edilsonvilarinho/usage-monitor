@@ -127,7 +127,8 @@ internal fun ResponsiveDashboardCardGrid(
                     ) {
                         ApiUsageCard(
                             source = stats.source,
-                            apiName = stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName,
+                            apiName = stats.displayTitle(),
+                            planLabel = stats.planLabel,
                             quotas = stats.quotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,

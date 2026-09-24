@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.theme.AppAccents
+import com.usagemonitor.presentation.ui.components.accentColorFor
+import com.usagemonitor.presentation.ui.components.AppProviderMark
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
@@ -300,20 +303,32 @@ private fun HudRingItem(account: HudAccount, vertical: Boolean) {
     val focus = account.focus
     val description = buildString {
         append(account.label)
+        account.planLabel?.let { plan -> append(" ($plan)") }
         append(" · ")
         append(account.statusLabel)
         account.quotas.forEach { quota -> append(" · ${quota.shortLabel} ${quota.percentText}") }
     }
     val ring: @Composable () -> Unit = {
-        AppUsageRing(
-            arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
-            description = description,
-            size = HUD_RING_SIZE,
-            stroke = HUD_RING_STROKE,
-            gap = HUD_RING_GAP,
-            active = account.sessionActive,
-            attention = account.needsAttention
-        )
+        // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
+        // reconhece antes de ler o nome, que o notch recolhido nem mostra. Na
+        // cor do texto e não no acento — em volta dela já estão os arcos, e o
+        // acento ali competiria com a cor de risco deles.
+        Box(contentAlignment = Alignment.Center) {
+            AppUsageRing(
+                arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
+                description = description,
+                size = HUD_RING_SIZE,
+                stroke = HUD_RING_STROKE,
+                gap = HUD_RING_GAP,
+                active = account.sessionActive,
+                attention = account.needsAttention
+            )
+            AppProviderMark(
+                source = account.source,
+                tint = MaterialTheme.colorScheme.onSurface,
+                size = hudRingMarkSize(account.rings.size, account.sessionActive)
+            )
+        }
     }
     val percent: @Composable () -> Unit = {
         Text(
@@ -363,19 +378,45 @@ private fun HudPanel(accounts: List<HudAccount>) {
     ) {
         accounts.forEach { account ->
             Column {
+                // Cabeçalho da conta: marca no acento, fornecedor e perfil, o
+                // plano em tom secundário — o "Claude Max 20x" do ai-usagebar —
+                // e o estado com ponto e palavra à direita.
                 Row(
-                    modifier = Modifier.height(HUD_PANEL_ROW_HEIGHT),
+                    modifier = Modifier.fillMaxWidth().height(HUD_PANEL_ROW_HEIGHT),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    AppStatusIndicator(label = account.statusLabel, tone = account.tone)
-                    Text(
-                        text = account.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    AppProviderMark(
+                        source = account.source,
+                        tint = accentColorFor(source = account.source, accents = AppAccents.current),
+                        size = HUD_PANEL_MARK_SIZE
                     )
+                    // Nome e plano num grupo só, que fica com toda a sobra: dois
+                    // `weight` na mesma linha dividiam a sobra ao meio e o nome
+                    // truncava com metade da largura vazia.
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = account.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        account.planLabel?.let { plan ->
+                            Text(
+                                text = plan,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    AppStatusIndicator(label = account.statusLabel, tone = account.tone)
                 }
                 account.quotas.forEach { quota -> HudQuotaRow(quota) }
             }
@@ -425,6 +466,20 @@ private fun HudQuotaRow(quota: HudQuota) {
 }
 
 private val QUOTA_LABEL_WIDTH = 48.dp
+
+/** A marca no cabeçalho do bloco da conta, do porte do texto `labelMedium`. */
+private val HUD_PANEL_MARK_SIZE = 13.dp
+
+/**
+ * A marca cabe no miolo que os arcos deixam livre: cada arco come um traço e um
+ * vão de cada lado, e o arco de sessão ativa, quando há, mais um pouco. 70% do
+ * miolo deixa ar entre a marca e o arco de dentro.
+ */
+private fun hudRingMarkSize(arcs: Int, active: Boolean): Dp {
+    val used = (HUD_RING_STROKE + HUD_RING_GAP) * 2 * arcs.coerceIn(1, 3)
+    val activeInset = if (active) (HUD_RING_GAP + HUD_RING_STROKE) * 2 else 0.dp
+    return ((HUD_RING_SIZE - used - activeInset) * 0.7f).coerceAtLeast(6.dp)
+}
 private val RESET_WIDTH = 64.dp
 
 /**

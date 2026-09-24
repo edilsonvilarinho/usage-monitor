@@ -1,10 +1,12 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.runtime.Immutable
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
+import com.usagemonitor.presentation.ui.components.displayTitle
 import com.usagemonitor.presentation.ui.components.hudQuotaShortLabel
 import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
@@ -23,7 +25,10 @@ import kotlinx.datetime.Instant
 @Immutable
 data class HudAccount(
     val targetKey: UsageTargetKey,
-    /** Perfil ou nome da fonte, sem rótulo de cota. */
+    /**
+     * O título do card: fornecedor e perfil ("Anthropic — Padrão"). Era só o
+     * perfil, e "Padrão" sozinho não diz de quem é a conta.
+     */
     val label: String,
     /** Palavra da **pior** cota — o papel do badge do card. */
     val statusLabel: String,
@@ -37,7 +42,11 @@ data class HudAccount(
      */
     val focusIndex: Int,
     /** Há turno de sessão CLI nos últimos 5 min nesta conta. */
-    val sessionActive: Boolean = false
+    val sessionActive: Boolean = false,
+    /** A marca e o acento do fornecedor saem daqui. */
+    val source: ApiSource = targetKey.source,
+    /** "Max 20x", "ChatGPT Plus"; `null` quando o fornecedor não informa. */
+    val planLabel: String? = null
 ) {
     /**
      * Os anéis concêntricos: até [MAX_HUD_RINGS] cotas, de fora para dentro na
@@ -111,12 +120,38 @@ internal fun buildHudAccounts(
             ) ?: 0
             HudAccount(
                 targetKey = target,
-                label = first.stats.profileLabel ?: first.stats.apiName,
+                label = first.stats.displayTitle(),
                 statusLabel = worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) } ?: noForecast,
                 tone = worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
                 quotas = quotas,
                 focusIndex = focusIndex,
-                sessionActive = target in activeTargets
+                sessionActive = target in activeTargets,
+                source = first.stats.source,
+                planLabel = first.stats.planLabel
             )
         }
 }
+
+/**
+ * O resumo da bandeja: "Anthropic — Padrão 87% · Codex 0% · Antigravity CLI 5%",
+ * uma entrada por conta com o percentual da cota em foco — o mesmo número que o
+ * anel mostra. É o tooltip do ícone, como o do Codenotch: dá para ler o estado
+ * sem abrir nada.
+ *
+ * O Windows corta tooltip de bandeja em 127 caracteres; o corte aqui é explícito,
+ * com reticências, em vez de a plataforma cortar no meio de um número.
+ */
+internal fun hudTraySummary(appName: String, accounts: List<HudAccount>): String {
+    if (accounts.isEmpty()) {
+        return appName
+    }
+    val body = accounts.joinToString(" · ") { account ->
+        val percent = account.focus?.percentText
+        if (percent == null) account.label else "${account.label} $percent"
+    }
+    val full = "$appName — $body"
+    return if (full.length <= TRAY_TOOLTIP_MAX_CHARS) full else full.take(TRAY_TOOLTIP_MAX_CHARS - 1) + "…"
+}
+
+/** O limite do `szTip` do Windows, menos o terminador. */
+internal const val TRAY_TOOLTIP_MAX_CHARS = 127

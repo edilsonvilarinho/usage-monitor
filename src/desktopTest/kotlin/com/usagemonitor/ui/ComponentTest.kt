@@ -108,6 +108,7 @@ import com.usagemonitor.presentation.ui.components.quotaBlockTag
 import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
 import com.usagemonitor.presentation.ui.historyAccountChipTag
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_PLAN_TAG
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
@@ -190,6 +191,33 @@ class ComponentTest {
         }
 
         onNodeWithContentDescription("Codex · Crítico").assertIsDisplayed()
+    }
+
+    /** O plano da conta sai como selo ao lado do nome, e sem plano não há selo. */
+    @Test
+    fun `ApiUsageCard shows the account plan beside the title`() = runDesktopComposeUiTest {
+        var plan by mutableStateOf<String?>("Max 20x")
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic — Padrão",
+                    quotas = emptyList(),
+                    planLabel = plan,
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    onRefresh = {},
+                    onOpenHistory = {},
+                    animationDelayMillis = 0
+                )
+            }
+        }
+
+        onNodeWithTag(API_USAGE_CARD_PLAN_TAG).assertTextEquals("Max 20x")
+        plan = null
+        waitForIdle()
+        onNodeWithTag(API_USAGE_CARD_PLAN_TAG).assertDoesNotExist()
     }
 
     @Test

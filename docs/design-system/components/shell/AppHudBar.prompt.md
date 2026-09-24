@@ -44,3 +44,10 @@ only (no popup — it would be clipped inside this window); a drag past the touc
 and on release it docks to the **nearest edge**, saved as edge + fraction along it (survives a
 resolution change). The old pill position migrates once. Move cursor on hover; the click action is
 declared in semantics for assistive tech. Three ways back: click, tray item, Ctrl+Shift+H.
+
+**Identification** (pass 2). The provider mark (`AppProviderMark`) sits in the middle of each ring in
+the foreground color — the arcs around it already carry the risk colors — and in the source accent
+in each expanded block header. The account label is the card title ("Anthropic — Padrão", never just
+"Padrão"), and the account plan ("Max 20x", "ChatGPT Plus") follows it in muted text, as in
+ai-usagebar's "Claude Max 20x". Rings grew from 28 to 36dp so the mark fits. The tray icon tooltip
+summarises every account with its focus percentage, cut at Windows' 127 characters.

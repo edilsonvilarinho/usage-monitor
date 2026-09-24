@@ -31,11 +31,15 @@ internal enum class HudEdge {
         get() = this == TOP || this == BOTTOM
 }
 
-/** Anel de uma conta: 28dp, três arcos concêntricos no máximo. */
-internal val HUD_RING_SIZE = 28.dp
+/**
+ * Anel de uma conta: 36dp, três arcos concêntricos no máximo e a marca do
+ * fornecedor no miolo. Era 28dp sem marca; com dois arcos o miolo de 28dp ficava
+ * com 10dp, pouco para reconhecer o asterisco do Claude.
+ */
+internal val HUD_RING_SIZE = 36.dp
 
 /** Espessura de cada arco e o vão entre dois arcos concêntricos. */
-internal val HUD_RING_STROKE = 3.dp
+internal val HUD_RING_STROKE = 2.5.dp
 internal val HUD_RING_GAP = 1.5.dp
 
 /**

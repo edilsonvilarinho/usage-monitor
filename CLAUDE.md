@@ -713,6 +713,15 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   bloco por conta (ponto + palavra, nome) e uma linha de 20dp por cota — rótulo curto, barra,
   percentual, hora do reinício (#189). Cota sem reset não imprime nada no lugar. O painel entra 60ms
   depois de o notch começar a crescer, para o texto não nascer espremido.
+- **Identificação, como no Codenotch e no ai-usagebar**: a **marca do fornecedor** (`AppProviderMark`)
+  no miolo de cada anel, na cor do texto — em volta dela os arcos já carregam a cor de risco —, e no
+  cabeçalho do bloco aberto no acento da fonte. O rótulo da conta é o **título do card**
+  (`ApiUsageStats.displayTitle`, dono único: "Anthropic — Padrão"); a HUD mostrava só "Padrão" e
+  escondia de quem era a conta. O **plano** ("Max 20x", "ChatGPT Plus") vem ao lado do nome no
+  painel aberto e na descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo.
+- **Resumo na bandeja** (`hudTraySummary`): o tooltip do ícone lista cada conta com o percentual em
+  foco — "Usage Monitor — Anthropic — Padrão 87% · Codex 0%" —, cortado com reticências nos 127
+  caracteres do `szTip` do Windows.
 - **A ordem é a dos cards** (`orderedByCardOrder`, em `buildHudAccounts`), nunca a do risco: com o
   risco mandando, a primeira conta trocava sozinha. `buildHudAccounts` é função pura de `commonMain`
   com teste próprio — a regra morava inline em `main()`, sem teste.

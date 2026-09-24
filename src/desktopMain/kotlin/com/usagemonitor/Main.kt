@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import com.usagemonitor.presentation.ui.hudTraySummary
+import com.usagemonitor.presentation.ui.buildHudAccounts
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -1647,11 +1649,19 @@ private fun runUsageMonitor(
         val trayState = rememberTrayState()
         val worstRisk by usageAlertViewModel.worstRisk.collectAsState()
         val trayIcon = remember(iconImage, worstRisk) { TrayRiskIconPainter(iconImage, worstRisk) }
+        // O tooltip da bandeja resume as contas — "Anthropic — Padrão 87% · Codex
+        // 0%" —, como o do Codenotch: dá para ler o estado sem abrir janela.
+        // Mesmas contas e mesma ordem da HUD (`buildHudAccounts`).
+        val trayQuotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
+        val trayTooltip = hudTraySummary(
+            appName = "Usage Monitor",
+            accounts = buildHudAccounts(trayQuotaRisks, cardOrder, language, Clock.System.now())
+        )
 
         Tray(
             icon = trayIcon,
             state = trayState,
-            tooltip = "Usage Monitor",
+            tooltip = trayTooltip,
             onAction = restoreMainWindow,
             menu = {
                 Item(

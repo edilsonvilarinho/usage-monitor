@@ -158,6 +158,8 @@ fun ApiUsageCard(
     quotas: List<QuotaInfo>,
     accountContext: UsageAccountContext? = null,
     notices: Set<ApiUsageNotice> = emptySet(),
+    /** Plano da conta ("Max 20x"); `null` quando o fornecedor não informa. */
+    planLabel: String? = null,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary> = emptyMap(),
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
@@ -378,17 +380,28 @@ fun ApiUsageCard(
                         // abaixo do cabeçalho inteiro, alinhada à borda do card e
                         // não ao título de que ela é o subtítulo.
                         Column(modifier = Modifier.weight(1f, fill = false)) {
-                            HoverTooltipBox(
-                                title = apiName,
-                                metrics = emptyList()
+                            // O plano da conta colado no nome — o "Claude Max 20x"
+                            // do ai-usagebar. Na linha do título e não depois da
+                            // coluna: a coluna mede o e-mail, que é mais largo, e o
+                            // selo ia parar longe do nome de que ele é atributo.
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(
-                                    text = apiName,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                HoverTooltipBox(
+                                    title = apiName,
+                                    metrics = emptyList(),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Text(
+                                        text = apiName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                planLabel?.let { plan -> CardHeaderBadge(plan, Modifier.testTag(API_USAGE_CARD_PLAN_TAG)) }
                             }
                             if (accountContext != null) {
                                 AccountIdentityLabel(
@@ -397,16 +410,7 @@ fun ApiUsageCard(
                                 )
                             }
                         }
-                        source.statusBadgeLabel(language)?.let { badgeLabel ->
-                            Text(
-                                text = badgeLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .appSurfaceBlock(color = Color.Transparent)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                        source.statusBadgeLabel(language)?.let { badgeLabel -> CardHeaderBadge(badgeLabel) }
 
                         // O aviso da fonte sai aqui, no cabeçalho, e não como
                         // banner abaixo das cotas: o cabeçalho é composto tanto
@@ -1691,3 +1695,20 @@ private const val REFRESH_TURN_MILLIS = 1_000
 
 /** A marca do cabeçalho: do tamanho do glifo de ação, para não disputar com o título. */
 private val PROVIDER_MARK_SIZE = 16.dp
+
+/** O selo do cabeçalho do card: plano da conta, fonte local. */
+@Composable
+private fun CardHeaderBadge(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = modifier
+            .appSurfaceBlock(color = Color.Transparent)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    )
+}
+
+/** O selo do plano; os testes o acham por aqui. */
+const val API_USAGE_CARD_PLAN_TAG = "apiUsageCardPlan"

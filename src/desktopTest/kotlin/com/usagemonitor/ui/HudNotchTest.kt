@@ -131,7 +131,7 @@ class HudNotchTest {
         onNodeWithText("28%").assertIsDisplayed()
         onNodeWithText("Crítico").assertIsDisplayed()
         onNodeWithText("Sem projeção").assertIsDisplayed()
-        onNodeWithContentDescription("INFORMATA2 · Crítico · 5h 28% · 7d 9%").assertExists()
+        onNodeWithContentDescription("INFORMATA2 (Max 20x) · Crítico · 5h 28% · 7d 9%").assertExists()
     }
 
     @Test
@@ -139,6 +139,8 @@ class HudNotchTest {
         setContent { notch(expanded = true) }
 
         onNodeWithText("INFORMATA2").assertIsDisplayed()
+        // O plano da conta, ao lado do nome, como no ai-usagebar.
+        onNodeWithText("Max 20x").assertIsDisplayed()
         onNodeWithText("22h59").assertIsDisplayed()
         onNodeWithText("Ter 21h00").assertIsDisplayed()
     }
@@ -444,6 +446,7 @@ class HudNotchTest {
 
     private fun account(label: String, word: String, tone: AppTone, vararg quotas: HudQuota): HudAccount {
         return HudAccount(
+            planLabel = if (label == "INFORMATA2") "Max 20x" else null,
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, label),
             label = label,
             statusLabel = word,

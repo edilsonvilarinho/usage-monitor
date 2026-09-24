@@ -139,6 +139,7 @@ internal object ScreenshotFixtures {
             targetKey = primaryAnthropicTarget,
             apiName = "Anthropic",
             profileLabel = "Padrão",
+            planLabel = "Max 20x",
             accountContext = primaryAccount,
             quotas = listOf(
                 fiveHourQuota(usedPercent = 68L, endsAt = NOW.plusHours(2)),
@@ -151,6 +152,7 @@ internal object ScreenshotFixtures {
             targetKey = secondaryAnthropicTarget,
             apiName = "Anthropic",
             profileLabel = "Sandbox",
+            planLabel = "Pro",
             accountContext = secondaryAccount,
             quotas = listOf(
                 fiveHourQuota(usedPercent = 12L, endsAt = NOW.plusHours(4)),
@@ -160,6 +162,7 @@ internal object ScreenshotFixtures {
         ApiUsageStats(
             source = ApiSource.CODEX,
             apiName = "Codex",
+            planLabel = "ChatGPT Plus",
             accountContext = codexAccount,
             quotas = listOf(
                 QuotaInfo(
@@ -229,6 +232,7 @@ internal object ScreenshotFixtures {
         ApiUsageStats(
             source = ApiSource.CURSOR,
             apiName = "Cursor",
+            planLabel = "Pro",
             quotas = listOf(
                 QuotaInfo(
                     label = CursorQuotaLabels.AUTO,
@@ -800,7 +804,8 @@ internal object ScreenshotFixtures {
                 HudQuota("7d", "41%", 0.41f, AppTone.OK, resetText = "Ter 21h00", hasForecast = true)
             ),
             focusIndex = 0,
-            sessionActive = true
+            sessionActive = true,
+            planLabel = "Max 20x"
         ),
         HudAccount(
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "sandbox"),

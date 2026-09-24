@@ -10,7 +10,9 @@ import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.MAX_HUD_RINGS
+import com.usagemonitor.presentation.ui.TRAY_TOOLTIP_MAX_CHARS
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
 import kotlinx.datetime.Instant
@@ -114,7 +116,50 @@ class HudModelTest {
         assertEquals(listOf(true, false), accounts.map { account -> account.sessionActive })
     }
 
-    private fun entry(target: UsageTargetKey, label: String, used: Int, risk: UsageRiskLevel?): HudQuotaEntry {
+    /** A HUD mostrava só o perfil ("Padrão"); agora o título é o do card. */
+    @Test
+    fun `o rotulo da conta traz o fornecedor e o plano vem junto`() {
+        val entries = listOf(entry(PADRAO, "Sessão 5h", used = 10, risk = null, profileLabel = "Padrão", plan = "Max 20x"))
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals("ANTHROPIC — Padrão", account.label)
+        assertEquals("Max 20x", account.planLabel)
+        assertEquals(ApiSource.ANTHROPIC, account.source)
+    }
+
+    @Test
+    fun `o resumo da bandeja traz cada conta com o percentual em foco`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 87, risk = UsageRiskLevel.AT_RISK, profileLabel = "Padrão"),
+            entry(CODEX, "Codex 5h", used = 0, risk = null)
+        )
+        val accounts = buildHudAccounts(entries, listOf(PADRAO, CODEX), AppLanguage.PT, HUD_NOW)
+
+        assertEquals("Usage Monitor — ANTHROPIC — Padrão 87% · CODEX 0%", hudTraySummary("Usage Monitor", accounts))
+        assertEquals("Usage Monitor", hudTraySummary("Usage Monitor", emptyList()))
+    }
+
+    /** O Windows corta o tooltip da bandeja em 127 caracteres; o corte é nosso. */
+    @Test
+    fun `o resumo da bandeja respeita o limite do windows`() {
+        val entries = (1..20).map { index ->
+            entry(UsageTargetKey(ApiSource.ANTHROPIC, "perfil$index"), "Sessão 5h", used = 50, risk = null, profileLabel = "Perfil longo $index")
+        }
+        val summary = hudTraySummary("Usage Monitor", buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW))
+
+        assertEquals(TRAY_TOOLTIP_MAX_CHARS, summary.length)
+        assertTrue(summary.endsWith("…"))
+    }
+
+    private fun entry(
+        target: UsageTargetKey,
+        label: String,
+        used: Int,
+        risk: UsageRiskLevel?,
+        profileLabel: String? = null,
+        plan: String? = null
+    ): HudQuotaEntry {
         val quota = QuotaInfo(
             label = label,
             used = used.toLong(),
@@ -127,7 +172,9 @@ class HudModelTest {
             source = target.source,
             targetKey = target,
             apiName = target.source.name,
-            quotas = listOf(quota)
+            quotas = listOf(quota),
+            profileLabel = profileLabel,
+            planLabel = plan
         )
         return HudQuotaEntry(stats, quota, risk?.let { level -> QuotaRiskSummary(level, HUD_NOW + 1.hours) })
     }

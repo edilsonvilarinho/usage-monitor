@@ -21,3 +21,9 @@ The data surface. Wrap every group of data on every screen; never invent another
   nearly invisible and the light does the work.
 - Never an accent glow or accent gradient. Blocks *inside* a panel are `FLAT`: a shadow inside a
   surface is the stack of same-weight blocks the August refactor removed.
+
+**Card header identity.** In the dashboard card the header reads: 2dp stroke · provider mark in the
+source accent (`AppProviderMark`) · title ("Anthropic — Padrão") with the **account plan** as a small
+bordered badge right after it ("Max 20x", "ChatGPT Plus") · email below. The plan badge sits on the
+title line, not after the column — the column is as wide as the email, and the badge would drift
+away from the name it qualifies. No plan known, no badge.

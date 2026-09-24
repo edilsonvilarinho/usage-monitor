@@ -55,7 +55,7 @@ O usuário comparou com Codenotch e ai-usagebar e apontou o que faltava: **marca
 |---|---|---|
 | D1 | Marca do fornecedor (`AppProviderMark`) e adoção no card | feito |
 | D2 | Plano da conta nos dados (`ApiUsageStats.planLabel`) | feito |
-| D3 | HUD com provedor, marca e plano; plano no card; resumo na bandeja | pendente |
+| D3 | HUD com provedor, marca e plano; plano no card; resumo na bandeja | feito |
 
 ## Pontos de situação
 
@@ -80,6 +80,7 @@ O usuário comparou com Codenotch e ai-usagebar e apontou o que faltava: **marca
 | 2026-09-24 | C17 | Claude Opus 5.5 | `gradlew.bat allTests` + `gradlew.bat generateScreenshots` + `gradlew.bat generateHelpMedia` + `desktopTest --tests "*HelpMediaResourcesTest*"` | Verde: 2079 testes, 0 falhas; capturas do README e as doze demos da ajuda regeneradas (a de modos de janela já mostra o notch aberto). `gradlew.bat run` **não** foi executado: a versão instalada estava aberta e o `SingleInstanceGuard` só a traria para frente. |
 | 2026-09-24 | D1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.AppProviderMarkTest" --tests "com.usagemonitor.ui.ComponentTest"` + `gradlew.bat generateScreenshots` | Verde; a captura mostra asterisco, nó e marca da DeepSeek no acento de cada card. |
 | 2026-09-24 | D2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.AccountPlanLabelTest"` | Verde: mapeamento dos três fornecedores, `planLabel` no Codex, no Cursor, no repositório da Anthropic e na ida e volta do cache. |
+| 2026-09-24 | D3 | Claude Opus 5.5 | `gradlew.bat allTests` + `generateScreenshots` + `generateHelpMedia` + renderização descartável do notch | Verde: 2088 testes, 0 falhas. Duas correções vindas do olho: no painel, dois `weight` na mesma linha dividiam a sobra e truncavam "Anthropic —…"; no card, o selo do plano ia parar longe do nome porque a coluna mede o e-mail. |
 
 ## C1 · Tokens de motion e política
 
@@ -330,3 +331,13 @@ na borda da sombra e CPU da rotação contínua.
   primeira coleta.
 - Antigravity e Gemini ficam sem plano: o `agy /usage` e os logs do Gemini CLI não o informam, e o
   caminho do ai-usagebar (RPC local do language server, OAuth do Google) é outra integração.
+
+## D3 · Identificação na tela
+
+- `ApiUsageStats.displayTitle()` é o dono único do título ("Anthropic — Padrão"): card e HUD usam o
+  mesmo. `HudAccount` ganhou `source` e `planLabel`.
+- HUD: marca no miolo do anel (cor do texto; tamanho calculado pelo miolo livre dos arcos), bloco
+  aberto com marca no acento, título completo, plano em tom secundário e estado à direita. Anel de 28
+  para 36dp.
+- Card: selo do plano na linha do título (`API_USAGE_CARD_PLAN_TAG`).
+- Bandeja: `hudTraySummary` no tooltip, com corte em 127 caracteres.
