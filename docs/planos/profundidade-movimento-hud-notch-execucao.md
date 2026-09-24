@@ -75,7 +75,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | feito |
 | E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | feito |
 | E7 | Documentação, design system, protótipo, ajuda, capturas | feito |
-| E8 | Verificação | pendente |
+| E8 | Verificação | feito (automática); manual pendente |
 
 ## Pontos de situação
 
@@ -108,6 +108,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.ui.FooterBar*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde: 28 casos do notch (engrenagem abre e fecha o balão; ações do rodapé pelas mesmas descrições; modos com o corrente marcado; anel troca para a conta; altura do balão com e sem atualização) e as suítes do rodapé e de componentes sem mudança. Renderização descartável: cauda na engrenagem nas bordas de cima e da direita. |
 | 2026-09-24 | E6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.ComponentTest" --tests "com.usagemonitor.ui.*Card*"` | Verde: 30 casos do notch (clique no anel atualiza só aquela conta, fora dos anéis nada; ação declarada na semântica do anel; botões do card no balão; indicador de atualização sem clique próprio), `CardActionsTest` (3) e o `ComponentTest` (99) sem mudança na barra do card. Renderização descartável: fileira histórico · sessões · time · presença · atualizar no balão. |
 | 2026-09-24 | E7 | Claude Opus 5.5 | `gradlew.bat generateScreenshots + gradlew.bat generateHelpMedia + desktopTest --tests "*Help*"` | Verde. Capturas do README idênticas às anteriores (a barra do card não mudou); demo de modos de janela com o balão e os botões do card — a primeira passada saiu com a fileira vazia, porque o gerador não passava `accountActions`; quatro demos atualizadas pelo selo do plano do D3. |
+| 2026-09-24 | E8 | Claude Opus 5.5 | `gradlew.bat allTests` | Verde: 2111 testes, 0 falhas (eram 2088). Verificação manual pendente: a sessão de debug aberta no IntelliJ roda o código de antes desta rodada e não foi encerrada. |
 
 ## C1 · Tokens de motion e política
 
@@ -505,3 +506,21 @@ na borda da sombra e CPU da rotação contínua.
   `accountActions` pela mesma `cardActionsFor`). As de dashboard, histórico, time e atualizações
   mudaram por outro motivo: o selo do plano ao lado do nome do card, correção do D3 que ainda não tinha
   chegado a elas. As capturas do README saíram idênticas — a barra do card não mudou.
+
+## E8 · Verificação
+
+**Automática (feita):** suíte completa, renderizações descartáveis das quatro bordas (notch parado com
+os arcos das alças, balão de conta, balão da engrenagem, fração 0,9 e 1) e demos regeneradas. O teste
+descartável de renderização não foi commitado.
+
+**Manual (pendente — precisa da janela real):** havia uma sessão de debug do IntelliJ aberta desde
+antes desta rodada, com o código anterior, e ela não foi encerrada. Com ela reiniciada:
+
+- Hover em cada anel nas quatro bordas: o balão da conta certa, a cauda no anel, deslizar entre anéis,
+  a janela crescendo sem piscar e sem o notch andar; perto do canto também.
+- Botões do balão: histórico, sessões CLI, sessões Codex, time e presença abrindo as janelas com a
+  principal escondida; atualizar só a conta; clique no anel atualizando e o anel pressionado.
+- Mão: arrastar para as quatro bordas; engrenagem: modos de janela, exportar, configurações, ajuda.
+- Timer inteiro a 115% com a escala do Windows em 125%.
+- Pendências do C17 que continuam: opacidade com a janela transparente, halo na sombra, "Reduzir
+  animações", CPU do arco girando.
