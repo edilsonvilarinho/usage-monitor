@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliSessionDetail
@@ -230,7 +231,7 @@ internal object ScreenshotFixtures {
             apiName = "Cursor",
             quotas = listOf(
                 QuotaInfo(
-                    label = "Cursor Auto",
+                    label = CursorQuotaLabels.AUTO,
                     used = 34L,
                     total = 100L,
                     periodEndAt = NOW.plusHours(24 * 12),
@@ -238,7 +239,7 @@ internal object ScreenshotFixtures {
                     unit = UsageUnit.PERCENTAGE
                 ),
                 QuotaInfo(
-                    label = "Cursor Included total",
+                    label = CursorQuotaLabels.API,
                     used = 22L,
                     total = 100L,
                     periodEndAt = NOW.plusHours(24 * 12),

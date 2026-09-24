@@ -13,6 +13,7 @@ import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
@@ -130,9 +131,11 @@ internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String
         PeriodType.MONTHLY -> if (language == AppLanguage.PT) "Mensal" else "Monthly"
         PeriodType.REPORTED -> if (language == AppLanguage.PT) "Uso atual" else "Current usage"
     }
-    // O Antigravity tem um limite semanal por grupo de modelos: sem o grupo, os
-    // dois blocos do card diriam "Semanal".
-    return AntigravityQuotaLabels.groupOf(quota.label)?.let { group -> "$group · $periodTitle" } ?: periodTitle
+    // Duas fontes têm mais de uma cota do mesmo `periodType`: o Antigravity, um
+    // limite semanal por grupo de modelos, e o Cursor, várias franquias no mesmo
+    // ciclo. Sem o grupo, os blocos do card diriam "Semanal" ou "Mensal" todos iguais.
+    val group = AntigravityQuotaLabels.groupOf(quota.label) ?: CursorQuotaLabels.groupOf(quota.label)
+    return group?.let { "$it · $periodTitle" } ?: periodTitle
 }
 
 @Composable

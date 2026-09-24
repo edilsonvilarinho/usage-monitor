@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
+import com.usagemonitor.domain.repository.CursorUsageFailureKind
 import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import kotlin.test.Test
@@ -55,6 +56,23 @@ class DashboardScreenWarningsTest {
                 AppLanguage.PT
             )?.title
         )
+    }
+
+    /**
+     * Cursor ausente ou deslogado virava toast e linha vermelha a cada coleta de 10
+     * minutos; agora é configuração, com um banner por causa.
+     */
+    @Test
+    fun `Cursor setup failures are configuration warnings without retry`() {
+        CursorUsageFailureKind.entries.forEach { kind ->
+            val error = UiApiError(source = ApiSource.CURSOR, message = kind.safeMessage)
+
+            assertEquals(kind, error.cursorFailureKind)
+            assertTrue(error.isConfigurationIssue)
+            assertNull(warningFor(error, AppLanguage.PT)?.actionLabel)
+            assertNotNull(warningFor(error, AppLanguage.EN))
+        }
+        assertNull(UiApiError(ApiSource.CURSOR, "Cursor usage request failed (HTTP 500)").cursorFailureKind)
     }
 
     @Test

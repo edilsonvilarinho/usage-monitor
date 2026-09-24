@@ -204,9 +204,21 @@ For personal usage, this integration follows the individual-account source refer
   logs. Usage Monitor does not start a login flow.
 - The route is not part of Cursor's documented public API. The response can change without notice;
   unknown or incomplete shapes are source failures and preserve the last valid reading.
-- Only percentages and billing-cycle reset dates present in the response are shown. Token counts,
-  money and limits are not derived from percentages. A plan with no recognized metered value is
-  unavailable rather than zero.
+- The response comes in two shapes. Personal plans (free/pro) carry `individualUsage.plan` with
+  `autoPercentUsed`, `apiPercentUsed` and `totalPercentUsed`; on a free plan `used`/`limit` stay at zero
+  even while the allowance is being spent, so only the percentages count there. Enterprise and team
+  plans carry no percentages and meter `individualUsage.overall` in `used`/`limit` instead.
+- Windows shown, all for the billing cycle: **Auto** (`autoPercentUsed`, the main allowance), **API**
+  (only above zero), **On-demand** (when enabled with a positive limit), **Included** (the enterprise
+  `overall` ceiling) and **Team on-demand** (only once something was spent). `totalPercentUsed` is a
+  blend of Auto and API and is not a row: as a third quota it fired the same alert twice.
+- Percentages are truncated like every other percentage in the app. A value above 100 means the
+  allowance was exceeded and saturates at 100 instead of failing the card. Without `billingCycleEnd`
+  the window has no known reset — the capture instant would make every refresh look like a new cycle.
+- Cursor not installed, signed out, a rejected session and a plan with nothing to meter are
+  configuration states: a banner without "Retry" and no toast on every refresh. A plan with nothing
+  to meter is not reported as zero usage. Network failures keep their type, so a proxy problem shows
+  the connectivity banner.
 - Collection follows the app's normal 10-minute dashboard refresh. The source is opt-in in
   **Settings > APIs**.
 

@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
+import com.usagemonitor.domain.repository.CursorUsageFailureKind
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppBanner
@@ -315,6 +316,10 @@ internal fun warningFor(
         return antigravityWarning(error, kind, language)
     }
 
+    error.cursorFailureKind?.let { kind ->
+        return cursorWarning(error, kind, language)
+    }
+
     if (error.isKiloLocalIssue) {
         return if (language == AppLanguage.PT) {
             DashboardWarning(
@@ -531,6 +536,47 @@ private fun antigravityWarning(
         } else {
             "Antigravity collection paused" to
                 "The CLI did not confirm that it answered /usage by itself, and another call could spend model quota. Collection stays paused until the app restarts."
+        }
+    }
+    return DashboardWarning(
+        target = error.target,
+        title = title,
+        description = description,
+        actionLabel = null
+    )
+}
+
+/**
+ * Nenhum oferece "Tentar novamente": instalar ou entrar no Cursor acontece fora do
+ * app, e o plano sem nada a medir continua igual na próxima coleta.
+ */
+private fun cursorWarning(
+    error: UiApiError,
+    kind: CursorUsageFailureKind,
+    language: AppLanguage
+): DashboardWarning {
+    val pt = language == AppLanguage.PT
+    val (title, description) = when (kind) {
+        CursorUsageFailureKind.NOT_INSTALLED -> if (pt) {
+            "Cursor não encontrado" to
+                "O banco local do editor Cursor não existe nesta máquina. Instale e abra o Cursor, ou desative esta integração em Configurações > APIs."
+        } else {
+            "Cursor not found" to
+                "The Cursor editor's local database does not exist on this machine. Install and open Cursor, or disable this integration under Settings > APIs."
+        }
+        CursorUsageFailureKind.SIGNED_OUT, CursorUsageFailureKind.SESSION_REJECTED -> if (pt) {
+            "Cursor sem sessão" to
+                "Entre na sua conta no editor Cursor. O monitor usa a sessão que o editor já mantém e não inicia login por conta própria."
+        } else {
+            "Cursor is signed out" to
+                "Sign in to your account in the Cursor editor. The monitor uses the session the editor already keeps and never starts a sign-in itself."
+        }
+        CursorUsageFailureKind.NOTHING_METERED -> if (pt) {
+            "Cursor sem franquia medida" to
+                "O plano desta conta não informa nenhuma franquia com percentual ou teto. Isso não é consumo zero: não há o que medir."
+        } else {
+            "Cursor has nothing metered" to
+                "This account's plan reports no allowance with a percentage or a ceiling. That is not zero usage: there is nothing to measure."
         }
     }
     return DashboardWarning(

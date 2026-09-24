@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
+import com.usagemonitor.domain.repository.CursorUsageFailureKind
 import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.displayName
@@ -99,6 +100,16 @@ data class UiApiError(
     val isGeminiLocalIssue: Boolean
         get() = isGeminiSessionHistoryUnreadable
 
+    /** Qual das falhas de configuração do Cursor é esta, ou `null` para falha comum. */
+    val cursorFailureKind: CursorUsageFailureKind?
+        get() = if (source == ApiSource.CURSOR) {
+            CursorUsageFailureKind.entries.firstOrNull { kind ->
+                message.contains(kind.safeMessage, ignoreCase = true)
+            }
+        } else {
+            null
+        }
+
     /**
      * Qual das falhas de configuração do Antigravity é esta, ou `null` para falha
      * comum (timeout, saída ilegível), que continua pedindo "Tentar novamente".
@@ -159,6 +170,7 @@ data class UiApiError(
             isKiloLocalIssue ||
             isGeminiLocalIssue ||
             antigravityFailureKind != null ||
+            cursorFailureKind != null ||
             isProxyAuthIssue
 }
 
