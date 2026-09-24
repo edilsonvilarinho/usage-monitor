@@ -28,7 +28,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | # | Atividade | Estado |
 |---|---|---|
 | C1 | Tokens de motion, `AppMotionPolicy` e "Reduzir animações" | feito |
-| C2 | Profundidade: `AppDepth`, `AppSurfaceLadder`, brilho e highlight | pendente |
+| C2 | Profundidade: `AppDepth`, `AppSurfaceLadder`, brilho e highlight | feito |
 | C3 | Seleção animada: aba, segmentado, navegação lateral, chip | pendente |
 | C4 | Overlays que entram e saem: menu, tooltip, diálogo | pendente |
 | C5 | Estados de interação: foco, hover em camada, pressão | pendente |
@@ -50,6 +50,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | Data | Atividade | Modelo | Comando | Resultado |
 |---|---|---|---|---|
 | 2026-09-24 | C1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.theme.*" --tests "com.usagemonitor.ReducedMotionPreferencesTest" --tests "com.usagemonitor.ui.AppStatesTest" --tests "com.usagemonitor.ui.ComponentTest"` | Verde. Primeira passada teve 2 falhas nos testes novos de bitmap da barra: diferiam só os 4 pixels de canto do recorte arredondado, cujo alfa de antialiasing varia com o número de quadros compostos. O teste passou a ignorar os cantos; a largura do preenchimento não passa por eles. |
+| 2026-09-24 | C2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*"` + `gradlew.bat generateScreenshots` | Verde. A primeira captura saiu praticamente igual à anterior: sombra preta sobre `#131010` não aparece (sonda: 10dp escurecem o fundo em 3/255) e o brilho, desenhado por baixo do conteúdo, era coberto pelo fundo do cabeçalho do card. Brilho passou para cima do conteúdo, com teto de 56dp, e a borda ganhou gradiente claro no topo. |
 
 ## C1 · Tokens de motion e política
 
@@ -65,3 +66,18 @@ cápsula, marcador de ritmo, "Next update in 2m").
 - **Por que ignorar os cantos no teste de bitmap.** A cena que animou compõe mais quadros que a que
   nasceu parada, e o antialiasing do recorte arredondado acumula alfa diferente nos quatro pixels de
   canto. O que o teste afirma é a largura do preenchimento; comparar os cantos testaria o compositor.
+
+## C2 · Profundidade
+
+- `AppDepth` (`FLAT`, `CARD` 1/6dp, `RAISED` 2/10, `OVERLAY` 3/14, `DIALOG` 4/20) substitui
+  `AppElevation`. `appDepth` empilha duas `shadow` com `clip = false` — o Compose 1.7 não tem
+  `dropShadow` com deslocamento e desfoque separados.
+- `AppSurfaceLadder.of(preset)`: camadas de hover (6%/4,5%) e pressão (10%/8%) do `foreground`,
+  highlight, brilho, cor e alfa de sombra e as duas pontas da borda. Derivado, sem tocar nos hex.
+- `appSurfaceBlock(depth, sheen)`: sombra antes do recorte; com `sheen` o bloco ganha brilho e a
+  borda em gradiente. `AppDataSurface`/`AppDataSurfaceFlush` passam a `CARD` + brilho.
+- Card: `CARD` em repouso, `RAISED` + 1dp com hover, `DIALOG` arrastado, `FLAT` como alvo do
+  arrasto, tudo por mola `GENTLE`. O fundo não troca mais no hover.
+- `AppMenu` em `OVERLAY`; `AppTooltipSurface` em `RAISED` pela sombra do sistema (a do Material saiu,
+  o `tonalElevation` de 2dp ficou para não mudar o tom da bolha).
+- Diálogos não entram: são janelas do SO, com a sombra do SO.

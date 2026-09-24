@@ -55,7 +55,7 @@ import androidx.compose.animation.core.VisibilityThreshold
 import com.usagemonitor.presentation.ui.theme.appSpring
 import com.usagemonitor.presentation.ui.theme.appTween
 import com.usagemonitor.presentation.ui.theme.AppChrome
-import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppDepth
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -602,7 +602,7 @@ fun AppMenu(
         ) {
             Column(
                 modifier = Modifier
-                    .shadow(AppElevation.raised, AppShapes.small)
+                    .appDepth(AppDepth.OVERLAY, AppShapes.small)
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.surface)
                     .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
@@ -724,10 +724,11 @@ private class AppMenuPositionProvider(private val gapPx: Int) : PopupPositionPro
  * Duas tooltips sobre o mesmo gráfico em alturas diferentes é o defeito que a
  * repetição produz sozinha.
  *
- * **Overlay curto: 2dp, não 8.** Oito é a elevação de diálogo e de menu, que
- * cobrem a janela; a bolha cobre um ponto do gráfico. É `tonalElevation` **e**
- * `shadowElevation` no mesmo patamar, senão o tom sobe sem a sombra acompanhar e
- * a bolha lê como bloco chapado.
+ * **Patamar [AppDepth.RAISED], não o de menu.** O menu cobre a janela; a bolha
+ * cobre um ponto do gráfico. A sombra é a do sistema ([appDepth]), em duas
+ * camadas, e não a `shadowElevation` do Material, que tem outra curva e outra
+ * cor. O `tonalElevation` fica: é ele que dá à bolha o tom um pouco acima do
+ * `surfaceVariant` que a separa do gráfico.
  *
  * Só o conteúdo é do chamador: cada bolha tem o próprio `padding` e a própria
  * largura máxima, e é por isso que isto é superfície e não contêiner.
@@ -739,12 +740,12 @@ fun AppTooltipSurface(
     content: @Composable () -> Unit
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.appDepth(AppDepth.RAISED, shape),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = AppElevation.raised,
-        shadowElevation = AppElevation.raised,
+        tonalElevation = TOOLTIP_TONAL_ELEVATION,
+        shadowElevation = 0.dp,
         border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant),
         content = content
     )
@@ -826,3 +827,6 @@ private data class ButtonColors(
 fun RowScope.AppSpacer() {
     Box(modifier = Modifier.weight(1f))
 }
+
+/** O tom que a bolha já tinha; a sombra saiu do Material para [appDepth]. */
+private val TOOLTIP_TONAL_ELEVATION = 2.dp

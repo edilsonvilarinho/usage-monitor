@@ -1,5 +1,5 @@
 The bubble anatomy shared by every floating hint in the app: `--raised` background, radius 6, a
-1dp border and `--shadow-2`.
+1dp border and `--shadow-raised`.
 
 ```jsx
 <AppTooltipSurface style={{ padding: 'var(--s2) var(--s3)', maxWidth: 240 }}>
@@ -25,6 +25,7 @@ primitive it mirrors already uses (`MaterialTheme.colorScheme.surfaceVariant`, w
 block and a chart annotation size themselves differently — this component owns only the anatomy,
 never the layout of what fills it.
 
-**`--shadow-2`, never `--shadow-8`.** Eight is the dialog and menu elevation, reserved for surfaces
-that cover the window; a tooltip covers a point on the screen. Reaching for the heavier shadow here
-would make the bubble read as a second, competing layer instead of a footnote.
+**Depth `RAISED` (`--shadow-raised`), never `OVERLAY` or `DIALOG`.** Those are the menu and the
+dragged card, surfaces that cover the window; a tooltip covers a point on the screen. The shadow is
+the system's two-layer `appDepth`, not Material's `shadowElevation`, which has another curve and
+another color.

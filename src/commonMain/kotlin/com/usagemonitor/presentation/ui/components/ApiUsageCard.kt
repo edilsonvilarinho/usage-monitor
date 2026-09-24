@@ -2,7 +2,6 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -59,7 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -90,7 +88,9 @@ import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.statusBadgeLabel
 import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppDepth
+import com.usagemonitor.presentation.ui.theme.appSpring
+import androidx.compose.animation.core.VisibilityThreshold
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -235,26 +235,41 @@ fun ApiUsageCard(
         animationSpec = tween(durationMillis = CardAnimations.EXPAND_DURATION_MS),
         label = "cardOffsetY"
     )
-    val cardElevation by animateDpAsState(
-        targetValue = when {
-            isBeingDragged -> AppElevation.dialog
-            isDragTarget   -> AppElevation.raised
-            else           -> AppElevation.card
-        },
-        animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
-        label = "cardElevation"
+    // A profundidade diz o que está sobre o quê: em repouso o card está sobre o
+    // fundo, com o ponteiro em cima ele sobe um patamar e 1dp, e arrastado ele
+    // flutua sobre os outros. O alvo do arrasto afunda para o plano -- é o vão
+    // que vai receber o card. Mola sem rebote: sombra que passa do alvo e volta
+    // lê como tremor.
+    val cardDepth = when {
+        isBeingDragged -> AppDepth.DIALOG
+        isDragTarget -> AppDepth.FLAT
+        isHovered -> AppDepth.RAISED
+        else -> AppDepth.CARD
+    }
+    val cardKeyShadow by animateDpAsState(
+        targetValue = cardDepth.key,
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
+        label = "cardKeyShadow"
+    )
+    val cardAmbientShadow by animateDpAsState(
+        targetValue = cardDepth.ambient,
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
+        label = "cardAmbientShadow"
+    )
+    val cardLift by animateDpAsState(
+        targetValue = if (isHovered && !isBeingDragged) (-1).dp else 0.dp,
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
+        label = "cardLift"
     )
     // O rastro que varria o card durante a coleta era `rememberInfiniteTransition`
     // — animação sem fim, a mesma classe de coisa que trava o `waitForIdle` dos
     // testes de componente. O estado de coleta agora se lê no rótulo do botão,
     // que já dizia "Atualizando…", e na opacidade das cotas.
 
-    val hoverBackground by animateColorAsState(
-        targetValue = if (isHovered) MaterialTheme.colorScheme.surfaceVariant
-                      else           cardContainerColor(),
-        animationSpec = tween(durationMillis = AppMotion.fast),
-        label = "cardHoverBg"
-    )
+    // O fundo do card não muda no hover: quem diz "o ponteiro está aqui" é a
+    // subida de patamar. Trocar para `surfaceVariant` também apagava o hover das
+    // linhas de cota, que usam aquele mesmo tom.
+    val cardBackground = cardContainerColor()
 
     // Era o único `Card()` do Material que restava na aplicação. A superfície
     // agora sai de `appSurfaceBlock` — o mesmo recorte, fundo e borda de 1dp que
@@ -286,10 +301,10 @@ fun ApiUsageCard(
                 alpha = cardAlpha
                 scaleX = cardScale
                 scaleY = cardScale
-                translationY = cardOffsetY.toPx()
+                translationY = (cardOffsetY + cardLift).toPx()
             }
-            .shadow(cardElevation, AppShapes.medium)
-            .appSurfaceBlock(shape = AppShapes.medium, color = hoverBackground)
+            .appDepth(key = cardKeyShadow, ambient = cardAmbientShadow, shape = AppShapes.medium)
+            .appSurfaceBlock(shape = AppShapes.medium, color = cardBackground, sheen = true)
     ) {
         BoxWithConstraints(
             modifier = Modifier

@@ -504,10 +504,30 @@ vira ponteiro para um documento que não descreve mais o produto.
 Vale para qualquer superfície visível — janela, diálogo, faixa, bandeja e relatório PDF.
 
 **Tokens** (`presentation/ui/theme/AppTheme.kt`): quatro superfícies neutras dentro de ~14% de
-luminância (`AppSurfaces`), raios 4/6/8/10 com **teto de 10** (`AppShapes`), elevação 0/2/8 —
-`card` é **zero**, e sombra só em diálogo e overlay —, espaçamento 4/8/12/16/24/32 (`AppSpacing`) e
-motion 120/180/240/90 (`AppMotion`). A profundidade vem da borda de 1dp e do espaçamento; foi o
-gradiente de acento em toda superfície que fazia a tela ler como pilha de blocos de mesmo peso.
+luminância (`AppSurfaces`), raios 4/6/8/10 com **teto de 10** (`AppShapes`), cinco patamares de
+profundidade (`AppDepth`), espaçamento 4/8/12/16/24/32 (`AppSpacing`) e motion 120/180/240/90
+(`AppMotion`). Foi o gradiente **de acento** em toda superfície que fazia a tela ler como pilha de
+blocos de mesmo peso; a regra que o substituiu ("card em zero, profundidade só por borda") deixou a
+tela chapada, e foi revista.
+
+**Profundidade** (`AppDepth` + `AppSurfaceLadder` + `appDepth`/`appSheen`/`appSurfaceBlock`):
+`FLAT` · `CARD` · `RAISED` · `OVERLAY` · `DIALOG`, cada um com duas sombras neutras empilhadas — a
+curta assenta, a larga dá distância. Painel e card em `CARD`, card com hover em `RAISED` subindo
+1dp, menu em `OVERLAY`, card arrastado em `DIALOG`. Bloco **dentro** de superfície é sempre `FLAT`.
+- **No escuro a sombra quase não existe, e isso foi medido**: 10dp de sombra preta escurecem
+  `#131010` em 3/255. O volume ali vem da luz — linha de highlight de 1dp, brilho vertical nos
+  primeiros 56dp e borda em gradiente, mais clara em cima. No claro a borda escurece embaixo e a
+  sombra é o `foreground` morno, não cinza.
+- **O brilho é desenhado por cima do conteúdo** (`appSheen`), porque o card pinta o cabeçalho com
+  fundo próprio e por baixo dele o brilho não chegava à tela; em 4,5% de alfa ele não mexe no
+  contraste do texto. A primeira passada o desenhava por baixo, e a captura saiu igual à de antes.
+- **`AppSurfaceLadder` é derivado do preset, nunca retocado**: os 26 presets têm contraste medido
+  contra a `surface`, e uma camada translúcida do `foreground` dá o mesmo degrau em qualquer um.
+  `AppSurfaceLadderTest` afirma hover visível (≥ 1,06:1), pressão acima do hover e texto legível
+  sobre a pressão nos 26; `AppDepthTest` mede a sombra e o brilho no **bitmap**, porque
+  `boundsInRoot` é idêntico com e sem eles.
+- **O hover do card não troca mais o fundo**: quem diz "o ponteiro está aqui" é a subida de
+  patamar. O `surfaceVariant` antigo apagava o hover das linhas de cota, que usam o mesmo tom.
 
 **Motion** (`AppMotion.Springs` + `AppMotionPolicy` + `appSpring`/`appTween`; plano
 [`profundidade-movimento-hud-notch-execucao.md`](docs/planos/profundidade-movimento-hud-notch-execucao.md)):

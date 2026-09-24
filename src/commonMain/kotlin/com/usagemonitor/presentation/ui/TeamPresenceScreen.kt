@@ -477,8 +477,9 @@ private fun TeamPresenceHeader(
     onSetOnlyOnline: (Boolean) -> Unit,
     onQueryChange: (String) -> Unit
 ) {
-    // Superfície de dados como as outras: `AppElevation.dialog` num painel dentro
-    // da janela punha 8dp de sombra sob um bloco que não flutua sobre nada.
+    // Superfície de dados como as outras, com o patamar `AppDepth.CARD` que ela
+    // já traz: a sombra de diálogo que existia aqui punha 8dp sob um bloco que
+    // não flutua sobre nada.
     //
     // `Arrangement.Top` porque este bloco separa os filhos com o `Spacer` que ele
     // já traz; o `spacedBy` default somaria 8dp a cada um deles.

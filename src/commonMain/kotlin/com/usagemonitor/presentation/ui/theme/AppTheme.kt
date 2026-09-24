@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.animation.core.CubicBezierEasing
@@ -196,23 +197,110 @@ fun <T> appTween(
 }
 
 /**
- * Três patamares: 0, 2 e 8.
+ * Patamares de profundidade.
  *
- * A superfície de dados fica em **zero** — quem a separa do fundo é a borda de
- * 1dp e o espaçamento, não a sombra. Sombra em card de conteúdo foi justamente
- * o que empilhou containers de mesmo peso na tela anterior. [dialog] é o único
- * patamar alto, e existe porque diálogo e menu flutuam de fato sobre a janela.
+ * A regra anterior era "card em zero, profundidade só por borda de 1dp", e o
+ * resultado foi uma tela chapada: quatro superfícies dentro de ~14% de
+ * luminância, separadas por um traço que some no escuro. A sombra que tinha sido
+ * tirada era a **de acento** — um brilho colorido em toda superfície, que fazia a
+ * tela ler como pilha de blocos de mesmo peso. Esta é outra coisa: sombra neutra,
+ * baixa, em duas camadas, que diz o que está **sobre** o quê.
+ *
+ * Cada patamar são duas sombras empilhadas — [key], curta e densa, que assenta o
+ * objeto no plano; [ambient], larga e rala, que dá a distância. Uma sombra só,
+ * grande o bastante para ler, borra o contorno; pequena o bastante para não
+ * borrar, não se vê no tema escuro.
+ *
+ * - [FLAT]: linha, célula, bloco dentro de painel. Nunca sombra dentro de superfície.
+ * - [CARD]: painel e card em repouso.
+ * - [RAISED]: card com o ponteiro em cima e tooltip.
+ * - [OVERLAY]: menu.
+ * - [DIALOG]: card sendo arrastado e a HUD — o que flutua de fato sobre o resto.
+ *
+ * O [ambient] de [CARD] fica em 6dp de propósito: o vão da grade do dashboard é
+ * 12dp, e sombra maior que metade dele se sobrepõe à do vizinho.
  */
-object AppElevation {
-    /** Superfície de dados e banner: separação por borda, não por sombra. */
-    val card:   Dp = 0.dp
-    val banner: Dp = 0.dp
+enum class AppDepth(val key: Dp, val ambient: Dp) {
+    FLAT(key = 0.dp, ambient = 0.dp),
+    CARD(key = 1.dp, ambient = 6.dp),
+    RAISED(key = 2.dp, ambient = 10.dp),
+    OVERLAY(key = 3.dp, ambient = 14.dp),
+    DIALOG(key = 4.dp, ambient = 20.dp)
+}
 
-    /** Overlay curto: tooltip e menu suspenso. */
-    val raised: Dp = 2.dp
+/**
+ * Camadas de estado e de luz derivadas do preset.
+ *
+ * **Derivadas, não retocadas.** Os 26 presets têm contraste medido contra a
+ * `surface` (`AppThemePresetTest`, `AppAccentsContrastTest`), e mexer nos hex de
+ * cada um para abrir espaço entre os degraus reabriria as 26 medições. Uma
+ * camada translúcida do `foreground` somada ao que está embaixo dá o mesmo
+ * degrau em qualquer superfície — e é por isso que a linha com hover dentro de
+ * um card com hover volta a reagir: a camada soma, não troca.
+ *
+ * - [hoverLayer]/[pressedLayer]: pintados **por cima** da superfície, nunca no lugar dela.
+ * - [highlight]: a linha de 1dp no topo interno de painel, card e HUD — a luz
+ *   que bate de cima. No claro ela quase some, e é certo: ali a sombra já separa.
+ * - [sheen]: o topo do gradiente vertical sutil das mesmas superfícies.
+ * - [shadow]: preto no escuro; o `foreground` morno no claro, para a sombra não
+ *   ficar cinza-azulada sobre um fundo quente.
+ * - [borderTop]/[borderBottom]: a borda de 1dp vira gradiente vertical. **No
+ *   escuro a sombra quase não existe** — medido: 10dp de sombra preta sobre
+ *   `#131010` escurecem o fundo em três níveis de 255 —, e quem dá volume ali é a
+ *   luz: a borda mais clara em cima que embaixo. No claro é o inverso, e a borda
+ *   de baixo escurece um pouco para assentar o objeto.
+ */
+@Immutable
+data class AppSurfaceLadder(
+    val hoverLayer: Color,
+    val pressedLayer: Color,
+    val highlight: Color,
+    val sheen: Color,
+    val shadow: Color,
+    val keyShadowAlpha: Float,
+    val ambientShadowAlpha: Float,
+    val borderTop: Color,
+    val borderBottom: Color
+) {
+    companion object {
+        fun of(preset: AppThemePreset): AppSurfaceLadder {
+            return if (preset.isDark) {
+                AppSurfaceLadder(
+                    hoverLayer = preset.foreground.copy(alpha = 0.06f),
+                    pressedLayer = preset.foreground.copy(alpha = 0.10f),
+                    highlight = Color.White.copy(alpha = 0.09f),
+                    sheen = preset.foreground.copy(alpha = 0.045f),
+                    shadow = Color.Black,
+                    keyShadowAlpha = 1f,
+                    ambientShadowAlpha = 1f,
+                    borderTop = lerp(preset.border, preset.foreground, 0.22f),
+                    borderBottom = preset.border
+                )
+            } else {
+                AppSurfaceLadder(
+                    hoverLayer = preset.foreground.copy(alpha = 0.045f),
+                    pressedLayer = preset.foreground.copy(alpha = 0.08f),
+                    highlight = Color.White.copy(alpha = 0.8f),
+                    sheen = Color.White.copy(alpha = 0.6f),
+                    shadow = preset.foreground,
+                    keyShadowAlpha = 0.5f,
+                    ambientShadowAlpha = 0.4f,
+                    borderTop = preset.border,
+                    borderBottom = lerp(preset.border, preset.foreground, 0.12f)
+                )
+            }
+        }
+    }
+}
 
-    /** Diálogo e qualquer coisa que cubra a janela. */
-    val dialog: Dp = 8.dp
+val LocalAppSurfaceLadder = staticCompositionLocalOf { AppSurfaceLadder.of(AppThemePreset.OBSIDIANA_DARK) }
+
+/** Mesmo desenho de `AppAccents.current`: lê o tema em vigor, nunca um `val` de topo. */
+object AppSurfaceLadders {
+    val current: AppSurfaceLadder
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalAppSurfaceLadder.current
 }
 
 /**
@@ -423,10 +511,12 @@ private fun appTypography(fonts: AppFontFamilies) = Typography(
 /**
  * Superfícies neutras da paleta.
  *
- * São quatro degraus dentro de ~14% de luminância, e é deliberado: a
- * profundidade passa a vir da **borda de 1dp e do espaçamento**, não de sombra
- * nem de gradiente de acento. Quatro superfícies muito distintas entre si
- * reconstruiriam por volume a hierarquia que este sistema quer ler por camada.
+ * São quatro degraus dentro de ~14% de luminância, e continua deliberado:
+ * quatro superfícies muito distintas entre si reconstruiriam por volume a
+ * hierarquia que este sistema quer ler por camada. O que faltava — a tela lia
+ * chapada — não se resolve afastando os degraus, e sim com o que fica **por
+ * cima** deles: [AppDepth] para o que está sobre o quê, e [AppSurfaceLadder] para
+ * hover, pressão, brilho e sombra.
  *
  * [AppSurfaces] existe como objeto nomeado — e não só como argumento do
  * `darkColorScheme` — porque os degraus não têm papel Material equivalente um a
@@ -567,6 +657,7 @@ fun AppTheme(
 ) {
     val colorScheme = appColorScheme(preset)
     val accents = if (preset.isDark) darkAppAccents else lightAppAccents
+    val ladder = remember(preset) { AppSurfaceLadder.of(preset) }
     // A escala é montada uma vez por processo: as famílias não mudam com o tema,
     // e reconstruir catorze `TextStyle` a cada troca seria trabalho sem efeito.
     val typography = rememberedTypography
@@ -598,7 +689,8 @@ fun AppTheme(
             LocalDensity provides scaledDensity,
             LocalScrollbarStyle provides scrollbarStyle,
             LocalAppAccents provides accents,
-            LocalAppMotionPolicy provides motion
+            LocalAppMotionPolicy provides motion,
+            LocalAppSurfaceLadder provides ladder
         ) {
             content()
         }

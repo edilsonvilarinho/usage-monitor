@@ -65,9 +65,13 @@ belongs to a banner.
 from `prefers-color-scheme` **and** the explicit `[data-app-theme="light"]` scope, never from
 the media query alone, because the app owns a theme switch that must win.
 
-**Surfaces.** Four steps inside ~14% luminance: `--bg` `--surface` `--raised` `--border`.
-Depth comes from the **1dp border and from spacing** — not from shadow, not from gradient.
-No accent glow on top of surfaces, no tinted cards, no colored card backgrounds.
+**Surfaces.** Four steps inside ~14% luminance: `--bg` `--surface` `--raised` `--border`. The
+steps stay close on purpose; what made the app read flat is fixed by what sits **on top** of them
+(`AppSurfaceLadder`, derived from the preset, never hand-tuned per theme): a translucent hover and
+pressed **layer** added over whatever surface is below (so a hovered row inside a hovered card
+still reacts), a 1dp inner **highlight** at the top, a neutral **sheen** gradient over the first
+56px, and a **border that is lighter on top** in dark (darker at the bottom in light). No accent
+glow on top of surfaces, no tinted cards, no colored card backgrounds.
 
 **Color area.** The nine integration accents are fixed (AA 4.5:1 on both surfaces, hue preserved
 across themes, ≥20° apart). What changed from the old UI is the **area**: from whole-card fill
@@ -102,11 +106,16 @@ update strip 28, control 28.
 **Shape.** Radius 4 chip · 6 control · 8 panel · 10 window. **10dp is the ceiling** — the old
 10–28dp range is what made every surface read as one big card.
 
-**Elevation.** 0 for data surfaces, 2 rarely, **8 reserved for window, dialog, menu and overlay**.
-Hierarchy is read by layer and divider, not by shadow depth.
+**Depth.** Five levels (`AppDepth`), each two stacked neutral shadows — a short dense *key* that
+seats the object and a wide faint *ambient* that gives distance: `FLAT` rows, cells and blocks
+inside a panel (never a shadow inside a surface) · `CARD` panels and cards at rest · `RAISED` a
+hovered card and tooltips · `OVERLAY` menus · `DIALOG` a dragged card and the HUD. `CARD`'s
+ambient stays at 6dp because the dashboard gap is 12dp. **In dark, black shadow barely shows**
+(measured: 10dp darkens `#131010` by 3/255) — there the volume comes from light: highlight, sheen
+and the lit top border. Hierarchy is still read by layer and divider first.
 
-**Backgrounds.** Flat. No imagery, no illustration, no pattern, no texture, no gradient anywhere
-in the product. The only graphics are data: line charts, bar series, a per-hour activity heatmap,
+**Backgrounds.** No imagery, no illustration, no pattern, no texture. **One gradient only**: the
+neutral top sheen of panels, cards and the HUD. Never an accent gradient, never behind a chart. The only graphics are data: line charts, bar series, a per-hour activity heatmap,
 stacked composition bars — all drawn in accent colors on `--raised`.
 
 **Borders and dividers.** 1px `--border` everywhere. A row owns its **bottom** divider (which is
@@ -117,8 +126,10 @@ paints after the content.
 **Transparency and blur.** Not used in the product. The main window has a user-set opacity
 (50–100%) applied to the whole window by the OS, not per element.
 
-**Hover.** Background steps to `--raised`, text from `--muted` to `--fg`. Never a color shift,
-never a scale, never a shadow. Close button is the one exception: it fills `--crit` with white.
+**Hover.** A `--hover-layer` is added over the surface below, text goes from `--muted` to
+`--fg`. Elevated surfaces (the dashboard card) also **lift**: one depth level up and 1dp higher,
+on the `GENTLE` spring. Never a hue shift. Close button is the one exception: it fills `--crit`
+with white.
 
 **Press / focus.** Press has no separate treatment beyond hover. Focus is a 2px `--info` outline
 with 1px offset (inset on fields).
@@ -136,7 +147,8 @@ General) turns every transition into an instant swap and stops anything continuo
 a **static skeleton**, never a shimmer.
 
 **Cards.** There are no "cards" in the decorative sense. There is one data surface: `--surface`
-fill, 1px border, radius 8, no shadow, optional 2px source marker in its header.
+fill, 1px border lit on top, radius 8, `--shadow-card`, top sheen and highlight, optional 2px
+source marker in its header.
 
 **Layout rules.** Dashboard is a 2-column grid of panels with `--s3` gap; other windows stack
 full-width panels. Every window that slices by time pins its parameters in one 34dp toolbar and

@@ -46,6 +46,19 @@
 
   --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
   --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+  /* Depth — two stacked shadows per level (Compose: AppDepth). Black barely
+     shows on #131010 (measured: 10dp of shadow darkens the ground by 3/255),
+     so in dark the volume comes from light: highlight, sheen, lit top border. */
+  --shadow-card:    0 1px 1px rgb(0 0 0 / .45), 0 3px 8px rgb(0 0 0 / .30);
+  --shadow-raised:  0 2px 3px rgb(0 0 0 / .45), 0 6px 14px rgb(0 0 0 / .32);
+  --shadow-overlay: 0 3px 4px rgb(0 0 0 / .45), 0 8px 20px rgb(0 0 0 / .35);
+  --shadow-dialog:  0 4px 6px rgb(0 0 0 / .45), 0 12px 28px rgb(0 0 0 / .40);
+  --highlight:      rgb(255 255 255 / .09);            /* 1dp inner top line */
+  --sheen:          color-mix(in srgb, var(--fg) 4.5%, transparent); /* top of the 56px gradient */
+  --border-top:     color-mix(in srgb, var(--fg) 22%, var(--border));
+  --border-bottom:  var(--border);
+  --hover-layer:    color-mix(in srgb, var(--fg) 6%, transparent);
+  --pressed-layer:  color-mix(in srgb, var(--fg) 10%, transparent);
 
   --r1: 4px;  --r2: 6px;  --r3: 8px;  --r4: 10px;
   --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px;
@@ -79,6 +92,16 @@
 
     --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
     --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+    --shadow-card:    0 1px 1px rgb(23 20 20 / .12), 0 3px 8px rgb(23 20 20 / .08);
+    --shadow-raised:  0 2px 3px rgb(23 20 20 / .12), 0 6px 14px rgb(23 20 20 / .10);
+    --shadow-overlay: 0 3px 4px rgb(23 20 20 / .12), 0 8px 20px rgb(23 20 20 / .12);
+    --shadow-dialog:  0 4px 6px rgb(23 20 20 / .12), 0 12px 28px rgb(23 20 20 / .14);
+    --highlight:      rgb(255 255 255 / .80);
+    --sheen:          rgb(255 255 255 / .60);
+    --border-top:     var(--border);
+    --border-bottom:  color-mix(in srgb, var(--fg) 12%, var(--border));
+    --hover-layer:    color-mix(in srgb, var(--fg) 4.5%, transparent);
+    --pressed-layer:  color-mix(in srgb, var(--fg) 8%, transparent);
   }
 }
 
@@ -104,6 +127,16 @@
 
   --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
   --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+  --shadow-card:    0 1px 1px rgb(23 20 20 / .12), 0 3px 8px rgb(23 20 20 / .08);
+  --shadow-raised:  0 2px 3px rgb(23 20 20 / .12), 0 6px 14px rgb(23 20 20 / .10);
+  --shadow-overlay: 0 3px 4px rgb(23 20 20 / .12), 0 8px 20px rgb(23 20 20 / .12);
+  --shadow-dialog:  0 4px 6px rgb(23 20 20 / .12), 0 12px 28px rgb(23 20 20 / .14);
+  --highlight:      rgb(255 255 255 / .80);
+  --sheen:          rgb(255 255 255 / .60);
+  --border-top:     var(--border);
+  --border-bottom:  color-mix(in srgb, var(--fg) 12%, var(--border));
+  --hover-layer:    color-mix(in srgb, var(--fg) 4.5%, transparent);
+  --pressed-layer:  color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
 :root[data-app-theme="dark"] {
@@ -117,6 +150,19 @@
   --cwrite:#FFA726; --savings:#26C6DA;
   --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
   --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+  /* Depth — two stacked shadows per level (Compose: AppDepth). Black barely
+     shows on #131010 (measured: 10dp of shadow darkens the ground by 3/255),
+     so in dark the volume comes from light: highlight, sheen, lit top border. */
+  --shadow-card:    0 1px 1px rgb(0 0 0 / .45), 0 3px 8px rgb(0 0 0 / .30);
+  --shadow-raised:  0 2px 3px rgb(0 0 0 / .45), 0 6px 14px rgb(0 0 0 / .32);
+  --shadow-overlay: 0 3px 4px rgb(0 0 0 / .45), 0 8px 20px rgb(0 0 0 / .35);
+  --shadow-dialog:  0 4px 6px rgb(0 0 0 / .45), 0 12px 28px rgb(0 0 0 / .40);
+  --highlight:      rgb(255 255 255 / .09);            /* 1dp inner top line */
+  --sheen:          color-mix(in srgb, var(--fg) 4.5%, transparent); /* top of the 56px gradient */
+  --border-top:     color-mix(in srgb, var(--fg) 22%, var(--border));
+  --border-bottom:  var(--border);
+  --hover-layer:    color-mix(in srgb, var(--fg) 6%, transparent);
+  --pressed-layer:  color-mix(in srgb, var(--fg) 10%, transparent);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -263,7 +309,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
 .body.tight { padding: var(--s3); gap: var(--s2); }
 
 /* Superfície de dados: borda de 1dp, sem brilho, sem gradiente */
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r3); }
+.panel { background: linear-gradient(var(--sheen), transparent 56px), var(--surface); border: 1px solid var(--border); border-color: var(--border-top) var(--border) var(--border-bottom); border-radius: var(--r3); box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-card); }
 .panel > .phead {
   display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3);
   border-bottom: 1px solid var(--border);
@@ -278,7 +324,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
 .row { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3);
   border-bottom: 1px solid var(--border); }
 .row:last-child { border-bottom: 0; }
-.row:hover { background: var(--raised); }
+.row:hover { background: var(--hover-layer); }
 .row .sp { flex: 1; }
 
 /* Marcador de fonte: 2px, discreto */
