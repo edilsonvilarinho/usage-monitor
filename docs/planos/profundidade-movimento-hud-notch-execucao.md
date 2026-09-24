@@ -41,7 +41,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C12 | Modelo puro da HUD | feito |
 | C13 | HUD em janela própria | feito |
 | C14 | Geometria de borda e migração da posição | feito |
-| C15 | O notch com anéis | pendente |
+| C15 | O notch com anéis | feito |
 | C16 | Indicadores contínuos atrás da política | pendente |
 | C17 | Verificação final | pendente |
 
@@ -63,6 +63,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C12 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest" --tests "com.usagemonitor.ui.*"` | Verde: sete casos do modelo e a suíte de UI inteira (a barra HUD atual consome o modelo por um adaptador, sem mudança visual). |
 | 2026-09-24 | C13 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.presentation.*"` | Verde. Os testes de `HudBar` já montavam a barra direto, sem `DesktopWindowFrame(hud)`, e não precisaram mudar. A verificação da janela real fica para o C17. |
 | 2026-09-24 | C14 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.HudWindowPreferencesTest"` | Verde: dez casos de geometria e quatro de posição (padrão, ida e volta, migração da pílula antiga, meia gravação ignorada). |
+| 2026-09-24 | C15 | Claude Opus 5.5 | `gradlew.bat allTests` + renderização descartável do notch (topo e lateral, escuro e claro, parado e aberto) | Verde: 2077 testes, 0 falhas. A primeira renderização mostrou a trilha dos anéis branca opaca — o alfa da camada de pressão tinha sido sobrescrito com 1 —; corrigida para a camada com 1,6× o peso. |
 
 ## C1 · Tokens de motion e política
 
@@ -252,3 +253,24 @@ na borda da sombra e CPU da rotação contínua.
 - `HudPlacement(borda, fração)` gravado em `hudEdge`/`hudEdgeOffset`; a posição da pílula antiga
   (`hudWindowX/Y`) migra uma vez para a borda mais próxima e as chaves velhas são apagadas. Estreia no
   topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.
+
+## C15 · O notch
+
+- `AppUsageRing` (`commonMain`, substitui o `UsageArcChart` sem uso, que tinha peso 700 e brilho de
+  acento): arcos concêntricos por mola `GENTLE`, trilha tracejada sem projeção, arco de sessão ativa e
+  pulso de atenção só com `AppMotionPolicy.continuous`, frase inteira na semântica.
+- `HudNotch` (`desktopMain`): forma com ombros côncavos, anéis + percentual em foco + palavra parado,
+  painel por conta aberto, contagem e atualização uma vez no fim, `hudPressGesture` preservado. O
+  contêiner usa os tamanhos de `hudNotchSizes`.
+- `HudWindowHost` reescrito: janela transparente; em repouso do tamanho do notch, cresce de uma vez ao
+  entrar o ponteiro e encolhe depois de a mola assentar (resultado B do C11); arrasto livre e encaixe
+  por `nearestHudPlacement`, gravado como borda + fração.
+- Apagados: `HudBar`, `HudSourceStatus`, `HudQuotaChip`, `HudPanelRow`, o adaptador `toSourceStatus`,
+  `HudWindowGeometry.kt` inteiro e os testes `HudBarHeightTest`, `HudBarCountdownTest`,
+  `HudBarUpdateIndicatorTest`, `HudWindowGeometryTest` e os casos de HUD do `DesktopWindowFrameTest`.
+  As asserções deles migraram para `HudNotchTest`, mais a costura de tamanho nas quatro bordas.
+- Textos: descrição do interruptor nas Configurações e o tópico "Modos de janela" da ajuda (PT/EN)
+  deixaram de falar em "faixa fina no topo". O rótulo "Barra HUD" continua — ele é citado pelos passos
+  da ajuda e pelo menu de modos.
+- Design system: `AppHudBar` (contrato, `.d.ts`, `.jsx`) reescrito como notch, `AppUsageRing` novo,
+  kit `Hud.jsx`, índice e regra de transparência do readme; seção "Barra HUD — notch" do protótipo.

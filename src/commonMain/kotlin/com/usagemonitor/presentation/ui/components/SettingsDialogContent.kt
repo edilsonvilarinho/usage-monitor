@@ -1334,9 +1334,9 @@ fun HudModeToggle(
     SettingsOptionRow(
         label = if (isPt) "Barra HUD" else "HUD strip",
         description = if (isPt) {
-            "Reduz a janela a uma faixa fina no topo da tela, com só o pior risco e o tempo até o reset. Para voltar: clique na faixa, Ctrl+Shift+H ou o ícone na bandeja."
+            "Troca a janela por um notch colado numa borda da tela, com um anel e a palavra do estado por conta; o ponteiro em cima abre cada cota. Para voltar: clique no notch, Ctrl+Shift+H ou o ícone na bandeja."
         } else {
-            "Shrinks the window to a thin strip at the top of the screen, showing only the worst risk and the time to reset. To return: click the strip, Ctrl+Shift+H, or the tray icon."
+            "Replaces the window with a notch docked to a screen edge, with a ring and the status word per account; hovering opens every quota. To return: click the notch, Ctrl+Shift+H, or the tray icon."
         },
         showDivider = showDivider,
         modifier = modifier

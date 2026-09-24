@@ -20,6 +20,7 @@
     'components/data/AppDataRow.jsx',
     'components/data/AppDataTable.jsx',
     'components/data/AppColumnHeader.jsx',
+    'components/data/AppUsageRing.jsx',
     'components/feedback/AppBanner.jsx',
     'components/feedback/AppEmptyState.jsx',
     'components/feedback/AppLoadingState.jsx',

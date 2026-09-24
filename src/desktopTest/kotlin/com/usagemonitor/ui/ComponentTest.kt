@@ -101,12 +101,14 @@ import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
-import com.usagemonitor.presentation.ui.components.UsageArcChart
+import com.usagemonitor.presentation.ui.components.AppRingArc
+import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
 import com.usagemonitor.presentation.ui.components.quotaBlockTag
 import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
 import com.usagemonitor.presentation.ui.historyAccountChipTag
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -150,36 +152,44 @@ class ComponentTest {
         const val HISTORY_SCENE_HEIGHT = 1_600
     }
 
-    // ── UsageArcChart ────────────────────────────────────────────────────
+    // ── AppUsageRing ─────────────────────────────────────────────────────
 
+    /** O anel nunca informa sozinho: a frase inteira vai na semântica. */
     @Test
-    fun `UsageArcChart displays percentage text`() = runDesktopComposeUiTest {
+    fun `AppUsageRing carries account word and quotas in its description`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                UsageArcChart(
-                    used = 500L,
-                    total = 1000L,
-                    unit = UsageUnit.REQUESTS
+                AppUsageRing(
+                    arcs = listOf(
+                        AppRingArc(fraction = 0.88f, tone = AppTone.CRITICAL),
+                        AppRingArc(fraction = 0.09f, tone = AppTone.OK)
+                    ),
+                    description = "Padrão · Crítico · 5h 88% · 7d 9%"
                 )
             }
         }
 
-        onNodeWithText("50%").assertIsDisplayed()
+        onNodeWithContentDescription("Padrão · Crítico · 5h 88% · 7d 9%").assertIsDisplayed()
     }
 
+    /**
+     * Sessão ativa e atenção sob a política estática: o anel não cria animação
+     * sem fim — chegar ao assert já prova que o `waitForIdle` voltou.
+     */
     @Test
-    fun `UsageArcChart shows 0 percent when total is 0`() = runDesktopComposeUiTest {
+    fun `AppUsageRing active and attention do not animate forever without the policy`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                UsageArcChart(
-                    used = 0L,
-                    total = 0L,
-                    unit = UsageUnit.TOKENS
+                AppUsageRing(
+                    arcs = listOf(AppRingArc(fraction = 1.4f, tone = AppTone.CRITICAL, hasForecast = false)),
+                    description = "Codex · Crítico",
+                    active = true,
+                    attention = true
                 )
             }
         }
 
-        onNodeWithText("0%").assertIsDisplayed()
+        onNodeWithContentDescription("Codex · Crítico").assertIsDisplayed()
     }
 
     @Test

@@ -123,8 +123,10 @@ why a list needs no gap and the nested guide comes out continuous). The nested-g
 2dp, drawn per item with `drawBehind` — not `Modifier.border`, which rounds thickness up and
 paints after the content.
 
-**Transparency and blur.** Not used in the product. The main window has a user-set opacity
-(50–100%) applied to the whole window by the OS, not per element.
+**Transparency and blur.** No blur, no acrylic. **One transparent window**: the HUD notch, so it can
+have its silhouette and shadow; it is notch-sized at rest because a transparent pixel swallows the
+click (measured on Windows 11). Every window, the HUD included, keeps the user-set opacity (50–100%)
+applied to the whole window by the OS, not per element.
 
 **Hover.** A `--hover-layer` is added over the surface below, text goes from `--muted` to
 `--fg`. Elevated surfaces (the dashboard card) also **lift**: one depth level up and 1dp higher,
@@ -198,7 +200,7 @@ invented here.
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
-| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
+| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing |
 | `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
@@ -221,7 +223,9 @@ had no signal they existed; those others behind a hover tooltip, because the pop
 24dp window and flickered over its own trigger; a list with no consumption at all; one row per source,
 because an account with a 5h and a 7d window still showed one limit; and one row per quota always
 visible, because ten rows on screen said what fits in one. `AppStatusDot` is the seventh addition,
-extracted from `AppStatusIndicator` for the collapsed state. Nothing else was invented.
+extracted from `AppStatusIndicator` for the collapsed state. **The depth-and-motion pass replaced the
+strip with a notch** docked to a screen edge (see `AppHudBar.prompt.md`) and added `AppUsageRing`,
+the eighth: one arc per quota, never a ring per vendor. Nothing else was invented.
 
 ### The conformance pass — 2026-08-27
 

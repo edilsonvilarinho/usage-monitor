@@ -687,215 +687,70 @@ acidente.
   controle — mesmo padrão de `onOpenAdminOverview`, e é o que mantém os geradores de captura
   intactos.
 
-**Barra HUD** (`DesktopWindowFrame(hud)` + `HudBar` + `HudWindowGeometry.kt` +
-`HudSummaryViewModel` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, plano
-[`hud-flutuante-164-execucao.md`](docs/planos/hud-flutuante-164-execucao.md)): terceiro chrome, ainda
-mais discreto que o modo somente cards — a mesma janela principal encolhida a um painel de **largura
-medida pelo conteúdo**, arrastável, sempre no topo. Não mostra cards: cada linha é uma
-**conta**, com ponto e palavra da pior cota dela, o nome, e um ponto por cota ao lado do percentual
-(`allQuotaRisks`, em `WorstQuotaSnapshot.kt`). Parada mostra a **primeira** conta da ordem de cards
-do usuário; com o ponteiro em cima, todas. **Também não é valor novo em enum nenhum**: `hud`
-é um terceiro booleano de `DesktopWindowFrame`, irmão de `compact`, e a exclusão mútua entre os dois é
-regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do tipo.
-- **Seis versões de conteúdo, cinco corrigidas depois de usar.** (1) Uma linha com a fonte de pior
-  risco: com várias contas, as outras não tinham sinal nenhum de que existiam. (2) As outras num
-  `HoverTooltipBox`: o dado ficou atrás de um gesto, e o popup piscava. (3) Uma linha por **fonte**,
-  sempre visível, com a pior cota de cada uma: a conta com janela de 5h e de 7d mostrava um limite
-  só. (4) Uma linha por **cota**, sempre visível, mais um rodapé de consumo: dez linhas na tela para
-  dizer o que cabe em uma. (5) Uma linha por cota no hover: a conta com 5h e 7d ocupava duas linhas
-  seguidas repetindo o próprio nome. (6) A que ficou: uma linha por **conta**, com um ponto por cota.
-  Nenhuma dessas voltas foi antecipada em plano; todas apareceram usando.
-- **O ponto por cota sem palavra tem precedente exato — é o desenho do card.** Ali o
-  `RiskSemaphoreDot` de cada cota é só ponto, e um badge de cabeçalho resume o pior com ponto **e**
-  palavra; a palavra da linha do HUD faz o papel desse badge. A cor nunca informa um estado que a
-  linha não tenha dito por escrito, e a palavra sai da **pior** cota da conta: mostrar "Normal" com a
-  7d estourada seria mentir.
-- **O rodapé de consumo foi removido, e a maquinaria dele junto.** `GetHudSessionSummaryUseCase`,
-  `HudSessionSummary`, `HudSummaryViewModel` e `hudSessionSummaryLabel` foram **apagados**, não
-  deixados sem consumidor: código morto com laço de 30s é pior que código morto parado, e este
-  documento já registra o que acontece com um caminho que ninguém lê mais (`UserPreferences`). O
-  consumo do CLI volta a existir só na tela de Sessões CLI.
-- **A ordem é a que o usuário arrastou no dashboard** (`orderedByCardOrder`, compartilhado com a
-  grade de cards), não a do risco: com o risco mandando, a linha parada trocava de conta sozinha e
-  nunca se sabia de antemão quem estava ali. Por isso `allQuotaRisks` **não ordena** — duas ordens
-  brigando dariam um resultado que nenhuma das duas descreve. Dentro da fonte vale a ordem de
-  declaração das cotas, que é a da resposta da API: é ela que o resumo `5h 88% · 7d 9%` imprime.
-- **A HUD tem janela própria** (`HudWindow.kt`, `HudWindowHost`, chamada por `main()` com
-  `if (hudMode)`), e a janela principal fica **escondida** (`visible = !hudMode`), não encolhida.
-  Antes a HUD era a janela principal reduzida, e isso custava três armadilhas medidas: guardar a
-  geometria de antes para restaurar ao sair, proibir o coletor de persistência de gravar a pílula
-  como "tamanho normal" e trocar o piso de tamanho **antes** do efeito que redimensiona, por ordem
-  textual. Com a janela separada as três deixaram de existir; o dashboard continua composto e a volta
-  é instantânea. Escondida não é minimizada: `isAppVisible` segue verdadeiro e a coleta alimenta a
-  HUD. "Abrir" (bandeja e segunda instância) sai da HUD antes de ativar a janela.
-- **A janela da HUD não interpola o tamanho quadro a quadro.** Era a fonte do tranco: cada quadro
-  redimensionava a janela AWT. O tamanho muda de uma vez e o movimento é do conteúdo.
-- **Clique em pixel transparente é engolido** (medido no Windows 11, C11 do plano
-  [`profundidade-movimento-hud-notch-execucao.md`](docs/planos/profundidade-movimento-hud-notch-execucao.md)):
-  numa janela transparente a área vazia não deixa o clique passar para trás. Por isso a janela só
-  tem o tamanho do painel aberto enquanto o ponteiro está nela.
-- **Duas versões de ocupação foram achadas erradas ao vivo, não antecipadas em plano nenhum.** A
-  primeira era a largura inteira da tela: sempre no topo (`alwaysOnTop`), cobria os controles de
-  qualquer outra janela que tivesse algo nos primeiros 24dp do topo — barra de menu de IDE, atalhos
-  de editor. A segunda reduziu para 320dp fixos no canto superior direito, e continuava medindo
-  320dp para mostrar a palavra "Normal", num canto que é exatamente onde IDE e navegador põem
-  controles. O Compose Desktop não tem click-through parcial numa `Window` comum — a região inteira
-  captura o clique, visível ou não —, então **a única mitigação viável é ocupar menos área e deixar
-  o usuário escolher onde**. `HUD_PILL_WIDTH_DP` virou `HUD_PILL_MAX_WIDTH`: teto, não largura. O
-  papel que a largura fixa cumpria (não mudar de tamanho a cada coleta) passou para o teto mais as
-  reticências (`TextOverflow.Ellipsis`) que a pílula já usava. `HudBar` continua sem saber a própria
-  largura — preenche o que recebe. O teto **subiu de 320 para 420** quando a linha ganhou quatro
-  colunas: com 320 sobravam ~96dp para o nome, treze caracteres, e toda conta virava
-  "Anthropic — I…" — justamente o que a lista existe para distinguir. E **de 420 para 484** quando a
-  contagem entrou (#185), que é exatamente o teto anterior mais a largura da coluna nova, não um
-  número escolhido por ser redondo: o 420 foi calibrado para a linha **sem** ela, e mantê-lo faria a
-  coluna ser paga pelo nome da conta. Medido com as contas reais, e não deduzido —
-  `Anthropic — Padrão` pedia 356,9dp e passou a 420,9; `OpenCode Go`, 361,6 e 425,6.
-- **A largura é estimada pela métrica da fonte, nunca medida na composição** (`hudPillWidth`,
-  `hudPanelWidth`). A escala `label*` deste sistema é **mono**, e é isso que torna o avanço por
-  caractere calculável antes de existir composição; numa fonte proporcional este número não
-  existiria. Medir e devolver a largura para a janela fecharia o laço `redimensionar → recompor →
-  medir → redimensionar`. O preço de errar é um caractere truncado a mais, que as reticências já
-  tratam.
-- **A lista é conteúdo da janela, nunca `Popup`.** Ela chegou a sair por `HoverTooltipBox`, e popup
-  no Compose Desktop é camada **dentro** da janela, recortada pelos limites dela —
-  `compose.layers.type` não está definido neste projeto, e o default recorta. Numa janela de 24dp,
-  um balão com piso de 180dp de largura e uma linha por fonte não cabe: era recortado sobre o
-  próprio alvo, o ponteiro passava a estar sobre o balão, a faixa recebia `Exit`, a tooltip fechava
-  e reabria no quadro seguinte. Sem popup não há laço.
-  - **Cada linha carrega ponto E palavra** (`AppStatusIndicator`), não só o ponto colorido. O
-    percentual ao lado descreve o **consumo**, não o risco: 40% às onze da manhã pode ser pior que
-    80% dez minutos antes do reinício, e é a palavra que diz qual dos dois é o caso.
-  - **A janela cresce e encolhe interpolada** (`animate` + `AppMotion.normal`), não em um salto:
-    abrir a lista trocava 24dp por 100dp num quadro só, e o que se via era a barra piscando de
-    tamanho. **Transição única, nunca laço** — animação infinita trava o `waitForIdle`. E é a janela
-    AWT que anda, não um `graphicsLayer`: aqui o tamanho é real, não overlay. `hudAppliedSize` separa
-    "abrir/fechar a lista", que anima, de "a barra andou com o ponteiro", que **não** pode animar —
-    arrastar com a janela interpolando deixaria a barra correndo atrás do mouse.
-  - **Cota sem projeção continua na lista**, com ponto neutro e a palavra dizendo isso. O percentual
-    é fato medido e não depende de previsão — é a diferença para o badge do card, que some sem
-    projeção: lá a pergunta é "qual o estado", aqui é "quanto já foi". Com a regra do badge, Kilo e
-    OpenCode (que nunca têm projeção, porque `currentSegment` vê um ponto por segmento) sumiriam do
-    HUD inteiro. Na ordem, "sem projeção" vem **depois** de `ON_TRACK`: um normal conhecido informa
-    mais que um desconhecido. O rótulo da linha é `{perfil ou fonte} · {cota}` — o rótulo da cota já
-    diz o fornecedor ("Claude 5h"), e repetir "Anthropic" ao lado gastaria a largura que o nome da
-    conta precisa. **Recolher ao ponto exige projeção em todas as cotas**: com uma sem projeção,
-    "está tudo bem" seria garantia que ninguém deu.
-  - **Nenhum formato novo na linha.** O percentual é `compactPercentageLabel`, o mesmo do card —
-    truncado, não arredondado. O reset é `resetShortLabel`, que sai das **mesmas**
-    `formatBrtDateTimeParts` da linha do card, só recortada: sem prefixo, sem fuso, sem a data do
-    dia quando a janela é intradiária. `null` ali é "não há reset a mostrar", e nada é impresso em
-    vez de um traço.
-  - **A hora do reinício sai só no painel expandido** (`HudQuotaChip.resetText`, issue #189). A
-    pílula parada fica na tela o tempo todo e o retângulo dela captura o clique de quem está atrás —
-    a queixa que fez a largura virar teto —, então o reset é detalhe sob demanda: o hover já é o
-    gesto que revela o resto da lista. Ele vai **ao lado da própria cota**, e não numa coluna à
-    direita da linha: a linha é por conta e as cotas são várias, e uma coluna só teria de escolher
-    qual delas descrever. Tom secundário e **sem separador impresso** — o vizinho é o percentual,
-    que é consumo, e é o tom que os separa. A coluna nasceu com a #164, sumiu quando a linha passou
-    a ser por conta e ficou meses **descrita no design system sem existir no Compose**; foi a regra
-    de precedência que decidiu quem estava errado.
-  - **O teto de largura é do estado, não do componente** (`HUD_PANEL_MAX_WIDTH`). `HUD_PILL_MAX_WIDTH`
-    foi calibrado para a linha sem a coluna de reset, e mantê-lo no painel faria a coluna nova ser
-    paga pelo nome da conta — o erro que os saltos 320 → 420 → 484 já recusaram duas vezes. O teto
-    do painel é o da pílula mais **três** colunas de reset, que é a maior contagem de cotas numa
-    fonte só (OpenCode Go), e a aritmética está afirmada no teste de contrato.
-  - **O hover mora no container inteiro.** Ele revela as demais fontes sem popup — preso a uma
-    linha, mover o ponteiro para dentro do painel tiraria o hover e a janela colapsaria debaixo dele.
-  - **`hudAnchor` descreve sempre o painel completo** e `hudWindowPosition` alinha os **dois** eixos
-    à borda mais próxima. Assim, a primeira linha parada e o painel expandido crescem para o lado
-    correto sem deslocar a âncora gravada.
-  - **A linha do painel não é `AppDataRow`** (`HUD_SOURCE_ROW_HEIGHT`, 20dp): aquela primitiva tem
-    piso de 32dp mais 8dp de padding vertical, e seis cotas dariam ~288dp — uma janela, não um HUD.
-    Mesma exceção que `AppChrome.hud` já abre ao furar o piso de 28dp do cromo.
-  - **`HudBarHeightTest` é a costura entre a geometria e o que o Compose dispõe.** A janela é
-    dimensionada antes de existir composição para medir, e as duas contas podem divergir sem nada
-    reclamar — foi o que aconteceu com o antigo rodapé, cujo padding vertical a geometria não
-    contava: a janela nascia 8dp mais curta e o `fillMaxSize` da raiz recortava o texto ao meio. Os
-    testes de geometria conferiam a conta com ela mesma; os de componente rodam numa cena de altura
-    fixa, onde sobra espaço. O bloco de conteúdo carrega `HUD_CONTENT_TEST_TAG` porque a raiz mede o
-    que a cena der.
-  - **O resumo da linha parada usa o rótulo curto da cota** (`hudQuotaShortLabel`, a última palavra:
-    "Claude 5h" → "5h"). A linha mostra uma fonte só, então o prefixo que distingue fornecedores já
-    está dito pelo nome da conta ao lado. Regra deliberadamente burra — nenhum rótulo do app tem duas
-    cotas da mesma fonte terminando na mesma palavra, e um mapa de abreviações seria um segundo dono
-    dos nomes de cota.
-- **`HudBar` ganhou arrasto, e continua sem `WindowScope`.** A decisão anterior ("ancoragem é
-  geometria de `Main.kt`, nunca gesto do usuário") foi revertida: com posição imutável não havia para
-  onde tirar a pílula de cima dos controles de outra janela. Mas `WindowDraggableArea` exigiria
-  `WindowScope` e arrasta a partir do `down`, que um `clickable` interno consumiria antes — sobraria
-  o clique e o arrasto nunca começaria. O gesto é **um só** (`hudPressGesture`), e o que separa
-  clique de arrasto é o limiar de deslocamento. A ação de clique é **declarada** na semântica
-  (`onClick`), não instalada: sem ela o único caminho de volta some para leitor de tela. Manter o AWT
-  fora de `HudBar` é também o que a deixa exercitável em `runDesktopComposeUiTest`.
-  - **Nenhuma coordenada sai de `HudBar`.** `positionChange` é relativo a um componente que, durante
-    o arrasto, se move junto com a janela; serve para medir o limiar e nada mais. `Main.kt` lê a
-    posição absoluta do ponteiro por `MouseInfo` — o mesmo caminho do `WindowDraggableArea` — e o
-    delta é **incremental**: guardar o ponto de partida e somar o total deixaria a pílula presa na
-    borda, porque o excedente de um arrasto para fora da tela nunca seria descartado.
-  - **O movimento é aplicado à âncora, nunca à janela.** Existe um caminho só até a geometria, e a
-    pílula expandida acompanha o ponteiro sem desfazer a conta de "cresce para cima ou para baixo".
-- **Onde ela para é escolha do usuário, e é gravada** (`snapHudPosition` + `HudWindowPreferences`).
-  Ao soltar, gruda na borda mais próxima dos **limites físicos do monitor**, que permitem ocupar a
-  região da barra de tarefas. Janelas normais continuam usando `maximumWindowBounds` e ficam acima
-  dela. Leitura
-  e escrita passam sempre por `fitWindowPosition`: posição salva num monitor que já não existe
-  descreve uma tela que sumiu.
-- **A HUD nunca recolhe ao ponto.** Parada, ela mostra uma linha da primeira fonte na ordem dos
-  cards; com hover, mostra todas. Isso mantém nome, estado e percentual legíveis mesmo em escala de
-  interface baixa. `AppStatusDot` continua existindo para os pontos das cotas, mas nunca informa o
-  estado da HUD sozinho.
-- **A barra não tem translucidez própria.** Ela chegou a ficar translúcida parada, para incomodar
-  menos a leitura do que está atrás; na prática deixou o texto mais difícil de ler sem devolver a
-  área, porque a janela continua capturando o clique de qualquer jeito. Quem decide a opacidade é só
-  a preferência do usuário, em todos os modos.
-- **O cursor é o que diz que a barra se move.** Sem barra de título e sem pegador visível, nada na
-  tela informava que ela é arrastável — a pergunta "como eu consigo mover?" veio de quem já estava
-  com ela na tela. `PointerIcon(Cursor.MOVE_CURSOR)` é a afordância que o cromo de janela normalmente
-  dá de graça.
-  - **A contagem até a próxima coleta sai uma vez só, na primeira linha** (`HudCountdown`, issue #185).
-  O rodapé, que já a mostrava, não é composto em modo HUD, e sem ela não havia como saber quanto
-  falta sem sair do modo. O polling é um laço **único** de 10 min para o app inteiro, não um por
-  conta: repeti-la em cada linha afirmaria que cada conta tem coleta própria. Recolhida ao ponto ela
-  não aparece — ali não há texto nenhum, e o hover devolve o painel com ela —, e aparece **também**
-  na linha de carregamento, que é a primeira linha.
-  - **O ícone é o que diz de que tempo se trata.** Aqui não cabe tooltip, pelo mesmo motivo que já
-    tirou a lista do `HoverTooltipBox`, e um `02:05` solto ao lado dos percentuais não se explica. A
-    frase por extenso vai no `contentDescription` do ícone, que é o caminho do leitor de tela e dos
-    asserts, e sai de `nextRefreshLabel(language)` — **dona única** do texto, compartilhada com a
-    tooltip do rodapé.
-  - **A largura é medida sobre um `"00:00"` fixo, nunca sobre o relógio.** A janela é dimensionada
-    pelo conteúdo; medir o texto corrente a faria mudar de tamanho a cada segundo. Com o poll de 10
-    min o `%02d:%02d` dá sempre cinco caracteres e a escala `label*` é mono, então o placeholder tem
-    exatamente a largura de qualquer valor que a barra imprima.
-  - **O tique mora no `HudBar`, e precisa de interruptor.** Em `Main.kt` ele recomporia `main()`
-    inteiro a cada segundo. `countdownUpdatesEnabled` **não é preferência de usuário**: sob o relógio
-    dos testes de componente o `delay` avança sozinho e o `nowProvider` fixo nunca deixa a contagem
-    chegar a zero, então o laço gira para sempre e o `waitForIdle` não retorna — foi medido, não
-    deduzido. É o mesmo interruptor que o `FooterBar` já tinha.
-  - **O `weight` da linha de carregamento mora no indicador**, não num `Spacer` próprio: a
-    `HudPanelRow` espaça os filhos, e um terceiro filho traria um vão que `hudFallbackRowWidth` não
-    conta — a janela nasceria estreita e o texto sairia comprimido.
-- **Três saídas, mesmo padrão do modo somente cards**: clique curto em qualquer ponto da pílula, o
-  item na bandeja e `Ctrl+Shift+H`, combinação própria sem colidir com o `Ctrl+Shift+M` do modo
-  somente cards.
-- **Não é primitiva de risco nova.** `AppHudBar`/`HudBar` reusa `AppStatusIndicator` por dentro —
-  mesma relação de `AppUpdateStrip` com `AppButton` no design system. `allSourceRisks`
-  (`WorstQuotaSnapshot.kt`) alimenta o painel, e `worstQuotaSnapshot` é só a primeira entrada dela:
-  duas passadas pela mesma lista divergiriam eventualmente.
-  - **Indicador de atualização pendente, sem clique próprio** (`HudUpdateIndicator` +
-  `HudUpdateBadge`, issue #225): `AppUpdateBanner` nunca é composto em modo HUD — `content()` é
-    descartado inteiro —, e a primeira linha precisa continuar visível para sinalizar que havia versão
-  pronta. O ícone (`Icons.Rounded.SystemUpdate`, tingido por `AppTone`) entra na primeira linha, entre
-  as cotas e a contagem — os dois são informação do app, não da conta —, e a frase inteira vai na
-  semântica (`indicator.description`, o mesmo título de `updateBannerContent`): não cabe tooltip aqui.
-  **Não tem zona de clique própria.** `hudPressGesture` ignora consumo de filhos de propósito, então
-  o ícone fica dentro do mesmo alvo que já abre a janela padrão — onde `AppUpdateBanner` oferece
-  "Reiniciar e atualizar agora" — sem precisar de matemática de posição nova. Uma ação de reiniciar
-  direto da HUD faria um clique de rotina na pílula reiniciar o app sem aviso sempre que uma
-    atualização estivesse pronta, risco pior que a falta de indicador. O indicador permanece na
-    primeira linha normal e `hudWindowSize` continua tratando-o como coluna adicional, junto de
-    `showsCountdown`.
+**Barra HUD — notch** (`HudWindow.kt` + `HudNotch.kt` + `HudNotchGeometry.kt` + `HudModel.kt` +
+`AppUsageRing` + `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, redesenhada no plano
+[`profundidade-movimento-hud-notch-execucao.md`](docs/planos/profundidade-movimento-hud-notch-execucao.md)):
+terceiro chrome, ainda mais discreto que o modo somente cards. A janela principal fica **escondida**
+(`visible = !hudMode`), com a geometria intacta, e sobra um **notch colado numa borda da tela** numa
+janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`). O desenho vem do
+Codenotch; a regra de conteúdo vem das seis versões da barra de linhas que ele substituiu.
+**Não é valor novo em enum existente**: `hudMode` continua um booleano, exclusivo com o modo somente
+cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
+- **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos, o de fora é a
+  primeira cota da API). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
+  esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, o percentual da **cota em foco** (pior
+  risco, depois maior percentual — `HudAccount.focusIndex`) e a **palavra do estado, sempre**: no
+  notch recolhido não existe mais nada na tela, e cor nunca informa sozinha. Cota sem projeção tem a
+  trilha **tracejada**.
+- **Aberto** (ponteiro em cima), o notch se desdobra pela mola `EXPRESSIVE` para dentro da tela: um
+  bloco por conta (ponto + palavra, nome) e uma linha de 20dp por cota — rótulo curto, barra,
+  percentual, hora do reinício (#189). Cota sem reset não imprime nada no lugar. O painel entra 60ms
+  depois de o notch começar a crescer, para o texto não nascer espremido.
+- **A ordem é a dos cards** (`orderedByCardOrder`, em `buildHudAccounts`), nunca a do risco: com o
+  risco mandando, a primeira conta trocava sozinha. `buildHudAccounts` é função pura de `commonMain`
+  com teste próprio — a regra morava inline em `main()`, sem teste.
+- **Forma** (`HudNotchShape`): reta e rente na borda, cantos de 14dp do lado de dentro e **ombros
+  côncavos** de 8dp ligando os dois. Isenta do teto de raio de 10dp: é silhueta, não painel. Desenhada
+  para o topo e levada às outras bordas refletindo/girando os pontos, de controle inclusive.
+  Profundidade `DIALOG`, brilho de topo, borda com luz.
+- **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
+  `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela tem o tamanho do notch parado mais a margem
+  de sombra de 16dp nos três lados de dentro, e só cresce quando o ponteiro entra: **de uma vez** (a
+  área nova é transparente, o salto não se vê), com a mola rodando **dentro** dela; ao sair, o
+  conteúdo recolhe (150ms de espera contra o `Exit` de um quadro na divisa) e a janela encolhe **depois**
+  de a mola assentar (450ms). **Nenhum redimensionamento AWT por quadro** — era o tranco da barra
+  anterior, que interpolava a janela.
+- **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
+  existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
+  estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número
+  calculável. O contêiner composto usa **os mesmos números** (`requiredSize`), e `HudNotchTest` afirma
+  que o disposto é exatamente eles nas quatro bordas, parado e aberto: é a costura que a barra antiga
+  quebrou quando o padding que a geometria não contava cortou o texto ao meio. A largura parada é o
+  maior entre percentual e palavra, e uma coleta que troca `9%` por `88%` não mexe na janela.
+- **Posição é borda + fração** (`HudPlacement`, chaves `hudEdge`/`hudEdgeOffset`): sobrevive a troca
+  de resolução e de monitor. Arrastar solta o notch da borda; ao soltar, `nearestHudPlacement` o gruda
+  na borda mais próxima do **centro** dele, na tela inteira (pode ficar sobre a barra de tarefas). A
+  posição da pílula antiga (`hudWindowX/Y`) migra uma vez e as chaves velhas são apagadas. Estreia no
+  topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.
+- **Um gesto só** (`hudPressGesture`): clique curto abre a janela padrão; botão direito vai direto a
+  "Somente cards" (sem popup — seria recortado dentro desta janela); arrasto além do limiar move. A
+  ação de clique é **declarada** na semântica, não instalada por `clickable`, que consumiria o `down`.
+  Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por `MouseInfo`, incremental.
+  Cursor de mover no hover. Três saídas: clique, bandeja, `Ctrl+Shift+H`; "Abrir" da bandeja e a
+  segunda instância saem da HUD antes de ativar a janela.
+- **Contagem até a próxima coleta uma vez só, no fim da faixa** (#185): o polling é do app inteiro. O
+  tique mora no composable e tem o interruptor `countdownUpdatesEnabled`, porque sob o relógio dos
+  testes o laço giraria para sempre. **Atualização pendente é só ícone, sem clique próprio** (#225):
+  o notch inteiro já abre a janela padrão, onde a faixa oferece o reinício.
+- **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira por
+  dentro do anel (turno CLI nos últimos 5 min) e o pulso do
+  anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
+  fica parado e o pulso some; a palavra continua dizendo o estado.
+- **O que a barra de linhas ensinou e continua valendo**: a lista é conteúdo da janela, nunca `Popup`
+  (popup aqui é camada **dentro** da janela e saía recortado sobre o próprio alvo); a HUD não tem
+  translucidez própria (a opacidade é só a preferência do usuário); cota sem projeção continua na HUD
+  (o percentual é fato medido); nenhum formato novo — percentual de `compactPercentageLabel`, reset de
+  `resetShortLabel`, rótulo curto de `hudQuotaShortLabel`.
 
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
 abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e

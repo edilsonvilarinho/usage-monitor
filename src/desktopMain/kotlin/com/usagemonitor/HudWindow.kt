@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -7,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -14,48 +18,51 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.HudNotch
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.buildHudAccounts
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.nextRefreshLabel
 import com.usagemonitor.presentation.ui.components.toneFor
-import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
-import com.usagemonitor.presentation.ui.toSourceStatus
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import java.awt.MouseInfo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.Clock
 
 /**
- * A barra HUD numa janela **própria**.
+ * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.
  *
- * Ela era a janela principal encolhida. Isso obrigava `main()` a guardar a
- * geometria de antes para restaurar ao sair (`preHudWindowGeometry`), a proibir
- * o coletor de persistência de gravar a pílula como "tamanho normal", a trocar o
- * piso de tamanho **antes** do efeito que redimensiona — por ordem textual — e a
- * redimensionar a janela AWT a cada quadro para animar o painel, que era a fonte
- * do tranco. Com uma janela só para a HUD, a principal fica escondida com a
- * própria geometria intacta, o dashboard continua composto (voltar é
- * instantâneo) e nada disso existe mais.
+ * Ela era a janela principal encolhida, e isso obrigava `main()` a guardar a
+ * geometria de antes, proibir o coletor de gravar a pílula como "tamanho
+ * normal", ordenar textualmente o piso de tamanho e redimensionar a janela AWT a
+ * cada quadro — a fonte do tranco. Agora a principal fica escondida com a
+ * geometria intacta, e esta janela é só do notch. Mora fora de `main()`, que está
+ * no limite do backend JVM.
  *
- * Mora fora de `main()` porque aquele composable está no limite do backend JVM
- * (CLAUDE.md, "Injeção de dependências"): estado novo ali é o que estoura o ASM.
- * `main()` só a chama com `if (hudMode)`.
+ * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
+ * 11, C11 do plano de execução): por isso ela só tem o tamanho do painel aberto
+ * enquanto o ponteiro está no notch. Ao entrar, a janela cresce **de uma vez** —
+ * a área nova é transparente, o salto não se vê — e a mola roda dentro dela; ao
+ * sair, o conteúdo recolhe e só depois de assentar a janela encolhe.
  */
 @Composable
 internal fun HudWindowHost(
@@ -73,17 +80,20 @@ internal fun HudWindowHost(
     onOpenFull: () -> Unit,
     onSwitchToCardsOnly: () -> Unit,
     onOpenHelp: () -> Unit,
-    onCloseRequest: () -> Unit
+    onCloseRequest: () -> Unit,
+    /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
+    activeTargets: StateFlow<Set<UsageTargetKey>>? = null
 ) {
     val snapshot by usageAlertViewModel.worstSnapshot.collectAsState()
     val quotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
+    val active = activeTargets?.collectAsState()?.value.orEmpty()
 
-    val statusTone = snapshot?.let { worst -> toneFor(worst.risk.level) } ?: AppTone.NEUTRAL
+    val fallbackTone = snapshot?.let { worst -> toneFor(worst.risk.level) } ?: AppTone.NEUTRAL
     val fallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
-    // A faixa de atualização do modo padrão não existe aqui; o indicador ocupa a
-    // primeira linha com o mesmo texto e tom de `updateBannerContent` (#225).
+    // A faixa de atualização do modo padrão não existe aqui; o indicador ocupa o
+    // notch com o mesmo texto e tom de `updateBannerContent` (#225).
     val updateIndicator = appUpdateState?.let { state ->
         val content = updateBannerContent(state = state, language = language)
         HudUpdateIndicator(tone = content.tone, description = content.title)
@@ -92,111 +102,117 @@ internal fun HudWindowHost(
         quotaRisks = quotaRisks,
         cardOrder = cardOrder,
         language = language,
-        now = Clock.System.now()
+        now = Clock.System.now(),
+        activeTargets = active
     )
-    val sources = accounts.map { account -> account.toSourceStatus() }
 
+    var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, hudScreenArea)) }
     var hovered by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
+    // A janela no tamanho do painel aberto. Anda **antes** do conteúdo ao abrir e
+    // **depois** dele ao fechar — ver o KDoc.
+    var windowOpen by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
-    // Última posição do ponteiro na tela durante o arrasto. Incremental: guardar
-    // a de partida e somar o total deixaria a barra presa na borda, porque o
-    // excedente de um arrasto para fora da tela nunca seria descartado.
+    // Durante o arrasto o notch sai da borda e anda livre; esta é a posição da
+    // janela (dp de janela). Nulo fora de arrasto.
+    var dragWindowPosition by remember { mutableStateOf<DpOffset?>(null) }
     var dragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
 
-    // Expandir é imediato; recolher espera uma passada de `AppMotion.fast` — sem
-    // ela o ponteiro cruzando a divisa entre duas linhas geraria um `Exit` de um
-    // quadro e o painel fecharia debaixo dele.
     LaunchedEffect(hovered, dragging) {
-        if (hovered && !dragging) {
+        if (dragging) {
+            return@LaunchedEffect
+        }
+        if (hovered) {
+            windowOpen = true
+            // Um quadro para a janela crescer antes de o conteúdo começar a se
+            // abrir; sem ele a mola corre nos primeiros quadros dentro da janela
+            // pequena e sai recortada.
+            withFrameNanos { }
             expanded = true
-        } else if (!dragging) {
-            delay(AppMotion.fast.toLong())
-            if (!dragging && !hovered) {
-                expanded = false
-            }
+        } else {
+            // Recolher espera uma passada: o ponteiro cruzando a divisa entre o
+            // notch e o painel gera um `Exit` de um quadro.
+            delay(HUD_COLLAPSE_DELAY_MILLIS)
+            expanded = false
+            delay(HUD_COLLAPSE_SETTLE_MILLIS)
+            windowOpen = false
         }
     }
 
     val scale = uiScaleFactor(uiScalePercent)
-    // A âncora descreve sempre o painel **parado**: é ela que o arrasto move e
-    // que fica gravada, e expandir não a desloca.
-    val anchorSize = hudWindowSize(
-        sources = sources,
+    val sizes = hudNotchSizes(
+        accounts = accounts,
+        edge = placement.edge,
         fallbackLabel = fallbackLabel,
-        expanded = false,
-        showsCountdown = true,
+        showsCountdown = nextRefreshAt != null,
         hasUpdateIndicator = updateIndicator != null
-    ).let { size -> DpSize(size.width * scale, size.height * scale) }
-    val targetSize = hudWindowSize(
-        sources = sources,
-        fallbackLabel = fallbackLabel,
-        expanded = expanded && !dragging,
-        showsCountdown = true,
-        hasUpdateIndicator = updateIndicator != null
-    ).let { size -> DpSize(size.width * scale, size.height * scale) }
+    )
+    // A geometria trabalha em dp de composição; a janela, em dp do sistema. A área
+    // da tela desce à escala da composição e o resultado volta multiplicado.
+    val composedArea = ScreenWorkArea(
+        x = hudScreenArea.x / scale,
+        y = hudScreenArea.y / scale,
+        size = DpSize(hudScreenArea.size.width / scale, hudScreenArea.size.height / scale)
+    )
+    val windowContent = if (windowOpen && !dragging) sizes.expanded else sizes.collapsed
+    val bounds = hudWindowBounds(placement.edge, placement.offsetFraction, windowContent, composedArea)
+    val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
+    val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
 
-    var anchor by remember {
-        val stored = readPersistedHudPosition(settings)
-        val entry = fitWindowPosition(
-            x = stored?.xDp?.dp ?: (hudScreenArea.x + hudScreenArea.size.width - anchorSize.width),
-            y = stored?.yDp?.dp ?: hudScreenArea.y,
-            size = anchorSize,
-            workArea = hudScreenArea
-        )
-        mutableStateOf(DpOffset(entry.x, entry.y))
-    }
-    val initialPosition = hudWindowPosition(anchor.x, anchor.y, anchorSize, targetSize, hudScreenArea)
     val windowState = rememberWindowState(
         placement = WindowPlacement.Floating,
-        size = targetSize,
-        position = initialPosition
+        size = windowSize,
+        position = docked
     )
-
-    // O tamanho muda **de uma vez**, sem interpolar a janela AWT quadro a quadro:
-    // aquela interpolação era a fonte do tranco da HUD anterior. O movimento do
-    // painel é conteúdo, e a janela só acompanha.
-    LaunchedEffect(anchor, targetSize, anchorSize) {
-        windowState.size = targetSize
-        windowState.position = hudWindowPosition(anchor.x, anchor.y, anchorSize, targetSize, hudScreenArea)
+    // Um salto, nunca interpolação AWT: o movimento é do conteúdo.
+    LaunchedEffect(windowSize, docked, dragWindowPosition) {
+        windowState.size = windowSize
+        val free = dragWindowPosition
+        windowState.position = if (free != null) WindowPosition(free.x, free.y) else docked
     }
 
     val dragBegin = {
         dragging = true
         expanded = false
+        windowOpen = false
+        val current = windowState.position
+        dragWindowPosition = DpOffset(current.x, current.y)
         dragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
     }
     val dragTo = {
         val previous = dragPointer
         val current = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
-        if (previous != null && current != null) {
+        val position = dragWindowPosition
+        if (previous != null && current != null && position != null) {
             dragPointer = current
-            // Mesma área do encaixe: arrastar limitado à área útil e encaixar na
-            // tela inteira impedia a barra de chegar sobre a barra de tarefas
-            // durante o arrasto, e só o encaixe final a deixava lá.
+            // Incremental: somar o total desde o início deixaria o notch preso na
+            // borda, porque o excedente de um arrasto para fora da tela nunca
+            // seria descartado. Mesma área do encaixe, a tela inteira.
             val moved = fitWindowPosition(
-                x = anchor.x + (current.x - previous.x).dp,
-                y = anchor.y + (current.y - previous.y).dp,
-                size = anchorSize,
+                x = position.x + (current.x - previous.x).dp,
+                y = position.y + (current.y - previous.y).dp,
+                size = windowSize,
                 workArea = hudScreenArea
             )
-            anchor = DpOffset(moved.x, moved.y)
+            dragWindowPosition = DpOffset(moved.x, moved.y)
         }
     }
     val dragFinish = {
-        dragPointer = null
-        dragging = false
-        val snapped = snapHudPosition(
-            x = anchor.x,
-            y = anchor.y,
-            size = anchorSize,
-            workArea = hudScreenArea
-        )
-        anchor = DpOffset(snapped.x, snapped.y)
-        persistHudPosition(settings, xDp = snapped.x.value, yDp = snapped.y.value)
-        if (hovered) {
-            expanded = true
+        val position = dragWindowPosition
+        if (position != null) {
+            // O notch gruda na borda mais próxima do **centro** dele, e a fração
+            // ao longo dela é gravada — sobrevive a troca de resolução.
+            val snapped = nearestHudPlacement(
+                centerX = position.x + windowSize.width / 2,
+                centerY = position.y + windowSize.height / 2,
+                area = hudScreenArea
+            )
+            placement = snapped
+            persistHudPlacement(settings, snapped)
         }
+        dragPointer = null
+        dragWindowPosition = null
+        dragging = false
         Unit
     }
 
@@ -206,6 +222,7 @@ internal fun HudWindowHost(
         icon = iconImage,
         state = windowState,
         undecorated = true,
+        transparent = true,
         resizable = false,
         alwaysOnTop = true,
         onKeyEvent = { event ->
@@ -225,23 +242,59 @@ internal fun HudWindowHost(
             applyWindowOpacity(window, windowOpacityPercent)
         }
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
-            HudBar(
-                statusTone = statusTone,
-                sources = sources,
-                fallbackLabel = fallbackLabel,
-                expanded = expanded && !dragging,
-                dragging = dragging,
-                updateIndicator = updateIndicator,
-                nextRefreshAt = nextRefreshAt,
-                countdownDescription = nextRefreshLabel(language),
-                onHoverChange = { isHovered -> hovered = isHovered },
-                onDragStart = dragBegin,
-                onDragMove = dragTo,
-                onDragEnd = dragFinish,
-                onOpenFull = onOpenFull,
-                // Botão direito (issue #215): direto para "Somente cards".
-                onSwitchToCardsOnly = onSwitchToCardsOnly
-            )
+            val edge = placement.edge
+            val centerInWindow = if (dragging) null else bounds.notchCenterInWindow
+            Box(modifier = Modifier.fillMaxSize()) {
+                HudNotch(
+                    accounts = accounts,
+                    edge = edge,
+                    sizes = sizes,
+                    fallbackLabel = fallbackLabel,
+                    fallbackTone = fallbackTone,
+                    expanded = expanded && !dragging,
+                    dragging = dragging,
+                    updateIndicator = updateIndicator,
+                    nextRefreshAt = nextRefreshAt,
+                    countdownDescription = nextRefreshLabel(language),
+                    onHoverChange = { isHovered -> hovered = isHovered },
+                    onDragStart = dragBegin,
+                    onDragMove = dragTo,
+                    onDragEnd = dragFinish,
+                    onOpenFull = onOpenFull,
+                    // Botão direito (issue #215): direto para "Somente cards".
+                    onSwitchToCardsOnly = onSwitchToCardsOnly,
+                    modifier = Modifier.dockedTo(edge, centerInWindow)
+                )
+            }
         }
     }
 }
+
+/**
+ * Põe o notch rente à borda e centrado em [center] ao longo dela — com o
+ * tamanho animado, o centro fica parado e ele cresce para os dois lados. Sem
+ * centro (arrasto), ele fica no meio da janela.
+ */
+private fun Modifier.dockedTo(edge: HudEdge, center: Dp?): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(Constraints())
+    val width = constraints.maxWidth
+    val height = constraints.maxHeight
+    layout(width, height) {
+        val alongMax = if (edge.isHorizontal) width - placeable.width else height - placeable.height
+        val alongSize = if (edge.isHorizontal) placeable.width else placeable.height
+        val alongCenter = center?.roundToPx() ?: ((if (edge.isHorizontal) width else height) / 2)
+        val along = (alongCenter - alongSize / 2).coerceIn(0, alongMax.coerceAtLeast(0))
+        when (edge) {
+            HudEdge.TOP -> placeable.place(along, 0)
+            HudEdge.BOTTOM -> placeable.place(along, height - placeable.height)
+            HudEdge.LEFT -> placeable.place(0, along)
+            HudEdge.RIGHT -> placeable.place(width - placeable.width, along)
+        }
+    }
+}
+
+/** Uma passada de hover: o `Exit` de um quadro na divisa não fecha o painel. */
+private const val HUD_COLLAPSE_DELAY_MILLIS = 150L
+
+/** A mola `EXPRESSIVE` assenta em ~420ms; a janela encolhe depois dela. */
+private const val HUD_COLLAPSE_SETTLE_MILLIS = 450L

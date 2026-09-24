@@ -6,7 +6,7 @@ private const val HUD_MODE_KEY = "hudMode"
 
 /**
  * Barra HUD (issue #164): terceiro chrome da janela principal, ainda mais
- * discreto que o modo somente cards — uma faixa de 24dp ancorada no topo da
+ * discreto que o modo somente cards — uma notch colado numa borda da tela da
  * tela, sem título, sem cards.
  *
  * Mesmo armazenamento das demais preferências de moldura (registro no
