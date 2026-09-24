@@ -36,7 +36,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C7 | `AppStateCrossfade` e o bug do `AnimatedContent` | feito |
 | C8 | Expandir/recolher e banners | feito |
 | C9 | Movimento da grade de cards | feito |
-| C10 | Limpeza de movimento do `ApiUsageCard` | pendente |
+| C10 | Limpeza de movimento do `ApiUsageCard` | feito |
 | C11 | Spike da janela transparente | pendente |
 | C12 | Modelo puro da HUD | pendente |
 | C13 | HUD em janela própria | pendente |
@@ -58,6 +58,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C7 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `a troca de estado mantem o estado antigo no slot que sai` (relógio manual, meio da saída: os dois textos presentes; depois do idle, só o novo). |
 | 2026-09-24 | C8 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o bloco recolhido sai da arvore depois de fechar`. |
 | 2026-09-24 | C9 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde depois de corrigir o fixture do teste novo (alvo não-Anthropic não leva perfil). A captura do dashboard saiu idêntica à anterior pixel a pixel: a primeira colocação é salto, sem animação. |
+| 2026-09-24 | C10 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde. As capturas mudaram em no máximo 5/255 por pixel (ruído subpixel), sem diferença visível; não foram commitadas agora e voltam no C17. O aquecimento de 20 × 100ms do gerador cobre as molas `GENTLE` (~450ms). |
 
 ## C1 · Tokens de motion e política
 
@@ -166,3 +167,11 @@ cápsula, marcador de ritmo, "Next update in 2m").
 - `isDragTarget` deixou de ser passado: o vão aberto já diz onde o card cai.
 - Os filhos são identificados por `layoutId`, não pela ordem de composição — a prévia reordena o
   layout sem recompor os cards.
+
+## C10 · Card
+
+- Entrada: fade por tween enfático de 240ms, subida e escala por mola `GENTLE`, tudo pela política
+  (com "Reduzir animações" o card nasce no lugar). `CardAnimations` saiu, com os comentários que
+  diziam 600ms e 250ms onde o código dava 420ms e 180ms.
+- Um dono só do tamanho: o `animateContentSize` do card inteiro saiu, e o `SizeTransform` do minimizar
+  anda pela mesma mola. As duas animações aninhadas esticavam o card em dois tempos.

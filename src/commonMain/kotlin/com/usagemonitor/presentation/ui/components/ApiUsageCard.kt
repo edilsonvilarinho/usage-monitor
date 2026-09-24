@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.ui.unit.IntSize
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.infiniteRepeatable
@@ -11,7 +12,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -144,13 +144,12 @@ fun apiUsageCardTag(apiName: String): String = "$API_USAGE_CARD_TAG_PREFIX$apiNa
 /** Opacidade do número de uma janela já vencida — o dado é real, mas velho. */
 private const val STALE_QUOTA_ALPHA = 0.45f
 
-// Durações centralizadas das animações do card (em ms). Mantém legibilidade ao
-// alterar timing globalmente sem caçar literais espalhados pelo composable.
-private object CardAnimations {
-    val EXPAND_DURATION_MS  = AppMotion.slow + AppMotion.normal   // 600ms
-    val MINIMIZE_DURATION_MS = AppMotion.normal                   // 250ms
-    const val PULSE_DURATION_MS = 1500
-}
+// Entrada do card: o fade é longo o bastante para a grade ler como cascata com
+// o atraso de `AppMotion.stagger`, e a subida e a escala andam por mola.
+private const val CARD_ENTER_FADE_MS = AppMotion.slow
+
+/** O conteúdo novo espera a saída do antigo começar, para não se sobreporem cheios. */
+private const val MINIMIZE_FADE_DELAY_MS = 50
 
 @Composable
 fun ApiUsageCard(
@@ -222,9 +221,12 @@ fun ApiUsageCard(
         visible = true
     }
 
+    // Tudo pela política de motion: com "Reduzir animações" o card nasce no
+    // lugar. Fade por tween enfático; escala e subida por mola, que é o que
+    // deixa o levantar do arrasto acompanhar a mão sem parar seco.
     val cardAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = CardAnimations.EXPAND_DURATION_MS),
+        animationSpec = appTween(CARD_ENTER_FADE_MS, AppMotion.emphasizedEasing),
         label = "cardAlpha"
     )
 
@@ -235,12 +237,12 @@ fun ApiUsageCard(
             visible -> 1f
             else -> 0.96f
         },
-        animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = 0.001f),
         label = "cardScale"
     )
     val cardOffsetY by animateDpAsState(
         targetValue = if (visible) 0.dp else 18.dp,
-        animationSpec = tween(durationMillis = CardAnimations.EXPAND_DURATION_MS),
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
         label = "cardOffsetY"
     )
     // A profundidade diz o que está sobre o quê: em repouso o card está sobre o
@@ -294,7 +296,6 @@ fun ApiUsageCard(
             .fillMaxWidth()
             .testTag(apiUsageCardTag(apiName))
             .hoverable(hoverInteraction)
-            .animateContentSize(animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS))
             .pointerInput(source) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { onDragStart() },
@@ -502,20 +503,21 @@ fun ApiUsageCard(
 
                 AppDivider()
 
+                // Um dono só para o tamanho: esta transição. Havia também um
+                // `animateContentSize` no card inteiro, e as duas animações de
+                // tamanho aninhadas faziam o card esticar em dois tempos ao
+                // minimizar. A mola do tamanho é a mesma do resto do card.
+                val minimizeFadeIn = appTween<Float>(AppMotion.normal, AppMotion.emphasizedEasing, delayMillis = MINIMIZE_FADE_DELAY_MS)
+                val minimizeFadeOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+                val minimizeScaleIn = appSpring<Float>(AppMotion.Springs.GENTLE, visibilityThreshold = 0.001f)
+                val minimizeScaleOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+                val minimizeSize = appSpring<IntSize>(AppMotion.Springs.GENTLE, visibilityThreshold = IntSize.VisibilityThreshold)
                 AnimatedContent(
                     targetState = isMinimized,
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(durationMillis = AppMotion.normal, delayMillis = 50, easing = AppMotion.enterEasing)) +
-                            scaleIn(
-                                animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS, easing = AppMotion.enterEasing),
-                                initialScale = 0.97f
-                            )).togetherWith(
-                            fadeOut(animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.exitEasing)) +
-                                scaleOut(
-                                    animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.exitEasing),
-                                    targetScale = 0.98f
-                                )
-                        ).using(SizeTransform(clip = false))
+                        (fadeIn(minimizeFadeIn) + scaleIn(minimizeScaleIn, initialScale = 0.97f))
+                            .togetherWith(fadeOut(minimizeFadeOut) + scaleOut(minimizeScaleOut, targetScale = 0.98f))
+                            .using(SizeTransform(clip = false) { _, _ -> minimizeSize })
                     },
                     label = "cardLayoutMode"
                 ) { minimized ->
