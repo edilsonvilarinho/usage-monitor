@@ -81,6 +81,9 @@ private const val VERTICAL_WORD_LINE_CHARS = 8
 private const val COUNTDOWN_CHARS = 5
 internal val HUD_COUNTDOWN_ICON = 12.dp
 
+/** Vão entre o ícone e o texto da contagem, o mesmo `spacedBy` do `HudCountdown`. */
+internal val HUD_COUNTDOWN_GAP = 4.dp
+
 /** Tamanho recolhido e aberto do conteúdo do notch, com os ombros. */
 internal data class HudNotchSizes(val collapsed: DpSize, val expanded: DpSize)
 
@@ -188,9 +191,20 @@ internal fun percentWidth(text: String): Dp = charWidth(text.length, PERCENT_ADV
 
 internal fun wordWidth(text: String): Dp = charWidth(text.length, WORD_ADVANCE_DP)
 
-private fun countdownWidth(): Dp = HUD_COUNTDOWN_ICON + 4.dp + charWidth(COUNTDOWN_CHARS, WORD_ADVANCE_DP)
+internal fun countdownWidth(): Dp = HUD_COUNTDOWN_ICON + HUD_COUNTDOWN_GAP + charWidth(COUNTDOWN_CHARS, WORD_ADVANCE_DP)
 
-private fun charWidth(chars: Int, advance: Float): Dp = ceil(chars * advance).dp
+/**
+ * Largura de [chars] caracteres mais a folga do arredondamento em pixel.
+ *
+ * O Skia devolve a largura da linha arredondada para cima em pixel inteiro, e
+ * em densidade fracionária (115% sobre os 125% do Windows) isso passa da conta
+ * em até um pixel — que nunca é mais que 1dp com densidade ≥ 1. Sem a folga a
+ * faixa somava a diferença de cada texto, e o último item, a contagem, ficava
+ * espremido e quebrava em "04:5" (`HudNotchTextFitTest`).
+ */
+private fun charWidth(chars: Int, advance: Float): Dp = ceil(chars * advance).dp + TEXT_PIXEL_ROUNDING_SLACK
+
+private val TEXT_PIXEL_ROUNDING_SLACK = 1.dp
 
 /** "Sem projeção" quebra em duas linhas na coluna estreita; palavra curta, uma. */
 internal fun verticalWordLines(word: String): Int {

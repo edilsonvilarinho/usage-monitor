@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.HUD_COUNTDOWN_GAP
 import com.usagemonitor.HUD_COUNTDOWN_ICON
 import com.usagemonitor.HUD_ITEM_GAP
 import com.usagemonitor.HUD_NOTCH_PADDING_ACROSS
@@ -599,7 +600,7 @@ private fun HudCountdown(
             text()
         }
     } else {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HUD_COUNTDOWN_GAP)) {
             icon()
             text()
         }

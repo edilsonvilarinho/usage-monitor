@@ -57,6 +57,26 @@ O usuário comparou com Codenotch e ai-usagebar e apontou o que faltava: **marca
 | D2 | Plano da conta nos dados (`ApiUsageStats.planLabel`) | feito |
 | D3 | HUD com provedor, marca e plano; plano no card; resumo na bandeja | feito |
 
+### Rodada 3 — balão por anel, alças e ações (pedido depois da rodada 2)
+
+O usuário comparou de novo com o Codenotch (`windows/codenotch/ui/notch.html`) e listou: hover num
+anel abre **um balão só daquele provedor**, não o painel com todas as contas; cada cota com
+**"87% usado · 13% restante"** e a **origem** ("Plus · via Codex"); os **botões do rodapé** e os
+**do card** alcançáveis no modo barra; um **botão para mover** o notch; e o **timer cortado**
+("04:5") na borda de cima. Decisões dele: as ações do rodapé moram num **balão aberto pela
+engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
+
+| # | Atividade | Estado |
+|---|---|---|
+| E1 | Timer cortado: folga de arredondamento de pixel na estimativa de texto | feito |
+| E2 | Modelo do balão: usado/restante, origem, rótulo e grupo da cota | pendente |
+| E3 | Balão por anel com cauda, no lugar do painel de todas as contas | pendente |
+| E4 | Alças: mão (mover) e engrenagem | pendente |
+| E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | pendente |
+| E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | pendente |
+| E7 | Documentação, design system, protótipo, ajuda, capturas | pendente |
+| E8 | Verificação | pendente |
+
 ## Pontos de situação
 
 | Data | Atividade | Modelo | Comando | Resultado |
@@ -81,6 +101,7 @@ O usuário comparou com Codenotch e ai-usagebar e apontou o que faltava: **marca
 | 2026-09-24 | D1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.AppProviderMarkTest" --tests "com.usagemonitor.ui.ComponentTest"` + `gradlew.bat generateScreenshots` | Verde; a captura mostra asterisco, nó e marca da DeepSeek no acento de cada card. |
 | 2026-09-24 | D2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.AccountPlanLabelTest"` | Verde: mapeamento dos três fornecedores, `planLabel` no Codex, no Cursor, no repositório da Anthropic e na ida e volta do cache. |
 | 2026-09-24 | D3 | Claude Opus 5.5 | `gradlew.bat allTests` + `generateScreenshots` + `generateHelpMedia` + renderização descartável do notch | Verde: 2088 testes, 0 falhas. Duas correções vindas do olho: no painel, dois `weight` na mesma linha dividiam a sobra e truncavam "Anthropic —…"; no card, o selo do plano ia parar longe do nome porque a coluna mede o e-mail. |
+| 2026-09-24 | E1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTextFitTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.HudNotchGeometryTest"` | Primeira passada do teste novo **vermelha**, reproduzindo o defeito: em toda escala fracionária (105%–200%) o texto desenhado passava a estimativa em até 0,8dp — o Skia arredonda a largura da linha para cima em pixel inteiro. Na faixa as diferenças somavam e a contagem, último item, quebrava. Com 1dp de folga por texto: verde. |
 
 ## C1 · Tokens de motion e política
 
@@ -341,3 +362,14 @@ na borda da sombra e CPU da rotação contínua.
   para 36dp.
 - Card: selo do plano na linha do título (`API_USAGE_CARD_PLAN_TAG`).
 - Bandeja: `hudTraySummary` no tooltip, com corte em 127 caracteres.
+
+## E1 · Timer cortado
+
+- **Causa medida, não suposta** (`HudNotchTextFitTest`): a geometria estima a largura pelo avanço
+  da Plex Mono, e o `TextMeasurer` devolve a linha arredondada para cima em pixel inteiro. Em
+  densidade 1 — a dos testes de componente — as duas contas batem, e por isso nenhum teste pegou;
+  com 115% sobre 125% do Windows cada texto sai até ~0,8dp mais largo. A faixa soma as diferenças e
+  o `Row` entrega ao último filho, a contagem, o que sobrou: com `maxLines = 1` o texto quebra por
+  caractere e aparece "04:5".
+- Correção em `charWidth`: 1dp de folga por texto, que cobre um pixel em qualquer densidade ≥ 1.
+  O teste varre 100%–200% de 5 em 5 mais 144% e 172%, as combinações comuns com a escala do Windows.
