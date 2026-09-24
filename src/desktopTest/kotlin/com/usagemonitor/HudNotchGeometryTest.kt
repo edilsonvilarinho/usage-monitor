@@ -51,18 +51,57 @@ class HudNotchGeometryTest {
     }
 
     @Test
-    fun `o notch aberto cresce para dentro da tela e nunca encolhe`() {
+    fun `aberto o balao fica do lado de dentro da tela e o notch nao cresce`() {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         for (edge in HudEdge.entries) {
             val sizes = hudNotchSizes(accounts, edge, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
-            assertTrue(sizes.expanded.width >= sizes.collapsed.width, "$edge: largura")
-            assertTrue(sizes.expanded.height >= sizes.collapsed.height, "$edge: altura")
             if (edge.isHorizontal) {
-                assertTrue(sizes.expanded.height > sizes.collapsed.height, "$edge: o painel desce/sobe")
+                assertEquals(sizes.collapsed.height + HUD_BALLOON_GAP + sizes.balloon.height, sizes.expanded.height, "$edge: altura")
+                assertTrue(sizes.expanded.width >= sizes.balloon.width, "$edge: largura")
             } else {
-                assertTrue(sizes.expanded.width > sizes.collapsed.width, "$edge: o painel vai para o lado")
+                assertEquals(sizes.collapsed.width + HUD_BALLOON_GAP + sizes.balloon.width, sizes.expanded.width, "$edge: largura")
+                assertTrue(sizes.expanded.height >= sizes.balloon.height, "$edge: altura")
             }
         }
+    }
+
+    /** A janela não pode mudar de tamanho ao passar de um anel para outro: o balão é o da conta mais alta. */
+    @Test
+    fun `o balao reservado e o da conta mais alta`() {
+        val short = account("A", "Normal", listOf("5h" to "9%"))
+        val tall = account("B", "Normal", listOf("5h" to "9%", "7d" to "1%", "30d" to "2%"))
+        val sizes = hudNotchSizes(listOf(short, tall), HudEdge.RIGHT, "", true, false)
+
+        assertEquals(hudBalloonHeight(tall), sizes.balloon.height)
+        assertTrue(hudBalloonHeight(tall) > hudBalloonHeight(short))
+    }
+
+    /**
+     * Perto do canto a janela aberta é presa na tela, e centrar nela o notch o
+     * faria andar ao abrir. O notch fica onde estava; quem se ajusta é o balão.
+     */
+    @Test
+    fun `abrir perto do canto nao move o notch na tela`() {
+        val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
+        for (edge in HudEdge.entries) {
+            for (fraction in listOf(0f, 0.02f, 0.5f, 0.98f, 1f)) {
+                val sizes = hudNotchSizes(accounts, edge, "", true, false)
+                val closed = hudWindowBounds(edge, fraction, sizes.collapsed, screen)
+                val open = hudOpenWindowBounds(edge, fraction, sizes, screen)
+                val closedCenter = (if (edge.isHorizontal) closed.x else closed.y) + closed.notchCenterInWindow
+                val openCenter = (if (edge.isHorizontal) open.x else open.y) + open.notchCenterInWindow
+                assertEquals(closedCenter, openCenter, "$edge em $fraction")
+            }
+        }
+    }
+
+    @Test
+    fun `cotas vizinhas do mesmo grupo formam uma caixa so`() {
+        fun quota(group: String?) = HudQuota("7d", "5%", 0.05f, AppTone.OK, resetText = null, hasForecast = true, group = group)
+        val runs = hudQuotaRuns(listOf(quota(null), quota("Gemini"), quota("Gemini"), quota("Claude/GPT")))
+
+        assertEquals(listOf(null, "Gemini", "Claude/GPT"), runs.map { run -> run.group })
+        assertEquals(listOf(1, 2, 1), runs.map { run -> run.quotas.size })
     }
 
     /**

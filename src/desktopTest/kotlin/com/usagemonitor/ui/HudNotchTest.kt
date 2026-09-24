@@ -1,6 +1,16 @@
 package com.usagemonitor.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.unit.DpSize
+import com.usagemonitor.HUD_BALLOON_PADDING
+import com.usagemonitor.ScreenWorkArea
+import com.usagemonitor.hudBalloonHeight
+import com.usagemonitor.hudOpenWindowBounds
+import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
+import com.usagemonitor.presentation.ui.hudBalloonBoxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,13 +74,18 @@ import kotlin.time.Duration.Companion.seconds
 class HudNotchTest {
 
     private val now = Instant.parse("2026-09-24T12:00:00Z")
+
+    private companion object {
+        const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · 5h 28% · 7d 9%"
+        const val DEEPSEEK_RING = "DeepSeek · Sem projeção · Saldo \$2.27"
+    }
     private val countdown = "Próxima atualização automática"
 
     private val accounts = listOf(
         account(
             "INFORMATA2", "Crítico", AppTone.CRITICAL,
-            HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true),
-            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true)
+            HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "28% usado · 72% restante"),
+            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "9% usado · 91% restante")
         ),
         account(
             "DeepSeek", "Sem projeção", AppTone.NEUTRAL,
@@ -131,18 +146,30 @@ class HudNotchTest {
         onNodeWithText("28%").assertIsDisplayed()
         onNodeWithText("Crítico").assertIsDisplayed()
         onNodeWithText("Sem projeção").assertIsDisplayed()
-        onNodeWithContentDescription("INFORMATA2 (Max 20x) · Crítico · 5h 28% · 7d 9%").assertExists()
+        onNodeWithContentDescription(INFORMATA_RING).assertExists()
     }
 
+    /** O balão é de **uma** conta, a do anel sob o ponteiro — como no Codenotch. */
     @Test
-    fun `aberto cada cota ganha linha com reset e o painel diz o nome da conta`() = runDesktopComposeUiTest {
+    fun `aberto o balao mostra so a conta do anel sob o ponteiro`() = runDesktopComposeUiTest {
         setContent { notch(expanded = true) }
 
+        // Aberto e sem anel sob o ponteiro ainda não há balão.
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertDoesNotExist()
+
+        hoverRing(INFORMATA_RING)
         onNodeWithText("INFORMATA2").assertIsDisplayed()
-        // O plano da conta, ao lado do nome, como no ai-usagebar.
+        // O plano no rodapé, e o reinício de cada cota com a palavra.
         onNodeWithText("Max 20x").assertIsDisplayed()
-        onNodeWithText("22h59").assertIsDisplayed()
-        onNodeWithText("Ter 21h00").assertIsDisplayed()
+        onNodeWithText("Reinicia 22h59").assertIsDisplayed()
+        onNodeWithText("Reinicia Ter 21h00").assertIsDisplayed()
+        onNodeWithText("28% usado · 72% restante").assertIsDisplayed()
+        onNodeWithText("DeepSeek").assertDoesNotExist()
+
+        hoverRing(DEEPSEEK_RING)
+        onNodeWithText("DeepSeek").assertIsDisplayed()
+        onNodeWithText("INFORMATA2").assertDoesNotExist()
+        onNodeWithText("Reinicia 22h59").assertDoesNotExist()
     }
 
     /** O notch parado fica na tela o tempo todo: o reset é detalhe sob demanda (#189). */
@@ -150,8 +177,9 @@ class HudNotchTest {
     fun `parado o notch nao mostra a hora do reinicio`() = runDesktopComposeUiTest {
         setContent { notch(expanded = false) }
 
-        onNodeWithText("22h59").assertDoesNotExist()
-        onNodeWithText("Ter 21h00").assertDoesNotExist()
+        hoverRing(INFORMATA_RING)
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertDoesNotExist()
+        onNodeWithText("Reinicia 22h59").assertDoesNotExist()
     }
 
     /** Saldo que não expira não imprime nada no lugar do reset — nem traço. */
@@ -159,8 +187,10 @@ class HudNotchTest {
     fun `cota sem reset nao imprime nada no lugar`() = runDesktopComposeUiTest {
         setContent { notch(expanded = true) }
 
-        // Aberto, o percentual aparece no notch e na linha do painel.
+        hoverRing(DEEPSEEK_RING)
+        // O valor aparece no notch e na linha do balão, que para saldo é o próprio valor.
         onAllNodesWithText("\$2.27").assertCountEquals(2)
+        onNodeWithText("Reinicia", substring = true).assertDoesNotExist()
         onNodeWithText("—").assertDoesNotExist()
         onNodeWithText("-").assertDoesNotExist()
     }
@@ -177,21 +207,60 @@ class HudNotchTest {
     /**
      * A costura entre a geometria e o que o Compose dispõe. A janela é
      * dimensionada antes de existir composição, e as duas contas podiam divergir
-     * sem nada reclamar — foi o que cortou o texto da barra antiga ao meio. Aqui
-     * o contêiner usa os números da geometria, e o teste afirma que o que foi
-     * disposto é exatamente eles, nas quatro bordas, parado e aberto.
+     * sem nada reclamar — foi o que cortou o texto da barra antiga ao meio.
+     *
+     * Nas quatro bordas: o notch tem exatamente o tamanho recolhido, parado **e**
+     * aberto (ele não cresce), e com a janela do tamanho aberto que a geometria
+     * calcula, o balão de cada conta cabe inteiro nela, com a altura calculada —
+     * a coluna de linhas dele mede o mesmo que `hudBalloonHeight` soma.
      */
     @Test
-    fun `o contêiner tem exatamente o tamanho que a geometria calcula`() {
+    fun `o notch e o balao tem exatamente o tamanho que a geometria calcula`() {
+        val screen = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(1920.dp, 1080.dp))
         for (edge in HudEdge.entries) {
-            for (open in listOf(false, true)) {
+            val sizes = hudNotchSizes(accounts, edge, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
+            for ((index, ring) in listOf(INFORMATA_RING, DEEPSEEK_RING).withIndex()) {
                 runDesktopComposeUiTest {
-                    setContent { notch(expanded = open, edge = edge, nextRefreshAt = now + 2.minutes) }
-                    val expected = hudNotchSizes(accounts, edge, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
-                    val target = if (open) expected.expanded else expected.collapsed
-                    val bounds = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
-                    assertEquals(target.width, bounds.width, "$edge aberto=$open: largura")
-                    assertEquals(target.height, bounds.height, "$edge aberto=$open: altura")
+                    val window = hudOpenWindowBounds(edge, 0.5f, sizes, screen)
+                    setContent {
+                        AppTheme(isDark = true) {
+                            Box(modifier = Modifier.size(window.size)) {
+                                HudNotch(
+                                    accounts = accounts,
+                                    edge = edge,
+                                    sizes = sizes,
+                                    fallbackLabel = "Carregando",
+                                    expanded = true,
+                                    nextRefreshAt = now + 2.minutes,
+                                    countdownDescription = countdown,
+                                    nowProvider = { now },
+                                    countdownUpdatesEnabled = false,
+                                    notchCenter = window.notchCenterInWindow,
+                                    onOpenFull = {},
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    }
+                    val notchBounds = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
+                    assertEquals(sizes.collapsed.width, notchBounds.width, "$edge: largura do notch")
+                    assertEquals(sizes.collapsed.height, notchBounds.height, "$edge: altura do notch")
+
+                    hoverRing(ring)
+                    val account = accounts[index]
+                    val expected = hudBalloonBoxSize(edge, hudBalloonHeight(account))
+                    val balloon = onNodeWithTag(HUD_BALLOON_TEST_TAG).getUnclippedBoundsInRoot()
+                    assertEquals(expected.width, balloon.width, "$edge conta $index: largura do balão")
+                    assertEquals(expected.height, balloon.height, "$edge conta $index: altura do balão")
+                    assertTrue(balloon.left >= 0.dp && balloon.top >= 0.dp, "$edge conta $index: balão fora da janela ($balloon)")
+                    assertTrue(
+                        balloon.right <= window.size.width && balloon.bottom <= window.size.height,
+                        "$edge conta $index: balão fora da janela ($balloon em ${window.size})"
+                    )
+                    val column = onNodeWithTag(HUD_BALLOON_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
+                    assertEquals(hudBalloonHeight(account) - HUD_BALLOON_PADDING * 2, column.height, "$edge conta $index: linhas do balão")
+                    // Aberto, o notch continua do mesmo tamanho e no mesmo lugar.
+                    assertEquals(notchBounds, onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot(), "$edge: o notch mudou")
                 }
             }
         }
@@ -442,6 +511,12 @@ class HudNotchTest {
             }
         }
         return false
+    }
+
+    /** Põe o ponteiro no anel da conta, achado pela frase inteira da semântica dele. */
+    private fun ComposeUiTest.hoverRing(description: String) {
+        onNodeWithContentDescription(description).performMouseInput { moveTo(center) }
+        waitForIdle()
     }
 
     private fun account(label: String, word: String, tone: AppTone, vararg quotas: HudQuota): HudAccount {

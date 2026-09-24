@@ -70,7 +70,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 |---|---|---|
 | E1 | Timer cortado: folga de arredondamento de pixel na estimativa de texto | feito |
 | E2 | Modelo do balão: usado/restante, origem, rótulo e grupo da cota | feito |
-| E3 | Balão por anel com cauda, no lugar do painel de todas as contas | pendente |
+| E3 | Balão por anel com cauda, no lugar do painel de todas as contas | feito |
 | E4 | Alças: mão (mover) e engrenagem | pendente |
 | E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | pendente |
 | E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | pendente |
@@ -103,6 +103,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | D3 | Claude Opus 5.5 | `gradlew.bat allTests` + `generateScreenshots` + `generateHelpMedia` + renderização descartável do notch | Verde: 2088 testes, 0 falhas. Duas correções vindas do olho: no painel, dois `weight` na mesma linha dividiam a sobra e truncavam "Anthropic —…"; no card, o selo do plano ia parar longe do nome porque a coluna mede o e-mail. |
 | 2026-09-24 | E1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTextFitTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.HudNotchGeometryTest"` | Primeira passada do teste novo **vermelha**, reproduzindo o defeito: em toda escala fracionária (105%–200%) o texto desenhado passava a estimativa em até 0,8dp — o Skia arredonda a largura da linha para cima em pixel inteiro. Na faixa as diferenças somavam e a contagem, último item, quebrava. Com 1dp de folga por texto: verde. |
 | 2026-09-24 | E2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest"` | Verde, com cinco casos novos: usado/restante nos dois idiomas, "<1" nas duas pontas, saldo e atividade observada sem a linha, rodapé de plano + origem, grupo e título do Antigravity. |
+| 2026-09-24 | E3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.Hud*"` | Verde: 19 casos do notch (balão só da conta do anel sob o ponteiro; costura de tamanho do notch e do balão nas 4 bordas) e os novos de geometria (notch parado na tela ao abrir em 5 frações × 4 bordas, balão da conta mais alta, grupos). Renderização descartável nas 4 bordas: cauda no anel certo e a contagem inteira ("04:50"). |
 
 ## C1 · Tokens de motion e política
 
@@ -386,3 +387,30 @@ na borda da sombra e CPU da rotação contínua.
 - `HudAccount.originLabel` por `hudSourceOrigin`, `when` exaustivo sobre `ApiSource`: descreve o
   caminho da leitura ("via Codex", "via Antigravity CLI", "via chave de API"), não a empresa, que
   já está no título. `detailLine` junta plano e origem: "Plus · via Codex".
+
+## E3 · Balão por anel
+
+- **O notch deixa de crescer.** O painel de todas as contas (`HudPanel`/`HudQuotaRow`) saiu. Com o
+  ponteiro em cima, o balão de **uma** conta — a do anel sob o ponteiro — aparece ao lado do notch,
+  do lado de dentro da tela, como o `#card` do Codenotch. Passar para outro anel desliza o balão pela
+  mola `GENTLE` e troca o conteúdo por `AppStateCrossfade`; a entrada é escala 0,96 → 1
+  (`EXPRESSIVE`) a partir do lado do notch, e a saída, fade de 90ms.
+- `HudBalloon.kt`: corpo em `OVERLAY` com brilho e borda de luz, e a **cauda** — a cunha curva do
+  `TooltipTail` do Codenotch, com os mesmos pontos de controle normalizados — desenhada depois do
+  corpo, cobrindo o trecho da borda onde encosta. A ponta toca o notch e aponta para o centro do anel;
+  a posição dela é lambda lida no desenho, e o balão deslizando não recompõe o conteúdo.
+- Conteúdo: marca no acento, título e estado; por cota, título do card ("Sessão 5h") e
+  "Reinicia 22h59", barra e "68% usado · 32% restante"; cotas do mesmo grupo numa caixa sob o nome
+  dele; rodapé "Max 20x · via Claude Code". Toda linha tem altura fixa.
+- **Geometria**: `hudBalloonHeight` soma as mesmas linhas que o balão compõe, e `hudNotchSizes`
+  reserva o balão da conta **mais alta** — trocar de anel não redimensiona a janela.
+  `hudOpenWindowBounds` calcula a janela aberta com o notch **no mesmo ponto da tela** em que estava
+  parado; perto do canto quem se ajusta é o balão, preso dentro da janela.
+- O contêiner do notch passou a ocupar a janela inteira e a posicionar o notch pelo centro que a
+  geometria dá; `dockedTo` saiu do host. A janela encolhe 200ms depois de o ponteiro sair (era 450ms,
+  o tempo da mola do notch crescendo, que não existe mais).
+- Hover é a **união** do corpo do notch e do balão: o caminho do anel até o balão passa pela cauda,
+  que é opaca e do balão — pixel transparente não recebe evento (C11).
+- Teste de costura reescrito: nas quatro bordas o notch tem o tamanho recolhido parado e aberto, o
+  balão de cada conta tem a caixa de `hudBalloonBoxSize`, cabe inteiro na janela aberta, e a coluna
+  de linhas mede exatamente `hudBalloonHeight` menos o padding.

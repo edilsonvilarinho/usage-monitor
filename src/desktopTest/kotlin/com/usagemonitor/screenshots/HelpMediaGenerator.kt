@@ -489,15 +489,17 @@ private fun recordWindowModes(outputDir: File) {
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            // O notch aberto, como ele fica com o ponteiro em
-                            // cima. O tamanho é o da geometria, a mesma que
-                            // dimensiona a janela no app: sem literal à mão.
+                            // O notch aberto, como ele fica com o ponteiro no
+                            // primeiro anel: o balão daquela conta. Os tamanhos
+                            // são os da geometria, a mesma que dimensiona a
+                            // janela no app: sem literal à mão.
                             HudNotch(
                                 accounts = ScreenshotFixtures.hudAccounts,
                                 edge = HudEdge.TOP,
                                 sizes = HUD_DEMO_SIZES,
                                 fallbackLabel = "Carregando",
                                 expanded = true,
+                                initialBalloonIndex = 0,
                                 // A contagem (#185) é parte do notch. O laço vai
                                 // desligado: o gravador dorme em tempo real e um
                                 // relógio andando mudaria cada passada.

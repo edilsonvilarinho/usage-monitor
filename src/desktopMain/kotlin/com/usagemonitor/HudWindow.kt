@@ -18,8 +18,6 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
@@ -59,10 +57,10 @@ import kotlinx.datetime.Clock
  * no limite do backend JVM.
  *
  * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
- * 11, C11 do plano de execução): por isso ela só tem o tamanho do painel aberto
+ * 11, C11 do plano de execução): por isso ela só tem o tamanho da área aberta
  * enquanto o ponteiro está no notch. Ao entrar, a janela cresce **de uma vez** —
- * a área nova é transparente, o salto não se vê — e a mola roda dentro dela; ao
- * sair, o conteúdo recolhe e só depois de assentar a janela encolhe.
+ * a área nova é transparente, o salto não se vê — e o balão entra dentro dela; ao
+ * sair, o balão some e só depois a janela encolhe. O notch não anda na tela.
  */
 @Composable
 internal fun HudWindowHost(
@@ -154,8 +152,13 @@ internal fun HudWindowHost(
         y = hudScreenArea.y / scale,
         size = DpSize(hudScreenArea.size.width / scale, hudScreenArea.size.height / scale)
     )
-    val windowContent = if (windowOpen && !dragging) sizes.expanded else sizes.collapsed
-    val bounds = hudWindowBounds(placement.edge, placement.offsetFraction, windowContent, composedArea)
+    // Aberta, a janela ganha o espaço do balão e o notch fica no mesmo ponto da
+    // tela (`hudOpenWindowBounds`); quem se ajusta a um canto é o balão.
+    val bounds = if (windowOpen && !dragging) {
+        hudOpenWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
+    } else {
+        hudWindowBounds(placement.edge, placement.offsetFraction, sizes.collapsed, composedArea)
+    }
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
 
@@ -256,6 +259,8 @@ internal fun HudWindowHost(
                     updateIndicator = updateIndicator,
                     nextRefreshAt = nextRefreshAt,
                     countdownDescription = nextRefreshLabel(language),
+                    notchCenter = centerInWindow,
+                    language = language,
                     onHoverChange = { isHovered -> hovered = isHovered },
                     onDragStart = dragBegin,
                     onDragMove = dragTo,
@@ -263,32 +268,9 @@ internal fun HudWindowHost(
                     onOpenFull = onOpenFull,
                     // Botão direito (issue #215): direto para "Somente cards".
                     onSwitchToCardsOnly = onSwitchToCardsOnly,
-                    modifier = Modifier.dockedTo(edge, centerInWindow)
+                    modifier = Modifier.fillMaxSize()
                 )
             }
-        }
-    }
-}
-
-/**
- * Põe o notch rente à borda e centrado em [center] ao longo dela — com o
- * tamanho animado, o centro fica parado e ele cresce para os dois lados. Sem
- * centro (arrasto), ele fica no meio da janela.
- */
-private fun Modifier.dockedTo(edge: HudEdge, center: Dp?): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(Constraints())
-    val width = constraints.maxWidth
-    val height = constraints.maxHeight
-    layout(width, height) {
-        val alongMax = if (edge.isHorizontal) width - placeable.width else height - placeable.height
-        val alongSize = if (edge.isHorizontal) placeable.width else placeable.height
-        val alongCenter = center?.roundToPx() ?: ((if (edge.isHorizontal) width else height) / 2)
-        val along = (alongCenter - alongSize / 2).coerceIn(0, alongMax.coerceAtLeast(0))
-        when (edge) {
-            HudEdge.TOP -> placeable.place(along, 0)
-            HudEdge.BOTTOM -> placeable.place(along, height - placeable.height)
-            HudEdge.LEFT -> placeable.place(0, along)
-            HudEdge.RIGHT -> placeable.place(width - placeable.width, along)
         }
     }
 }
@@ -296,5 +278,5 @@ private fun Modifier.dockedTo(edge: HudEdge, center: Dp?): Modifier = layout { m
 /** Uma passada de hover: o `Exit` de um quadro na divisa não fecha o painel. */
 private const val HUD_COLLAPSE_DELAY_MILLIS = 150L
 
-/** A mola `EXPRESSIVE` assenta em ~420ms; a janela encolhe depois dela. */
-private const val HUD_COLLAPSE_SETTLE_MILLIS = 450L
+/** A saída do balão (fade de 90ms) com folga; a janela encolhe depois dela. */
+private const val HUD_COLLAPSE_SETTLE_MILLIS = 200L

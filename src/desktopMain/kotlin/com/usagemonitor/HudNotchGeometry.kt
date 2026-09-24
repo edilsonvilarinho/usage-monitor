@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.HudQuota
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -60,12 +61,6 @@ internal val HUD_NOTCH_PADDING_ACROSS = 8.dp
 internal val HUD_ITEM_GAP = 12.dp
 internal val HUD_RING_TEXT_GAP = 6.dp
 
-/** Largura do painel aberto: rótulo, barra cápsula, percentual e reset cabem numa linha. */
-internal val HUD_PANEL_WIDTH = 320.dp
-internal val HUD_PANEL_PADDING = 12.dp
-internal val HUD_PANEL_ROW_HEIGHT = 20.dp
-internal val HUD_PANEL_BLOCK_GAP = 8.dp
-
 /** Linha de texto `labelMedium` (percentual) e `labelSmall` (palavra, contagem). */
 internal val HUD_PERCENT_LINE = 16.dp
 internal val HUD_WORD_LINE = 14.dp
@@ -84,19 +79,32 @@ internal val HUD_COUNTDOWN_ICON = 12.dp
 /** Vão entre o ícone e o texto da contagem, o mesmo `spacedBy` do `HudCountdown`. */
 internal val HUD_COUNTDOWN_GAP = 4.dp
 
-/** Tamanho recolhido e aberto do conteúdo do notch, com os ombros. */
-internal data class HudNotchSizes(val collapsed: DpSize, val expanded: DpSize)
+/**
+ * Tamanho do notch e da área aberta.
+ *
+ * [collapsed] é o **notch**, parado ou aberto: ele não cresce mais. [expanded]
+ * é o que a janela precisa com o ponteiro em cima — o notch, a folga da cauda e
+ * o **maior** balão possível ao lado dele, do lado de dentro da tela. O maior, e
+ * não o da conta em foco: passar de um anel para outro não pode redimensionar a
+ * janela AWT, que é o tranco que a HUD já teve.
+ */
+internal data class HudNotchSizes(
+    val collapsed: DpSize,
+    val expanded: DpSize,
+    /** O balão maior, com a cauda; é o teto de todos. */
+    val balloon: DpSize = DpSize(0.dp, 0.dp)
+)
 
 /**
- * O tamanho do notch parado e aberto.
+ * O tamanho do notch e da área aberta.
  *
- * Recolhido ele mostra, por conta, o anel, o percentual da cota em foco e a
- * palavra do estado — **a palavra sempre**: cor nunca informa sozinha, e no
- * notch recolhido é só isso que existe na tela. Aberto ele acrescenta o painel
- * do lado de dentro da tela, com uma linha por cota.
+ * O notch mostra, por conta, o anel, o percentual da cota em foco e a palavra do
+ * estado — **a palavra sempre**: cor nunca informa sozinha, e no notch é só isso
+ * que existe na tela. O detalhe é o balão de **uma** conta, a do anel sob o
+ * ponteiro, como no Codenotch.
  *
  * Sem contas é a linha de carregamento: a palavra [fallbackLabel] no lugar dos
- * anéis.
+ * anéis, e nenhum balão.
  */
 internal fun hudNotchSizes(
     accounts: List<HudAccount>,
@@ -110,13 +118,76 @@ internal fun hudNotchSizes(
     } else {
         verticalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator)
     }
-    val panel = panelSize(accounts)
+    val tallest = accounts.maxOfOrNull { account -> hudBalloonHeight(account) }
+        ?: return HudNotchSizes(collapsed = collapsed, expanded = collapsed)
+    // O balão não gira com a borda: é texto, e fica sempre de pé.
+    val balloon = DpSize(HUD_BALLOON_WIDTH, tallest)
     val expanded = if (edge.isHorizontal) {
-        DpSize(maxOf(collapsed.width, panel.width + HUD_NOTCH_SHOULDER * 2), collapsed.height + panel.height)
+        DpSize(maxOf(collapsed.width, balloon.width), collapsed.height + HUD_BALLOON_GAP + balloon.height)
     } else {
-        DpSize(collapsed.width + panel.width, maxOf(collapsed.height, panel.height + HUD_NOTCH_SHOULDER * 2))
+        DpSize(collapsed.width + HUD_BALLOON_GAP + balloon.width, maxOf(collapsed.height, balloon.height))
     }
-    return HudNotchSizes(collapsed = collapsed, expanded = expanded)
+    return HudNotchSizes(collapsed = collapsed, expanded = expanded, balloon = balloon)
+}
+
+/** Largura do balão: o teto do card do Codenotch (246px), com folga para "Reinicia ter 21h00". */
+internal val HUD_BALLOON_WIDTH = 264.dp
+internal val HUD_BALLOON_PADDING = 12.dp
+
+/** A distância entre o notch e o balão, que a cauda atravessa. */
+internal val HUD_BALLOON_GAP = 10.dp
+
+/** Base da cauda, ao longo da borda. */
+internal val HUD_BALLOON_TAIL_BASE = 26.dp
+
+/** Linhas do balão, todas de altura fixa: é o que torna a altura calculável sem medir. */
+internal val HUD_BALLOON_HEADER = 24.dp
+internal val HUD_BALLOON_SECTION_GAP = 10.dp
+internal val HUD_BALLOON_QUOTA_TITLE = 16.dp
+internal val HUD_BALLOON_BAR_ROW = 12.dp
+internal val HUD_BALLOON_QUOTA_DETAIL = 14.dp
+internal val HUD_BALLOON_GROUP_HEADER = 16.dp
+internal val HUD_BALLOON_GROUP_PADDING = 8.dp
+internal val HUD_BALLOON_FOOTER = 14.dp
+
+private val HUD_BALLOON_QUOTA_BLOCK = HUD_BALLOON_QUOTA_TITLE + HUD_BALLOON_BAR_ROW + HUD_BALLOON_QUOTA_DETAIL
+
+/**
+ * A altura do balão de uma conta: cabeçalho, uma seção por cota — rótulo e
+ * reinício, barra, "usado · restante" —, as de mesmo grupo numa caixa sob o nome
+ * dele, e a linha de plano e origem. É a mesma sequência que `HudBalloon`
+ * compõe, e `HudNotchTest` afirma que as duas batem.
+ */
+internal fun hudBalloonHeight(account: HudAccount): Dp {
+    var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER
+    hudQuotaRuns(account.quotas).forEach { run ->
+        height += if (run.group == null) {
+            (HUD_BALLOON_SECTION_GAP + HUD_BALLOON_QUOTA_BLOCK) * run.quotas.size
+        } else {
+            HUD_BALLOON_SECTION_GAP + HUD_BALLOON_GROUP_HEADER + HUD_BALLOON_GROUP_PADDING * 2 +
+                HUD_BALLOON_QUOTA_BLOCK * run.quotas.size + HUD_BALLOON_SECTION_GAP * (run.quotas.size - 1)
+        }
+    }
+    if (account.detailLine != null) {
+        height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
+    }
+    return height
+}
+
+/** Cotas vizinhas do mesmo grupo, na ordem da API; grupo nulo é cota solta. */
+internal data class HudQuotaRun(val group: String?, val quotas: List<HudQuota>)
+
+internal fun hudQuotaRuns(quotas: List<HudQuota>): List<HudQuotaRun> {
+    val runs = mutableListOf<HudQuotaRun>()
+    quotas.forEach { quota ->
+        val last = runs.lastOrNull()
+        if (last != null && last.group != null && last.group == quota.group) {
+            runs[runs.lastIndex] = last.copy(quotas = last.quotas + quota)
+        } else {
+            runs += HudQuotaRun(quota.group, listOf(quota))
+        }
+    }
+    return runs
 }
 
 private fun horizontalCollapsed(
@@ -173,18 +244,6 @@ private fun verticalCollapsed(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,
         height = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
     )
-}
-
-/** O painel aberto: um bloco por conta, cabeçalho mais uma linha por cota. */
-private fun panelSize(accounts: List<HudAccount>): DpSize {
-    if (accounts.isEmpty()) {
-        return DpSize(0.dp, 0.dp)
-    }
-    val rows = accounts.sumOf { account -> 1 + account.quotas.size }
-    val height = HUD_PANEL_ROW_HEIGHT * rows +
-        HUD_PANEL_BLOCK_GAP * (accounts.size - 1) +
-        HUD_PANEL_PADDING * 2
-    return DpSize(HUD_PANEL_WIDTH + HUD_PANEL_PADDING * 2, height)
 }
 
 internal fun percentWidth(text: String): Dp = charWidth(text.length, PERCENT_ADVANCE_DP)
@@ -271,6 +330,34 @@ internal fun hudWindowBounds(
             area.x + area.size.width - acrossWindow, start, DpSize(acrossWindow, alongWindow), centerInWindow
         )
     }
+}
+
+/**
+ * A janela aberta, com o notch **no mesmo ponto da tela** em que estava parado.
+ *
+ * A área aberta é maior que o notch, e centrá-la na fração gravada faria o notch
+ * andar ao abrir sempre que ela fosse presa perto de um canto. Aqui a janela
+ * aberta é calculada como sempre e o centro do notch dentro dela é refeito a
+ * partir da posição **na tela** do notch parado; quem se ajusta ao canto é o
+ * balão, que o composable prende dentro da janela.
+ */
+internal fun hudOpenWindowBounds(
+    edge: HudEdge,
+    offsetFraction: Float,
+    sizes: HudNotchSizes,
+    area: ScreenWorkArea,
+    margin: Dp = HUD_SHADOW_MARGIN
+): HudWindowBounds {
+    val closed = hudWindowBounds(edge, offsetFraction, sizes.collapsed, area, margin)
+    val open = hudWindowBounds(edge, offsetFraction, sizes.expanded, area, margin)
+    val closedStart = if (edge.isHorizontal) closed.x else closed.y
+    val openStart = if (edge.isHorizontal) open.x else open.y
+    val openAlong = if (edge.isHorizontal) open.size.width else open.size.height
+    val notchAlong = if (edge.isHorizontal) sizes.collapsed.width else sizes.collapsed.height
+    val center = (closedStart + closed.notchCenterInWindow - openStart)
+        .coerceAtLeast(margin + notchAlong / 2)
+        .coerceAtMost(openAlong - margin - notchAlong / 2)
+    return open.copy(notchCenterInWindow = center)
 }
 
 /** Uma posição de notch gravada: a borda e o centro ao longo dela, em fração da tela. */

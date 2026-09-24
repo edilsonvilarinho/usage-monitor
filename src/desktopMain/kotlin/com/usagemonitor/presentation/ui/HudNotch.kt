@@ -1,12 +1,11 @@
 package com.usagemonitor.presentation.ui
 
-import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.components.accentColorFor
-import com.usagemonitor.presentation.ui.components.AppProviderMark
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -17,12 +16,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -32,8 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,7 +42,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
@@ -52,16 +50,21 @@ import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_COUNTDOWN_GAP
 import com.usagemonitor.HUD_COUNTDOWN_ICON
@@ -70,19 +73,18 @@ import com.usagemonitor.HUD_NOTCH_PADDING_ACROSS
 import com.usagemonitor.HUD_NOTCH_PADDING_ALONG
 import com.usagemonitor.HUD_NOTCH_RADIUS
 import com.usagemonitor.HUD_NOTCH_SHOULDER
-import com.usagemonitor.HUD_PANEL_BLOCK_GAP
-import com.usagemonitor.HUD_PANEL_PADDING
-import com.usagemonitor.HUD_PANEL_ROW_HEIGHT
 import com.usagemonitor.HUD_RING_GAP
 import com.usagemonitor.HUD_RING_SIZE
 import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.HUD_RING_TEXT_GAP
+import com.usagemonitor.HUD_SHADOW_MARGIN
 import com.usagemonitor.HudEdge
 import com.usagemonitor.HudNotchSizes
-import com.usagemonitor.percentWidth
-import com.usagemonitor.presentation.ui.theme.AppDepth
-import com.usagemonitor.presentation.ui.components.AppProgressTrack
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.hudBalloonHeight
+import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppRingArc
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppUsageRing
@@ -90,19 +92,23 @@ import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.appSheen
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
+import com.usagemonitor.presentation.ui.components.rememberLatestNonNull
+import com.usagemonitor.presentation.ui.theme.AppDepth
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import com.usagemonitor.presentation.ui.theme.appSpring
 import com.usagemonitor.presentation.ui.theme.appTween
 import java.awt.Cursor
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
 /** Descrição do alvo de clique do notch — é por ela que leitor de tela e testes o acham. */
 internal const val HUD_BAR_OPEN_DESCRIPTION = "Abrir Usage Monitor"
 
-/** O contêiner do notch, cujo tamanho a geometria afirma (`HudNotchSizeTest`). */
+/** O corpo do notch, cujo tamanho a geometria afirma (`HudNotchTest`). */
 internal const val HUD_CONTENT_TEST_TAG = "hudContent"
 
 internal const val HUD_UPDATE_INDICATOR_TAG = "hudUpdateIndicator"
@@ -116,21 +122,22 @@ internal data class HudUpdateIndicator(
 /**
  * O notch da HUD: colado numa borda da tela, com um anel por conta.
  *
- * **Parado**, ele mostra por conta o anel (um arco por cota), o percentual da
- * cota em foco e a palavra do estado — a palavra sempre, porque é só isso que
- * existe na tela e cor nunca informa sozinha. **Aberto** (ponteiro em cima), ele
- * se desdobra pela mola `EXPRESSIVE` e acrescenta, do lado de dentro da tela, um
- * bloco por conta com uma linha por cota: rótulo, barra cápsula, percentual e
- * hora do reinício.
+ * **O notch não cresce.** Ele mostra por conta o anel (um arco por cota), o
+ * percentual da cota em foco e a palavra do estado — a palavra sempre, porque é
+ * só isso que existe na tela e cor nunca informa sozinha. Com o ponteiro em cima
+ * ([expanded]), o **balão** de uma conta só — a do anel sob o ponteiro, como no
+ * Codenotch — aparece ao lado dele, do lado de dentro da tela, com a cauda
+ * apontando para o anel. Passar para outro anel desliza o balão até ele.
  *
- * **O tamanho é da geometria, não da composição** ([sizes], de `hudNotchSizes`):
- * a janela é dimensionada antes de existir composição, e medir aqui para devolver
- * lá fecharia o laço de redimensionamento. O contêiner anima entre os dois
- * tamanhos; o texto que não couber sai com reticências.
+ * O contêiner ocupa o espaço que recebe (a janela inteira, no app): o notch fica
+ * rente à borda, centrado em [notchCenter] ao longo dela, e o balão é preso
+ * dentro do contêiner. **Os tamanhos são da geometria** ([sizes], de
+ * `hudNotchSizes`): a janela é dimensionada antes de existir composição, e medir
+ * aqui para devolver lá fecharia o laço de redimensionamento.
  *
- * Stateless e sem AWT: os gestos saem como eventos, e é por isso que ele é
- * exercitável em `runDesktopComposeUiTest`. Nenhuma coordenada sai daqui — quem
- * move a janela lê o ponteiro na tela.
+ * Sem AWT: os gestos saem como eventos, e é por isso que ele é exercitável em
+ * `runDesktopComposeUiTest`. Nenhuma coordenada de tela sai daqui — quem move a
+ * janela lê o ponteiro na tela.
  */
 @Composable
 internal fun HudNotch(
@@ -144,6 +151,11 @@ internal fun HudNotch(
     updateIndicator: HudUpdateIndicator? = null,
     nextRefreshAt: Instant? = null,
     countdownDescription: String? = null,
+    /** Centro do notch ao longo da borda, no contêiner; `null` centra. */
+    notchCenter: Dp? = null,
+    language: AppLanguage = AppLanguage.PT,
+    /** O balão já aberto nesta conta — para a demo da ajuda, que não tem ponteiro. */
+    initialBalloonIndex: Int? = null,
     onHoverChange: (Boolean) -> Unit = {},
     onDragStart: () -> Unit = {},
     onDragMove: () -> Unit = {},
@@ -156,110 +168,221 @@ internal fun HudNotch(
     /** O interruptor do `FooterBar`: sob o relógio dos testes o laço giraria para sempre. */
     countdownUpdatesEnabled: Boolean = true
 ) {
-    val hoverInteraction = remember { MutableInteractionSource() }
-    val isHovered by hoverInteraction.collectIsHoveredAsState()
-    LaunchedEffect(isHovered) {
-        onHoverChange(isHovered)
+    // O ponteiro "está no notch" enquanto estiver no corpo **ou** no balão: sair
+    // de um para o outro atravessa a cauda, que é do balão.
+    val notchHover = remember { MutableInteractionSource() }
+    val balloonHover = remember { MutableInteractionSource() }
+    val notchHovered by notchHover.collectIsHoveredAsState()
+    val balloonHovered by balloonHover.collectIsHoveredAsState()
+    val hovered = notchHovered || balloonHovered
+    LaunchedEffect(hovered) {
+        onHoverChange(hovered)
     }
 
     val open = expanded && !dragging
-    val target = if (open) sizes.expanded else sizes.collapsed
-    val sizeSpec = appSpring(AppMotion.Springs.EXPRESSIVE, visibilityThreshold = Dp.VisibilityThreshold)
-    val width by animateDpAsState(target.width, sizeSpec, label = "hudNotchWidth")
-    val height by animateDpAsState(target.height, sizeSpec, label = "hudNotchHeight")
+    // A conta do balão é a do último anel sob o ponteiro. Fechado, ela é
+    // esquecida: a próxima abertura começa pelo anel em que o ponteiro entrar.
+    var balloonIndex by remember { mutableStateOf(initialBalloonIndex) }
+    LaunchedEffect(open) {
+        if (!open && initialBalloonIndex == null) balloonIndex = null
+    }
+    val shownIndex = balloonIndex?.takeIf { index -> index in accounts.indices }
+    // Durante a saída o balão continua desenhando a última conta.
+    val lastShown = rememberLatestNonNull(shownIndex)
+    // Centro de cada anel ao longo da borda, em px do contêiner.
+    val ringCenters = remember { mutableStateMapOf<Int, Float>() }
+    var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
     val shape = remember(edge) { HudNotchShape(edge) }
     val ladder = AppSurfaceLadders.current
 
-    Box(
-        modifier = modifier
-            .requiredSize(width, height)
-            .testTag(HUD_CONTENT_TEST_TAG)
-            .appDepth(AppDepth.DIALOG, shape)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .appSheen()
-            .border(1.dp, ladder.borderTop, shape)
-            .hoverable(hoverInteraction)
-            // Sem barra de título nem pegador, é o cursor que diz que o notch se
-            // move — a pergunta "como eu movo?" veio de quem já o tinha na tela.
-            .pointerHoverIcon(PointerIcon(Cursor(Cursor.MOVE_CURSOR)))
-            .hudPressGesture(
-                onDragStart = onDragStart,
-                onDragMove = onDragMove,
-                onDragEnd = onDragEnd,
-                onClick = onOpenFull,
-                onSecondaryClick = onSwitchToCardsOnly
+    val countdown: (@Composable () -> Unit)? = if (nextRefreshAt == null || countdownDescription == null) {
+        null
+    } else {
+        {
+            HudCountdown(
+                nextRefreshAt = nextRefreshAt,
+                description = countdownDescription,
+                vertical = !edge.isHorizontal,
+                nowProvider = nowProvider,
+                waitNextTick = waitNextTick,
+                updatesEnabled = countdownUpdatesEnabled
             )
-            // A ação de clique é **declarada**, não instalada: um `clickable`
-            // consumiria o `down` e o arrasto nunca começaria.
-            .semantics {
-                contentDescription = HUD_BAR_OPEN_DESCRIPTION
-                onClick(label = HUD_BAR_OPEN_DESCRIPTION) {
-                    onOpenFull()
-                    true
-                }
-            }
-    ) {
-        val countdown: (@Composable () -> Unit)? = if (nextRefreshAt == null || countdownDescription == null) {
-            null
-        } else {
-            {
-                HudCountdown(
-                    nextRefreshAt = nextRefreshAt,
-                    description = countdownDescription,
-                    vertical = !edge.isHorizontal,
-                    nowProvider = nowProvider,
-                    waitNextTick = waitNextTick,
-                    updatesEnabled = countdownUpdatesEnabled
+        }
+    }
+
+    // Ao longo da borda o balão segue o anel pela mola `GENTLE`. A primeira
+    // posição de cada abertura é salto, senão ele entraria deslizando a partir
+    // do anel da abertura anterior.
+    val balloonAlong = remember { Animatable(0f) }
+    val placement = remember { HudBalloonPlacement() }
+    val alongSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = BALLOON_ALONG_THRESHOLD_PX)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(open) {
+        if (!open) placement.placed = false
+    }
+
+    Layout(
+        modifier = modifier.onPlaced { coordinates -> rootCoordinates = coordinates },
+        content = {
+            Box(
+                modifier = Modifier
+                    .layoutId(HudNotchPart.NOTCH)
+                    .requiredSize(sizes.collapsed)
+                    .testTag(HUD_CONTENT_TEST_TAG)
+                    .appDepth(AppDepth.DIALOG, shape)
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .appSheen()
+                    .border(1.dp, ladder.borderTop, shape)
+                    .hoverable(notchHover)
+                    // Sem barra de título nem pegador, é o cursor que diz que o notch se
+                    // move — a pergunta "como eu movo?" veio de quem já o tinha na tela.
+                    .pointerHoverIcon(PointerIcon(Cursor(Cursor.MOVE_CURSOR)))
+                    .hudPressGesture(
+                        onDragStart = onDragStart,
+                        onDragMove = onDragMove,
+                        onDragEnd = onDragEnd,
+                        onClick = onOpenFull,
+                        onSecondaryClick = onSwitchToCardsOnly
+                    )
+                    // A ação de clique é **declarada**, não instalada: um `clickable`
+                    // consumiria o `down` e o arrasto nunca começaria.
+                    .semantics {
+                        contentDescription = HUD_BAR_OPEN_DESCRIPTION
+                        onClick(label = HUD_BAR_OPEN_DESCRIPTION) {
+                            onOpenFull()
+                            true
+                        }
+                    }
+            ) {
+                HudRingStrip(
+                    accounts = accounts,
+                    edge = edge,
+                    fallbackLabel = fallbackLabel,
+                    fallbackTone = fallbackTone,
+                    updateIndicator = updateIndicator,
+                    countdown = countdown,
+                    size = sizes.collapsed,
+                    onRingHovered = { index -> balloonIndex = index },
+                    onRingPlaced = { index, coordinates ->
+                        val root = rootCoordinates
+                        if (root != null && root.isAttached && coordinates.isAttached) {
+                            val center = root.localPositionOf(
+                                coordinates,
+                                Offset(coordinates.size.width / 2f, coordinates.size.height / 2f)
+                            )
+                            ringCenters[index] = if (edge.isHorizontal) center.x else center.y
+                        }
+                    }
                 )
             }
-        }
-        val strip: @Composable () -> Unit = {
-            HudRingStrip(
-                accounts = accounts,
-                edge = edge,
-                fallbackLabel = fallbackLabel,
-                fallbackTone = fallbackTone,
-                updateIndicator = updateIndicator,
-                countdown = countdown,
-                size = sizes.collapsed
-            )
-        }
-        val panel: @Composable () -> Unit = {
             AnimatedVisibility(
-                visible = open && accounts.isNotEmpty(),
-                enter = fadeIn(appTween(AppMotion.normal, AppMotion.emphasizedEasing, delayMillis = PANEL_FADE_DELAY_MS)),
+                visible = open && shownIndex != null,
+                modifier = Modifier.layoutId(HudNotchPart.BALLOON),
+                enter = fadeIn(appTween(AppMotion.normal, AppMotion.emphasizedEasing)) +
+                    scaleIn(
+                        appSpring<Float>(AppMotion.Springs.EXPRESSIVE),
+                        initialScale = BALLOON_ENTER_SCALE,
+                        transformOrigin = balloonOrigin(edge)
+                    ),
                 exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
             ) {
-                HudPanel(accounts)
+                val index = lastShown ?: 0
+                val account = accounts.getOrNull(index)
+                if (account != null) {
+                    HudBalloon(
+                        edge = edge,
+                        bodyHeight = hudBalloonHeight(account),
+                        tailCenter = { (ringCenters[index] ?: 0f) - balloonAlong.value },
+                        modifier = Modifier.hoverable(balloonHover),
+                        content = {
+                            AppStateCrossfade(state = account, key = { shown -> shown.targetKey }) { shown ->
+                                HudAccountBalloonContent(shown, language)
+                            }
+                        }
+                    )
+                }
             }
         }
-        // O anel fica rente à borda da tela e o painel abre para dentro dela.
-        when (edge) {
-            HudEdge.TOP -> Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
-                strip()
-                panel()
+    ) { measurables, constraints ->
+        val notch = measurables.first { measurable -> measurable.layoutId == HudNotchPart.NOTCH }
+            .measure(Constraints())
+        val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
+            ?.measure(Constraints())
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else notch.width
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else notch.height
+        val alongLength = if (edge.isHorizontal) width else height
+        val notchAlong = if (edge.isHorizontal) notch.width else notch.height
+        val center = notchCenter?.roundToPx() ?: (alongLength / 2)
+        val notchStart = (center - notchAlong / 2).coerceIn(0, (alongLength - notchAlong).coerceAtLeast(0))
+
+        // O balão centrado no anel e preso ao contêiner, com a margem da sombra.
+        var balloonStart = 0
+        if (balloon != null && balloon.width > 0) {
+            val balloonAlongSize = if (edge.isHorizontal) balloon.width else balloon.height
+            val ring = ringCenters[lastShown ?: 0] ?: (notchStart + notchAlong / 2f)
+            val margin = HUD_SHADOW_MARGIN.roundToPx()
+            val maxStart = (alongLength - margin - balloonAlongSize).coerceAtLeast(0).toFloat()
+            val target = (ring - balloonAlongSize / 2f).coerceIn(margin.toFloat().coerceAtMost(maxStart), maxStart)
+            if (!placement.placed) {
+                placement.placed = true
+                placement.target = target
+                scope.launch { balloonAlong.snapTo(target) }
+                balloonStart = target.roundToInt()
+            } else {
+                if (placement.target != target) {
+                    placement.target = target
+                    scope.launch { balloonAlong.animateTo(target, alongSpec) }
+                }
+                balloonStart = balloonAlong.value.roundToInt()
             }
-            HudEdge.BOTTOM -> Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
-                panel()
-                strip()
+        }
+
+        layout(width, height) {
+            when (edge) {
+                HudEdge.TOP -> notch.place(notchStart, 0)
+                HudEdge.BOTTOM -> notch.place(notchStart, height - notch.height)
+                HudEdge.LEFT -> notch.place(0, notchStart)
+                HudEdge.RIGHT -> notch.place(width - notch.width, notchStart)
             }
-            HudEdge.LEFT -> Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
-                strip()
-                panel()
-            }
-            HudEdge.RIGHT -> Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
-                panel()
-                strip()
+            if (balloon != null) {
+                when (edge) {
+                    HudEdge.TOP -> balloon.place(balloonStart, notch.height)
+                    HudEdge.BOTTOM -> balloon.place(balloonStart, height - notch.height - balloon.height)
+                    HudEdge.LEFT -> balloon.place(notch.width, balloonStart)
+                    HudEdge.RIGHT -> balloon.place(width - notch.width - balloon.width, balloonStart)
+                }
             }
         }
     }
 }
 
-/** O painel entra depois de o notch começar a se abrir, não junto — senão o texto nasce espremido. */
-private const val PANEL_FADE_DELAY_MS = 60
+private enum class HudNotchPart { NOTCH, BALLOON }
 
-/** A faixa de anéis que fica na tela o tempo todo, do tamanho recolhido. */
+/**
+ * Onde o balão foi posto nesta abertura. Não é estado de composição: é lido e
+ * escrito no passo de layout, e como estado cada escrita pediria outro layout.
+ */
+private class HudBalloonPlacement {
+    var placed = false
+    var target = 0f
+}
+
+/** O balão cresce a partir do lado do notch. */
+private fun balloonOrigin(edge: HudEdge): TransformOrigin = when (edge) {
+    HudEdge.TOP -> TransformOrigin(0.5f, 0f)
+    HudEdge.BOTTOM -> TransformOrigin(0.5f, 1f)
+    HudEdge.LEFT -> TransformOrigin(0f, 0.5f)
+    HudEdge.RIGHT -> TransformOrigin(1f, 0.5f)
+}
+
+private const val BALLOON_ENTER_SCALE = 0.96f
+
+/** Meio pixel: abaixo disso o balão já está no anel. */
+private const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
+
+/** A faixa de anéis, do tamanho do notch. */
 @Composable
 private fun HudRingStrip(
     accounts: List<HudAccount>,
@@ -268,13 +391,22 @@ private fun HudRingStrip(
     fallbackTone: AppTone,
     updateIndicator: HudUpdateIndicator?,
     countdown: (@Composable () -> Unit)?,
-    size: DpSize
+    size: DpSize,
+    onRingHovered: (Int) -> Unit,
+    onRingPlaced: (Int, LayoutCoordinates) -> Unit
 ) {
     val items: @Composable () -> Unit = {
         if (accounts.isEmpty()) {
             AppStatusIndicator(label = fallbackLabel, tone = fallbackTone)
         } else {
-            accounts.forEach { account -> HudRingItem(account, vertical = !edge.isHorizontal) }
+            accounts.forEachIndexed { index, account ->
+                HudRingItem(
+                    account = account,
+                    vertical = !edge.isHorizontal,
+                    onHovered = { onRingHovered(index) },
+                    onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
+                )
+            }
         }
         // Atualização e contagem são do app, não de uma conta: uma vez, no fim.
         updateIndicator?.let { indicator -> HudUpdateBadge(indicator) }
@@ -300,7 +432,19 @@ private fun HudRingStrip(
 }
 
 @Composable
-private fun HudRingItem(account: HudAccount, vertical: Boolean) {
+private fun HudRingItem(
+    account: HudAccount,
+    vertical: Boolean,
+    onHovered: () -> Unit,
+    onPlaced: (LayoutCoordinates) -> Unit
+) {
+    // O anel sob o ponteiro escolhe a conta do balão.
+    val hover = remember { MutableInteractionSource() }
+    val isHovered by hover.collectIsHoveredAsState()
+    val currentOnHovered by rememberUpdatedState(onHovered)
+    LaunchedEffect(isHovered) {
+        if (isHovered) currentOnHovered()
+    }
     val focus = account.focus
     val description = buildString {
         append(account.label)
@@ -314,7 +458,10 @@ private fun HudRingItem(account: HudAccount, vertical: Boolean) {
         // reconhece antes de ler o nome, que o notch recolhido nem mostra. Na
         // cor do texto e não no acento — em volta dela já estão os arcos, e o
         // acento ali competiria com a cor de risco deles.
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.onGloballyPositioned(onPlaced),
+            contentAlignment = Alignment.Center
+        ) {
             AppUsageRing(
                 arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
                 description = description,
@@ -349,13 +496,14 @@ private fun HudRingItem(account: HudAccount, vertical: Boolean) {
         )
     }
     if (vertical) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.hoverable(hover), horizontalAlignment = Alignment.CenterHorizontally) {
             ring()
             percent()
             word()
         }
     } else {
         Row(
+            modifier = Modifier.hoverable(hover),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(HUD_RING_TEXT_GAP)
         ) {
@@ -368,109 +516,6 @@ private fun HudRingItem(account: HudAccount, vertical: Boolean) {
     }
 }
 
-/** O painel aberto: um bloco por conta, uma linha por cota. */
-@Composable
-private fun HudPanel(accounts: List<HudAccount>) {
-    Column(
-        modifier = Modifier
-            .width(com.usagemonitor.HUD_PANEL_WIDTH + HUD_PANEL_PADDING * 2)
-            .padding(HUD_PANEL_PADDING),
-        verticalArrangement = Arrangement.spacedBy(HUD_PANEL_BLOCK_GAP)
-    ) {
-        accounts.forEach { account ->
-            Column {
-                // Cabeçalho da conta: marca no acento, fornecedor e perfil, o
-                // plano em tom secundário — o "Claude Max 20x" do ai-usagebar —
-                // e o estado com ponto e palavra à direita.
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(HUD_PANEL_ROW_HEIGHT),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    AppProviderMark(
-                        source = account.source,
-                        tint = accentColorFor(source = account.source, accents = AppAccents.current),
-                        size = HUD_PANEL_MARK_SIZE
-                    )
-                    // Nome e plano num grupo só, que fica com toda a sobra: dois
-                    // `weight` na mesma linha dividiam a sobra ao meio e o nome
-                    // truncava com metade da largura vazia.
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = account.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        account.planLabel?.let { plan ->
-                            Text(
-                                text = plan,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                    AppStatusIndicator(label = account.statusLabel, tone = account.tone)
-                }
-                account.quotas.forEach { quota -> HudQuotaRow(quota) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HudQuotaRow(quota: HudQuota) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(HUD_PANEL_ROW_HEIGHT),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = quota.shortLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(QUOTA_LABEL_WIDTH)
-        )
-        AppProgressTrack(
-            fraction = quota.fraction,
-            tone = quota.tone,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = quota.percentText,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            modifier = Modifier.width(percentWidth("100%"))
-        )
-        // Sem reset não se imprime nada no lugar, nem traço: saldo que não
-        // expira é o caso comum.
-        Text(
-            text = quota.resetText.orEmpty(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier.width(RESET_WIDTH)
-        )
-    }
-}
-
-private val QUOTA_LABEL_WIDTH = 48.dp
-
-/** A marca no cabeçalho do bloco da conta, do porte do texto `labelMedium`. */
-private val HUD_PANEL_MARK_SIZE = 13.dp
-
 /**
  * A marca cabe no miolo que os arcos deixam livre: cada arco come um traço e um
  * vão de cada lado, e o arco de sessão ativa, quando há, mais um pouco. 70% do
@@ -481,7 +526,6 @@ private fun hudRingMarkSize(arcs: Int, active: Boolean): Dp {
     val activeInset = if (active) (HUD_RING_GAP + HUD_RING_STROKE) * 2 else 0.dp
     return ((HUD_RING_SIZE - used - activeInset) * 0.7f).coerceAtLeast(6.dp)
 }
-private val RESET_WIDTH = 64.dp
 
 /**
  * A silhueta do notch: reta e rente na borda da tela, cantos redondos do lado de
