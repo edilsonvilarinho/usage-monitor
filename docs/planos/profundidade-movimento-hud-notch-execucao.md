@@ -37,7 +37,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C8 | Expandir/recolher e banners | feito |
 | C9 | Movimento da grade de cards | feito |
 | C10 | Limpeza de movimento do `ApiUsageCard` | feito |
-| C11 | Spike da janela transparente | pendente |
+| C11 | Spike da janela transparente | feito — resultado B |
 | C12 | Modelo puro da HUD | pendente |
 | C13 | HUD em janela própria | pendente |
 | C14 | Geometria de borda e migração da posição | pendente |
@@ -59,6 +59,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C8 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o bloco recolhido sai da arvore depois de fechar`. |
 | 2026-09-24 | C9 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde depois de corrigir o fixture do teste novo (alvo não-Anthropic não leva perfil). A captura do dashboard saiu idêntica à anterior pixel a pixel: a primeira colocação é salto, sem animação. |
 | 2026-09-24 | C10 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde. As capturas mudaram em no máximo 5/255 por pixel (ruído subpixel), sem diferença visível; não foram commitadas agora e voltam no C17. O aquecimento de 20 × 100ms do gerador cobre as molas `GENTLE` (~450ms). |
+| 2026-09-24 | C11 | Claude Opus 5.5 | teste descartável `TransparentWindowSpikeTest` via `gradlew.bat desktopTest --tests "com.usagemonitor.spike.*"`, com `skiko.renderApi` padrão, `SOFTWARE` e `OPENGL` | Resultado **B** nos três: clique em pixel alfa 0 de uma `ComposeWindow` transparente é **engolido** — não chega nem ao conteúdo Compose nem à janela de trás. Clique de controle fora do overlay chega à janela de trás; clique no centro opaco chega ao Compose. O arquivo do spike não foi commitado. |
 
 ## C1 · Tokens de motion e política
 
@@ -175,3 +176,39 @@ cápsula, marcador de ritmo, "Next update in 2m").
   diziam 600ms e 250ms onde o código dava 420ms e 180ms.
 - Um dono só do tamanho: o `animateContentSize` do card inteiro saiu, e o `SizeTransform` do minimizar
   anda pela mesma mola. As duas animações aninhadas esticavam o card em dois tempos.
+
+## C11 · Spike da janela transparente
+
+**Pergunta:** numa `Window(transparent = true)` do Compose Desktop no Windows 11, clique sobre pixel
+totalmente transparente atravessa para a janela de trás?
+
+**Montagem:** um `Frame` AWT com contador de cliques atrás; por cima, `ComposeWindow` sem decoração,
+transparente, sempre no topo, 300×300, com um quadrado opaco de 100dp no centro (sombra de 12dp).
+`java.awt.Robot` clica em três pontos: fora do overlay (controle), no canto transparente do overlay e
+no centro opaco.
+
+**Duas rodadas descartadas antes da medida válida.** Na primeira o `Frame` ficou atrás da janela do
+terminal e nem o clique de controle chegava; na segunda, com os dois "sempre no topo", o `Frame`
+passou para cima do overlay. A montagem final traz o `Frame` à frente e só o overlay fica no topo.
+
+**Resultado (três render APIs, duas rodadas na padrão):**
+
+| Clique | Janela de trás | Conteúdo Compose |
+|---|---|---|
+| Controle, fora do overlay | recebeu | — |
+| Pixel transparente do overlay | **não recebeu** | **não recebeu** |
+| Centro opaco | — | recebeu |
+
+**Decisão: resultado B.** A janela da HUD não pode ficar do tamanho do painel expandido o tempo todo:
+a área transparente engoliria o clique de quem está atrás, que é justamente a queixa que fez a
+largura da pílula virar teto. Portanto:
+
+- **Em repouso** a janela tem o tamanho do notch **mais a margem da sombra** — é a única área que
+  captura clique.
+- **Ao entrar o ponteiro**, a janela cresce **de uma vez** para o tamanho do painel expandido (a área
+  nova é transparente, então o salto não se vê) e a mola roda **dentro** dela.
+- **Ao sair**, o conteúdo recolhe pela mola e só **depois** de assentar a janela encolhe.
+- Nenhum redimensionamento AWT por quadro — era essa a fonte do tranco da HUD anterior.
+
+Ficaram fora da medida, para a verificação manual do C17: combinação com `applyWindowOpacity`, halo
+na borda da sombra e CPU da rotação contínua.
