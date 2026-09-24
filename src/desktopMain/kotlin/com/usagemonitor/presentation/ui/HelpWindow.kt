@@ -21,6 +21,7 @@ import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.help.HelpContent
 import com.usagemonitor.presentation.ui.help.HelpTopic
 import com.usagemonitor.presentation.ui.help.helpWindowTitle
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.uiScaleFactor
@@ -42,6 +43,7 @@ internal fun HelpWindow(
     language: AppLanguage,
     themePreset: AppThemePreset,
     uiScalePercent: Int,
+    motion: AppMotionPolicy,
     iconImage: Painter?,
     screenWorkArea: ScreenWorkArea,
     onCloseRequest: () -> Unit
@@ -74,7 +76,7 @@ internal fun HelpWindow(
             uiScalePercent = uiScalePercent,
             workArea = screenWorkArea
         )
-        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             DesktopDialogFrame(
                 title = title,
                 iconPainter = iconImage,

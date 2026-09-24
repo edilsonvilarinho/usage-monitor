@@ -195,6 +195,7 @@ import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
@@ -976,6 +977,11 @@ private fun runUsageMonitor(
     // A escala é lida antes das janelas: é ela que dimensiona o tamanho default de
     // cada uma quando não há nada persistido.
     var uiScalePercent by remember { mutableStateOf(readPersistedUiScalePercent(settings)) }
+    // "Reduzir animações" vira a política de motion de **todas** as janelas:
+    // cada `Window` tem composição própria, e a que não receber `appMotion`
+    // fica na política estática sem erro nenhum -- a armadilha da escala.
+    var reducedMotion by remember { mutableStateOf(readPersistedReducedMotion(settings)) }
+    val appMotion = AppMotionPolicy.forPreference(reducedMotion)
     // A escala que a janela principal já reflete. A razão do redimensionamento sai
     // daqui e nunca de 100 — duas mudanças seguidas multiplicariam duas vezes.
     var appliedUiScalePercent by remember { mutableStateOf(uiScalePercent) }
@@ -2165,7 +2171,7 @@ private fun runUsageMonitor(
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
-        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
             // Acesso rápido às três molduras (issues #187 e #215). Um `val` só,
             // partilhado pelo menu do rodapé (modo padrão) e pelo da faixa
             // revelada do modo somente cards — dois donos da mesma conta
@@ -2436,7 +2442,7 @@ private fun runUsageMonitor(
             LaunchedEffect(historyOpenGeneration) {
                 activateWindow(window)
             }
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
                 DesktopDialogFrame(
                     title = historyWindowTitle(source, language),
                     iconPainter = iconImage,
@@ -2481,7 +2487,7 @@ private fun runUsageMonitor(
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
                 DesktopDialogFrame(
                     title = cliSessionsTitle,
                     iconPainter = iconImage,
@@ -2521,7 +2527,7 @@ private fun runUsageMonitor(
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
                 DesktopDialogFrame(
                     title = codexCliSessionsTitle,
                     iconPainter = iconImage,
@@ -2567,7 +2573,7 @@ private fun runUsageMonitor(
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
                 DesktopDialogFrame(
                     title = teamTitle,
                     iconPainter = iconImage,
@@ -2616,7 +2622,7 @@ private fun runUsageMonitor(
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
                 DesktopDialogFrame(
                     title = presenceTitle,
                     iconPainter = iconImage,
@@ -2640,6 +2646,7 @@ private fun runUsageMonitor(
             language = language,
             themePreset = themePreset,
             uiScalePercent = uiScalePercent,
+            motion = appMotion,
             iconImage = iconImage,
             screenWorkArea = screenWorkArea,
             onCloseRequest = { isHelpDialogOpen = false }
@@ -2651,6 +2658,7 @@ private fun runUsageMonitor(
         language = language,
         themePreset = themePreset,
         uiScalePercent = uiScalePercent,
+        motion = appMotion,
         iconImage = iconImage,
         screenWorkArea = screenWorkArea,
         onOpenReleasePage = { url -> appUpdateReleaseOpener.open(url) }
@@ -2680,7 +2688,7 @@ private fun runUsageMonitor(
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
                 DesktopDialogFrame(
                     title = keysTitle,
                     iconPainter = iconImage,
@@ -2717,7 +2725,7 @@ private fun runUsageMonitor(
                 uiScalePercent = uiScalePercent,
                 workArea = screenWorkArea
             )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
                 DesktopDialogFrame(
                     title = if (language == AppLanguage.PT) "Configurações" else "Settings",
                     iconPainter = iconImage,
@@ -2739,6 +2747,11 @@ private fun runUsageMonitor(
                             // Aviso e gravação não saem daqui pelo mesmo motivo da
                             // opacidade: quem persiste é o coletor com debounce.
                             uiScalePercent = clampUiScalePercent(percent)
+                        },
+                        reducedMotion = reducedMotion,
+                        onReducedMotionChange = { enabled ->
+                            reducedMotion = enabled
+                            persistReducedMotion(settings, enabled)
                         },
                         onReportBug = {
                             // As Configurações fecham: o formulário mora na janela

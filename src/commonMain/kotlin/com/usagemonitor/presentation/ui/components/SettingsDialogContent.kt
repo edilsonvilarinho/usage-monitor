@@ -89,6 +89,7 @@ const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
 const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
 const val HUD_MODE_SWITCH_TEST_TAG = "hudModeSwitch"
+const val REDUCED_MOTION_SWITCH_TEST_TAG = "reducedMotionSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
@@ -149,6 +150,9 @@ fun SettingsDialogContent(
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
     onUiScaleChange: (Int) -> Unit = {},
+    reducedMotion: Boolean = false,
+    /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
+    onReducedMotionChange: (Boolean) -> Unit = {},
     /** Abre o diálogo de relatório de bug. Default vazio: os geradores de captura não o abrem. */
     onReportBug: () -> Unit = {},
     onThemeChange: (AppThemePreset) -> Unit,
@@ -305,6 +309,7 @@ fun SettingsDialogContent(
                         windowOpacityPercent = windowOpacityPercent,
                         windowOpacityEnabled = windowOpacityEnabled,
                         uiScalePercent = uiScalePercent,
+                        reducedMotion = reducedMotion,
                         autoUpdateEnabled = autoUpdateEnabled,
                         autoUpdateSupport = autoUpdateSupport,
                         autoUpdatePlatform = autoUpdatePlatform,
@@ -319,6 +324,7 @@ fun SettingsDialogContent(
                         onAutoUpdateChange = onAutoUpdateChange,
                         onWindowOpacityChange = onWindowOpacityChange,
                         onUiScaleChange = onUiScaleChange,
+                        onReducedMotionChange = onReducedMotionChange,
                         onReportBug = onReportBug
                     )
 
@@ -455,6 +461,7 @@ private fun GeneralSettingsTab(
     windowOpacityPercent: Int,
     windowOpacityEnabled: Boolean,
     uiScalePercent: Int,
+    reducedMotion: Boolean,
     autoUpdateEnabled: Boolean,
     autoUpdateSupport: AppUpdateSupport,
     autoUpdatePlatform: AppUpdatePlatform?,
@@ -469,6 +476,7 @@ private fun GeneralSettingsTab(
     onAutoUpdateChange: (Boolean) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit,
+    onReducedMotionChange: (Boolean) -> Unit,
     onReportBug: () -> Unit
 ) {
     val isPt = currentLanguage == AppLanguage.PT
@@ -520,6 +528,14 @@ private fun GeneralSettingsTab(
             percent = uiScalePercent,
             language = currentLanguage,
             onPercentChange = onUiScaleChange
+        )
+        // Em Aparência e não em Sistema: é sobre como a janela se desenha, a
+        // mesma pergunta da escala logo acima.
+        ReducedMotionToggle(
+            enabled = reducedMotion,
+            language = currentLanguage,
+            onToggle = onReducedMotionChange,
+            showDivider = false
         )
     }
 
@@ -1315,6 +1331,38 @@ fun HudModeToggle(
             checked = enabled,
             onCheckedChange = { onToggle(it) },
             modifier = Modifier.testTag(HUD_MODE_SWITCH_TEST_TAG)
+        )
+    }
+}
+
+/**
+ * "Reduzir animações": para quem se incomoda com movimento, e para máquina lenta
+ * em que a transição vira tranco. O texto diz o que some — as transições **e** o
+ * que gira ou pulsa —, porque as duas coisas desligam juntas.
+ */
+@Composable
+fun ReducedMotionToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
+) {
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Reduzir animações" else "Reduce motion",
+        description = if (isPt) {
+            "Troca telas, barras e menus de uma vez, sem transição, e desliga o que gira ou pulsa para indicar sessão ativa."
+        } else {
+            "Switches screens, bars and menus at once, without transitions, and turns off what spins or pulses to show an active session."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(REDUCED_MOTION_SWITCH_TEST_TAG)
         )
     }
 }

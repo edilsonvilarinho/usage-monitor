@@ -56,6 +56,8 @@ export function Settings() {
               <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>
                 Mudar a escala redimensiona a janela principal na mesma razão, para caber o mesmo conteúdo.
               </span>
+              <AppSwitch checked={false} label="Reduzir animações"
+                hint="Troca telas, barras e menus de uma vez, sem transição, e desliga o que gira ou pulsa para indicar sessão ativa." />
             </React.Fragment>
           ) : null}
 

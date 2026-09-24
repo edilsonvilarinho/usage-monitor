@@ -14,9 +14,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -25,20 +33,39 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Durações: 120 para hover e foco, 180 para seleção, 240 para expandir e
- * recolher.
+ * recolher, 90 para saída.
  *
  * São mais curtas que as anteriores (150/250/350) porque a densidade subiu: numa
  * linha de 32dp de altura, 350ms de transição é tempo suficiente para o olho
  * perceber atraso onde antes havia um card de 96dp se movendo.
  *
- * **Nenhuma animação infinita.** A regra não é estética: animação sem fim trava
- * o `waitForIdle` dos testes de componente, e o `ShimmerBox` — a única que
- * existe — fica onde está sem ser replicada.
+ * **Tween para cor e opacidade, mola para posição, tamanho e escala.** A tela
+ * lia como "sem fluidez" porque tudo era tween de duração fixa: um card que muda
+ * de lugar com curva de duração fixa para seco no fim, e interromper a transição
+ * no meio recomeçava a curva do zero. A mola herda a velocidade de onde estava —
+ * é isso que faz o movimento parecer contínuo quando o alvo muda antes de chegar.
+ *
+ * **Sem overshoot em dado.** Barra, anel e número usam [Springs.GENTLE], que é
+ * criticamente amortecida: uma barra que passa de 88% antes de voltar mostra, por
+ * alguns quadros, um valor que não é verdade. A mola com rebote
+ * ([Springs.EXPRESSIVE]) fica para superfícies que não carregam número — o
+ * desdobrar da HUD e a entrada do menu.
+ *
+ * **Animação contínua só atrás de [AppMotionPolicy.continuous].** Animação sem
+ * fim trava o `waitForIdle` dos testes de componente, e por isso a política
+ * nasce desligada em [AppTheme]: só o `Main` a liga, e só para estado vivo.
  */
 object AppMotion {
     const val fast:   Int  = 120
     const val normal: Int  = 180
     const val slow:   Int  = 240
+
+    /**
+     * Saída. Mais curta que a entrada de propósito: o que sai já não interessa,
+     * e uma saída tão longa quanto a entrada deixa dois estados na tela ao mesmo
+     * tempo por tempo demais.
+     */
+    const val exit:   Int  = 90
 
     /**
      * Atraso entre itens vizinhos na entrada de uma grade ou lista.
@@ -52,6 +79,120 @@ object AppMotion {
 
     val enterEasing: Easing = FastOutSlowInEasing
     val exitEasing:  Easing = FastOutLinearInEasing
+
+    /**
+     * Curva enfática: sai rápido e assenta longo. É a de entrada de superfície —
+     * o card, o banner, o conteúdo que troca —, onde o olho precisa ver o
+     * movimento começar e o conteúdo parar legível.
+     */
+    val emphasizedEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
+    /**
+     * Três molas, e só três: com uma por tela o sistema volta a ter tantas
+     * curvas quantas telas, que é o que a escala de durações existe para evitar.
+     */
+    enum class Springs(val dampingRatio: Float, val stiffness: Float) {
+        /** Dado e superfície: barra, anel, número, card. Sem rebote, assenta em ~450ms. */
+        GENTLE(dampingRatio = 1f, stiffness = 400f),
+
+        /** Indicador de seleção e pressão: sublinhado de aba, polegar, botão pressionado. */
+        SNAPPY(dampingRatio = 1f, stiffness = 1_500f),
+
+        /** Superfície sem número que se desdobra: HUD e menu. Um rebote curto. */
+        EXPRESSIVE(dampingRatio = 0.75f, stiffness = 600f)
+    }
+}
+
+/**
+ * Como a composição trata movimento.
+ *
+ * [reduced] é a preferência "Reduzir animações": nada se move, tudo troca de uma
+ * vez. [continuous] libera animação sem fim — o arco de sessão ativa, o pulso de
+ * atenção, o glifo girando na recarga.
+ *
+ * O default de [AppTheme] é [Static] — transições finitas ligadas, contínuas
+ * desligadas — e não o que o app usa. É o que deixa `ScreenshotGenerator`,
+ * `HelpMediaGenerator`, `TourGifGenerator` e todo `runDesktopComposeUiTest`
+ * seguros sem cada um lembrar de desligar nada: um teste que esquecesse travaria
+ * no `waitForIdle` em vez de falhar.
+ */
+@Immutable
+data class AppMotionPolicy(
+    val reduced: Boolean,
+    val continuous: Boolean
+) {
+    companion object {
+        /** Transições finitas, nada contínuo. Default de testes e geradores. */
+        val Static = AppMotionPolicy(reduced = false, continuous = false)
+
+        /** O app em uso: transições e animação contínua de estado vivo. */
+        val Live = AppMotionPolicy(reduced = false, continuous = true)
+
+        /** "Reduzir animações": nenhuma transição, nenhuma animação contínua. */
+        val Reduced = AppMotionPolicy(reduced = true, continuous = false)
+
+        /** A política do app a partir da preferência do usuário. */
+        fun forPreference(reduceMotion: Boolean): AppMotionPolicy {
+            return if (reduceMotion) Reduced else Live
+        }
+    }
+}
+
+val LocalAppMotionPolicy = staticCompositionLocalOf { AppMotionPolicy.Static }
+
+/**
+ * Mola do sistema sob a política. Com movimento reduzido vira [snap]: o valor
+ * chega ao alvo no mesmo quadro, e quem lê o estado final não precisa saber que
+ * a preferência existe.
+ *
+ * Função pura, e não só a versão `@Composable`: é o que deixa a regra testável
+ * sem composição.
+ */
+fun <T> appSpringSpec(
+    kind: AppMotion.Springs,
+    policy: AppMotionPolicy,
+    visibilityThreshold: T? = null
+): FiniteAnimationSpec<T> {
+    if (policy.reduced) {
+        return snap()
+    }
+    return spring(
+        dampingRatio = kind.dampingRatio,
+        stiffness = kind.stiffness,
+        visibilityThreshold = visibilityThreshold
+    )
+}
+
+/** Tween do sistema sob a política; mesma regra de [appSpringSpec]. */
+fun <T> appTweenSpec(
+    durationMillis: Int,
+    policy: AppMotionPolicy,
+    easing: Easing = AppMotion.enterEasing,
+    delayMillis: Int = 0
+): FiniteAnimationSpec<T> {
+    if (policy.reduced) {
+        return snap()
+    }
+    return tween(durationMillis = durationMillis, delayMillis = delayMillis, easing = easing)
+}
+
+@Composable
+@ReadOnlyComposable
+fun <T> appSpring(
+    kind: AppMotion.Springs = AppMotion.Springs.GENTLE,
+    visibilityThreshold: T? = null
+): FiniteAnimationSpec<T> {
+    return appSpringSpec(kind, LocalAppMotionPolicy.current, visibilityThreshold)
+}
+
+@Composable
+@ReadOnlyComposable
+fun <T> appTween(
+    durationMillis: Int = AppMotion.normal,
+    easing: Easing = AppMotion.enterEasing,
+    delayMillis: Int = 0
+): FiniteAnimationSpec<T> {
+    return appTweenSpec(durationMillis, LocalAppMotionPolicy.current, easing, delayMillis)
 }
 
 /**
@@ -412,11 +553,16 @@ private val rememberedTypography by lazy { appTypography(appFontFamilies) }
  * precisa receber o valor**: `Window`/`DialogWindow` do Compose Desktop têm
  * composição própria e a plataforma reprovisiona `LocalDensity` na raiz de cada
  * uma — provisionar na janela pai não atravessa para a filha.
+ *
+ * [motion] segue a mesma regra, e pelo mesmo motivo: janela que não recebe a
+ * política fica em [AppMotionPolicy.Static] sem erro nenhum — anima, mas ignora
+ * "Reduzir animações".
  */
 @Composable
 fun AppTheme(
     preset: AppThemePreset = AppThemePreset.OBSIDIANA_DARK,
     uiScalePercent: Int = 100,
+    motion: AppMotionPolicy = AppMotionPolicy.Static,
     content: @Composable () -> Unit
 ) {
     val colorScheme = appColorScheme(preset)
@@ -451,7 +597,8 @@ fun AppTheme(
         CompositionLocalProvider(
             LocalDensity provides scaledDensity,
             LocalScrollbarStyle provides scrollbarStyle,
-            LocalAppAccents provides accents
+            LocalAppAccents provides accents,
+            LocalAppMotionPolicy provides motion
         ) {
             content()
         }
@@ -463,11 +610,13 @@ fun AppTheme(
 fun AppTheme(
     isDark: Boolean,
     uiScalePercent: Int = 100,
+    motion: AppMotionPolicy = AppMotionPolicy.Static,
     content: @Composable () -> Unit
 ) {
     AppTheme(
         preset = AppThemePreset.fromLegacyMode(isDark),
         uiScalePercent = uiScalePercent,
+        motion = motion,
         content = content
     )
 }

@@ -20,7 +20,7 @@ export function AppProgressTrack({ percent = 0, level = 'neutral', color, label,
         ...style
       }}
     >
-      <span style={{ display: 'block', height: '100%', width: p + '%', background: color || LEVELS[level] || LEVELS.neutral }} />
+      <span style={{ display: 'block', height: '100%', width: p + '%', background: color || LEVELS[level] || LEVELS.neutral, transition: 'width var(--spring-gentle), background var(--dur-select) var(--ease)' }} />
     </div>
   );
 }

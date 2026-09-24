@@ -3,6 +3,9 @@ package com.usagemonitor.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
@@ -23,6 +26,7 @@ import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -169,6 +173,59 @@ class AppStatesTest {
         }
     }
 
+    /**
+     * A barra anima a largura, mas tem de **chegar**: depois do idle, o bitmap de
+     * uma barra que foi de 20% a 70% é o mesmo de uma que nasceu em 70%. Uma mola
+     * que parasse perto do alvo, ou uma animação que nunca terminasse, apareceria
+     * aqui como pixels diferentes — ou como `waitForIdle` sem voltar.
+     */
+    @Test
+    fun `a barra animada assenta exatamente no valor novo`() {
+        val settled = renderTrack(uiScalePercent = 100, fraction = 0.7f)
+        lateinit var animated: PixelMap
+        runDesktopComposeUiTest {
+            var fraction by mutableStateOf(0.2f)
+            setContent {
+                AppTheme(isDark = true) {
+                    Box(modifier = Modifier.width(TRACK_WIDTH_DP.dp).height(40.dp)) {
+                        AppProgressTrack(fraction = fraction, tone = AppTone.CRITICAL)
+                    }
+                }
+            }
+            waitForIdle()
+            fraction = 0.7f
+            waitForIdle()
+            animated = captureToImage().toPixelMap()
+        }
+
+        assertEquals(0, countDifferencesOffCorners(settled, animated))
+    }
+
+    /** Com "Reduzir animações" a barra salta para o valor no primeiro quadro. */
+    @Test
+    fun `com movimento reduzido a barra troca no mesmo quadro`() {
+        val settled = renderTrack(uiScalePercent = 100, fraction = 0.7f)
+        lateinit var reduced: PixelMap
+        runDesktopComposeUiTest {
+            mainClock.autoAdvance = false
+            var fraction by mutableStateOf(0.2f)
+            setContent {
+                AppTheme(isDark = true, motion = AppMotionPolicy.Reduced) {
+                    Box(modifier = Modifier.width(TRACK_WIDTH_DP.dp).height(40.dp)) {
+                        AppProgressTrack(fraction = fraction, tone = AppTone.CRITICAL)
+                    }
+                }
+            }
+            mainClock.advanceTimeByFrame()
+            fraction = 0.7f
+            mainClock.advanceTimeByFrame()
+            mainClock.advanceTimeByFrame()
+            reduced = captureToImage().toPixelMap()
+        }
+
+        assertEquals(0, countDifferencesOffCorners(settled, reduced))
+    }
+
     private fun renderTrack(uiScalePercent: Int, fraction: Float): PixelMap {
         lateinit var pixels: PixelMap
         runDesktopComposeUiTest {
@@ -182,6 +239,27 @@ class AppStatesTest {
             pixels = captureToImage().toPixelMap()
         }
         return pixels
+    }
+
+    /**
+     * Como [countDifferences], mas sem os quatro pixels de canto do trilho. O
+     * recorte arredondado os pinta com antialiasing, e o alfa deles varia com o
+     * número de quadros compostos sobre a cena -- uma cena que animou desenhou
+     * mais quadros que a que nasceu parada. O que o teste afirma é a largura do
+     * preenchimento, e ela não passa por canto nenhum.
+     */
+    private fun countDifferencesOffCorners(a: PixelMap, b: PixelMap): Int {
+        val lastX = TRACK_WIDTH_DP - 1
+        var different = 0
+        for (y in 0 until minOf(a.height, b.height)) {
+            for (x in 0 until minOf(a.width, b.width)) {
+                val isCorner = (x == 0 || x == lastX) && (y == 0 || y == TRACK_HEIGHT_PX - 1)
+                if (!isCorner && a[x, y] != b[x, y]) {
+                    different += 1
+                }
+            }
+        }
+        return different
     }
 
     private fun countDifferences(a: PixelMap, b: PixelMap): Int {
@@ -198,5 +276,8 @@ class AppStatesTest {
 
     private companion object {
         const val TRACK_WIDTH_DP = 300
+
+        /** 4dp a escala 100: os testes que a usam renderizam sem escala. */
+        const val TRACK_HEIGHT_PX = 4
     }
 }

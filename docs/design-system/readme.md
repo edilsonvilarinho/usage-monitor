@@ -123,10 +123,17 @@ never a scale, never a shadow. Close button is the one exception: it fills `--cr
 **Press / focus.** Press has no separate treatment beyond hover. Focus is a 2px `--info` outline
 with 1px offset (inset on fields).
 
-**Motion.** 120ms hover/focus · 180ms selection · 240ms expand/collapse, ease
-`cubic-bezier(.2,0,.2,1)`. **No infinite animation anywhere** — it hangs `waitForIdle` in the
-Compose component tests, and this app's data arrives on a 600s cycle. Loading is a **static
-skeleton**, never a shimmer, never a spinner.
+**Motion.** 120ms hover/focus · 180ms selection · 240ms expand/collapse · 90ms exit. **Tween
+for color and opacity, spring for position, size and scale** (`AppMotion.Springs`: `GENTLE` for
+data and surfaces, `SNAPPY` for selection and press, `EXPRESSIVE` only for the HUD and the menu).
+A spring keeps its velocity when the target changes mid-flight — the fixed-length tweens stopped
+dry and restarted from zero, which is what made the app read as stiff. **No overshoot on data**:
+bars, rings and numbers settle without rebounding past the value. Every transition is finite.
+**Continuous animation lives only behind `AppMotionPolicy.continuous`**, off by default in
+`AppTheme` so component tests and capture generators never meet it (an endless animation hangs
+`waitForIdle`); the app turns it on only for live state. **"Reduzir animações"** (Settings →
+General) turns every transition into an instant swap and stops anything continuous. First load is
+a **static skeleton**, never a shimmer.
 
 **Cards.** There are no "cards" in the decorative sense. There is one data surface: `--surface`
 fill, 1px border, radius 8, no shadow, optional 2px source marker in its header.

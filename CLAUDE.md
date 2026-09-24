@@ -506,8 +506,24 @@ Vale para qualquer superfície visível — janela, diálogo, faixa, bandeja e r
 **Tokens** (`presentation/ui/theme/AppTheme.kt`): quatro superfícies neutras dentro de ~14% de
 luminância (`AppSurfaces`), raios 4/6/8/10 com **teto de 10** (`AppShapes`), elevação 0/2/8 —
 `card` é **zero**, e sombra só em diálogo e overlay —, espaçamento 4/8/12/16/24/32 (`AppSpacing`) e
-motion 120/180/240 (`AppMotion`). A profundidade vem da borda de 1dp e do espaçamento; foi o
+motion 120/180/240/90 (`AppMotion`). A profundidade vem da borda de 1dp e do espaçamento; foi o
 gradiente de acento em toda superfície que fazia a tela ler como pilha de blocos de mesmo peso.
+
+**Motion** (`AppMotion.Springs` + `AppMotionPolicy` + `appSpring`/`appTween`; plano
+[`profundidade-movimento-hud-notch-execucao.md`](docs/planos/profundidade-movimento-hud-notch-execucao.md)):
+tween para cor e opacidade, **mola** para posição, tamanho e escala. Três molas e só três —
+`GENTLE` (dado e superfície), `SNAPPY` (seleção e pressão) e `EXPRESSIVE` (só HUD e menu, o único
+com rebote). **Sem overshoot em dado**: barra, anel e número passando do valor mostram, por alguns
+quadros, um percentual que não é verdade.
+- **`AppMotionPolicy` nasce `Static` em `AppTheme`** — transições finitas ligadas, animação contínua
+  desligada. É isso que mantém `ScreenshotGenerator`, `HelpMediaGenerator`, `TourGifGenerator` e todo
+  `runDesktopComposeUiTest` seguros sem cada um lembrar de desligar nada. Só o `Main` passa
+  `AppMotionPolicy.forPreference(reducedMotion)`, e **a todas as janelas** — a armadilha da escala:
+  janela que não recebe o valor anima e ignora a preferência, sem erro nenhum.
+- **"Reduzir animações"** (Configurações → Geral → Aparência, `ReducedMotionPreferences.kt`) vira
+  `snap()` em `appSpringSpec`/`appTweenSpec`: o valor chega ao alvo no mesmo quadro, e quem lê o
+  estado final não precisa saber que a preferência existe. As duas funções são puras para a regra ser
+  testável sem composição.
 
 **Tipografia**: IBM Plex Mono e Sans, carregadas do classpath por `appFontFamilies`
 (`expect`/`actual`, TTFs em `desktopMain/resources/fonts/`). `label*`, `title*`, `headline*` e
@@ -914,8 +930,8 @@ aviso: a tooltip lista todos, com bullet só a partir do segundo.
   árvore, então é por ela que leitor de tela e testes chegam ao aviso — os dois asserts de notice
   em `ComponentTest` usam `onNodeWithContentDescription(..., substring = true)`.
 
-**Regras que continuam valendo**: nenhuma animação infinita nova (trava o `waitForIdle`);
-`ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
+**Regras que continuam valendo**: animação infinita só atrás de `AppMotionPolicy.continuous`
+(sem a política ela trava o `waitForIdle`); `ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
 `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
 **Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS a partir do monograma descrito em

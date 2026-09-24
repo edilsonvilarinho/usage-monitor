@@ -11,6 +11,7 @@ import androidx.compose.ui.window.rememberDialogState
 import com.usagemonitor.DEFAULT_MODAL_MIN_HEIGHT
 import com.usagemonitor.ApplyWindowMinimumSize
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.ScreenWorkArea
@@ -33,6 +34,7 @@ internal fun ReleaseNotesWindow(
     language: AppLanguage,
     themePreset: AppThemePreset,
     uiScalePercent: Int,
+    motion: AppMotionPolicy,
     iconImage: Painter?,
     screenWorkArea: ScreenWorkArea,
     onOpenReleasePage: (String) -> Unit
@@ -66,7 +68,7 @@ internal fun ReleaseNotesWindow(
             uiScalePercent = uiScalePercent,
             workArea = screenWorkArea
         )
-        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent) {
+        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             DesktopDialogFrame(
                 title = title,
                 iconPainter = iconImage,

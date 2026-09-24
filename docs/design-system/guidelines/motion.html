@@ -1,11 +1,11 @@
-<!-- @dsCard group="Patterns" viewport="700x170" name="Motion" subtitle="120 hover · 180 selection · 240 expand. No infinite animation, anywhere" -->
+<!-- @dsCard group="Patterns" viewport="700x222" name="Motion" subtitle="Tween for color, spring for movement. No overshoot on data. Continuous only behind the policy" -->
 <!DOCTYPE html>
 <html lang="pt-BR" data-app-theme="dark">
 <head>
 <meta charset="utf-8">
 <link rel="stylesheet" href="../styles.css">
 <style>
-  body { padding: 16px; width: 700px; height: 138px; overflow: hidden; }
+  body { padding: 16px; width: 700px; height: 190px; overflow: hidden; }
   .g { display: grid; gap: 8px; }
   .r { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .sw { border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
@@ -25,7 +25,9 @@
   <div class="r"><span class="k" style="width:70px">120ms</span><span style="font-family:var(--mono);font-size:var(--t12)">hover, foco, press</span></div>
   <div class="r"><span class="k" style="width:70px">180ms</span><span style="font-family:var(--mono);font-size:var(--t12)">seleção, troca de aba</span></div>
   <div class="r"><span class="k" style="width:70px">240ms</span><span style="font-family:var(--mono);font-size:var(--t12)">expandir, recolher, minimizar card</span></div>
-  <div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:2px">Animação infinita trava o <code style="border:0;background:none;padding:0;color:var(--fg)">waitForIdle</code> dos testes de componente. Carregamento é esqueleto estático.</div>
+  <div class="r"><span class="k" style="width:70px">90ms</span><span style="font-family:var(--mono);font-size:var(--t12)">saída — sempre mais curta que a entrada</span></div>
+  <div class="r"><span class="k" style="width:70px">mola</span><span style="font-family:var(--mono);font-size:var(--t12)">gentle: dado e superfície · snappy: seleção e pressão · expressive: HUD e menu</span></div>
+  <div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:2px">Barra, anel e número assentam sem passar do valor. Animação contínua só atrás de <code style="border:0;background:none;padding:0;color:var(--fg)">AppMotionPolicy.continuous</code>, desligada nos testes. "Reduzir animações" troca tudo de uma vez.</div>
 </div>
 </body>
 </html>

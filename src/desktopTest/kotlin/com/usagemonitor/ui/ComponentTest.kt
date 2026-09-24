@@ -82,6 +82,7 @@ import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.HUD_MODE_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.REDUCED_MOTION_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
@@ -2701,6 +2702,34 @@ class ComponentTest {
         }
 
         onNodeWithTag(HUD_MODE_SWITCH_TEST_TAG).performScrollTo().performClick()
+
+        assertEquals(true, enabled)
+    }
+
+    /** "Reduzir animações" mora em Aparência, ao lado da escala da interface. */
+    @Test
+    fun `SettingsDialogContent emits the reduced motion change`() = runDesktopComposeUiTest {
+        var enabled: Boolean? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    reducedMotion = false,
+                    onReducedMotionChange = { value -> enabled = value },
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        onNodeWithText("Reduzir animações").assertExists()
+        onNodeWithTag(REDUCED_MOTION_SWITCH_TEST_TAG).performScrollTo().performClick()
 
         assertEquals(true, enabled)
     }

@@ -49,7 +49,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.VisibilityThreshold
+import com.usagemonitor.presentation.ui.theme.appSpring
+import com.usagemonitor.presentation.ui.theme.appTween
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppElevation
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -322,9 +326,11 @@ private val TEXT_AREA_HEIGHT = 96.dp
 /**
  * Interruptor de 30 × 17.
  *
- * A transição do botão é de 120ms e **termina**: `animateDpAsState` chega ao
- * alvo e para. Nada aqui pode virar animação infinita, que travaria o
- * `waitForIdle` dos testes de componente.
+ * O botão anda por mola rápida e trilho, borda e botão mudam de cor **juntos**,
+ * no mesmo tween. Antes só o trilho e a posição animavam: borda e botão trocavam
+ * de cor no primeiro quadro, e o interruptor chegava verde de um lado enquanto o
+ * botão ainda estava no outro. Tudo termina — nada aqui pode virar animação
+ * infinita, que travaria o `waitForIdle` dos testes de componente.
  */
 @Composable
 fun AppSwitch(
@@ -341,16 +347,24 @@ fun AppSwitch(
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     val knobOffset by animateDpAsState(
         targetValue = if (checked) SWITCH_WIDTH - SWITCH_KNOB - SWITCH_PADDING * 2 else 0.dp,
-        animationSpec = tween(AppMotion.fast),
+        animationSpec = appSpring(AppMotion.Springs.SNAPPY, visibilityThreshold = Dp.VisibilityThreshold),
         label = "appSwitchKnob"
     )
     val track by animateColorAsState(
         targetValue = if (checked) accent.copy(alpha = 0.30f) else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(AppMotion.fast),
+        animationSpec = appTween(AppMotion.fast),
         label = "appSwitchTrack"
     )
-    val border = if (checked) accent else MaterialTheme.colorScheme.outlineVariant
-    val knob = if (checked) accent else MaterialTheme.colorScheme.onSurfaceVariant
+    val border by animateColorAsState(
+        targetValue = if (checked) accent else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appSwitchBorder"
+    )
+    val knob by animateColorAsState(
+        targetValue = if (checked) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appSwitchKnobColor"
+    )
     val shape: Shape = RoundedCornerShape(SWITCH_HEIGHT / 2)
 
     Box(

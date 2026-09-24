@@ -29,9 +29,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.getValue
 import com.usagemonitor.presentation.ui.theme.AppAccents
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.ui.theme.appSpring
+import com.usagemonitor.presentation.ui.theme.appTween
 
 /**
  * Primitivas de estado: aviso, vazio, carregando, erro, indicador e barra.
@@ -145,6 +151,12 @@ fun AppStatusIndicator(
  * mais padding usa `roundToPx`, que acompanha a altura do trilho, e é também o
  * `box-sizing: border-box` que o protótipo especifica, em que a cor nunca fica
  * por baixo do anel.
+ *
+ * **A largura anda por mola e a cor por tween**, as duas finitas. Antes a barra
+ * saltava de largura e de tom no quadro da coleta, e era o salto mais visível da
+ * tela — a cota muda a cada dez minutos em todo card ao mesmo tempo. A mola é a
+ * [AppMotion.Springs.GENTLE], sem rebote: barra que passa do valor antes de
+ * voltar mostra um percentual que não é verdade.
  */
 @Composable
 fun AppProgressTrack(
@@ -152,7 +164,16 @@ fun AppProgressTrack(
     tone: AppTone,
     modifier: Modifier = Modifier
 ) {
-    val safe = fraction.coerceIn(0f, 1f)
+    val safe by animateFloatAsState(
+        targetValue = fraction.coerceIn(0f, 1f),
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = PROGRESS_VISIBILITY_THRESHOLD),
+        label = "appProgressFraction"
+    )
+    val fill by animateColorAsState(
+        targetValue = tone.color(),
+        animationSpec = appTween(AppMotion.normal),
+        label = "appProgressTone"
+    )
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -172,10 +193,16 @@ fun AppProgressTrack(
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(safe)
-                .background(tone.color())
+                .background(fill)
         )
     }
 }
+
+/**
+ * Um milésimo da largura: abaixo disso a diferença é menor que um pixel mesmo
+ * numa barra de 1000dp, e a mola continuaria pedindo quadros sem nada mudar.
+ */
+private const val PROGRESS_VISIBILITY_THRESHOLD = 0.001f
 
 /**
  * Aviso: barra de severidade, título, descrição e ação.
