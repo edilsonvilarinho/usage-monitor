@@ -112,6 +112,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E7 | Claude Opus 5.5 | `gradlew.bat generateScreenshots + gradlew.bat generateHelpMedia + desktopTest --tests "*Help*"` | Verde. Capturas do README idênticas às anteriores (a barra do card não mudou); demo de modos de janela com o balão e os botões do card — a primeira passada saiu com a fileira vazia, porque o gerador não passava `accountActions`; quatro demos atualizadas pelo selo do plano do D3. |
 | 2026-09-24 | E8 | Claude Opus 5.5 | `gradlew.bat allTests` | Verde: 2111 testes, 0 falhas (eram 2088). Verificação manual pendente: a sessão de debug aberta no IntelliJ roda o código de antes desta rodada e não foi encerrada. |
 | 2026-09-24 | E9 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*"` | Verde: 32 casos do notch (compacta sem a palavra na faixa e com ela no balão; costura de tamanho compacta nas 4 bordas com a contagem inteira) e 15 de geometria (sete contas compactam nas 4 bordas, duas não, carregando nunca). A primeira versão do teste exigia o mesmo encolhimento em pé e deitada e reprovou a lateral: em pé só sai a linha da palavra. |
+| 2026-09-24 | E10 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "*LocalCodexActivityDataSourceTest*" --tests "*SessionPulseViewModelTest*"` | Verde: 6 casos da sonda (turno do app vivo com o rollout parado, turno preso depois de queda, rollout recente do CLI, rollout antigo, máquina sem Codex, segundos × milissegundos) e 19 do view model, 2 novos (o Codex soma a activeTargets; leitura que falha mantém o veredito). |
 
 ## C1 · Tokens de motion e política
 
@@ -541,3 +542,18 @@ antes desta rodada, com o código anterior, e ela não foi encerrada. Com ela re
 - Renderização descartável com sete contas numa tela de 1366×768 a 115%: deitada, 429dp (a completa
   passava de 900); em pé, 514dp — acima dos 45%, porque ali só sai a linha da palavra, mas dentro da
   altura da tela.
+
+## E10 · Indicador de execução do Codex
+
+- Relato do usuário: uma execução no app desktop do Codex e o anel do Codex sem o arco de sessão ativa.
+  Causa: `activeTargets` saía só do índice de sessões do **Claude** CLI.
+- **Medido nesta máquina** com o turno rodando: `thread_turns` com `status = 'inProgress'` desde
+  17:55:27 e item de 3 min antes; o rollout, parado desde 17:55:27. Olhar só a data do rollout diria
+  "parado" no meio da execução — por isso a tabela do app desktop vem primeiro, como no Codenotch.
+- `LocalCodexActivityDataSource` (`desktopMain`): turno `inProgress` vivo (`isCodexTurnLive`: item nos
+  últimos 10 min ou início há menos de 2 — a guarda contra turno preso depois de uma queda); na falta,
+  rollout de hoje ou de ontem escrito nos últimos 5 min (CLI e extensão). Só leitura, só metadados.
+- `SessionPulseViewModel` ganhou a sonda `codexActivity`, lida no mesmo laço de 30s; o alvo do Codex
+  entra em `activeTargets` ao lado das contas do Claude, e leitura que falha mantém o veredito anterior.
+- A sonda descartável contra o `~/.codex` real, rodada minutos depois, deu `false` — e o turno já estava
+  `completed` na tabela, coerente com a regra.

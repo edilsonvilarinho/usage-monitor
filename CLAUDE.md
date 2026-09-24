@@ -798,6 +798,14 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   dentro do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
   fica parado e o pulso some; a palavra continua dizendo o estado.
+  - **O Codex tem sonda própria** (`LocalCodexActivityDataSource`, E10): o índice de sessões é só do
+    Claude CLI, e uma execução do Codex nunca acendia o arco. Primeiro o estado do **app desktop**,
+    `thread_turns.status = 'inProgress'` em `~/.codex/thread_history_1.sqlite`, vivo com item nos
+    últimos 10 min ou iniciado há menos de 2 (a guarda do Codenotch contra turno preso depois de uma
+    queda); depois o **rollout** escrito nos últimos 5 min, para o CLI. A ordem é medida: com um turno
+    do app rodando havia sete minutos, o rollout não era escrito desde o início dele — a data do
+    arquivo sozinha diria "parado". Só leitura, só metadados; hoje e ontem de `sessions/`, nunca o
+    histórico inteiro. Leitura que falha mantém o veredito anterior.
 - **O que a barra de linhas ensinou e continua valendo**: o balão é conteúdo da janela, nunca `Popup`
   (popup aqui é camada **dentro** da janela e saía recortado sobre o próprio alvo); a HUD não tem
   translucidez própria (a opacidade é só a preferência do usuário); cota sem projeção continua na HUD

@@ -82,7 +82,13 @@ class SessionPulseViewModel(
     private val clock: Clock = Clock.System,
     autoStart: Boolean = true,
     /** Trilha do relatório de bug; ver [BreadcrumbRecorder]. */
-    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder,
+    /**
+     * O Codex está trabalhando agora, pelo relógio em milissegundos. `null`
+     * desliga. O índice lido acima é só do Claude CLI, e sem isto uma execução do
+     * Codex nunca acendia o arco de sessão ativa do anel dele.
+     */
+    private val codexActivity: (suspend (Long) -> Result<Boolean>)? = null
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + dispatcher)
     private var loopJob: Job? = null
@@ -207,12 +213,19 @@ class SessionPulseViewModel(
             ?: _cliPulses.value
 
         _cliPulses.value = pulses.prunedAt(now)
-        if (activity != null) {
-            _activeTargets.value = activity.activeProfileIds
-                .map { profileId -> UsageTargetKey(ApiSource.ANTHROPIC, profileId) }
-                .toSet()
-        }
+
+        // Leitura que falha mantém o valor anterior, de cada lado separadamente.
+        val codexKey = UsageTargetKey.forSource(ApiSource.CODEX)
+        val claudeTargets = activity?.activeProfileIds
+            ?.map { profileId -> UsageTargetKey(ApiSource.ANTHROPIC, profileId) }
+            ?.toSet()
+            ?: (_activeTargets.value - codexKey)
+        codexActivity?.invoke(now.toEpochMilliseconds())?.onSuccess { active -> codexActive = active }
+        _activeTargets.value = if (codexActive) claudeTargets + codexKey else claudeTargets
     }
+
+    /** Último veredito do Codex; uma leitura que falha não o apaga. */
+    private var codexActive = false
 
     /** Ver [refreshCliPulses]: motivo da última falha anotada, para não repeti-la. */
     private var lastCliPulseFailure: String? = null

@@ -41,6 +41,8 @@ import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalGeminiUsageDataSource
 import com.usagemonitor.data.datasource.LocalCursorSessionDataSource
+import com.usagemonitor.data.datasource.LocalCodexActivityDataSource
+import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.data.datasource.LocalAntigravityUsageDataSource
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
@@ -803,6 +805,7 @@ private fun runUsageMonitor(
     // Semáforo dos botões dos cards: lê o índice local de todas as contas e, para
     // as que participam do time, o servidor. Reusa o mesmo `syncCliSessionIndex`
     // das outras telas — o índice é um só.
+    val codexActivityDataSource = remember { LocalCodexActivityDataSource(CodexCliHomeProvider.resolve()) }
     val sessionPulseViewModel = remember(cliSessionRepository, teamUsageRepository, profileRegistry) {
         SessionPulseViewModel(
             getCliPulses = GetActiveCliSessionPulsesUseCase(cliSessionRepository),
@@ -812,6 +815,13 @@ private fun runUsageMonitor(
             // deste laço continua com a janela minimizada, que é o destinatário
             // do aviso.
             getStalledSessions = getStalledCliSessions,
+            // O Codex não entra no índice do Claude: a execução dele é lida do
+            // estado do app desktop e dos rollouts, como no Codenotch.
+            codexActivity = { nowMillis ->
+                runCatching {
+                    withContext(Dispatchers.IO) { codexActivityDataSource.isActive(nowMillis) }
+                }
+            },
             stallThresholdProvider = { alertSettingsFlow.value.effectiveStallThresholdMillis },
             teamTargetsProvider = {
                 buildSessionPulseTargets(
