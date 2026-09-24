@@ -39,7 +39,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C10 | Limpeza de movimento do `ApiUsageCard` | feito |
 | C11 | Spike da janela transparente | feito — resultado B |
 | C12 | Modelo puro da HUD | feito |
-| C13 | HUD em janela própria | pendente |
+| C13 | HUD em janela própria | feito |
 | C14 | Geometria de borda e migração da posição | pendente |
 | C15 | O notch com anéis | pendente |
 | C16 | Indicadores contínuos atrás da política | pendente |
@@ -61,6 +61,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C10 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde. As capturas mudaram em no máximo 5/255 por pixel (ruído subpixel), sem diferença visível; não foram commitadas agora e voltam no C17. O aquecimento de 20 × 100ms do gerador cobre as molas `GENTLE` (~450ms). |
 | 2026-09-24 | C11 | Claude Opus 5.5 | teste descartável `TransparentWindowSpikeTest` via `gradlew.bat desktopTest --tests "com.usagemonitor.spike.*"`, com `skiko.renderApi` padrão, `SOFTWARE` e `OPENGL` | Resultado **B** nos três: clique em pixel alfa 0 de uma `ComposeWindow` transparente é **engolido** — não chega nem ao conteúdo Compose nem à janela de trás. Clique de controle fora do overlay chega à janela de trás; clique no centro opaco chega ao Compose. O arquivo do spike não foi commitado. |
 | 2026-09-24 | C12 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest" --tests "com.usagemonitor.ui.*"` | Verde: sete casos do modelo e a suíte de UI inteira (a barra HUD atual consome o modelo por um adaptador, sem mudança visual). |
+| 2026-09-24 | C13 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.presentation.*"` | Verde. Os testes de `HudBar` já montavam a barra direto, sem `DesktopWindowFrame(hud)`, e não precisaram mudar. A verificação da janela real fica para o C17. |
 
 ## C1 · Tokens de motion e política
 
@@ -223,3 +224,17 @@ na borda da sombra e CPU da rotação contínua.
   empate na de maior percentual.
 - `main()` perdeu o bloco que montava as linhas; a barra atual recebe `HudAccount.toSourceStatus()`,
   adaptador que some quando o notch a substituir.
+
+## C13 · HUD em janela própria
+
+- `HudWindowHost` (`desktopMain/HudWindow.kt`): coleta os fluxos, monta as contas com
+  `buildHudAccounts`, guarda hover/arrasto/âncora e abre uma `Window` sem decoração, sempre no topo,
+  sem redimensionamento pelo usuário, com `AppTheme(motion)` e a opacidade do usuário.
+- `main()` perdeu ~250 linhas: estado, geometria, efeitos e composição da HUD, o guard do coletor de
+  persistência, o piso de tamanho da HUD e os termos HUD de `alwaysOnTop`/`resizable`. A janela
+  principal passou a `visible = !hudMode`.
+- `DesktopWindowFrame` perdeu `hud`/`hudContent`.
+- Corrigido no caminho: o arrasto limitava a posição à área **útil** e o encaixe usava a tela
+  **inteira**; agora os dois usam a tela inteira, e a barra chega sobre a barra de tarefas também
+  durante o arrasto.
+- `restoreMainWindow` sai da HUD antes de ativar a janela principal.

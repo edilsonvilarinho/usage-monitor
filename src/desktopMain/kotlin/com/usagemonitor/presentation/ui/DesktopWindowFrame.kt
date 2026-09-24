@@ -150,15 +150,6 @@ fun WindowScope.DesktopWindowFrame(
     /** Volta ao modo normal; `null` esconde o botão correspondente na faixa. */
     onExitCompact: (() -> Unit)? = null,
     /**
-     * Barra HUD (issue #164): terceiro chrome, ainda mais discreto que
-     * [compact] — sem título, sem [content], só [HudBar]. Mutuamente
-     * exclusivo com `compact` por regra de negócio de quem chama esta
-     * função (`Main.kt`), não por tipo.
-     */
-    hud: Boolean = false,
-    /** Conteúdo da barra HUD; ignorado quando [hud] é `false`. */
-    hudContent: (@Composable () -> Unit)? = null,
-    /**
      * Idioma do menu de modos revelado no modo "Somente cards"
      * ([onWindowModeChange]). Sem efeito quando ele é `null`.
      */
@@ -178,11 +169,11 @@ fun WindowScope.DesktopWindowFrame(
     val density = LocalDensity.current
     val isMaximized = windowState.placement == WindowPlacement.Maximized
 
-    // Cantos arredondados pressupõem a janela flutuando sobre o desktop; a
-    // faixa HUD, encostada na borda superior da tela, sai reta como uma
-    // janela maximizada.
-    DisposableEffect(isMaximized, hud, density) {
-        if (isMaximized || hud) {
+    // Cantos arredondados pressupõem a janela flutuando sobre o desktop. A
+    // barra HUD não passa mais por aqui: ela tem janela própria
+    // (`HudWindowHost`).
+    DisposableEffect(isMaximized, density) {
+        if (isMaximized) {
             window.shape = null
         } else {
             applyWindowShape(density, WindowCornerRadius)
@@ -202,7 +193,7 @@ fun WindowScope.DesktopWindowFrame(
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (!compact && !hud) {
+            if (!compact) {
                 DesktopTitleBar(
                     title = title,
                     iconPainter = iconPainter,
@@ -217,14 +208,6 @@ fun WindowScope.DesktopWindowFrame(
                     .weight(1f)
                     .background(MaterialTheme.colorScheme.background)
             ) {
-                // Em modo HUD, content() não compõe: a faixa não mostra cards,
-                // só o resumo que hudContent traz. A janela real, redimensionada
-                // por quem chama esta função, mal tem altura para mais que isso.
-                if (hud) {
-                    hudContent?.invoke()
-                    return@Box
-                }
-
                 content()
 
                 if (compact) {

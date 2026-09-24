@@ -720,20 +720,20 @@ regra de negócio dos setters em `Main.kt` (ligar um desliga o outro), não do t
   nunca se sabia de antemão quem estava ali. Por isso `allQuotaRisks` **não ordena** — duas ordens
   brigando dariam um resultado que nenhuma das duas descreve. Dentro da fonte vale a ordem de
   declaração das cotas, que é a da resposta da API: é ela que o resumo `5h 88% · 7d 9%` imprime.
-- **A janela muda de tamanho de verdade — não é overlay como o modo somente cards.** `alwaysOnTop`
-  vira `alwaysOnTopEnabled || hudMode` (expressão recomposta a cada leitura, nunca uma gravação: a
-  preferência do usuário não é sobrescrita) e `resizable = false`. Sair restaura tamanho, posição e
-  `placement` de antes, guardados num `remember` local — não em `MainWindowSnapshot`, que nunca
-  carregou posição porque a janela normal não precisava dela.
-- **Duas armadilhas de geometria, as duas medidas, não deduzidas.** (1) O coletor que persiste
-  tamanho/posição da janela (`LaunchedEffect(mainWindowState, settings)`, debounce de 250ms) ignora
-  toda mudança enquanto `hudMode=true` — sem o guard, a pílula seria gravada como "tamanho normal" e
-  o app nasceria nela na próxima abertura. (2) `ApplyWindowMinimumSize` usa um piso bem menor em HUD
-  (`HUD_MIN_WINDOW_WIDTH_DP` + `AppChrome.hud`), chamado **antes** do efeito que redimensiona, na
-  mesma ordem textual dentro do `Window { ... }`: os dois reagem a `hudMode` na mesma recomposição, e
-  é a ordem — não o tipo — que decide qual dos dois o AWT aplica primeiro. Sem isso o piso normal
-  (240×320dp) impediria a pílula de existir, e a janela ficaria presa no tamanho antigo por baixo do
-  que `mainWindowState.size` pede.
+- **A HUD tem janela própria** (`HudWindow.kt`, `HudWindowHost`, chamada por `main()` com
+  `if (hudMode)`), e a janela principal fica **escondida** (`visible = !hudMode`), não encolhida.
+  Antes a HUD era a janela principal reduzida, e isso custava três armadilhas medidas: guardar a
+  geometria de antes para restaurar ao sair, proibir o coletor de persistência de gravar a pílula
+  como "tamanho normal" e trocar o piso de tamanho **antes** do efeito que redimensiona, por ordem
+  textual. Com a janela separada as três deixaram de existir; o dashboard continua composto e a volta
+  é instantânea. Escondida não é minimizada: `isAppVisible` segue verdadeiro e a coleta alimenta a
+  HUD. "Abrir" (bandeja e segunda instância) sai da HUD antes de ativar a janela.
+- **A janela da HUD não interpola o tamanho quadro a quadro.** Era a fonte do tranco: cada quadro
+  redimensionava a janela AWT. O tamanho muda de uma vez e o movimento é do conteúdo.
+- **Clique em pixel transparente é engolido** (medido no Windows 11, C11 do plano
+  [`profundidade-movimento-hud-notch-execucao.md`](docs/planos/profundidade-movimento-hud-notch-execucao.md)):
+  numa janela transparente a área vazia não deixa o clique passar para trás. Por isso a janela só
+  tem o tamanho do painel aberto enquanto o ponteiro está nela.
 - **Duas versões de ocupação foram achadas erradas ao vivo, não antecipadas em plano nenhum.** A
   primeira era a largura inteira da tela: sempre no topo (`alwaysOnTop`), cobria os controles de
   qualquer outra janela que tivesse algo nos primeiros 24dp do topo — barra de menu de IDE, atalhos
