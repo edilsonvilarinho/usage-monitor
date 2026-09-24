@@ -40,6 +40,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ActiveSessionAlert
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
+import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
@@ -3153,6 +3154,53 @@ class ComponentTest {
         onNodeWithText("Últimas 5h").assertIsDisplayed()
         onNodeWithText("7d: 31").assertIsDisplayed()
         onAllNodesWithText("0%").assertCountEquals(0)
+    }
+
+    /**
+     * Fora do Codex, `SOURCE_UNSTABLE` é a marca da última leitura guardada depois
+     * de uma falha (issue #267). A frase do contrato do Codex não pode aparecer no
+     * card do Cursor, e cada franquia do ciclo tem o nome no título.
+     */
+    @Test
+    fun `Cursor card names each allowance and explains a stale reading`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.CURSOR,
+                    apiName = "Cursor",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = CursorQuotaLabels.AUTO,
+                            used = 34L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-10-01T00:00:00Z"),
+                            periodType = PeriodType.MONTHLY,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = CursorQuotaLabels.API,
+                            used = 11L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-10-01T00:00:00Z"),
+                            periodType = PeriodType.MONTHLY,
+                            unit = UsageUnit.PERCENTAGE
+                        )
+                    ),
+                    notices = setOf(ApiUsageNotice.SOURCE_UNSTABLE),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = {},
+                    now = Instant.parse("2026-09-24T10:00:00Z")
+                )
+            }
+        }
+
+        onNodeWithText("Auto · Mensal").assertIsDisplayed()
+        onNodeWithText("API · Mensal").assertIsDisplayed()
+        onNodeWithContentDescription("última leitura válida", substring = true).assertIsDisplayed()
+        onAllNodesWithContentDescription("Codex", substring = true).assertCountEquals(0)
     }
 
     /**

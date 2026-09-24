@@ -383,6 +383,7 @@ fun ApiUsageCard(
                         if (notices.isNotEmpty()) {
                             CardNoticeHint(
                                 notices = notices,
+                                source = source,
                                 language = language,
                                 iconSize = density.actionIconSize
                             )
@@ -712,16 +713,17 @@ private fun AccountIdentityLabel(
 @Composable
 private fun CardNoticeHint(
     notices: Set<ApiUsageNotice>,
+    source: ApiSource,
     language: AppLanguage,
     iconSize: Dp,
     modifier: Modifier = Modifier
 ) {
     // Mesma ordem estável dos banners que este hint substituiu.
-    val texts = remember(notices, language) {
+    val texts = remember(notices, source, language) {
         notices
             .toList()
             .sortedBy { notice -> notice.ordinal }
-            .map { notice -> noticeText(notice = notice, language = language) }
+            .map { notice -> noticeText(notice = notice, source = source, language = language) }
     }
     if (texts.isEmpty()) return
 
@@ -765,7 +767,7 @@ private fun noticeHintTitle(count: Int, language: AppLanguage): String {
     }
 }
 
-private fun noticeText(notice: ApiUsageNotice, language: AppLanguage): String {
+private fun noticeText(notice: ApiUsageNotice, source: ApiSource, language: AppLanguage): String {
     return when (notice) {
         ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE -> {
             if (language == AppLanguage.PT) {
@@ -774,7 +776,15 @@ private fun noticeText(notice: ApiUsageNotice, language: AppLanguage): String {
                 "7d quota unavailable in Codex weekly source"
             }
         }
-        ApiUsageNotice.SOURCE_UNSTABLE -> {
+        // Fora do Codex a marca é posta pelo painel quando guarda a última leitura
+        // depois de uma falha (issue #267): a frase do contrato do Codex não se aplica.
+        ApiUsageNotice.SOURCE_UNSTABLE -> if (source != ApiSource.CODEX) {
+            if (language == AppLanguage.PT) {
+                "A coleta mais recente falhou. Os números são da última leitura válida e podem estar desatualizados."
+            } else {
+                "The latest refresh failed. These numbers are from the last valid reading and may be out of date."
+            }
+        } else {
             if (language == AppLanguage.PT) {
                 "Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar."
             } else {

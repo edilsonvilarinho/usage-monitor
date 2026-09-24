@@ -75,6 +75,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
 
+/**
+ * Fontes locais (issue #267) cuja última leitura sobrevive a uma falha, como a do
+ * Codex. O dado guardado leva [ApiUsageNotice.SOURCE_UNSTABLE]: sem a marca o card
+ * mostrava números congelados — janelas deslizantes de 5h/7d que não andam mais —
+ * como se fossem da coleta corrente.
+ */
+private val LOCAL_SESSION_CACHE_SOURCES = setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY)
+
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
     private val getMiniMaxUsage: GetMiniMaxUsageUseCase,
@@ -621,14 +629,13 @@ class DashboardViewModel(
                                 existingStats != null &&
                                 isPersistableDashboardStats(existingStats)
                         val canPreserveLocalIntegrationCache =
-                            target.source in setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY) &&
-                                existingStats != null
+                            target.source in LOCAL_SESSION_CACHE_SOURCES && existingStats != null
                         val shouldRemoveData =
                             (!preserveDataOnFailure && !canPreserveCodexCache && !canPreserveLocalIntegrationCache) ||
                                 target !in cachedStatsByTarget
                         if (shouldRemoveData) {
                             cachedStatsByTarget.remove(target)
-                        } else if (canPreserveCodexCache) {
+                        } else if (canPreserveCodexCache || canPreserveLocalIntegrationCache) {
                             cachedStatsByTarget[target] = existingStats!!.copy(
                                 notices = existingStats.notices + ApiUsageNotice.SOURCE_UNSTABLE
                             )
