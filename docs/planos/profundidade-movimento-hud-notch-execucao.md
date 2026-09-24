@@ -40,7 +40,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C11 | Spike da janela transparente | feito — resultado B |
 | C12 | Modelo puro da HUD | feito |
 | C13 | HUD em janela própria | feito |
-| C14 | Geometria de borda e migração da posição | pendente |
+| C14 | Geometria de borda e migração da posição | feito |
 | C15 | O notch com anéis | pendente |
 | C16 | Indicadores contínuos atrás da política | pendente |
 | C17 | Verificação final | pendente |
@@ -62,6 +62,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C11 | Claude Opus 5.5 | teste descartável `TransparentWindowSpikeTest` via `gradlew.bat desktopTest --tests "com.usagemonitor.spike.*"`, com `skiko.renderApi` padrão, `SOFTWARE` e `OPENGL` | Resultado **B** nos três: clique em pixel alfa 0 de uma `ComposeWindow` transparente é **engolido** — não chega nem ao conteúdo Compose nem à janela de trás. Clique de controle fora do overlay chega à janela de trás; clique no centro opaco chega ao Compose. O arquivo do spike não foi commitado. |
 | 2026-09-24 | C12 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest" --tests "com.usagemonitor.ui.*"` | Verde: sete casos do modelo e a suíte de UI inteira (a barra HUD atual consome o modelo por um adaptador, sem mudança visual). |
 | 2026-09-24 | C13 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.presentation.*"` | Verde. Os testes de `HudBar` já montavam a barra direto, sem `DesktopWindowFrame(hud)`, e não precisaram mudar. A verificação da janela real fica para o C17. |
+| 2026-09-24 | C14 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.HudWindowPreferencesTest"` | Verde: dez casos de geometria e quatro de posição (padrão, ida e volta, migração da pílula antiga, meia gravação ignorada). |
 
 ## C1 · Tokens de motion e política
 
@@ -238,3 +239,16 @@ na borda da sombra e CPU da rotação contínua.
   **inteira**; agora os dois usam a tela inteira, e a barra chega sobre a barra de tarefas também
   durante o arrasto.
 - `restoreMainWindow` sai da HUD antes de ativar a janela principal.
+
+## C14 · Geometria de borda
+
+- `HudNotchGeometry.kt`: `HudEdge` (enum novo), `hudNotchSizes` (recolhido e aberto, com os ombros),
+  `hudWindowBounds` (janela colada à borda, margem de sombra só nos três lados de dentro, presa à tela
+  perto dos cantos, com o centro do notch em coordenadas da janela) e `nearestHudPlacement`.
+- **A geometria é dona do tamanho do conteúdo**: o notch composto usará estes números como tamanho do
+  contêiner, sem medir nada — medir e devolver para a janela fecharia o laço de redimensionamento.
+- A largura recolhida é o maior entre percentual e palavra, e por isso uma coleta que troca `9%` por
+  `88%` não muda a janela.
+- `HudPlacement(borda, fração)` gravado em `hudEdge`/`hudEdgeOffset`; a posição da pílula antiga
+  (`hudWindowX/Y`) migra uma vez para a borda mais próxima e as chaves velhas são apagadas. Estreia no
+  topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.

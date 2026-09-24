@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 private const val HUD_WINDOW_X_KEY = "hudWindowX"
@@ -64,3 +65,55 @@ internal fun persistHudPosition(settings: PreferencesSettings, xDp: Float, yDp: 
     settings.putString(HUD_WINDOW_X_KEY, xDp.roundToInt().toString())
     settings.putString(HUD_WINDOW_Y_KEY, yDp.roundToInt().toString())
 }
+
+private const val HUD_EDGE_KEY = "hudEdge"
+private const val HUD_EDGE_OFFSET_KEY = "hudEdgeOffset"
+
+/**
+ * Onde o notch mora: a borda e o centro ao longo dela, em **fração** da tela.
+ *
+ * Fração e não dp: ao trocar de resolução ou de monitor o notch continua no
+ * mesmo ponto relativo da borda, em vez de sair da tela por uma coordenada que
+ * descrevia um monitor mais largo.
+ *
+ * **Migra a posição da pílula antiga** na primeira leitura: quem já tinha
+ * arrastado a barra para um canto não pode perder a escolha só porque o
+ * desenho mudou. O canto gravado vira a borda mais próxima dele, as chaves
+ * novas são gravadas e as antigas apagadas — a migração acontece uma vez.
+ * Meia posição (borda sem fração, ou o contrário) é ignorada, pela mesma razão
+ * de [readPersistedHudPosition].
+ */
+internal fun readPersistedHudPlacement(settings: PreferencesSettings, area: ScreenWorkArea): HudPlacement {
+    val edge = settings.getStringOrNull(HUD_EDGE_KEY)?.let { name ->
+        HudEdge.entries.firstOrNull { entry -> entry.name == name }
+    }
+    val fraction = settings.getStringOrNull(HUD_EDGE_OFFSET_KEY)?.toFloatOrNull()
+    if (edge != null && fraction != null && fraction.isFinite()) {
+        return HudPlacement(edge, fraction.coerceIn(0f, 1f))
+    }
+
+    val legacy = readPersistedHudPosition(settings) ?: return HudPlacement.Default
+    // O canto gravado era o superior esquerdo da pílula; o centro dela ficava
+    // meia pílula adiante. Um palpite de 100dp basta: só decide a borda e o
+    // ponto ao longo dela, e o usuário arrasta se não gostar.
+    val migrated = nearestHudPlacement(
+        centerX = (legacy.xDp + LEGACY_PILL_HALF_WIDTH_DP).dp,
+        centerY = (legacy.yDp + LEGACY_PILL_HALF_HEIGHT_DP).dp,
+        area = area
+    )
+    persistHudPlacement(settings, migrated)
+    settings.remove(HUD_WINDOW_X_KEY)
+    settings.remove(HUD_WINDOW_Y_KEY)
+    return migrated
+}
+
+internal fun persistHudPlacement(settings: PreferencesSettings, placement: HudPlacement) {
+    if (!placement.offsetFraction.isFinite()) {
+        return
+    }
+    settings.putString(HUD_EDGE_KEY, placement.edge.name)
+    settings.putString(HUD_EDGE_OFFSET_KEY, placement.offsetFraction.coerceIn(0f, 1f).toString())
+}
+
+private const val LEGACY_PILL_HALF_WIDTH_DP = 100
+private const val LEGACY_PILL_HALF_HEIGHT_DP = 14
