@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_APP_BALLOON_ACTIONS
 import com.usagemonitor.HUD_APP_BALLOON_CAPTION
 import com.usagemonitor.HUD_APP_BALLOON_MODE_ROW
+import com.usagemonitor.HUD_BALLOON_ACTIONS
 import com.usagemonitor.HUD_BALLOON_BAR_ROW
 import com.usagemonitor.HUD_BALLOON_FOOTER
 import com.usagemonitor.HUD_BALLOON_GAP
@@ -195,7 +196,12 @@ private const val CORNER_CLEARANCE_PX = 12f
 
 /** O conteúdo do balão de uma conta. */
 @Composable
-internal fun HudAccountBalloonContent(account: HudAccount, language: AppLanguage) {
+internal fun HudAccountBalloonContent(
+    account: HudAccount,
+    language: AppLanguage,
+    /** Os botões do card desta conta; a fileira tem a altura reservada mesmo vazia. */
+    actions: (@Composable (HudAccount) -> Unit)? = null
+) {
     Column(modifier = Modifier.fillMaxWidth().testTag(HUD_BALLOON_CONTENT_TEST_TAG)) {
         Row(
             modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_HEADER),
@@ -257,6 +263,14 @@ internal fun HudAccountBalloonContent(account: HudAccount, language: AppLanguage
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.height(HUD_BALLOON_FOOTER)
             )
+        }
+        Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+        Row(
+            modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_ACTIONS),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            actions?.invoke(account)
         }
     }
 }

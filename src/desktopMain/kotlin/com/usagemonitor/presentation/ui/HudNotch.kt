@@ -52,6 +52,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -107,8 +117,12 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
-/** Descrição do alvo de clique do notch — é por ela que leitor de tela e testes o acham. */
-internal const val HUD_BAR_OPEN_DESCRIPTION = "Abrir Usage Monitor"
+/** Descrição do corpo do notch — é por ela que leitor de tela e testes o acham. */
+internal const val HUD_NOTCH_DESCRIPTION = "Barra HUD do Usage Monitor"
+
+/** "Atualizar Anthropic — Padrão": a ação do clique num anel, na semântica dele. */
+internal fun hudRefreshAccountLabel(account: HudAccount, language: AppLanguage): String =
+    if (language == AppLanguage.PT) "Atualizar ${account.label}" else "Refresh ${account.label}"
 
 /** O corpo do notch, cujo tamanho a geometria afirma (`HudNotchTest`). */
 internal const val HUD_CONTENT_TEST_TAG = "hudContent"
@@ -162,8 +176,11 @@ internal fun HudNotch(
     onDragStart: () -> Unit = {},
     onDragMove: () -> Unit = {},
     onDragEnd: () -> Unit = {},
-    onOpenFull: () -> Unit,
+    /** Clique num anel: recoleta aquela conta, como no Codenotch. */
+    onRefreshAccount: (UsageTargetKey) -> Unit = {},
     onSwitchToCardsOnly: () -> Unit = {},
+    /** Os botões do card de cada conta, na fileira de baixo do balão dela. */
+    accountActions: (@Composable (HudAccount) -> Unit)? = null,
     /**
      * O conteúdo do balão da engrenagem. Com ele, a engrenagem abre e fecha o
      * balão; sem ele, o clique vai a [onGearClick].
@@ -214,6 +231,11 @@ internal fun HudNotch(
     // Centro de cada anel ao longo da borda, em px do contêiner.
     val ringCenters = remember { mutableStateMapOf<Int, Float>() }
     var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    // A caixa de cada conta no corpo do notch, para achar o anel de um clique.
+    // Não é estado: é lida no gesto, nunca na composição.
+    val ringItemBounds = remember { HudRingHitBoxes() }
+    val currentAccounts by rememberUpdatedState(accounts)
+    val currentOnRefreshAccount by rememberUpdatedState(onRefreshAccount)
 
     val shape = remember(edge) { HudNotchShape(edge) }
     val ladder = AppSurfaceLadders.current
@@ -258,25 +280,25 @@ internal fun HudNotch(
                     .appSheen()
                     .border(1.dp, ladder.borderTop, shape)
                     .hoverable(notchHover)
-                    // Sem barra de título nem pegador, é o cursor que diz que o notch se
-                    // move — a pergunta "como eu movo?" veio de quem já o tinha na tela.
+                    .onPlaced { coordinates -> ringItemBounds.body = coordinates }
+                    // O cursor de mover continua sobre o corpo: arrastar por ele move,
+                    // além da mão.
                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.MOVE_CURSOR)))
                     .hudPressGesture(
                         onDragStart = onDragStart,
                         onDragMove = onDragMove,
                         onDragEnd = onDragEnd,
-                        onClick = onOpenFull,
+                        // Clique num anel recoleta aquela conta; fora dos anéis
+                        // (contagem, margem) não faz nada. Abrir a janela padrão
+                        // ficou com a engrenagem, a bandeja e `Ctrl+Shift+H`.
+                        onClick = { position ->
+                            ringItemBounds.indexAt(position)
+                                ?.let { index -> currentAccounts.getOrNull(index) }
+                                ?.let { account -> currentOnRefreshAccount(account.targetKey) }
+                        },
                         onSecondaryClick = onSwitchToCardsOnly
                     )
-                    // A ação de clique é **declarada**, não instalada: um `clickable`
-                    // consumiria o `down` e o arrasto nunca começaria.
-                    .semantics {
-                        contentDescription = HUD_BAR_OPEN_DESCRIPTION
-                        onClick(label = HUD_BAR_OPEN_DESCRIPTION) {
-                            onOpenFull()
-                            true
-                        }
-                    }
+                    .semantics { contentDescription = HUD_NOTCH_DESCRIPTION }
             ) {
                 HudRingStrip(
                     accounts = accounts,
@@ -287,6 +309,14 @@ internal fun HudNotch(
                     countdown = countdown,
                     size = sizes.collapsed,
                     onRingHovered = { index -> balloonIndex = index },
+                    language = language,
+                    onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
+                    onItemPlaced = { index, coordinates ->
+                        val body = ringItemBounds.body
+                        if (body != null && body.isAttached && coordinates.isAttached) {
+                            ringItemBounds.boxes[index] = body.localBoundingBoxOf(coordinates)
+                        }
+                    },
                     onRingPlaced = { index, coordinates ->
                         val root = rootCoordinates
                         if (root != null && root.isAttached && coordinates.isAttached) {
@@ -379,7 +409,7 @@ internal fun HudNotch(
                                 val shownAccount = accounts.getOrNull(shown)
                                 when {
                                     shown == APP_BALLOON -> appBalloon?.invoke()
-                                    shownAccount != null -> HudAccountBalloonContent(shownAccount, language)
+                                    shownAccount != null -> HudAccountBalloonContent(shownAccount, language, accountActions)
                                 }
                             }
                         }
@@ -464,6 +494,14 @@ internal fun HudNotch(
 
 private enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
 
+/** A caixa de cada conta no corpo do notch; o gesto do corpo acha o anel clicado por ela. */
+private class HudRingHitBoxes {
+    var body: LayoutCoordinates? = null
+    val boxes = mutableMapOf<Int, Rect>()
+
+    fun indexAt(position: Offset): Int? = boxes.entries.firstOrNull { (_, box) -> box.contains(position) }?.key
+}
+
 /** O "índice" do balão da engrenagem, fora do intervalo das contas. */
 private const val APP_BALLOON = -1
 
@@ -500,6 +538,12 @@ private fun balloonOrigin(edge: HudEdge): TransformOrigin = when (edge) {
 
 private const val BALLOON_ENTER_SCALE = 0.96f
 
+/** O anel "pressionado" enquanto a conta recoleta. */
+private const val RING_REFRESH_SCALE = 0.9f
+
+/** A marca gira uma volta por segundo, o ritmo do glifo de recarga do card. */
+private const val RING_REFRESH_TURN_MILLIS = 1_000
+
 /** Meio pixel: abaixo disso o balão já está no anel. */
 private const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
 
@@ -513,7 +557,10 @@ private fun HudRingStrip(
     updateIndicator: HudUpdateIndicator?,
     countdown: (@Composable () -> Unit)?,
     size: DpSize,
+    language: AppLanguage,
     onRingHovered: (Int) -> Unit,
+    onRingRefresh: (Int) -> Unit,
+    onItemPlaced: (Int, LayoutCoordinates) -> Unit,
     onRingPlaced: (Int, LayoutCoordinates) -> Unit
 ) {
     val items: @Composable () -> Unit = {
@@ -524,7 +571,10 @@ private fun HudRingStrip(
                 HudRingItem(
                     account = account,
                     vertical = !edge.isHorizontal,
+                    language = language,
                     onHovered = { onRingHovered(index) },
+                    onRefresh = { onRingRefresh(index) },
+                    onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
                     onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
                 )
             }
@@ -556,9 +606,43 @@ private fun HudRingStrip(
 private fun HudRingItem(
     account: HudAccount,
     vertical: Boolean,
+    language: AppLanguage,
     onHovered: () -> Unit,
+    onRefresh: () -> Unit,
+    onItemPlaced: (LayoutCoordinates) -> Unit,
     onPlaced: (LayoutCoordinates) -> Unit
 ) {
+    // Coletando, o anel fica pressionado — o `refreshRing` do Codenotch — e a
+    // marca gira, só com a política contínua.
+    val pressScale by animateFloatAsState(
+        targetValue = if (account.refreshing) RING_REFRESH_SCALE else 1f,
+        animationSpec = appSpring(AppMotion.Springs.SNAPPY),
+        label = "hudRingRefreshScale"
+    )
+    val policy = LocalAppMotionPolicy.current
+    val markTurn = if (account.refreshing && policy.continuous) {
+        val transition = rememberInfiniteTransition(label = "hudRingRefresh")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(RING_REFRESH_TURN_MILLIS, easing = LinearEasing)),
+            label = "hudRingRefreshAngle"
+        )
+        angle
+    } else {
+        0f
+    }
+    val refreshLabel = hudRefreshAccountLabel(account, language)
+    // A ação é **declarada** na semântica, não instalada: um `clickable` aqui
+    // consumiria o `down` e o arrasto pelo corpo nunca começaria.
+    val itemModifier = Modifier
+        .onGloballyPositioned(onItemPlaced)
+        .semantics {
+            onClick(label = refreshLabel) {
+                onRefresh()
+                true
+            }
+        }
     // O anel sob o ponteiro escolhe a conta do balão.
     val hover = remember { MutableInteractionSource() }
     val isHovered by hover.collectIsHoveredAsState()
@@ -580,7 +664,12 @@ private fun HudRingItem(
         // cor do texto e não no acento — em volta dela já estão os arcos, e o
         // acento ali competiria com a cor de risco deles.
         Box(
-            modifier = Modifier.onGloballyPositioned(onPlaced),
+            modifier = Modifier
+                .onGloballyPositioned(onPlaced)
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                },
             contentAlignment = Alignment.Center
         ) {
             AppUsageRing(
@@ -595,7 +684,8 @@ private fun HudRingItem(
             AppProviderMark(
                 source = account.source,
                 tint = MaterialTheme.colorScheme.onSurface,
-                size = hudRingMarkSize(account.rings.size, account.sessionActive)
+                size = hudRingMarkSize(account.rings.size, account.sessionActive),
+                modifier = Modifier.graphicsLayer { rotationZ = markTurn }
             )
         }
     }
@@ -617,14 +707,14 @@ private fun HudRingItem(
         )
     }
     if (vertical) {
-        Column(modifier = Modifier.hoverable(hover), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = itemModifier.hoverable(hover), horizontalAlignment = Alignment.CenterHorizontally) {
             ring()
             percent()
             word()
         }
     } else {
         Row(
-            modifier = Modifier.hoverable(hover),
+            modifier = itemModifier.hoverable(hover),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(HUD_RING_TEXT_GAP)
         ) {
@@ -699,8 +789,8 @@ internal class HudNotchShape(private val edge: HudEdge) : Shape {
 
 @Composable
 private fun HudUpdateBadge(indicator: HudUpdateIndicator) {
-    // Sem clique próprio (#225): o notch inteiro já abre a janela padrão, onde a
-    // faixa de atualização oferece o reinício. Reiniciar direto daqui faria um
+    // Sem clique próprio (#225): o balão da engrenagem repete a frase, e o
+    // reinício é oferecido na janela padrão. Reiniciar direto daqui faria um
     // clique de rotina reiniciar o app sem aviso.
     Icon(
         imageVector = Icons.Rounded.SystemUpdate,
@@ -783,7 +873,8 @@ internal fun Modifier.hudPressGesture(
     onDragStart: () -> Unit,
     onDragMove: () -> Unit,
     onDragEnd: () -> Unit,
-    onClick: () -> Unit,
+    /** Recebe a posição do `down`, no nó do gesto: é por ela que o notch acha o anel. */
+    onClick: (Offset) -> Unit,
     onSecondaryClick: () -> Unit = {}
 ): Modifier {
     val currentDragStart by rememberUpdatedState(onDragStart)
@@ -826,7 +917,7 @@ internal fun Modifier.hudPressGesture(
                 val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
                     ?: break
                 if (!change.pressed) {
-                    if (dragging) currentDragEnd() else currentClick()
+                    if (dragging) currentDragEnd() else currentClick(down.position)
                     break
                 }
                 travelled += change.positionChange().getDistance()

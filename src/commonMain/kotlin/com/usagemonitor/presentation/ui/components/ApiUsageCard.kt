@@ -587,91 +587,32 @@ fun ApiUsageCard(
             // do pisca ("1 sessão ativa agora pede atenção: …"), que é o motivo de
             // o semáforo existir. Texto no botão não teria onde levá-la.
             AppStatusBar {
-                CardIconActionButton(
-                    label = historyActionLabel(language = language),
-                    onClick = onOpenHistory,
-                    buttonSize = density.actionButtonSize
-                ) { tint ->
-                    Icon(
-                        imageVector = Icons.Rounded.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(density.actionIconSize),
-                        tint = tint
+                // A ordem e as condições são de `cardActionsFor`, dono único da
+                // regra; aqui chegam como lambdas nulas ou não.
+                val actions = buildList {
+                    add(CardAction.HISTORY)
+                    if (onOpenCodexCliSessions != null) add(CardAction.CODEX_CLI_SESSIONS)
+                    if (onOpenCliSessions != null) add(CardAction.CLI_SESSIONS)
+                    if (onOpenTeamUsage != null) add(CardAction.TEAM_USAGE)
+                    if (onOpenTeamPresence != null) add(CardAction.TEAM_PRESENCE)
+                }
+                actions.forEach { action ->
+                    CardActionButton(
+                        action = action,
+                        language = language,
+                        buttonSize = density.actionButtonSize,
+                        iconSize = density.actionIconSize,
+                        cliSessionPulse = cliSessionPulse,
+                        teamSessionPulse = teamSessionPulse,
+                        onClick = when (action) {
+                            CardAction.HISTORY -> onOpenHistory
+                            CardAction.CODEX_CLI_SESSIONS -> onOpenCodexCliSessions ?: {}
+                            CardAction.CLI_SESSIONS -> onOpenCliSessions ?: {}
+                            CardAction.TEAM_USAGE -> onOpenTeamUsage ?: {}
+                            CardAction.TEAM_PRESENCE -> onOpenTeamPresence ?: {}
+                        }
                     )
                 }
-
-                if (onOpenCodexCliSessions != null) {
-                    CardIconActionButton(
-                        label = codexCliSessionsActionLabel(language = language),
-                        onClick = onOpenCodexCliSessions,
-                        buttonSize = density.actionButtonSize
-                    ) { tint ->
-                        Icon(
-                            imageVector = Icons.Rounded.Terminal,
-                            contentDescription = null,
-                            modifier = Modifier.size(density.actionIconSize),
-                            tint = tint
-                        )
-                    }
-                }
-
-                if (onOpenCliSessions != null) {
-                    CardIconActionButton(
-                        label = cliSessionsActionLabel(language = language),
-                        onClick = onOpenCliSessions,
-                        buttonSize = density.actionButtonSize,
-                        pulse = cliSessionPulse,
-                        language = language
-                    ) { tint ->
-                        Icon(
-                            imageVector = Icons.Rounded.Terminal,
-                            contentDescription = null,
-                            modifier = Modifier.size(density.actionIconSize),
-                            tint = tint
-                        )
-                    }
-                }
-
-                    // Só chega não-nulo quando a integração está ligada e esta
-                    // conta foi marcada como parte do time nas Configurações.
-                    if (onOpenTeamUsage != null) {
-                        CardIconActionButton(
-                            label = teamUsageActionLabel(language = language),
-                            onClick = onOpenTeamUsage,
-                            buttonSize = density.actionButtonSize,
-                            pulse = teamSessionPulse,
-                            language = language
-                        ) { tint ->
-                            Icon(
-                                imageVector = Icons.Rounded.Groups,
-                                contentDescription = null,
-                                modifier = Modifier.size(density.actionIconSize),
-                                tint = tint
-                            )
-                        }
-                    }
-
-                    // Vizinho do botão de sessões do time de propósito: os dois
-                    // abrem janelas do time, e separá-los mandaria o usuário
-                    // procurar em dois cantos.
-                    //
-                    // Sem `pulse`, e o default já é `SessionPulse.EMPTY`. Neste
-                    // app o pisca significa uma coisa só — sessão em atenção ou
-                    // saturada — e o botão colado a este já a carrega.
-                    if (onOpenTeamPresence != null) {
-                        CardIconActionButton(
-                            label = teamPresenceActionLabel(language = language),
-                            onClick = onOpenTeamPresence,
-                            buttonSize = density.actionButtonSize
-                        ) { tint ->
-                            Icon(
-                                imageVector = Icons.Rounded.Sensors,
-                                contentDescription = null,
-                                modifier = Modifier.size(density.actionIconSize),
-                                tint = tint
-                            )
-                        }
-                    }
             }
             }
         }
@@ -1133,7 +1074,7 @@ private fun ObservedUsageInlineBar(
 
 
 @Composable
-private fun CardIconActionButton(
+internal fun CardIconActionButton(
     label: String,
     onClick: () -> Unit,
     buttonSize: Dp,
@@ -1666,7 +1607,7 @@ private fun quotaTone(quota: QuotaInfo, risk: QuotaRiskSummary?): AppTone {
  * `waitForIdle`.
  */
 @Composable
-private fun RefreshGlyph(refreshing: Boolean, tint: Color, size: Dp) {
+internal fun RefreshGlyph(refreshing: Boolean, tint: Color, size: Dp) {
     val policy = LocalAppMotionPolicy.current
     val rotation = if (refreshing && policy.continuous) {
         val transition = rememberInfiniteTransition(label = "refreshGlyph")

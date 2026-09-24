@@ -73,7 +73,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | E3 | Balão por anel com cauda, no lugar do painel de todas as contas | feito |
 | E4 | Alças: mão (mover) e engrenagem | feito |
 | E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | feito |
-| E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | pendente |
+| E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | feito |
 | E7 | Documentação, design system, protótipo, ajuda, capturas | pendente |
 | E8 | Verificação | pendente |
 
@@ -106,6 +106,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.Hud*"` | Verde: 19 casos do notch (balão só da conta do anel sob o ponteiro; costura de tamanho do notch e do balão nas 4 bordas) e os novos de geometria (notch parado na tela ao abrir em 5 frações × 4 bordas, balão da conta mais alta, grupos). Renderização descartável nas 4 bordas: cauda no anel certo e a contagem inteira ("04:50"). |
 | 2026-09-24 | E4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*"` | Verde: 24 casos do notch (alças só abertas, arrasto pela mão sem abrir nada, mão presente durante o arrasto, engrenagem, hover na alça conta como no notch, alças dentro da janela aberta nas 4 bordas) e 13 de geometria (notch parado na tela e alças dentro da janela até na fração 0 e 1). A renderização em fração 0,9 reprovou a primeira versão: engrenagem fora da janela. |
 | 2026-09-24 | E5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.ui.FooterBar*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde: 28 casos do notch (engrenagem abre e fecha o balão; ações do rodapé pelas mesmas descrições; modos com o corrente marcado; anel troca para a conta; altura do balão com e sem atualização) e as suítes do rodapé e de componentes sem mudança. Renderização descartável: cauda na engrenagem nas bordas de cima e da direita. |
+| 2026-09-24 | E6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.ComponentTest" --tests "com.usagemonitor.ui.*Card*"` | Verde: 30 casos do notch (clique no anel atualiza só aquela conta, fora dos anéis nada; ação declarada na semântica do anel; botões do card no balão; indicador de atualização sem clique próprio), `CardActionsTest` (3) e o `ComponentTest` (99) sem mudança na barra do card. Renderização descartável: fileira histórico · sessões · time · presença · atualizar no balão. |
 
 ## C1 · Tokens de motion e política
 
@@ -461,3 +462,27 @@ na borda da sombra e CPU da rotação contínua.
   retorno, e falha vai ao mesmo `recordFailure`.
 - Geometria: `hudAppBalloonHeight` soma as linhas do balão, e o balão reservado é o maior entre as
   contas **e** a engrenagem. Sem conta nenhuma ele continua existindo: é a saída do modo.
+
+## E6 · Botões do card no balão e clique no anel
+
+- **`cardActionsFor` é a dona única da regra** de quais janelas uma conta abre: histórico sempre,
+  sessões CLI na Anthropic, sessões Codex CLI no Codex, uso e presença do time na conta Anthropic
+  marcada. Morava inline na grade de cards; a HUD precisaria de uma segunda cópia das condições de
+  time. `CardActionButton` é o botão de cada ação — ícone, rótulo e pisca de sessão —, e a barra do
+  card passou a compô-lo: mesma ordem, mesmo desenho, `ComponentTest` sem mudança.
+- No balão da conta, uma fileira embaixo com esses botões e, por último, **atualizar só esta conta**,
+  com o `RefreshGlyph` do card (gira enquanto coleta, só com a política contínua). A fileira tem a
+  altura reservada em toda conta: o histórico existe em todas.
+- `AppShellActions` ganhou as cinco janelas por conta, extraídas dos lambdas do `DashboardScreen` em
+  `main()`; o host recebe os perfis do time e os pulsos de sessão para desenhar os botões como o card.
+  `HudAccount` ganhou a chave da conta do provedor (o histórico filtra por ela) e `refreshing`.
+- **Clique num anel recoleta aquela conta** (`viewModel.refresh(target)`), decisão do usuário, como o
+  `refreshRing` do Codenotch. O gesto do corpo agora entrega a posição do `down`, e o notch acha o anel
+  pela caixa de cada conta; fora dos anéis (contagem, margem) o clique não faz nada. Continua
+  **declarado** na semântica de cada anel ("Atualizar Anthropic — Padrão"), não instalado — um
+  `clickable` consumiria o `down` e o arrasto pelo corpo nunca começaria.
+- Coletando, o anel fica "pressionado" (escala 0,9 pela mola `SNAPPY`) e a marca gira, só com a
+  política contínua.
+- **O clique deixou de abrir a janela padrão.** Ela continua a um gesto: "Padrão" no balão da
+  engrenagem, "Abrir" na bandeja, `Ctrl+Shift+H`; e o botão direito continua indo a "Somente cards"
+  (#215). `HUD_BAR_OPEN_DESCRIPTION` virou `HUD_NOTCH_DESCRIPTION`, sem ação de clique.

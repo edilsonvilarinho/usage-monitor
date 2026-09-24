@@ -506,8 +506,7 @@ private fun recordWindowModes(outputDir: File) {
                                 nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
                                 countdownDescription = "Próxima atualização automática",
                                 nowProvider = { ScreenshotFixtures.NOW },
-                                countdownUpdatesEnabled = false,
-                                onOpenFull = {}
+                                countdownUpdatesEnabled = false
                             )
                         }
                     }

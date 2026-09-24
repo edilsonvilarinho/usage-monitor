@@ -119,6 +119,9 @@ internal fun ResponsiveDashboardCardGrid(
                 val isBeingDragged = dragState?.target == stats.targetKey
 
                 key(stats.targetKey) {
+                    // Quais janelas o card abre: `cardActionsFor`, a mesma regra do
+                    // balão da conta na barra HUD.
+                    val actions = cardActionsFor(stats.targetKey, teamEnabledProfileIds)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -147,30 +150,22 @@ internal fun ResponsiveDashboardCardGrid(
                             animationDelayMillis = index * AppMotion.stagger.toInt(),
                             onRefresh = { onRefreshCard(stats.targetKey) },
                             onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
-                            onOpenCliSessions = if (stats.source == ApiSource.ANTHROPIC) {
+                            onOpenCliSessions = if (CardAction.CLI_SESSIONS in actions) {
                                 { onOpenCliSessionsCard(stats.targetKey) }
                             } else {
                                 null
                             },
-                            onOpenCodexCliSessions = if (stats.source == ApiSource.CODEX) {
+                            onOpenCodexCliSessions = if (CardAction.CODEX_CLI_SESSIONS in actions) {
                                 { onOpenCodexCliSessionsCard(stats.targetKey) }
                             } else {
                                 null
                             },
-                            onOpenTeamUsage = if (
-                                stats.source == ApiSource.ANTHROPIC &&
-                                stats.targetKey.profileId in teamEnabledProfileIds
-                            ) {
+                            onOpenTeamUsage = if (CardAction.TEAM_USAGE in actions) {
                                 { onOpenTeamUsageCard(stats.targetKey) }
                             } else {
                                 null
                             },
-                            // Mesma condição: as duas janelas leem o mesmo
-                            // servidor de time, para a mesma conta.
-                            onOpenTeamPresence = if (
-                                stats.source == ApiSource.ANTHROPIC &&
-                                stats.targetKey.profileId in teamEnabledProfileIds
-                            ) {
+                            onOpenTeamPresence = if (CardAction.TEAM_PRESENCE in actions) {
                                 { onOpenTeamPresenceCard(stats.targetKey) }
                             } else {
                                 null

@@ -1782,6 +1782,83 @@ private fun runUsageMonitor(
         } else {
             null
         },
+        openHistory = { source, accountKey ->
+            // O nome da fonte entra; a chave da conta não. Ela é
+            // identidade, e o pacote vira issue pública.
+            breadcrumbs.recordScreenOpened("histórico de ${source.name}")
+            historyDialogSource = source
+            historyOpenGeneration++
+            historyViewModel.openForSource(source, accountKey)
+        },
+        openCliSessions = { target ->
+            // Sem o apelido do perfil: ele é digitado pelo usuário e
+            // costuma ser o e-mail da conta.
+            breadcrumbs.recordScreenOpened("sessões CLI da máquina")
+            val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+            val label = profileRecords
+                .firstOrNull { record -> record.id == profileId }
+                ?.label
+            cliSessionsProfileLabel = label
+            cliSessionsProfileId = profileId
+            isCliSessionsOpen = true
+            cliSessionsOpenGeneration++
+            cliSessionsViewModel.openForProfile(
+                profileId = profileId,
+                profileLabel = label,
+                quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
+            )
+        },
+        openCodexCliSessions = { _ ->
+            breadcrumbs.recordScreenOpened("sessões Codex CLI")
+            isCodexCliSessionsOpen = true
+            codexCliSessionsOpenGeneration++
+            codexCliSessionsViewModel.openWindow()
+        },
+        openTeamUsage = { target ->
+            val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+            val accountContext = profileResolution.inspections[profileId]?.accountContext
+            // Sem `accountUuid` não há como agrupar as máquinas — e o
+            // botão nem deveria ter aparecido. Abortar é melhor que
+            // consultar o servidor com uma chave inventada.
+            val accountKey = accountContext?.key?.providerAccountId
+            if (accountKey != null) {
+                breadcrumbs.recordScreenOpened("uso do time")
+                teamUsageAccountLabel = accountContext.displayLabel
+                teamUsageProfileId = profileId
+                teamUsageIsAdminOverview = false
+                isTeamUsageOpen = true
+                teamUsageOpenGeneration++
+                teamUsageViewModel.openForAccount(
+                    accountKey = accountKey,
+                    accountLabel = accountContext.displayLabel,
+                    quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
+                )
+                // Antecipa o envio desta máquina: sem isso a janela
+                // abriria mostrando o time sem o que foi feito aqui
+                // desde o último tique de 30s.
+                teamSyncService.requestImmediateSync()
+            }
+        },
+        openTeamPresence = { target ->
+            val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+            val accountContext = profileResolution.inspections[profileId]?.accountContext
+            val accountKey = accountContext?.key?.providerAccountId
+            if (accountKey != null) {
+                breadcrumbs.recordScreenOpened("presença do time")
+                teamPresenceAccountLabel = accountContext.displayLabel
+                teamPresenceIsAdminOverview = false
+                isTeamPresenceOpen = true
+                teamPresenceOpenGeneration++
+                teamPresenceViewModel.openForAccount(
+                    accountKey = accountKey,
+                    accountLabel = accountContext.displayLabel
+                )
+                // Antecipa a batida desta máquina: sem isso a janela
+                // abriria com o próprio usuário aparecendo offline
+                // por até 30 segundos.
+                teamSyncService.requestImmediateSync()
+            }
+        },
         openTeamPresenceOverview = if (teamSettings.isAdminMode) {
             {
                 breadcrumbs.recordScreenOpened("presença global do time (admin)")
@@ -1959,89 +2036,16 @@ private fun runUsageMonitor(
                         minimizedCards = updatedMinimizedCards
                         writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, updatedMinimizedCards)
                     },
-                    onOpenHistory = { source, accountKey ->
-                        // O nome da fonte entra; a chave da conta não. Ela é
-                        // identidade, e o pacote vira issue pública.
-                        breadcrumbs.recordScreenOpened("histórico de ${source.name}")
-                        historyDialogSource = source
-                        historyOpenGeneration++
-                        historyViewModel.openForSource(source, accountKey)
-                    },
+                    onOpenHistory = shellActions.openHistory,
                     onOpenSettings = shellActions.openSettings,
                     onOpenHelp = shellActions.openHelp,
-                    onOpenCodexCliSessions = { _ ->
-                        breadcrumbs.recordScreenOpened("sessões Codex CLI")
-                        isCodexCliSessionsOpen = true
-                        codexCliSessionsOpenGeneration++
-                        codexCliSessionsViewModel.openWindow()
-                    },
+                    onOpenCodexCliSessions = shellActions.openCodexCliSessions,
                     // Só quem administra recebe os dois botões: `null` esconde.
                     onOpenAdminOverview = shellActions.openAdminOverview,
                     onOpenTeamPresenceOverview = shellActions.openTeamPresenceOverview,
-                    onOpenCliSessions = { target ->
-                        // Sem o apelido do perfil: ele é digitado pelo usuário e
-                        // costuma ser o e-mail da conta.
-                        breadcrumbs.recordScreenOpened("sessões CLI da máquina")
-                        val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
-                        val label = profileRecords
-                            .firstOrNull { record -> record.id == profileId }
-                            ?.label
-                        cliSessionsProfileLabel = label
-                        cliSessionsProfileId = profileId
-                        isCliSessionsOpen = true
-                        cliSessionsOpenGeneration++
-                        cliSessionsViewModel.openForProfile(
-                            profileId = profileId,
-                            profileLabel = label,
-                            quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
-                        )
-                    },
-                    onOpenTeamUsage = { target ->
-                        val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
-                        val accountContext = profileResolution.inspections[profileId]?.accountContext
-                        // Sem `accountUuid` não há como agrupar as máquinas — e o
-                        // botão nem deveria ter aparecido. Abortar é melhor que
-                        // consultar o servidor com uma chave inventada.
-                        val accountKey = accountContext?.key?.providerAccountId
-                        if (accountKey != null) {
-                            breadcrumbs.recordScreenOpened("uso do time")
-                            teamUsageAccountLabel = accountContext.displayLabel
-                            teamUsageProfileId = profileId
-                            teamUsageIsAdminOverview = false
-                            isTeamUsageOpen = true
-                            teamUsageOpenGeneration++
-                            teamUsageViewModel.openForAccount(
-                                accountKey = accountKey,
-                                accountLabel = accountContext.displayLabel,
-                                quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
-                            )
-                            // Antecipa o envio desta máquina: sem isso a janela
-                            // abriria mostrando o time sem o que foi feito aqui
-                            // desde o último tique de 30s.
-                            teamSyncService.requestImmediateSync()
-                        }
-                    },
-                    onOpenTeamPresence = { target ->
-                        val profileId = target.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
-                        val accountContext = profileResolution.inspections[profileId]?.accountContext
-                        val accountKey = accountContext?.key?.providerAccountId
-                        if (accountKey != null) {
-                            breadcrumbs.recordScreenOpened("presença do time")
-                            teamPresenceAccountLabel = accountContext.displayLabel
-                            teamPresenceIsAdminOverview = false
-                            isTeamPresenceOpen = true
-                            teamPresenceOpenGeneration++
-                            teamPresenceViewModel.openForAccount(
-                                accountKey = accountKey,
-                                accountLabel = accountContext.displayLabel
-                            )
-                            // Antecipa a batida desta máquina: sem isso a janela
-                            // abriria com o próprio usuário aparecendo offline
-                            // por até 30 segundos.
-                            teamSyncService.requestImmediateSync()
-                        }
-                    },
-                    // Vazio quando a integração está desligada: o botão some de
+                    onOpenCliSessions = shellActions.openCliSessions,
+                    onOpenTeamUsage = shellActions.openTeamUsage,
+                    onOpenTeamPresence = shellActions.openTeamPresence,                    // Vazio quando a integração está desligada: o botão some de
                     // todos os cards sem nenhuma outra condição espalhada na tela.
                     teamEnabledProfileIds = if (teamSettings.isActive) {
                         teamSettings.participatingProfileIds
@@ -2318,6 +2322,10 @@ private fun runUsageMonitor(
             onOpenFull = { setHudMode(false) },
             onSwitchToCardsOnly = { setCardsOnlyMode(true) },
             actions = shellActions,
+            // O que o card de cada conta oferece, para os botões do balão.
+            teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),
+            cliSessionPulses = cliSessionPulses,
+            teamSessionPulses = teamSessionPulses,
             onCloseRequest = { shutdownApplication() },
             activeTargets = sessionPulseViewModel.activeTargets
         )

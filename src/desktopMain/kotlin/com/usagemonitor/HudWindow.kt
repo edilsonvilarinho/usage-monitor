@@ -32,7 +32,15 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import androidx.compose.runtime.rememberCoroutineScope
 import com.usagemonitor.presentation.ui.HudAppBalloonContent
 import com.usagemonitor.presentation.ui.HudCountdown
+import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudNotch
+import com.usagemonitor.presentation.ui.components.CardAction
+import com.usagemonitor.presentation.ui.components.CardActionButton
+import com.usagemonitor.presentation.ui.components.CardIconActionButton
+import com.usagemonitor.presentation.ui.components.RefreshGlyph
+import com.usagemonitor.presentation.ui.components.cardActionsFor
+import com.usagemonitor.presentation.ui.components.refreshActionLabel
+import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.launch
@@ -85,6 +93,10 @@ internal fun HudWindowHost(
     onSwitchToCardsOnly: () -> Unit,
     /** As ações do rodapé, que aqui moram no balão da engrenagem. */
     actions: AppShellActions,
+    /** Perfis marcados como parte do time: decidem os botões de time no balão. */
+    teamEnabledProfileIds: Set<String>,
+    cliSessionPulses: Map<UsageTargetKey, SessionPulse>,
+    teamSessionPulses: Map<UsageTargetKey, SessionPulse>,
     onCloseRequest: () -> Unit,
     /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
     activeTargets: StateFlow<Set<UsageTargetKey>>? = null
@@ -94,6 +106,7 @@ internal fun HudWindowHost(
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
     val dashboardState by viewModel.uiState.collectAsState()
+    val refreshingTargets by viewModel.refreshingTargets.collectAsState()
     val exportScope = rememberCoroutineScope()
     val active = activeTargets?.collectAsState()?.value.orEmpty()
 
@@ -110,7 +123,8 @@ internal fun HudWindowHost(
         cardOrder = cardOrder,
         language = language,
         now = Clock.System.now(),
-        activeTargets = active
+        activeTargets = active,
+        refreshingTargets = refreshingTargets
     )
 
     var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, hudScreenArea)) }
@@ -276,7 +290,20 @@ internal fun HudWindowHost(
                     onDragStart = dragBegin,
                     onDragMove = dragTo,
                     onDragEnd = dragFinish,
-                    onOpenFull = onOpenFull,
+                    // Clique num anel recoleta aquela conta, como no Codenotch.
+                    onRefreshAccount = { target -> viewModel.refresh(target) },
+                    // Os botões do card daquela conta, pela mesma regra do card.
+                    accountActions = { account ->
+                        HudAccountActions(
+                            account = account,
+                            language = language,
+                            teamEnabledProfileIds = teamEnabledProfileIds,
+                            cliSessionPulse = cliSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
+                            teamSessionPulse = teamSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
+                            actions = actions,
+                            onRefresh = { viewModel.refresh(account.targetKey) }
+                        )
+                    },
                     // Botão direito (issue #215): direto para "Somente cards".
                     onSwitchToCardsOnly = onSwitchToCardsOnly,
                     // A engrenagem da ponta de longe abre o balão com o que o
@@ -328,6 +355,53 @@ internal fun HudWindowHost(
         }
     }
 }
+
+/**
+ * Os botões do card de uma conta, no balão dela: as janelas de
+ * `cardActionsFor` — a mesma regra do card — e, por último, atualizar só esta
+ * conta, com o glifo que gira enquanto coleta.
+ */
+@Composable
+private fun HudAccountActions(
+    account: HudAccount,
+    language: AppLanguage,
+    teamEnabledProfileIds: Set<String>,
+    cliSessionPulse: SessionPulse,
+    teamSessionPulse: SessionPulse,
+    actions: AppShellActions,
+    onRefresh: () -> Unit
+) {
+    val target = account.targetKey
+    cardActionsFor(target, teamEnabledProfileIds).forEach { action ->
+        CardActionButton(
+            action = action,
+            language = language,
+            buttonSize = HUD_BALLOON_ACTIONS,
+            iconSize = HUD_BALLOON_ACTION_ICON,
+            cliSessionPulse = cliSessionPulse,
+            teamSessionPulse = teamSessionPulse,
+            onClick = {
+                when (action) {
+                    CardAction.HISTORY -> actions.openHistory(target.source, account.accountKey)
+                    CardAction.CODEX_CLI_SESSIONS -> actions.openCodexCliSessions(target)
+                    CardAction.CLI_SESSIONS -> actions.openCliSessions(target)
+                    CardAction.TEAM_USAGE -> actions.openTeamUsage(target)
+                    CardAction.TEAM_PRESENCE -> actions.openTeamPresence(target)
+                }
+            }
+        )
+    }
+    CardIconActionButton(
+        label = refreshActionLabel(account.refreshing, language),
+        onClick = onRefresh,
+        buttonSize = HUD_BALLOON_ACTIONS,
+        enabled = !account.refreshing
+    ) { tint ->
+        RefreshGlyph(refreshing = account.refreshing, tint = tint, size = HUD_BALLOON_ACTION_ICON)
+    }
+}
+
+private val HUD_BALLOON_ACTION_ICON = 16.dp
 
 /** A engrenagem abre as ações do app; é o que ela diz ao leitor de tela. */
 internal fun hudGearDescription(language: AppLanguage): String =

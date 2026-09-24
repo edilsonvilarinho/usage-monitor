@@ -3,6 +3,12 @@ package com.usagemonitor.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.material3.Text
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.DpSize
 import com.usagemonitor.HUD_BALLOON_PADDING
 import com.usagemonitor.ScreenWorkArea
@@ -58,7 +64,7 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.presentation.ui.HUD_BAR_OPEN_DESCRIPTION
+import com.usagemonitor.presentation.ui.HUD_NOTCH_DESCRIPTION
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_UPDATE_INDICATOR_TAG
 import com.usagemonitor.presentation.ui.HudAccount
@@ -121,7 +127,8 @@ class HudNotchTest {
         onDragStart: () -> Unit = {},
         onDragMove: () -> Unit = {},
         onDragEnd: () -> Unit = {},
-        onOpenFull: () -> Unit = {},
+        onRefreshAccount: (UsageTargetKey) -> Unit = {},
+        accountActions: (@Composable (HudAccount) -> Unit)? = null,
         onSwitchToCardsOnly: () -> Unit = {},
         dragging: Boolean = false,
         onGearClick: () -> Unit = {}
@@ -144,7 +151,8 @@ class HudNotchTest {
                     onDragStart = onDragStart,
                     onDragMove = onDragMove,
                     onDragEnd = onDragEnd,
-                    onOpenFull = onOpenFull,
+                    onRefreshAccount = onRefreshAccount,
+                    accountActions = accountActions,
                     onSwitchToCardsOnly = onSwitchToCardsOnly,
                     dragging = dragging,
                     onGearClick = onGearClick,
@@ -254,7 +262,6 @@ class HudNotchTest {
                                     nowProvider = { now },
                                     countdownUpdatesEnabled = false,
                                     notchCenter = window.notchCenterInWindow,
-                                    onOpenFull = {},
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -293,17 +300,45 @@ class HudNotchTest {
 
     // ------------------------------------------------------------ gestos
 
+    /** Como no Codenotch: o clique num anel recoleta aquela conta, e só ela. */
     @Test
-    fun `o clique em qualquer ponto abre a janela completa`() = runDesktopComposeUiTest {
-        var clicks = 0
-        setContent { notch(onOpenFull = { clicks += 1 }) }
+    fun `o clique num anel atualiza aquela conta`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        setContent { notch(nextRefreshAt = now + 2.minutes, onRefreshAccount = { target -> refreshed += target }) }
 
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performClick()
-        assertEquals(1, clicks)
+        onNodeWithContentDescription(DEEPSEEK_RING).performClick()
+        assertEquals(listOf(accounts[1].targetKey), refreshed)
+        onNodeWithContentDescription(INFORMATA_RING).performClick()
+        assertEquals(listOf(accounts[1].targetKey, accounts[0].targetKey), refreshed)
+        // Fora dos anéis — a contagem — o clique não atualiza nada.
+        onNodeWithText("02:00").performClick()
+        assertEquals(2, refreshed.size)
+    }
+
+    /** O leitor de tela chega à mesma ação pela semântica do anel. */
+    @Test
+    fun `cada anel declara a acao de atualizar a conta`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        setContent { notch(onRefreshAccount = { target -> refreshed += target }) }
+
+        onNode(hasClickAction() and hasAnyDescendant(hasContentDescription(DEEPSEEK_RING)))
+            .performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(listOf(accounts[1].targetKey), refreshed)
+    }
+
+    /** O balão traz os botões do card daquela conta, embaixo. */
+    @Test
+    fun `o balao traz os botoes do card da conta`() = runDesktopComposeUiTest {
+        setContent {
+            notch(expanded = true, accountActions = { account -> Text("botões de ${account.label}") })
+        }
+
+        hoverRing(DEEPSEEK_RING)
+        onNodeWithText("botões de DeepSeek").assertIsDisplayed()
     }
 
     @Test
-    fun `arrastar o notch nao abre a janela completa`() = runDesktopComposeUiTest {
+    fun `arrastar o notch nao atualiza nada`() = runDesktopComposeUiTest {
         var clicks = 0
         val events = mutableListOf<String>()
         setContent {
@@ -311,11 +346,11 @@ class HudNotchTest {
                 onDragStart = { events += "start" },
                 onDragMove = { events += "move" },
                 onDragEnd = { events += "end" },
-                onOpenFull = { clicks += 1 }
+                onRefreshAccount = { clicks += 1 }
             )
         }
 
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput {
+        onNodeWithContentDescription(HUD_NOTCH_DESCRIPTION).performMouseInput {
             moveTo(center)
             press()
             moveTo(center + Offset(60f, 0f))
@@ -335,7 +370,7 @@ class HudNotchTest {
         var moves by mutableStateOf(0)
         setContent { notch(fallbackLabel = "movimentos $moves", onDragMove = { moves += 1 }) }
 
-        val target = onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION)
+        val target = onNodeWithContentDescription(HUD_NOTCH_DESCRIPTION)
         target.performMouseInput {
             moveTo(center)
             press()
@@ -360,12 +395,12 @@ class HudNotchTest {
             notch(
                 onDragStart = { events += "start" },
                 onDragEnd = { events += "end" },
-                onOpenFull = { opens += 1 },
+                onRefreshAccount = { opens += 1 },
                 onSwitchToCardsOnly = { switches += 1 }
             )
         }
 
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput {
+        onNodeWithContentDescription(HUD_NOTCH_DESCRIPTION).performMouseInput {
             moveTo(center)
             press(MouseButton.Secondary)
             release(MouseButton.Secondary)
@@ -382,11 +417,11 @@ class HudNotchTest {
         val reported = mutableListOf<Boolean>()
         setContent { notch(onHoverChange = { hovered -> reported += hovered }) }
 
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput { enter(center) }
+        onNodeWithContentDescription(HUD_NOTCH_DESCRIPTION).performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(true, reported.last())
 
-        onNodeWithContentDescription(HUD_BAR_OPEN_DESCRIPTION).performMouseInput { exit(Offset(-1f, -1f)) }
+        onNodeWithContentDescription(HUD_NOTCH_DESCRIPTION).performMouseInput { exit(Offset(-1f, -1f)) }
         waitForIdle()
         assertEquals(false, reported.last())
     }
@@ -417,7 +452,7 @@ class HudNotchTest {
                 onDragStart = { events += "start" },
                 onDragMove = { events += "move" },
                 onDragEnd = { events += "end" },
-                onOpenFull = { opens += 1 }
+                onRefreshAccount = { opens += 1 }
             )
         }
 
@@ -489,7 +524,6 @@ class HudNotchTest {
                     sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false, false),
                     fallbackLabel = "Carregando",
                     expanded = true,
-                    onOpenFull = {},
                     appBalloon = { appBalloonFixture(onMode, onRefresh) },
                     appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),
                     gearDescription = GEAR
@@ -633,14 +667,14 @@ class HudNotchTest {
     }
 
     @Test
-    fun `o indicador aparece uma vez e o clique nele abre a janela completa`() = runDesktopComposeUiTest {
-        var opens = 0
+    fun `o indicador aparece uma vez e nao tem clique proprio`() = runDesktopComposeUiTest {
+        var refreshes = 0
         var open by mutableStateOf(false)
         setContent {
             notch(
                 expanded = open,
                 updateIndicator = HudUpdateIndicator(tone = AppTone.OK, description = "Atualização pronta"),
-                onOpenFull = { opens += 1 }
+                onRefreshAccount = { refreshes += 1 }
             )
         }
 
@@ -648,8 +682,9 @@ class HudNotchTest {
         open = true
         waitForIdle()
         onAllNodesWithContentDescription("Atualização pronta").assertCountEquals(1)
+        // Reiniciar num clique de rotina reiniciaria o app sem aviso (#225).
         onNodeWithTag(HUD_UPDATE_INDICATOR_TAG).performClick()
-        assertEquals(1, opens)
+        assertEquals(0, refreshes)
     }
 
     @Test

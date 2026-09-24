@@ -175,12 +175,15 @@ internal val HUD_BALLOON_GROUP_HEADER = 16.dp
 internal val HUD_BALLOON_GROUP_PADDING = 8.dp
 internal val HUD_BALLOON_FOOTER = 14.dp
 
+/** A fileira de botões: o alvo de 28dp do rodapé. */
+internal val HUD_BALLOON_ACTIONS = 28.dp
+
 private val HUD_BALLOON_QUOTA_BLOCK = HUD_BALLOON_QUOTA_TITLE + HUD_BALLOON_BAR_ROW + HUD_BALLOON_QUOTA_DETAIL
 
 /**
  * A altura do balão de uma conta: cabeçalho, uma seção por cota — rótulo e
  * reinício, barra, "usado · restante" —, as de mesmo grupo numa caixa sob o nome
- * dele, e a linha de plano e origem. É a mesma sequência que `HudBalloon`
+ * dele, a linha de plano e origem e a fileira de botões do card. É a mesma sequência que `HudBalloon`
  * compõe, e `HudNotchTest` afirma que as duas batem.
  */
 internal fun hudBalloonHeight(account: HudAccount): Dp {
@@ -196,13 +199,15 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
     if (account.detailLine != null) {
         height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
     }
+    // A fileira de botões do card — o histórico existe em toda conta.
+    height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_ACTIONS
     return height
 }
 
 /** As linhas do balão da engrenagem. */
 internal val HUD_APP_BALLOON_CAPTION = 16.dp
 internal val HUD_APP_BALLOON_MODE_ROW = 24.dp
-internal val HUD_APP_BALLOON_ACTIONS = 28.dp
+internal val HUD_APP_BALLOON_ACTIONS = HUD_BALLOON_ACTIONS
 
 /** Quantos modos de janela o balão da engrenagem lista: os três do rodapé. */
 internal const val HUD_APP_BALLOON_MODES = 3

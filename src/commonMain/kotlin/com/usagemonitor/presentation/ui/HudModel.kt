@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
@@ -58,7 +59,11 @@ data class HudAccount(
      * do balão do Codenotch. Diz **qual** leitura está na tela, que é a primeira
      * pergunta quando um número parece errado. Dono único: [hudSourceOrigin].
      */
-    val originLabel: String? = null
+    val originLabel: String? = null,
+    /** A conta do provedor, que o histórico filtra; `null` quando a fonte não a identifica. */
+    val accountKey: UsageAccountKey? = null,
+    /** Coleta desta conta em andamento: o anel fica pressionado até ela voltar. */
+    val refreshing: Boolean = false
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
@@ -119,7 +124,8 @@ internal fun buildHudAccounts(
     cardOrder: List<UsageTargetKey>,
     language: AppLanguage,
     now: Instant,
-    activeTargets: Set<UsageTargetKey> = emptySet()
+    activeTargets: Set<UsageTargetKey> = emptySet(),
+    refreshingTargets: Set<UsageTargetKey> = emptySet()
 ): List<HudAccount> {
     val noForecast = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
     return orderedByCardOrder(quotaRisks, cardOrder) { entry -> entry.stats.targetKey }
@@ -156,7 +162,9 @@ internal fun buildHudAccounts(
                 sessionActive = target in activeTargets,
                 source = first.stats.source,
                 planLabel = first.stats.planLabel,
-                originLabel = hudSourceOrigin(first.stats.source, language)
+                originLabel = hudSourceOrigin(first.stats.source, language),
+                accountKey = first.stats.accountContext?.key,
+                refreshing = target in refreshingTargets
             )
         }
 }
