@@ -134,8 +134,9 @@ class HudNotchGeometryTest {
     fun `sem contas sobra a linha de carregamento`() {
         val sizes = hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
         assertTrue(sizes.collapsed.width > HUD_RING_SIZE)
-        // Sem conta não há balão, mas as alças continuam: a engrenagem é a saída.
-        assertEquals(sizes.withHandles, sizes.expanded)
+        // Sem conta sobram as alças e o balão da engrenagem: é a saída do modo.
+        assertEquals(hudAppBalloonHeight(hasUpdateIndicator = false), sizes.balloon.height)
+        assertEquals(sizes.collapsed.height + HUD_BALLOON_GAP + sizes.balloon.height, sizes.expanded.height)
         assertEquals(sizes.collapsed.height, sizes.withHandles.height)
         assertEquals(sizes.collapsed.width + (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2, sizes.withHandles.width)
     }

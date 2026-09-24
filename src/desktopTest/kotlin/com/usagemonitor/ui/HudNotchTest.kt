@@ -10,6 +10,16 @@ import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudOpenWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_MODE_TAG_PREFIX
+import com.usagemonitor.presentation.ui.HudAppBalloonContent
+import com.usagemonitor.presentation.ui.components.FooterActionGroup
+import com.usagemonitor.presentation.ui.components.WindowMode
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.hudAppBalloonHeight
+import com.usagemonitor.HUD_BALLOON_WIDTH
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.test.assertIsSelected
 import com.usagemonitor.presentation.ui.HUD_GEAR_HANDLE_TAG
 import com.usagemonitor.presentation.ui.HUD_MOVE_HANDLE_TAG
 import com.usagemonitor.presentation.ui.hudBalloonBoxSize
@@ -451,6 +461,112 @@ class HudNotchTest {
         onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(true, reported.last())
+    }
+
+    // ------------------------------------------------------------ balão da engrenagem (rodada 3)
+
+    /** O conteúdo de teste do balão da engrenagem: os modos e uma ação do rodapé. */
+    @Composable
+    private fun appBalloonFixture(onMode: (WindowMode) -> Unit, onRefresh: () -> Unit) {
+        HudAppBalloonContent(
+            language = AppLanguage.PT,
+            countdown = null,
+            updateIndicator = null,
+            onWindowModeChange = onMode,
+            actions = {
+                FooterActionGroup(language = AppLanguage.PT, onRefresh = onRefresh, onOpenSettings = {})
+            }
+        )
+    }
+
+    @Composable
+    private fun notchWithActions(onMode: (WindowMode) -> Unit = {}, onRefresh: () -> Unit = {}) {
+        AppTheme(isDark = true) {
+            Box(modifier = Modifier.size(900.dp, 600.dp)) {
+                HudNotch(
+                    accounts = accounts,
+                    edge = HudEdge.TOP,
+                    sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false, false),
+                    fallbackLabel = "Carregando",
+                    expanded = true,
+                    onOpenFull = {},
+                    appBalloon = { appBalloonFixture(onMode, onRefresh) },
+                    appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),
+                    gearDescription = GEAR
+                )
+            }
+        }
+    }
+
+    /** Na barra HUD não há rodapé: a engrenagem abre o que ele oferece. */
+    @Test
+    fun `a engrenagem abre e fecha o balao com as acoes do rodape`() = runDesktopComposeUiTest {
+        var refreshes = 0
+        setContent { notchWithActions(onRefresh = { refreshes += 1 }) }
+
+        onNodeWithContentDescription(GEAR).performClick()
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
+        onNodeWithText("Modo de janela").assertIsDisplayed()
+        // A mesma fileira do rodapé, pelas mesmas descrições.
+        onNodeWithContentDescription("Atualizar agora").performClick()
+        assertEquals(1, refreshes)
+        onNodeWithContentDescription("Abrir configurações").assertIsDisplayed()
+        onNodeWithContentDescription("Abrir ajuda").assertIsDisplayed()
+
+        onNodeWithContentDescription(GEAR).performClick()
+        waitForIdle()
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `os modos de janela saem do balao da engrenagem com o corrente marcado`() = runDesktopComposeUiTest {
+        val chosen = mutableListOf<WindowMode>()
+        setContent { notchWithActions(onMode = { mode -> chosen += mode }) }
+
+        onNodeWithContentDescription(GEAR).performClick()
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.HUD.name).assertIsSelected()
+        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.STANDARD.name).performClick()
+        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.CARDS_ONLY.name).performClick()
+
+        assertEquals(listOf(WindowMode.STANDARD, WindowMode.CARDS_ONLY), chosen)
+    }
+
+    /** Com o balão da engrenagem aberto, passar por um anel mostra aquela conta. */
+    @Test
+    fun `um anel sob o ponteiro troca o balao da engrenagem pelo da conta`() = runDesktopComposeUiTest {
+        setContent { notchWithActions() }
+
+        onNodeWithContentDescription(GEAR).performClick()
+        waitForIdle()
+        hoverRing(INFORMATA_RING)
+        onNodeWithText("INFORMATA2").assertIsDisplayed()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertDoesNotExist()
+    }
+
+    /** A coluna do balão da engrenagem mede o que `hudAppBalloonHeight` soma, com e sem atualização. */
+    @Test
+    fun `o balao da engrenagem tem a altura que a geometria calcula`() {
+        for (update in listOf(null, HudUpdateIndicator(AppTone.OK, "Atualização pronta"))) {
+            runDesktopComposeUiTest {
+                setContent {
+                    AppTheme(isDark = true) {
+                        Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                            HudAppBalloonContent(
+                                language = AppLanguage.PT,
+                                countdown = null,
+                                updateIndicator = update,
+                                onWindowModeChange = {},
+                                actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) }
+                            )
+                        }
+                    }
+                }
+                val column = onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
+                assertEquals(hudAppBalloonHeight(update != null) - HUD_BALLOON_PADDING * 2, column.height, "atualização=$update")
+            }
+        }
     }
 
     // ------------------------------------------------------------ contagem (#185)

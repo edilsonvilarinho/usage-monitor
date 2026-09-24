@@ -164,7 +164,13 @@ internal fun HudNotch(
     onDragEnd: () -> Unit = {},
     onOpenFull: () -> Unit,
     onSwitchToCardsOnly: () -> Unit = {},
-    /** O clique na engrenagem, a alça da ponta de longe. */
+    /**
+     * O conteúdo do balão da engrenagem. Com ele, a engrenagem abre e fecha o
+     * balão; sem ele, o clique vai a [onGearClick].
+     */
+    appBalloon: (@Composable () -> Unit)? = null,
+    appBalloonHeight: Dp = 0.dp,
+    /** O clique na engrenagem quando não há [appBalloon]. */
     onGearClick: () -> Unit = {},
     gearDescription: String = "",
     modifier: Modifier = Modifier,
@@ -193,13 +199,16 @@ internal fun HudNotch(
     // As alças ficam durante o arrasto: é a mão que está sendo carregada, e
     // tirá-la da composição cancelaria o gesto no meio.
     val showHandles = open || dragging
-    // A conta do balão é a do último anel sob o ponteiro. Fechado, ela é
-    // esquecida: a próxima abertura começa pelo anel em que o ponteiro entrar.
+    // O balão é da conta do último anel sob o ponteiro, ou da engrenagem
+    // ([APP_BALLOON]). Fechado, ele é esquecido: a próxima abertura começa pelo
+    // anel em que o ponteiro entrar.
     var balloonIndex by remember { mutableStateOf(initialBalloonIndex) }
     LaunchedEffect(open) {
         if (!open && initialBalloonIndex == null) balloonIndex = null
     }
-    val shownIndex = balloonIndex?.takeIf { index -> index in accounts.indices }
+    val shownIndex = balloonIndex?.takeIf { index ->
+        index in accounts.indices || (index == APP_BALLOON && appBalloon != null)
+    }
     // Durante a saída o balão continua desenhando a última conta.
     val lastShown = rememberLatestNonNull(shownIndex)
     // Centro de cada anel ao longo da borda, em px do contêiner.
@@ -321,7 +330,29 @@ internal fun HudNotch(
                 enter = handleEnter(),
                 exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
             ) {
-                HudGearHandle(description = gearDescription, onClick = onGearClick, interaction = gearHover)
+                HudGearHandle(
+                    description = gearDescription,
+                    onClick = {
+                        if (appBalloon == null) {
+                            onGearClick()
+                        } else {
+                            balloonIndex = if (balloonIndex == APP_BALLOON) null else APP_BALLOON
+                        }
+                    },
+                    interaction = gearHover,
+                    // A cauda do balão da engrenagem aponta para ela, como a do
+                    // de conta aponta para o anel.
+                    modifier = Modifier.onGloballyPositioned { coordinates ->
+                        val root = rootCoordinates
+                        if (root != null && root.isAttached && coordinates.isAttached) {
+                            val center = root.localPositionOf(
+                                coordinates,
+                                Offset(coordinates.size.width / 2f, coordinates.size.height / 2f)
+                            )
+                            ringCenters[APP_BALLOON] = if (edge.isHorizontal) center.x else center.y
+                        }
+                    }
+                )
             }
             AnimatedVisibility(
                 visible = open && shownIndex != null,
@@ -336,15 +367,20 @@ internal fun HudNotch(
             ) {
                 val index = lastShown ?: 0
                 val account = accounts.getOrNull(index)
-                if (account != null) {
+                val app = appBalloon.takeIf { index == APP_BALLOON }
+                if (account != null || app != null) {
                     HudBalloon(
                         edge = edge,
-                        bodyHeight = hudBalloonHeight(account),
+                        bodyHeight = if (app != null) appBalloonHeight else hudBalloonHeight(account!!),
                         tailCenter = { (ringCenters[index] ?: 0f) - balloonAlong.value },
                         modifier = Modifier.hoverable(balloonHover),
                         content = {
-                            AppStateCrossfade(state = account, key = { shown -> shown.targetKey }) { shown ->
-                                HudAccountBalloonContent(shown, language)
+                            AppStateCrossfade(state = index, key = { shown -> shown }) { shown ->
+                                val shownAccount = accounts.getOrNull(shown)
+                                when {
+                                    shown == APP_BALLOON -> appBalloon?.invoke()
+                                    shownAccount != null -> HudAccountBalloonContent(shownAccount, language)
+                                }
                             }
                         }
                     )
@@ -427,6 +463,9 @@ internal fun HudNotch(
 }
 
 private enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
+
+/** O "índice" do balão da engrenagem, fora do intervalo das contas. */
+private const val APP_BALLOON = -1
 
 private fun Placeable.alongSize(edge: HudEdge): Int = if (edge.isHorizontal) width else height
 
@@ -678,7 +717,7 @@ private fun HudUpdateBadge(indicator: HudUpdateIndicator) {
  * chama, e para em zero — é suspensão, não quadro pendente.
  */
 @Composable
-private fun HudCountdown(
+internal fun HudCountdown(
     nextRefreshAt: Instant,
     description: String,
     vertical: Boolean,

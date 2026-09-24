@@ -29,7 +29,13 @@ import androidx.compose.ui.window.rememberWindowState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
+import androidx.compose.runtime.rememberCoroutineScope
+import com.usagemonitor.presentation.ui.HudAppBalloonContent
+import com.usagemonitor.presentation.ui.HudCountdown
 import com.usagemonitor.presentation.ui.HudNotch
+import com.usagemonitor.presentation.ui.components.FooterActionGroup
+import com.usagemonitor.presentation.viewmodel.UiState
+import kotlinx.coroutines.launch
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.buildHudAccounts
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -77,8 +83,8 @@ internal fun HudWindowHost(
     hudScreenArea: ScreenWorkArea,
     onOpenFull: () -> Unit,
     onSwitchToCardsOnly: () -> Unit,
-    onOpenHelp: () -> Unit,
-    onOpenSettings: () -> Unit,
+    /** As ações do rodapé, que aqui moram no balão da engrenagem. */
+    actions: AppShellActions,
     onCloseRequest: () -> Unit,
     /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
     activeTargets: StateFlow<Set<UsageTargetKey>>? = null
@@ -87,6 +93,8 @@ internal fun HudWindowHost(
     val quotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
+    val dashboardState by viewModel.uiState.collectAsState()
+    val exportScope = rememberCoroutineScope()
     val active = activeTargets?.collectAsState()?.value.orEmpty()
 
     val fallbackTone = snapshot?.let { worst -> toneFor(worst.risk.level) } ?: AppTone.NEUTRAL
@@ -239,7 +247,7 @@ internal fun HudWindowHost(
             when {
                 hudToggle -> onOpenFull()
                 cardsOnlyToggle -> onSwitchToCardsOnly()
-                help -> onOpenHelp()
+                help -> actions.openHelp()
             }
             hudToggle || cardsOnlyToggle || help
         }
@@ -271,15 +279,59 @@ internal fun HudWindowHost(
                     onOpenFull = onOpenFull,
                     // Botão direito (issue #215): direto para "Somente cards".
                     onSwitchToCardsOnly = onSwitchToCardsOnly,
-                    // A engrenagem da ponta de longe, o `SettingsOrb` do Codenotch.
-                    onGearClick = onOpenSettings,
-                    gearDescription = if (language == AppLanguage.PT) "Configurações" else "Settings",
+                    // A engrenagem da ponta de longe abre o balão com o que o
+                    // rodapé do modo padrão oferece — aqui não há rodapé.
+                    appBalloon = {
+                        HudAppBalloonContent(
+                            language = language,
+                            countdown = nextRefreshAt?.let { refreshAt ->
+                                {
+                                    HudCountdown(
+                                        nextRefreshAt = refreshAt,
+                                        description = nextRefreshLabel(language),
+                                        vertical = false,
+                                        nowProvider = { Clock.System.now() },
+                                        waitNextTick = { delay(1_000L) },
+                                        updatesEnabled = true
+                                    )
+                                }
+                            },
+                            updateIndicator = updateIndicator,
+                            onWindowModeChange = actions.changeWindowMode,
+                            actions = {
+                                FooterActionGroup(
+                                    language = language,
+                                    onRefresh = actions.refreshAll,
+                                    onOpenSettings = actions.openSettings,
+                                    onOpenAdminOverview = actions.openAdminOverview,
+                                    onOpenTeamPresence = actions.openTeamPresenceOverview,
+                                    onOpenHelp = actions.openHelp,
+                                    onExportSnapshot = {
+                                        val stats = (dashboardState as? UiState.Success)?.data
+                                        if (stats != null) {
+                                            // Sem snackbar aqui: o diálogo de arquivo é o retorno.
+                                            exportScope.launch {
+                                                runCatching { actions.exportSnapshot(stats) }
+                                                    .onFailure { error -> actions.onExportFailure(error) }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        )
+                    },
+                    appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = updateIndicator != null),
+                    gearDescription = hudGearDescription(language),
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
     }
 }
+
+/** A engrenagem abre as ações do app; é o que ela diz ao leitor de tela. */
+internal fun hudGearDescription(language: AppLanguage): String =
+    if (language == AppLanguage.PT) "Ações do Usage Monitor" else "Usage Monitor actions"
 
 /** Uma passada de hover: o `Exit` de um quadro na divisa não fecha o painel. */
 private const val HUD_COLLAPSE_DELAY_MILLIS = 150L

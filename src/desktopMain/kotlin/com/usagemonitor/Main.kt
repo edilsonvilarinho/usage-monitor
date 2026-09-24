@@ -1736,6 +1736,66 @@ private fun runUsageMonitor(
         }
     }
 
+    // As ações do rodapé têm duas portas — o rodapé e a engrenagem da barra HUD —
+    // e são montadas uma vez só (`AppShellActions`).
+    val shellActions = AppShellActions(
+        refreshAll = { viewModel.refresh() },
+        openSettings = {
+            breadcrumbs.recordScreenOpened("Configurações")
+            isSettingsDialogOpen = true
+            settingsOpenGeneration++
+        },
+        openHelp = {
+            breadcrumbs.recordScreenOpened("Ajuda")
+            isHelpDialogOpen = true
+        },
+        changeWindowMode = { mode ->
+            when (mode) {
+                WindowMode.STANDARD -> {
+                    setCardsOnlyMode(false)
+                    setHudMode(false)
+                }
+                WindowMode.CARDS_ONLY -> setCardsOnlyMode(true)
+                WindowMode.HUD -> setHudMode(true)
+            }
+        },
+        // Retrato do Dashboard (issue #215): mesmo `usageExportWriter` que
+        // Sessões CLI e Time já usam, um diálogo de arquivo só.
+        exportSnapshot = { stats ->
+            usageExportWriter.write(exportRequestForDashboard(stats, Clock.System.now()))
+        },
+        onExportFailure = { error ->
+            breadcrumbs.recordFailure("exportar retrato do dashboard", error)
+        },
+        // Só quem administra: a conta não entra na condição de propósito —
+        // administrar o servidor não exige participar de nenhum time.
+        openAdminOverview = if (teamSettings.isAdminMode) {
+            {
+                breadcrumbs.recordScreenOpened("visão global do time (admin)")
+                teamUsageAccountLabel = null
+                teamUsageProfileId = null
+                teamUsageIsAdminOverview = true
+                isTeamUsageOpen = true
+                teamUsageOpenGeneration++
+                teamUsageViewModel.openForAllAccounts()
+            }
+        } else {
+            null
+        },
+        openTeamPresenceOverview = if (teamSettings.isAdminMode) {
+            {
+                breadcrumbs.recordScreenOpened("presença global do time (admin)")
+                teamPresenceAccountLabel = null
+                teamPresenceIsAdminOverview = true
+                isTeamPresenceOpen = true
+                teamPresenceOpenGeneration++
+                teamPresenceViewModel.openForAllAccounts()
+            }
+        } else {
+            null
+        }
+    )
+
     Window(
         onCloseRequest = {
             shutdownApplication()
@@ -1853,16 +1913,7 @@ private fun runUsageMonitor(
                 cardsOnlyMode -> WindowMode.CARDS_ONLY
                 else -> WindowMode.STANDARD
             }
-            val onWindowModeChange: (WindowMode) -> Unit = { mode ->
-                when (mode) {
-                    WindowMode.STANDARD -> {
-                        setCardsOnlyMode(false)
-                        setHudMode(false)
-                    }
-                    WindowMode.CARDS_ONLY -> setCardsOnlyMode(true)
-                    WindowMode.HUD -> setHudMode(true)
-                }
-            }
+            val onWindowModeChange = shellActions.changeWindowMode
             DesktopWindowFrame(
                 title = "Usage Monitor",
                 iconPainter = iconImage,
@@ -1916,52 +1967,17 @@ private fun runUsageMonitor(
                         historyOpenGeneration++
                         historyViewModel.openForSource(source, accountKey)
                     },
-                    onOpenSettings = {
-                        breadcrumbs.recordScreenOpened("Configurações")
-                        isSettingsDialogOpen = true
-                        settingsOpenGeneration++
-                    },
-                    onOpenHelp = {
-                        breadcrumbs.recordScreenOpened("Ajuda")
-                        isHelpDialogOpen = true
-                    },
+                    onOpenSettings = shellActions.openSettings,
+                    onOpenHelp = shellActions.openHelp,
                     onOpenCodexCliSessions = { _ ->
                         breadcrumbs.recordScreenOpened("sessões Codex CLI")
                         isCodexCliSessionsOpen = true
                         codexCliSessionsOpenGeneration++
                         codexCliSessionsViewModel.openWindow()
                     },
-                    // Só quem administra recebe o botão; `null` esconde. A conta
-                    // não entra na condição de propósito: administrar o servidor
-                    // não exige participar de nenhum time.
-                    onOpenAdminOverview = if (teamSettings.isAdminMode) {
-                        {
-                            breadcrumbs.recordScreenOpened("visão global do time (admin)")
-                            teamUsageAccountLabel = null
-                            teamUsageProfileId = null
-                            teamUsageIsAdminOverview = true
-                            isTeamUsageOpen = true
-                            teamUsageOpenGeneration++
-                            teamUsageViewModel.openForAllAccounts()
-                        }
-                    } else {
-                        null
-                    },
-                    // Também só para quem administra: aqui o escopo é o servidor
-                    // inteiro. O integrante comum entra pelo botão do card, que
-                    // já é escopado na conta dele.
-                    onOpenTeamPresenceOverview = if (teamSettings.isAdminMode) {
-                        {
-                            breadcrumbs.recordScreenOpened("presença global do time (admin)")
-                            teamPresenceAccountLabel = null
-                            teamPresenceIsAdminOverview = true
-                            isTeamPresenceOpen = true
-                            teamPresenceOpenGeneration++
-                            teamPresenceViewModel.openForAllAccounts()
-                        }
-                    } else {
-                        null
-                    },
+                    // Só quem administra recebe os dois botões: `null` esconde.
+                    onOpenAdminOverview = shellActions.openAdminOverview,
+                    onOpenTeamPresenceOverview = shellActions.openTeamPresenceOverview,
                     onOpenCliSessions = { target ->
                         // Sem o apelido do perfil: ele é digitado pelo usuário e
                         // costuma ser o e-mail da conta.
@@ -2043,14 +2059,8 @@ private fun runUsageMonitor(
                     // clique (ou botão direito) na pílula do HUD.
                     windowMode = windowMode,
                     onWindowModeChange = onWindowModeChange,
-                    // Retrato do Dashboard (issue #215): mesmo `usageExportWriter`
-                    // que Sessões CLI e Time já usam, um diálogo de arquivo só.
-                    onExportSnapshot = { stats ->
-                        usageExportWriter.write(exportRequestForDashboard(stats, Clock.System.now()))
-                    },
-                    onExportFailure = { error ->
-                        breadcrumbs.recordFailure("exportar retrato do dashboard", error)
-                    }
+                    onExportSnapshot = shellActions.exportSnapshot,
+                    onExportFailure = shellActions.onExportFailure
                 )
             }
 
@@ -2307,15 +2317,7 @@ private fun runUsageMonitor(
             hudScreenArea = hudScreenArea,
             onOpenFull = { setHudMode(false) },
             onSwitchToCardsOnly = { setCardsOnlyMode(true) },
-            onOpenHelp = {
-                breadcrumbs.recordScreenOpened("Ajuda (F1)")
-                isHelpDialogOpen = true
-            },
-            onOpenSettings = {
-                breadcrumbs.recordScreenOpened("Configurações (HUD)")
-                isSettingsDialogOpen = true
-                settingsOpenGeneration++
-            },
+            actions = shellActions,
             onCloseRequest = { shutdownApplication() },
             activeTargets = sessionPulseViewModel.activeTargets
         )

@@ -72,7 +72,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | E2 | Modelo do balão: usado/restante, origem, rótulo e grupo da cota | feito |
 | E3 | Balão por anel com cauda, no lugar do painel de todas as contas | feito |
 | E4 | Alças: mão (mover) e engrenagem | feito |
-| E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | pendente |
+| E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | feito |
 | E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | pendente |
 | E7 | Documentação, design system, protótipo, ajuda, capturas | pendente |
 | E8 | Verificação | pendente |
@@ -105,6 +105,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest"` | Verde, com cinco casos novos: usado/restante nos dois idiomas, "<1" nas duas pontas, saldo e atividade observada sem a linha, rodapé de plano + origem, grupo e título do Antigravity. |
 | 2026-09-24 | E3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.Hud*"` | Verde: 19 casos do notch (balão só da conta do anel sob o ponteiro; costura de tamanho do notch e do balão nas 4 bordas) e os novos de geometria (notch parado na tela ao abrir em 5 frações × 4 bordas, balão da conta mais alta, grupos). Renderização descartável nas 4 bordas: cauda no anel certo e a contagem inteira ("04:50"). |
 | 2026-09-24 | E4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*"` | Verde: 24 casos do notch (alças só abertas, arrasto pela mão sem abrir nada, mão presente durante o arrasto, engrenagem, hover na alça conta como no notch, alças dentro da janela aberta nas 4 bordas) e 13 de geometria (notch parado na tela e alças dentro da janela até na fração 0 e 1). A renderização em fração 0,9 reprovou a primeira versão: engrenagem fora da janela. |
+| 2026-09-24 | E5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.ui.FooterBar*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde: 28 casos do notch (engrenagem abre e fecha o balão; ações do rodapé pelas mesmas descrições; modos com o corrente marcado; anel troca para a conta; altura do balão com e sem atualização) e as suítes do rodapé e de componentes sem mudança. Renderização descartável: cauda na engrenagem nas bordas de cima e da direita. |
 
 ## C1 · Tokens de motion e política
 
@@ -439,3 +440,24 @@ na borda da sombra e CPU da rotação contínua.
   engrenagem fora da janela: o centro era preso contando só o notch. Com a mesma reserva nos dois
   estados o notch continua sem andar ao abrir, e as alças cabem na tela até no canto — o preço é o notch
   parar 38dp mais longe do canto que antes.
+
+## E5 · Balão da engrenagem
+
+- **A engrenagem abre e fecha um balão com o que o rodapé do modo padrão oferece** — a barra HUD não
+  tem rodapé. Título "Usage Monitor" com a contagem até a próxima coleta; os três modos de janela; a
+  fileira de ações; a atualização pendente, quando há. A cauda aponta para a engrenagem; passar por um
+  anel troca para o balão daquela conta.
+- **A fileira é o próprio `FooterActionGroup`**, que passou a `internal`: mesmos ícones, mesmas
+  descrições, mesmas condições de admin. Duas cópias divergiriam na primeira tradução.
+- **Os modos vão em linhas, não no menu do rodapé**: aquele é `Popup`, e popup no Compose Desktop é
+  recortado pela própria janela — o motivo registrado no KDoc do `WindowModeMenuButton` desde a
+  barra antiga. Linha com a marca do corrente num espaço reservado em todas, a regra do `AppMenu`.
+- **`AppShellActions`** (`desktopMain`): atualizar, configurações, ajuda, modo de janela, exportação e
+  as duas visões de admin, montadas **uma vez** em `main()` e consumidas pelo `DashboardScreen` e
+  pelo `HudWindowHost`. Os lambdas saíram do meio da chamada do `DashboardScreen`; o `onWindowModeChange`
+  saiu de dentro do conteúdo da janela principal, onde a HUD não o alcançava. O breadcrumb da ajuda pelo
+  F1 da HUD virou o mesmo "Ajuda" do rodapé.
+- Na HUD a exportação lê o `UiState.Success` corrente e não mostra snackbar: o diálogo de arquivo é o
+  retorno, e falha vai ao mesmo `recordFailure`.
+- Geometria: `hudAppBalloonHeight` soma as linhas do balão, e o balão reservado é o maior entre as
+  contas **e** a engrenagem. Sem conta nenhuma ele continua existindo: é a saída do modo.

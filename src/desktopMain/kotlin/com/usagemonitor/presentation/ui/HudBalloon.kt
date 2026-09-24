@@ -2,6 +2,21 @@ package com.usagemonitor.presentation.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.HUD_APP_BALLOON_ACTIONS
+import com.usagemonitor.HUD_APP_BALLOON_CAPTION
+import com.usagemonitor.HUD_APP_BALLOON_MODE_ROW
 import com.usagemonitor.HUD_BALLOON_BAR_ROW
 import com.usagemonitor.HUD_BALLOON_FOOTER
 import com.usagemonitor.HUD_BALLOON_GAP
@@ -45,6 +63,8 @@ import com.usagemonitor.hudQuotaRuns
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.WindowMode
+import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.appSheen
@@ -283,6 +303,135 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage) {
         modifier = Modifier.height(HUD_BALLOON_QUOTA_DETAIL)
     )
 }
+
+/** A coluna do balão da engrenagem. */
+internal const val HUD_APP_BALLOON_CONTENT_TEST_TAG = "hudAppBalloonContent"
+
+/** Prefixo das linhas de modo de janela do balão da engrenagem, seguido do nome do modo. */
+internal const val HUD_APP_BALLOON_MODE_TAG_PREFIX = "hudAppBalloonMode_"
+
+/**
+ * O balão da engrenagem: tudo o que o rodapé do modo padrão oferece, para quem
+ * está na barra HUD e não tem rodapé.
+ *
+ * Título com a contagem até a próxima coleta; os três modos de janela em linhas,
+ * o corrente marcado — **em linhas e não no menu do rodapé**, porque aquele é um
+ * `Popup`, e popup no Compose Desktop é recortado pela própria janela, que aqui
+ * é do tamanho do balão —; a fileira de ações do rodapé, a **mesma**
+ * ([actions] recebe o `FooterActionGroup`), com os mesmos ícones e descrições; e a
+ * atualização pendente, quando há.
+ *
+ * Alturas fixas, somadas por `hudAppBalloonHeight`, como no balão de conta.
+ */
+@Composable
+internal fun HudAppBalloonContent(
+    language: AppLanguage,
+    countdown: (@Composable () -> Unit)?,
+    updateIndicator: HudUpdateIndicator?,
+    onWindowModeChange: (WindowMode) -> Unit,
+    actions: @Composable () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().testTag(HUD_APP_BALLOON_CONTENT_TEST_TAG)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_HEADER),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Usage Monitor",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            countdown?.invoke()
+        }
+        Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+        Text(
+            text = if (language == AppLanguage.PT) "Modo de janela" else "Window mode",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            modifier = Modifier.height(HUD_APP_BALLOON_CAPTION)
+        )
+        WindowMode.entries.forEach { mode ->
+            HudModeRow(
+                label = mode.label(language),
+                selected = mode == WindowMode.HUD,
+                testTag = HUD_APP_BALLOON_MODE_TAG_PREFIX + mode.name,
+                onClick = { onWindowModeChange(mode) }
+            )
+        }
+        Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+        Box(
+            modifier = Modifier.fillMaxWidth().height(HUD_APP_BALLOON_ACTIONS),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            actions()
+        }
+        updateIndicator?.let { indicator ->
+            Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+            Text(
+                text = indicator.description,
+                style = MaterialTheme.typography.labelSmall,
+                color = indicator.tone.color(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.height(HUD_BALLOON_FOOTER)
+            )
+        }
+    }
+}
+
+/**
+ * Uma linha de modo: a marca do corrente num espaço reservado em todas — sem ele
+ * o rótulo andaria para o lado a cada troca, a regra do `AppMenu` —, hover e
+ * pressão como camadas.
+ */
+@Composable
+private fun HudModeRow(label: String, selected: Boolean, testTag: String, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val pressed by interaction.collectIsPressedAsState()
+    val ladder = AppSurfaceLadders.current
+    val layer = when {
+        pressed -> ladder.pressedLayer
+        hovered -> ladder.hoverLayer
+        else -> Color.Transparent
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HUD_APP_BALLOON_MODE_ROW)
+            .clip(AppShapes.small)
+            .background(layer)
+            .hoverable(interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .semantics { this.selected = selected }
+            .testTag(testTag)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(modifier = Modifier.size(MODE_MARK_SIZE), contentAlignment = Alignment.Center) {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(MODE_MARK_SIZE)
+                )
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
+private val MODE_MARK_SIZE = 14.dp
 
 /** "Reinicia ter 21h00" / "Resets Tue 21h00" — o "Resets at 20:19" do Codenotch. */
 internal fun hudResetCaption(reset: String, language: AppLanguage): String {

@@ -130,8 +130,11 @@ internal fun hudNotchSizes(
     } else {
         DpSize(collapsed.width, collapsed.height + handlesReach)
     }
-    val tallest = accounts.maxOfOrNull { account -> hudBalloonHeight(account) }
-        ?: return HudNotchSizes(collapsed = collapsed, expanded = withHandles, withHandles = withHandles)
+    // O balão da engrenagem existe mesmo sem conta nenhuma: é a saída do modo.
+    val tallest = maxOf(
+        accounts.maxOfOrNull { account -> hudBalloonHeight(account) } ?: 0.dp,
+        hudAppBalloonHeight(hasUpdateIndicator)
+    )
     // O balão não gira com a borda: é texto, e fica sempre de pé.
     val balloon = DpSize(HUD_BALLOON_WIDTH, tallest)
     val expanded = if (edge.isHorizontal) {
@@ -191,6 +194,28 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
         }
     }
     if (account.detailLine != null) {
+        height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
+    }
+    return height
+}
+
+/** As linhas do balão da engrenagem. */
+internal val HUD_APP_BALLOON_CAPTION = 16.dp
+internal val HUD_APP_BALLOON_MODE_ROW = 24.dp
+internal val HUD_APP_BALLOON_ACTIONS = 28.dp
+
+/** Quantos modos de janela o balão da engrenagem lista: os três do rodapé. */
+internal const val HUD_APP_BALLOON_MODES = 3
+
+/**
+ * A altura do balão da engrenagem: título com a contagem, os modos de janela, a
+ * fileira de ações do rodapé e, quando há atualização pendente, a linha dela.
+ */
+internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean): Dp {
+    var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER +
+        HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_CAPTION + HUD_APP_BALLOON_MODE_ROW * HUD_APP_BALLOON_MODES +
+        HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS
+    if (hasUpdateIndicator) {
         height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
     }
     return height
