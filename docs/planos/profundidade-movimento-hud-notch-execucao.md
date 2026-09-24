@@ -43,7 +43,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C14 | Geometria de borda e migração da posição | feito |
 | C15 | O notch com anéis | feito |
 | C16 | Indicadores contínuos atrás da política | feito |
-| C17 | Verificação final | pendente |
+| C17 | Verificação final | feito (automática); manual pendente |
 
 ## Pontos de situação
 
@@ -65,6 +65,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C14 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.HudWindowPreferencesTest"` | Verde: dez casos de geometria e quatro de posição (padrão, ida e volta, migração da pílula antiga, meia gravação ignorada). |
 | 2026-09-24 | C15 | Claude Opus 5.5 | `gradlew.bat allTests` + renderização descartável do notch (topo e lateral, escuro e claro, parado e aberto) | Verde: 2077 testes, 0 falhas. A primeira renderização mostrou a trilha dos anéis branca opaca — o alfa da camada de pressão tinha sido sobrescrito com 1 —; corrigida para a camada com 1,6× o peso. |
 | 2026-09-24 | C16 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.presentation.SessionPulse*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde. O teste de giro falhou uma vez no caso estático: sobre fundo transparente dois instantes parados diferiam pelo antialiasing acumulado; com fundo opaco, parado é idêntico e com a política contínua os dois instantes diferem. |
+| 2026-09-24 | C17 | Claude Opus 5.5 | `gradlew.bat allTests` + `gradlew.bat generateScreenshots` + `gradlew.bat generateHelpMedia` + `desktopTest --tests "*HelpMediaResourcesTest*"` | Verde: 2079 testes, 0 falhas; capturas do README e as doze demos da ajuda regeneradas (a de modos de janela já mostra o notch aberto). `gradlew.bat run` **não** foi executado: a versão instalada estava aberta e o `SingleInstanceGuard` só a traria para frente. |
 
 ## C1 · Tokens de motion e política
 
@@ -285,3 +286,18 @@ na borda da sombra e CPU da rotação contínua.
 - `rememberSessionPulseFrame` passou para trás de `AppMotionPolicy.continuous`: sem ela o botão fica
   aceso e parado no pico da primeira severidade.
 - Custo de CPU da rotação contínua fica para a verificação manual do C17.
+
+## C17 · Verificação
+
+**Automática (feita):** suíte completa, capturas e demos regeneradas e commitadas.
+
+**Manual (pendente — precisa da janela real, com a versão instalada fechada):**
+
+- `gradlew.bat run` a 100% e 115%, em Obsidiana, Porcelana e um preset colorido: hover e arrasto de
+  card com o vão abrindo, menu e diálogo com saída, aba deslizando, barra e percentual animando numa
+  coleta.
+- HUD nas quatro bordas: arrastar, soltar perto de cada borda, reiniciar (posição gravada e a
+  migração da pílula antiga), clique, botão direito, `Ctrl+Shift+H`, item da bandeja, e a janela
+  crescendo sem piscar ao entrar o ponteiro.
+- Opacidade da janela combinada com a janela transparente da HUD, e halo na borda da sombra.
+- "Reduzir animações" ligado e desligado; CPU com o arco de sessão ativa girando (meta < ~1%).
