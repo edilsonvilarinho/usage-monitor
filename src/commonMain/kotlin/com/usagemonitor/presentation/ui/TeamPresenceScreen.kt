@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -234,27 +235,29 @@ internal fun TeamPresenceContent(
     var pendingAccount by remember { mutableStateOf<TeamPresenceAccountGroup?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
-        when (state) {
-            is TeamPresenceUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
+        AppStateCrossfade(state) { state ->
+    when (state) {
+                is TeamPresenceUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
 
-            is TeamPresenceUiState.Error -> AppErrorState(
-                TeamPresenceLabels.error(state.message, language)
-            )
+                is TeamPresenceUiState.Error -> AppErrorState(
+                    TeamPresenceLabels.error(state.message, language)
+                )
 
-            is TeamPresenceUiState.Success -> TeamPresenceList(
-                state = state,
-                language = language,
-                localDeviceId = localDeviceId,
-                canManage = canManage && state.isAdminOverview,
-                actionError = actionError,
-                onToggleAccount = onToggleAccount,
-                onSetOnlyOnline = onSetOnlyOnline,
-                onQueryChange = onQueryChange,
-                onRequestRemoveMember = { entry -> pendingMember = entry },
-                onRequestDeleteAccount = { group -> pendingAccount = group },
-                onDismissActionError = onDismissActionError
-            )
-        }
+                is TeamPresenceUiState.Success -> TeamPresenceList(
+                    state = state,
+                    language = language,
+                    localDeviceId = localDeviceId,
+                    canManage = canManage && state.isAdminOverview,
+                    actionError = actionError,
+                    onToggleAccount = onToggleAccount,
+                    onSetOnlyOnline = onSetOnlyOnline,
+                    onQueryChange = onQueryChange,
+                    onRequestRemoveMember = { entry -> pendingMember = entry },
+                    onRequestDeleteAccount = { group -> pendingAccount = group },
+                    onDismissActionError = onDismissActionError
+                )
+    }
+}
     }
 
     val memberToRemove = pendingMember

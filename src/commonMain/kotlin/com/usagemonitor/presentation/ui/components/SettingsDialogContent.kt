@@ -298,104 +298,116 @@ fun SettingsDialogContent(
                     .padding(AppSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
-                when (selectedTab) {
-                    SettingsTab.GENERAL -> GeneralSettingsTab(
-                        currentTheme = currentTheme,
-                        currentLanguage = currentLanguage,
-                        autoStartEnabled = autoStartEnabled,
-                        alwaysOnTopEnabled = alwaysOnTopEnabled,
-                        cardsOnlyMode = cardsOnlyMode,
-                        hudMode = hudMode,
-                        windowOpacityPercent = windowOpacityPercent,
-                        windowOpacityEnabled = windowOpacityEnabled,
-                        uiScalePercent = uiScalePercent,
-                        reducedMotion = reducedMotion,
-                        autoUpdateEnabled = autoUpdateEnabled,
-                        autoUpdateSupport = autoUpdateSupport,
-                        autoUpdatePlatform = autoUpdatePlatform,
-                        lastUpdateReceipt = lastUpdateReceipt,
-                        autoUpdateFeedOverride = autoUpdateFeedOverride,
-                        onThemeChange = onThemeChange,
-                        onLanguageChange = onLanguageChange,
-                        onAutoStartChange = onAutoStartChange,
-                        onAlwaysOnTopChange = onAlwaysOnTopChange,
-                        onCardsOnlyModeChange = onCardsOnlyModeChange,
-                        onHudModeChange = onHudModeChange,
-                        onAutoUpdateChange = onAutoUpdateChange,
-                        onWindowOpacityChange = onWindowOpacityChange,
-                        onUiScaleChange = onUiScaleChange,
-                        onReducedMotionChange = onReducedMotionChange,
-                        onReportBug = onReportBug
-                    )
+                // A aba nova entra com o mesmo fade que as telas usam ao trocar de
+                // estado; só a escolhida continua composta -- a saída da anterior
+                // dura 120ms e some. A `Column` interna existe porque as abas
+                // emitem vários painéis e contam com o `spacedBy` do pai.
+                AppStateCrossfade(
+                    state = selectedTab,
+                    key = { tab -> tab },
+                    label = "settingsTab"
+                ) { tab ->
+                    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                        when (tab) {
+                            SettingsTab.GENERAL -> GeneralSettingsTab(
+                                currentTheme = currentTheme,
+                                currentLanguage = currentLanguage,
+                                autoStartEnabled = autoStartEnabled,
+                                alwaysOnTopEnabled = alwaysOnTopEnabled,
+                                cardsOnlyMode = cardsOnlyMode,
+                                hudMode = hudMode,
+                                windowOpacityPercent = windowOpacityPercent,
+                                windowOpacityEnabled = windowOpacityEnabled,
+                                uiScalePercent = uiScalePercent,
+                                reducedMotion = reducedMotion,
+                                autoUpdateEnabled = autoUpdateEnabled,
+                                autoUpdateSupport = autoUpdateSupport,
+                                autoUpdatePlatform = autoUpdatePlatform,
+                                lastUpdateReceipt = lastUpdateReceipt,
+                                autoUpdateFeedOverride = autoUpdateFeedOverride,
+                                onThemeChange = onThemeChange,
+                                onLanguageChange = onLanguageChange,
+                                onAutoStartChange = onAutoStartChange,
+                                onAlwaysOnTopChange = onAlwaysOnTopChange,
+                                onCardsOnlyModeChange = onCardsOnlyModeChange,
+                                onHudModeChange = onHudModeChange,
+                                onAutoUpdateChange = onAutoUpdateChange,
+                                onWindowOpacityChange = onWindowOpacityChange,
+                                onUiScaleChange = onUiScaleChange,
+                                onReducedMotionChange = onReducedMotionChange,
+                                onReportBug = onReportBug
+                            )
 
-                    SettingsTab.ALERTS -> {
-                        AlertSettingsSection(
-                            settings = alertSettings,
-                            language = currentLanguage,
-                            onSettingsChange = onAlertSettingsChange,
-                            budgetText = monthlyBudgetText,
-                            onBudgetCommit = onMonthlyBudgetCommit
-                        )
-                    }
+                            SettingsTab.ALERTS -> {
+                                AlertSettingsSection(
+                                    settings = alertSettings,
+                                    language = currentLanguage,
+                                    onSettingsChange = onAlertSettingsChange,
+                                    budgetText = monthlyBudgetText,
+                                    onBudgetCommit = onMonthlyBudgetCommit
+                                )
+                            }
 
-                    SettingsTab.APIS -> MonitoredApisTab(
-                        currentLanguage = currentLanguage,
-                        enabledApis = enabledApis,
-                        configuredApiKeys = configuredApiKeys,
-                        onApiToggle = onApiToggle,
-                        onApiKeySave = onApiKeySave,
-                        onApiKeyRemove = onApiKeyRemove,
-                        apiKeyCheck = apiKeyCheck,
-                        onApiKeyTest = onApiKeyTest,
-                        onApiKeyCheckReset = onApiKeyCheckReset
-                    )
+                            SettingsTab.APIS -> MonitoredApisTab(
+                                currentLanguage = currentLanguage,
+                                enabledApis = enabledApis,
+                                configuredApiKeys = configuredApiKeys,
+                                onApiToggle = onApiToggle,
+                                onApiKeySave = onApiKeySave,
+                                onApiKeyRemove = onApiKeyRemove,
+                                apiKeyCheck = apiKeyCheck,
+                                onApiKeyTest = onApiKeyTest,
+                                onApiKeyCheckReset = onApiKeyCheckReset
+                            )
 
-                    SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
-                        currentLanguage = currentLanguage,
-                        anthropicProfiles = anthropicProfiles,
-                        expandedProfileId = expandedProfileId,
-                        onAnthropicProfileToggle = onAnthropicProfileToggle,
-                        onAnthropicProfileRename = onAnthropicProfileRename,
-                        onAddAnthropicProfile = onAddAnthropicProfile,
-                        onRemoveAnthropicProfile = onRemoveAnthropicProfile,
-                        onRescanAnthropicProfiles = onRescanAnthropicProfiles,
-                        onToggleProfileExpanded = onToggleProfileExpanded
-                    )
+                            SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
+                                currentLanguage = currentLanguage,
+                                anthropicProfiles = anthropicProfiles,
+                                expandedProfileId = expandedProfileId,
+                                onAnthropicProfileToggle = onAnthropicProfileToggle,
+                                onAnthropicProfileRename = onAnthropicProfileRename,
+                                onAddAnthropicProfile = onAddAnthropicProfile,
+                                onRemoveAnthropicProfile = onRemoveAnthropicProfile,
+                                onRescanAnthropicProfiles = onRescanAnthropicProfiles,
+                                onToggleProfileExpanded = onToggleProfileExpanded
+                            )
 
-                    SettingsTab.TEAM -> {
-                        TeamIntegrationSection(
-                            settings = teamSettings,
-                            language = currentLanguage,
-                            profiles = anthropicProfiles,
-                            connection = teamConnection,
-                            onEnabledChange = onTeamEnabledChange,
-                            onServerUrlChange = onTeamServerUrlChange,
-                            onApiKeyChange = onTeamApiKeyChange,
-                            onAliasChange = onTeamAliasChange,
-                            onProfileParticipationChange = onTeamProfileParticipationChange,
-                            onTestConnection = onTeamTestConnection,
-                            syncFailureMessage = teamSyncFailureMessage,
-                            rejectedProfiles = teamRejectedProfiles,
-                            adminConnection = teamAdminConnection,
-                            onAdminTokenChange = onTeamAdminTokenChange,
-                            onValidateAdminToken = onTeamValidateAdminToken,
-                            onOpenKeysManager = onTeamOpenKeysManager,
-                            onExitAdminMode = onTeamExitAdminMode
-                        )
-                    }
+                            SettingsTab.TEAM -> {
+                                TeamIntegrationSection(
+                                    settings = teamSettings,
+                                    language = currentLanguage,
+                                    profiles = anthropicProfiles,
+                                    connection = teamConnection,
+                                    onEnabledChange = onTeamEnabledChange,
+                                    onServerUrlChange = onTeamServerUrlChange,
+                                    onApiKeyChange = onTeamApiKeyChange,
+                                    onAliasChange = onTeamAliasChange,
+                                    onProfileParticipationChange = onTeamProfileParticipationChange,
+                                    onTestConnection = onTeamTestConnection,
+                                    syncFailureMessage = teamSyncFailureMessage,
+                                    rejectedProfiles = teamRejectedProfiles,
+                                    adminConnection = teamAdminConnection,
+                                    onAdminTokenChange = onTeamAdminTokenChange,
+                                    onValidateAdminToken = onTeamValidateAdminToken,
+                                    onOpenKeysManager = onTeamOpenKeysManager,
+                                    onExitAdminMode = onTeamExitAdminMode
+                                )
+                            }
 
-                    SettingsTab.NETWORK -> {
-                        NetworkSettingsSection(
-                            settings = proxySettings,
-                            language = currentLanguage,
-                            connection = proxyConnection,
-                            onUseEnvironmentProxyChange = onProxyUseEnvironmentChange,
-                            onHostChange = onProxyHostChange,
-                            onPortChange = onProxyPortChange,
-                            onUsernameChange = onProxyUsernameChange,
-                            onPasswordChange = onProxyPasswordChange,
-                            onTestConnection = onProxyTestConnection
-                        )
+                            SettingsTab.NETWORK -> {
+                                NetworkSettingsSection(
+                                    settings = proxySettings,
+                                    language = currentLanguage,
+                                    connection = proxyConnection,
+                                    onUseEnvironmentProxyChange = onProxyUseEnvironmentChange,
+                                    onHostChange = onProxyHostChange,
+                                    onPortChange = onProxyPortChange,
+                                    onUsernameChange = onProxyUsernameChange,
+                                    onPasswordChange = onProxyPasswordChange,
+                                    onTestConnection = onProxyTestConnection
+                                )
+                            }
+                        }
                     }
                 }
             }

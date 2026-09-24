@@ -1,12 +1,6 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,7 +52,6 @@ import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
-import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
@@ -279,17 +272,15 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
-                        AnimatedContent(
-                            targetState = uiState::class,
-                            transitionSpec = {
-                                (fadeIn(tween(AppMotion.normal, easing = AppMotion.enterEasing)) +
-                                    slideInVertically(tween(AppMotion.slow, easing = AppMotion.enterEasing)) { it / 12 })
-                                    .togetherWith(fadeOut(tween(AppMotion.fast, easing = AppMotion.exitEasing)))
-                                    .using(SizeTransform(clip = false))
-                            },
+                        // O estado vem **pelo parâmetro** da lambda. A versão
+                        // anterior lia `uiState` de fora e desenhava o estado novo
+                        // nos dois slots da transição: o esqueleto sumia no
+                        // primeiro quadro e duas grades se sobrepunham.
+                        AppStateCrossfade(
+                            state = uiState,
                             label = "dashboardStateContent"
-                        ) { _ ->
-                            when (val state = uiState) {
+                        ) { state ->
+                            when (state) {
                                 is UiState.Loading -> LoadingContent(language = language)
                                 UiState.NoApisEnabled -> NoApisEnabledContent(
                                     language = language,

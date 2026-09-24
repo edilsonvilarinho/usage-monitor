@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -263,51 +264,53 @@ internal fun TeamUsageContent(
     var pendingSessionRemoval by remember { mutableStateOf<PendingSessionRemoval?>(null) }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        when (state) {
-            is TeamUsageUiState.Loading -> AppLoadingState(
-                if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"
-            )
+        AppStateCrossfade(state, key = { current -> if (current is TeamUsageUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
+    when (state) {
+                is TeamUsageUiState.Loading -> AppLoadingState(
+                    if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"
+                )
 
-            is TeamUsageUiState.Error -> AppErrorState(
-                TeamUsageLabels.serverError(state.message, language)
-            )
+                is TeamUsageUiState.Error -> AppErrorState(
+                    TeamUsageLabels.serverError(state.message, language)
+                )
 
-            is TeamUsageUiState.Success -> {
-                val detail = state.detail
-                if (detail == null) {
-                    TeamUsageList(
-                        state = state,
-                        language = language,
-                        localDeviceId = localDeviceId,
-                        removalError = removalError,
-                        sessionRemovalError = sessionRemovalError,
-                        onSelectRange = onSelectRange,
-                        onToggleMember = onToggleMember,
-                        onToggleAccount = onToggleAccount,
-                        onOpenSession = onOpenSession,
-                        onRequestRemoveMember = { member -> pendingRemoval = member },
-                        onDismissRemovalError = onDismissRemovalError,
-                        onRequestRemoveSession = { member, session ->
-                            pendingSessionRemoval = PendingSessionRemoval(member, session)
-                        },
-                        onDismissSessionRemovalError = onDismissSessionRemovalError,
-                        onSelectView = onSelectView,
-                        onExportReport = onExportReport
-                    )
-                } else {
-                    TeamSessionDetailPane(
-                        detail = detail,
-                        language = language,
-                        isLocalSession = localDeviceId != null && detail.deviceId == localDeviceId,
-                        advancedExpanded = state.advancedExpanded,
-                        glossaryExpanded = state.glossaryExpanded,
-                        onCloseDetail = onCloseDetail,
-                        onToggleAdvanced = onToggleAdvanced,
-                        onToggleGlossary = onToggleGlossary
-                    )
+                is TeamUsageUiState.Success -> {
+                    val detail = state.detail
+                    if (detail == null) {
+                        TeamUsageList(
+                            state = state,
+                            language = language,
+                            localDeviceId = localDeviceId,
+                            removalError = removalError,
+                            sessionRemovalError = sessionRemovalError,
+                            onSelectRange = onSelectRange,
+                            onToggleMember = onToggleMember,
+                            onToggleAccount = onToggleAccount,
+                            onOpenSession = onOpenSession,
+                            onRequestRemoveMember = { member -> pendingRemoval = member },
+                            onDismissRemovalError = onDismissRemovalError,
+                            onRequestRemoveSession = { member, session ->
+                                pendingSessionRemoval = PendingSessionRemoval(member, session)
+                            },
+                            onDismissSessionRemovalError = onDismissSessionRemovalError,
+                            onSelectView = onSelectView,
+                            onExportReport = onExportReport
+                        )
+                    } else {
+                        TeamSessionDetailPane(
+                            detail = detail,
+                            language = language,
+                            isLocalSession = localDeviceId != null && detail.deviceId == localDeviceId,
+                            advancedExpanded = state.advancedExpanded,
+                            glossaryExpanded = state.glossaryExpanded,
+                            onCloseDetail = onCloseDetail,
+                            onToggleAdvanced = onToggleAdvanced,
+                            onToggleGlossary = onToggleGlossary
+                        )
+                    }
                 }
-            }
-        }
+    }
+}
     }
 
     val memberToRemove = pendingRemoval

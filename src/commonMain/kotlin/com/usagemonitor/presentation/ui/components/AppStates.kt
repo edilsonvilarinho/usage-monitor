@@ -1,5 +1,13 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -431,3 +439,47 @@ private fun AppCenteredState(
         content = content
     )
 }
+
+/**
+ * Troca de estado de uma tela: carregando → dados → erro, lista → detalhe.
+ *
+ * Duas telas animavam a troca e o resto não; e as duas que animavam tinham o
+ * mesmo defeito: a lambda do `AnimatedContent` **ignorava o argumento** e lia o
+ * estado atual de fora (`{ _ -> when (val state = uiState) ... }`). Durante a
+ * transição os dois slots desenhavam o estado novo — o esqueleto de
+ * carregamento sumia no primeiro quadro e duas grades de cards se sobrepunham
+ * esmaecendo. Aqui o conteúdo **só** recebe o estado pelo parâmetro, e não há
+ * como ler o de fora sem escrever isso explicitamente.
+ *
+ * [key] decide o que é "outra tela": por default a classe do estado, então
+ * `Success` → `Success` (o tique do laço ao vivo) atualiza no lugar, sem
+ * transição — animar a cada 5s seria o pisca que o laço existe para evitar.
+ */
+@Composable
+fun <S : Any> AppStateCrossfade(
+    state: S,
+    modifier: Modifier = Modifier,
+    key: (S) -> Any = { current -> current::class },
+    label: String = "appStateCrossfade",
+    content: @Composable (S) -> Unit
+) {
+    val enterFade = appTween<Float>(AppMotion.normal, AppMotion.emphasizedEasing)
+    val exitFade = appTween<Float>(AppMotion.fast, AppMotion.exitEasing)
+    val rise = appSpring<IntOffset>(AppMotion.Springs.GENTLE, visibilityThreshold = IntOffset.VisibilityThreshold)
+    AnimatedContent(
+        targetState = state,
+        modifier = modifier,
+        contentKey = key,
+        transitionSpec = {
+            (fadeIn(enterFade) + slideInVertically(rise) { height -> height / STATE_RISE_FRACTION })
+                .togetherWith(fadeOut(exitFade))
+                .using(SizeTransform(clip = false))
+        },
+        label = label
+    ) { current ->
+        content(current)
+    }
+}
+
+/** A tela nova sobe 1/24 da própria altura: movimento que se sente, não que se vê. */
+private const val STATE_RISE_FRACTION = 24

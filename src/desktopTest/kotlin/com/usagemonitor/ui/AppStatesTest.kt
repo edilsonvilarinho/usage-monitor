@@ -8,6 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.MaterialTheme
 import com.usagemonitor.presentation.ui.components.AppAnimatedNumber
+import androidx.compose.material3.Text
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
@@ -227,6 +230,39 @@ class AppStatesTest {
 
         onNodeWithText("68%").assertIsDisplayed()
         onNodeWithText("41%").assertDoesNotExist()
+    }
+
+    /**
+     * Regressão do defeito do dashboard e do histórico: a lambda do
+     * `AnimatedContent` ignorava o argumento, e no meio da transição os **dois**
+     * slots desenhavam o estado novo. Aqui, um quadro depois da troca, o slot que
+     * sai ainda mostra o estado antigo; e depois do idle só o novo sobra.
+     */
+    @Test
+    fun `a troca de estado mantem o estado antigo no slot que sai`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        var state by mutableStateOf<Any>("carregando")
+        setContent {
+            AppTheme(isDark = true) {
+                AppStateCrossfade(state = state) { current ->
+                    Text(if (current is String) "Carregando" else "Dados: $current")
+                }
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Carregando").assertExists()
+
+        state = 42
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(AppMotion.exit.toLong() / 2)
+
+        onNodeWithText("Carregando").assertExists()
+        onNodeWithText("Dados: 42").assertExists()
+
+        mainClock.autoAdvance = true
+        waitForIdle()
+        onNodeWithText("Carregando").assertDoesNotExist()
+        onNodeWithText("Dados: 42").assertExists()
     }
 
     /** Com "Reduzir animações" a barra salta para o valor no primeiro quadro. */

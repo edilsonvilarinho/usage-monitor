@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -215,36 +216,38 @@ internal fun CliSessionsContent(
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        when (state) {
-            is CliSessionsUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
+        AppStateCrossfade(state, key = { current -> if (current is CliSessionsUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
+    when (state) {
+                is CliSessionsUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
 
-            is CliSessionsUiState.Error -> AppErrorState(state.message)
+                is CliSessionsUiState.Error -> AppErrorState(state.message)
 
-            is CliSessionsUiState.Success -> {
-                val detail = state.detail
-                if (detail == null) {
-                    CliSessionsList(
-                        state = state,
-                        language = language,
-                        onSelectRange = onSelectRange,
-                        onOpenSession = onOpenSession,
-                        onSelectView = onSelectView,
-                        onExport = onExport,
-                        onExportReport = onExportReport
-                    )
-                } else {
-                    CliSessionDetailPane(
-                        detail = detail,
-                        language = language,
-                        advancedExpanded = state.advancedExpanded,
-                        glossaryExpanded = state.glossaryExpanded,
-                        onCloseDetail = onCloseDetail,
-                        onToggleAdvanced = onToggleAdvanced,
-                        onToggleGlossary = onToggleGlossary
-                    )
+                is CliSessionsUiState.Success -> {
+                    val detail = state.detail
+                    if (detail == null) {
+                        CliSessionsList(
+                            state = state,
+                            language = language,
+                            onSelectRange = onSelectRange,
+                            onOpenSession = onOpenSession,
+                            onSelectView = onSelectView,
+                            onExport = onExport,
+                            onExportReport = onExportReport
+                        )
+                    } else {
+                        CliSessionDetailPane(
+                            detail = detail,
+                            language = language,
+                            advancedExpanded = state.advancedExpanded,
+                            glossaryExpanded = state.glossaryExpanded,
+                            onCloseDetail = onCloseDetail,
+                            onToggleAdvanced = onToggleAdvanced,
+                            onToggleGlossary = onToggleGlossary
+                        )
+                    }
                 }
-            }
-        }
+    }
+}
     }
 }
 
