@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
+import com.usagemonitor.presentation.ui.components.AppAnimatedNumber
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
@@ -199,6 +201,32 @@ class AppStatesTest {
         }
 
         assertEquals(0, countDifferencesOffCorners(settled, animated))
+    }
+
+    /**
+     * O número desliza, mas depois do idle sobra **um** nó com o valor novo: o
+     * antigo saiu da árvore. Dois nós com o mesmo papel quebrariam todo
+     * `onNodeWithText` das suítes do card.
+     */
+    @Test
+    fun `o numero animado termina com um so no no valor novo`() = runDesktopComposeUiTest {
+        var value by mutableStateOf("41%")
+        setContent {
+            AppTheme(isDark = true) {
+                AppAnimatedNumber(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        onNodeWithText("41%").assertIsDisplayed()
+        value = "68%"
+        waitForIdle()
+
+        onNodeWithText("68%").assertIsDisplayed()
+        onNodeWithText("41%").assertDoesNotExist()
     }
 
     /** Com "Reduzir animações" a barra salta para o valor no primeiro quadro. */

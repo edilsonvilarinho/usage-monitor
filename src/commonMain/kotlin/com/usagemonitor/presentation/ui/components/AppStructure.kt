@@ -877,11 +877,10 @@ fun AppMetricBlock(
                 labelTrailing()
             }
         }
-        Text(
+        AppAnimatedNumber(
             text = value,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         if (footer != null) {

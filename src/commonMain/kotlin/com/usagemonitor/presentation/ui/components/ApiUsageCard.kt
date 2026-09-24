@@ -1,5 +1,10 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
 import com.usagemonitor.presentation.ui.theme.appTween
 import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import androidx.compose.animation.animateColorAsState
@@ -43,7 +48,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Terminal
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -467,19 +471,11 @@ fun ApiUsageCard(
                             buttonSize = density.actionButtonSize,
                             enabled = !isRefreshing
                         ) { tint ->
-                            if (isRefreshing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(density.actionIconSize),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(density.actionIconSize),
-                                    tint = tint
-                                )
-                            }
+                            RefreshGlyph(
+                                refreshing = isRefreshing,
+                                tint = tint,
+                                size = density.actionIconSize
+                            )
                         }
 
                         CardIconActionButton(
@@ -1398,7 +1394,7 @@ private fun CompactQuotaBadgeContent(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        Text(
+        AppAnimatedNumber(
             text = compactPercentageLabel(quota),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
@@ -1573,14 +1569,14 @@ private fun QuotaRowContent(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            Text(
+            AppAnimatedNumber(
                 text = compactPercentageLabel(quota),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
                 // Mesmo tratamento de antes: janela vencida mostra o último
                 // dado real da fonte, esmaecido para não passar por corrente.
-                modifier = Modifier.alpha(staleAlpha)
+                modifier = Modifier.alpha(staleAlpha),
+                contentAlignment = Alignment.CenterEnd
             )
         }
 
@@ -1643,3 +1639,41 @@ private fun quotaTone(quota: QuotaInfo, risk: QuotaRiskSummary?): AppTone {
         else -> AppTone.OK
     }
 }
+
+/**
+ * O glifo de recarga do card.
+ *
+ * Coletando, ele **gira** — só com [com.usagemonitor.presentation.ui.theme.AppMotionPolicy.continuous]
+ * ligada, que é o app em uso; nos testes e nos geradores de captura ele fica
+ * parado no tom de informação, e a semântica ("Atualizando…") continua dizendo o
+ * estado. Era um `CircularProgressIndicator` do Material: outra espessura, outro
+ * raio e animação infinita incondicional, a mesma classe de coisa que trava o
+ * `waitForIdle`.
+ */
+@Composable
+private fun RefreshGlyph(refreshing: Boolean, tint: Color, size: Dp) {
+    val policy = LocalAppMotionPolicy.current
+    val rotation = if (refreshing && policy.continuous) {
+        val transition = rememberInfiniteTransition(label = "refreshGlyph")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(REFRESH_TURN_MILLIS, easing = LinearEasing)),
+            label = "refreshGlyphAngle"
+        )
+        angle
+    } else {
+        0f
+    }
+    Icon(
+        imageVector = Icons.Rounded.Refresh,
+        contentDescription = null,
+        modifier = Modifier
+            .size(size)
+            .graphicsLayer { rotationZ = rotation },
+        tint = if (refreshing) AppTone.INFO.color() else tint
+    )
+}
+
+/** Uma volta por segundo: rápido o bastante para ler "trabalhando", lento para não agitar. */
+private const val REFRESH_TURN_MILLIS = 1_000

@@ -951,7 +951,7 @@ aviso: a tooltip lista todos, com bullet só a partir do segundo.
   em `ComponentTest` usam `onNodeWithContentDescription(..., substring = true)`.
 
 **Regras que continuam valendo**: animação infinita só atrás de `AppMotionPolicy.continuous`
-(sem a política ela trava o `waitForIdle`); `ShimmerBox` existe mas não se replica; nenhuma composable nova em `main()`; nenhum
+(sem a política ela trava o `waitForIdle`); `ShimmerBox` foi apagado — não tinha chamador; nenhuma composable nova em `main()`; nenhum
 `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
 **Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS a partir do monograma descrito em

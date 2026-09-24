@@ -32,7 +32,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C3 | Seleção animada: aba, segmentado, navegação lateral, chip | feito |
 | C4 | Overlays que entram e saem: menu, tooltip, diálogo | feito |
 | C5 | Estados de interação: foco, hover em camada, pressão | feito |
-| C6 | Números animados e recarga do card | pendente |
+| C6 | Números animados e recarga do card | feito |
 | C7 | `AppStateCrossfade` e o bug do `AnimatedContent` | pendente |
 | C8 | Expandir/recolher e banners | pendente |
 | C9 | Movimento da grade de cards | pendente |
@@ -54,6 +54,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o sublinhado desliza ate a aba escolhida` (indicador termina com `left` e largura iguais aos da aba nova). |
 | 2026-09-24 | C4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o menu some da arvore depois da saida` e os testes de "abre para cima" do `FooterBarTest`. A saída da janela de diálogo não tem teste de componente (a moldura exige `WindowScope`); fica para a verificação manual do C17. |
 | 2026-09-24 | C5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o campo focado desenha o anel de foco` (pixels 0 e 1 da borda esquerda mudam com o foco). |
+| 2026-09-24 | C6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o numero animado termina com um so no no valor novo` e `AppAnimatedNumberTest`. |
 
 ## C1 · Tokens de motion e política
 
@@ -113,3 +114,12 @@ cápsula, marcador de ritmo, "Next update in 2m").
 - `CardIconActionButton`: ganhou hover, pressão e escala — era o único botão sem resposta ao ponteiro.
 - `AppDataRow`: hover e pressão como camadas somadas; a seleção continua em `surfaceVariant`.
 - `AppTextField`/`AppTextArea`: anel de foco de 2dp em `--info`, cor e largura em tween.
+
+## C6 · Números e recarga
+
+- `AppAnimatedNumber`: `AnimatedContent` por texto; o valor novo entra de baixo quando sobe e de cima
+  quando desce (`numericDirection`, puro e testado), mola `GENTLE`, `SizeTransform` com recorte.
+  Adotado no percentual das cotas do card e no valor de `AppMetricBlock`.
+- Recarga do card: `RefreshGlyph` no lugar do `CircularProgressIndicator`. Gira só com
+  `AppMotionPolicy.continuous`; parado, fica no tom de informação e a semântica diz "Atualizando…".
+- `ShimmerBox.kt` apagado: sem chamador, e com o deslocamento do gradiente em pixels.

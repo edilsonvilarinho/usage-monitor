@@ -146,7 +146,10 @@ bars, rings and numbers settle without rebounding past the value. Every transiti
 `AppTheme` so component tests and capture generators never meet it (an endless animation hangs
 `waitForIdle`); the app turns it on only for live state. **"Reduzir animações"** (Settings →
 General) turns every transition into an instant swap and stops anything continuous. First load is
-a **static skeleton**, never a shimmer.
+a **static skeleton**, never a shimmer. A refreshing card turns its refresh glyph (tinted `--info`)
+only while continuous motion is on; otherwise the glyph stays still and the label says
+"Atualizando…". Numbers that change (quota percent, metric value) slide in the direction of the
+change (`AppAnimatedNumber`).
 
 **Cards.** There are no "cards" in the decorative sense. There is one data surface: `--surface`
 fill, 1px border lit on top, radius 8, `--shadow-card`, top sheen and highlight, optional 2px

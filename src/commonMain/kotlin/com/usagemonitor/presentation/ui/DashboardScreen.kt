@@ -394,9 +394,9 @@ private fun NoApisEnabledContent(
 /**
  * Carregando: esqueleto **estático**.
  *
- * O `ShimmerBox` sai daqui. Ele é a única animação infinita da app e continua
- * existindo, mas era usado justamente na tela de abertura — a primeira coisa que
- * um teste de componente do dashboard encontra, e a que trava o `waitForIdle`.
+ * O `ShimmerBox` que existia aqui foi apagado: era animação infinita na tela de
+ * abertura — a primeira coisa que um teste de componente do dashboard encontra,
+ * e a que travava o `waitForIdle`.
  */
 @Composable
 private fun LoadingContent(language: AppLanguage) {

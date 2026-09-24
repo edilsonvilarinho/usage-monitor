@@ -315,10 +315,10 @@ fun AppEmptyState(
 /**
  * Carregando: esqueleto **estático**.
  *
- * Sem shimmer. `ShimmerBox` é a única animação infinita da app e continua onde
- * está, mas não se replica: animação sem fim trava o `waitForIdle` dos testes
- * de componente, e cada tela nova que a copiasse tornaria uma suíte inteira
- * impossível de escrever.
+ * Sem shimmer. O `ShimmerBox` foi apagado: não tinha chamador, e o deslocamento
+ * do gradiente era em pixels, então ele varria três pixels e não a caixa.
+ * Animação contínua existe agora só atrás de `AppMotionPolicy.continuous`, e
+ * carregamento não é estado vivo — é espera, e esqueleto parado a descreve.
  */
 @Composable
 fun AppLoadingState(
