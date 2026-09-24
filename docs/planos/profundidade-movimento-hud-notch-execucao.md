@@ -35,7 +35,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C6 | Números animados e recarga do card | feito |
 | C7 | `AppStateCrossfade` e o bug do `AnimatedContent` | feito |
 | C8 | Expandir/recolher e banners | feito |
-| C9 | Movimento da grade de cards | pendente |
+| C9 | Movimento da grade de cards | feito |
 | C10 | Limpeza de movimento do `ApiUsageCard` | pendente |
 | C11 | Spike da janela transparente | pendente |
 | C12 | Modelo puro da HUD | pendente |
@@ -57,6 +57,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o numero animado termina com um so no no valor novo` e `AppAnimatedNumberTest`. |
 | 2026-09-24 | C7 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `a troca de estado mantem o estado antigo no slot que sai` (relógio manual, meio da saída: os dois textos presentes; depois do idle, só o novo). |
 | 2026-09-24 | C8 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o bloco recolhido sai da arvore depois de fechar`. |
+| 2026-09-24 | C9 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde depois de corrigir o fixture do teste novo (alvo não-Anthropic não leva perfil). A captura do dashboard saiu idêntica à anterior pixel a pixel: a primeira colocação é salto, sem animação. |
 
 ## C1 · Tokens de motion e política
 
@@ -150,3 +151,18 @@ cápsula, marcador de ritmo, "Next update in 2m").
   aparecer e a puxava ao sumir.
 - Os banners de erro por alvo continuam sem animação: saem de uma coleta e ficam; animá-los a cada
   recomposição da lista de avisos não descreveria mudança nenhuma.
+
+## C9 · Grade de cards
+
+- Posicionamento animado dentro do próprio `Layout` (`placeAnimated`): cada card tem um
+  `Animatable<IntOffset>`; a primeira colocação é salto e as seguintes deslizam pela mola `GENTLE`.
+  Cobre reordenar, minimizar um vizinho e a troca de uma para duas colunas.
+- Durante o arrasto a grade é disposta na **ordem de prévia** (`previewCardOrder`, pura e testada):
+  os vizinhos abrem o vão enquanto o card está no ar, e soltar não move mais nada.
+- As caixas usadas para achar o alvo são **congeladas** no início do arrasto; medir contra caixas que
+  andam com a prévia faria o alvo trocar a cada quadro.
+- O card arrastado é posto em `início congelado + deslocamento`; ao soltar, a posição do ponteiro vira
+  a partida da mola (`snapTo` com `CoroutineStart.UNDISPATCHED`, antes de limpar o arrasto).
+- `isDragTarget` deixou de ser passado: o vão aberto já diz onde o card cai.
+- Os filhos são identificados por `layoutId`, não pela ordem de composição — a prévia reordena o
+  layout sem recompor os cards.

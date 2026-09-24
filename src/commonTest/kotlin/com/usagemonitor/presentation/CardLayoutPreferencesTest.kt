@@ -8,6 +8,7 @@ import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.reorderVisibleCards
 import com.usagemonitor.presentation.ui.resolveDropTargetIndex
+import com.usagemonitor.presentation.ui.previewCardOrder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -96,5 +97,28 @@ class CardLayoutPreferencesTest {
         )
 
         assertEquals(0, targetIndex)
+    }
+
+    @Test
+    fun `previewCardOrder moves the dragged card into the target slot`() {
+        val a = UsageTargetKey(ApiSource.ANTHROPIC, "a")
+        val b = UsageTargetKey(ApiSource.ANTHROPIC, "b")
+        val c = UsageTargetKey(ApiSource.CODEX)
+
+        assertEquals(listOf(b, c, a), previewCardOrder(listOf(a, b, c), a, 2))
+        assertEquals(listOf(c, a, b), previewCardOrder(listOf(a, b, c), c, 0))
+        assertEquals(listOf(a, b, c), previewCardOrder(listOf(a, b, c), b, 1))
+    }
+
+    @Test
+    fun `previewCardOrder keeps the order outside a drag and clamps stale targets`() {
+        val a = UsageTargetKey(ApiSource.ANTHROPIC, "a")
+        val b = UsageTargetKey(ApiSource.ANTHROPIC, "b")
+        val stranger = UsageTargetKey(ApiSource.DEEPSEEK)
+
+        assertEquals(listOf(a, b), previewCardOrder(listOf(a, b), null, 1))
+        assertEquals(listOf(a, b), previewCardOrder(listOf(a, b), a, null))
+        assertEquals(listOf(a, b), previewCardOrder(listOf(a, b), stranger, 0))
+        assertEquals(listOf(b, a), previewCardOrder(listOf(a, b), a, 9))
     }
 }

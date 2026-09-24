@@ -643,6 +643,12 @@ largura que faltava dentro do card. A coluna rolável **não** reserva folga par
 ela flutua sobre o padding direito da grade. Somadas, as duas davam 28dp à direita contra 16 à
 esquerda.
 
+**Movimento da grade** (`ResponsiveDashboardCardGrid` + `previewCardOrder`): os cards deslizam para
+a vaga nova pela mola `GENTLE` ao reordenar, ao minimizar um vizinho e na troca de colunas; a
+primeira colocação é salto, e por isso as capturas não mudam. Durante o arrasto a grade já é
+disposta na ordem em que o card cairia, com as caixas do alvo **congeladas** no início — medir contra
+caixas que se movem com a prévia faria o vão pular de lado a cada quadro.
+
 **Modo somente cards** (`DesktopWindowFrame(compact)` + `DashboardScreen(showFooter)` +
 `CardsOnlyModePreferences.kt`): a janela sem barra de título e sem rodapé. **Não é valor novo em
 enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `Boolean` em
