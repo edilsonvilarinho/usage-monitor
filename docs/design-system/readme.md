@@ -69,14 +69,26 @@ the media query alone, because the app owns a theme switch that must win.
 Depth comes from the **1dp border and from spacing** — not from shadow, not from gradient.
 No accent glow on top of surfaces, no tinted cards, no colored card backgrounds.
 
-**Color area.** Integration accents target AA 4.5:1 on both surfaces, preserve hue across themes,
-and stay ≥20° apart when they represent different vendors. What changed from the old UI is the
-**area**: from whole-card fill to a 2px marker, a chart line, and value text.
+**Color area.** The nine integration accents are fixed (AA 4.5:1 on both surfaces, hue preserved
+across themes, ≥20° apart). What changed from the old UI is the **area**: from whole-card fill
+to a 2px marker, a chart line, and value text. `--oc` is the color of the monitored OpenCode
+integration — never the app's brand color.
 
-**Accent ownership.** The accent is the identity of the *vendor*, not of one card: OpenCode Zen
-Free and OpenCode Go share `--oc`, and Gemini CLI and Antigravity share `--gemini`. Other vendors
-keep distinct hues, with a 20° minimum separation. Same-vendor cards remain distinguishable by
-their names and metric labels; color never identifies a quota by itself.
+**Nine accents, eleven sources.** The accent is the identity of the *vendor*, not of one card:
+OpenCode Zen Free (read from the local SQLite) and OpenCode Go (the paid subscription, read over
+HTTP) are two sources that both wear `--oc`. Adding a hue would have to clear AA on both
+surfaces and stay ≥20° from all the others — a real cost, paid to distinguish two plans of the same
+product. What separates the two cards is the title, and "colour never informs alone" already
+guarantees that is enough. `--openrouter` does **not** reuse any other accent: OpenRouter is not the
+vendor of any source already monitored, so sharing a hue would visually associate two unrelated
+companies. Rose/magenta (~336°) fills the arc between `--deepseek` (270°) and `--minimax` (24°).
+
+`--gemini` and `--cursor` came with issue #267 under the same two rules. **Gemini CLI and
+Antigravity share `--gemini`**: both are Google tools, exactly the OpenCode case. `--gemini` is
+orchid at ~294° — 24° from `--deepseek` and 42° from `--openrouter`. **Cursor gets `--cursor`**:
+it is the vendor of no other source. Lime at ~90° sits 36° from `--kilo` (54°) and 40° from `--oc`
+(130°). Both keep their hue in the light variant (`#7C1D87`, `#477915`) and are checked by
+`AppAccentsContrastTest` like the other seven.
 
 **Type.** Two families. **IBM Plex Mono** for titles, labels, numbers, tables and window chrome
 (tabular alignment); **IBM Plex Sans** for explanatory prose only. Weights 400/500/600. Six sizes:

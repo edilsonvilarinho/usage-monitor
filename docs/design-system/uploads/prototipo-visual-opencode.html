@@ -549,7 +549,6 @@ table.dt td.num, table.dt th.num { text-align: right; }
     <div class="phead"><span class="ptitle">AppBanner</span></div>
     <div class="pbody">
       <div class="banner warn"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Anthropic — Padrão</span><span class="bd">Limite de requisições atingido. Aguarde antes de tentar de novo.</span></div><span class="sp"></span><button class="btn ghost" type="button">Tentar de novo</button></div>
-      <div class="banner warn"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Gemini CLI sem histórico local</span><span class="bd">Nenhuma sessão local foi encontrada para este perfil. Use o Gemini CLI neste perfil e atualize o monitor novamente.</span></div></div>
       <div class="banner crit"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Créditos de uso indisponíveis</span><span class="bd">A resposta veio sem limite mensal. A linha de créditos não é exibida nesta coleta.</span></div></div>
       <div class="banner info"><span class="bar"></span><div class="stack" style="gap:2px"><span class="bt">Versão 36.0.0 disponível</span></div><span class="sp"></span><button class="btn ghost" type="button">Ver release</button></div>
     </div>
@@ -752,13 +751,13 @@ table.dt td.num, table.dt th.num { text-align: right; }
       <!-- Cursor · sessão pessoal existente -->
       <div class="panel">
         <div class="phead"><span class="srcmark" style="background:var(--cursor)"></span><span class="ptitle">Cursor</span><span class="sp"></span><span class="st ok">Normal</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
-        <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Auto</span><span class="sp"></span><span class="v">38%</span></div><div class="track ok"><i style="width:38%"></i></div><span class="k dim">Fim do ciclo informado: 01/10/2026</span></div></div><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">API</span><span class="sp"></span><span class="v">11%</span></div><div class="track ok"><i style="width:11%"></i></div></div></div></div>
+        <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Auto · Mensal</span><span class="sp"></span><span class="v">38%</span></div><div class="track ok"><i style="width:38%"></i></div><span class="k dim">Fim do ciclo informado: 01/10/2026</span></div></div><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">API · Mensal</span><span class="sp"></span><span class="v">11%</span></div><div class="track ok"><i style="width:11%"></i></div></div></div></div>
       </div>
 
-      <!-- Antigravity CLI · campos textuais explícitos de /usage -->
+      <!-- Antigravity CLI · um limite semanal por grupo de modelos, lido de agy --print /usage -->
       <div class="panel">
-        <div class="phead"><span class="srcmark" style="background:var(--gemini)"></span><div class="stack" style="gap:0"><span class="ptitle">Antigravity CLI</span><span class="psub">painel oficial /usage</span></div><span class="sp"></span><span class="st ok">Informado pelo CLI</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
-        <div class="pbody flush"><div class="row"><div class="stack" style="gap:var(--s1);flex:1"><span class="v sm">Modelos Gemini</span><span class="k">Limite semanal restante · 99,49%</span><span class="k dim">Reinício informado · 167h 58m</span></div></div><div class="row"><div class="stack" style="gap:var(--s1);flex:1"><span class="v sm">Claude e GPT</span><span class="k">Limite semanal restante · 100%</span></div></div></div>
+        <div class="phead"><span class="srcmark" style="background:var(--gemini)"></span><div class="stack" style="gap:0"><span class="ptitle">Antigravity CLI</span><span class="psub">agy --print /usage</span></div><span class="sp"></span><span class="st ok">Normal</span><button class="btn icon" type="button" aria-label="Atualizar">↻</button><button class="btn icon" type="button" aria-label="Minimizar card">–</button></div>
+        <div class="pbody flush"><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Gemini · Semanal</span><span class="sp"></span><span class="v">5%</span></div><div class="track ok"><i style="width:5%"></i></div><span class="k dim">Reinício: Qua 30/09 18h57 BRT</span></div></div><div class="row"><div class="stack" style="gap:3px;flex:1"><div class="hstack"><span class="k">Claude/GPT · Semanal</span><span class="sp"></span><span class="v">0%</span></div><div class="track"><i style="width:0%"></i></div></div></div></div>
       </div>
 
     </div>
@@ -840,7 +839,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="k">Atualizando…</span>
         <button class="btn icon" type="button" disabled aria-label="Atualizando">↻</button>
       </div>
-  <div class="pbody flush">
+      <div class="pbody flush">
         <div class="row"><div class="stack" style="gap:3px;flex:1;opacity:.5">
           <div class="hstack"><span class="k">Codex atual</span><span class="sp"></span><span class="v">23%</span></div>
           <div class="track"><i style="width:23%"></i></div>

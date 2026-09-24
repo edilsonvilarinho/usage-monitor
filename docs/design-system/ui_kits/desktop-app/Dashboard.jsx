@@ -216,7 +216,7 @@ const CARDS = [
     tooltip: 'Tokens locais observados. A quota da conta Google é uma medida separada.',
     nav: 0,
     reported: [
-      { label: 'Gemini 3.1 Pro · tokens (5h)', value: '18,4 mil', detail: 'Tokens e sessões locais; quota da conta separada' },
+      { label: 'Gemini 3.1 Pro · tokens (5h)', value: '18,4 mil', detail: 'Tokens locais; quota da conta separada' },
       { label: 'Gemini 3.1 Pro · tokens (7d)', value: '142 mil' }
     ]
   },
@@ -230,22 +230,22 @@ const CARDS = [
     tooltip: 'Percentuais fornecidos pela sessão do Cursor; rota pessoal sem contrato público.',
     nav: 0,
     quotas: [
-      { label: 'Auto', value: '38%', percent: 38, level: 'ok', reset: 'Fim do ciclo: 01/10/2026' },
-      { label: 'API', value: '11%', percent: 11, level: 'ok', reset: 'Fim do ciclo: 01/10/2026' }
+      { label: 'Auto · Mensal', value: '38%', percent: 38, level: 'ok', reset: 'Fim do ciclo: 01/10/2026' },
+      { label: 'API · Mensal', value: '11%', percent: 11, level: 'ok', reset: 'Fim do ciclo: 01/10/2026' }
     ]
   },
   {
     id: 'antigravity',
     source: 'gemini',
     title: 'Antigravity CLI',
-    subtitle: 'painel oficial /usage · cotas semanais informadas',
+    subtitle: 'agy --print /usage · um limite semanal por grupo de modelos',
     level: 'ok',
-    status: 'Informado pelo CLI',
-    tooltip: 'Percentuais restantes exibidos explicitamente em cotas compartilhadas por grupo.',
+    status: 'Normal',
+    tooltip: 'Cota por grupo de modelos, lida do /usage que o próprio CLI responde, sem turno de modelo.',
     nav: 0,
-    reported: [
-      { label: 'Modelos Gemini · limite semanal restante', value: '99,49%', detail: 'Reinício informado: 167h 58m' },
-      { label: 'Claude e GPT · limite semanal restante', value: '100%' }
+    quotas: [
+      { label: 'Gemini · Semanal', value: '5%', percent: 5, level: 'ok', reset: 'Reinício: Qua 30/09 18h57 BRT' },
+      { label: 'Claude/GPT · Semanal', value: '0%', percent: 0, level: 'neutral', reset: 'Janela de reset ainda não disponível' }
     ]
   }
 ];

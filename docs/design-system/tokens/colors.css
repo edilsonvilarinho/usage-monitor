@@ -23,9 +23,12 @@
   --info:      #4C8DFF;
 
   /* integration identity — AA 4.5:1 on both surfaces, hue preserved across
-     themes, >=20 degrees apart from each other. Same-vendor tools may share
-     an accent; unrelated sources stay distinct. Gemini CLI and Antigravity
-     share Google's identity. */
+     themes, >=20 degrees apart from each other. These do not change without a
+     recorded decision in readme.md. Nine accents cover eleven sources: --oc is
+     the OpenCode vendor, worn by both the free Zen card and the paid Go card,
+     and --gemini is Google's, worn by Gemini CLI and Antigravity. --openrouter
+     and --cursor are their own identities — neither is the vendor of any
+     other source here. */
   --anthropic:  #4F8CFF;
   --codex:      #27BFA3;
   --deepseek:   #C084FC;
