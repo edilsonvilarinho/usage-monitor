@@ -364,6 +364,15 @@ fun ApiUsageCard(
                             color = accentColorFor(source = source, accents = AppAccents.current),
                             height = if (accountContext == null) 18.dp else 28.dp
                         )
+                        // A marca do fornecedor, no acento da fonte: reconhecer o
+                        // card antes de ler o título, como no Codenotch e no
+                        // ai-usagebar. O traço continua — ele é a identidade no
+                        // alinhamento vertical da grade; a marca é a do olho.
+                        AppProviderMark(
+                            source = source,
+                            tint = accentColorFor(source = source, accents = AppAccents.current),
+                            size = PROVIDER_MARK_SIZE
+                        )
                         // Título e conta na mesma coluna, como o `.ptitle`/`.psub`
                         // do protótipo. A conta era uma linha de largura cheia
                         // abaixo do cabeçalho inteiro, alinhada à borda do card e
@@ -1679,3 +1688,6 @@ private fun RefreshGlyph(refreshing: Boolean, tint: Color, size: Dp) {
 
 /** Uma volta por segundo: rápido o bastante para ler "trabalhando", lento para não agitar. */
 private const val REFRESH_TURN_MILLIS = 1_000
+
+/** A marca do cabeçalho: do tamanho do glifo de ação, para não disputar com o título. */
+private val PROVIDER_MARK_SIZE = 16.dp

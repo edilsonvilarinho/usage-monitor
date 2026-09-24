@@ -588,6 +588,13 @@ Antes de desenhar um retângulo novo, procure aqui.
   que o âmbar do semáforo de risco passou anos abaixo de 3:1 contra a superfície clara.
 - **Acento é identidade de fonte, não de valor**: ele vive no marcador de 2dp e na linha do gráfico.
   Custo em azul e tempo em verde na mesma tabela sugerem categorias que não existem.
+- **Marca do fornecedor** (`AppProviderMark`): a única exceção a "sem biblioteca de ícones". O
+  asterisco do Claude, o nó da OpenAI, o cubo do Cursor e os demais são caminhos SVG monocromáticos
+  (Simple Icons CC0 e lobe-icons MIT, o mesmo conjunto do ai-usagebar), tingidos pelo acento no
+  cabeçalho do card e pela cor do texto no anel da HUD. Identificação não é glifo de controle, que
+  continua Unicode. Decorativa para a semântica: o nome está sempre escrito ao lado. `when`
+  exaustivo sobre `ApiSource`: fonte nova sem marca não compila, e `AppProviderMarkTest` pega o SVG
+  que perdeu um caractere na cópia (o parser devolveria caminho vazio, sem erro).
 
 **Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
 

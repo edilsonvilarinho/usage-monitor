@@ -9,6 +9,7 @@
     'components/core/AppIconButton.jsx',
     'components/core/AppPanel.jsx',
     'components/core/AppSourceMark.jsx',
+    'components/core/AppProviderMark.jsx',
     'components/core/AppMetric.jsx',
     'components/forms/AppTextField.jsx',
     'components/forms/AppSwitch.jsx',

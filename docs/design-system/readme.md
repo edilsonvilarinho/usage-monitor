@@ -182,6 +182,12 @@ component tests observe. A text button would have nowhere to put it.
 
 **Emoji are never used.** Unicode marks are used as icons, deliberately and only from the list above.
 
+**Provider marks — the one exception** (`AppProviderMark`). Identification is not a control: the
+Claude asterisk, the OpenAI knot, the Cursor cube and the others are small monochrome SVG paths
+(Simple Icons CC0 and lobe-icons MIT, the same set ai-usagebar ships), tinted by the source accent in
+card headers and by the foreground inside a HUD ring. The provider name is always written beside
+the mark, so it is decorative for semantics. Control glyphs stay Unicode.
+
 **Brand mark.** Own geometric monogram, built by a deterministic script: three stems joined by a
 bowl, reads as **U** and **M** overlapped at large sizes and keeps a distinct silhouette at 16px,
 where the tray icon lives. In `assets/`: `mark.svg`, `mark-on-light.svg`, `lockup.svg`, and the
@@ -198,7 +204,7 @@ invented here.
 | `styles.css` | Global entry point. `@import` lines only. |
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
 | `assets/` | Monogram, light variant, lockup, tray badge states |
-| `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric · AppTooltipSurface |
+| `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
 | `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing |
 | `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |

@@ -45,6 +45,18 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C16 | Indicadores contínuos atrás da política | feito |
 | C17 | Verificação final | feito (automática); manual pendente |
 
+### Rodada 2 — identificação (pedido depois da entrega)
+
+O usuário comparou com Codenotch e ai-usagebar e apontou o que faltava: **marca do fornecedor**,
+**plano da conta** ("Max 20x", "ChatGPT Plus") e **o provedor sempre escrito** — a HUD mostrava só
+"Padrão". O `ai-usagebar` foi clonado localmente como referência.
+
+| # | Atividade | Estado |
+|---|---|---|
+| D1 | Marca do fornecedor (`AppProviderMark`) e adoção no card | feito |
+| D2 | Plano da conta nos dados (`ApiUsageStats.planLabel`) | pendente |
+| D3 | HUD com provedor, marca e plano; plano no card; resumo na bandeja | pendente |
+
 ## Pontos de situação
 
 | Data | Atividade | Modelo | Comando | Resultado |
@@ -66,6 +78,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C15 | Claude Opus 5.5 | `gradlew.bat allTests` + renderização descartável do notch (topo e lateral, escuro e claro, parado e aberto) | Verde: 2077 testes, 0 falhas. A primeira renderização mostrou a trilha dos anéis branca opaca — o alfa da camada de pressão tinha sido sobrescrito com 1 —; corrigida para a camada com 1,6× o peso. |
 | 2026-09-24 | C16 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.presentation.SessionPulse*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde. O teste de giro falhou uma vez no caso estático: sobre fundo transparente dois instantes parados diferiam pelo antialiasing acumulado; com fundo opaco, parado é idêntico e com a política contínua os dois instantes diferem. |
 | 2026-09-24 | C17 | Claude Opus 5.5 | `gradlew.bat allTests` + `gradlew.bat generateScreenshots` + `gradlew.bat generateHelpMedia` + `desktopTest --tests "*HelpMediaResourcesTest*"` | Verde: 2079 testes, 0 falhas; capturas do README e as doze demos da ajuda regeneradas (a de modos de janela já mostra o notch aberto). `gradlew.bat run` **não** foi executado: a versão instalada estava aberta e o `SingleInstanceGuard` só a traria para frente. |
+| 2026-09-24 | D1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.AppProviderMarkTest" --tests "com.usagemonitor.ui.ComponentTest"` + `gradlew.bat generateScreenshots` | Verde; a captura mostra asterisco, nó e marca da DeepSeek no acento de cada card. |
 
 ## C1 · Tokens de motion e política
 
