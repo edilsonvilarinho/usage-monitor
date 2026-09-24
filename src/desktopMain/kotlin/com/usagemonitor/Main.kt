@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.toSourceStatus
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -1869,45 +1871,16 @@ private fun runUsageMonitor(
         // é formato de data novo.
         val hudNow = Clock.System.now()
         val hudQuotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
-        val hudNoForecastLabel = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
-        // **A ordem é a que o usuário arrastou no dashboard**, não a do risco:
-        // com o risco mandando, a linha parada trocava de conta sozinha e nunca
-        // se sabia de antemão quem estava ali. Mesmo `orderedByCardOrder` da
-        // grade de cards — duas cópias divergiriam no item sem posição.
-        val hudOrderedQuotas = orderedByCardOrder(hudQuotaRisks, cardOrder) { entry ->
-            entry.stats.targetKey
-        }
-        // **Uma linha por conta, não por cota.** A conta com janela de 5h e de
-        // 7d ocupava duas linhas seguidas repetindo o próprio nome; com dez
-        // cotas em cinco contas, a lista virou parede de texto. Cada linha traz
-        // a palavra da **pior** cota da conta e um ponto por cota ao lado do
-        // percentual — o mesmo desenho do card, onde o `RiskSemaphoreDot` de
-        // cada cota é só ponto e o badge do cabeçalho resume o pior com palavra.
-        val hudSources = hudOrderedQuotas
-            .groupBy { entry -> entry.stats.targetKey }
-            .map { (_, entries) ->
-                val first = entries.first()
-                val worst = entries.maxByOrNull { entry -> entry.risk?.level?.ordinal ?: -1 }
-                HudSourceStatus(
-                    label = first.stats.profileLabel ?: first.stats.apiName,
-                    statusLabel = worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) }
-                        ?: hudNoForecastLabel,
-                    tone = worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
-                    quotas = entries.map { entry ->
-                        HudQuotaChip(
-                            text = hudQuotaChipText(entry.quota),
-                            tone = entry.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
-                            // A hora do reinício (issue #189), desenhada só com o
-                            // painel expandido. `resetShortLabel` é a linha do
-                            // card recortada — nenhum formato de data novo — e
-                            // devolve `null` para saldo que não expira e para
-                            // janela sem reset conhecido, que é o "caso item
-                            // tenha" da issue.
-                            resetText = resetShortLabel(entry.quota, language, hudNow)
-                        )
-                    }
-                )
-            }
+        // Uma linha por conta, na ordem dos cards, com a palavra da pior cota e
+        // todas as cotas ao lado. A regra mora em `buildHudAccounts`
+        // (`HudModel.kt`), com teste próprio; aqui só a composição a consome.
+        val hudAccounts = buildHudAccounts(
+            quotaRisks = hudQuotaRisks,
+            cardOrder = cardOrder,
+            language = language,
+            now = hudNow
+        )
+        val hudSources = hudAccounts.map { account -> account.toSourceStatus() }
         // Contagem até a próxima coleta (issue #185). O rodapé, que já a mostrava,
         // não é composto em modo HUD — `DesktopWindowFrame` descarta `content()`
         // quando `hud = true` —, e sem ela quem trabalha com a barra flutuante não

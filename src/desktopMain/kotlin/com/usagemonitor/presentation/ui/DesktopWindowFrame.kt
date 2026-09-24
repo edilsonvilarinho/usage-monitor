@@ -1226,3 +1226,22 @@ private suspend fun fadeOutThenClose(
 
 /** Um pouco mais longa que a saída de menu: a janela é uma superfície maior. */
 private const val DIALOG_EXIT_MILLIS = 140
+
+/**
+ * A linha da barra HUD atual a partir do modelo puro. Existe só enquanto a barra
+ * de linhas convive com o modelo novo; o notch consome [HudAccount] direto.
+ */
+internal fun HudAccount.toSourceStatus(): HudSourceStatus {
+    return HudSourceStatus(
+        label = label,
+        statusLabel = statusLabel,
+        tone = tone,
+        quotas = quotas.map { quota ->
+            HudQuotaChip(
+                text = "${quota.shortLabel} ${quota.percentText}",
+                tone = quota.tone,
+                resetText = quota.resetText
+            )
+        }
+    )
+}

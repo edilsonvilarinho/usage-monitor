@@ -38,7 +38,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C9 | Movimento da grade de cards | feito |
 | C10 | Limpeza de movimento do `ApiUsageCard` | feito |
 | C11 | Spike da janela transparente | feito — resultado B |
-| C12 | Modelo puro da HUD | pendente |
+| C12 | Modelo puro da HUD | feito |
 | C13 | HUD em janela própria | pendente |
 | C14 | Geometria de borda e migração da posição | pendente |
 | C15 | O notch com anéis | pendente |
@@ -60,6 +60,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C9 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde depois de corrigir o fixture do teste novo (alvo não-Anthropic não leva perfil). A captura do dashboard saiu idêntica à anterior pixel a pixel: a primeira colocação é salto, sem animação. |
 | 2026-09-24 | C10 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` + `gradlew.bat generateScreenshots` | Verde. As capturas mudaram em no máximo 5/255 por pixel (ruído subpixel), sem diferença visível; não foram commitadas agora e voltam no C17. O aquecimento de 20 × 100ms do gerador cobre as molas `GENTLE` (~450ms). |
 | 2026-09-24 | C11 | Claude Opus 5.5 | teste descartável `TransparentWindowSpikeTest` via `gradlew.bat desktopTest --tests "com.usagemonitor.spike.*"`, com `skiko.renderApi` padrão, `SOFTWARE` e `OPENGL` | Resultado **B** nos três: clique em pixel alfa 0 de uma `ComposeWindow` transparente é **engolido** — não chega nem ao conteúdo Compose nem à janela de trás. Clique de controle fora do overlay chega à janela de trás; clique no centro opaco chega ao Compose. O arquivo do spike não foi commitado. |
+| 2026-09-24 | C12 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest" --tests "com.usagemonitor.ui.*"` | Verde: sete casos do modelo e a suíte de UI inteira (a barra HUD atual consome o modelo por um adaptador, sem mudança visual). |
 
 ## C1 · Tokens de motion e política
 
@@ -212,3 +213,13 @@ largura da pílula virar teto. Portanto:
 
 Ficaram fora da medida, para a verificação manual do C17: combinação com `applyWindowOpacity`, halo
 na borda da sombra e CPU da rotação contínua.
+
+## C12 · Modelo puro da HUD
+
+- `HudModel.kt` (`commonMain`): `buildHudAccounts(quotaRisks, cardOrder, language, now, activeTargets)`
+  → `List<HudAccount>`. Uma conta por alvo na ordem dos cards; palavra e tom da pior cota; todas as
+  cotas como `HudQuota` (rótulo curto, percentual do card, fração presa a 0..1, tom, reset, se há
+  projeção); `rings` limitados a `MAX_HUD_RINGS` = 3; `focusIndex` na cota de pior risco, e no
+  empate na de maior percentual.
+- `main()` perdeu o bloco que montava as linhas; a barra atual recebe `HudAccount.toSourceStatus()`,
+  adaptador que some quando o notch a substituir.
