@@ -21,6 +21,8 @@ class CodexMapperTest {
         assertEquals(listOf("Codex 5h", "Codex 7d"), result.quotas.map { it.label })
         assertEquals(listOf(PeriodType.INTERVAL, PeriodType.WEEKLY), result.quotas.map { it.periodType })
         assertEquals(emptySet(), result.notices)
+        // O `plan_type` da própria resposta vira o plano do card.
+        assertEquals("ChatGPT Plus", result.planLabel)
     }
 
     @Test

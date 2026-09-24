@@ -30,5 +30,9 @@ interface CredentialDataSource {
 
 data class AnthropicSession(
     val accessToken: String,
-    val accountContext: com.usagemonitor.domain.entity.UsageAccountContext
+    val accountContext: com.usagemonitor.domain.entity.UsageAccountContext,
+    /** `claudeAiOauth.subscriptionType` do arquivo: "max", "pro". Só para o rótulo do plano. */
+    val subscriptionType: String? = null,
+    /** `claudeAiOauth.rateLimitTier`: "default_claude_max_20x". */
+    val rateLimitTier: String? = null
 )

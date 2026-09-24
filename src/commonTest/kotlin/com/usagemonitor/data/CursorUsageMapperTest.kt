@@ -33,6 +33,7 @@ class CursorUsageMapperTest {
         )
 
         assertEquals(ApiSource.CURSOR, stats.source)
+        assertEquals("Free", stats.planLabel)
         assertEquals(listOf(CursorQuotaLabels.AUTO, CursorQuotaLabels.API), stats.quotas.map { it.label })
         // Truncado, não arredondado: 10,9% não é 11%.
         assertEquals(listOf(10L, 19L), stats.quotas.map { it.used })

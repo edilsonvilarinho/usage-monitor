@@ -54,7 +54,7 @@ O usuário comparou com Codenotch e ai-usagebar e apontou o que faltava: **marca
 | # | Atividade | Estado |
 |---|---|---|
 | D1 | Marca do fornecedor (`AppProviderMark`) e adoção no card | feito |
-| D2 | Plano da conta nos dados (`ApiUsageStats.planLabel`) | pendente |
+| D2 | Plano da conta nos dados (`ApiUsageStats.planLabel`) | feito |
 | D3 | HUD com provedor, marca e plano; plano no card; resumo na bandeja | pendente |
 
 ## Pontos de situação
@@ -79,6 +79,7 @@ O usuário comparou com Codenotch e ai-usagebar e apontou o que faltava: **marca
 | 2026-09-24 | C16 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.presentation.SessionPulse*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde. O teste de giro falhou uma vez no caso estático: sobre fundo transparente dois instantes parados diferiam pelo antialiasing acumulado; com fundo opaco, parado é idêntico e com a política contínua os dois instantes diferem. |
 | 2026-09-24 | C17 | Claude Opus 5.5 | `gradlew.bat allTests` + `gradlew.bat generateScreenshots` + `gradlew.bat generateHelpMedia` + `desktopTest --tests "*HelpMediaResourcesTest*"` | Verde: 2079 testes, 0 falhas; capturas do README e as doze demos da ajuda regeneradas (a de modos de janela já mostra o notch aberto). `gradlew.bat run` **não** foi executado: a versão instalada estava aberta e o `SingleInstanceGuard` só a traria para frente. |
 | 2026-09-24 | D1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.AppProviderMarkTest" --tests "com.usagemonitor.ui.ComponentTest"` + `gradlew.bat generateScreenshots` | Verde; a captura mostra asterisco, nó e marca da DeepSeek no acento de cada card. |
+| 2026-09-24 | D2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.AccountPlanLabelTest"` | Verde: mapeamento dos três fornecedores, `planLabel` no Codex, no Cursor, no repositório da Anthropic e na ida e volta do cache. |
 
 ## C1 · Tokens de motion e política
 
@@ -314,3 +315,18 @@ na borda da sombra e CPU da rotação contínua.
   crescendo sem piscar ao entrar o ponteiro.
 - Opacidade da janela combinada com a janela transparente da HUD, e halo na borda da sombra.
 - "Reduzir animações" ligado e desligado; CPU com o arco de sessão ativa girando (meta < ~1%).
+
+## D2 · Plano da conta
+
+- `ApiUsageStats.planLabel` (campo novo com default; fontes sem plano continuam iguais) e
+  `AccountPlanLabel.kt`, dono único da tradução, com o mesmo mapeamento do ai-usagebar:
+  - Claude: `subscriptionType` + multiplicação do `rateLimitTier` do `.credentials.json` → "Max 20x",
+    "Pro". Não vem do endpoint de uso; `AnthropicSession` passou a carregar os dois campos.
+  - Codex: `plan_type` da própria resposta de uso → "ChatGPT Plus".
+  - Cursor: `membershipType` do resumo de uso → "Ultra".
+- Sem o campo não há rótulo — nunca "Desconhecido", que afirmaria um plano estranho onde só falta
+  o dado.
+- O cache do dashboard guarda o plano; sem isso o card aberto pelo cache ficaria sem ele até a
+  primeira coleta.
+- Antigravity e Gemini ficam sem plano: o `agy /usage` e os logs do Gemini CLI não o informam, e o
+  caminho do ai-usagebar (RPC local do language server, OAuth do Google) é outra integração.
