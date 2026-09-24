@@ -92,16 +92,12 @@ data class UiApiError(
     val isKiloLocalIssue: Boolean
         get() = source == ApiSource.KILO && isKiloLocalMessage(message)
 
-    val isGeminiSessionDirectoryMissing: Boolean
-        get() = source == ApiSource.GEMINI &&
-            message.contains(GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage, ignoreCase = true)
-
     val isGeminiSessionHistoryUnreadable: Boolean
         get() = source == ApiSource.GEMINI &&
             message.contains(GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage, ignoreCase = true)
 
     val isGeminiLocalIssue: Boolean
-        get() = isGeminiSessionDirectoryMissing || isGeminiSessionHistoryUnreadable
+        get() = isGeminiSessionHistoryUnreadable
 
     /**
      * Qual das falhas de configuração do Antigravity é esta, ou `null` para falha

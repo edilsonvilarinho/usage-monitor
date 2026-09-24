@@ -58,7 +58,7 @@ sends prompt or response content anywhere.
 | OpenCode Go | Remote | `GET /zen/go/v1/usage` | API key, entered in **Settings > APIs** |
 | Kilo Free | Local | reads `~/.local/share/kilo/kilo.db` | an existing Kilo database |
 | OpenRouter | Remote | `GET /api/v1/credits` | API key, entered in **Settings > APIs** |
-| Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/session-*.jsonl` | local Gemini CLI session history; token activity only |
+| Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/*.jsonl` | local Gemini CLI session history; token activity only |
 | Cursor | Remote | `GET https://cursor.com/api/usage-summary` | an existing signed-in Cursor editor session; undocumented personal route |
 | Antigravity CLI | Local | `agy --print /usage` (answered by the CLI itself, no model turn) | Antigravity CLI 1.2.9+ installed and already authenticated |
 

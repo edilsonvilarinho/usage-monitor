@@ -42,7 +42,7 @@ fun ApiSource.statusBadgeLabel(language: AppLanguage = AppLanguage.PT): String? 
 
 fun ApiSource.statusSupportingText(language: AppLanguage = AppLanguage.PT): String? {
     return if (this == ApiSource.GEMINI) {
-        if (language == AppLanguage.PT) "Tokens e sessões observados no Gemini CLI" else "Tokens and sessions observed in Gemini CLI"
+        if (language == AppLanguage.PT) "Tokens observados no Gemini CLI" else "Tokens observed in Gemini CLI"
     } else if (this == ApiSource.CURSOR) {
         if (language == AppLanguage.PT) "Lê o uso pela sessão já conectada no Cursor" else "Reads usage through your existing Cursor session"
     } else if (this == ApiSource.ANTIGRAVITY) {

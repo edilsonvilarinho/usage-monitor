@@ -12,21 +12,15 @@ class UiStateTest {
 
     @Test
     fun geminiLocalHistoryFailuresClassifyOnlyForGemini() {
-        val missing = UiApiError(
-            source = ApiSource.GEMINI,
-            message = GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage
-        )
         val unreadable = UiApiError(
             source = ApiSource.GEMINI,
             message = GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage
         )
         val otherSource = UiApiError(
             source = ApiSource.CURSOR,
-            message = GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage
+            message = GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage
         )
 
-        assertTrue(missing.isGeminiSessionDirectoryMissing)
-        assertTrue(missing.isConfigurationIssue)
         assertTrue(unreadable.isGeminiSessionHistoryUnreadable)
         assertTrue(unreadable.isConfigurationIssue)
         assertFalse(otherSource.isGeminiLocalIssue)

@@ -62,7 +62,7 @@ envia conteúdo de prompt ou de resposta para lugar nenhum.
 | OpenCode Go | Remota | `GET /zen/go/v1/usage` | chave informada em **Configurações > APIs** |
 | Kilo Free | Local | lê `~/.local/share/kilo/kilo.db` | base local do Kilo existente |
 | OpenRouter | Remota | `GET /api/v1/credits` | chave informada em **Configurações > APIs** |
-| Gemini CLI | Local | lê `~/.gemini/tmp/*/chats/session-*.jsonl` | histórico local do Gemini CLI; somente atividade de tokens |
+| Gemini CLI | Local | lê `~/.gemini/tmp/*/chats/*.jsonl` | histórico local do Gemini CLI; somente atividade de tokens |
 | Cursor | Remota | `GET https://cursor.com/api/usage-summary` | sessão existente do editor Cursor; rota pessoal sem contrato público |
 | Antigravity CLI | Local | `agy --print /usage` (respondido pelo próprio CLI, sem turno de modelo) | CLI Antigravity 1.2.9+ instalado e já autenticado |
 

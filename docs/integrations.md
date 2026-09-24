@@ -14,7 +14,7 @@ For the short version, see the table in the [README](../README.md#supported-inte
 | OpenCode Go | Remote | `GET https://opencode.ai/zen/go/v1/usage` | API key entered in **Settings > APIs** |
 | Kilo Free | Local | reads `~/.local/share/kilo/kilo.db` | an existing local Kilo database |
 | OpenRouter | Remote | `GET https://openrouter.ai/api/v1/credits` | API key entered in **Settings > APIs** |
-| Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/session-*.jsonl` | local Gemini CLI session history; token activity only |
+| Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/*.jsonl` | local Gemini CLI session history; token activity only |
 | Cursor | Remote | `GET https://cursor.com/api/usage-summary` | existing signed-in Cursor editor session; undocumented personal route |
 | Antigravity CLI | Local | `agy --output-format json --print /usage` | Antigravity CLI 1.2.9+ installed and already authenticated |
 
@@ -33,7 +33,7 @@ a credential file.
 | `~/.usage-monitor/api-keys.json` | MiniMax, DeepSeek, OpenCode Go and OpenRouter keys — atomic write, owner-only permissions |
 | `~/.local/share/opencode/opencode.db` | OpenCode local activity |
 | `~/.local/share/kilo/kilo.db` | Kilo local activity |
-| `~/.gemini/tmp/<project_hash>/chats/session-*.jsonl` | Gemini CLI session metadata and token counts; prompt/response content is not retained |
+| `~/.gemini/tmp/<project>/chats/*.jsonl` | Gemini CLI session metadata and token counts; prompt/response content is not retained |
 | `%APPDATA%/Cursor/User/globalStorage/state.vscdb` (Windows), `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` (macOS), or `~/.config/Cursor/User/globalStorage/state.vscdb` (Linux) | Cursor session values read from SQLite in read-only mode |
 | `%LOCALAPPDATA%gyingy.exe` (Windows) or `agy` on `PATH` | Antigravity CLI; Usage Monitor runs `/usage` against its existing authenticated session |
 
@@ -159,23 +159,28 @@ as distinct rows in **Settings > APIs**.
 
 ## Gemini CLI local usage
 
-- Reads Gemini CLI session files from `~/.gemini/tmp/<project_hash>/chats/` on Windows, macOS and
+- Reads Gemini CLI session files from `~/.gemini/tmp/<project>/chats/*.jsonl` on Windows, macOS and
   Linux. The path and session retention behavior are described in the
   [official session-management guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/session-management.md).
-- Current session files are JSONL. They contain prompts, responses, tool calls and other private
+- Session files are append-only JSONL. They contain prompts, responses, tool calls and other private
   content. The parser uses only the session/message IDs, timestamps, model names and token counters;
   it does not persist or log conversation content.
-- Reports observed token counts over rolling 5-hour and 7-day windows. A token count is not an
-  account quota: no limit, percentage or cost is inferred from it. `total` is used when present;
-  cached-token counts are not added a second time.
+- Reports observed token counts per model over rolling 5-hour and 7-day windows. A token count is not
+  an account quota: no limit, percentage or cost is inferred from it. `tokens.total` is used; it
+  already includes the cached input, so cached tokens are not added a second time.
+- Each call is written twice with the same `id` — without `tokens` when the turn starts and with them
+  when the usage arrives. Only the write with tokens counts, and a later tokenless write never erases
+  it. `{"$set": …}` patches, which the CLI appends after every message, do not change the count.
+  `{"$rewindTo": …}` undoes the conversation, not the bill: the rewound call stays counted.
 - Google account quota is a separate source. Gemini CLI documents `/stats model` as an interactive
   view of model token counts and quota information, but this integration has no stable
   machine-readable quota contract. No Google quota card is created until a verifiable source is
   available.
-- Session rewinds remove the superseded messages from the aggregate. Repeated message IDs replace
-  their earlier record. Messages without token metadata are ignored.
-- Collection follows the app's normal 10-minute dashboard refresh. A missing or unreadable local
-  source is reported as unavailable; it is never presented as zero usage.
+- No `~/.gemini/tmp` directory means Gemini CLI never ran on this machine: the card shows its empty
+  state, with no warning. Recent session files that exist but none of which is readable are a
+  failure that preserves the last valid reading; a corrupt file among valid ones is skipped.
+- Files last modified before the 7-day window are not read, and unchanged files are served from an
+  in-memory cache keyed by path, size and modification time.
 
 ## Cursor
 

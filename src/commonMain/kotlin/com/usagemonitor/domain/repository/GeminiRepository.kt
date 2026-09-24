@@ -6,8 +6,11 @@ interface GeminiRepository {
     suspend fun getUsage(): Result<ApiUsageStats>
 }
 
+/**
+ * Diretório ausente **não** está aqui: sem `~/.gemini/tmp` o Gemini CLI nunca rodou
+ * na máquina, e isso é card vazio, não falha.
+ */
 enum class GeminiUsageFailureKind(val safeMessage: String) {
-    SESSION_DIRECTORY_MISSING("Gemini CLI local session directory is missing for this profile"),
     SESSION_HISTORY_UNREADABLE("Gemini CLI local session history contains no recognized usage records")
 }
 

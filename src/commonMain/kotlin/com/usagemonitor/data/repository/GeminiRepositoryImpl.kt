@@ -15,6 +15,14 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 
+/**
+ * Tokens observados no Gemini CLI, por modelo, nas janelas de 5h e 7d — a mesma
+ * convenção de atividade observada do Kilo e do OpenCode Zen. `total = 0` porque
+ * contagem local não conhece limite de conta; nenhum percentual é derivado.
+ *
+ * Não existe mais a linha "Gemini CLI sessions": ela fingia ser um modelo, usava
+ * `REQUESTS` para contar sessões e dependia de uma string mágica no card.
+ */
 class GeminiRepositoryImpl(
     private val dataSource: GeminiUsageDataSource,
     private val nowProvider: () -> Instant = { Clock.System.now() }
@@ -55,22 +63,6 @@ class GeminiRepositoryImpl(
                         label = "$modelName 7d",
                         amount = sumTokens(sevenDayMessages, modelName),
                         unit = UsageUnit.TOKENS,
-                        periodType = PeriodType.WEEKLY,
-                        capturedAt = now
-                    ))
-                }
-                if (fiveHourMessages.isNotEmpty() || sevenDayMessages.isNotEmpty()) {
-                    add(observedQuota(
-                        label = "Gemini CLI sessions 5h",
-                        amount = fiveHourMessages.map { item -> item.first }.toSet().size.toLong(),
-                        unit = UsageUnit.REQUESTS,
-                        periodType = PeriodType.INTERVAL,
-                        capturedAt = now
-                    ))
-                    add(observedQuota(
-                        label = "Gemini CLI sessions 7d",
-                        amount = sevenDayMessages.map { item -> item.first }.toSet().size.toLong(),
-                        unit = UsageUnit.REQUESTS,
                         periodType = PeriodType.WEEKLY,
                         capturedAt = now
                     ))

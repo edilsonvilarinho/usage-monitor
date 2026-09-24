@@ -1,7 +1,6 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.datasource.GeminiMessageUsage
-import com.usagemonitor.data.datasource.GeminiSessionUsage
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -11,11 +10,28 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
 /**
- * Parser seletivo do JSONL documentado pelo Gemini CLI.
+ * Parser seletivo do JSONL de sessões do Gemini CLI
+ * (`~/.gemini/tmp/<projeto>/chats/<sessão>.jsonl`).
  *
- * Não lê `content`, `displayContent`, argumentos ou resultados de ferramentas
- * para o modelo de domínio. Eventos de rewind e checkpoints são aplicados
- * antes da agregação, como no leitor oficial de sessões.
+ * O arquivo é append-only: uma linha de cabeçalho (`sessionId`, `projectHash`),
+ * registros de mensagem e dois tipos de patch, `{"$set":{...}}` e
+ * `{"$rewindTo":"<id>"}`. Três regras que a forma do arquivo impõe, conferidas
+ * contra o leitor do Codenotch (`GeminiCLIUsage.swift`, Gemini CLI 0.58.0):
+ *
+ * - **Uma chamada é gravada duas vezes com o mesmo `id`**: sem `tokens` quando o
+ *   turno começa e com eles quando o `usageMetadata` chega. Só a gravação com
+ *   tokens conta, e uma gravação posterior sem tokens não apaga a que tinha.
+ * - **`$set` não mexe na contagem.** O CLI grava `$set lastUpdated` depois de cada
+ *   mensagem; a versão anterior limpava tudo a cada patch, e a sessão real
+ *   terminava contando perto de zero.
+ * - **`$rewindTo` desfaz a conversa, não a cobrança.** O Google cobrou a chamada
+ *   que o usuário voltou atrás, e ela continua contada.
+ *
+ * `tokens.total` já soma entrada, saída, pensamento e ferramenta, e `cached` é
+ * subconjunto de `input`: somar as partes contaria o cache duas vezes.
+ *
+ * Não lê `content`, `displayContent`, argumentos nem resultados de ferramenta para
+ * o modelo de domínio.
  */
 internal object GeminiSessionLogParser {
     private val json = Json { isLenient = true }
@@ -29,33 +45,26 @@ internal object GeminiSessionLogParser {
     fun parse(lines: Iterable<String>): ParseResult {
         var recognizedRecords = 0
         var sessionId: String? = null
-        val messages = linkedMapOf<String, ParsedMessage>()
+        val answered = linkedMapOf<String, GeminiMessageUsage>()
 
         lines.forEach { line ->
             if (line.isBlank()) return@forEach
             val record = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
                 ?: return@forEach
 
-            val rewindId = record.stringValue("\$rewindTo")
-            if (rewindId != null) {
+            if (record.containsKey(REWIND_KEY)) {
                 recognizedRecords += 1
-                val ids = messages.keys.toList()
-                val rewindIndex = ids.indexOf(rewindId)
-                if (rewindIndex < 0) {
-                    messages.clear()
-                } else {
-                    ids.drop(rewindIndex).forEach(messages::remove)
-                }
                 return@forEach
             }
 
-            val checkpoint = record["\$set"]?.objectOrNull()
-            if (checkpoint != null) {
+            val patch = record[SET_KEY]?.objectOrNull()
+            if (patch != null) {
                 recognizedRecords += 1
-                messages.clear()
-                checkpoint.stringValue("sessionId")?.let { value -> sessionId = value }
-                checkpoint["messages"]?.arrayOrNull()?.forEach { message ->
-                    message.objectOrNull()?.let { value -> replaceMessage(value, messages) }
+                patch.stringValue("sessionId")?.let { value -> sessionId = value }
+                // Forma antiga que embute as mensagens no patch: entram pela mesma
+                // dedup por `id`, então nada é contado duas vezes.
+                patch["messages"]?.arrayOrNull()?.forEach { message ->
+                    message.objectOrNull()?.let { value -> recordCall(value, answered) }
                 }
                 return@forEach
             }
@@ -64,57 +73,43 @@ internal object GeminiSessionLogParser {
                 sessionId = value
                 recognizedRecords += 1
             }
-            record.stringValue("projectHash")?.let { recognizedRecords += 1 }
-            val embeddedMessages = record["messages"]?.arrayOrNull()
-            if (embeddedMessages != null) {
+            if (record.stringValue("projectHash") != null) recognizedRecords += 1
+
+            record["messages"]?.arrayOrNull()?.let { embedded ->
                 recognizedRecords += 1
-                embeddedMessages.forEach { message ->
-                    message.objectOrNull()?.let { value -> replaceMessage(value, messages) }
-                }
+                embedded.forEach { message -> message.objectOrNull()?.let { value -> recordCall(value, answered) } }
                 return@forEach
             }
 
             if (record.stringValue("id") != null) {
                 recognizedRecords += 1
-                replaceMessage(record, messages)
+                recordCall(record, answered)
             }
         }
 
         return ParseResult(
             recognizedRecords = recognizedRecords,
             sessionId = sessionId,
-            messages = messages.values.mapNotNull { message -> message.toUsageOrNull() }
+            messages = answered.values.toList()
         )
     }
 
-    private fun replaceMessage(record: JsonObject, messages: MutableMap<String, ParsedMessage>) {
+    /** Só a gravação que traz tokens vira chamada; a última delas vence. */
+    private fun recordCall(record: JsonObject, answered: MutableMap<String, GeminiMessageUsage>) {
         val id = record.stringValue("id") ?: return
-        // Registros não Gemini também participam da ordem de rewind e podem
-        // substituir o mesmo ID; sem tokens, não entram no consumo agregado.
-        val timestamp = record.stringValue("timestamp")?.let { value ->
-            runCatching { Instant.parse(value) }.getOrNull()
-        }
-        val tokens = record["tokens"]?.objectOrNull()?.longValue("total")
+        val type = record.stringValue("type")
+        if (type != null && type != GEMINI_RECORD_TYPE) return
+        val tokens = record["tokens"]?.objectOrNull()?.longValue("total")?.takeIf { value -> value >= 0L } ?: return
+        val timestamp = record.stringValue("timestamp")
+            ?.let { value -> runCatching { Instant.parse(value) }.getOrNull() }
+            ?: return
         val modelName = record.stringValue("model")?.takeIf(String::isNotBlank) ?: UNKNOWN_MODEL
-        messages[id] = ParsedMessage(id, timestamp, modelName, tokens)
-    }
-
-    private data class ParsedMessage(
-        val id: String,
-        val timestamp: Instant?,
-        val modelName: String,
-        val totalTokens: Long?
-    ) {
-        fun toUsageOrNull(): GeminiMessageUsage? {
-            val capturedAt = timestamp ?: return null
-            val tokens = totalTokens?.takeIf { value -> value >= 0L } ?: return null
-            return GeminiMessageUsage(
-                messageId = id,
-                capturedAt = capturedAt,
-                modelName = modelName,
-                totalTokens = tokens
-            )
-        }
+        answered[id] = GeminiMessageUsage(
+            messageId = id,
+            capturedAt = timestamp,
+            modelName = modelName,
+            totalTokens = tokens
+        )
     }
 
     private fun JsonObject.stringValue(key: String): String? =
@@ -130,4 +125,7 @@ internal object GeminiSessionLogParser {
     private fun JsonPrimitive.contentOrNull(): String? = if (isString) content else null
 
     private const val UNKNOWN_MODEL = "Unknown Gemini model"
+    private const val GEMINI_RECORD_TYPE = "gemini"
+    private const val SET_KEY = "\$set"
+    private const val REWIND_KEY = "\$rewindTo"
 }

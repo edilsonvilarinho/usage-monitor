@@ -293,24 +293,6 @@ internal fun warningFor(
         }
     }
 
-    if (error.isGeminiSessionDirectoryMissing) {
-        return if (language == AppLanguage.PT) {
-            DashboardWarning(
-                target = error.target,
-                title = "Gemini CLI sem histórico local",
-                description = "Nenhuma sessão local foi encontrada para este perfil. Use o Gemini CLI neste perfil e atualize o monitor novamente.",
-                actionLabel = null
-            )
-        } else {
-            DashboardWarning(
-                target = error.target,
-                title = "Gemini CLI has no local session history",
-                description = "No local sessions were found for this profile. Use Gemini CLI in this profile, then refresh Usage Monitor.",
-                actionLabel = null
-            )
-        }
-    }
-
     if (error.isGeminiSessionHistoryUnreadable) {
         return if (language == AppLanguage.PT) {
             DashboardWarning(

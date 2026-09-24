@@ -946,12 +946,7 @@ private fun ObservedUsageModelRowContent(
             Spacer(modifier = Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = localizedObservedCount(
-                        summary.amountFiveHours,
-                        summary.unit,
-                        language,
-                        summary.modelName.endsWith(" sessions")
-                    ),
+                    text = localizedObservedCount(summary.amountFiveHours, summary.unit, language),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
@@ -966,8 +961,7 @@ private fun ObservedUsageModelRowContent(
                         value = summary.amountSevenDays,
                         source = source,
                         unit = summary.unit,
-                        language = language,
-                        isSessionCount = summary.modelName.endsWith(" sessions")
+                        language = language
                     ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1015,7 +1009,6 @@ private fun ObservedUsageInlineComparisonChart(
             value = summary.amountFiveHours,
             fraction = summary.amountFiveHours / maxValue,
             unit = summary.unit,
-            isSessionCount = summary.modelName.endsWith(" sessions"),
             language = language
         )
         ObservedUsageInlineBar(
@@ -1024,7 +1017,6 @@ private fun ObservedUsageInlineComparisonChart(
             value = summary.amountSevenDays,
             fraction = summary.amountSevenDays / maxValue,
             unit = summary.unit,
-            isSessionCount = summary.modelName.endsWith(" sessions"),
             language = language
         )
     }
@@ -1037,7 +1029,6 @@ private fun ObservedUsageInlineBar(
     value: Long,
     fraction: Float,
     unit: UsageUnit,
-    isSessionCount: Boolean,
     language: AppLanguage,
     modifier: Modifier = Modifier
 ) {
@@ -1066,14 +1057,11 @@ private fun ObservedUsageInlineBar(
                 ),
                 TooltipMetric(
                     label = when {
-                        isSessionCount && language == AppLanguage.PT -> "Sessões"
-                        isSessionCount -> "Sessions"
-                        unit == UsageUnit.TOKENS && language == AppLanguage.PT -> "Tokens"
                         unit == UsageUnit.TOKENS -> "Tokens"
                         language == AppLanguage.PT -> "Requisições"
                         else -> "Requests"
                     },
-                    value = localizedObservedCount(value, unit, language, isSessionCount)
+                    value = localizedObservedCount(value, unit, language)
                 )
             ),
             modifier = Modifier.weight(1f)

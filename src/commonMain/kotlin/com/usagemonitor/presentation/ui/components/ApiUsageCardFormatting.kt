@@ -33,12 +33,9 @@ internal data class ObservedUsageModelSummary(
 internal fun localizedObservedCount(
     value: Long,
     unit: UsageUnit,
-    language: AppLanguage,
-    isSessionCount: Boolean = false
+    language: AppLanguage
 ): String {
     val noun = when {
-        isSessionCount && language == AppLanguage.PT -> if (value == 1L) "sessão" else "sessões"
-        isSessionCount -> if (value == 1L) "session" else "sessions"
         unit == UsageUnit.TOKENS && language == AppLanguage.PT -> "tokens"
         unit == UsageUnit.TOKENS -> "tokens"
         language == AppLanguage.PT -> if (value == 1L) "requisição" else "requisições"
@@ -64,11 +61,10 @@ internal fun observedSecondaryWindowLabel(
     value: Long,
     source: ApiSource,
     unit: UsageUnit,
-    language: AppLanguage,
-    isSessionCount: Boolean
+    language: AppLanguage
 ): String {
     val displayValue = if (source == ApiSource.GEMINI) {
-        localizedObservedCount(value, unit, language, isSessionCount)
+        localizedObservedCount(value, unit, language)
     } else {
         value.toString()
     }
@@ -79,15 +75,14 @@ internal fun buildObservedUsageTooltipMetrics(
     summary: ObservedUsageModelSummary,
     language: AppLanguage
 ): List<TooltipMetric> {
-    val isSessionCount = summary.modelName.endsWith(" sessions")
     return listOf(
         TooltipMetric(
             label = observedPrimaryWindowLabel(language),
-            value = localizedObservedCount(summary.amountFiveHours, summary.unit, language, isSessionCount)
+            value = localizedObservedCount(summary.amountFiveHours, summary.unit, language)
         ),
         TooltipMetric(
             label = if (language == AppLanguage.PT) "Últimos 7d" else "Last 7d",
-            value = localizedObservedCount(summary.amountSevenDays, summary.unit, language, isSessionCount)
+            value = localizedObservedCount(summary.amountSevenDays, summary.unit, language)
         )
     )
 }

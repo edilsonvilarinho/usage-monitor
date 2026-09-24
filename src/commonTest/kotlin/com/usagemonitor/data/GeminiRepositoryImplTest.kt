@@ -19,7 +19,7 @@ class GeminiRepositoryImplTest {
     private val now = Instant.parse("2026-09-23T12:00:00Z")
 
     @Test
-    fun `keeps observed tokens and session counts separate from account quotas`() = runTest {
+    fun `keeps observed tokens per model separate from account quotas`() = runTest {
         val repository = GeminiRepositoryImpl(
             dataSource = FixedGeminiDataSource(
                 listOf(
@@ -39,9 +39,9 @@ class GeminiRepositoryImplTest {
         assertEquals(150L, quotasByLabel.getValue("gemini-2.5-pro 7d").used)
         assertEquals(0L, quotasByLabel.getValue("gemini-2.5-flash 5h").used)
         assertEquals(50L, quotasByLabel.getValue("gemini-2.5-flash 7d").used)
-        assertEquals(1L, quotasByLabel.getValue("Gemini CLI sessions 5h").used)
-        assertEquals(2L, quotasByLabel.getValue("Gemini CLI sessions 7d").used)
-        assertTrue(stats.quotas.filter { quota -> quota.unit == UsageUnit.TOKENS }.all { quota -> quota.total == 0L })
+        // Nenhuma linha que finja ser modelo: só tokens, por modelo, sem teto.
+        assertEquals(4, stats.quotas.size)
+        assertTrue(stats.quotas.all { quota -> quota.unit == UsageUnit.TOKENS && quota.total == 0L })
         assertFalse(stats.quotas.any { quota -> quota.unit == UsageUnit.PERCENTAGE })
         assertFalse(stats.quotas.any { quota -> quota.unit == UsageUnit.CURRENCY_USD })
     }
@@ -68,7 +68,7 @@ class GeminiRepositoryImplTest {
         val repository = GeminiRepositoryImpl(
             dataSource = object : GeminiUsageDataSource {
                 override suspend fun loadSessions(): List<GeminiSessionUsage> {
-                    throw GeminiUsageException(GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING)
+                    throw GeminiUsageException(GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE)
                 }
             },
             nowProvider = { now }
@@ -77,7 +77,7 @@ class GeminiRepositoryImplTest {
         val failure = repository.getUsage().exceptionOrNull()
 
         assertEquals(
-            GeminiUsageFailureKind.SESSION_DIRECTORY_MISSING.safeMessage,
+            GeminiUsageFailureKind.SESSION_HISTORY_UNREADABLE.safeMessage,
             failure?.message
         )
         assertFalse(failure?.message.orEmpty().contains("C:\\"))
