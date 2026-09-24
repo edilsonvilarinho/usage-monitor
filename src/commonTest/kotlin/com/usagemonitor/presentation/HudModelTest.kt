@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
@@ -12,7 +13,9 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.MAX_HUD_RINGS
 import com.usagemonitor.presentation.ui.TRAY_TOOLTIP_MAX_CHARS
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudSourceOrigin
 import com.usagemonitor.presentation.ui.hudTraySummary
+import com.usagemonitor.presentation.ui.hudUsedLeftText
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
 import kotlinx.datetime.Instant
@@ -150,6 +153,63 @@ class HudModelTest {
 
         assertEquals(TRAY_TOOLTIP_MAX_CHARS, summary.length)
         assertTrue(summary.endsWith("…"))
+    }
+
+    // ------------------------------------------------------------ balão (rodada 3)
+
+    @Test
+    fun `cada cota diz quanto foi usado e quanto resta, somando cem`() {
+        val account = buildHudAccounts(listOf(entry(PADRAO, "Sessão 5h", used = 87, risk = null)), emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals("87% usado · 13% restante", account.quotas.single().usedLeftText)
+        val english = buildHudAccounts(listOf(entry(PADRAO, "Sessão 5h", used = 87, risk = null)), emptyList(), AppLanguage.EN, HUD_NOW).single()
+        assertEquals("87% used · 13% left", english.quotas.single().usedLeftText)
+    }
+
+    /** Truncar 0,4% daria "0% usado" com consumo real; o Codenotch diz "<1", e aqui também. */
+    @Test
+    fun `consumo abaixo de um por cento nao vira zero`() {
+        val tiny = QuotaInfo("Tokens 7d", used = 4L, total = 1_000L, periodEndAt = HUD_NOW + 2.hours, unit = UsageUnit.TOKENS)
+        val almostFull = QuotaInfo("Tokens 7d", used = 996L, total = 1_000L, periodEndAt = HUD_NOW + 2.hours, unit = UsageUnit.TOKENS)
+
+        assertEquals("<1% usado · 100% restante", hudUsedLeftText(tiny, AppLanguage.PT))
+        assertEquals("99% usado · <1% restante", hudUsedLeftText(almostFull, AppLanguage.PT))
+    }
+
+    /** Saldo não tem teto: "restante" ali seria uma conta sem sentido. */
+    @Test
+    fun `saldo e atividade observada nao tem usado e restante`() {
+        val balance = QuotaInfo("Saldo", used = 0L, total = 227L, periodEndAt = HUD_NOW, unit = UsageUnit.CURRENCY_USD)
+        val observed = QuotaInfo("Tokens 5h", used = 5_000L, total = 0L, periodEndAt = HUD_NOW, unit = UsageUnit.TOKENS)
+
+        assertEquals(null, hudUsedLeftText(balance, AppLanguage.PT))
+        assertEquals(null, hudUsedLeftText(observed, AppLanguage.PT))
+    }
+
+    @Test
+    fun `o rodape do balao junta plano e origem`() {
+        val codex = buildHudAccounts(listOf(entry(CODEX, "Codex 5h", used = 0, risk = null, plan = "Plus")), emptyList(), AppLanguage.PT, HUD_NOW).single()
+        val claude = buildHudAccounts(listOf(entry(PADRAO, "Sessão 5h", used = 0, risk = null)), emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals("Plus · via Codex", codex.detailLine)
+        assertEquals("via Claude Code", claude.detailLine)
+        assertEquals("via chave de API", hudSourceOrigin(ApiSource.DEEPSEEK, AppLanguage.PT))
+        assertEquals("via Antigravity CLI", hudSourceOrigin(ApiSource.ANTIGRAVITY, AppLanguage.EN))
+    }
+
+    /** No balão o grupo é o cabeçalho da caixa; repeti-lo no título de cada cota seria eco. */
+    @Test
+    fun `cota do antigravity leva o grupo a parte e o titulo sem ele`() {
+        val target = UsageTargetKey.forSource(ApiSource.ANTIGRAVITY)
+        val label = AntigravityQuotaLabels.label("Gemini", "7d")
+        val quota = QuotaInfo(label, used = 5L, total = 100L, periodEndAt = HUD_NOW + 2.hours, periodType = PeriodType.WEEKLY, unit = UsageUnit.PERCENTAGE)
+        val stats = ApiUsageStats(source = ApiSource.ANTIGRAVITY, targetKey = target, apiName = "Antigravity CLI", quotas = listOf(quota))
+
+        val hudQuota = buildHudAccounts(listOf(HudQuotaEntry(stats, quota, null)), emptyList(), AppLanguage.PT, HUD_NOW).single().quotas.single()
+
+        assertEquals("Gemini", hudQuota.group)
+        assertEquals("Semanal", hudQuota.title)
+        assertEquals("5% usado · 95% restante", hudQuota.usedLeftText)
     }
 
     private fun entry(

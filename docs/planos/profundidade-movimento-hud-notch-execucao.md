@@ -69,7 +69,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | # | Atividade | Estado |
 |---|---|---|
 | E1 | Timer cortado: folga de arredondamento de pixel na estimativa de texto | feito |
-| E2 | Modelo do balão: usado/restante, origem, rótulo e grupo da cota | pendente |
+| E2 | Modelo do balão: usado/restante, origem, rótulo e grupo da cota | feito |
 | E3 | Balão por anel com cauda, no lugar do painel de todas as contas | pendente |
 | E4 | Alças: mão (mover) e engrenagem | pendente |
 | E5 | Balão da engrenagem com as ações do rodapé (`AppShellActions`) | pendente |
@@ -102,6 +102,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | D2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.AccountPlanLabelTest"` | Verde: mapeamento dos três fornecedores, `planLabel` no Codex, no Cursor, no repositório da Anthropic e na ida e volta do cache. |
 | 2026-09-24 | D3 | Claude Opus 5.5 | `gradlew.bat allTests` + `generateScreenshots` + `generateHelpMedia` + renderização descartável do notch | Verde: 2088 testes, 0 falhas. Duas correções vindas do olho: no painel, dois `weight` na mesma linha dividiam a sobra e truncavam "Anthropic —…"; no card, o selo do plano ia parar longe do nome porque a coluna mede o e-mail. |
 | 2026-09-24 | E1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTextFitTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.HudNotchGeometryTest"` | Primeira passada do teste novo **vermelha**, reproduzindo o defeito: em toda escala fracionária (105%–200%) o texto desenhado passava a estimativa em até 0,8dp — o Skia arredonda a largura da linha para cima em pixel inteiro. Na faixa as diferenças somavam e a contagem, último item, quebrava. Com 1dp de folga por texto: verde. |
+| 2026-09-24 | E2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudModelTest"` | Verde, com cinco casos novos: usado/restante nos dois idiomas, "<1" nas duas pontas, saldo e atividade observada sem a linha, rodapé de plano + origem, grupo e título do Antigravity. |
 
 ## C1 · Tokens de motion e política
 
@@ -373,3 +374,15 @@ na borda da sombra e CPU da rotação contínua.
   caractere e aparece "04:5".
 - Correção em `charWidth`: 1dp de folga por texto, que cobre um pixel em qualquer densidade ≥ 1.
   O teste varre 100%–200% de 5 em 5 mais 144% e 172%, as combinações comuns com a escala do Windows.
+
+## E2 · Modelo do balão
+
+- `HudQuota` ganhou `title` (o título do bloco expandido do card, `expandedQuotaTitle`, sem o prefixo
+  do grupo), `group` (Antigravity/Cursor, pelos donos dos rótulos) e `usedLeftText`.
+- **Usado truncado, restante derivado do usado exibido**: o balão não pode dizer 88% ao lado do
+  anel que diz 87%, e os dois números somam 100. Abaixo de 1% a linha diz "<1%" — truncar daria
+  "0% usado" com consumo real —, e perto do teto, "<1% restante". Saldo e atividade observada
+  não têm teto e ficam sem a linha.
+- `HudAccount.originLabel` por `hudSourceOrigin`, `when` exaustivo sobre `ApiSource`: descreve o
+  caminho da leitura ("via Codex", "via Antigravity CLI", "via chave de API"), não a empresa, que
+  já está no título. `detailLine` junta plano e origem: "Plus · via Codex".
