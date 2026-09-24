@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
 import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.presentation.viewmodel.UiApiError
 import kotlin.test.Test
@@ -48,6 +49,41 @@ class DashboardScreenWarningsTest {
         assertEquals("Histórico local do Gemini CLI indisponível", warning.title)
         assertTrue(warning.description.contains("registros de uso reconhecidos"))
         assertNull(warning.actionLabel)
+    }
+
+    /**
+     * Instalar, atualizar, autenticar ou reiniciar: nenhum dos casos se resolve
+     * tentando de novo, então nenhum oferece o botão, e todos contam como
+     * configuração — sem toast a cada coleta de 10 minutos.
+     */
+    @Test
+    fun `Antigravity setup failures are configuration warnings without retry`() {
+        AntigravityUsageFailureKind.entries.forEach { kind ->
+            val error = UiApiError(source = ApiSource.ANTIGRAVITY, message = kind.safeMessage)
+
+            assertEquals(kind, error.antigravityFailureKind)
+            assertTrue(error.isConfigurationIssue)
+            listOf(AppLanguage.PT, AppLanguage.EN).forEach { language ->
+                val warning = warningFor(error, language)
+                assertNotNull(warning, "$kind/$language")
+                assertNull(warning.actionLabel, "$kind/$language")
+            }
+        }
+        assertEquals(
+            "Coleta do Antigravity pausada",
+            warningFor(
+                UiApiError(ApiSource.ANTIGRAVITY, AntigravityUsageFailureKind.COLLECTION_PAUSED.safeMessage),
+                AppLanguage.PT
+            )?.title
+        )
+    }
+
+    @Test
+    fun `an Antigravity timeout stays an ordinary failure`() {
+        val error = UiApiError(source = ApiSource.ANTIGRAVITY, message = "Antigravity CLI /usage timed out")
+
+        assertNull(error.antigravityFailureKind)
+        assertTrue(!error.isConfigurationIssue)
     }
 
     // ── Identificação do alvo ────────────────────────────────────────────

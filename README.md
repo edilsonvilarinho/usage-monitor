@@ -60,7 +60,7 @@ sends prompt or response content anywhere.
 | OpenRouter | Remote | `GET /api/v1/credits` | API key, entered in **Settings > APIs** |
 | Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/session-*.jsonl` | local Gemini CLI session history; token activity only |
 | Cursor | Remote | `GET https://cursor.com/api/usage-summary` | an existing signed-in Cursor editor session; undocumented personal route |
-| Antigravity CLI | Local | interactive `agy` PTY and `/usage` command | Antigravity CLI installed on `PATH` and already authenticated |
+| Antigravity CLI | Local | `agy --print /usage` (answered by the CLI itself, no model turn) | Antigravity CLI 1.2.9+ installed and already authenticated |
 
 Full endpoints, credential paths and per-integration limits:
 [`docs/integrations.md`](docs/integrations.md).
@@ -73,7 +73,7 @@ One card per account or integration. The Anthropic card shows all three quotas â
 weekly, and usage credits â€” with a risk indicator on whichever one is in danger.
 
 The additional local and CLI sources keep observed tokens, Cursor's personal usage summary, and
-Antigravity's explicitly reported model metrics distinct:
+Antigravity's per-model-group quotas distinct:
 
 ![Gemini CLI, Cursor and Antigravity CLI cards](img/new-integrations.png)
 

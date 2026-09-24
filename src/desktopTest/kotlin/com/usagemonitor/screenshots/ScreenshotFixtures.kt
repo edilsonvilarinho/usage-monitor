@@ -2,6 +2,7 @@ package com.usagemonitor.screenshots
 
 import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.AccountCreditUsage
+import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -15,7 +16,6 @@ import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
-import com.usagemonitor.domain.entity.ReportedModelQuota
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.QuotaSeriesKey
@@ -250,17 +250,22 @@ internal object ScreenshotFixtures {
         ApiUsageStats(
             source = ApiSource.ANTIGRAVITY,
             apiName = "Antigravity CLI",
-            quotas = emptyList(),
-            reportedModelQuotas = listOf(
-                ReportedModelQuota(
-                    modelName = "Gemini models",
-                    remainingPercent = 99.49,
-                    unit = UsageUnit.PERCENTAGE,
-                    resetDescription = "167h 58m"
+            quotas = listOf(
+                QuotaInfo(
+                    label = AntigravityQuotaLabels.label("Gemini", "7d"),
+                    used = 4L,
+                    total = 100L,
+                    periodEndAt = NOW.plusHours(24 * 6),
+                    periodType = PeriodType.WEEKLY,
+                    unit = UsageUnit.PERCENTAGE
                 ),
-                ReportedModelQuota(
-                    modelName = "Claude and GPT models",
-                    remainingPercent = 100.0,
+                QuotaInfo(
+                    label = AntigravityQuotaLabels.label("Claude/GPT", "7d"),
+                    used = 0L,
+                    total = 100L,
+                    periodEndAt = Instant.parse("2100-01-01T00:00:00Z"),
+                    hasKnownResetAt = false,
+                    periodType = PeriodType.WEEKLY,
                     unit = UsageUnit.PERCENTAGE
                 )
             )

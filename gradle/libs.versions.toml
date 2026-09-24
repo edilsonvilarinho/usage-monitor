@@ -7,7 +7,6 @@ kotlinx-datetime = "0.6.1"
 kotlinx-coroutines = "1.9.0"
 multiplatform-settings = "1.3.0"
 sqlite-jdbc = "3.53.4.0"
-pty4j = "0.13.13"
 pdfbox = "3.0.8"
 commons-compress = "1.27.1"
 kover = "0.9.9"
@@ -34,7 +33,6 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 # Preferências persistidas (tema, idioma)
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
-pty4j = { module = "org.jetbrains.pty4j:pty4j", version.ref = "pty4j" }
 
 # Leitura do .tar.gz da atualizacao Linux. O JDK nao traz leitor de tar, e
 # depender do comando `tar` deixaria o update na mao do que estiver no PATH.

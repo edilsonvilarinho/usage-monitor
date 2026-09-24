@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppBanner
@@ -328,6 +329,10 @@ internal fun warningFor(
         }
     }
 
+    error.antigravityFailureKind?.let { kind ->
+        return antigravityWarning(error, kind, language)
+    }
+
     if (error.isKiloLocalIssue) {
         return if (language == AppLanguage.PT) {
             DashboardWarning(
@@ -501,3 +506,55 @@ internal data class UpdateBannerContent(
     val actionLabel: String?,
     val tone: AppTone
 )
+
+/**
+ * Nenhum dos quatro oferece "Tentar novamente": todos dependem de uma ação fora do
+ * app (instalar, atualizar, autenticar) ou de reiniciá-lo, e repetir a coleta
+ * devolveria a mesma falha.
+ */
+private fun antigravityWarning(
+    error: UiApiError,
+    kind: AntigravityUsageFailureKind,
+    language: AppLanguage
+): DashboardWarning {
+    val pt = language == AppLanguage.PT
+    val (title, description) = when (kind) {
+        AntigravityUsageFailureKind.CLI_NOT_INSTALLED,
+        AntigravityUsageFailureKind.UNSUPPORTED_LAUNCHER -> if (pt) {
+            "Antigravity CLI não encontrado" to
+                "Instale o Antigravity CLI (agy) ou desative esta integração em Configurações > APIs. " +
+                "O monitor procura o executável agy em %LOCALAPPDATA%\\agy\\bin e no PATH, nunca um atalho .cmd ou .bat."
+        } else {
+            "Antigravity CLI not found" to
+                "Install the Antigravity CLI (agy) or disable this integration under Settings > APIs. " +
+                "The monitor looks for the agy executable in %LOCALAPPDATA%\\agy\\bin and on PATH, never a .cmd or .bat shim."
+        }
+        AntigravityUsageFailureKind.UNVERIFIED_VERSION -> if (pt) {
+            "Atualize o Antigravity CLI" to
+                "Esta integração foi verificada com o agy 1.2.9 ou mais novo. Rode `agy update` e o monitor volta a ler as cotas na próxima coleta."
+        } else {
+            "Update the Antigravity CLI" to
+                "This integration was verified against agy 1.2.9 or newer. Run `agy update` and the monitor reads the quotas again on the next refresh."
+        }
+        AntigravityUsageFailureKind.AUTHENTICATION_UNAVAILABLE -> if (pt) {
+            "Antigravity CLI sem login" to
+                "Abra o agy num terminal e faça login. O monitor usa a sessão que já existe e não inicia login por conta própria."
+        } else {
+            "Antigravity CLI is signed out" to
+                "Open agy in a terminal and sign in. The monitor uses the existing session and never starts a sign-in itself."
+        }
+        AntigravityUsageFailureKind.COLLECTION_PAUSED -> if (pt) {
+            "Coleta do Antigravity pausada" to
+                "O CLI não confirmou ter respondido /usage sozinho, e a próxima chamada poderia gastar cota de modelo. A coleta fica parada até o app ser reiniciado."
+        } else {
+            "Antigravity collection paused" to
+                "The CLI did not confirm that it answered /usage by itself, and another call could spend model quota. Collection stays paused until the app restarts."
+        }
+    }
+    return DashboardWarning(
+        target = error.target,
+        title = title,
+        description = description,
+        actionLabel = null
+    )
+}

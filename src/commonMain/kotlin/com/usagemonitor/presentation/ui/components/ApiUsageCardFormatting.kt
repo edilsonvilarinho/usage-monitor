@@ -10,6 +10,7 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
@@ -52,27 +53,6 @@ internal fun compactObservedCount(value: Long, unit: UsageUnit): String {
         UsageUnit.REQUESTS -> "${abbreviate(value)} req."
         UsageUnit.TOKENS -> "${abbreviate(value)} tok"
         else -> value.toString()
-    }
-}
-
-internal fun formatReportedPercent(value: Double, language: AppLanguage): String {
-    val number = value.toString().removeSuffix(".0")
-    val localizedNumber = if (language == AppLanguage.PT) number.replace('.', ',') else number
-    return "$localizedNumber%"
-}
-
-internal fun antigravityGroupDisplayName(value: String, language: AppLanguage): String {
-    if (language == AppLanguage.PT) {
-        return when (value.lowercase()) {
-            "gemini models" -> "Modelos Gemini"
-            "claude and gpt models" -> "Claude e GPT"
-            else -> value
-        }
-    }
-    return when (value.lowercase()) {
-        "gemini models" -> "Gemini models"
-        "claude and gpt models" -> "Claude and GPT models"
-        else -> value
     }
 }
 
@@ -149,12 +129,15 @@ internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String
         return quota.label
     }
 
-    return when (quota.periodType) {
+    val periodTitle = when (quota.periodType) {
         PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Sessão 5h" else "5h session"
         PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Semanal" else "Weekly"
         PeriodType.MONTHLY -> if (language == AppLanguage.PT) "Mensal" else "Monthly"
         PeriodType.REPORTED -> if (language == AppLanguage.PT) "Uso atual" else "Current usage"
     }
+    // O Antigravity tem um limite semanal por grupo de modelos: sem o grupo, os
+    // dois blocos do card diriam "Semanal".
+    return AntigravityQuotaLabels.groupOf(quota.label)?.let { group -> "$group · $periodTitle" } ?: periodTitle
 }
 
 @Composable
@@ -689,11 +672,15 @@ internal fun compactPercentageLabel(quota: QuotaInfo): String {
  * pelo nome da conta ao lado — repeti-lo em cada cota gastaria a largura que a
  * própria conta precisa.
  *
- * Regra deliberadamente burra: nenhum rótulo do app tem duas cotas da mesma
- * fonte terminando na mesma palavra, e inventar um mapa de abreviações seria um
- * segundo dono dos nomes de cota.
+ * Regra deliberadamente burra: fora do Antigravity, nenhuma fonte tem duas cotas
+ * terminando na mesma palavra, e inventar um mapa de abreviações seria um segundo
+ * dono dos nomes de cota. O Antigravity é resolvido por [AntigravityQuotaLabels],
+ * que já é o dono dos rótulos dele.
  */
 internal fun hudQuotaShortLabel(label: String): String {
+    // Exceção única à regra: o Antigravity tem duas cotas "7d" na mesma fonte, e a
+    // última palavra sozinha diria "7d 4% · 7d 0%". O grupo fica.
+    AntigravityQuotaLabels.withoutSource(label)?.let { return it }
     return label.substringAfterLast(' ')
 }
 

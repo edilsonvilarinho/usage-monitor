@@ -13,9 +13,11 @@ package com.usagemonitor.domain.entity
  *   teto de janela contra o qual medir percentual.
  * - [OBSERVED_ACTIVITY]: atividade observada nasce com `total = 0`
  *   (`KiloRepositoryImpl`, `OpenCodeRepositoryImpl`, `GeminiRepositoryImpl`),
- *   porque a contagem observada não conhece limite de conta. As métricas do
- *   Antigravity ficam em `ReportedModelQuota`, fora do modelo normalizado que o
- *   avaliador de limiar consome. `evaluateQuotaAlerts` ignora essas fontes.
+ *   porque a contagem observada não conhece limite de conta. `evaluateQuotaAlerts`
+ *   descarta essas cotas no primeiro `if` do laço.
+ *
+ * O Antigravity **não** está nesta lista: o `/usage` do CLI informa a fração
+ * restante de cada janela e o reset, a mesma forma percentual do OpenCode Go.
  *
  * O defeito da issue #194 não é o silêncio do avaliador: é a aba Alertas
  * oferecer o limiar sem dizer quais fontes ficam de fora dele.
@@ -41,13 +43,13 @@ enum class QuotaThresholdGap {
 fun ApiSource.quotaThresholdGap(): QuotaThresholdGap? {
     return when (this) {
         ApiSource.DEEPSEEK, ApiSource.OPENROUTER -> QuotaThresholdGap.PREPAID_BALANCE
-        ApiSource.OPENCODE, ApiSource.KILO, ApiSource.GEMINI, ApiSource.ANTIGRAVITY ->
-            QuotaThresholdGap.OBSERVED_ACTIVITY
+        ApiSource.OPENCODE, ApiSource.KILO, ApiSource.GEMINI -> QuotaThresholdGap.OBSERVED_ACTIVITY
         ApiSource.ANTHROPIC,
         ApiSource.CODEX,
         ApiSource.MINIMAX,
         ApiSource.OPENCODE_GO,
-        ApiSource.CURSOR -> null
+        ApiSource.CURSOR,
+        ApiSource.ANTIGRAVITY -> null
     }
 }
 

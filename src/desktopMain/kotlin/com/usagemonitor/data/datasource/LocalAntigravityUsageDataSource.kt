@@ -1,223 +1,265 @@
 package com.usagemonitor.data.datasource
 
-import com.pty4j.PtyProcess
-import com.pty4j.PtyProcessBuilder
-import com.usagemonitor.data.mapper.AntigravityUsageParser
-import com.usagemonitor.domain.entity.ReportedModelQuota
-import kotlinx.coroutines.CancellationException
+import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
-import java.util.LinkedHashMap
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-internal interface AntigravityPtySession {
-    fun sendUsageCommand()
-    fun readOutput(): String
-    fun isAlive(): Boolean
-    fun exitCodeOrNull(): Int?
-    fun terminateProcessTree()
-    fun outputCaptureSummary(): String? = null
-}
-
-internal data class AntigravityPtyOutputSummary(
-    val capturedBytes: Int,
-    val receivedBytes: Long
-) {
-    val wasTruncated: Boolean get() = receivedBytes > capturedBytes
-}
-
-internal fun interface AntigravityPtySessionFactory {
-    fun start(executable: File, workingDirectory: File): AntigravityPtySession
-}
-
-internal fun interface AntigravityUsageCommandRunner {
-    suspend fun readUsagePanel(): String
-}
-
-/** Lê o painel oficial /usage sem prompt de modelo, login automatizado ou RPC da IDE. */
+/**
+ * Lê as cotas por `agy --output-format json --print /usage`, que o próprio CLI
+ * responde sem abrir turno de modelo (doc oficial do modo headless; medição no
+ * plano `docs/planos/integracoes-267-ajustes-execucao.md`).
+ *
+ * **O argumento chega por lista, nunca por shell.** Pelo Git Bash, `/usage` vira
+ * `C:/Program Files/Git/usage` e vai ao modelo como prompt — foi medido. Pelo mesmo
+ * motivo shims `.cmd`/`.bat`, que o Windows executa pelo `cmd.exe`, são recusados.
+ *
+ * Não há PTY: o pipe comum devolve o envelope completo, e a TUI interativa que a
+ * versão anterior tentava dirigir nunca chegava a abrir o painel.
+ */
 internal class LocalAntigravityUsageDataSource(
-    private val runner: AntigravityUsageCommandRunner = PtyAntigravityUsageCommandRunner()
+    private val processStarter: AntigravityProcessStarter = SystemAntigravityProcessStarter,
+    private val executableResolver: () -> File? = ::findAgyExecutable,
+    private val workingDirectoryProvider: () -> File = ::antigravityWorkingDirectory,
+    private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
+    private val versionTimeoutMillis: Long = DEFAULT_VERSION_TIMEOUT_MILLIS
 ) : AntigravityUsageDataSource {
-    override suspend fun readUsage(): List<ReportedModelQuota> {
-        return AntigravityUsageParser.parse(runner.readUsagePanel())
+
+    private var verifiedVersionKey: String? = null
+
+    override suspend fun readUsageJson(): String = withContext(Dispatchers.IO) {
+        val executable = executableResolver()
+            ?: throw IllegalStateException(AntigravityUsageFailureKind.CLI_NOT_INSTALLED.safeMessage)
+        if (!isDirectExecutable(executable)) {
+            throw IllegalStateException(AntigravityUsageFailureKind.UNSUPPORTED_LAUNCHER.safeMessage)
+        }
+        ensureVerifiedVersion(executable)
+
+        val workingDirectory = workingDirectoryProvider()
+        workingDirectory.mkdirs()
+        val result = processStarter.run(
+            command = listOf(executable.absolutePath) + USAGE_ARGUMENTS,
+            workingDirectory = workingDirectory,
+            timeoutMillis = timeoutMillis,
+            maxOutputBytes = MAX_OUTPUT_BYTES
+        )
+        when {
+            result.timedOut -> throw IllegalStateException(ANTIGRAVITY_CLI_TIMED_OUT)
+            result.outputTooLarge -> throw IllegalStateException(ANTIGRAVITY_CLI_OUTPUT_TOO_LARGE)
+            // Exit 1 é o que a doc descreve para autenticação ou entrada inválida;
+            // o envelope JSON costuma vir mesmo assim e é ele que diz qual dos dois.
+            result.stdout.isBlank() -> throw IllegalStateException(
+                "$ANTIGRAVITY_CLI_EXITED (exit code ${result.exitCode})"
+            )
+        }
+        result.stdout
+    }
+
+    /**
+     * O portão de versão roda uma vez por executável: a chave é caminho + tamanho +
+     * data de modificação, então uma atualização do CLI volta a ser conferida.
+     */
+    private fun ensureVerifiedVersion(executable: File) {
+        val key = "${executable.absolutePath}|${executable.length()}|${executable.lastModified()}"
+        if (verifiedVersionKey == key) return
+
+        val result = processStarter.run(
+            command = listOf(executable.absolutePath, "--version"),
+            workingDirectory = workingDirectoryProvider().also(File::mkdirs),
+            timeoutMillis = versionTimeoutMillis,
+            maxOutputBytes = MAX_VERSION_OUTPUT_BYTES
+        )
+        val version = parseAgyVersion(result.stdout)
+        if (result.timedOut || version == null || compareVersions(version, MIN_VERIFIED_VERSION) < 0) {
+            throw IllegalStateException(AntigravityUsageFailureKind.UNVERIFIED_VERSION.safeMessage)
+        }
+        verifiedVersionKey = key
+    }
+
+    internal companion object {
+        /** A versão contra a qual o envelope e a ausência de turno foram medidos. */
+        val MIN_VERIFIED_VERSION = listOf(1, 2, 9)
+
+        val USAGE_ARGUMENTS = listOf(
+            "--sandbox",
+            "--print-timeout", "30s",
+            "--output-format", "json",
+            "--print", "/usage"
+        )
+
+        const val DEFAULT_TIMEOUT_MILLIS = 45_000L
+        const val DEFAULT_VERSION_TIMEOUT_MILLIS = 10_000L
+        const val MAX_OUTPUT_BYTES = 64 * 1024
+        const val MAX_VERSION_OUTPUT_BYTES = 1024
     }
 }
 
-internal class PtyAntigravityUsageCommandRunner(
-    private val sessionFactory: AntigravityPtySessionFactory = NativeAntigravityPtySessionFactory(),
-    private val executableResolver: () -> File? = ::findAgyExecutable,
-    private val workingDirectoryProvider: () -> File = { File(System.getProperty("user.home") ?: ".").absoluteFile },
-    private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
-    private val startupDelayMillis: Long = DEFAULT_STARTUP_DELAY_MILLIS,
-    private val settleDelayMillis: Long = 350L
-) : AntigravityUsageCommandRunner {
-    override suspend fun readUsagePanel(): String = withContext(Dispatchers.IO) {
-        val executable = executableResolver()
-            ?: throw IllegalStateException("Antigravity CLI is not installed or is not on PATH")
-        val home = workingDirectoryProvider()
-        val session = sessionFactory.start(executable, home)
-        try {
-            delay(startupDelayMillis)
-            val startupOutput = session.readOutput()
-            if (isAuthenticationPrompt(startupOutput)) {
-                throw IllegalStateException("Antigravity CLI authentication is unavailable")
-            }
-            if (!session.isAlive()) {
-                throw IllegalStateException("Antigravity CLI exited before the usage command was sent")
-            }
-            session.sendUsageCommand()
-            val panelDeadline = System.nanoTime() + timeoutMillis * 1_000_000
-            var sawPanel = false
+internal data class AntigravityProcessResult(
+    val exitCode: Int?,
+    val stdout: String,
+    val timedOut: Boolean,
+    val outputTooLarge: Boolean
+)
 
-            while (System.nanoTime() < panelDeadline) {
-                val output = session.readOutput()
-                if (isAuthenticationPrompt(output)) {
-                    throw IllegalStateException("Antigravity CLI authentication is unavailable")
-                }
-                if (AntigravityUsageParser.hasRecognizedPanelHeader(output)) {
-                    sawPanel = true
-                    val parsed = runCatching { AntigravityUsageParser.parse(output) }.getOrNull()
-                    if (!parsed.isNullOrEmpty()) {
-                        delay(settleDelayMillis)
-                        return@withContext session.readOutput()
-                    }
-                }
-                if (!session.isAlive()) {
-                    val status = session.exitCodeOrNull()
-                    throw IllegalStateException(
-                        if (status == 0 && sawPanel) "Antigravity usage panel returned no quota values"
-                        else "Antigravity CLI exited before the usage panel was available"
-                    )
-                }
-                delay(POLL_INTERVAL_MILLIS)
-            }
+internal fun interface AntigravityProcessStarter {
+    fun run(
+        command: List<String>,
+        workingDirectory: File,
+        timeoutMillis: Long,
+        maxOutputBytes: Int
+    ): AntigravityProcessResult
+}
 
-            throw IllegalStateException(
-                if (sawPanel) "Antigravity usage panel format is unrecognized"
-                else "Antigravity CLI did not show the official /usage panel before timeout" +
-                    (session.outputCaptureSummary()?.let { summary -> " ($summary)" } ?: "")
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } finally {
-            session.terminateProcessTree()
+/**
+ * Processo real, sem shell. stdin fechado — o CLI não tem a quem perguntar nada —,
+ * stderr drenado e descartado (nunca logado), e a árvore inteira morta no timeout.
+ */
+internal object SystemAntigravityProcessStarter : AntigravityProcessStarter {
+    override fun run(
+        command: List<String>,
+        workingDirectory: File,
+        timeoutMillis: Long,
+        maxOutputBytes: Int
+    ): AntigravityProcessResult {
+        val process = ProcessBuilder(command)
+            .directory(workingDirectory)
+            .redirectInput(ProcessBuilder.Redirect.from(nullDevice()))
+            .start()
+        val stdout = BoundedCapture(maxOutputBytes)
+        val stdoutReader = drain(process.inputStream, stdout)
+        val stderrReader = drain(process.errorStream, null)
+
+        val finished = try {
+            process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
+        } catch (interrupted: InterruptedException) {
+            terminateProcessTree(process)
+            Thread.currentThread().interrupt()
+            throw interrupted
+        }
+        if (!finished) {
+            terminateProcessTree(process)
+        }
+        stdoutReader.join(READER_JOIN_MILLIS)
+        stderrReader.join(READER_JOIN_MILLIS)
+
+        return AntigravityProcessResult(
+            exitCode = if (finished) process.exitValue() else null,
+            stdout = stdout.text(),
+            timedOut = !finished,
+            outputTooLarge = stdout.overflowed
+        )
+    }
+
+    private fun drain(stream: InputStream, capture: BoundedCapture?): Thread =
+        thread(name = "antigravity-usage-reader", isDaemon = true) {
+            val buffer = ByteArray(4096)
+            try {
+                while (true) {
+                    val count = stream.read(buffer)
+                    if (count < 0) break
+                    capture?.append(buffer, count)
+                }
+            } catch (_: Throwable) {
+                // O fechamento pelo timeout encerra a leitura; nada a relatar.
+            }
+        }
+
+    private fun terminateProcessTree(process: Process) {
+        runCatching {
+            process.toHandle().descendants().toList().asReversed().forEach { child ->
+                runCatching { child.destroyForcibly() }
+            }
+        }
+        runCatching { process.destroyForcibly() }
+        runCatching { process.waitFor(2, TimeUnit.SECONDS) }
+    }
+
+    private fun nullDevice(): File =
+        File(if (isWindows()) "NUL" else "/dev/null")
+
+    private const val READER_JOIN_MILLIS = 2_000L
+}
+
+/**
+ * Guarda até [maxBytes] e marca o excedente. Saída acima do teto é **falha**, não
+ * truncamento: JSON cortado ao meio não tem o que parsear, e a leitura parcial de
+ * um envelope seria dado inventado.
+ */
+private class BoundedCapture(private val maxBytes: Int) {
+    private val bytes = ByteArrayOutputStream()
+
+    @Volatile
+    var overflowed: Boolean = false
+        private set
+
+    @Synchronized
+    fun append(chunk: ByteArray, count: Int) {
+        val remaining = maxBytes - bytes.size()
+        if (count > remaining) overflowed = true
+        if (remaining > 0) bytes.write(chunk, 0, minOf(count, remaining))
+    }
+
+    @Synchronized
+    fun text(): String = bytes.toString(StandardCharsets.UTF_8.name())
+}
+
+internal fun parseAgyVersion(output: String): List<Int>? {
+    val match = Regex("(\\d+)\\.(\\d+)\\.(\\d+)").find(output) ?: return null
+    return match.groupValues.drop(1).map(String::toInt)
+}
+
+internal fun compareVersions(left: List<Int>, right: List<Int>): Int {
+    for (index in 0 until maxOf(left.size, right.size)) {
+        val difference = left.getOrElse(index) { 0 } - right.getOrElse(index) { 0 }
+        if (difference != 0) return difference
+    }
+    return 0
+}
+
+/** Só executável que o SO inicia direto; `.cmd`/`.bat` passariam pelo `cmd.exe`. */
+internal fun isDirectExecutable(executable: File): Boolean {
+    val name = executable.name.lowercase()
+    return !(name.endsWith(".cmd") || name.endsWith(".bat") || name.endsWith(".ps1"))
+}
+
+/**
+ * `%LOCALAPPDATA%\agy\bin\agy.exe` primeiro — é onde o instalador oficial põe o CLI
+ * no Windows, e onde o Codenotch também o procura —, depois o `PATH`.
+ */
+internal fun findAgyExecutable(
+    environment: Map<String, String> = System.getenv(),
+    windows: Boolean = isWindows()
+): File? {
+    if (windows) {
+        environment["LOCALAPPDATA"]?.takeIf(String::isNotBlank)?.let { localAppData ->
+            val installed = File(localAppData, "agy/bin/agy.exe")
+            if (installed.isFile) return installed
         }
     }
-
-    private fun isAuthenticationPrompt(output: String): Boolean {
-        val normalized = output.lowercase()
-        return "sign in to continue" in normalized ||
-            "login required" in normalized ||
-            "authentication required" in normalized ||
-            "session expired" in normalized ||
-            "not authenticated" in normalized
-    }
-
-    private companion object {
-        const val DEFAULT_TIMEOUT_MILLIS = 15_000L
-        const val DEFAULT_STARTUP_DELAY_MILLIS = 900L
-        const val POLL_INTERVAL_MILLIS = 100L
-    }
-}
-
-private fun findAgyExecutable(): File? {
-    val pathValue = System.getenv("PATH").orEmpty()
-    val windows = System.getProperty("os.name").orEmpty().contains("win", ignoreCase = true)
     val executableName = if (windows) "agy.exe" else "agy"
-    return pathValue.split(File.pathSeparator)
+    return environment["PATH"].orEmpty()
+        .split(File.pathSeparator)
         .asSequence()
         .filter(String::isNotBlank)
         .map { directory -> File(directory, executableName) }
         .firstOrNull { file -> file.isFile && (windows || file.canExecute()) }
 }
 
-private class NativeAntigravityPtySessionFactory : AntigravityPtySessionFactory {
-    override fun start(executable: File, workingDirectory: File): AntigravityPtySession {
-        val environment = LinkedHashMap(System.getenv())
-        environment.putIfAbsent("TERM", "xterm-256color")
-        environment["COLUMNS"] = "120"
-        environment["LINES"] = "40"
+/**
+ * Diretório vazio e dedicado: rodar em `user.home` convidaria o CLI a tratar a pasta
+ * pessoal como projeto, com o que isso tiver de detecção ou pergunta de confiança.
+ */
+private fun antigravityWorkingDirectory(): File =
+    File(System.getProperty("user.home") ?: ".", ".usage-monitor/antigravity-work").absoluteFile
 
-        val process = PtyProcessBuilder(arrayOf(executable.absolutePath))
-            .setEnvironment(environment)
-            .setDirectory(workingDirectory.absolutePath)
-            .start()
-        return NativeAntigravityPtySession(process)
-    }
-}
+private fun isWindows(): Boolean =
+    System.getProperty("os.name").orEmpty().contains("win", ignoreCase = true)
 
-private class NativeAntigravityPtySession(
-    private val process: PtyProcess
-) : AntigravityPtySession {
-    private val output = BoundedPtyOutput(MAX_CAPTURE_BYTES)
-    private val inputStream = process.inputStream
-    private val reader = thread(name = "antigravity-usage-pty-reader", isDaemon = true) {
-        val buffer = ByteArray(1024)
-        try {
-            while (true) {
-                val count = inputStream.read(buffer)
-                if (count < 0) break
-                output.append(buffer, count)
-            }
-        } catch (_: Throwable) {
-            // Fechamento normal quando o timeout ou cancelamento mata a árvore.
-        }
-    }
-
-    override fun sendUsageCommand() {
-        val stream = process.outputStream
-        stream.write("/usage".toByteArray(StandardCharsets.UTF_8))
-        stream.write(process.enterKeyCode.toInt())
-        stream.flush()
-    }
-
-    override fun readOutput(): String = output.snapshot()
-
-    override fun isAlive(): Boolean = process.isAlive
-
-    override fun exitCodeOrNull(): Int? = runCatching { process.exitValue() }.getOrNull()
-
-    override fun outputCaptureSummary(): String {
-        val summary = output.summary()
-        return "terminal bytes captured=${summary.capturedBytes}, received=${summary.receivedBytes}, truncated=${summary.wasTruncated}"
-    }
-
-    override fun terminateProcessTree() {
-        runCatching {
-            val descendants = process.toHandle().descendants().toList().asReversed()
-            descendants.forEach { child -> runCatching { child.destroyForcibly() } }
-        }
-        runCatching { process.destroyForcibly() }
-        runCatching { process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) }
-        runCatching { process.inputStream.close() }
-        runCatching { process.outputStream.close() }
-        reader.join(500L)
-    }
-
-    private companion object {
-        const val MAX_CAPTURE_BYTES = 64 * 1024
-    }
-}
-
-private class BoundedPtyOutput(private val maxBytes: Int) {
-    private val bytes = ByteArrayOutputStream(maxBytes)
-    private var receivedBytes = 0L
-
-    @Synchronized
-    fun append(chunk: ByteArray, count: Int) {
-        val acceptedCount = count.coerceIn(0, chunk.size)
-        receivedBytes = if (Long.MAX_VALUE - receivedBytes < acceptedCount) Long.MAX_VALUE else receivedBytes + acceptedCount
-        val remaining = maxBytes - bytes.size()
-        if (remaining > 0) bytes.write(chunk, 0, minOf(acceptedCount, remaining))
-    }
-
-    @Synchronized
-    fun snapshot(): String = bytes.toString(StandardCharsets.UTF_8.name())
-
-    @Synchronized
-    fun summary(): AntigravityPtyOutputSummary = AntigravityPtyOutputSummary(bytes.size(), receivedBytes)
-}
+internal const val ANTIGRAVITY_CLI_TIMED_OUT = "Antigravity CLI /usage timed out"
+internal const val ANTIGRAVITY_CLI_OUTPUT_TOO_LARGE = "Antigravity CLI /usage output exceeded the size limit"
+internal const val ANTIGRAVITY_CLI_EXITED = "Antigravity CLI /usage exited without output"

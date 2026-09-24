@@ -16,7 +16,7 @@ For the short version, see the table in the [README](../README.md#supported-inte
 | OpenRouter | Remote | `GET https://openrouter.ai/api/v1/credits` | API key entered in **Settings > APIs** |
 | Gemini CLI | Local | reads `~/.gemini/tmp/*/chats/session-*.jsonl` | local Gemini CLI session history; token activity only |
 | Cursor | Remote | `GET https://cursor.com/api/usage-summary` | existing signed-in Cursor editor session; undocumented personal route |
-| Antigravity CLI | Local | interactive `agy` PTY and `/usage` command | Antigravity CLI on `PATH`, already authenticated |
+| Antigravity CLI | Local | `agy --output-format json --print /usage` | Antigravity CLI 1.2.9+ installed and already authenticated |
 
 Usage Monitor **only reads** these files. It never runs a login or logout flow, and it never deletes
 a credential file.
@@ -35,7 +35,7 @@ a credential file.
 | `~/.local/share/kilo/kilo.db` | Kilo local activity |
 | `~/.gemini/tmp/<project_hash>/chats/session-*.jsonl` | Gemini CLI session metadata and token counts; prompt/response content is not retained |
 | `%APPDATA%/Cursor/User/globalStorage/state.vscdb` (Windows), `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` (macOS), or `~/.config/Cursor/User/globalStorage/state.vscdb` (Linux) | Cursor session values read from SQLite in read-only mode |
-| `agy` executable on `PATH` | Antigravity CLI; Usage Monitor opens its existing authenticated session interactively |
+| `%LOCALAPPDATA%gyingy.exe` (Windows) or `agy` on `PATH` | Antigravity CLI; Usage Monitor runs `/usage` against its existing authenticated session |
 
 Environment variables are never read for API keys.
 
@@ -207,18 +207,27 @@ For personal usage, this integration follows the individual-account source refer
 
 ## Antigravity
 
-- Uses the official Antigravity CLI command `/usage` (alias `/quota`). It refreshes model quota data
-  from the backend and opens an interactive terminal panel; see the
-  [official command reference](https://antigravity.google/docs/cli/commands/usage).
-- The collector runs the CLI in a pseudo-terminal, sends only `/usage`, reads the displayed quota
-  fields, then terminates the process tree. It never uses `agy -p`, which is a model-prompt mode,
-  and does not call undocumented IDE RPCs.
-- CLI absence, missing authentication, exit before the panel appears, timeout or an unrecognized
-  output format make the source unavailable. They are not converted to zero usage, and the last
-  valid reading is preserved.
-- Only values explicitly reported by the CLI are shown: model, percentages, used/remaining counts,
-  limits and reset descriptions when the panel provides them. The collector does not infer a
-  percentage or reset date from another metric. Since these values remain separate from normalized
-  quotas, they do not trigger quota threshold alerts or forecasts.
-- Collection follows the app's normal 10-minute dashboard refresh. The source is opt-in in
-  **Settings > APIs** and uses the account already configured in Antigravity CLI.
+- Runs `agy --sandbox --print-timeout 30s --output-format json --print /usage` in an empty working
+  directory (`~/.usage-monitor/antigravity-work/`). The
+  [official headless reference](https://antigravity.google/docs/cli/headless) states that `/usage`
+  and `/model` are *"answered by the CLI itself"* and should be run *"as their own `--print`
+  invocation"*: they produce a report without a model turn. Measured against agy 1.2.9 on Windows,
+  the JSON envelope comes back with `num_turns: 0` and `usage.total_tokens: 0`, and three consecutive
+  runs left the remaining fraction unchanged.
+- **Guard rails.** The CLI is only called when `agy --version` is 1.2.9 or newer, the version the
+  envelope was measured against. The argument reaches `agy` as its own process argument, never
+  through a shell: through Git Bash (MSYS), `/usage` is rewritten into a Windows path and reaches the
+  model as a prompt, so `.cmd`/`.bat` launchers are refused. Every envelope must carry
+  `command.name == "usage"`, `num_turns == 0` and `total_tokens == 0`; if it does not, collection
+  pauses until the app restarts instead of repeating a call that could spend model quota.
+- Each bucket of `command.data.groups[].buckets[]` becomes a percentage quota:
+  used = 100 − `remaining_fraction` × 100 (truncated), with `reset_time` as the reset. The quotas
+  take part in history, threshold alerts, forecasts and the HUD like any other windowed quota. A
+  window that has not been touched (`remaining_fraction` = 1) reports "now + 7 days" as its reset,
+  which moves on every call, so it is shown without a known reset.
+- CLI absence, an old version, a signed-out session and a paused collection are configuration
+  states: a banner without "Retry" and no toast on every refresh. Timeout, a non-JSON answer or an
+  answer with no quota window are failures that keep the last valid reading.
+- The CLI is called at most once every 5 minutes; the reset wake-up of another source reuses the
+  last reading. A refresh requested by the user always calls it again.
+- The collector does not call undocumented IDE RPCs and never stores or logs the CLI output.

@@ -64,7 +64,7 @@ envia conteúdo de prompt ou de resposta para lugar nenhum.
 | OpenRouter | Remota | `GET /api/v1/credits` | chave informada em **Configurações > APIs** |
 | Gemini CLI | Local | lê `~/.gemini/tmp/*/chats/session-*.jsonl` | histórico local do Gemini CLI; somente atividade de tokens |
 | Cursor | Remota | `GET https://cursor.com/api/usage-summary` | sessão existente do editor Cursor; rota pessoal sem contrato público |
-| Antigravity CLI | Local | PTY interativo `agy` com comando `/usage` | CLI Antigravity no `PATH` e já autenticado |
+| Antigravity CLI | Local | `agy --print /usage` (respondido pelo próprio CLI, sem turno de modelo) | CLI Antigravity 1.2.9+ instalado e já autenticado |
 
 Endpoints completos, caminhos de credencial e limites de cada integração:
 [`docs/integrations.md`](docs/integrations.md) (em inglês).
@@ -77,7 +77,7 @@ Um card por conta ou integração. O card Anthropic mostra as três cotas — se
 créditos de uso — com o semáforo de risco na cota em perigo.
 
 As novas fontes locais e CLI mantêm separados os tokens observados, o resumo pessoal do Cursor e as
-métricas de modelo informadas pelo Antigravity:
+cotas por grupo de modelos do Antigravity:
 
 ![Cards do Gemini CLI, Cursor e Antigravity CLI](img/new-integrations.png)
 

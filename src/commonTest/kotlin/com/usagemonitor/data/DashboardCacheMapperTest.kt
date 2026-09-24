@@ -9,14 +9,11 @@ import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
-import com.usagemonitor.domain.entity.ReportedModelQuota
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.Instant
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -24,40 +21,6 @@ import kotlin.test.assertTrue
 class DashboardCacheMapperTest {
 
     private val fixedInstant = Instant.parse("2025-01-01T12:00:00Z")
-
-    @Test
-    fun `round trip preserves Antigravity metrics without inferring quota percentages`() {
-        val original = ApiUsageStats(
-            source = ApiSource.ANTIGRAVITY,
-            apiName = "Antigravity CLI",
-            quotas = emptyList(),
-            reportedModelQuotas = listOf(
-                ReportedModelQuota(
-                    modelName = "Gemini models",
-                    remainingPercent = 99.49,
-                    unit = UsageUnit.PERCENTAGE,
-                    resetDescription = "167h 58m"
-                )
-            )
-        )
-
-        val restored = DashboardCacheDto(
-            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
-            entries = listOf(original.toCacheDto())
-        ).toDomain()
-
-        assertEquals(original, restored.single())
-        assertTrue(restored.single().quotas.isEmpty())
-    }
-
-    @Test
-    fun reportedMetricCacheReadsLegacyIntegerPercentagesAsDoubles() {
-        val legacy = Json.decodeFromString<com.usagemonitor.data.dto.ReportedModelQuotaCacheDto>(
-            """{"modelName":"Gemini models","remainingPercent":42,"unit":"PERCENTAGE"}"""
-        )
-
-        assertEquals(42.0, legacy.remainingPercent)
-    }
 
     @Test
     fun `round trip preserves stats without account context`() {

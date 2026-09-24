@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
 import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.displayName
@@ -102,6 +103,19 @@ data class UiApiError(
     val isGeminiLocalIssue: Boolean
         get() = isGeminiSessionDirectoryMissing || isGeminiSessionHistoryUnreadable
 
+    /**
+     * Qual das falhas de configuração do Antigravity é esta, ou `null` para falha
+     * comum (timeout, saída ilegível), que continua pedindo "Tentar novamente".
+     */
+    val antigravityFailureKind: AntigravityUsageFailureKind?
+        get() = if (source == ApiSource.ANTIGRAVITY) {
+            AntigravityUsageFailureKind.entries.firstOrNull { kind ->
+                message.contains(kind.safeMessage, ignoreCase = true)
+            }
+        } else {
+            null
+        }
+
     val isRateLimitIssue: Boolean
         get() = isRateLimitMessage(message)
 
@@ -148,6 +162,7 @@ data class UiApiError(
             isOpenCodeGoSubscriptionIssue ||
             isKiloLocalIssue ||
             isGeminiLocalIssue ||
+            antigravityFailureKind != null ||
             isProxyAuthIssue
 }
 

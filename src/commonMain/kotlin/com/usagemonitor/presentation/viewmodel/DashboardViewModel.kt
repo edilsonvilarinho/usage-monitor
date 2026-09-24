@@ -667,6 +667,7 @@ class DashboardViewModel(
         // explica a falha. O que interessa aqui é a ação que o usuário vai
         // descrever ("cliquei em atualizar e...").
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de todas as fontes pedida")
+        invalidateAntigravityReadingIfRequested(ApiSource.ANTIGRAVITY)
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = enabledTargets())
@@ -680,6 +681,7 @@ class DashboardViewModel(
         }
 
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${source.name} pedida")
+        invalidateAntigravityReadingIfRequested(source)
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(
@@ -696,9 +698,22 @@ class DashboardViewModel(
         // O alvo carrega `profileId`, que é interno do app e não identifica
         // ninguém; o apelido do perfil, que é o e-mail digitado, fica de fora.
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${target.source.name} pedida")
+        invalidateAntigravityReadingIfRequested(target.source)
         scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = setOf(target), preserveDataOnFailure = true)
+        }
+    }
+
+    /**
+     * O Antigravity guarda a última leitura por alguns minutos para o despertar por
+     * reset de outra fonte não abrir um processo do CLI a cada vez. O clique do
+     * usuário é o único gatilho que pede um número novo, então só ele descarta a
+     * leitura guardada.
+     */
+    private fun invalidateAntigravityReadingIfRequested(source: ApiSource) {
+        if (source == ApiSource.ANTIGRAVITY) {
+            getAntigravityUsage.invalidateCachedReading()
         }
     }
 

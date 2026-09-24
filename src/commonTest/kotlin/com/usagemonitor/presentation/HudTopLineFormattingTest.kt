@@ -38,6 +38,10 @@ class HudTopLineFormattingTest {
         assertEquals("7d", hudQuotaShortLabel("Claude 7d"))
         assertEquals("semanal", hudQuotaShortLabel("Go semanal"))
         assertEquals("mensal", hudQuotaShortLabel("Codex mensal"))
+        // Única fonte com duas cotas da mesma janela: o grupo fica, senão a linha
+        // diria "7d 4% · 7d 0%".
+        assertEquals("Gemini 7d", hudQuotaShortLabel("Antigravity Gemini 7d"))
+        assertEquals("Claude/GPT 7d", hudQuotaShortLabel("Antigravity Claude/GPT 7d"))
     }
 
     /** Rótulo de uma palavra só continua inteiro — não sobra nada para cortar. */

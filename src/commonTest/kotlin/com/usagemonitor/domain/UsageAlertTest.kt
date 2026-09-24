@@ -651,7 +651,7 @@ class UsageAlertTest {
 
     /**
      * A classificação e o silêncio precisam concordar: a frase da tela cita
-     * exatamente as fontes que este teste prova serem inalcançáveis, e as cinco
+     * exatamente as fontes que este teste prova serem inalcançáveis, e as seis
      * restantes continuam com limiar avaliado normalmente.
      */
     @Test
@@ -661,7 +661,7 @@ class UsageAlertTest {
             sourcesWithQuotaThresholdGap(QuotaThresholdGap.PREPAID_BALANCE)
         )
         assertEquals(
-            listOf(ApiSource.OPENCODE, ApiSource.KILO, ApiSource.GEMINI, ApiSource.ANTIGRAVITY),
+            listOf(ApiSource.OPENCODE, ApiSource.KILO, ApiSource.GEMINI),
             sourcesWithQuotaThresholdGap(QuotaThresholdGap.OBSERVED_ACTIVITY)
         )
 
@@ -672,6 +672,8 @@ class UsageAlertTest {
         assertNull(ApiSource.CODEX.quotaThresholdGap())
         assertNull(ApiSource.MINIMAX.quotaThresholdGap())
         assertNull(ApiSource.CURSOR.quotaThresholdGap())
+        // Antigravity informa fração restante e reset: é cota, não atividade observada.
+        assertNull(ApiSource.ANTIGRAVITY.quotaThresholdGap())
     }
 
     /** O valor vem de armazenamento em claro; abaixo do piso ele não vale. */

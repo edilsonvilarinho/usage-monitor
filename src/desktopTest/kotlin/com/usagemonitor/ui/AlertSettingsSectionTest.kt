@@ -89,9 +89,9 @@ class AlertSettingsSectionTest {
     // ------------------------------------------------------------------
 
     /**
-     * A aba oferecia o limiar sem qualificação e seis das onze fontes nunca são
+     * A aba oferecia o limiar sem qualificação e cinco das onze fontes nunca são
      * alcançadas — por duas mecânicas diferentes. Sem esta frase, quem lê a tela
-     * acredita estar protegido em todas, que é a falha silenciosa da issue.
+     * acredita estar protegido nas onze, que é a falha silenciosa da issue.
      */
     @Test
     fun `the quota threshold declares which sources it does not reach`() = runDesktopComposeUiTest {
@@ -99,9 +99,9 @@ class AlertSettingsSectionTest {
 
         onNodeWithTag(ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG).assertIsDisplayed()
         onNodeWithText(
-            "O limiar mede percentual contra cotas normalizadas. Saldo pré-pago não tem teto " +
-                "(DeepSeek, OpenRouter); atividade observada ou métricas fora do modelo de cotas " +
-                "(OpenCode Zen Free, Kilo Free, Gemini CLI, Antigravity CLI) não passam por essa avaliação."
+            "O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto " +
+                "(DeepSeek, OpenRouter) e atividade observada não informa limite " +
+                "(OpenCode Zen Free, Kilo Free, Gemini CLI): nessas fontes nenhum limiar é avaliado."
         ).assertIsDisplayed()
     }
 
@@ -124,9 +124,9 @@ class AlertSettingsSectionTest {
         )
 
         onNodeWithText(
-            "The threshold is evaluated against normalized quotas. Prepaid balances have no ceiling " +
-                "(DeepSeek, OpenRouter); observed activity and metrics outside the quota model " +
-                "(OpenCode Zen Free, Kilo Free, Gemini CLI, Antigravity CLI) do not go through this evaluation."
+            "The threshold measures a percentage against the quota ceiling. Prepaid balance has " +
+                "no ceiling (DeepSeek, OpenRouter) and observed activity reports no limit " +
+                "(OpenCode Zen Free, Kilo Free, Gemini CLI): on those sources no threshold is ever evaluated."
         ).assertIsDisplayed()
     }
 

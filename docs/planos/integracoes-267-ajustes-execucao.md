@@ -100,3 +100,4 @@ saída por pipe desta versão não imprime. O envelope JSON evita essa dependên
 | # | Atividade | Comando | Resultado |
 |---|---|---|---|
 | A01 | Plano de ajustes e medições do CLI | `agy --sandbox --print-timeout 30s --output-format json --print /usage` (PowerShell) | exit 0, `num_turns: 0`, `total_tokens: 0`, 2 buckets semanais |
+| A02 | Antigravity por `agy --print /usage` JSON: runner sem PTY, portão de versão, disjuntor, TTL, cotas normalizadas, pty4j removido | `gradlew.bat desktopTest --tests "com.usagemonitor.data.*Antigravity*"` + teste temporário contra o agy 1.2.9 real (não versionado) | Suíte verde. Leitura real em 4,4 s: `Antigravity Gemini 7d` 5% com reset, `Antigravity Claude/GPT 7d` 0% sem reset; duas chamadas seguidas com fração idêntica (0,945244…) |

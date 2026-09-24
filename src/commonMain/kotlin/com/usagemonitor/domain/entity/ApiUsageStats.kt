@@ -27,23 +27,7 @@ data class ApiUsageStats(
     val profileLabel: String? = null,
 
     // Avisos não fatais que a UI pode expor sem rebaixar a fonte para erro.
-    val notices: Set<ApiUsageNotice> = emptySet(),
-
-    // Algumas CLIs expõem métricas textuais sem percentual contratual. Elas
-    // passam pela tela e pelo cache sem virar QuotaInfo nem alimentar alertas.
-    val reportedModelQuotas: List<ReportedModelQuota> = emptyList()
-)
-
-/** Métricas exatamente impressas pela CLI; campos ausentes permanecem nulos. */
-data class ReportedModelQuota(
-    val modelName: String,
-    val used: Long? = null,
-    val remaining: Long? = null,
-    val limit: Long? = null,
-    val usedPercent: Double? = null,
-    val remainingPercent: Double? = null,
-    val unit: UsageUnit,
-    val resetDescription: String? = null
+    val notices: Set<ApiUsageNotice> = emptySet()
 )
 
 enum class ApiUsageNotice {

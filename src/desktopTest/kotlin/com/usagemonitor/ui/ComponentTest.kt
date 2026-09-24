@@ -39,6 +39,7 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.ActiveSessionAlert
+import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
@@ -49,7 +50,6 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.OpenCodeGoQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
-import com.usagemonitor.domain.entity.ReportedModelQuota
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageForecast
@@ -3155,24 +3155,37 @@ class ComponentTest {
         onAllNodesWithText("0%").assertCountEquals(0)
     }
 
+    /**
+     * O Antigravity tem um limite semanal **por grupo de modelos**. O título do
+     * bloco sai do `periodType`, e sem o grupo os dois blocos diriam "Semanal".
+     */
     @Test
-    fun `Antigravity card shows reported counts without derived percentage`() = runDesktopComposeUiTest {
+    fun `Antigravity card renders one percentage quota per model group`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTIGRAVITY,
                     apiName = "Antigravity CLI",
-                    quotas = emptyList(),
-                    reportedModelQuotas = listOf(
-                        ReportedModelQuota(
-                            modelName = "Gemini 3.1 Pro",
-                            remaining = 400L,
-                            limit = 1_000L,
-                            unit = UsageUnit.TOKENS,
-                            resetDescription = "2h 15m"
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = AntigravityQuotaLabels.label("Gemini", "7d"),
+                            used = 4L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-09-30T21:57:08Z"),
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
+                        ),
+                        QuotaInfo(
+                            label = AntigravityQuotaLabels.label("Claude/GPT", "7d"),
+                            used = 0L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2100-01-01T00:00:00Z"),
+                            hasKnownResetAt = false,
+                            periodType = PeriodType.WEEKLY,
+                            unit = UsageUnit.PERCENTAGE
                         )
                     ),
-                    showUsageDetails = true,
+                    showUsageDetails = false,
                     isRefreshing = false,
                     language = AppLanguage.PT,
                     animationDelayMillis = 0,
@@ -3182,53 +3195,10 @@ class ComponentTest {
         }
 
         onNodeWithText("Antigravity CLI").assertIsDisplayed()
-        onNodeWithText("Gemini 3.1 Pro").assertIsDisplayed()
-        onNodeWithText("Restante").assertIsDisplayed()
-        onNodeWithText("400 tokens").assertIsDisplayed()
-        onNodeWithText("Limite informado").assertIsDisplayed()
-        onNodeWithText("1000 tokens").assertIsDisplayed()
-        onNodeWithText("Reinício informado: 2h 15m").assertIsDisplayed()
-        onAllNodesWithText("40%").assertCountEquals(0)
-        onAllNodesWithTag("quotaProgress:Gemini 3.1 Pro").assertCountEquals(0)
-    }
-
-    @Test
-    fun antigravityCardPreservesFractionalWeeklyRemainingPercentage() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                ApiUsageCard(
-                    source = ApiSource.ANTIGRAVITY,
-                    apiName = "Antigravity CLI",
-                    quotas = emptyList(),
-                    reportedModelQuotas = listOf(
-                        ReportedModelQuota(
-                            modelName = "Gemini models",
-                            remainingPercent = 99.49,
-                            unit = UsageUnit.PERCENTAGE,
-                            resetDescription = "167h 58m"
-                        ),
-                        ReportedModelQuota(
-                            modelName = "Claude and GPT models",
-                            remainingPercent = 100.0,
-                            unit = UsageUnit.PERCENTAGE
-                        )
-                    ),
-                    showUsageDetails = true,
-                    isRefreshing = false,
-                    language = AppLanguage.PT,
-                    animationDelayMillis = 0,
-                    onRefresh = {}
-                )
-            }
-        }
-
-        onNodeWithText("Modelos Gemini").assertIsDisplayed()
-        onAllNodesWithText("Limite semanal restante").assertCountEquals(2)
-        onNodeWithText("99,49%").assertIsDisplayed()
-        onNodeWithText("Reinício informado: 167h 58m").assertIsDisplayed()
-        onNodeWithText("Claude e GPT").assertIsDisplayed()
-        onAllNodesWithText("100%").assertCountEquals(1)
-        onAllNodesWithTag("quotaProgress:Modelos Gemini").assertCountEquals(0)
+        onNodeWithText("Gemini · Semanal").assertIsDisplayed()
+        onNodeWithText("Claude/GPT · Semanal").assertIsDisplayed()
+        onNodeWithText("4%").assertIsDisplayed()
+        onAllNodesWithText("Semanal").assertCountEquals(0)
     }
 
     @Test

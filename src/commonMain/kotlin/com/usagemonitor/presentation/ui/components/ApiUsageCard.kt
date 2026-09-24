@@ -79,7 +79,6 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaInfo
-import com.usagemonitor.domain.entity.ReportedModelQuota
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
@@ -150,7 +149,6 @@ fun ApiUsageCard(
     source: ApiSource,
     apiName: String,
     quotas: List<QuotaInfo>,
-    reportedModelQuotas: List<ReportedModelQuota> = emptyList(),
     accountContext: UsageAccountContext? = null,
     notices: Set<ApiUsageNotice> = emptySet(),
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary> = emptyMap(),
@@ -513,14 +511,7 @@ fun ApiUsageCard(
                         horizontal = density.contentHorizontalPadding,
                         vertical = density.contentVerticalPadding
                     )
-                    if (source == ApiSource.ANTIGRAVITY) {
-                        AntigravityUsageSummary(
-                            quotas = reportedModelQuotas,
-                            language = language,
-                            compact = minimized,
-                            modifier = blockPadding
-                        )
-                    } else if (source.isObservedActivitySource()) {
+                    if (source.isObservedActivitySource()) {
                         ObservedUsageSummary(
                             source = source,
                             quotas = orderedQuotas,
@@ -653,92 +644,6 @@ fun ApiUsageCard(
             }
             }
         }
-    }
-}
-
-@Composable
-private fun AntigravityUsageSummary(
-    quotas: List<ReportedModelQuota>,
-    language: AppLanguage,
-    compact: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(if (compact) AppSpacing.xs else AppSpacing.sm)
-    ) {
-        quotas.forEach { quota ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .appSurfaceBlock()
-                    .padding(horizontal = AppSpacing.md, vertical = if (compact) AppSpacing.sm else AppSpacing.md),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
-            ) {
-                Text(
-                    text = antigravityGroupDisplayName(quota.modelName, language),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                val unitLabel = if (quota.unit == UsageUnit.TOKENS) "tokens" else if (language == AppLanguage.PT) "requisições" else "requests"
-                quota.usedPercent?.let { value ->
-                    AntigravityMetricLine(
-                        label = if (language == AppLanguage.PT) "Uso informado" else "Reported usage",
-                        value = formatReportedPercent(value, language)
-                    )
-                }
-                quota.remainingPercent?.let { value ->
-                    AntigravityMetricLine(
-                        label = if (quota.unit == UsageUnit.PERCENTAGE) {
-                            if (language == AppLanguage.PT) "Limite semanal restante" else "Weekly limit remaining"
-                        } else {
-                            if (language == AppLanguage.PT) "Restante informado" else "Reported remaining"
-                        },
-                        value = formatReportedPercent(value, language)
-                    )
-                }
-                quota.used?.let { value ->
-                    AntigravityMetricLine(
-                        label = if (language == AppLanguage.PT) "Usado" else "Used",
-                        value = "$value $unitLabel"
-                    )
-                }
-                quota.remaining?.let { value ->
-                    AntigravityMetricLine(
-                        label = if (language == AppLanguage.PT) "Restante" else "Remaining",
-                        value = "$value $unitLabel"
-                    )
-                }
-                quota.limit?.let { value ->
-                    AntigravityMetricLine(
-                        label = if (language == AppLanguage.PT) "Limite informado" else "Reported limit",
-                        value = "$value $unitLabel"
-                    )
-                }
-                quota.resetDescription?.let { value ->
-                    Text(
-                        text = if (language == AppLanguage.PT) "Reinício informado: $value" else "Reported reset: $value",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AntigravityMetricLine(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

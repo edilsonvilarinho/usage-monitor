@@ -127,7 +127,6 @@ internal fun ResponsiveDashboardCardGrid(
                             source = stats.source,
                             apiName = stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName,
                             quotas = stats.quotas,
-                            reportedModelQuotas = stats.reportedModelQuotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,
                             riskByQuotaKey = riskSummaries[stats.targetKey].orEmpty(),
