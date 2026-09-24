@@ -76,6 +76,8 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | E6 | Botões do card no balão (`cardActionsFor`) e clique no anel = atualizar | feito |
 | E7 | Documentação, design system, protótipo, ajuda, capturas | feito |
 | E8 | Verificação | feito (automática); manual pendente |
+| E9 | Faixa compacta com contas demais para a borda | feito |
+| E10 | Indicador de execução do Codex | feito |
 
 ## Pontos de situação
 
@@ -109,6 +111,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.ComponentTest" --tests "com.usagemonitor.ui.*Card*"` | Verde: 30 casos do notch (clique no anel atualiza só aquela conta, fora dos anéis nada; ação declarada na semântica do anel; botões do card no balão; indicador de atualização sem clique próprio), `CardActionsTest` (3) e o `ComponentTest` (99) sem mudança na barra do card. Renderização descartável: fileira histórico · sessões · time · presença · atualizar no balão. |
 | 2026-09-24 | E7 | Claude Opus 5.5 | `gradlew.bat generateScreenshots + gradlew.bat generateHelpMedia + desktopTest --tests "*Help*"` | Verde. Capturas do README idênticas às anteriores (a barra do card não mudou); demo de modos de janela com o balão e os botões do card — a primeira passada saiu com a fileira vazia, porque o gerador não passava `accountActions`; quatro demos atualizadas pelo selo do plano do D3. |
 | 2026-09-24 | E8 | Claude Opus 5.5 | `gradlew.bat allTests` | Verde: 2111 testes, 0 falhas (eram 2088). Verificação manual pendente: a sessão de debug aberta no IntelliJ roda o código de antes desta rodada e não foi encerrada. |
+| 2026-09-24 | E9 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*"` | Verde: 32 casos do notch (compacta sem a palavra na faixa e com ela no balão; costura de tamanho compacta nas 4 bordas com a contagem inteira) e 15 de geometria (sete contas compactam nas 4 bordas, duas não, carregando nunca). A primeira versão do teste exigia o mesmo encolhimento em pé e deitada e reprovou a lateral: em pé só sai a linha da palavra. |
 
 ## C1 · Tokens de motion e política
 
@@ -524,3 +527,17 @@ antes desta rodada, com o código anterior, e ela não foi encerrada. Com ela re
 - Timer inteiro a 115% com a escala do Windows em 125%.
 - Pendências do C17 que continuam: opacidade com a janela transparente, halo na sombra, "Reduzir
   animações", CPU do arco girando.
+
+## E9 · Faixa compacta
+
+- Pedido do usuário depois da rodada 3: com sete APIs ligadas numa tela de notebook, a faixa completa
+  atravessava a borda de cima. O Codenotch resolve com a célula compacta — anel e percentual embaixo,
+  sem palavra —, e é ela que entra aqui, **só quando a faixa completa não cabe**.
+- `hudNotchSizes(maxAlong)`: calcula a faixa completa e, se ela passa do limite, a compacta
+  (`HudNotchSizes.compact`). O host passa `HUD_MAX_ALONG_FRACTION` (45%) do comprimento da borda,
+  em dp de composição. Sem conta nenhuma nunca compacta: a linha de carregamento é uma palavra só.
+- A regra "a palavra sempre" virou "a palavra enquanto couber": compacta, ela continua no cabeçalho do
+  balão e na descrição do anel, e o tom do anel diz o estado de relance.
+- Renderização descartável com sete contas numa tela de 1366×768 a 115%: deitada, 429dp (a completa
+  passava de 900); em pé, 514dp — acima dos 45%, porque ali só sai a linha da palavra, mas dentro da
+  altura da tela.

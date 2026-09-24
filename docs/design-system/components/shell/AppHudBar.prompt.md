@@ -21,7 +21,9 @@ the 10dp radius ceiling: it is a silhouette, not a panel. Depth `DIALOG`, top sh
 used to swap by itself): an `AppUsageRing` (one arc per quota, up to three), the percentage of the
 quota in focus (worst risk, then highest percent) and the **status word — always**. Color never
 informs alone. Horizontal on top/bottom, a column on the sides, where a long word ("Sem projeção")
-wraps to two lines. The strip ends with the update icon (no click of its own — #225) and the
+wraps to two lines. **Compact** when the full strip would take more than 45% of the edge (six or
+seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and percentage under it,
+no word, which stays in the balloon and the ring description. The strip ends with the update icon (no click of its own — #225) and the
 countdown to the next collection, **once**: polling is app-wide. Each text estimate carries 1dp of
 slack for Skia's whole-pixel rounding, or the countdown breaks into "04:5" at fractional densities.
 

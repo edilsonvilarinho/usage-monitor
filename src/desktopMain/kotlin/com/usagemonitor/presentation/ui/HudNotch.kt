@@ -308,6 +308,7 @@ internal fun HudNotch(
                     updateIndicator = updateIndicator,
                     countdown = countdown,
                     size = sizes.collapsed,
+                    compact = sizes.compact,
                     onRingHovered = { index -> balloonIndex = index },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
@@ -557,6 +558,7 @@ private fun HudRingStrip(
     updateIndicator: HudUpdateIndicator?,
     countdown: (@Composable () -> Unit)?,
     size: DpSize,
+    compact: Boolean,
     language: AppLanguage,
     onRingHovered: (Int) -> Unit,
     onRingRefresh: (Int) -> Unit,
@@ -571,6 +573,7 @@ private fun HudRingStrip(
                 HudRingItem(
                     account = account,
                     vertical = !edge.isHorizontal,
+                    compact = compact,
                     language = language,
                     onHovered = { onRingHovered(index) },
                     onRefresh = { onRingRefresh(index) },
@@ -606,6 +609,8 @@ private fun HudRingStrip(
 private fun HudRingItem(
     account: HudAccount,
     vertical: Boolean,
+    /** A célula do Codenotch: anel e percentual embaixo, sem a palavra. */
+    compact: Boolean,
     language: AppLanguage,
     onHovered: () -> Unit,
     onRefresh: () -> Unit,
@@ -706,11 +711,13 @@ private fun HudRingItem(
             overflow = TextOverflow.Ellipsis
         )
     }
-    if (vertical) {
+    if (vertical || compact) {
         Column(modifier = itemModifier.hoverable(hover), horizontalAlignment = Alignment.CenterHorizontally) {
             ring()
             percent()
-            word()
+            // Compacto, a palavra fica no balão e na descrição do anel: com
+            // contas demais ela é o que fazia a faixa atravessar a tela.
+            if (!compact) word()
         }
     } else {
         Row(

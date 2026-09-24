@@ -98,16 +98,28 @@ internal data class HudNotchSizes(
      * **durante o arrasto**: simétrico ao longo da borda, o centro da janela
      * continua sendo o centro do notch, que é o que o encaixe lê.
      */
-    val withHandles: DpSize = collapsed
+    val withHandles: DpSize = collapsed,
+    /**
+     * A faixa compacta do Codenotch: por conta só o anel e o percentual
+     * embaixo, sem a palavra. Liga sozinha quando a faixa completa passa do
+     * comprimento que a borda comporta ([hudNotchSizes], `maxAlong`).
+     */
+    val compact: Boolean = false
 )
 
 /**
  * O tamanho do notch e da área aberta.
  *
  * O notch mostra, por conta, o anel, o percentual da cota em foco e a palavra do
- * estado — **a palavra sempre**: cor nunca informa sozinha, e no notch é só isso
- * que existe na tela. O detalhe é o balão de **uma** conta, a do anel sob o
- * ponteiro, como no Codenotch.
+ * estado — a palavra porque cor nunca informa sozinha. O detalhe é o balão de
+ * **uma** conta, a do anel sob o ponteiro, como no Codenotch.
+ *
+ * **Com contas demais para a borda, o notch fica compacto**: se a faixa completa
+ * passa de [maxAlong], cada conta vira só anel e percentual embaixo — a célula do
+ * Codenotch —, e a palavra sai. Com seis ou sete APIs numa tela de notebook a
+ * faixa completa atravessava a tela inteira; compacta ela mede menos da metade.
+ * A palavra não some da HUD: continua no cabeçalho do balão e na descrição do
+ * anel, e o tom do anel segue dizendo o estado de relance.
  *
  * Sem contas é a linha de carregamento: a palavra [fallbackLabel] no lugar dos
  * anéis, e nenhum balão.
@@ -117,12 +129,21 @@ internal fun hudNotchSizes(
     edge: HudEdge,
     fallbackLabel: String,
     showsCountdown: Boolean,
-    hasUpdateIndicator: Boolean
+    hasUpdateIndicator: Boolean,
+    /** O comprimento que a faixa completa pode ter antes de virar compacta. */
+    maxAlong: Dp = Dp.Infinity
 ): HudNotchSizes {
-    val collapsed = if (edge.isHorizontal) {
-        horizontalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator)
+    val full = if (edge.isHorizontal) {
+        horizontalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = false)
     } else {
-        verticalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator)
+        verticalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = false)
+    }
+    val fullAlong = if (edge.isHorizontal) full.width else full.height
+    val compact = accounts.isNotEmpty() && fullAlong > maxAlong
+    val collapsed = when {
+        !compact -> full
+        edge.isHorizontal -> horizontalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = true)
+        else -> verticalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = true)
     }
     val handlesReach = (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2
     val withHandles = if (edge.isHorizontal) {
@@ -142,7 +163,7 @@ internal fun hudNotchSizes(
     } else {
         DpSize(collapsed.width + HUD_BALLOON_GAP + balloon.width, maxOf(withHandles.height, balloon.height))
     }
-    return HudNotchSizes(collapsed = collapsed, expanded = expanded, balloon = balloon, withHandles = withHandles)
+    return HudNotchSizes(collapsed = collapsed, expanded = expanded, balloon = balloon, withHandles = withHandles, compact = compact)
 }
 
 /**
@@ -154,6 +175,12 @@ internal fun hudNotchSizes(
  */
 internal val HUD_HANDLE_SIZE = 32.dp
 internal val HUD_HANDLE_GAP = 6.dp
+
+/**
+ * A fração da borda que a faixa completa pode ocupar antes de virar compacta.
+ * Menos da metade: o notch divide a borda com títulos e abas de outras janelas.
+ */
+internal const val HUD_MAX_ALONG_FRACTION = 0.45f
 
 /** Largura do balão: o teto do card do Codenotch (246px), com folga para "Reinicia ter 21h00". */
 internal val HUD_BALLOON_WIDTH = 264.dp
@@ -246,14 +273,20 @@ private fun horizontalCollapsed(
     accounts: List<HudAccount>,
     fallbackLabel: String,
     showsCountdown: Boolean,
-    hasUpdateIndicator: Boolean
+    hasUpdateIndicator: Boolean,
+    compact: Boolean
 ): DpSize {
     val items = if (accounts.isEmpty()) {
         listOf(HUD_RING_SIZE + HUD_RING_TEXT_GAP + wordWidth(fallbackLabel))
     } else {
         accounts.map { account ->
             val percent = percentWidth(account.focus?.percentText.orEmpty())
-            HUD_RING_SIZE + HUD_RING_TEXT_GAP + maxOf(percent, wordWidth(account.statusLabel))
+            if (compact) {
+                // Compacta: o percentual embaixo do anel, sem a palavra.
+                maxOf(HUD_RING_SIZE, percent)
+            } else {
+                HUD_RING_SIZE + HUD_RING_TEXT_GAP + maxOf(percent, wordWidth(account.statusLabel))
+            }
         }
     }
     val extras = buildList {
@@ -262,7 +295,11 @@ private fun horizontalCollapsed(
     }
     val all = items + extras
     val along = all.fold(0.dp) { sum, width -> sum + width } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    val across = maxOf(HUD_RING_SIZE, HUD_PERCENT_LINE + HUD_WORD_LINE)
+    val across = if (compact) {
+        HUD_RING_SIZE + HUD_PERCENT_LINE
+    } else {
+        maxOf(HUD_RING_SIZE, HUD_PERCENT_LINE + HUD_WORD_LINE)
+    }
     return DpSize(
         width = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2,
         height = across + HUD_NOTCH_PADDING_ACROSS * 2
@@ -273,14 +310,20 @@ private fun verticalCollapsed(
     accounts: List<HudAccount>,
     fallbackLabel: String,
     showsCountdown: Boolean,
-    hasUpdateIndicator: Boolean
+    hasUpdateIndicator: Boolean,
+    compact: Boolean
 ): DpSize {
-    val words = if (accounts.isEmpty()) listOf(fallbackLabel) else accounts.map { account -> account.statusLabel }
+    val words = when {
+        accounts.isEmpty() -> listOf(fallbackLabel)
+        compact -> emptyList()
+        else -> accounts.map { account -> account.statusLabel }
+    }
     val itemHeights = if (accounts.isEmpty()) {
         listOf(HUD_RING_SIZE + HUD_WORD_LINE * verticalWordLines(fallbackLabel))
     } else {
         accounts.map { account ->
-            HUD_RING_SIZE + HUD_PERCENT_LINE + HUD_WORD_LINE * verticalWordLines(account.statusLabel)
+            val word = if (compact) 0.dp else HUD_WORD_LINE * verticalWordLines(account.statusLabel)
+            HUD_RING_SIZE + HUD_PERCENT_LINE + word
         }
     }
     val extras = buildList {
@@ -289,7 +332,7 @@ private fun verticalCollapsed(
     }
     val all = itemHeights + extras
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    val widestWord = words.maxOf { word -> verticalWordLineWidth(word) }
+    val widestWord = words.maxOfOrNull { word -> verticalWordLineWidth(word) } ?: 0.dp
     val widestPercent = accounts.maxOfOrNull { account -> percentWidth(account.focus?.percentText.orEmpty()) } ?: 0.dp
     val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent, charWidth(COUNTDOWN_CHARS, WORD_ADVANCE_DP))
     return DpSize(

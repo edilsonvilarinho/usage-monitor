@@ -150,6 +150,35 @@ class HudNotchGeometryTest {
         assertEquals(HUD_WORD_LINE, double.collapsed.height - single.collapsed.height)
     }
 
+    /**
+     * Sete APIs numa tela de notebook: a faixa completa atravessava a borda. Acima
+     * do comprimento permitido ela vira a célula do Codenotch — anel e percentual
+     * embaixo, sem a palavra —, e com poucas contas continua completa.
+     */
+    @Test
+    fun `contas demais para a borda deixam a faixa compacta`() {
+        val many = (1..7).map { index -> account("Conta $index", "Sem projeção", listOf("5h" to "3%")) }
+        val few = many.take(2)
+        for (edge in HudEdge.entries) {
+            val budget = if (edge.isHorizontal) 1366.dp * HUD_MAX_ALONG_FRACTION else 768.dp * HUD_MAX_ALONG_FRACTION
+            val unbounded = hudNotchSizes(many, edge, "", showsCountdown = true, hasUpdateIndicator = false)
+            val bounded = hudNotchSizes(many, edge, "", showsCountdown = true, hasUpdateIndicator = false, maxAlong = budget)
+            val along = { size: DpSize -> if (edge.isHorizontal) size.width else size.height }
+
+            assertTrue(!unbounded.compact && bounded.compact, "$edge: sete contas deviam compactar")
+            // Deitada sai a palavra ao lado do anel e a faixa cai para menos da metade;
+            // em pé sai só a linha da palavra embaixo, e o ganho é menor.
+            val ratio = if (edge.isHorizontal) 0.6f else 0.8f
+            assertTrue(along(bounded.collapsed) < along(unbounded.collapsed) * ratio, "$edge: compacta devia encolher")
+            assertTrue(!hudNotchSizes(few, edge, "", true, false, maxAlong = budget).compact, "$edge: duas contas cabem completas")
+        }
+    }
+
+    @Test
+    fun `sem contas a linha de carregamento nunca compacta`() {
+        assertTrue(!hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", true, false, maxAlong = 10.dp).compact)
+    }
+
     @Test
     fun `soltar o notch gruda na borda mais proxima`() {
         assertEquals(HudPlacement(HudEdge.TOP, 0.5f), nearestHudPlacement(960.dp, 40.dp, screen))

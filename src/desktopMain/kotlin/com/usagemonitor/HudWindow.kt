@@ -166,7 +166,10 @@ internal fun HudWindowHost(
         edge = placement.edge,
         fallbackLabel = fallbackLabel,
         showsCountdown = nextRefreshAt != null,
-        hasUpdateIndicator = updateIndicator != null
+        hasUpdateIndicator = updateIndicator != null,
+        // Mais que isso da borda e a faixa fica compacta (anel + percentual).
+        maxAlong = (if (placement.edge.isHorizontal) hudScreenArea.size.width else hudScreenArea.size.height) /
+            uiScaleFactor(uiScalePercent) * HUD_MAX_ALONG_FRACTION
     )
     // A geometria trabalha em dp de composição; a janela, em dp do sistema. A área
     // da tela desce à escala da composição e o resultado volta multiplicado.

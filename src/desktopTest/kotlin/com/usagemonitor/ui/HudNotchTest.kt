@@ -426,6 +426,59 @@ class HudNotchTest {
         assertEquals(false, reported.last())
     }
 
+    // ------------------------------------------------------------ faixa compacta
+
+    private val manyAccounts = (1..7).map { index ->
+        account("Conta $index", "Sem projeção", AppTone.NEUTRAL, HudQuota("5h", "${index}%", index / 100f, AppTone.NEUTRAL, resetText = null, hasForecast = false))
+    }
+
+    /** Compacta, a faixa é a célula do Codenotch: anel e percentual, a palavra vai para o balão. */
+    @Test
+    fun `compacta a palavra sai da faixa e continua no balao e no anel`() = runDesktopComposeUiTest {
+        val sizes = hudNotchSizes(manyAccounts, HudEdge.TOP, "Carregando", false, false, maxAlong = 400.dp)
+        assertTrue(sizes.compact)
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.size(1200.dp, 600.dp)) {
+                    HudNotch(accounts = manyAccounts, edge = HudEdge.TOP, sizes = sizes, fallbackLabel = "Carregando", expanded = true)
+                }
+            }
+        }
+
+        onNodeWithText("1%").assertIsDisplayed()
+        onAllNodesWithText("Sem projeção").assertCountEquals(0)
+        hoverRing("Conta 1 · Sem projeção · 5h 1%")
+        onNodeWithText("Conta 1").assertIsDisplayed()
+        onNodeWithText("Sem projeção").assertIsDisplayed()
+    }
+
+    /** A costura de tamanho vale também compacta, nas quatro bordas. */
+    @Test
+    fun `compacta o notch tem o tamanho que a geometria calcula`() {
+        for (edge in HudEdge.entries) {
+            runDesktopComposeUiTest {
+                val sizes = hudNotchSizes(manyAccounts, edge, "Carregando", true, false, maxAlong = 300.dp)
+                assertTrue(sizes.compact, "$edge")
+                setContent {
+                    AppTheme(isDark = true) {
+                        Box(modifier = Modifier.size(1400.dp, 1000.dp)) {
+                            HudNotch(
+                                accounts = manyAccounts, edge = edge, sizes = sizes, fallbackLabel = "Carregando",
+                                nextRefreshAt = now + 2.minutes, countdownDescription = countdown,
+                                nowProvider = { now }, countdownUpdatesEnabled = false
+                            )
+                        }
+                    }
+                }
+                val bounds = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
+                assertEquals(sizes.collapsed.width, bounds.width, "$edge: largura")
+                assertEquals(sizes.collapsed.height, bounds.height, "$edge: altura")
+                // O último item, a contagem, inteiro — foi ele que a faixa espremeu antes.
+                onNodeWithText("02:00").assertIsDisplayed()
+            }
+        }
+    }
+
     // ------------------------------------------------------------ alças (rodada 3)
 
     @Test

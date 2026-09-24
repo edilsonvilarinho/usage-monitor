@@ -707,9 +707,13 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
 - **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos, o de fora é a
   primeira cota da API). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
   esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, o percentual da **cota em foco** (pior
-  risco, depois maior percentual — `HudAccount.focusIndex`) e a **palavra do estado, sempre**: no
-  notch recolhido não existe mais nada na tela, e cor nunca informa sozinha. Cota sem projeção tem a
-  trilha **tracejada**.
+  risco, depois maior percentual — `HudAccount.focusIndex`) e a **palavra do estado**: cor nunca
+  informa sozinha. Cota sem projeção tem a trilha **tracejada**.
+  - **Com contas demais para a borda a faixa fica compacta** (`HudNotchSizes.compact`, E9): se a faixa
+    completa passa de `HUD_MAX_ALONG_FRACTION` (45%) do comprimento da borda, cada conta vira a célula do
+    Codenotch — anel e percentual embaixo, sem a palavra. Com sete APIs numa tela de notebook a faixa
+    completa atravessava a borda de cima; compacta ela cai para menos da metade. A palavra não some da
+    HUD: fica no cabeçalho do balão e na descrição do anel. Com poucas contas nada muda.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
