@@ -34,7 +34,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C5 | Estados de interação: foco, hover em camada, pressão | feito |
 | C6 | Números animados e recarga do card | feito |
 | C7 | `AppStateCrossfade` e o bug do `AnimatedContent` | feito |
-| C8 | Expandir/recolher e banners | pendente |
+| C8 | Expandir/recolher e banners | feito |
 | C9 | Movimento da grade de cards | pendente |
 | C10 | Limpeza de movimento do `ApiUsageCard` | pendente |
 | C11 | Spike da janela transparente | pendente |
@@ -56,6 +56,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o campo focado desenha o anel de foco` (pixels 0 e 1 da borda esquerda mudam com o foco). |
 | 2026-09-24 | C6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o numero animado termina com um so no no valor novo` e `AppAnimatedNumberTest`. |
 | 2026-09-24 | C7 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `a troca de estado mantem o estado antigo no slot que sai` (relógio manual, meio da saída: os dois textos presentes; depois do idle, só o novo). |
+| 2026-09-24 | C8 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o bloco recolhido sai da arvore depois de fechar`. |
 
 ## C1 · Tokens de motion e política
 
@@ -135,3 +136,17 @@ cápsula, marcador de ritmo, "Next update in 2m").
   aba das Configurações. Em Sessões CLI e Uso do time a chave separa lista de detalhe, então abrir
   uma sessão também faz a transição. `Success → Success` do laço ao vivo continua sem animação.
 - Codex CLI ficou de fora: tem dois `when` sobre o mesmo estado e a troca dele é de uma área só.
+
+## C8 · Expandir, recolher e faixas
+
+- `AppExpandable`: `AnimatedVisibility` que cresce de cima (`GENTLE`) com fade e recolhe em tween;
+  fechado, o conteúdo sai da composição como no `if (expanded)` de antes. Adotado no "Avançado" e no
+  glossário de Sessões CLI e na edição de perfil das Configurações → Contas.
+- `appItemMotion()`: `animateItem` com os tokens do sistema nos itens com chave das listas de time,
+  presença e sessões — abrir um integrante desliza as linhas de baixo em vez de empurrá-las.
+- Faixa de atualização do dashboard entra e sai por `AppExpandable`, desenhando o último estado não
+  nulo (`rememberLatestNonNull`) durante a saída.
+- `SnackbarHost` do dashboard virou sobreposição embaixo: dentro da coluna ele empurrava a grade ao
+  aparecer e a puxava ao sumir.
+- Os banners de erro por alvo continuam sem animação: saem de uma coleta e ficam; animá-los a cada
+  recomposição da lista de avisos não descreveria mudança nenhuma.

@@ -1,5 +1,10 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.togetherWith
@@ -483,3 +488,51 @@ fun <S : Any> AppStateCrossfade(
 
 /** A tela nova sobe 1/24 da própria altura: movimento que se sente, não que se vê. */
 private const val STATE_RISE_FRACTION = 24
+
+/**
+ * Bloco que abre e fecha: cresce de cima para baixo com a mola `GENTLE` e fade,
+ * recolhe em tween curto.
+ *
+ * Trocava-se `if (expanded) content()`, e o conteúdo aparecia de uma vez,
+ * empurrando tudo abaixo dele num quadro. Fechado, o conteúdo **sai da
+ * composição** depois da saída, como antes: dois gráficos e sete cards não têm
+ * por que existir na árvore só para ficarem invisíveis.
+ */
+@Composable
+fun AppExpandable(
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val grow = appSpring<IntSize>(AppMotion.Springs.GENTLE, visibilityThreshold = IntSize.VisibilityThreshold)
+    val shrink = appTween<IntSize>(AppMotion.fast, AppMotion.exitEasing)
+    val enterFade = appTween<Float>(AppMotion.normal)
+    val exitFade = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+    AnimatedVisibility(
+        visible = expanded,
+        modifier = modifier,
+        enter = expandVertically(grow, expandFrom = Alignment.Top) + fadeIn(enterFade),
+        exit = shrinkVertically(shrink, shrinkTowards = Alignment.Top) + fadeOut(exitFade),
+        label = "appExpandable"
+    ) {
+        content()
+    }
+}
+
+/**
+ * O último valor não nulo. Serve a quem esconde uma faixa quando o dado vira
+ * `null`: sem ele a saída animada não teria o que desenhar, porque o conteúdo
+ * já teria perdido o valor no quadro em que começou a sair.
+ */
+@Composable
+fun <T : Any> rememberLatestNonNull(value: T?): T? {
+    val holder = remember { LatestHolder<T>() }
+    if (value != null) {
+        holder.value = value
+    }
+    return holder.value
+}
+
+private class LatestHolder<T : Any> {
+    var value: T? = null
+}

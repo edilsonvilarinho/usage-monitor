@@ -11,6 +11,7 @@ import com.usagemonitor.presentation.ui.components.AppAnimatedNumber
 import androidx.compose.material3.Text
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.components.AppExpandable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
@@ -263,6 +264,30 @@ class AppStatesTest {
         waitForIdle()
         onNodeWithText("Carregando").assertDoesNotExist()
         onNodeWithText("Dados: 42").assertExists()
+    }
+
+    /**
+     * O bloco recolhido sai da composição depois da saída animada, como o
+     * `if (expanded)` de antes: gráfico escondido não pode continuar na árvore.
+     */
+    @Test
+    fun `o bloco recolhido sai da arvore depois de fechar`() = runDesktopComposeUiTest {
+        var expanded by mutableStateOf(false)
+        setContent {
+            AppTheme(isDark = true) {
+                AppExpandable(expanded) {
+                    Text("Detalhe avançado")
+                }
+            }
+        }
+
+        onNodeWithText("Detalhe avançado").assertDoesNotExist()
+        expanded = true
+        waitForIdle()
+        onNodeWithText("Detalhe avançado").assertIsDisplayed()
+        expanded = false
+        waitForIdle()
+        onNodeWithText("Detalhe avançado").assertDoesNotExist()
     }
 
     /** Com "Reduzir animações" a barra salta para o valor no primeiro quadro. */

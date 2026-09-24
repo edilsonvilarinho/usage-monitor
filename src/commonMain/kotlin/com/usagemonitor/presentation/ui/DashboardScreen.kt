@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.rememberLatestNonNull
+import com.usagemonitor.presentation.ui.components.AppExpandable
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
@@ -250,22 +252,23 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    appUpdateState?.let { updateState ->
-                        AppUpdateBanner(
-                            state = updateState,
-                            language = language,
-                            onOpenRelease = { viewModel.openUpdateReleasePage() },
-                            onRestartAndUpdate = { viewModel.restartAndUpdateNow() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs)
-                        )
+                    // A faixa de atualização entra e sai deslizando. Ela sumia no
+                    // quadro em que a versão era aplicada e a grade inteira pulava
+                    // para cima; o último estado não nulo é o que a saída desenha.
+                    val shownUpdateState = rememberLatestNonNull(appUpdateState)
+                    AppExpandable(expanded = appUpdateState != null) {
+                        if (shownUpdateState != null) {
+                            AppUpdateBanner(
+                                state = shownUpdateState,
+                                language = language,
+                                onOpenRelease = { viewModel.openUpdateReleasePage() },
+                                onRestartAndUpdate = { viewModel.restartAndUpdateNow() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs)
+                            )
+                        }
                     }
-
-                    SnackbarHost(
-                        hostState = snackbarHostState,
-                        modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
-                    )
 
                     Box(
                         modifier = Modifier
@@ -319,6 +322,16 @@ fun DashboardScreen(
                         }
                     }
                 }
+
+                // Sobreposição, e não uma linha da coluna: dentro dela o aviso
+                // empurrava a grade para baixo ao aparecer e a puxava de volta ao
+                // sumir -- dois saltos por aviso. Por cima, ele não mexe em nada.
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.md)
+                )
             }
         }
     }

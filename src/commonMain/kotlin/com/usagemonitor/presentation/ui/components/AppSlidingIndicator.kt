@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.theme.appTween
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -103,3 +107,19 @@ internal fun animatedIndicatorSpan(state: SlidingIndicatorState, selectedIndex: 
 
 /** Meio pixel: abaixo disso o indicador já está no lugar a olho nu. */
 private const val INDICATOR_VISIBILITY_THRESHOLD = 0.5f
+
+/**
+ * Movimento de item de lista preguiçosa: entra com fade, sai com fade curto e,
+ * quando a ordem muda, desliza até a posição nova pela mola `GENTLE`. Sem isto
+ * abrir o bloco de sessões de um integrante empurrava as linhas abaixo num
+ * quadro. A ordem das listas do time é total e determinística, então o laço ao
+ * vivo de 5s não produz movimento nenhum — só mudança real anda.
+ */
+@Composable
+fun LazyItemScope.appItemMotion(): Modifier {
+    return Modifier.animateItem(
+        fadeInSpec = appTween(AppMotion.normal),
+        placementSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = IntOffset.VisibilityThreshold),
+        fadeOutSpec = appTween(AppMotion.exit, AppMotion.exitEasing)
+    )
+}

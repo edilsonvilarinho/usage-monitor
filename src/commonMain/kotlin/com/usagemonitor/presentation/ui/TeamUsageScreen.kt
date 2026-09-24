@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.appItemMotion
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -590,15 +591,17 @@ private fun TeamUsageList(
                     // conta já é a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
                         item(key = "email:${emailGroup.groupKey}") {
-                            TeamAccountGroupHeader(
-                                group = emailGroup,
-                                share = state.tokenShareOf(emailGroup),
-                                expanded = state.isEmailExpanded(emailGroup),
-                                language = language,
-                                hasStatusColumn = hasStatusColumn,
-                                hasActionColumn = state.isAdminOverview,
-                                onToggle = { onToggleAccount(emailGroup.groupKey) }
-                            )
+                            Box(modifier = appItemMotion()) {
+                                TeamAccountGroupHeader(
+                                    group = emailGroup,
+                                    share = state.tokenShareOf(emailGroup),
+                                    expanded = state.isEmailExpanded(emailGroup),
+                                    language = language,
+                                    hasStatusColumn = hasStatusColumn,
+                                    hasActionColumn = state.isAdminOverview,
+                                    onToggle = { onToggleAccount(emailGroup.groupKey) }
+                                )
+                            }
                         }
                     }
 
@@ -622,28 +625,32 @@ private fun TeamUsageList(
 
                         if (hasUuidHeader) {
                             item(key = "uuid:${account.accountKey}") {
-                                TeamAccountUuidHeader(
-                                    account = account,
-                                    language = language,
-                                    indent = TEAM_NEST_INDENT
-                                )
+                                Box(modifier = appItemMotion()) {
+                                    TeamAccountUuidHeader(
+                                        account = account,
+                                        language = language,
+                                        indent = TEAM_NEST_INDENT
+                                    )
+                                }
                             }
                         }
 
                     for (member in account.members) {
                         item(key = member.memberKey) {
-                            TeamMemberRow(
-                                member = member,
-                                share = state.tokenShareOf(member),
-                                expanded = member.memberKey in state.expandedMemberKeys,
-                                language = language,
-                                indent = memberIndent,
-                                removable = state.isAdminOverview,
-                                hasStatusColumn = hasStatusColumn,
-                                hasActionColumn = state.isAdminOverview,
-                                onToggle = { onToggleMember(member.memberKey) },
-                                onRemove = { onRequestRemoveMember(member) }
-                            )
+                            Box(modifier = appItemMotion()) {
+                                TeamMemberRow(
+                                    member = member,
+                                    share = state.tokenShareOf(member),
+                                    expanded = member.memberKey in state.expandedMemberKeys,
+                                    language = language,
+                                    indent = memberIndent,
+                                    removable = state.isAdminOverview,
+                                    hasStatusColumn = hasStatusColumn,
+                                    hasActionColumn = state.isAdminOverview,
+                                    onToggle = { onToggleMember(member.memberKey) },
+                                    onRemove = { onRequestRemoveMember(member) }
+                                )
+                            }
                         }
 
                         if (member.memberKey in state.expandedMemberKeys) {
@@ -652,15 +659,17 @@ private fun TeamUsageList(
                             // sem ela o bloco entrega sete números sem dizer o que
                             // cada um é.
                             item(key = "${member.memberKey}:sessionHeader") {
-                                Box(
-                                    modifier = Modifier
-                                        .appNestedGroupItem(indent = sessionIndent)
-                                        .padding(top = AppSpacing.sm)
-                                ) {
-                                    CliSessionColumnHeader(
-                                        language = language,
-                                        hasActionColumn = state.isAdminOverview
-                                    )
+                                Box(modifier = appItemMotion()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .appNestedGroupItem(indent = sessionIndent)
+                                            .padding(top = AppSpacing.sm)
+                                    ) {
+                                        CliSessionColumnHeader(
+                                            language = language,
+                                            hasActionColumn = state.isAdminOverview
+                                        )
+                                    }
                                 }
                             }
 

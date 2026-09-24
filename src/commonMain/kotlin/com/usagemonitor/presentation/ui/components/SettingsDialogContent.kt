@@ -1060,28 +1060,30 @@ private fun AnthropicProfileRow(
                 }
             }
 
-            if (expanded) {
-                DebouncedTextField(
-                    value = profile.label,
-                    label = if (language == AppLanguage.PT) "Apelido" else "Label",
-                    onCommit = { newLabel -> onRename(profile.id, newLabel) }
-                )
-                Text(
-                    text = profile.path,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = statusTone.color()
-                )
-                if (profile.removable) {
-                    AppButton(
-                        label = if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor",
-                        onClick = { onRemove(profile.id) },
-                        tone = AppButtonTone.GHOST
-                    )
+            AppExpandable(expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                        DebouncedTextField(
+                            value = profile.label,
+                            label = if (language == AppLanguage.PT) "Apelido" else "Label",
+                            onCommit = { newLabel -> onRename(profile.id, newLabel) }
+                        )
+                        Text(
+                            text = profile.path,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = statusTone.color()
+                        )
+                        if (profile.removable) {
+                            AppButton(
+                                label = if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor",
+                                onClick = { onRemove(profile.id) },
+                                tone = AppButtonTone.GHOST
+                            )
+                        }
                 }
             }
         }

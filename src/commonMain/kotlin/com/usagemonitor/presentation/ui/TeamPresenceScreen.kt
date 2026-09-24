@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.appItemMotion
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -402,13 +403,15 @@ private fun TeamPresenceList(
                     // a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
                         item(key = "email:${emailGroup.groupKey}") {
-                            TeamPresenceEmailHeader(
-                                group = emailGroup,
-                                expanded = state.isEmailExpanded(emailGroup),
-                                language = language,
-                                hasActionColumn = canManage,
-                                onToggle = { onToggleAccount(emailGroup.groupKey) }
-                            )
+                            Box(modifier = appItemMotion()) {
+                                TeamPresenceEmailHeader(
+                                    group = emailGroup,
+                                    expanded = state.isEmailExpanded(emailGroup),
+                                    language = language,
+                                    hasActionColumn = canManage,
+                                    onToggle = { onToggleAccount(emailGroup.groupKey) }
+                                )
+                            }
                         }
                     }
 
@@ -430,32 +433,36 @@ private fun TeamPresenceList(
                         }
                         if (state.isAdminOverview) {
                             item(key = "uuid:${account.accountKey}") {
-                                TeamPresenceAccountSubgroupHeader(
-                                    group = account,
-                                    language = language,
-                                    deletable = canManage && !isLocalAccount,
-                                    hasActionColumn = canManage,
-                                    onDelete = { onRequestDeleteAccount(account) }
-                                )
+                                Box(modifier = appItemMotion()) {
+                                    TeamPresenceAccountSubgroupHeader(
+                                        group = account,
+                                        language = language,
+                                        deletable = canManage && !isLocalAccount,
+                                        hasActionColumn = canManage,
+                                        onDelete = { onRequestDeleteAccount(account) }
+                                    )
+                                }
                             }
                         }
 
                     items(count = account.entries.size, key = { index -> account.entries[index].memberKey }) { index ->
-                        val entry = account.entries[index]
-                        val isLocalMachine = localDeviceId != null && entry.deviceId == localDeviceId
-                        TeamPresenceRow(
-                            entry = entry,
-                            language = language,
-                            isLocalMachine = isLocalMachine,
-                            indent = entryIndent,
-                            // Mesma regra do modal de consumo: esta máquina volta
-                            // no próximo envio, então o botão entregaria uma
-                            // remoção que se desfaz sozinha.
-                            removable = canManage && !isLocalMachine,
-                            hasHealthColumn = hasHealthColumn,
-                            hasActionColumn = canManage,
-                            onRemove = { onRequestRemoveMember(entry) }
-                        )
+                        Box(modifier = appItemMotion()) {
+                            val entry = account.entries[index]
+                            val isLocalMachine = localDeviceId != null && entry.deviceId == localDeviceId
+                            TeamPresenceRow(
+                                entry = entry,
+                                language = language,
+                                isLocalMachine = isLocalMachine,
+                                indent = entryIndent,
+                                // Mesma regra do modal de consumo: esta máquina volta
+                                // no próximo envio, então o botão entregaria uma
+                                // remoção que se desfaz sozinha.
+                                removable = canManage && !isLocalMachine,
+                                hasHealthColumn = hasHealthColumn,
+                                hasActionColumn = canManage,
+                                onRemove = { onRequestRemoveMember(entry) }
+                            )
+                        }
                     }
                     }
                 }
