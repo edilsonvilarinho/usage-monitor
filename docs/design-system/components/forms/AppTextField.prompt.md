@@ -6,3 +6,7 @@ Single-line input — session/project filters, team server URL, nickname, keys.
 ```
 
 Never put an explanation in the placeholder — placeholders disappear. Use `hint`.
+
+**Focus.** A 2dp `--info` ring drawn inside the field, crossfading from the neutral 1dp stroke in
+120ms. The readme always required it; the Compose field never had it, and in a five-field form
+(Settings → Network) nothing said which one was receiving the typing.

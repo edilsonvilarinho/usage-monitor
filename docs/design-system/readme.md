@@ -131,8 +131,10 @@ paints after the content.
 on the `GENTLE` spring. Never a hue shift. Close button is the one exception: it fills `--crit`
 with white.
 
-**Press / focus.** Press has no separate treatment beyond hover. Focus is a 2px `--info` outline
-with 1px offset (inset on fields).
+**Press / focus.** Press adds `--pressed-layer`, one step above hover; surfaces without text (icon
+buttons, the card's actions, the HUD) also scale to 0.96 on the `SNAPPY` spring — never text, which
+blurs when scaled. No ripple. Focus is a 2px `--info` outline with 1px offset (inset on fields,
+crossfading from the neutral stroke).
 
 **Motion.** 120ms hover/focus · 180ms selection · 240ms expand/collapse · 90ms exit. **Tween
 for color and opacity, spring for position, size and scale** (`AppMotion.Springs`: `GENTLE` for

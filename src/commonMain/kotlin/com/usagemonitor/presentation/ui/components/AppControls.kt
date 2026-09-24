@@ -1,5 +1,11 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.animation.core.rememberTransition
@@ -123,20 +129,18 @@ fun AppButton(
     val colors = buttonColors(tone)
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    val container by animateColorAsState(
-        targetValue = if (hovered && enabled) colors.hover else colors.container,
-        animationSpec = tween(AppMotion.fast),
-        label = "appButtonContainer"
-    )
+    val container = animatedButtonContainer(colors, interactionSource, enabled, "appButtonContainer")
 
+    // Texto não encolhe na pressão: escalar uma camada com Plex Mono borra o
+    // traço durante a transição. Quem responde ao clique aqui é a camada de
+    // pressão, um degrau acima do hover.
     Row(
         modifier = modifier
             .clip(AppShapes.small)
             .background(container.copy(alpha = container.alpha * alpha))
             .border(AppBorderWidth, colors.border.copy(alpha = colors.border.alpha * alpha), AppShapes.small)
             .hoverable(interactionSource, enabled = enabled)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
             .defaultMinSize(minHeight = CONTROL_HEIGHT)
             .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -174,21 +178,17 @@ fun AppIconButton(
     val colors = buttonColors(tone)
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    val container by animateColorAsState(
-        targetValue = if (hovered && enabled) colors.hover else colors.container,
-        animationSpec = tween(AppMotion.fast),
-        label = "appIconButtonContainer"
-    )
+    val container = animatedButtonContainer(colors, interactionSource, enabled, "appIconButtonContainer")
 
     Box(
         modifier = modifier
             .size(ICON_BUTTON_SIZE)
+            .appPressScale(interactionSource, enabled)
             .clip(AppShapes.small)
             .background(container.copy(alpha = container.alpha * alpha))
             .border(AppBorderWidth, colors.border.copy(alpha = colors.border.alpha * alpha), AppShapes.small)
             .hoverable(interactionSource, enabled = enabled)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
             // `contentDescription` na semântica, e não só `onClickLabel`: o
             // rótulo do clique descreve a **ação** para o leitor de tela, mas
             // não é o que `onNodeWithContentDescription` encontra — e é assim
@@ -223,6 +223,8 @@ fun AppTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None
 ) {
     val alpha = if (enabled) 1f else DISABLED_ALPHA
+    val interactionSource = remember { MutableInteractionSource() }
+    val focusRing = animatedFocusRing(interactionSource)
     // A moldura entra por `decorationBox`, e o [modifier] do chamador fica no
     // próprio `BasicTextField`: é ele que carrega o foco e a ação de digitar.
     // Com a decoração por fora, uma `testTag` do chamador cairia num `Box` sem
@@ -230,6 +232,7 @@ fun AppTextField(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        interactionSource = interactionSource,
         modifier = modifier.defaultMinSize(minHeight = CONTROL_HEIGHT),
         enabled = enabled,
         singleLine = true,
@@ -243,7 +246,7 @@ fun AppTextField(
                 modifier = Modifier
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.background)
-                    .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                    .border(focusRing.width, focusRing.color, AppShapes.small)
                     .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -287,9 +290,12 @@ fun AppTextArea(
     enabled: Boolean = true
 ) {
     val alpha = if (enabled) 1f else DISABLED_ALPHA
+    val interactionSource = remember { MutableInteractionSource() }
+    val focusRing = animatedFocusRing(interactionSource)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        interactionSource = interactionSource,
         modifier = modifier.defaultMinSize(minHeight = TEXT_AREA_HEIGHT),
         enabled = enabled,
         singleLine = false,
@@ -302,7 +308,7 @@ fun AppTextArea(
                 modifier = Modifier
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.background)
-                    .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                    .border(focusRing.width, focusRing.color, AppShapes.small)
                     .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
                 // Topo, e não centro: texto que cresce para baixo tem de começar
                 // sempre no mesmo lugar, senão a primeira linha se move enquanto
@@ -911,6 +917,83 @@ private data class ButtonColors(
     val border: Color,
     val content: Color
 )
+
+/**
+ * Repouso → hover → pressão, em tween. A pressão é a camada de pressão do
+ * [AppSurfaceLadder] somada ao hover: um degrau acima dele em qualquer tom de
+ * botão, sem uma terceira cor por tom.
+ */
+@Composable
+private fun animatedButtonContainer(
+    colors: ButtonColors,
+    interactionSource: MutableInteractionSource,
+    enabled: Boolean,
+    label: String
+): Color {
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val pressed by interactionSource.collectIsPressedAsState()
+    val ladder = AppSurfaceLadders.current
+    val target = when {
+        !enabled -> colors.container
+        pressed -> ladder.pressedLayer.compositeOver(colors.hover)
+        hovered -> colors.hover
+        else -> colors.container
+    }
+    val container by animateColorAsState(
+        targetValue = target,
+        animationSpec = appTween(AppMotion.fast),
+        label = label
+    )
+    return container
+}
+
+/**
+ * Pressão por escala, **só em superfície sem texto** — botão de ícone, ação do
+ * card, HUD. Escalar texto em Plex Mono borra o traço durante a transição, e
+ * por isso o botão com rótulo responde só com a camada. Mola `SNAPPY`: a
+ * pressão tem de acompanhar o dedo, e sem rebote para não tremer.
+ */
+@Composable
+fun Modifier.appPressScale(interactionSource: MutableInteractionSource, enabled: Boolean = true): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) PRESSED_SCALE else 1f,
+        animationSpec = appSpring(AppMotion.Springs.SNAPPY, visibilityThreshold = 0.001f),
+        label = "appPressScale"
+    )
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+private const val PRESSED_SCALE = 0.96f
+
+@Immutable
+private data class FocusRing(val width: Dp, val color: Color)
+
+/**
+ * O anel de foco que o design system já exigia e o código não tinha: 2dp em
+ * `--info`, por dentro do campo. Sem ele não havia como saber qual campo
+ * recebia a digitação num formulário de três — a aba Rede tem cinco.
+ */
+@Composable
+private fun animatedFocusRing(interactionSource: MutableInteractionSource): FocusRing {
+    val focused by interactionSource.collectIsFocusedAsState()
+    val color by animateColorAsState(
+        targetValue = if (focused) AppTone.INFO.color() else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appFocusRingColor"
+    )
+    val width by animateDpAsState(
+        targetValue = if (focused) FOCUS_RING_WIDTH else AppBorderWidth,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appFocusRingWidth"
+    )
+    return FocusRing(width, color)
+}
+
+private val FOCUS_RING_WIDTH = 2.dp
 
 /** Espaço reservado para o `RowScope` de quem compõe uma barra de ações. */
 @Composable

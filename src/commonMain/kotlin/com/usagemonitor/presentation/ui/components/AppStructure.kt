@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -700,10 +701,22 @@ fun AppDataRow(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val background = when {
-        highlighted || hovered -> MaterialTheme.colorScheme.surfaceVariant
-        else -> Color.Transparent
-    }
+    val pressed by interactionSource.collectIsPressedAsState()
+    // Realce de seleção continua sendo o degrau `surfaceVariant`; o hover e a
+    // pressão são **camadas somadas por cima**, e é isso que faz a linha dentro
+    // de um card com hover voltar a reagir -- a troca de fundo antiga dava ao
+    // card e à linha o mesmo tom.
+    val background = if (highlighted) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+    val ladder = AppSurfaceLadders.current
+    val layer by animateColorAsState(
+        targetValue = when {
+            pressed && onClick != null -> ladder.pressedLayer
+            hovered -> ladder.hoverLayer
+            else -> Color.Transparent
+        },
+        animationSpec = appTween(AppMotion.fast),
+        label = "appDataRowLayer"
+    )
     val clickable = if (onClick != null) {
         Modifier.clickable(
             interactionSource = interactionSource,
@@ -721,6 +734,7 @@ fun AppDataRow(
                 .hoverable(interactionSource)
                 .then(clickable)
                 .background(background)
+                .background(layer)
                 .defaultMinSize(minHeight = ROW_MIN_HEIGHT)
                 .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically,

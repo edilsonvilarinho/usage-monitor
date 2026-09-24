@@ -31,7 +31,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C2 | Profundidade: `AppDepth`, `AppSurfaceLadder`, brilho e highlight | feito |
 | C3 | Seleção animada: aba, segmentado, navegação lateral, chip | feito |
 | C4 | Overlays que entram e saem: menu, tooltip, diálogo | feito |
-| C5 | Estados de interação: foco, hover em camada, pressão | pendente |
+| C5 | Estados de interação: foco, hover em camada, pressão | feito |
 | C6 | Números animados e recarga do card | pendente |
 | C7 | `AppStateCrossfade` e o bug do `AnimatedContent` | pendente |
 | C8 | Expandir/recolher e banners | pendente |
@@ -53,6 +53,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*"` + `gradlew.bat generateScreenshots` | Verde. A primeira captura saiu praticamente igual à anterior: sombra preta sobre `#131010` não aparece (sonda: 10dp escurecem o fundo em 3/255) e o brilho, desenhado por baixo do conteúdo, era coberto pelo fundo do cabeçalho do card. Brilho passou para cima do conteúdo, com teto de 56dp, e a borda ganhou gradiente claro no topo. |
 | 2026-09-24 | C3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o sublinhado desliza ate a aba escolhida` (indicador termina com `left` e largura iguais aos da aba nova). |
 | 2026-09-24 | C4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o menu some da arvore depois da saida` e os testes de "abre para cima" do `FooterBarTest`. A saída da janela de diálogo não tem teste de componente (a moldura exige `WindowScope`); fica para a verificação manual do C17. |
+| 2026-09-24 | C5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.presentation.*"` | Verde, incluindo `o campo focado desenha o anel de foco` (pixels 0 e 1 da borda esquerda mudam com o foco). |
 
 ## C1 · Tokens de motion e política
 
@@ -104,3 +105,11 @@ cápsula, marcador de ritmo, "Next update in 2m").
 - `DesktopDialogFrame`: o botão de fechar esmaece a **janela** AWT em 140ms e só então pede o
   fechamento, restaurando a opacidade depois. Sem translucidez de janela ou com movimento reduzido,
   fecha na hora. Fechar pelo sistema (Alt+F4) continua imediato.
+
+## C5 · Estados de interação
+
+- `AppButton`/`AppIconButton`: repouso → hover → pressão (`pressedLayer` sobre o hover), por tween.
+  Sem ripple (`indication = null`). Só o de ícone encolhe (`appPressScale`, 0,96, `SNAPPY`).
+- `CardIconActionButton`: ganhou hover, pressão e escala — era o único botão sem resposta ao ponteiro.
+- `AppDataRow`: hover e pressão como camadas somadas; a seleção continua em `surfaceVariant`.
+- `AppTextField`/`AppTextArea`: anel de foco de 2dp em `--info`, cor e largura em tween.

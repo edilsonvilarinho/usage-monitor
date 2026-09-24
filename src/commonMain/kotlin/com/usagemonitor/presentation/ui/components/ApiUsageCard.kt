@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.theme.appTween
+import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
@@ -1156,11 +1160,31 @@ private fun CardIconActionButton(
         // círculos no cabeçalho pesavam mais que o número que o card existe
         // para mostrar. O contêiner só ganha cor quando o semáforo está aceso —
         // aí a cor é informação, não decoração.
+        // Sem hover nem pressão, a ação do card era o único botão da tela que não
+        // respondia ao ponteiro. Ganha as duas camadas e a escala de pressão --
+        // é superfície sem texto, então encolher não borra nada.
+        val interaction = remember { MutableInteractionSource() }
+        val hovered by interaction.collectIsHoveredAsState()
+        val pressed by interaction.collectIsPressedAsState()
+        val ladder = AppSurfaceLadders.current
+        val layer by animateColorAsState(
+            targetValue = when {
+                !enabled -> Color.Transparent
+                pressed -> ladder.pressedLayer
+                hovered -> ladder.hoverLayer
+                else -> Color.Transparent
+            },
+            animationSpec = appTween(AppMotion.fast),
+            label = "cardActionLayer"
+        )
         Box(
             modifier = Modifier
                 .size(buttonSize)
+                .appPressScale(interaction, enabled)
                 .appSurfaceBlock(color = containerColor)
-                .clickable(enabled = enabled, onClick = onClick)
+                .background(layer)
+                .hoverable(interaction, enabled = enabled)
+                .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
                 .semantics {
                     contentDescription = description
                 },
