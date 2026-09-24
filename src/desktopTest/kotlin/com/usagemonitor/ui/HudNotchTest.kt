@@ -6,6 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import com.usagemonitor.presentation.ui.components.AppRingArc
+import com.usagemonitor.presentation.ui.components.AppUsageRing
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -380,6 +388,58 @@ class HudNotchTest {
         }
 
         onNodeWithTag(HUD_UPDATE_INDICATOR_TAG).assertIsDisplayed()
+    }
+
+    // ------------------------------------------------------------ movimento contínuo
+
+    /**
+     * O arco de sessão ativa **gira** só com a política contínua: com ela e o
+     * relógio manual, dois instantes desenham o anel diferente. Sem ela
+     * (`waitForIdle` voltou em todos os outros testes deste arquivo) nada gira.
+     */
+    @Test
+    fun `o arco de sessao ativa gira so com a politica continua`() {
+        val active = listOf(accounts.first().copy(sessionActive = true))
+        fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
+            lateinit var first: PixelMap
+            lateinit var second: PixelMap
+            runDesktopComposeUiTest {
+                mainClock.autoAdvance = false
+                setContent {
+                    AppTheme(isDark = true, motion = policy) {
+                        // Fundo opaco: sobre transparente o antialiasing acumula
+                        // alfa a cada quadro composto, e dois instantes diferem
+                        // mesmo parados (o mesmo artefato do teste da barra).
+                        Box(modifier = Modifier.background(Color.Black)) {
+                            AppUsageRing(
+                                arcs = listOf(AppRingArc(0.3f, AppTone.OK)),
+                                description = "anel",
+                                active = active.first().sessionActive
+                            )
+                        }
+                    }
+                }
+                mainClock.advanceTimeBy(400)
+                first = onNodeWithContentDescription("anel").captureToImage().toPixelMap()
+                mainClock.advanceTimeBy(350)
+                second = onNodeWithContentDescription("anel").captureToImage().toPixelMap()
+            }
+            return first to second
+        }
+
+        val (liveA, liveB) = frames(AppMotionPolicy.Live)
+        assertTrue(differs(liveA, liveB), "com a política contínua o arco devia ter girado")
+        val (staticA, staticB) = frames(AppMotionPolicy.Static)
+        assertTrue(!differs(staticA, staticB), "sem a política o arco devia ficar parado")
+    }
+
+    private fun differs(a: PixelMap, b: PixelMap): Boolean {
+        for (y in 0 until minOf(a.height, b.height)) {
+            for (x in 0 until minOf(a.width, b.width)) {
+                if (a[x, y] != b[x, y]) return true
+            }
+        }
+        return false
     }
 
     private fun account(label: String, word: String, tone: AppTone, vararg quotas: HudQuota): HudAccount {

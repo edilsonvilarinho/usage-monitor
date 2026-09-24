@@ -42,7 +42,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | C13 | HUD em janela própria | feito |
 | C14 | Geometria de borda e migração da posição | feito |
 | C15 | O notch com anéis | feito |
-| C16 | Indicadores contínuos atrás da política | pendente |
+| C16 | Indicadores contínuos atrás da política | feito |
 | C17 | Verificação final | pendente |
 
 ## Pontos de situação
@@ -64,6 +64,7 @@ cápsula, marcador de ritmo, "Next update in 2m").
 | 2026-09-24 | C13 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.presentation.*"` | Verde. Os testes de `HudBar` já montavam a barra direto, sem `DesktopWindowFrame(hud)`, e não precisaram mudar. A verificação da janela real fica para o C17. |
 | 2026-09-24 | C14 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.HudWindowPreferencesTest"` | Verde: dez casos de geometria e quatro de posição (padrão, ida e volta, migração da pílula antiga, meia gravação ignorada). |
 | 2026-09-24 | C15 | Claude Opus 5.5 | `gradlew.bat allTests` + renderização descartável do notch (topo e lateral, escuro e claro, parado e aberto) | Verde: 2077 testes, 0 falhas. A primeira renderização mostrou a trilha dos anéis branca opaca — o alfa da camada de pressão tinha sido sobrescrito com 1 —; corrigida para a camada com 1,6× o peso. |
+| 2026-09-24 | C16 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.presentation.SessionPulse*" --tests "com.usagemonitor.ui.ComponentTest"` | Verde. O teste de giro falhou uma vez no caso estático: sobre fundo transparente dois instantes parados diferiam pelo antialiasing acumulado; com fundo opaco, parado é idêntico e com a política contínua os dois instantes diferem. |
 
 ## C1 · Tokens de motion e política
 
@@ -274,3 +275,13 @@ na borda da sombra e CPU da rotação contínua.
   da ajuda e pelo menu de modos.
 - Design system: `AppHudBar` (contrato, `.d.ts`, `.jsx`) reescrito como notch, `AppUsageRing` novo,
   kit `Hud.jsx`, índice e regra de transparência do readme; seção "Barra HUD — notch" do protótipo.
+
+## C16 · Indicadores contínuos
+
+- `GetActiveCliSessionPulsesUseCase.activity()` devolve pulsos **e** contas com turno na janela, da
+  mesma leitura; `invoke()` continua devolvendo só os pulsos.
+- `SessionPulseViewModel.activeTargets` publica as contas ativas; `HudWindowHost` o repassa a
+  `buildHudAccounts`, e o anel da conta ganha o arco fino que gira.
+- `rememberSessionPulseFrame` passou para trás de `AppMotionPolicy.continuous`: sem ela o botão fica
+  aceso e parado no pico da primeira severidade.
+- Custo de CPU da rotação contínua fica para a verificação manual do C17.

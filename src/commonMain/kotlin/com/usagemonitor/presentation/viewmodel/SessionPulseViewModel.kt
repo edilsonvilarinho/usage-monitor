@@ -92,6 +92,18 @@ class SessionPulseViewModel(
     /** Sessões desta máquina, por card. Chave ausente significa botão normal. */
     val cliPulses: StateFlow<Map<UsageTargetKey, SessionPulse>> = _cliPulses.asStateFlow()
 
+    private val _activeTargets = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
+
+    /**
+     * Contas desta máquina com turno nos últimos 5 min, com ou sem atenção.
+     *
+     * É o que acende o arco de sessão ativa da HUD. Não é [cliPulses]: aquele só
+     * guarda o que merece o pisca (`ATTENTION`/`SATURATED`), e uma sessão
+     * saudável trabalhando não produzia sinal nenhum. Sai da **mesma** leitura, e
+     * leitura que falha mantém o conjunto anterior, como os pulsos.
+     */
+    val activeTargets: StateFlow<Set<UsageTargetKey>> = _activeTargets.asStateFlow()
+
     private val _teamPulses = MutableStateFlow<Map<UsageTargetKey, SessionPulse>>(emptyMap())
 
     /** Sessões de todo o time na conta do card, incluindo as desta máquina. */
@@ -167,7 +179,7 @@ class SessionPulseViewModel(
     }
 
     private suspend fun refreshCliPulses(now: Instant) {
-        val result = getCliPulses()
+        val result = getCliPulses.activity()
 
         // Este laço roda de 30 em 30 segundos: sem a deduplicação, uma leitura
         // quebrada escreveria 120 passos por hora e expulsaria da trilha tudo o
@@ -189,11 +201,17 @@ class SessionPulseViewModel(
         }
 
         // Leitura falhou: mantém o mapa anterior, que envelhece no `prunedAt`.
-        val pulses = result.getOrNull()
+        val activity = result.getOrNull()
+        val pulses = activity?.pulses
             ?.mapKeys { (profileId, _) -> UsageTargetKey(ApiSource.ANTHROPIC, profileId) }
             ?: _cliPulses.value
 
         _cliPulses.value = pulses.prunedAt(now)
+        if (activity != null) {
+            _activeTargets.value = activity.activeProfileIds
+                .map { profileId -> UsageTargetKey(ApiSource.ANTHROPIC, profileId) }
+                .toSet()
+        }
     }
 
     /** Ver [refreshCliPulses]: motivo da última falha anotada, para não repeti-la. */

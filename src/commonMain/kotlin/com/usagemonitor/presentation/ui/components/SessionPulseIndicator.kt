@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -75,12 +76,22 @@ fun sessionPulseFrame(phase: Float, severities: List<CliSessionHealth>): Session
  * Sem pulso **nenhuma transição infinita é criada**: uma animação que nunca
  * termina impede o `waitForIdle` dos testes de componente de retornar, e o botão
  * em repouso é o caso normal da tela.
+ *
+ * **Com pulso, o pisca é animação contínua, e por isso mora atrás de
+ * `AppMotionPolicy.continuous`** — a mesma política do arco de sessão ativa da
+ * HUD. Sem ela (testes, geradores, "Reduzir animações") o botão fica **aceso e
+ * parado** no pico da primeira severidade: o aviso continua na tela e na
+ * descrição, só não respira.
  */
 @Composable
 internal fun rememberSessionPulseFrame(pulse: SessionPulse): SessionPulseFrame? {
     val severities = pulse.severities
     if (severities.isEmpty()) {
         return null
+    }
+    if (!LocalAppMotionPolicy.current.continuous) {
+        // Meio do primeiro passo: é onde o triângulo do respiro chega a 1.
+        return sessionPulseFrame(STATIC_PULSE_PHASE / severities.size, severities)
     }
 
     val transition = rememberInfiniteTransition(label = "sessionPulse")
@@ -123,3 +134,6 @@ internal fun sessionPulseContainerColor(frame: SessionPulseFrame?, resting: Colo
         alpha = SESSION_PULSE_CONTAINER_MIN_OPACITY + SESSION_PULSE_CONTAINER_RANGE * frame.alpha
     )
 }
+
+/** Fase do quadro parado: o pico do primeiro passo. */
+private const val STATIC_PULSE_PHASE = 0.5f

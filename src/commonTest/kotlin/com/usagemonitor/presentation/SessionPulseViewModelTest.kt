@@ -102,6 +102,25 @@ class SessionPulseViewModelTest {
         viewModel.onDestroy()
     }
 
+    /**
+     * A sessão saudável não pisca, mas **está trabalhando**: é o que acende o
+     * arco de sessão ativa da HUD. Sai da mesma leitura dos pulsos.
+     */
+    @Test
+    fun `a healthy active session is an active target without pulsing`() = runTest {
+        val repository = FakePulseCliRepository(listOf(session("a", liveContextTokens = 10_000L)))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.refreshOnce()
+
+        assertTrue(viewModel.cliPulses.value.isEmpty())
+        assertEquals(
+            setOf(UsageTargetKey(ApiSource.ANTHROPIC, "conta2")),
+            viewModel.activeTargets.value
+        )
+        viewModel.onDestroy()
+    }
+
     @Test
     fun `team pulses come from the configured accounts`() = runTest {
         val teamRepository = FakePulseTeamRepository(

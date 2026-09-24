@@ -2301,7 +2301,8 @@ private fun runUsageMonitor(
                 breadcrumbs.recordScreenOpened("Ajuda (F1)")
                 isHelpDialogOpen = true
             },
-            onCloseRequest = { shutdownApplication() }
+            onCloseRequest = { shutdownApplication() },
+            activeTargets = sessionPulseViewModel.activeTargets
         )
     }
 
