@@ -36,7 +36,7 @@ funcione em mais de um monitor e mostre cada conta com cor própria. O levantame
 | P0 | — | Plano de aderência | — | feito |
 | P1 | #274 | Deixar claro que é reiniciar o Usage Monitor | `fix/274-restart-wording` | feito (automática); olhar no app pendente |
 | P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | feito (automática); olhar no app pendente |
-| P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | pendente |
+| P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | feito (automática); dois monitores reais não executada |
 | P4 | #275 | Cor por conta Claude | `feat/275-account-color` | pendente |
 | P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | pendente |
 | P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | pendente |
@@ -55,6 +55,7 @@ Regra comum a todos os PRs:
 | 2026-09-25 | P0 | Claude Opus 5.5 | `gh issue view` 265, 273–278; leitura de `WindowScreenFit.kt`, `HudWindow.kt`, `HudModel.kt`, `AppUsageRing.kt`, `HudModePreferences.kt`, `AnthropicProfileRegistry.kt`, `AppAccents.kt`, `DashboardScreenWarnings.kt` e READMEs | Diagnóstico acima. Nenhum código alterado. |
 | 2026-09-25 | P1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HelpCatalogTest" --tests "…AppUpdateBannerTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest"`; depois `gradlew.bat allTests` | Primeira passada vermelha, e de propósito: o teste de encaixe novo reprovou o título em inglês "…it will be applied when Usage Monitor closes" (três linhas no balão, nas 23 escalas). Encurtado, 72 testes verdes. `allTests`: 214 classes, **2141 testes, 0 falhas** (11m36s). Pendente: olhar a faixa e o balão no `gradlew.bat run`. |
 | 2026-09-25 | P2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudModelTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest" --tests "…ComponentTest"` | 5 classes, **178 testes, 0 falhas**. Entre eles, o arco de fora medido no bitmap com o tom da semanal crítica, o glifo de legenda por cota e a descrição "anel externo 7d 9% · anel interno 5h 28%". Depois `gradlew.bat allTests`: 214 classes, **2150 testes, 0 falhas** (9m28s). Pendente: olhar o notch e o balão no `gradlew.bat run`. |
+| 2026-09-25 | P3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…ScreenLocatorTest" --tests "…MainWindowPreferencesTest" --tests "…HudWindowPreferencesTest" --tests "…WindowScreenFitTest" --tests "…HudNotchGeometryTest"` | Primeira passada: erro de compilação (`GraphicsDevice.idString` não existe em Kotlin, o getter Java é `getIDstring()`). Corrigido: 5 classes, **61 testes, 0 falhas**, com monitor à direita, à esquerda (x negativo), acima e renumerado. **Validação em dois monitores reais não executada**: esta máquina tem um só (`\\.\DISPLAY1`, 1366×768). Depois `gradlew.bat allTests`: 215 classes, **2164 testes, 0 falhas**. |
 
 ## P1 · #274 — Reiniciar o Usage Monitor, não o computador
 
@@ -127,6 +128,9 @@ Regra comum a todos os PRs:
   - passa a salvar `windowX`/`windowY`, com coordenadas negativas permitidas (monitor à esquerda);
   - grava só em FLOATING e fora do modo HUD, como o coletor atual;
   - o piso de tamanho e a correção de escala usam o monitor da janela (`graphicsConfiguration`).
+- **O que ficou de fora:** o piso de tamanho (`ApplyWindowMinimumSize`) e a correção de escala
+  (`availableWindowSizeDp`) continuam medindo o monitor padrão. Os dois só limitam o tamanho máximo,
+  nunca a posição, e o pior caso é a janela ficar um pouco maior que o monitor secundário menor.
 - **Risco de DPI misto.** No Windows cada monitor tem o próprio espaço de usuário escalado, e o
   código trata px como dp. Só uma medição em dois monitores reais, de preferência com escalas
   diferentes, valida isso; ela é registrada aqui. Os testes unitários não pegam.

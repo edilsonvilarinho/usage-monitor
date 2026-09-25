@@ -179,6 +179,63 @@ class MainWindowPreferencesTest {
         assertEquals(1200.dp, scaled.height)
     }
 
+    /** A janela principal passou a guardar posição (issue #273); negativo é monitor à esquerda. */
+    @Test
+    fun `main window position round trips, negative included`() {
+        withTestSettings { settings ->
+            persistMainWindowState(
+                settings = settings,
+                snapshot = MainWindowSnapshot(
+                    widthDp = 480f,
+                    heightDp = 900f,
+                    placement = WindowPlacement.Floating,
+                    xDp = -1180.4f,
+                    yDp = 36.6f
+                )
+            )
+
+            val state = readPersistedMainWindowState(settings)
+
+            assertEquals(-1180, state.xDp)
+            assertEquals(37, state.yDp)
+        }
+    }
+
+    @Test
+    fun `main window without a known position keeps none`() {
+        withTestSettings { settings ->
+            persistMainWindowState(
+                settings = settings,
+                snapshot = MainWindowSnapshot(widthDp = 480f, heightDp = 900f, placement = WindowPlacement.Floating)
+            )
+
+            val state = readPersistedMainWindowState(settings)
+
+            assertEquals(null, state.xDp)
+            assertEquals(null, state.yDp)
+        }
+    }
+
+    /** Maximizada, a posição é a do sistema e não uma escolha: a de antes fica. */
+    @Test
+    fun `maximized window does not overwrite the floating position`() {
+        withTestSettings { settings ->
+            persistMainWindowState(
+                settings = settings,
+                snapshot = MainWindowSnapshot(480f, 900f, WindowPlacement.Floating, xDp = 2100f, yDp = 80f)
+            )
+            persistMainWindowState(
+                settings = settings,
+                snapshot = MainWindowSnapshot(1920f, 1040f, WindowPlacement.Maximized, xDp = 0f, yDp = 0f)
+            )
+
+            val state = readPersistedMainWindowState(settings)
+
+            assertEquals(2100, state.xDp)
+            assertEquals(80, state.yDp)
+        }
+    }
+
     private fun withTestSettings(block: (PreferencesSettings) -> Unit) {
         val nodeName = "com.usagemonitor.tests.${UUID.randomUUID()}"
         val preferencesNode = Preferences.userRoot().node(nodeName)
