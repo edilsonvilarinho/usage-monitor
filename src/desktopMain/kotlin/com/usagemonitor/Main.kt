@@ -979,9 +979,6 @@ private fun runUsageMonitor(
     // tem moldura do sistema, então nascer maior que o monitor é nascer sem botão
     // de fechar.
     val screenWorkArea = remember { availableWindowAreaDp() }
-    // A HUD pode ocupar a faixa da barra de tarefas; as demais janelas continuam
-    // presas à área útil para manter seus controles recuperáveis.
-    val hudScreenArea = remember { fullScreenAreaDp() }
     val mainWindowState = rememberPersistedMainWindowState(
         persistedState = persistedMainWindowState,
         uiScalePercent = uiScalePercent,
@@ -2287,7 +2284,7 @@ private fun runUsageMonitor(
             motion = appMotion,
             windowOpacityPercent = windowOpacityPercent,
             iconImage = iconImage,
-            hudScreenArea = hudScreenArea,
+            hudScreenArea = screenWorkArea,
             onOpenFull = { setHudMode(false) },
             onSwitchToCardsOnly = { setCardsOnlyMode(true) },
             actions = shellActions,

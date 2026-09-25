@@ -890,11 +890,26 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
     `hudRestWindowBounds`/`hudOpenWindowBounds`): com o mesmo recorte nos dois estados o notch não anda
     na tela ao abrir perto de um canto, e as alças nunca ficam fora da tela. Durante o arrasto a janela
     é `withHandles`, simétrica, e o centro dela continua sendo o do notch.
+  - **O arrasto parte de `hudDragWindowBounds` e mede pela janela de arrasto, nunca por `windowSize`**
+    (issue #288). Só dá para pegar a mão com o notch aberto, e o gesto guarda os lambdas da composição
+    em que começou: com `windowSize` ali, o primeiro passo prendia à tela uma janela da **largura do
+    balão** e a empurrava 274dp para dentro — só embaixo e à direita, onde a janela aberta é recuada —,
+    e como o passo é incremental o vão seguia o arrasto inteiro; o encaixe lia o centro dessa mesma
+    largura errada e soltava o notch na borda errada. Medido com o app real e ponteiro sintético: antes
+    a mão ficava ~270px ao lado do ponteiro, depois fica sob ele. `HudNotchGeometryTest` afirma o notch
+    no mesmo ponto parado, aberto e no começo do arrasto, nas quatro bordas.
 - **Posição é borda + fração** (`HudPlacement`, chaves `hudEdge`/`hudEdgeOffset`): sobrevive a troca
   de resolução e de monitor. Arrastar solta o notch da borda; ao soltar, `nearestHudPlacement` o gruda
-  na borda mais próxima do **centro** dele, na tela inteira (pode ficar sobre a barra de tarefas). A
+  na borda mais próxima do **centro** dele. A
   posição da pílula antiga (`hudWindowX/Y`) migra uma vez e as chaves velhas são apagadas. Estreia no
   topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.
+  - **Parado, aberto e encaixado o notch mora na área útil, fora da barra de tarefas** (issue #288).
+    A #256 o deixava ocupar a faixa da barra, mas no Windows ela também é *topmost* e volta para cima
+    de toda janela *topmost* a cada clique, hover ou notificação: o `alwaysOnTop` perde essa disputa,
+    e o notch de baixo ficava meio coberto. Só o **arrasto** continua livre sobre a tela inteira. O
+    monitor segue identificado pelos limites **inteiros**, que não mudam quando a barra é movida.
+    Barra com ocultação automática não reserva área útil e continua podendo cobrir o notch quando
+    sobe — escolha de quem a oculta.
   - **E o monitor** (`hudScreenId`/`hudScreenBounds`, issue #273). Borda e fração eram resolvidas
     sempre contra o monitor padrão, então o arrasto era preso a ele e o notch nunca saía do primário.
     Agora o arrasto e o encaixe usam o monitor **sob o ponteiro** (`MouseInfo.getPointerInfo().device`),

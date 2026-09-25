@@ -523,6 +523,23 @@ internal fun hudOpenWindowBounds(
     area: ScreenWorkArea
 ): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.expanded, area, reserveAlong = sizes.handlesAlong(edge))
 
+/**
+ * A janela durante o arrasto: o notch com as alças, simétrica ao longo da borda,
+ * **com o notch no mesmo ponto da tela** em que estava aberto ou parado.
+ *
+ * É daqui que o arrasto parte (issue #288). Ele começava da origem da janela
+ * aberta — só dá para pegar a mão com o notch aberto — e só encolhia o tamanho.
+ * Em cima e à esquerda as duas origens coincidem; embaixo e à direita a aberta
+ * fica recuada pelo balão, e o notch saltava 274dp para longe do ponteiro e
+ * seguia o arrasto inteiro com esse vão.
+ */
+internal fun hudDragWindowBounds(
+    edge: HudEdge,
+    offsetFraction: Float,
+    sizes: HudNotchSizes,
+    area: ScreenWorkArea
+): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.withHandles, area)
+
 private fun HudNotchSizes.handlesAlong(edge: HudEdge): Dp = if (edge.isHorizontal) withHandles.width else withHandles.height
 
 /** Uma posição de notch gravada: a borda e o centro ao longo dela, em fração da tela. */

@@ -216,7 +216,7 @@ internal fun HudWindowHost(
     // Carregando, a janela é o notch com as alças — simétrico ao longo da borda,
     // então o centro dela continua sendo o do notch, que é o que o encaixe lê.
     val bounds = when {
-        dragging -> hudWindowBounds(placement.edge, placement.offsetFraction, sizes.withHandles, composedArea)
+        dragging -> hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
         windowOpen -> hudOpenWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
         else -> hudRestWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     }
@@ -235,12 +235,22 @@ internal fun HudWindowHost(
         windowState.position = if (free != null) WindowPosition(free.x, free.y) else docked
     }
 
+    // A janela de arrasto, que é o que se move (issue #288). O gesto guarda os
+    // lambdas da composição em que começou, com o notch **aberto**: com
+    // `windowSize` ali, o primeiro passo prendia à tela uma janela da largura do
+    // balão e a jogava 274dp para dentro, e o vão seguia o arrasto inteiro —
+    // embaixo e à direita, onde a aberta é recuada. O encaixe lia o centro dessa
+    // mesma largura errada. Esta medida sai da geometria e não muda no arrasto.
+    val dragStart = hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
+    val dragSize = DpSize(dragStart.size.width * scale, dragStart.size.height * scale)
+
     val dragBegin = {
         dragging = true
         expanded = false
         windowOpen = false
-        val current = windowState.position
-        dragWindowPosition = DpOffset(current.x, current.y)
+        // O arrasto parte da janela de arrasto já encaixada, com o notch no ponto
+        // da tela em que ele está — nunca da origem da janela aberta.
+        dragWindowPosition = DpOffset(dragStart.x * scale, dragStart.y * scale)
         dragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
     }
     val dragTo = {
@@ -256,7 +266,7 @@ internal fun HudWindowHost(
             val moved = fitWindowPosition(
                 x = position.x + (current.x - previous.x).dp,
                 y = position.y + (current.y - previous.y).dp,
-                size = windowSize,
+                size = dragSize,
                 workArea = pointerScreen()?.bounds ?: screenArea
             )
             dragWindowPosition = DpOffset(moved.x, moved.y)
@@ -266,16 +276,18 @@ internal fun HudWindowHost(
         val position = dragWindowPosition
         if (position != null) {
             // O notch gruda na borda mais próxima do **centro** dele, no monitor
-            // em que foi solto, e borda, fração e monitor são gravados.
+            // em que foi solto, e borda, fração e monitor são gravados. O encaixe
+            // é na área **útil**: a barra de tarefas também é *topmost* e volta
+            // para cima do notch a cada clique nela (issue #288).
             val target = pointerScreen()
-            val area = target?.bounds ?: screenArea
+            val area = target?.workArea ?: screenArea
             val snapped = nearestHudPlacement(
-                centerX = position.x + windowSize.width / 2,
-                centerY = position.y + windowSize.height / 2,
+                centerX = position.x + dragSize.width / 2,
+                centerY = position.y + dragSize.height / 2,
                 area = area
             )
             if (target != null) {
-                screenArea = target.bounds
+                screenArea = target.workArea
                 persistHudScreen(settings, target)
             }
             placement = snapped
@@ -465,12 +477,19 @@ private fun pointerScreen(): ScreenInfo? =
     runCatching { MouseInfo.getPointerInfo()?.device?.toScreenInfo() }.getOrNull()
 
 /**
- * A tela inteira do monitor gravado para o notch; sem gravação, ou com o
- * monitor desligado, a do padrão. O que está gravado **não é apagado** quando o
- * monitor some: ele pode voltar.
+ * A área útil do monitor gravado para o notch; sem gravação, ou com o monitor
+ * desligado, a do padrão. O que está gravado **não é apagado** quando o monitor
+ * some: ele pode voltar.
+ *
+ * Área **útil**, e não a tela inteira (issue #288). A #256 deixou o notch ocupar
+ * a faixa da barra de tarefas, mas no Windows ela também é *topmost* e volta
+ * para cima de toda janela *topmost* a cada clique, hover ou notificação: o
+ * `alwaysOnTop` perde essa disputa, e o notch de baixo ficava meio coberto. O
+ * monitor continua identificado pelos limites **inteiros** (`persistHudScreen`),
+ * que não mudam quando a barra é movida.
  */
 private fun resolveHudScreenArea(settings: PreferencesSettings, fallback: ScreenWorkArea): ScreenWorkArea {
     val saved = readPersistedHudScreen(settings)
     val screens = availableScreens()
-    return resolveScreen(screens, saved.id, saved.bounds)?.bounds ?: screens.firstOrNull()?.bounds ?: fallback
+    return resolveScreen(screens, saved.id, saved.bounds)?.workArea ?: screens.firstOrNull()?.workArea ?: fallback
 }
