@@ -65,9 +65,13 @@ belongs to a banner.
 from `prefers-color-scheme` **and** the explicit `[data-app-theme="light"]` scope, never from
 the media query alone, because the app owns a theme switch that must win.
 
-**Surfaces.** Four steps inside ~14% luminance: `--bg` `--surface` `--raised` `--border`.
-Depth comes from the **1dp border and from spacing** — not from shadow, not from gradient.
-No accent glow on top of surfaces, no tinted cards, no colored card backgrounds.
+**Surfaces.** Four steps inside ~14% luminance: `--bg` `--surface` `--raised` `--border`. The
+steps stay close on purpose; what made the app read flat is fixed by what sits **on top** of them
+(`AppSurfaceLadder`, derived from the preset, never hand-tuned per theme): a translucent hover and
+pressed **layer** added over whatever surface is below (so a hovered row inside a hovered card
+still reacts), a 1dp inner **highlight** at the top, a neutral **sheen** gradient over the first
+56px, and a **border that is lighter on top** in dark (darker at the bottom in light). No accent
+glow on top of surfaces, no tinted cards, no colored card backgrounds.
 
 **Color area.** The nine integration accents are fixed (AA 4.5:1 on both surfaces, hue preserved
 across themes, ≥20° apart). What changed from the old UI is the **area**: from whole-card fill
@@ -102,11 +106,16 @@ update strip 28, control 28.
 **Shape.** Radius 4 chip · 6 control · 8 panel · 10 window. **10dp is the ceiling** — the old
 10–28dp range is what made every surface read as one big card.
 
-**Elevation.** 0 for data surfaces, 2 rarely, **8 reserved for window, dialog, menu and overlay**.
-Hierarchy is read by layer and divider, not by shadow depth.
+**Depth.** Five levels (`AppDepth`), each two stacked neutral shadows — a short dense *key* that
+seats the object and a wide faint *ambient* that gives distance: `FLAT` rows, cells and blocks
+inside a panel (never a shadow inside a surface) · `CARD` panels and cards at rest · `RAISED` a
+hovered card and tooltips · `OVERLAY` menus · `DIALOG` a dragged card and the HUD. `CARD`'s
+ambient stays at 6dp because the dashboard gap is 12dp. **In dark, black shadow barely shows**
+(measured: 10dp darkens `#131010` by 3/255) — there the volume comes from light: highlight, sheen
+and the lit top border. Hierarchy is still read by layer and divider first.
 
-**Backgrounds.** Flat. No imagery, no illustration, no pattern, no texture, no gradient anywhere
-in the product. The only graphics are data: line charts, bar series, a per-hour activity heatmap,
+**Backgrounds.** No imagery, no illustration, no pattern, no texture. **One gradient only**: the
+neutral top sheen of panels, cards and the HUD. Never an accent gradient, never behind a chart. The only graphics are data: line charts, bar series, a per-hour activity heatmap,
 stacked composition bars — all drawn in accent colors on `--raised`.
 
 **Borders and dividers.** 1px `--border` everywhere. A row owns its **bottom** divider (which is
@@ -114,22 +123,39 @@ why a list needs no gap and the nested guide comes out continuous). The nested-g
 2dp, drawn per item with `drawBehind` — not `Modifier.border`, which rounds thickness up and
 paints after the content.
 
-**Transparency and blur.** Not used in the product. The main window has a user-set opacity
-(50–100%) applied to the whole window by the OS, not per element.
+**Transparency and blur.** No blur, no acrylic. **One transparent window**: the HUD notch, so it can
+have its silhouette and shadow; it is notch-sized at rest because a transparent pixel swallows the
+click (measured on Windows 11). Every window, the HUD included, keeps the user-set opacity (50–100%)
+applied to the whole window by the OS, not per element.
 
-**Hover.** Background steps to `--raised`, text from `--muted` to `--fg`. Never a color shift,
-never a scale, never a shadow. Close button is the one exception: it fills `--crit` with white.
+**Hover.** A `--hover-layer` is added over the surface below, text goes from `--muted` to
+`--fg`. Elevated surfaces (the dashboard card) also **lift**: one depth level up and 1dp higher,
+on the `GENTLE` spring. Never a hue shift. Close button is the one exception: it fills `--crit`
+with white.
 
-**Press / focus.** Press has no separate treatment beyond hover. Focus is a 2px `--info` outline
-with 1px offset (inset on fields).
+**Press / focus.** Press adds `--pressed-layer`, one step above hover; surfaces without text (icon
+buttons, the card's actions, the HUD) also scale to 0.96 on the `SNAPPY` spring — never text, which
+blurs when scaled. No ripple. Focus is a 2px `--info` outline with 1px offset (inset on fields,
+crossfading from the neutral stroke).
 
-**Motion.** 120ms hover/focus · 180ms selection · 240ms expand/collapse, ease
-`cubic-bezier(.2,0,.2,1)`. **No infinite animation anywhere** — it hangs `waitForIdle` in the
-Compose component tests, and this app's data arrives on a 600s cycle. Loading is a **static
-skeleton**, never a shimmer, never a spinner.
+**Motion.** 120ms hover/focus · 180ms selection · 240ms expand/collapse · 90ms exit. **Tween
+for color and opacity, spring for position, size and scale** (`AppMotion.Springs`: `GENTLE` for
+data and surfaces, `SNAPPY` for selection and press, `EXPRESSIVE` only for the menu — its rebound read as a tremor in the HUD).
+A spring keeps its velocity when the target changes mid-flight — the fixed-length tweens stopped
+dry and restarted from zero, which is what made the app read as stiff. **No overshoot on data**:
+bars, rings and numbers settle without rebounding past the value. Every transition is finite.
+**Continuous animation lives only behind `AppMotionPolicy.continuous`**, off by default in
+`AppTheme` so component tests and capture generators never meet it (an endless animation hangs
+`waitForIdle`); the app turns it on only for live state. **"Reduzir animações"** (Settings →
+General) turns every transition into an instant swap and stops anything continuous. First load is
+a **static skeleton**, never a shimmer. A refreshing card turns its refresh glyph (tinted `--info`)
+only while continuous motion is on; otherwise the glyph stays still and the label says
+"Atualizando…". Numbers that change (quota percent, metric value) slide in the direction of the
+change (`AppAnimatedNumber`).
 
 **Cards.** There are no "cards" in the decorative sense. There is one data surface: `--surface`
-fill, 1px border, radius 8, no shadow, optional 2px source marker in its header.
+fill, 1px border lit on top, radius 8, `--shadow-card`, top sheen and highlight, optional 2px
+source marker in its header.
 
 **Layout rules.** Dashboard is a 2-column grid of panels with `--s3` gap; other windows stack
 full-width panels. Every window that slices by time pins its parameters in one 34dp toolbar and
@@ -156,6 +182,12 @@ component tests observe. A text button would have nowhere to put it.
 
 **Emoji are never used.** Unicode marks are used as icons, deliberately and only from the list above.
 
+**Provider marks — the one exception** (`AppProviderMark`). Identification is not a control: the
+Claude asterisk, the OpenAI knot, the Cursor cube and the others are small monochrome SVG paths
+(Simple Icons CC0 and lobe-icons MIT, the same set ai-usagebar ships), tinted by the source accent in
+card headers and by the foreground inside a HUD ring. The provider name is always written beside
+the mark, so it is decorative for semantics. Control glyphs stay Unicode.
+
 **Brand mark.** Own geometric monogram, built by a deterministic script: three stems joined by a
 bowl, reads as **U** and **M** overlapped at large sizes and keeps a distinct silhouette at 16px,
 where the tray icon lives. In `assets/`: `mark.svg`, `mark-on-light.svg`, `lockup.svg`, and the
@@ -172,10 +204,10 @@ invented here.
 | `styles.css` | Global entry point. `@import` lines only. |
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
 | `assets/` | Monogram, light variant, lockup, tray badge states |
-| `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppMetric · AppTooltipSurface |
+| `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
-| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand |
-| `components/feedback/` | AppBanner · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
+| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing |
+| `components/feedback/` | AppBanner · AppDialog · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
 | `ui_kits/desktop-app/` | Click-through recreation: Dashboard, cards-only mode, History, CLI Sessions, Session detail, Team usage, Presence, Settings |
@@ -197,7 +229,13 @@ had no signal they existed; those others behind a hover tooltip, because the pop
 24dp window and flickered over its own trigger; a list with no consumption at all; one row per source,
 because an account with a 5h and a 7d window still showed one limit; and one row per quota always
 visible, because ten rows on screen said what fits in one. `AppStatusDot` is the seventh addition,
-extracted from `AppStatusIndicator` for the collapsed state. Nothing else was invented.
+extracted from `AppStatusIndicator` for the collapsed state. **The depth-and-motion pass replaced the
+strip with a notch** docked to a screen edge (see `AppHudBar.prompt.md`) and added `AppUsageRing`,
+the eighth: one arc per quota, never a ring per vendor. Its third round stopped the notch from
+growing: hovering a ring opens a **balloon for that account only**, with the card's own buttons, and
+a move hand and a gear sit past its ends — the gear holding everything the footer offers. No new
+primitive: the balloon reuses the card's `CardActionButton` and the footer's action row. Nothing else
+was invented.
 
 ### The conformance pass — 2026-08-27
 

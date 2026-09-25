@@ -32,7 +32,7 @@ export function AppMenu({
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--r2)',
-              boxShadow: 'var(--shadow-2)',
+              boxShadow: 'var(--shadow-overlay)',
               overflow: 'hidden',
               zIndex: 2
             }}

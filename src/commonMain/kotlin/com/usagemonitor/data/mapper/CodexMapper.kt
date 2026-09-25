@@ -1,5 +1,6 @@
 package com.usagemonitor.data.mapper
 
+import com.usagemonitor.domain.entity.codexPlanLabel
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
 import com.usagemonitor.domain.entity.ApiSource
@@ -50,7 +51,8 @@ object CodexMapper {
             source = ApiSource.CODEX,
             apiName = "Codex",
             quotas = quotasByPeriod.values.sortedBy { quota -> periodRank(quota.periodType) },
-            notices = notices
+            notices = notices,
+            planLabel = codexPlanLabel(response.planType)
         )
     }
 

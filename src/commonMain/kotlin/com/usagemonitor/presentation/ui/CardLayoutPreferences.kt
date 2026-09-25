@@ -40,6 +40,25 @@ internal data class CardGridSlot(
         get() = top + (height / 2f)
 }
 
+/**
+ * A ordem em que a grade é disposta durante um arrasto: a de [ordered] com o
+ * card [dragged] já no índice [targetIndex]. Fora de arrasto, ou sem alvo, é a
+ * própria [ordered]. Índice fora do intervalo é preso a ele — o alvo é
+ * calculado contra caixas congeladas e a lista pode ter encolhido no meio.
+ */
+internal fun previewCardOrder(
+    ordered: List<UsageTargetKey>,
+    dragged: UsageTargetKey?,
+    targetIndex: Int?
+): List<UsageTargetKey> {
+    if (dragged == null || targetIndex == null || dragged !in ordered) {
+        return ordered
+    }
+    val without = ordered.filter { key -> key != dragged }
+    val index = targetIndex.coerceIn(0, without.size)
+    return without.subList(0, index) + dragged + without.subList(index, without.size)
+}
+
 internal fun resolveDropTargetIndex(
     orderedTargets: List<UsageTargetKey>,
     boundsByTarget: Map<UsageTargetKey, CardGridSlot>,

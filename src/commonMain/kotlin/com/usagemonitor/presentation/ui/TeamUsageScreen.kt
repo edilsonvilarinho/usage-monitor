@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.appItemMotion
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,7 +29,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,6 +57,7 @@ import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppDialog
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppCellValue
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
@@ -263,51 +265,53 @@ internal fun TeamUsageContent(
     var pendingSessionRemoval by remember { mutableStateOf<PendingSessionRemoval?>(null) }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        when (state) {
-            is TeamUsageUiState.Loading -> AppLoadingState(
-                if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"
-            )
+        AppStateCrossfade(state, key = { current -> if (current is TeamUsageUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
+    when (state) {
+                is TeamUsageUiState.Loading -> AppLoadingState(
+                    if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"
+                )
 
-            is TeamUsageUiState.Error -> AppErrorState(
-                TeamUsageLabels.serverError(state.message, language)
-            )
+                is TeamUsageUiState.Error -> AppErrorState(
+                    TeamUsageLabels.serverError(state.message, language)
+                )
 
-            is TeamUsageUiState.Success -> {
-                val detail = state.detail
-                if (detail == null) {
-                    TeamUsageList(
-                        state = state,
-                        language = language,
-                        localDeviceId = localDeviceId,
-                        removalError = removalError,
-                        sessionRemovalError = sessionRemovalError,
-                        onSelectRange = onSelectRange,
-                        onToggleMember = onToggleMember,
-                        onToggleAccount = onToggleAccount,
-                        onOpenSession = onOpenSession,
-                        onRequestRemoveMember = { member -> pendingRemoval = member },
-                        onDismissRemovalError = onDismissRemovalError,
-                        onRequestRemoveSession = { member, session ->
-                            pendingSessionRemoval = PendingSessionRemoval(member, session)
-                        },
-                        onDismissSessionRemovalError = onDismissSessionRemovalError,
-                        onSelectView = onSelectView,
-                        onExportReport = onExportReport
-                    )
-                } else {
-                    TeamSessionDetailPane(
-                        detail = detail,
-                        language = language,
-                        isLocalSession = localDeviceId != null && detail.deviceId == localDeviceId,
-                        advancedExpanded = state.advancedExpanded,
-                        glossaryExpanded = state.glossaryExpanded,
-                        onCloseDetail = onCloseDetail,
-                        onToggleAdvanced = onToggleAdvanced,
-                        onToggleGlossary = onToggleGlossary
-                    )
+                is TeamUsageUiState.Success -> {
+                    val detail = state.detail
+                    if (detail == null) {
+                        TeamUsageList(
+                            state = state,
+                            language = language,
+                            localDeviceId = localDeviceId,
+                            removalError = removalError,
+                            sessionRemovalError = sessionRemovalError,
+                            onSelectRange = onSelectRange,
+                            onToggleMember = onToggleMember,
+                            onToggleAccount = onToggleAccount,
+                            onOpenSession = onOpenSession,
+                            onRequestRemoveMember = { member -> pendingRemoval = member },
+                            onDismissRemovalError = onDismissRemovalError,
+                            onRequestRemoveSession = { member, session ->
+                                pendingSessionRemoval = PendingSessionRemoval(member, session)
+                            },
+                            onDismissSessionRemovalError = onDismissSessionRemovalError,
+                            onSelectView = onSelectView,
+                            onExportReport = onExportReport
+                        )
+                    } else {
+                        TeamSessionDetailPane(
+                            detail = detail,
+                            language = language,
+                            isLocalSession = localDeviceId != null && detail.deviceId == localDeviceId,
+                            advancedExpanded = state.advancedExpanded,
+                            glossaryExpanded = state.glossaryExpanded,
+                            onCloseDetail = onCloseDetail,
+                            onToggleAdvanced = onToggleAdvanced,
+                            onToggleGlossary = onToggleGlossary
+                        )
+                    }
                 }
-            }
-        }
+    }
+}
     }
 
     val memberToRemove = pendingRemoval
@@ -353,7 +357,7 @@ private fun RemoveMemberConfirmation(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(TeamUsageLabels.removeMemberTitle(language)) },
         text = { ModalDialogText(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
@@ -382,7 +386,7 @@ private fun RemoveSessionConfirmation(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(TeamUsageLabels.removeSessionTitle(language)) },
         text = {
@@ -587,15 +591,17 @@ private fun TeamUsageList(
                     // conta já é a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
                         item(key = "email:${emailGroup.groupKey}") {
-                            TeamAccountGroupHeader(
-                                group = emailGroup,
-                                share = state.tokenShareOf(emailGroup),
-                                expanded = state.isEmailExpanded(emailGroup),
-                                language = language,
-                                hasStatusColumn = hasStatusColumn,
-                                hasActionColumn = state.isAdminOverview,
-                                onToggle = { onToggleAccount(emailGroup.groupKey) }
-                            )
+                            Box(modifier = appItemMotion()) {
+                                TeamAccountGroupHeader(
+                                    group = emailGroup,
+                                    share = state.tokenShareOf(emailGroup),
+                                    expanded = state.isEmailExpanded(emailGroup),
+                                    language = language,
+                                    hasStatusColumn = hasStatusColumn,
+                                    hasActionColumn = state.isAdminOverview,
+                                    onToggle = { onToggleAccount(emailGroup.groupKey) }
+                                )
+                            }
                         }
                     }
 
@@ -619,28 +625,32 @@ private fun TeamUsageList(
 
                         if (hasUuidHeader) {
                             item(key = "uuid:${account.accountKey}") {
-                                TeamAccountUuidHeader(
-                                    account = account,
-                                    language = language,
-                                    indent = TEAM_NEST_INDENT
-                                )
+                                Box(modifier = appItemMotion()) {
+                                    TeamAccountUuidHeader(
+                                        account = account,
+                                        language = language,
+                                        indent = TEAM_NEST_INDENT
+                                    )
+                                }
                             }
                         }
 
                     for (member in account.members) {
                         item(key = member.memberKey) {
-                            TeamMemberRow(
-                                member = member,
-                                share = state.tokenShareOf(member),
-                                expanded = member.memberKey in state.expandedMemberKeys,
-                                language = language,
-                                indent = memberIndent,
-                                removable = state.isAdminOverview,
-                                hasStatusColumn = hasStatusColumn,
-                                hasActionColumn = state.isAdminOverview,
-                                onToggle = { onToggleMember(member.memberKey) },
-                                onRemove = { onRequestRemoveMember(member) }
-                            )
+                            Box(modifier = appItemMotion()) {
+                                TeamMemberRow(
+                                    member = member,
+                                    share = state.tokenShareOf(member),
+                                    expanded = member.memberKey in state.expandedMemberKeys,
+                                    language = language,
+                                    indent = memberIndent,
+                                    removable = state.isAdminOverview,
+                                    hasStatusColumn = hasStatusColumn,
+                                    hasActionColumn = state.isAdminOverview,
+                                    onToggle = { onToggleMember(member.memberKey) },
+                                    onRemove = { onRequestRemoveMember(member) }
+                                )
+                            }
                         }
 
                         if (member.memberKey in state.expandedMemberKeys) {
@@ -649,15 +659,17 @@ private fun TeamUsageList(
                             // sem ela o bloco entrega sete números sem dizer o que
                             // cada um é.
                             item(key = "${member.memberKey}:sessionHeader") {
-                                Box(
-                                    modifier = Modifier
-                                        .appNestedGroupItem(indent = sessionIndent)
-                                        .padding(top = AppSpacing.sm)
-                                ) {
-                                    CliSessionColumnHeader(
-                                        language = language,
-                                        hasActionColumn = state.isAdminOverview
-                                    )
+                                Box(modifier = appItemMotion()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .appNestedGroupItem(indent = sessionIndent)
+                                            .padding(top = AppSpacing.sm)
+                                    ) {
+                                        CliSessionColumnHeader(
+                                            language = language,
+                                            hasActionColumn = state.isAdminOverview
+                                        )
+                                    }
                                 }
                             }
 

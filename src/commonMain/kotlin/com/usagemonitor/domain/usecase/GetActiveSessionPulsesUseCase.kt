@@ -25,17 +25,36 @@ class GetActiveCliSessionPulsesUseCase(
     private val clock: Clock = Clock.System
 ) {
     suspend operator fun invoke(): Result<Map<String, SessionPulse>> {
+        return activity().map { active -> active.pulses }
+    }
+
+    /**
+     * A mesma leitura, devolvendo também **quem teve turno** na janela — com ou
+     * sem veredito de atenção. O pisca só existe em `ATTENTION`/`SATURATED`, mas o
+     * arco de sessão ativa da HUD acende para qualquer sessão viva; ler de novo só
+     * para essa pergunta seria um segundo `SELECT` idêntico a cada 30s.
+     */
+    suspend fun activity(): Result<ActiveCliActivity> {
         val now = clock.now()
         val cutoffMillis = now.toEpochMilliseconds() - ACTIVE_SESSION_WINDOW_MILLIS
 
         return repository.getSessions(profileId = null, sinceEpochMillis = cutoffMillis).map { sessions ->
-            sessions
-                .groupBy { session -> session.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID }
-                .mapValues { (_, profileSessions) -> profileSessions.toSessionPulse(now) }
-                .filterValues { pulse -> pulse.isPulsing }
+            val byProfile = sessions.groupBy { session -> session.profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID }
+            ActiveCliActivity(
+                pulses = byProfile
+                    .mapValues { (_, profileSessions) -> profileSessions.toSessionPulse(now) }
+                    .filterValues { pulse -> pulse.isPulsing },
+                activeProfileIds = byProfile.keys
+            )
         }
     }
 }
+
+/** As contas com turno nos últimos 5 min e, entre elas, as que merecem o pisca. */
+data class ActiveCliActivity(
+    val pulses: Map<String, SessionPulse>,
+    val activeProfileIds: Set<String>
+)
 
 /**
  * Sessões de todo o time com interação nos últimos minutos, numa conta.

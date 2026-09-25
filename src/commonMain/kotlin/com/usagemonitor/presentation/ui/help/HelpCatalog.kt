@@ -269,26 +269,31 @@ object HelpCatalog {
             summary = "A janela reduzida aos cards, ou a uma barra flutuante sempre visível.",
             description = "O modo somente cards tira a barra de título e o rodapé e deixa a grade de " +
                 "cards; a faixa de título volta enquanto o ponteiro está sobre o topo da janela. A " +
-                "barra HUD vai mais longe: encolhe a janela a um painel de uma linha por conta, " +
-                "sempre no topo das outras, arrastável e que gruda na borda mais próxima. Parada, " +
-                "ela mostra a primeira conta; o ponteiro em cima devolve a lista inteira e " +
-                "acrescenta, ao lado de cada cota, a hora em que ela reinicia — a cota que não " +
-                "tem reset a mostrar, como um saldo pré-pago, sai só com o percentual. A " +
-                "primeira linha termina com quanto falta para a próxima coleta automática. Os " +
-                "dois modos são exclusivos: ligar um desliga o outro.",
+                "barra HUD vai mais longe: esconde a janela e deixa um notch colado numa borda da " +
+                "tela, sempre no topo das outras, com um anel por conta — um arco por cota —, o " +
+                "percentual e a palavra do estado. Com o ponteiro sobre um anel abre-se o balão " +
+                "daquela conta: cada cota com a barra, quanto foi usado e quanto resta e a hora " +
+                "em que ela reinicia, o plano e de onde veio a leitura, e os mesmos botões do " +
+                "card. Clicar num anel atualiza aquela conta. Nas pontas do notch ficam a mão, " +
+                "que o move, e a engrenagem, que abre o que o rodapé oferece. O notch termina com " +
+                "quanto falta para a próxima coleta automática. Os dois modos são exclusivos: " +
+                "ligar um desliga o outro.",
             steps = listOf(
                 "No rodapé da janela (modo Padrão), clique no ícone \"Modo de janela\" e escolha " +
                     "\"Padrão\", \"Somente os cards\" ou \"Barra HUD\".",
                 "No modo Somente cards, o mesmo menu está na faixa revelada ao passar o mouse no " +
                     "topo — troca direto para a Barra HUD sem passar pelo Padrão.",
-                "Na Barra HUD, um clique curto devolve a janela ao Padrão; o botão direito troca " +
-                    "direto para Somente cards.",
+                "Na Barra HUD, clique na engrenagem da ponta do notch e escolha \"Padrão\" ou " +
+                    "\"Somente os cards\"; o botão direito sobre o notch troca direto para " +
+                    "Somente cards.",
                 "Pelas Configurações: abra \"Geral\" e use \"Somente os cards\" ou \"Barra HUD\".",
                 "Pelo teclado: Ctrl+Shift+M alterna o modo somente cards e Ctrl+Shift+H alterna a " +
                     "barra HUD.",
                 "O menu do ícone da bandeja tem as duas entradas — é o caminho de volta quando a " +
                     "janela está coberta por outra.",
-                "Na barra HUD, arraste para escolher o canto."
+                "Na barra HUD, arraste pela mão da ponta do notch (só ela move) e solte " +
+                    "perto de qualquer borda — em cima, embaixo ou nas laterais: ele gruda na mais " +
+                    "próxima e fica ali na próxima abertura."
             ),
             mediaId = "window-modes"
         )
@@ -511,26 +516,31 @@ object HelpCatalog {
             summary = "The window cut down to the cards, or to a floating always-on-top strip.",
             description = "Cards only mode drops the title bar and the footer and leaves the card " +
                 "grid; the title strip comes back while the pointer is over the top of the window. " +
-                "The HUD strip goes further: it shrinks the window to a panel with one line per " +
-                "account, always above other windows, draggable and snapping to the nearest edge. " +
-                "With everything on track it collapses to a single dot; hovering brings the whole " +
-                "list back and adds, next to each quota, the time it resets — a quota with no " +
-                "reset to show, such as a prepaid balance, keeps only its percentage. The first " +
-                "row ends with how long is left until the next automatic " +
-                "collection. The two modes are mutually exclusive: turning one on turns the other off.",
+                "The HUD strip goes further: it hides the window and leaves a notch docked to a " +
+                "screen edge, always above other windows, with one ring per account — one arc per " +
+                "quota —, the percentage and the status word. Hovering a ring opens that " +
+                "account's balloon: each quota with its bar, how much is used and left and when " +
+                "it resets, the plan and where the reading came from, and the card's own buttons. " +
+                "Clicking a ring refreshes that account. At the ends of the notch sit the hand, " +
+                "which moves it, and the gear, which opens what the footer offers. The notch ends " +
+                "with how long is left until the next automatic collection. The two modes are " +
+                "mutually exclusive: turning one on turns the other off.",
             steps = listOf(
                 "In the window footer (Standard mode), click the \"Window mode\" icon and pick " +
                     "\"Standard\", \"Cards only\" or \"HUD strip\".",
                 "In Cards only mode, the same menu is in the strip revealed by hovering the top — " +
                     "it jumps straight to the HUD strip without going through Standard.",
-                "On the HUD strip, a short click restores the window to Standard; the right mouse " +
-                    "button switches straight to Cards only.",
+                "On the HUD strip, click the gear at the end of the notch and pick \"Standard\" or " +
+                    "\"Cards only\"; the right mouse button over the notch switches straight to " +
+                    "Cards only.",
                 "From Settings: open \"General\" and use \"Cards only\" or \"HUD strip\".",
                 "From the keyboard: Ctrl+Shift+M toggles cards only mode and Ctrl+Shift+H toggles " +
                     "the HUD strip.",
                 "The tray icon menu carries both entries — that is the way back when the window is " +
                     "covered by another one.",
-                "On the HUD strip, drag to choose the corner."
+                "On the HUD strip, drag the hand at the end of the notch (only the hand moves it) and " +
+                    "drop it near any edge — top, bottom or the sides: it docks to the nearest one " +
+                    "and stays there next time."
             ),
             mediaId = "window-modes"
         )

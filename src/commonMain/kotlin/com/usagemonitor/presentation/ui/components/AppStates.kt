@@ -1,5 +1,18 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,9 +41,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.getValue
 import com.usagemonitor.presentation.ui.theme.AppAccents
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.ui.theme.appSpring
+import com.usagemonitor.presentation.ui.theme.appTween
 
 /**
  * Primitivas de estado: aviso, vazio, carregando, erro, indicador e barra.
@@ -145,6 +163,12 @@ fun AppStatusIndicator(
  * mais padding usa `roundToPx`, que acompanha a altura do trilho, e é também o
  * `box-sizing: border-box` que o protótipo especifica, em que a cor nunca fica
  * por baixo do anel.
+ *
+ * **A largura anda por mola e a cor por tween**, as duas finitas. Antes a barra
+ * saltava de largura e de tom no quadro da coleta, e era o salto mais visível da
+ * tela — a cota muda a cada dez minutos em todo card ao mesmo tempo. A mola é a
+ * [AppMotion.Springs.GENTLE], sem rebote: barra que passa do valor antes de
+ * voltar mostra um percentual que não é verdade.
  */
 @Composable
 fun AppProgressTrack(
@@ -152,7 +176,16 @@ fun AppProgressTrack(
     tone: AppTone,
     modifier: Modifier = Modifier
 ) {
-    val safe = fraction.coerceIn(0f, 1f)
+    val safe by animateFloatAsState(
+        targetValue = fraction.coerceIn(0f, 1f),
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = PROGRESS_VISIBILITY_THRESHOLD),
+        label = "appProgressFraction"
+    )
+    val fill by animateColorAsState(
+        targetValue = tone.color(),
+        animationSpec = appTween(AppMotion.normal),
+        label = "appProgressTone"
+    )
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -172,10 +205,16 @@ fun AppProgressTrack(
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(safe)
-                .background(tone.color())
+                .background(fill)
         )
     }
 }
+
+/**
+ * Um milésimo da largura: abaixo disso a diferença é menor que um pixel mesmo
+ * numa barra de 1000dp, e a mola continuaria pedindo quadros sem nada mudar.
+ */
+private const val PROGRESS_VISIBILITY_THRESHOLD = 0.001f
 
 /**
  * Aviso: barra de severidade, título, descrição e ação.
@@ -288,10 +327,10 @@ fun AppEmptyState(
 /**
  * Carregando: esqueleto **estático**.
  *
- * Sem shimmer. `ShimmerBox` é a única animação infinita da app e continua onde
- * está, mas não se replica: animação sem fim trava o `waitForIdle` dos testes
- * de componente, e cada tela nova que a copiasse tornaria uma suíte inteira
- * impossível de escrever.
+ * Sem shimmer. O `ShimmerBox` foi apagado: não tinha chamador, e o deslocamento
+ * do gradiente era em pixels, então ele varria três pixels e não a caixa.
+ * Animação contínua existe agora só atrás de `AppMotionPolicy.continuous`, e
+ * carregamento não é estado vivo — é espera, e esqueleto parado a descreve.
  */
 @Composable
 fun AppLoadingState(
@@ -371,7 +410,7 @@ fun AppConfirmationDialog(
     onDismiss: () -> Unit,
     confirmTag: String? = null
 ) {
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { ModalDialogText(message) },
@@ -403,4 +442,96 @@ private fun AppCenteredState(
         verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         content = content
     )
+}
+
+/**
+ * Troca de estado de uma tela: carregando → dados → erro, lista → detalhe.
+ *
+ * Duas telas animavam a troca e o resto não; e as duas que animavam tinham o
+ * mesmo defeito: a lambda do `AnimatedContent` **ignorava o argumento** e lia o
+ * estado atual de fora (`{ _ -> when (val state = uiState) ... }`). Durante a
+ * transição os dois slots desenhavam o estado novo — o esqueleto de
+ * carregamento sumia no primeiro quadro e duas grades de cards se sobrepunham
+ * esmaecendo. Aqui o conteúdo **só** recebe o estado pelo parâmetro, e não há
+ * como ler o de fora sem escrever isso explicitamente.
+ *
+ * [key] decide o que é "outra tela": por default a classe do estado, então
+ * `Success` → `Success` (o tique do laço ao vivo) atualiza no lugar, sem
+ * transição — animar a cada 5s seria o pisca que o laço existe para evitar.
+ */
+@Composable
+fun <S : Any> AppStateCrossfade(
+    state: S,
+    modifier: Modifier = Modifier,
+    key: (S) -> Any = { current -> current::class },
+    label: String = "appStateCrossfade",
+    content: @Composable (S) -> Unit
+) {
+    val enterFade = appTween<Float>(AppMotion.normal, AppMotion.emphasizedEasing)
+    val exitFade = appTween<Float>(AppMotion.fast, AppMotion.exitEasing)
+    val rise = appSpring<IntOffset>(AppMotion.Springs.GENTLE, visibilityThreshold = IntOffset.VisibilityThreshold)
+    AnimatedContent(
+        targetState = state,
+        modifier = modifier,
+        contentKey = key,
+        transitionSpec = {
+            (fadeIn(enterFade) + slideInVertically(rise) { height -> height / STATE_RISE_FRACTION })
+                .togetherWith(fadeOut(exitFade))
+                .using(SizeTransform(clip = false))
+        },
+        label = label
+    ) { current ->
+        content(current)
+    }
+}
+
+/** A tela nova sobe 1/24 da própria altura: movimento que se sente, não que se vê. */
+private const val STATE_RISE_FRACTION = 24
+
+/**
+ * Bloco que abre e fecha: cresce de cima para baixo com a mola `GENTLE` e fade,
+ * recolhe em tween curto.
+ *
+ * Trocava-se `if (expanded) content()`, e o conteúdo aparecia de uma vez,
+ * empurrando tudo abaixo dele num quadro. Fechado, o conteúdo **sai da
+ * composição** depois da saída, como antes: dois gráficos e sete cards não têm
+ * por que existir na árvore só para ficarem invisíveis.
+ */
+@Composable
+fun AppExpandable(
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val grow = appSpring<IntSize>(AppMotion.Springs.GENTLE, visibilityThreshold = IntSize.VisibilityThreshold)
+    val shrink = appTween<IntSize>(AppMotion.fast, AppMotion.exitEasing)
+    val enterFade = appTween<Float>(AppMotion.normal)
+    val exitFade = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+    AnimatedVisibility(
+        visible = expanded,
+        modifier = modifier,
+        enter = expandVertically(grow, expandFrom = Alignment.Top) + fadeIn(enterFade),
+        exit = shrinkVertically(shrink, shrinkTowards = Alignment.Top) + fadeOut(exitFade),
+        label = "appExpandable"
+    ) {
+        content()
+    }
+}
+
+/**
+ * O último valor não nulo. Serve a quem esconde uma faixa quando o dado vira
+ * `null`: sem ele a saída animada não teria o que desenhar, porque o conteúdo
+ * já teria perdido o valor no quadro em que começou a sair.
+ */
+@Composable
+fun <T : Any> rememberLatestNonNull(value: T?): T? {
+    val holder = remember { LatestHolder<T>() }
+    if (value != null) {
+        holder.value = value
+    }
+    return holder.value
+}
+
+private class LatestHolder<T : Any> {
+    var value: T? = null
 }

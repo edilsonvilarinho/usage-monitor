@@ -1,5 +1,6 @@
 package com.usagemonitor.data.mapper
 
+import com.usagemonitor.domain.entity.cursorPlanLabel
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CursorQuotaLabels
@@ -89,7 +90,8 @@ internal object CursorUsageMapper {
         return ApiUsageStats(
             source = ApiSource.CURSOR,
             apiName = "Cursor",
-            quotas = quotas
+            quotas = quotas,
+            planLabel = cursorPlanLabel(root.stringAt("membershipType"))
         )
     }
 

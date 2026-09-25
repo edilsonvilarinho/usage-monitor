@@ -32,5 +32,9 @@ design here.
 window, clipped to its bounds, and the footer is the window's last row — a menu that only opened
 downwards would be born outside the window. The position is pinned to the window on both axes.
 
-**No entry animation.** The same rule as everywhere else in this system: an endless one stalls the
-component tests' idle wait, and a menu is not where a one-off transition earns its cost.
+**It enters and leaves.** The first version refused an entry animation, and the menu appeared and
+vanished in one frame — the single most abrupt moment in the app, on the control used to switch the
+whole window mode. Entry: scale 0.96 → 1 on the `EXPRESSIVE` spring plus a fade, **growing from the
+edge that touches the anchor** (a menu that opens upwards grows from its bottom). Exit: fade only,
+90ms. The popup stays composed until the exit finishes and then leaves the tree — a popup kept at
+alpha zero would still capture the window's clicks. Depth `OVERLAY` (`--shadow-overlay`).

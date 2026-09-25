@@ -1,130 +1,57 @@
-import type { ReactNode, CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
+import type { AppRingLevel } from '../data/AppUsageRing';
+
+export interface AppHudQuota {
+  /** `5h`, `7d`, `Saldo` — last word of the quota label, for the ring description. */
+  short: string;
+  /** The card's quota title in the balloon: `Sessão 5h`, `Semanal`. */
+  title?: string;
+  /** The card's truncated percentage. */
+  percent: string;
+  fraction: number;
+  level: AppRingLevel;
+  /** Short reset time, drawn in the balloon as "Reinicia …"; absent prints nothing. */
+  reset?: string;
+  /** "68% usado · 32% restante"; absent for balances and observed activity. */
+  usedLeft?: string;
+  forecast?: boolean;
+}
+
+export interface AppHudAccount {
+  label: string;
+  /** Word of the account's worst quota — always shown, even at rest. */
+  statusLabel: string;
+  level: AppRingLevel;
+  quotas: AppHudQuota[];
+  /** Index of the quota whose percent the notch prints: worst risk, then highest percent. */
+  focus?: number;
+  /** CLI session with a turn in the last 5 minutes. */
+  active?: boolean;
+  /** Plan and origin of the reading: "Plus · via Codex". */
+  detail?: string;
+}
 
 /**
- * The HUD: **one 20dp row per account.** Each row carries dot and word for that
- * account's worst quota, the account name, and one dot per quota beside its
- * percentage. At rest only the first account in the user's card order is drawn;
- * hovering draws them all, with the window growing interpolated rather than in
- * one jump.
- *
- * The per-quota dot without a word has an exact precedent: it is the card's own
- * design — a dot per quota, plus one header badge with dot and word summarising
- * the worst. The row's word plays that badge's part, so color never states
- * anything the row has not already said in writing. Dragged to wherever the user wants it; on release
- * it snaps to the nearest work-area edge. A short click anywhere returns the
- * full window.
- *
- * Five content versions, four corrected after using it. A single line with the
- * worst source: the other accounts had no signal they existed. Those others
- * behind a hover tooltip: a popup here is a layer *inside* the window, clipped
- * to its bounds, so it landed on top of its own trigger and flickered. One row
- * per *source*, always visible: an account with both a 5h and a 7d window still
- * showed a single limit. One row per *quota* plus a spend footer, always
- * visible: ten rows on screen to say what fits in one. What stuck joins the two
- * halves that were right.
- *
- * The component doesn't own its width: it fills whatever the host gives it, and
- * the name truncates rather than force it wider. The host measures the window
- * from these same labels (mono type makes the advance calculable) and resizes.
- * The cap belongs to the **state**, not to the component: 484dp while resting,
- * plus three reset columns while expanded — keeping the resting cap there would
- * make the reset column be paid for by the account name.
- * @startingPoint section="Shell" subtitle="HUD — one line, list on hover" viewport="700x320"
+ * The HUD notch (Compose: `HudNotch` in its own transparent window,
+ * `HudWindowHost`). Docked to a screen edge — flat and flush there, rounded on
+ * the inner side, concave shoulders joining the two. The notch never grows: per
+ * account, a usage ring, the focus percentage and the status word. Hovered, the
+ * move hand and the gear appear past its ends, and a balloon for **one**
+ * account — the ring under the pointer — or for the gear opens beside it.
  */
 export interface AppHudBarProps {
-  /** Tone of the dot in the collapsed state; each row carries its own. */
-  level?: 'ok' | 'warn' | 'crit' | 'off';
-  /**
-   * One entry per account, in the user's card order. At rest only the **first**
-   * is drawn; hovering draws them all.
-   */
-  sources?: Array<{
-    /** Profile or source name, without any quota label. */
-    label: ReactNode;
-    /**
-     * Vendor key for the second identity reinforcement (`AppSourceDot`,
-     * 6dp) drawn before the name — `anthropic`, `codex`, `deepseek`, etc.
-     * Absent draws no dot, same as today. This bar has no `AppSourceMark`
-     * (the card's 2dp bar): a row with several accounts of different
-     * providers reads as plain text with no vendor signal at all until this
-     * lands. **Proposed here only** (issue #223) — not wired into the
-     * Compose bar yet: the panel's width caps (`HUD_PILL_MAX_WIDTH`,
-     * `HUD_PANEL_MAX_WIDTH`) are measured per character against the real
-     * accounts on a machine, and this adds a column that measurement never
-     * accounted for. Wiring it needs the same treatment issue #185 gave the
-     * countdown column — measured against real accounts, not estimated.
-     */
-    source?: string;
-    /** Word for the **worst** quota of that account — the card badge's role. */
-    statusLabel: ReactNode;
-    level?: 'ok' | 'warn' | 'crit' | 'off';
-    /**
-     * Every quota of that account, in the API's order.
-     *
-     * `reset` is the short reset label — `22h59`, `Ter 21h00` — and it is drawn
-     * **only while expanded**: the resting pill is the one that sits on screen
-     * capturing the click of whatever is behind it, so the reset is a detail on
-     * demand. Absent means "no reset to show" (a balance that never expires, a
-     * window with no known reset) and nothing is printed in its place, not even
-     * a dash.
-     */
-    quotas?: Array<{
-      text: ReactNode;
-      level?: 'ok' | 'warn' | 'crit' | 'off';
-      reset?: ReactNode;
-    }>;
-  }>;
-  /** Word of the single line shown before the first collection lands. */
-  fallbackLabel?: ReactNode;
-  /**
-   * A pending app update, if any (issue #225).
-   *
-   * Icon only, no visible text — the sentence rides entirely in `label`,
-   * the icon's accessible name, same treatment as `countdownLabel`: there is
-   * no tooltip to lean on inside this window. Drawn once, on the first row,
-   * right after the quotas and before the countdown — both are app-wide
-   * signals, not account ones, so they follow the quotas rather than sit
-   * among them. `absent` means no update pending: auto-update off, or the
-   * installed version is already current.
-   *
-   * **No click of its own.** The badge sits inside the same `onOpen` target
-   * as the rest of the bar — a short click anywhere, including the badge,
-   * returns the full window, where the standard update strip already offers
-   * "Restart and update now". A dedicated restart action here would make a
-   * routine click on the bar restart the app without warning whenever an
-   * update happened to be ready — worse than the missing indicator this
-   * prop fixes.
-   */
-  update?: {
-    level: 'ok' | 'warn' | 'crit' | 'info';
-    label: string;
-  };
-  /**
-   * Time left until the next automatic collection, already formatted as `mm:ss`.
-   *
-   * It is drawn **once**, on the first row, and never in the collapsed state.
-   * The polling is a single loop for the whole app, not one per account, so a
-   * countdown on every row would claim each account has its own collection.
-   *
-   * This reference component only prints what it is handed. The Compose one ticks
-   * inside instead, because there the host is the window composable that builds
-   * the whole application graph and a per-second state in it would recompose all
-   * of it — see the contract note.
-   */
-  countdown?: ReactNode;
-  /**
-   * What the countdown means, spelled out — the icon's accessible name.
-   *
-   * There is no tooltip to lean on here (a popup is a layer *inside* the window
-   * and gets clipped over its own trigger), so the icon is the only thing that
-   * says which time this is, and this sentence is how a screen reader reaches it.
-   */
-  countdownLabel?: string;
-  /** The pointer is over the bar: the list replaces the single line. */
-  expanded?: boolean;
-  /** Fires on a short click anywhere — restores the full window. */
-  onOpen?: () => void;
+  accounts?: AppHudAccount[];
+  edge?: 'top' | 'bottom' | 'left' | 'right';
+  /** Which balloon is open: an account index, `'gear'`, or none (resting). */
+  balloon?: number | 'gear';
+  fallbackLabel?: string;
+  /** `02:05` — next automatic collection, once, at the end of the strip. */
+  countdown?: string;
+  /** Pending update sentence; the icon has no click of its own. */
+  update?: string;
+  /** Glyphs of the card's buttons shown in an account balloon (refresh is always last). */
+  actions?: string[];
   style?: CSSProperties;
 }
 
-export function AppHudBar(props: AppHudBarProps): JSX.Element;
+export declare function AppHudBar(props: AppHudBarProps): JSX.Element;

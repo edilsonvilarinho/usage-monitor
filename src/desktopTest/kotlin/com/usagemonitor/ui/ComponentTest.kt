@@ -82,6 +82,7 @@ import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.HUD_MODE_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.REDUCED_MOTION_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
@@ -100,12 +101,15 @@ import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
-import com.usagemonitor.presentation.ui.components.UsageArcChart
+import com.usagemonitor.presentation.ui.components.AppRingArc
+import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
 import com.usagemonitor.presentation.ui.components.quotaBlockTag
 import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
 import com.usagemonitor.presentation.ui.historyAccountChipTag
 import com.usagemonitor.presentation.ui.theme.AppTheme
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_PLAN_TAG
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -149,36 +153,71 @@ class ComponentTest {
         const val HISTORY_SCENE_HEIGHT = 1_600
     }
 
-    // ── UsageArcChart ────────────────────────────────────────────────────
+    // ── AppUsageRing ─────────────────────────────────────────────────────
 
+    /** O anel nunca informa sozinho: a frase inteira vai na semântica. */
     @Test
-    fun `UsageArcChart displays percentage text`() = runDesktopComposeUiTest {
+    fun `AppUsageRing carries account word and quotas in its description`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                UsageArcChart(
-                    used = 500L,
-                    total = 1000L,
-                    unit = UsageUnit.REQUESTS
+                AppUsageRing(
+                    arcs = listOf(
+                        AppRingArc(fraction = 0.88f, tone = AppTone.CRITICAL),
+                        AppRingArc(fraction = 0.09f, tone = AppTone.OK)
+                    ),
+                    description = "Padrão · Crítico · 5h 88% · 7d 9%"
                 )
             }
         }
 
-        onNodeWithText("50%").assertIsDisplayed()
+        onNodeWithContentDescription("Padrão · Crítico · 5h 88% · 7d 9%").assertIsDisplayed()
     }
 
+    /**
+     * Sessão ativa e atenção sob a política estática: o anel não cria animação
+     * sem fim — chegar ao assert já prova que o `waitForIdle` voltou.
+     */
     @Test
-    fun `UsageArcChart shows 0 percent when total is 0`() = runDesktopComposeUiTest {
+    fun `AppUsageRing active and attention do not animate forever without the policy`() = runDesktopComposeUiTest {
         setContent {
             AppTheme(isDark = true) {
-                UsageArcChart(
-                    used = 0L,
-                    total = 0L,
-                    unit = UsageUnit.TOKENS
+                AppUsageRing(
+                    arcs = listOf(AppRingArc(fraction = 1.4f, tone = AppTone.CRITICAL, hasForecast = false)),
+                    description = "Codex · Crítico",
+                    active = true,
+                    attention = true
                 )
             }
         }
 
-        onNodeWithText("0%").assertIsDisplayed()
+        onNodeWithContentDescription("Codex · Crítico").assertIsDisplayed()
+    }
+
+    /** O plano da conta sai como selo ao lado do nome, e sem plano não há selo. */
+    @Test
+    fun `ApiUsageCard shows the account plan beside the title`() = runDesktopComposeUiTest {
+        var plan by mutableStateOf<String?>("Max 20x")
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic — Padrão",
+                    quotas = emptyList(),
+                    planLabel = plan,
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    onRefresh = {},
+                    onOpenHistory = {},
+                    animationDelayMillis = 0
+                )
+            }
+        }
+
+        onNodeWithTag(API_USAGE_CARD_PLAN_TAG).assertTextEquals("Max 20x")
+        plan = null
+        waitForIdle()
+        onNodeWithTag(API_USAGE_CARD_PLAN_TAG).assertDoesNotExist()
     }
 
     @Test
@@ -2701,6 +2740,34 @@ class ComponentTest {
         }
 
         onNodeWithTag(HUD_MODE_SWITCH_TEST_TAG).performScrollTo().performClick()
+
+        assertEquals(true, enabled)
+    }
+
+    /** "Reduzir animações" mora em Aparência, ao lado da escala da interface. */
+    @Test
+    fun `SettingsDialogContent emits the reduced motion change`() = runDesktopComposeUiTest {
+        var enabled: Boolean? = null
+
+        setContent {
+            AppTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    reducedMotion = false,
+                    onReducedMotionChange = { value -> enabled = value },
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        onNodeWithText("Reduzir animações").assertExists()
+        onNodeWithTag(REDUCED_MOTION_SWITCH_TEST_TAG).performScrollTo().performClick()
 
         assertEquals(true, enabled)
     }

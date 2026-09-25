@@ -34,8 +34,8 @@ import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.presentation.ui.HudQuotaChip
-import com.usagemonitor.presentation.ui.HudSourceStatus
+import com.usagemonitor.presentation.ui.HudQuota
+import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
@@ -139,6 +139,7 @@ internal object ScreenshotFixtures {
             targetKey = primaryAnthropicTarget,
             apiName = "Anthropic",
             profileLabel = "Padrão",
+            planLabel = "Max 20x",
             accountContext = primaryAccount,
             quotas = listOf(
                 fiveHourQuota(usedPercent = 68L, endsAt = NOW.plusHours(2)),
@@ -151,6 +152,7 @@ internal object ScreenshotFixtures {
             targetKey = secondaryAnthropicTarget,
             apiName = "Anthropic",
             profileLabel = "Sandbox",
+            planLabel = "Pro",
             accountContext = secondaryAccount,
             quotas = listOf(
                 fiveHourQuota(usedPercent = 12L, endsAt = NOW.plusHours(4)),
@@ -160,6 +162,7 @@ internal object ScreenshotFixtures {
         ApiUsageStats(
             source = ApiSource.CODEX,
             apiName = "Codex",
+            planLabel = "ChatGPT Plus",
             accountContext = codexAccount,
             quotas = listOf(
                 QuotaInfo(
@@ -229,6 +232,7 @@ internal object ScreenshotFixtures {
         ApiUsageStats(
             source = ApiSource.CURSOR,
             apiName = "Cursor",
+            planLabel = "Pro",
             quotas = listOf(
                 QuotaInfo(
                     label = CursorQuotaLabels.AUTO,
@@ -789,32 +793,43 @@ internal object ScreenshotFixtures {
      * coleta vista de outro jeito, e números diferentes nas duas telas fariam
      * quem compara as demos duvidar de qual está certa.
      */
-    val hudSources: List<HudSourceStatus> = listOf(
-        HudSourceStatus(
+    val hudAccounts: List<HudAccount> = listOf(
+        HudAccount(
+            targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "padrao"),
             label = "Anthropic — Padrão",
             statusLabel = "Atenção",
             tone = AppTone.WARNING,
             quotas = listOf(
-                HudQuotaChip(text = "5h 68%", tone = AppTone.WARNING, resetText = "22h59"),
-                HudQuotaChip(text = "7d 41%", tone = AppTone.OK, resetText = "Ter 21h00")
-            )
+                HudQuota("5h", "68%", 0.68f, AppTone.WARNING, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "68% usado · 32% restante"),
+                HudQuota("7d", "41%", 0.41f, AppTone.OK, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "41% usado · 59% restante")
+            ),
+            focusIndex = 0,
+            sessionActive = true,
+            planLabel = "Max 20x",
+            originLabel = "via Claude Code"
         ),
-        HudSourceStatus(
+        HudAccount(
+            targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "sandbox"),
             label = "Anthropic — Sandbox",
             statusLabel = "Normal",
             tone = AppTone.OK,
             quotas = listOf(
-                HudQuotaChip(text = "5h 12%", tone = AppTone.OK, resetText = "1h30"),
-                HudQuotaChip(text = "7d 7%", tone = AppTone.OK, resetText = "Qui 9h00")
-            )
+                HudQuota("5h", "12%", 0.12f, AppTone.OK, resetText = "1h30", hasForecast = true, title = "Sessão 5h", usedLeftText = "12% usado · 88% restante"),
+                HudQuota("7d", "7%", 0.07f, AppTone.OK, resetText = "Qui 9h00", hasForecast = true, title = "Semanal", usedLeftText = "7% usado · 93% restante")
+            ),
+            focusIndex = 0,
+            originLabel = "via Claude Code"
         ),
-        // Sem `resetText`: o saldo pré-pago não expira, e a demo mostra que a
-        // linha dele sai só com o percentual — é o "caso item tenha" da #189.
-        HudSourceStatus(
+        // Sem reset: o saldo pré-pago não expira, e a linha dele sai só com o
+        // percentual — é o "caso item tenha" da #189.
+        HudAccount(
+            targetKey = UsageTargetKey.forSource(ApiSource.DEEPSEEK),
             label = "DeepSeek",
             statusLabel = "Normal",
             tone = AppTone.OK,
-            quotas = listOf(HudQuotaChip(text = "Saldo 62%", tone = AppTone.OK))
+            quotas = listOf(HudQuota("Saldo", "62%", 0.62f, AppTone.OK, resetText = null, hasForecast = true, title = "Saldo")),
+            focusIndex = 0,
+            originLabel = "via chave de API"
         )
     )
 

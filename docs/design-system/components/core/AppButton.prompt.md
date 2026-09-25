@@ -11,3 +11,7 @@ Text button for every committing, refreshing or navigating action — the app's 
 - One `primary` per surface, maximum. Panels and status bars use `ghost`.
 - A disabled button ALWAYS carries `title` with the reason. A grey control with no explanation is worse than no control.
 - No circular buttons, no pill radius, no uppercase labels.
+
+**Press.** The pressed layer is added over the hover color — one step above it in every tone. **No
+scale**: scaling a layer with Plex Mono blurs the strokes while it runs. No ripple either; the
+platform ripple is not part of this system.

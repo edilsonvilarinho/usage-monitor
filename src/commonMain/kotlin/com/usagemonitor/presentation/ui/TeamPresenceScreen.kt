@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.appItemMotion
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -234,27 +236,29 @@ internal fun TeamPresenceContent(
     var pendingAccount by remember { mutableStateOf<TeamPresenceAccountGroup?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
-        when (state) {
-            is TeamPresenceUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
+        AppStateCrossfade(state) { state ->
+    when (state) {
+                is TeamPresenceUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
 
-            is TeamPresenceUiState.Error -> AppErrorState(
-                TeamPresenceLabels.error(state.message, language)
-            )
+                is TeamPresenceUiState.Error -> AppErrorState(
+                    TeamPresenceLabels.error(state.message, language)
+                )
 
-            is TeamPresenceUiState.Success -> TeamPresenceList(
-                state = state,
-                language = language,
-                localDeviceId = localDeviceId,
-                canManage = canManage && state.isAdminOverview,
-                actionError = actionError,
-                onToggleAccount = onToggleAccount,
-                onSetOnlyOnline = onSetOnlyOnline,
-                onQueryChange = onQueryChange,
-                onRequestRemoveMember = { entry -> pendingMember = entry },
-                onRequestDeleteAccount = { group -> pendingAccount = group },
-                onDismissActionError = onDismissActionError
-            )
-        }
+                is TeamPresenceUiState.Success -> TeamPresenceList(
+                    state = state,
+                    language = language,
+                    localDeviceId = localDeviceId,
+                    canManage = canManage && state.isAdminOverview,
+                    actionError = actionError,
+                    onToggleAccount = onToggleAccount,
+                    onSetOnlyOnline = onSetOnlyOnline,
+                    onQueryChange = onQueryChange,
+                    onRequestRemoveMember = { entry -> pendingMember = entry },
+                    onRequestDeleteAccount = { group -> pendingAccount = group },
+                    onDismissActionError = onDismissActionError
+                )
+    }
+}
     }
 
     val memberToRemove = pendingMember
@@ -399,13 +403,15 @@ private fun TeamPresenceList(
                     // a da janela e repeti-la aqui seria ruído.
                     if (state.isAdminOverview) {
                         item(key = "email:${emailGroup.groupKey}") {
-                            TeamPresenceEmailHeader(
-                                group = emailGroup,
-                                expanded = state.isEmailExpanded(emailGroup),
-                                language = language,
-                                hasActionColumn = canManage,
-                                onToggle = { onToggleAccount(emailGroup.groupKey) }
-                            )
+                            Box(modifier = appItemMotion()) {
+                                TeamPresenceEmailHeader(
+                                    group = emailGroup,
+                                    expanded = state.isEmailExpanded(emailGroup),
+                                    language = language,
+                                    hasActionColumn = canManage,
+                                    onToggle = { onToggleAccount(emailGroup.groupKey) }
+                                )
+                            }
                         }
                     }
 
@@ -427,32 +433,36 @@ private fun TeamPresenceList(
                         }
                         if (state.isAdminOverview) {
                             item(key = "uuid:${account.accountKey}") {
-                                TeamPresenceAccountSubgroupHeader(
-                                    group = account,
-                                    language = language,
-                                    deletable = canManage && !isLocalAccount,
-                                    hasActionColumn = canManage,
-                                    onDelete = { onRequestDeleteAccount(account) }
-                                )
+                                Box(modifier = appItemMotion()) {
+                                    TeamPresenceAccountSubgroupHeader(
+                                        group = account,
+                                        language = language,
+                                        deletable = canManage && !isLocalAccount,
+                                        hasActionColumn = canManage,
+                                        onDelete = { onRequestDeleteAccount(account) }
+                                    )
+                                }
                             }
                         }
 
                     items(count = account.entries.size, key = { index -> account.entries[index].memberKey }) { index ->
-                        val entry = account.entries[index]
-                        val isLocalMachine = localDeviceId != null && entry.deviceId == localDeviceId
-                        TeamPresenceRow(
-                            entry = entry,
-                            language = language,
-                            isLocalMachine = isLocalMachine,
-                            indent = entryIndent,
-                            // Mesma regra do modal de consumo: esta máquina volta
-                            // no próximo envio, então o botão entregaria uma
-                            // remoção que se desfaz sozinha.
-                            removable = canManage && !isLocalMachine,
-                            hasHealthColumn = hasHealthColumn,
-                            hasActionColumn = canManage,
-                            onRemove = { onRequestRemoveMember(entry) }
-                        )
+                        Box(modifier = appItemMotion()) {
+                            val entry = account.entries[index]
+                            val isLocalMachine = localDeviceId != null && entry.deviceId == localDeviceId
+                            TeamPresenceRow(
+                                entry = entry,
+                                language = language,
+                                isLocalMachine = isLocalMachine,
+                                indent = entryIndent,
+                                // Mesma regra do modal de consumo: esta máquina volta
+                                // no próximo envio, então o botão entregaria uma
+                                // remoção que se desfaz sozinha.
+                                removable = canManage && !isLocalMachine,
+                                hasHealthColumn = hasHealthColumn,
+                                hasActionColumn = canManage,
+                                onRemove = { onRequestRemoveMember(entry) }
+                            )
+                        }
                     }
                     }
                 }
@@ -477,8 +487,9 @@ private fun TeamPresenceHeader(
     onSetOnlyOnline: (Boolean) -> Unit,
     onQueryChange: (String) -> Unit
 ) {
-    // Superfície de dados como as outras: `AppElevation.dialog` num painel dentro
-    // da janela punha 8dp de sombra sob um bloco que não flutua sobre nada.
+    // Superfície de dados como as outras, com o patamar `AppDepth.CARD` que ela
+    // já traz: a sombra de diálogo que existia aqui punha 8dp sob um bloco que
+    // não flutua sobre nada.
     //
     // `Arrangement.Top` porque este bloco separa os filhos com o `Spacer` que ele
     // já traz; o `spacedBy` default somaria 8dp a cada um deles.

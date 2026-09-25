@@ -1,141 +1,135 @@
 import React from 'react';
-import { AppStatusIndicator } from '../data/AppStatusIndicator.jsx';
-import { AppStatusDot } from '../data/AppStatusDot.jsx';
-import { AppSourceDot } from '../core/AppSourceMark.jsx';
 
+const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info: 'var(--info)', off: 'var(--muted)' };
+
+// O notch da HUD (Compose: `HudNotch`). Colado numa borda da tela: reto e rente
+// nela, cantos redondos do lado de dentro e ombros côncavos ligando os dois.
+// O notch não cresce: por conta, anel + percentual em foco + palavra. Com o
+// ponteiro em cima aparecem as alças (mão e engrenagem) e, ao lado, o balão de
+// UMA conta — a do anel sob o ponteiro — ou o da engrenagem.
 export function AppHudBar({
-  level = 'ok',
-  sources = [],
-  fallbackLabel = 'Carregando',
-  expanded = false,
-  update,
-  countdown,
-  countdownLabel = 'Próxima atualização automática',
-  onOpen,
-  style
+  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, update,
+  actions = ['⟲', '▣'], style
 }) {
-  // Parada mostra a primeira conta; com o ponteiro em cima, todas.
-  const visible = expanded ? sources : sources.slice(0, 1);
+  const horizontal = edge === 'top' || edge === 'bottom';
+  const open = balloon !== undefined && balloon !== null;
+  const shoulder = 8;
+  const radius = 14;
+  const flat = {
+    top: { borderTop: 'none', borderRadius: `0 0 ${radius}px ${radius}px` },
+    bottom: { borderBottom: 'none', borderRadius: `${radius}px ${radius}px 0 0` },
+    left: { borderLeft: 'none', borderRadius: `0 ${radius}px ${radius}px 0` },
+    right: { borderRight: 'none', borderRadius: `${radius}px 0 0 ${radius}px` }
+  }[edge];
 
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label="Abrir Usage Monitor"
-      onClick={onOpen}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        maxWidth: 484,
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--r2)',
-        boxShadow: 'var(--shadow-8)',
-        background: 'var(--surface)',
-        overflow: 'hidden',
-        cursor: 'default',
-        ...style
-      }}
-    >
-      <div style={{ padding: 'var(--s1) 0' }}>
-          {visible.length === 0 ? (
-            <HudRow>
-              {/* O flex mora no indicador, não num spacer: a linha espaça os
-                  filhos, e um terceiro filho traria um vão que a medida da
-                  janela não conta. */}
-              <AppStatusIndicator level="off" style={{ flex: 1, minWidth: 0 }}>{fallbackLabel}</AppStatusIndicator>
-              {update ? <HudUpdateBadge update={update} /> : null}
-              {countdown ? <HudCountdown label={countdownLabel}>{countdown}</HudCountdown> : null}
-            </HudRow>
-          ) : visible.map((source, index) => (
-            <HudRow key={source.label}>
-              <AppStatusIndicator level={source.level}>{source.statusLabel}</AppStatusIndicator>
-              {/* Segundo ponto de reforço da identidade de vendor (issue
-                  #223): a barra de 2dp de AppSourceMark não existe neste
-                  cromo, e o nome sozinho não diz de que fornecedor é a
-                  conta. Proposta de design system, ainda não fiada no
-                  Compose — ver AppHudBar.prompt.md. */}
-              {source.source ? (
-                <AppSourceDot source={source.source} size={6} style={{ flex: 'none' }} />
-              ) : null}
-              <span style={NAME}>{source.label}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
-                {(source.quotas || []).map((chip) => (
-                  <span key={chip.text} style={{ display: 'flex', alignItems: 'center', gap: 'var(--s1)' }}>
-                    <AppStatusDot level={chip.level} />
-                    <span style={VALUE}>{chip.text}</span>
-                    {/* A hora do reinício, só no painel expandido: a pílula
-                        parada é a que fica na tela capturando clique de quem
-                        está atrás. Tom secundário e sem separador -- o vizinho
-                        é o percentual, que é consumo, e é o tom que os separa.
-                        Cota sem reset a mostrar não imprime nada no lugar. */}
-                    {expanded && chip.reset ? <span style={RESET}>{chip.reset}</span> : null}
-                  </span>
-                ))}
-              </span>
-              {/* Uma vez só, na primeira linha: atualização e contagem são
-                  informação do app inteiro, não da conta -- um por linha
-                  diria que cada conta tem a sua própria. */}
-              {index === 0 && update ? <HudUpdateBadge update={update} /> : null}
-              {index === 0 && countdown ? <HudCountdown label={countdownLabel}>{countdown}</HudCountdown> : null}
-            </HudRow>
-          ))}
-      </div>
+  const notch = (
+    <div style={{
+      display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center',
+      justifyContent: 'center', gap: 12, padding: horizontal ? `8px ${12 + shoulder}px` : `${12 + shoulder}px 8px`,
+      background: 'linear-gradient(var(--sheen), transparent 56px), var(--surface)',
+      border: '1px solid var(--border-top)', ...flat,
+      boxShadow: 'inset 0 1px 0 var(--highlight), var(--shadow-dialog)'
+    }}>
+      {accounts.length === 0 ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--muted)' }} />{fallbackLabel}
+        </span>
+      ) : accounts.map((account) => {
+        const focus = account.quotas[account.focus || 0] || account.quotas[0];
+        return (
+          <div key={account.label} style={{ display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center', gap: horizontal ? 6 : 0 }}>
+            <AppUsageRing
+              arcs={account.quotas.map((q) => ({ fraction: q.fraction, level: q.level, forecast: q.forecast }))}
+              active={account.active}
+              label={`${account.label} · ${account.statusLabel}`}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: horizontal ? 'flex-start' : 'center' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--fg)' }}>{focus && focus.percent}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', letterSpacing: '.07em', color: LEVELS[account.level] || LEVELS.off, textAlign: 'center', maxWidth: horizontal ? 'none' : 56 }}>{account.statusLabel}</span>
+            </div>
+          </div>
+        );
+      })}
+      {update ? <span title={update} style={{ color: 'var(--ok)', fontSize: 12 }}>⤓</span> : null}
+      {countdown ? (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>↻ {countdown}</span>
+      ) : null}
     </div>
   );
-}
 
-const NAME = { flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--t12)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
-const VALUE = { flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' };
-const RESET = { ...VALUE, color: 'var(--muted)' };
-const UPDATE_LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info: 'var(--info)' };
-
-// Atualização pendente (issue #225). Só ícone, sem texto -- a frase inteira
-// vai no rótulo acessível, mesmo desenho da contagem, e o tom vem do estado
-// da faixa padrão (Available/Downloading = info, Ready = ok, Failed = warn).
-// **Sem clique próprio**: o ícone vive dentro do `role="button"` que já abre
-// a janela padrão -- é lá, não aqui, que "Reiniciar e atualizar agora" mora.
-function HudUpdateBadge({ update }) {
-  const color = UPDATE_LEVELS[update.level] || UPDATE_LEVELS.info;
-  return (
-    <span
-      title={update.label}
-      aria-label={update.label}
-      style={{ display: 'flex', alignItems: 'center', flex: 'none', color }}
-    >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <path d="M12 3v12m0 0-4-4m4 4 4-4" />
-        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-      </svg>
-    </span>
+  // Alças: mão na ponta de perto (move), engrenagem na de longe (ações do app).
+  const handle = (glyph, title) => (
+    <span title={title} style={{
+      width: 32, height: 32, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--surface)', border: '1px solid var(--border-top)', boxShadow: 'var(--shadow-raised)',
+      color: 'var(--muted)', fontSize: 14
+    }}>{glyph}</span>
   );
-}
 
-// A contagem até a próxima coleta. O ícone é o que diz de que tempo se trata:
-// aqui não cabe tooltip -- popup nesta plataforma é camada dentro da janela e
-// sai recortado sobre o próprio alvo --, e um `02:05` solto ao lado dos
-// percentuais não se explica. A frase por extenso vai no rótulo acessível.
-function HudCountdown({ label, children }) {
-  return (
-    <span
-      title={label}
-      aria-label={label}
-      style={{ display: 'flex', alignItems: 'center', gap: 'var(--s1)', flex: 'none', color: 'var(--muted)' }}
-    >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-        <path d="M20 4v5h-5" />
-      </svg>
-      <span style={VALUE}>{children}</span>
-    </span>
+  const account = typeof balloon === 'number' ? accounts[balloon] : null;
+  const body = !open ? null : (
+    <div style={{
+      width: 240, padding: 12, borderRadius: 'var(--r4)', background: 'linear-gradient(var(--sheen), transparent 56px), var(--surface)',
+      border: '1px solid var(--border-top)', boxShadow: 'var(--shadow-overlay)', display: 'flex', flexDirection: 'column', gap: 10
+    }}>
+      {account ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 24 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t14)', fontWeight: 600, flex: 1 }}>{account.label}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: LEVELS[account.level] }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />{account.statusLabel}
+            </span>
+          </div>
+          {account.quotas.map((q) => (
+            <div key={q.short}>
+              <div style={{ display: 'flex', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>
+                <span style={{ flex: 1, fontWeight: 600 }}>{q.title || q.short}</span>
+                {q.reset ? <span style={{ fontSize: 'var(--t10)', color: 'var(--muted)' }}>Reinicia {q.reset}</span> : null}
+              </div>
+              <AppProgressTrack percent={q.fraction * 100} level={q.level === 'off' ? 'neutral' : q.level} style={{ margin: '4px 0' }} />
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{q.usedLeft || q.percent}</span>
+            </div>
+          ))}
+          {account.detail ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{account.detail}</span> : null}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[...actions, '↻'].map((glyph) => (
+              <span key={glyph} style={{ width: 28, height: 28, borderRadius: 'var(--r2)', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>{glyph}</span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', height: 24 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t14)', fontWeight: 600, flex: 1 }}>Usage Monitor</span>
+            {countdown ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>↻ {countdown}</span> : null}
+          </div>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Modo de janela</span>
+          {['Padrão', 'Somente os cards', 'Barra HUD'].map((mode) => (
+            <span key={mode} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: mode === 'Barra HUD' ? 'var(--fg)' : 'var(--muted)' }}>
+              <span style={{ display: 'inline-block', width: 16 }}>{mode === 'Barra HUD' ? '✓' : ''}</span>{mode}
+            </span>
+          ))}
+          <div style={{ display: 'flex', gap: 6, color: 'var(--muted)' }}>⤓ ↻ ⚙ ?</div>
+        </>
+      )}
+    </div>
   );
-}
 
-// 20px por linha, e não AppDataRow: aquela primitiva floora em 32px mais
-// padding, e seis cotas dariam ~288px de painel -- uma janela, não um HUD.
-function HudRow({ children }) {
+  const row = horizontal ? 'row' : 'column';
+  const strip = (
+    <div style={{ display: 'flex', flexDirection: row, alignItems: 'center', gap: 6 }}>
+      {open ? handle('✋', 'Mover a barra HUD') : null}
+      {notch}
+      {open ? handle('⚙', 'Ações do Usage Monitor') : null}
+    </div>
+  );
+  const outer = edge === 'bottom' || edge === 'right' ? [body, strip] : [strip, body];
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', height: 20, padding: '0 var(--s3)' }}>
-      {children}
+    <div style={{
+      display: 'inline-flex', flexDirection: horizontal ? 'column' : 'row', alignItems: 'center', gap: 10,
+      transition: 'all var(--spring-expressive)', ...style
+    }}>
+      {outer[0]}{outer[1]}
     </div>
   );
 }

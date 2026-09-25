@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -89,6 +88,7 @@ const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
 const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
 const val HUD_MODE_SWITCH_TEST_TAG = "hudModeSwitch"
+const val REDUCED_MOTION_SWITCH_TEST_TAG = "reducedMotionSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
@@ -149,6 +149,9 @@ fun SettingsDialogContent(
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
     onUiScaleChange: (Int) -> Unit = {},
+    reducedMotion: Boolean = false,
+    /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
+    onReducedMotionChange: (Boolean) -> Unit = {},
     /** Abre o diálogo de relatório de bug. Default vazio: os geradores de captura não o abrem. */
     onReportBug: () -> Unit = {},
     onThemeChange: (AppThemePreset) -> Unit,
@@ -294,102 +297,116 @@ fun SettingsDialogContent(
                     .padding(AppSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
-                when (selectedTab) {
-                    SettingsTab.GENERAL -> GeneralSettingsTab(
-                        currentTheme = currentTheme,
-                        currentLanguage = currentLanguage,
-                        autoStartEnabled = autoStartEnabled,
-                        alwaysOnTopEnabled = alwaysOnTopEnabled,
-                        cardsOnlyMode = cardsOnlyMode,
-                        hudMode = hudMode,
-                        windowOpacityPercent = windowOpacityPercent,
-                        windowOpacityEnabled = windowOpacityEnabled,
-                        uiScalePercent = uiScalePercent,
-                        autoUpdateEnabled = autoUpdateEnabled,
-                        autoUpdateSupport = autoUpdateSupport,
-                        autoUpdatePlatform = autoUpdatePlatform,
-                        lastUpdateReceipt = lastUpdateReceipt,
-                        autoUpdateFeedOverride = autoUpdateFeedOverride,
-                        onThemeChange = onThemeChange,
-                        onLanguageChange = onLanguageChange,
-                        onAutoStartChange = onAutoStartChange,
-                        onAlwaysOnTopChange = onAlwaysOnTopChange,
-                        onCardsOnlyModeChange = onCardsOnlyModeChange,
-                        onHudModeChange = onHudModeChange,
-                        onAutoUpdateChange = onAutoUpdateChange,
-                        onWindowOpacityChange = onWindowOpacityChange,
-                        onUiScaleChange = onUiScaleChange,
-                        onReportBug = onReportBug
-                    )
+                // A aba nova entra com o mesmo fade que as telas usam ao trocar de
+                // estado; só a escolhida continua composta -- a saída da anterior
+                // dura 120ms e some. A `Column` interna existe porque as abas
+                // emitem vários painéis e contam com o `spacedBy` do pai.
+                AppStateCrossfade(
+                    state = selectedTab,
+                    key = { tab -> tab },
+                    label = "settingsTab"
+                ) { tab ->
+                    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                        when (tab) {
+                            SettingsTab.GENERAL -> GeneralSettingsTab(
+                                currentTheme = currentTheme,
+                                currentLanguage = currentLanguage,
+                                autoStartEnabled = autoStartEnabled,
+                                alwaysOnTopEnabled = alwaysOnTopEnabled,
+                                cardsOnlyMode = cardsOnlyMode,
+                                hudMode = hudMode,
+                                windowOpacityPercent = windowOpacityPercent,
+                                windowOpacityEnabled = windowOpacityEnabled,
+                                uiScalePercent = uiScalePercent,
+                                reducedMotion = reducedMotion,
+                                autoUpdateEnabled = autoUpdateEnabled,
+                                autoUpdateSupport = autoUpdateSupport,
+                                autoUpdatePlatform = autoUpdatePlatform,
+                                lastUpdateReceipt = lastUpdateReceipt,
+                                autoUpdateFeedOverride = autoUpdateFeedOverride,
+                                onThemeChange = onThemeChange,
+                                onLanguageChange = onLanguageChange,
+                                onAutoStartChange = onAutoStartChange,
+                                onAlwaysOnTopChange = onAlwaysOnTopChange,
+                                onCardsOnlyModeChange = onCardsOnlyModeChange,
+                                onHudModeChange = onHudModeChange,
+                                onAutoUpdateChange = onAutoUpdateChange,
+                                onWindowOpacityChange = onWindowOpacityChange,
+                                onUiScaleChange = onUiScaleChange,
+                                onReducedMotionChange = onReducedMotionChange,
+                                onReportBug = onReportBug
+                            )
 
-                    SettingsTab.ALERTS -> {
-                        AlertSettingsSection(
-                            settings = alertSettings,
-                            language = currentLanguage,
-                            onSettingsChange = onAlertSettingsChange,
-                            budgetText = monthlyBudgetText,
-                            onBudgetCommit = onMonthlyBudgetCommit
-                        )
-                    }
+                            SettingsTab.ALERTS -> {
+                                AlertSettingsSection(
+                                    settings = alertSettings,
+                                    language = currentLanguage,
+                                    onSettingsChange = onAlertSettingsChange,
+                                    budgetText = monthlyBudgetText,
+                                    onBudgetCommit = onMonthlyBudgetCommit
+                                )
+                            }
 
-                    SettingsTab.APIS -> MonitoredApisTab(
-                        currentLanguage = currentLanguage,
-                        enabledApis = enabledApis,
-                        configuredApiKeys = configuredApiKeys,
-                        onApiToggle = onApiToggle,
-                        onApiKeySave = onApiKeySave,
-                        onApiKeyRemove = onApiKeyRemove,
-                        apiKeyCheck = apiKeyCheck,
-                        onApiKeyTest = onApiKeyTest,
-                        onApiKeyCheckReset = onApiKeyCheckReset
-                    )
+                            SettingsTab.APIS -> MonitoredApisTab(
+                                currentLanguage = currentLanguage,
+                                enabledApis = enabledApis,
+                                configuredApiKeys = configuredApiKeys,
+                                onApiToggle = onApiToggle,
+                                onApiKeySave = onApiKeySave,
+                                onApiKeyRemove = onApiKeyRemove,
+                                apiKeyCheck = apiKeyCheck,
+                                onApiKeyTest = onApiKeyTest,
+                                onApiKeyCheckReset = onApiKeyCheckReset
+                            )
 
-                    SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
-                        currentLanguage = currentLanguage,
-                        anthropicProfiles = anthropicProfiles,
-                        expandedProfileId = expandedProfileId,
-                        onAnthropicProfileToggle = onAnthropicProfileToggle,
-                        onAnthropicProfileRename = onAnthropicProfileRename,
-                        onAddAnthropicProfile = onAddAnthropicProfile,
-                        onRemoveAnthropicProfile = onRemoveAnthropicProfile,
-                        onRescanAnthropicProfiles = onRescanAnthropicProfiles,
-                        onToggleProfileExpanded = onToggleProfileExpanded
-                    )
+                            SettingsTab.ACCOUNTS -> AnthropicAccountsTab(
+                                currentLanguage = currentLanguage,
+                                anthropicProfiles = anthropicProfiles,
+                                expandedProfileId = expandedProfileId,
+                                onAnthropicProfileToggle = onAnthropicProfileToggle,
+                                onAnthropicProfileRename = onAnthropicProfileRename,
+                                onAddAnthropicProfile = onAddAnthropicProfile,
+                                onRemoveAnthropicProfile = onRemoveAnthropicProfile,
+                                onRescanAnthropicProfiles = onRescanAnthropicProfiles,
+                                onToggleProfileExpanded = onToggleProfileExpanded
+                            )
 
-                    SettingsTab.TEAM -> {
-                        TeamIntegrationSection(
-                            settings = teamSettings,
-                            language = currentLanguage,
-                            profiles = anthropicProfiles,
-                            connection = teamConnection,
-                            onEnabledChange = onTeamEnabledChange,
-                            onServerUrlChange = onTeamServerUrlChange,
-                            onApiKeyChange = onTeamApiKeyChange,
-                            onAliasChange = onTeamAliasChange,
-                            onProfileParticipationChange = onTeamProfileParticipationChange,
-                            onTestConnection = onTeamTestConnection,
-                            syncFailureMessage = teamSyncFailureMessage,
-                            rejectedProfiles = teamRejectedProfiles,
-                            adminConnection = teamAdminConnection,
-                            onAdminTokenChange = onTeamAdminTokenChange,
-                            onValidateAdminToken = onTeamValidateAdminToken,
-                            onOpenKeysManager = onTeamOpenKeysManager,
-                            onExitAdminMode = onTeamExitAdminMode
-                        )
-                    }
+                            SettingsTab.TEAM -> {
+                                TeamIntegrationSection(
+                                    settings = teamSettings,
+                                    language = currentLanguage,
+                                    profiles = anthropicProfiles,
+                                    connection = teamConnection,
+                                    onEnabledChange = onTeamEnabledChange,
+                                    onServerUrlChange = onTeamServerUrlChange,
+                                    onApiKeyChange = onTeamApiKeyChange,
+                                    onAliasChange = onTeamAliasChange,
+                                    onProfileParticipationChange = onTeamProfileParticipationChange,
+                                    onTestConnection = onTeamTestConnection,
+                                    syncFailureMessage = teamSyncFailureMessage,
+                                    rejectedProfiles = teamRejectedProfiles,
+                                    adminConnection = teamAdminConnection,
+                                    onAdminTokenChange = onTeamAdminTokenChange,
+                                    onValidateAdminToken = onTeamValidateAdminToken,
+                                    onOpenKeysManager = onTeamOpenKeysManager,
+                                    onExitAdminMode = onTeamExitAdminMode
+                                )
+                            }
 
-                    SettingsTab.NETWORK -> {
-                        NetworkSettingsSection(
-                            settings = proxySettings,
-                            language = currentLanguage,
-                            connection = proxyConnection,
-                            onUseEnvironmentProxyChange = onProxyUseEnvironmentChange,
-                            onHostChange = onProxyHostChange,
-                            onPortChange = onProxyPortChange,
-                            onUsernameChange = onProxyUsernameChange,
-                            onPasswordChange = onProxyPasswordChange,
-                            onTestConnection = onProxyTestConnection
-                        )
+                            SettingsTab.NETWORK -> {
+                                NetworkSettingsSection(
+                                    settings = proxySettings,
+                                    language = currentLanguage,
+                                    connection = proxyConnection,
+                                    onUseEnvironmentProxyChange = onProxyUseEnvironmentChange,
+                                    onHostChange = onProxyHostChange,
+                                    onPortChange = onProxyPortChange,
+                                    onUsernameChange = onProxyUsernameChange,
+                                    onPasswordChange = onProxyPasswordChange,
+                                    onTestConnection = onProxyTestConnection
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -455,6 +472,7 @@ private fun GeneralSettingsTab(
     windowOpacityPercent: Int,
     windowOpacityEnabled: Boolean,
     uiScalePercent: Int,
+    reducedMotion: Boolean,
     autoUpdateEnabled: Boolean,
     autoUpdateSupport: AppUpdateSupport,
     autoUpdatePlatform: AppUpdatePlatform?,
@@ -469,6 +487,7 @@ private fun GeneralSettingsTab(
     onAutoUpdateChange: (Boolean) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit,
+    onReducedMotionChange: (Boolean) -> Unit,
     onReportBug: () -> Unit
 ) {
     val isPt = currentLanguage == AppLanguage.PT
@@ -520,6 +539,14 @@ private fun GeneralSettingsTab(
             percent = uiScalePercent,
             language = currentLanguage,
             onPercentChange = onUiScaleChange
+        )
+        // Em Aparência e não em Sistema: é sobre como a janela se desenha, a
+        // mesma pergunta da escala logo acima.
+        ReducedMotionToggle(
+            enabled = reducedMotion,
+            language = currentLanguage,
+            onToggle = onReducedMotionChange,
+            showDivider = false
         )
     }
 
@@ -747,7 +774,7 @@ private fun ApiKeyDialog(
     val isChecking = checkState.status == ApiKeyCheckStatus.CHECKING
     val hasCandidateKey = apiKey.isNotBlank() || hasStoredKey
 
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -843,8 +870,6 @@ private fun ApiKeyDialog(
                 }
             }
         },
-        shape = AppShapes.large,
-        containerColor = MaterialTheme.colorScheme.surface,
         confirmButton = {
             AppButton(
                 label = if (isPt) "Salvar" else "Save",
@@ -860,7 +885,7 @@ private fun ApiKeyDialog(
             )
         },
         dismissButton = {
-            // As duas ações secundárias moram no mesmo slot para o `AlertDialog`
+            // As duas ações secundárias moram no mesmo slot para o `AppDialog`
             // as manter na fileira do rodapé, à esquerda do `PRIMARY`. Remover é
             // `GHOST` e não `DANGER`: `PRIMARY` é uma por tela e o realce forte
             // aqui é do "Salvar", que é o que o diálogo propõe.
@@ -1032,28 +1057,30 @@ private fun AnthropicProfileRow(
                 }
             }
 
-            if (expanded) {
-                DebouncedTextField(
-                    value = profile.label,
-                    label = if (language == AppLanguage.PT) "Apelido" else "Label",
-                    onCommit = { newLabel -> onRename(profile.id, newLabel) }
-                )
-                Text(
-                    text = profile.path,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = statusTone.color()
-                )
-                if (profile.removable) {
-                    AppButton(
-                        label = if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor",
-                        onClick = { onRemove(profile.id) },
-                        tone = AppButtonTone.GHOST
-                    )
+            AppExpandable(expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                        DebouncedTextField(
+                            value = profile.label,
+                            label = if (language == AppLanguage.PT) "Apelido" else "Label",
+                            onCommit = { newLabel -> onRename(profile.id, newLabel) }
+                        )
+                        Text(
+                            text = profile.path,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = listOfNotNull(statusText, profile.detail).joinToString(" — "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = statusTone.color()
+                        )
+                        if (profile.removable) {
+                            AppButton(
+                                label = if (language == AppLanguage.PT) "Remover do monitor" else "Remove from monitor",
+                                onClick = { onRemove(profile.id) },
+                                tone = AppButtonTone.GHOST
+                            )
+                        }
                 }
             }
         }
@@ -1304,9 +1331,9 @@ fun HudModeToggle(
     SettingsOptionRow(
         label = if (isPt) "Barra HUD" else "HUD strip",
         description = if (isPt) {
-            "Reduz a janela a uma faixa fina no topo da tela, com só o pior risco e o tempo até o reset. Para voltar: clique na faixa, Ctrl+Shift+H ou o ícone na bandeja."
+            "Troca a janela por um notch colado numa borda da tela, com um anel e a palavra do estado por conta; o ponteiro em cima abre cada cota. Para voltar: clique no notch, Ctrl+Shift+H ou o ícone na bandeja."
         } else {
-            "Shrinks the window to a thin strip at the top of the screen, showing only the worst risk and the time to reset. To return: click the strip, Ctrl+Shift+H, or the tray icon."
+            "Replaces the window with a notch docked to a screen edge, with a ring and the status word per account; hovering opens every quota. To return: click the notch, Ctrl+Shift+H, or the tray icon."
         },
         showDivider = showDivider,
         modifier = modifier
@@ -1315,6 +1342,38 @@ fun HudModeToggle(
             checked = enabled,
             onCheckedChange = { onToggle(it) },
             modifier = Modifier.testTag(HUD_MODE_SWITCH_TEST_TAG)
+        )
+    }
+}
+
+/**
+ * "Reduzir animações": para quem se incomoda com movimento, e para máquina lenta
+ * em que a transição vira tranco. O texto diz o que some — as transições **e** o
+ * que gira ou pulsa —, porque as duas coisas desligam juntas.
+ */
+@Composable
+fun ReducedMotionToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
+) {
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Reduzir animações" else "Reduce motion",
+        description = if (isPt) {
+            "Troca telas, barras e menus de uma vez, sem transição, e desliga o que gira ou pulsa para indicar sessão ativa."
+        } else {
+            "Switches screens, bars and menus at once, without transitions, and turns off what spins or pulses to show an active session."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(REDUCED_MOTION_SWITCH_TEST_TAG)
         )
     }
 }

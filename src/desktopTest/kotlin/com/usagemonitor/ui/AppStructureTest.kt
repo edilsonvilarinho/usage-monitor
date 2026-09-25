@@ -7,14 +7,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
+import com.usagemonitor.presentation.ui.components.APP_TABS_INDICATOR_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppGroupBand
@@ -97,6 +103,44 @@ class AppStructureTest {
         onNodeWithText("Tendência").performClick()
 
         assertEquals(2, selected)
+    }
+
+    /**
+     * O sublinhado é um só e desliza até a aba escolhida. Depois do idle ele
+     * termina **exatamente** sob a aba nova, com a largura dela — uma mola que
+     * parasse perto, ou um sublinhado deixado na aba antiga, apareceria aqui.
+     */
+    @Test
+    fun `o sublinhado desliza ate a aba escolhida`() = runDesktopComposeUiTest {
+        var selected by mutableStateOf(0)
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(600.dp).height(200.dp)) {
+                    AppTabs(
+                        tabs = listOf(
+                            AppTab("Sessões", testTag = "tab0"),
+                            AppTab("Resumo", testTag = "tab1"),
+                            AppTab("Tendência", testTag = "tab2")
+                        ),
+                        selectedIndex = selected,
+                        onSelect = { selected = it }
+                    )
+                }
+            }
+        }
+
+        val first = onNodeWithTag(APP_TABS_INDICATOR_TEST_TAG).getUnclippedBoundsInRoot()
+        val firstTab = onNodeWithTag("tab0").getUnclippedBoundsInRoot()
+        assertEquals(firstTab.left, first.left)
+        assertEquals(firstTab.width, first.width)
+
+        onNodeWithText("Tendência").performClick()
+        waitForIdle()
+
+        val moved = onNodeWithTag(APP_TABS_INDICATOR_TEST_TAG).getUnclippedBoundsInRoot()
+        val lastTab = onNodeWithTag("tab2").getUnclippedBoundsInRoot()
+        assertEquals(lastTab.left, moved.left)
+        assertEquals(lastTab.width, moved.width)
     }
 
     @Test

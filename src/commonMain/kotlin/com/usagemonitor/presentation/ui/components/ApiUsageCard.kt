@@ -1,9 +1,17 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.ui.unit.IntSize
+import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import com.usagemonitor.presentation.ui.theme.appTween
+import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -40,7 +48,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Terminal
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +66,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -90,7 +96,9 @@ import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.statusBadgeLabel
 import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppDepth
+import com.usagemonitor.presentation.ui.theme.appSpring
+import androidx.compose.animation.core.VisibilityThreshold
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -136,13 +144,12 @@ fun apiUsageCardTag(apiName: String): String = "$API_USAGE_CARD_TAG_PREFIX$apiNa
 /** Opacidade do número de uma janela já vencida — o dado é real, mas velho. */
 private const val STALE_QUOTA_ALPHA = 0.45f
 
-// Durações centralizadas das animações do card (em ms). Mantém legibilidade ao
-// alterar timing globalmente sem caçar literais espalhados pelo composable.
-private object CardAnimations {
-    val EXPAND_DURATION_MS  = AppMotion.slow + AppMotion.normal   // 600ms
-    val MINIMIZE_DURATION_MS = AppMotion.normal                   // 250ms
-    const val PULSE_DURATION_MS = 1500
-}
+// Entrada do card: o fade é longo o bastante para a grade ler como cascata com
+// o atraso de `AppMotion.stagger`, e a subida e a escala andam por mola.
+private const val CARD_ENTER_FADE_MS = AppMotion.slow
+
+/** O conteúdo novo espera a saída do antigo começar, para não se sobreporem cheios. */
+private const val MINIMIZE_FADE_DELAY_MS = 50
 
 @Composable
 fun ApiUsageCard(
@@ -151,6 +158,8 @@ fun ApiUsageCard(
     quotas: List<QuotaInfo>,
     accountContext: UsageAccountContext? = null,
     notices: Set<ApiUsageNotice> = emptySet(),
+    /** Plano da conta ("Max 20x"); `null` quando o fornecedor não informa. */
+    planLabel: String? = null,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary> = emptyMap(),
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
@@ -214,9 +223,12 @@ fun ApiUsageCard(
         visible = true
     }
 
+    // Tudo pela política de motion: com "Reduzir animações" o card nasce no
+    // lugar. Fade por tween enfático; escala e subida por mola, que é o que
+    // deixa o levantar do arrasto acompanhar a mão sem parar seco.
     val cardAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = CardAnimations.EXPAND_DURATION_MS),
+        animationSpec = appTween(CARD_ENTER_FADE_MS, AppMotion.emphasizedEasing),
         label = "cardAlpha"
     )
 
@@ -227,34 +239,49 @@ fun ApiUsageCard(
             visible -> 1f
             else -> 0.96f
         },
-        animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = 0.001f),
         label = "cardScale"
     )
     val cardOffsetY by animateDpAsState(
         targetValue = if (visible) 0.dp else 18.dp,
-        animationSpec = tween(durationMillis = CardAnimations.EXPAND_DURATION_MS),
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
         label = "cardOffsetY"
     )
-    val cardElevation by animateDpAsState(
-        targetValue = when {
-            isBeingDragged -> AppElevation.dialog
-            isDragTarget   -> AppElevation.raised
-            else           -> AppElevation.card
-        },
-        animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS),
-        label = "cardElevation"
+    // A profundidade diz o que está sobre o quê: em repouso o card está sobre o
+    // fundo, com o ponteiro em cima ele sobe um patamar e 1dp, e arrastado ele
+    // flutua sobre os outros. O alvo do arrasto afunda para o plano -- é o vão
+    // que vai receber o card. Mola sem rebote: sombra que passa do alvo e volta
+    // lê como tremor.
+    val cardDepth = when {
+        isBeingDragged -> AppDepth.DIALOG
+        isDragTarget -> AppDepth.FLAT
+        isHovered -> AppDepth.RAISED
+        else -> AppDepth.CARD
+    }
+    val cardKeyShadow by animateDpAsState(
+        targetValue = cardDepth.key,
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
+        label = "cardKeyShadow"
+    )
+    val cardAmbientShadow by animateDpAsState(
+        targetValue = cardDepth.ambient,
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
+        label = "cardAmbientShadow"
+    )
+    val cardLift by animateDpAsState(
+        targetValue = if (isHovered && !isBeingDragged) (-1).dp else 0.dp,
+        animationSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = Dp.VisibilityThreshold),
+        label = "cardLift"
     )
     // O rastro que varria o card durante a coleta era `rememberInfiniteTransition`
     // — animação sem fim, a mesma classe de coisa que trava o `waitForIdle` dos
     // testes de componente. O estado de coleta agora se lê no rótulo do botão,
     // que já dizia "Atualizando…", e na opacidade das cotas.
 
-    val hoverBackground by animateColorAsState(
-        targetValue = if (isHovered) MaterialTheme.colorScheme.surfaceVariant
-                      else           cardContainerColor(),
-        animationSpec = tween(durationMillis = AppMotion.fast),
-        label = "cardHoverBg"
-    )
+    // O fundo do card não muda no hover: quem diz "o ponteiro está aqui" é a
+    // subida de patamar. Trocar para `surfaceVariant` também apagava o hover das
+    // linhas de cota, que usam aquele mesmo tom.
+    val cardBackground = cardContainerColor()
 
     // Era o único `Card()` do Material que restava na aplicação. A superfície
     // agora sai de `appSurfaceBlock` — o mesmo recorte, fundo e borda de 1dp que
@@ -271,7 +298,6 @@ fun ApiUsageCard(
             .fillMaxWidth()
             .testTag(apiUsageCardTag(apiName))
             .hoverable(hoverInteraction)
-            .animateContentSize(animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS))
             .pointerInput(source) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { onDragStart() },
@@ -286,10 +312,10 @@ fun ApiUsageCard(
                 alpha = cardAlpha
                 scaleX = cardScale
                 scaleY = cardScale
-                translationY = cardOffsetY.toPx()
+                translationY = (cardOffsetY + cardLift).toPx()
             }
-            .shadow(cardElevation, AppShapes.medium)
-            .appSurfaceBlock(shape = AppShapes.medium, color = hoverBackground)
+            .appDepth(key = cardKeyShadow, ambient = cardAmbientShadow, shape = AppShapes.medium)
+            .appSurfaceBlock(shape = AppShapes.medium, color = cardBackground, sheen = true)
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -340,22 +366,42 @@ fun ApiUsageCard(
                             color = accentColorFor(source = source, accents = AppAccents.current),
                             height = if (accountContext == null) 18.dp else 28.dp
                         )
+                        // A marca do fornecedor, no acento da fonte: reconhecer o
+                        // card antes de ler o título, como no Codenotch e no
+                        // ai-usagebar. O traço continua — ele é a identidade no
+                        // alinhamento vertical da grade; a marca é a do olho.
+                        AppProviderMark(
+                            source = source,
+                            tint = accentColorFor(source = source, accents = AppAccents.current),
+                            size = PROVIDER_MARK_SIZE
+                        )
                         // Título e conta na mesma coluna, como o `.ptitle`/`.psub`
                         // do protótipo. A conta era uma linha de largura cheia
                         // abaixo do cabeçalho inteiro, alinhada à borda do card e
                         // não ao título de que ela é o subtítulo.
                         Column(modifier = Modifier.weight(1f, fill = false)) {
-                            HoverTooltipBox(
-                                title = apiName,
-                                metrics = emptyList()
+                            // O plano da conta colado no nome — o "Claude Max 20x"
+                            // do ai-usagebar. Na linha do título e não depois da
+                            // coluna: a coluna mede o e-mail, que é mais largo, e o
+                            // selo ia parar longe do nome de que ele é atributo.
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(
-                                    text = apiName,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                HoverTooltipBox(
+                                    title = apiName,
+                                    metrics = emptyList(),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Text(
+                                        text = apiName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                planLabel?.let { plan -> CardHeaderBadge(plan, Modifier.testTag(API_USAGE_CARD_PLAN_TAG)) }
                             }
                             if (accountContext != null) {
                                 AccountIdentityLabel(
@@ -364,16 +410,7 @@ fun ApiUsageCard(
                                 )
                             }
                         }
-                        source.statusBadgeLabel(language)?.let { badgeLabel ->
-                            Text(
-                                text = badgeLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .appSurfaceBlock(color = Color.Transparent)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                        source.statusBadgeLabel(language)?.let { badgeLabel -> CardHeaderBadge(badgeLabel) }
 
                         // O aviso da fonte sai aqui, no cabeçalho, e não como
                         // banner abaixo das cotas: o cabeçalho é composto tanto
@@ -448,19 +485,11 @@ fun ApiUsageCard(
                             buttonSize = density.actionButtonSize,
                             enabled = !isRefreshing
                         ) { tint ->
-                            if (isRefreshing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(density.actionIconSize),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(density.actionIconSize),
-                                    tint = tint
-                                )
-                            }
+                            RefreshGlyph(
+                                refreshing = isRefreshing,
+                                tint = tint,
+                                size = density.actionIconSize
+                            )
                         }
 
                         CardIconActionButton(
@@ -487,20 +516,21 @@ fun ApiUsageCard(
 
                 AppDivider()
 
+                // Um dono só para o tamanho: esta transição. Havia também um
+                // `animateContentSize` no card inteiro, e as duas animações de
+                // tamanho aninhadas faziam o card esticar em dois tempos ao
+                // minimizar. A mola do tamanho é a mesma do resto do card.
+                val minimizeFadeIn = appTween<Float>(AppMotion.normal, AppMotion.emphasizedEasing, delayMillis = MINIMIZE_FADE_DELAY_MS)
+                val minimizeFadeOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+                val minimizeScaleIn = appSpring<Float>(AppMotion.Springs.GENTLE, visibilityThreshold = 0.001f)
+                val minimizeScaleOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+                val minimizeSize = appSpring<IntSize>(AppMotion.Springs.GENTLE, visibilityThreshold = IntSize.VisibilityThreshold)
                 AnimatedContent(
                     targetState = isMinimized,
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(durationMillis = AppMotion.normal, delayMillis = 50, easing = AppMotion.enterEasing)) +
-                            scaleIn(
-                                animationSpec = tween(durationMillis = CardAnimations.MINIMIZE_DURATION_MS, easing = AppMotion.enterEasing),
-                                initialScale = 0.97f
-                            )).togetherWith(
-                            fadeOut(animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.exitEasing)) +
-                                scaleOut(
-                                    animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.exitEasing),
-                                    targetScale = 0.98f
-                                )
-                        ).using(SizeTransform(clip = false))
+                        (fadeIn(minimizeFadeIn) + scaleIn(minimizeScaleIn, initialScale = 0.97f))
+                            .togetherWith(fadeOut(minimizeFadeOut) + scaleOut(minimizeScaleOut, targetScale = 0.98f))
+                            .using(SizeTransform(clip = false) { _, _ -> minimizeSize })
                     },
                     label = "cardLayoutMode"
                 ) { minimized ->
@@ -557,91 +587,32 @@ fun ApiUsageCard(
             // do pisca ("1 sessão ativa agora pede atenção: …"), que é o motivo de
             // o semáforo existir. Texto no botão não teria onde levá-la.
             AppStatusBar {
-                CardIconActionButton(
-                    label = historyActionLabel(language = language),
-                    onClick = onOpenHistory,
-                    buttonSize = density.actionButtonSize
-                ) { tint ->
-                    Icon(
-                        imageVector = Icons.Rounded.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(density.actionIconSize),
-                        tint = tint
+                // A ordem e as condições são de `cardActionsFor`, dono único da
+                // regra; aqui chegam como lambdas nulas ou não.
+                val actions = buildList {
+                    add(CardAction.HISTORY)
+                    if (onOpenCodexCliSessions != null) add(CardAction.CODEX_CLI_SESSIONS)
+                    if (onOpenCliSessions != null) add(CardAction.CLI_SESSIONS)
+                    if (onOpenTeamUsage != null) add(CardAction.TEAM_USAGE)
+                    if (onOpenTeamPresence != null) add(CardAction.TEAM_PRESENCE)
+                }
+                actions.forEach { action ->
+                    CardActionButton(
+                        action = action,
+                        language = language,
+                        buttonSize = density.actionButtonSize,
+                        iconSize = density.actionIconSize,
+                        cliSessionPulse = cliSessionPulse,
+                        teamSessionPulse = teamSessionPulse,
+                        onClick = when (action) {
+                            CardAction.HISTORY -> onOpenHistory
+                            CardAction.CODEX_CLI_SESSIONS -> onOpenCodexCliSessions ?: {}
+                            CardAction.CLI_SESSIONS -> onOpenCliSessions ?: {}
+                            CardAction.TEAM_USAGE -> onOpenTeamUsage ?: {}
+                            CardAction.TEAM_PRESENCE -> onOpenTeamPresence ?: {}
+                        }
                     )
                 }
-
-                if (onOpenCodexCliSessions != null) {
-                    CardIconActionButton(
-                        label = codexCliSessionsActionLabel(language = language),
-                        onClick = onOpenCodexCliSessions,
-                        buttonSize = density.actionButtonSize
-                    ) { tint ->
-                        Icon(
-                            imageVector = Icons.Rounded.Terminal,
-                            contentDescription = null,
-                            modifier = Modifier.size(density.actionIconSize),
-                            tint = tint
-                        )
-                    }
-                }
-
-                if (onOpenCliSessions != null) {
-                    CardIconActionButton(
-                        label = cliSessionsActionLabel(language = language),
-                        onClick = onOpenCliSessions,
-                        buttonSize = density.actionButtonSize,
-                        pulse = cliSessionPulse,
-                        language = language
-                    ) { tint ->
-                        Icon(
-                            imageVector = Icons.Rounded.Terminal,
-                            contentDescription = null,
-                            modifier = Modifier.size(density.actionIconSize),
-                            tint = tint
-                        )
-                    }
-                }
-
-                    // Só chega não-nulo quando a integração está ligada e esta
-                    // conta foi marcada como parte do time nas Configurações.
-                    if (onOpenTeamUsage != null) {
-                        CardIconActionButton(
-                            label = teamUsageActionLabel(language = language),
-                            onClick = onOpenTeamUsage,
-                            buttonSize = density.actionButtonSize,
-                            pulse = teamSessionPulse,
-                            language = language
-                        ) { tint ->
-                            Icon(
-                                imageVector = Icons.Rounded.Groups,
-                                contentDescription = null,
-                                modifier = Modifier.size(density.actionIconSize),
-                                tint = tint
-                            )
-                        }
-                    }
-
-                    // Vizinho do botão de sessões do time de propósito: os dois
-                    // abrem janelas do time, e separá-los mandaria o usuário
-                    // procurar em dois cantos.
-                    //
-                    // Sem `pulse`, e o default já é `SessionPulse.EMPTY`. Neste
-                    // app o pisca significa uma coisa só — sessão em atenção ou
-                    // saturada — e o botão colado a este já a carrega.
-                    if (onOpenTeamPresence != null) {
-                        CardIconActionButton(
-                            label = teamPresenceActionLabel(language = language),
-                            onClick = onOpenTeamPresence,
-                            buttonSize = density.actionButtonSize
-                        ) { tint ->
-                            Icon(
-                                imageVector = Icons.Rounded.Sensors,
-                                contentDescription = null,
-                                modifier = Modifier.size(density.actionIconSize),
-                                tint = tint
-                            )
-                        }
-                    }
             }
             }
         }
@@ -1103,7 +1074,7 @@ private fun ObservedUsageInlineBar(
 
 
 @Composable
-private fun CardIconActionButton(
+internal fun CardIconActionButton(
     label: String,
     onClick: () -> Unit,
     buttonSize: Dp,
@@ -1141,11 +1112,31 @@ private fun CardIconActionButton(
         // círculos no cabeçalho pesavam mais que o número que o card existe
         // para mostrar. O contêiner só ganha cor quando o semáforo está aceso —
         // aí a cor é informação, não decoração.
+        // Sem hover nem pressão, a ação do card era o único botão da tela que não
+        // respondia ao ponteiro. Ganha as duas camadas e a escala de pressão --
+        // é superfície sem texto, então encolher não borra nada.
+        val interaction = remember { MutableInteractionSource() }
+        val hovered by interaction.collectIsHoveredAsState()
+        val pressed by interaction.collectIsPressedAsState()
+        val ladder = AppSurfaceLadders.current
+        val layer by animateColorAsState(
+            targetValue = when {
+                !enabled -> Color.Transparent
+                pressed -> ladder.pressedLayer
+                hovered -> ladder.hoverLayer
+                else -> Color.Transparent
+            },
+            animationSpec = appTween(AppMotion.fast),
+            label = "cardActionLayer"
+        )
         Box(
             modifier = Modifier
                 .size(buttonSize)
+                .appPressScale(interaction, enabled)
                 .appSurfaceBlock(color = containerColor)
-                .clickable(enabled = enabled, onClick = onClick)
+                .background(layer)
+                .hoverable(interaction, enabled = enabled)
+                .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
                 .semantics {
                     contentDescription = description
                 },
@@ -1359,7 +1350,7 @@ private fun CompactQuotaBadgeContent(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        Text(
+        AppAnimatedNumber(
             text = compactPercentageLabel(quota),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
@@ -1534,14 +1525,14 @@ private fun QuotaRowContent(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            Text(
+            AppAnimatedNumber(
                 text = compactPercentageLabel(quota),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
                 // Mesmo tratamento de antes: janela vencida mostra o último
                 // dado real da fonte, esmaecido para não passar por corrente.
-                modifier = Modifier.alpha(staleAlpha)
+                modifier = Modifier.alpha(staleAlpha),
+                contentAlignment = Alignment.CenterEnd
             )
         }
 
@@ -1604,3 +1595,61 @@ private fun quotaTone(quota: QuotaInfo, risk: QuotaRiskSummary?): AppTone {
         else -> AppTone.OK
     }
 }
+
+/**
+ * O glifo de recarga do card.
+ *
+ * Coletando, ele **gira** — só com [com.usagemonitor.presentation.ui.theme.AppMotionPolicy.continuous]
+ * ligada, que é o app em uso; nos testes e nos geradores de captura ele fica
+ * parado no tom de informação, e a semântica ("Atualizando…") continua dizendo o
+ * estado. Era um `CircularProgressIndicator` do Material: outra espessura, outro
+ * raio e animação infinita incondicional, a mesma classe de coisa que trava o
+ * `waitForIdle`.
+ */
+@Composable
+internal fun RefreshGlyph(refreshing: Boolean, tint: Color, size: Dp) {
+    val policy = LocalAppMotionPolicy.current
+    val rotation = if (refreshing && policy.continuous) {
+        val transition = rememberInfiniteTransition(label = "refreshGlyph")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(REFRESH_TURN_MILLIS, easing = LinearEasing)),
+            label = "refreshGlyphAngle"
+        )
+        angle
+    } else {
+        0f
+    }
+    Icon(
+        imageVector = Icons.Rounded.Refresh,
+        contentDescription = null,
+        modifier = Modifier
+            .size(size)
+            .graphicsLayer { rotationZ = rotation },
+        tint = if (refreshing) AppTone.INFO.color() else tint
+    )
+}
+
+/** Uma volta por segundo: rápido o bastante para ler "trabalhando", lento para não agitar. */
+private const val REFRESH_TURN_MILLIS = 1_000
+
+/** A marca do cabeçalho: do tamanho do glifo de ação, para não disputar com o título. */
+private val PROVIDER_MARK_SIZE = 16.dp
+
+/** O selo do cabeçalho do card: plano da conta, fonte local. */
+@Composable
+private fun CardHeaderBadge(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = modifier
+            .appSurfaceBlock(color = Color.Transparent)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    )
+}
+
+/** O selo do plano; os testes o acham por aqui. */
+const val API_USAGE_CARD_PLAN_TAG = "apiUsageCardPlan"

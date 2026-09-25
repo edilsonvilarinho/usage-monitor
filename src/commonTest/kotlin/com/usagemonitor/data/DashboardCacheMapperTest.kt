@@ -38,7 +38,10 @@ class DashboardCacheMapperTest {
                     rawTotal = 4500L
                 )
             ),
-            notices = setOf(ApiUsageNotice.SOURCE_UNSTABLE)
+            notices = setOf(ApiUsageNotice.SOURCE_UNSTABLE),
+            // O plano sobrevive ao cache: sem isso o card aberto pelo cache
+            // mostraria o plano só depois da primeira coleta.
+            planLabel = "Token Plan"
         )
 
         val restored = DashboardCacheDto(

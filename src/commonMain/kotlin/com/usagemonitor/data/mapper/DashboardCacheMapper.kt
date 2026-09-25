@@ -27,7 +27,8 @@ fun ApiUsageStats.toCacheDto(): ApiUsageStatsCacheDto {
         accountEmail = accountContext?.email,
         accountWorkspaceName = accountContext?.workspaceName,
         profileLabel = profileLabel,
-        notices = notices.map { notice -> notice.name }
+        notices = notices.map { notice -> notice.name },
+        planLabel = planLabel
     )
 }
 
@@ -84,7 +85,8 @@ private fun ApiUsageStatsCacheDto.toDomainOrNull(): ApiUsageStats? {
             quotas = parsedQuotas,
             accountContext = parsedAccountContext,
             profileLabel = profileLabel,
-            notices = notices.mapNotNull { name -> runCatching { ApiUsageNotice.valueOf(name) }.getOrNull() }.toSet()
+            notices = notices.mapNotNull { name -> runCatching { ApiUsageNotice.valueOf(name) }.getOrNull() }.toSet(),
+            planLabel = planLabel
         )
     }.getOrNull()
 }

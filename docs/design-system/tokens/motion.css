@@ -1,14 +1,37 @@
 /* ── Motion ──────────────────────────────────────────────────────────────
-   Three durations, one easing. NO infinite animation anywhere: an endless
-   animation hangs waitForIdle in the Compose component tests, and a shimmer
-   on a dashboard that refreshes every 10 minutes is noise, not feedback.
-   Loading is a static skeleton.
+   Tween for color and opacity, SPRING for position, size and scale.
+   The app read as "without fluidity" because everything was a fixed-length
+   tween: a moving thing stopped dry at the end, and an interrupted transition
+   restarted its curve from zero. A spring keeps its velocity when the target
+   changes mid-flight. CSS has no spring, so the kit approximates each one with
+   a duration + curve pair; the Compose values (AppMotion.Springs) are the
+   source of truth.
+
+   No overshoot on data: bars, rings and numbers use GENTLE (critically
+   damped). A bar that passes 88% before settling shows a value that is not
+   true. EXPRESSIVE (one short rebound) is only for surfaces that carry no
+   number — the menu entering. The HUD used it too, and on top of the window
+   growing the rebound read as a tremor.
+
+   Continuous animation (spinning arc of an active session, attention pulse,
+   refresh glyph) exists only behind AppMotionPolicy.continuous, which is OFF
+   by default in AppTheme — tests and capture generators never see it. The
+   "Reduzir animações" setting turns everything into an instant swap.
    ──────────────────────────────────────────────────────────────────────── */
 :root {
   --dur-hover:  120ms;  /* hover, focus, press */
   --dur-select: 180ms;  /* selection, tab change */
   --dur-expand: 240ms;  /* expand / collapse, card minimize */
+  --dur-exit:    90ms;  /* anything leaving: shorter than any entry */
   --ease: cubic-bezier(.2, 0, .2, 1);
+  --ease-emphasized: cubic-bezier(.2, 0, 0, 1); /* surface entering */
+
+  /* Spring approximations — Compose: dampingRatio / stiffness */
+  --spring-gentle:     450ms cubic-bezier(.25, .1, .25, 1);   /* 1.0 / 400  — data, surfaces */
+  --spring-snappy:     200ms cubic-bezier(.3, 0, .2, 1);      /* 1.0 / 1500 — selection, press */
+  --spring-expressive: 420ms cubic-bezier(.34, 1.3, .64, 1);  /* 0.75 / 600 — HUD, menu */
+
+  --stagger: 60ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -16,5 +39,9 @@
     --dur-hover: 0ms;
     --dur-select: 0ms;
     --dur-expand: 0ms;
+    --dur-exit: 0ms;
+    --spring-gentle: 0ms linear;
+    --spring-snappy: 0ms linear;
+    --spring-expressive: 0ms linear;
   }
 }

@@ -1,46 +1,41 @@
 const { AppHudBar } = DS;
 
-// Uma linha por CONTA, com um ponto por cota: a palavra é a da pior cota, e os
-// pontos detalham o que ela resumiu -- o desenho do card. Cota sem projeção sai
-// com ponto neutro e a palavra dizendo isso.
-//
-// `reset` é a hora do reinício (issue #189), desenhada só no painel expandido.
-// O saldo pré-pago não tem reset a mostrar e vem sem o campo: nada é impresso
-// no lugar.
-const SOURCES = [
+// Uma conta por anel, um arco por cota. A palavra é a da pior cota, e o
+// percentual ao lado é o da cota em foco (pior risco, depois maior percentual).
+// `reset` só aparece no balão; o saldo pré-pago não tem e nada é impresso.
+const ACCOUNTS = [
   {
-    label: 'INFORMATA2', source: 'anthropic', statusLabel: 'Crítico', level: 'crit',
+    label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', active: true,
+    detail: 'Max 20x · via Claude Code',
     quotas: [
-      { text: '5h 28%', level: 'ok', reset: '22h59' },
-      { text: '7d 9%', level: 'crit', reset: 'Ter 21h00' }
+      { short: '5h', title: 'Sessão 5h', percent: '68%', fraction: 0.68, level: 'warn', reset: '22h59', usedLeft: '68% usado · 32% restante' },
+      { short: '7d', title: 'Semanal', percent: '41%', fraction: 0.41, level: 'ok', reset: 'Ter 21h00', usedLeft: '41% usado · 59% restante' }
     ]
   },
   {
-    label: 'Padrão', source: 'anthropic', statusLabel: 'Atenção', level: 'warn',
+    label: 'Anthropic — Sandbox', statusLabel: 'Normal', level: 'ok',
     quotas: [
-      { text: '5h 88%', level: 'warn', reset: '1h30' },
-      { text: '7d 41%', level: 'ok', reset: 'Qui 9h00' }
+      { short: '5h', percent: '12%', fraction: 0.12, level: 'ok', reset: '1h30' },
+      { short: '7d', percent: '7%', fraction: 0.07, level: 'ok', reset: 'Qui 9h00' }
     ]
   },
   {
-    label: 'OpenCode Go', source: 'opencode', statusLabel: 'Sem projeção', level: 'off',
-    quotas: [
-      { text: '5h 0%', level: 'off', reset: '22h59' },
-      { text: 'mensal 47%', level: 'off', reset: 'Qua 21h00' }
-    ]
-  },
-  {
-    label: 'DeepSeek', source: 'deepseek', statusLabel: 'Sem projeção', level: 'off',
-    quotas: [{ text: 'Saldo $2.27', level: 'off' }]
+    label: 'DeepSeek', statusLabel: 'Sem projeção', level: 'off',
+    quotas: [{ short: 'Saldo', percent: '$2.27', fraction: 0.3, level: 'off', forecast: false }]
   }
 ];
 
-function HudScreen({ children, corner = 'top-right', tall = false }) {
-  const anchor = corner === 'top-right' ? { top: 0, right: 0 } : { bottom: 0, right: 0 };
+function Screen({ children, edge = 'top', tall = false }) {
+  const place = {
+    top: { top: 0, left: '50%', transform: 'translateX(-50%)' },
+    bottom: { bottom: 0, left: '50%', transform: 'translateX(-50%)' },
+    right: { right: 0, top: '50%', transform: 'translateY(-50%)' },
+    left: { left: 0, top: '50%', transform: 'translateY(-50%)' }
+  }[edge];
   return (
-    <div style={{ position: 'relative', width: 620, height: tall ? 250 : 190, border: '1px solid var(--border)', borderRadius: 'var(--r3)', background: 'var(--bg)', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: '28px 16px 16px', border: '1px solid var(--border)', borderRadius: 'var(--r2)', background: 'var(--surface)' }} />
-      <div style={{ position: 'absolute', ...anchor }}>{children}</div>
+    <div style={{ position: 'relative', width: 720, height: tall ? 300 : 170, border: '1px solid var(--border)', borderRadius: 'var(--r3)', background: 'var(--bg)', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: '40px 24px 24px', border: '1px solid var(--border)', borderRadius: 'var(--r2)', background: 'var(--surface)', opacity: .5 }} />
+      <div style={{ position: 'absolute', ...place }}>{children}</div>
     </div>
   );
 }
@@ -56,48 +51,44 @@ function Caption({ children }) {
 export function Hud() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', alignItems: 'flex-start' }}>
-      <Caption>barra HUD · painel arrastável, uma linha por conta, teto de 484dp parada</Caption>
+      <Caption>barra HUD · notch colado numa borda, um anel por conta</Caption>
 
-      <Caption>1 · parada — uma linha, a primeira da ordem de cards</Caption>
-      <HudScreen>
-        <AppHudBar sources={SOURCES} countdown="02:05" />
-      </HudScreen>
+      <Caption>1 · parado no topo — anel, percentual em foco e a palavra de cada conta</Caption>
+      <Screen>
+        <AppHudBar accounts={ACCOUNTS} countdown="02:05" />
+      </Screen>
 
-      <Caption>2 · hover — a lista, a hora do reinício por cota, e a contagem só na primeira linha</Caption>
-      <HudScreen tall>
-        <AppHudBar sources={SOURCES} expanded countdown="02:05" />
-      </HudScreen>
+      <Caption>2 · ponteiro no primeiro anel — balão só daquela conta, alças nas pontas</Caption>
+      <Screen tall>
+        <AppHudBar accounts={ACCOUNTS} balloon={0} countdown="02:05" actions={['⟲', '▣', '⚇', '◉']} />
+      </Screen>
 
-      <Caption>3 · antes da primeira coleta — uma linha, e ela diz o que está acontecendo</Caption>
-      <HudScreen>
-        <AppHudBar sources={[]} fallbackLabel="Carregando" countdown="02:05" />
-      </HudScreen>
+      <Caption>3 · colado na lateral direita — o balão abre para dentro, a cauda no anel</Caption>
+      <Screen edge="right" tall>
+        <AppHudBar accounts={ACCOUNTS} edge="right" balloon={0} countdown="02:05" />
+      </Screen>
 
-      <Caption>4 · arrastado para a borda de baixo — sobre a barra de tarefas</Caption>
-      <HudScreen corner="bottom-right" tall>
-        <AppHudBar sources={SOURCES.slice(0, 2)} expanded countdown="02:05" />
-      </HudScreen>
+      <Caption>3b · engrenagem — o que o rodapé oferece: contagem, modos, ações</Caption>
+      <Screen tall>
+        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" />
+      </Screen>
 
-      <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '54ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>
-        Terceiro chrome, um passo além do modo somente cards (issue #164): a mesma janela principal
-        redimensionada a um painel. Três versões de conteúdo foram achadas erradas ao vivo, uma por
-        vez — uma linha só com a pior fonte, depois as outras atrás de um hover, depois a lista sem
-        nenhum número de consumo. Parada, a barra mostra uma linha; com o ponteiro em cima, todas as cotas, cada uma com a hora em que reinicia (issue #189) — a pílula parada não a
-        mostra, porque é ela que fica capturando o clique de quem está atrás. A largura sai do
-        conteúdo, com teto por estado: 484dp parada, mais três colunas de reset expandida, e o
-        painel é arrastado para onde o usuário quiser — durante o arrasto ele permanece em uma linha
-        fixa; ao soltar ele gruda na borda mais próxima dos limites físicos do monitor e a posição é
-        gravada. A HUD pode ocupar a barra de tarefas; janelas comuns continuam acima dela. Três saídas:
-        clique curto em qualquer ponto, item na bandeja
-        e Ctrl+Shift+H. A linha termina com a contagem até a próxima coleta (issue #185), que sai
-        <b> uma vez só</b>, na primeira: o polling é do app inteiro, e uma contagem por linha diria
-        que cada conta tem coleta própria. A barra permanece visível fora do hover e continua em uma
-        linha quando parada. Cota sem reset a mostrar — o saldo que não
-        expira — sai com o percentual e nada no lugar, nem um traço. O ponto de 6dp antes do nome é
-        <b> proposta</b> (issue #223): esta faixa não tem a barra de 2dp que o card tem, e o nome
-        sozinho não diz de que fornecedor é a conta. Ainda não fiado no Compose — o teto de largura
-        aqui é medido caractere a caractere contra as contas reais de uma máquina, e a coluna nova
-        pede a mesma medição que a contagem regressiva recebeu na issue #185.
+      <Caption>4 · antes da primeira coleta, com atualização pendente</Caption>
+      <Screen>
+        <AppHudBar accounts={[]} fallbackLabel="Carregando" countdown="02:05" update="Atualização pronta" />
+      </Screen>
+
+      <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '58ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>
+        Janela própria, transparente e sempre no topo; a janela principal fica escondida com a
+        geometria intacta. O notch não cresce: o detalhe é o balão de uma conta, a do anel sob o
+        ponteiro. Clique em pixel transparente é engolido no Windows (medido), então a janela só
+        tem o tamanho da área aberta enquanto o ponteiro está no notch: cresce de uma vez ao
+        entrar e encolhe depois de o balão sair, sem mover o notch. Só a mão move (solte perto de
+        qualquer borda: ele gruda na mais próxima, gravado como borda + fração); a engrenagem abre
+        as ações do rodapé. Clique num anel atualiza aquela conta; botão direito vai direto a
+        "Somente cards"; "Padrão" na engrenagem, Ctrl+Shift+H e a bandeja voltam à janela. O arco
+        fino de sessão ativa gira em órbita por fora do anel e o anel de fora pulsa em atenção só com a animação contínua
+        ligada — nunca em testes nem capturas.
       </span>
     </div>
   );

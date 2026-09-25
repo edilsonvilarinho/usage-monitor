@@ -1,12 +1,8 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
+import com.usagemonitor.presentation.ui.components.rememberLatestNonNull
+import com.usagemonitor.presentation.ui.components.AppExpandable
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,7 +54,6 @@ import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
-import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
@@ -257,39 +252,38 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    appUpdateState?.let { updateState ->
-                        AppUpdateBanner(
-                            state = updateState,
-                            language = language,
-                            onOpenRelease = { viewModel.openUpdateReleasePage() },
-                            onRestartAndUpdate = { viewModel.restartAndUpdateNow() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs)
-                        )
+                    // A faixa de atualização entra e sai deslizando. Ela sumia no
+                    // quadro em que a versão era aplicada e a grade inteira pulava
+                    // para cima; o último estado não nulo é o que a saída desenha.
+                    val shownUpdateState = rememberLatestNonNull(appUpdateState)
+                    AppExpandable(expanded = appUpdateState != null) {
+                        if (shownUpdateState != null) {
+                            AppUpdateBanner(
+                                state = shownUpdateState,
+                                language = language,
+                                onOpenRelease = { viewModel.openUpdateReleasePage() },
+                                onRestartAndUpdate = { viewModel.restartAndUpdateNow() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs)
+                            )
+                        }
                     }
-
-                    SnackbarHost(
-                        hostState = snackbarHostState,
-                        modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm)
-                    )
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
-                        AnimatedContent(
-                            targetState = uiState::class,
-                            transitionSpec = {
-                                (fadeIn(tween(AppMotion.normal, easing = AppMotion.enterEasing)) +
-                                    slideInVertically(tween(AppMotion.slow, easing = AppMotion.enterEasing)) { it / 12 })
-                                    .togetherWith(fadeOut(tween(AppMotion.fast, easing = AppMotion.exitEasing)))
-                                    .using(SizeTransform(clip = false))
-                            },
+                        // O estado vem **pelo parâmetro** da lambda. A versão
+                        // anterior lia `uiState` de fora e desenhava o estado novo
+                        // nos dois slots da transição: o esqueleto sumia no
+                        // primeiro quadro e duas grades se sobrepunham.
+                        AppStateCrossfade(
+                            state = uiState,
                             label = "dashboardStateContent"
-                        ) { _ ->
-                            when (val state = uiState) {
+                        ) { state ->
+                            when (state) {
                                 is UiState.Loading -> LoadingContent(language = language)
                                 UiState.NoApisEnabled -> NoApisEnabledContent(
                                     language = language,
@@ -328,6 +322,16 @@ fun DashboardScreen(
                         }
                     }
                 }
+
+                // Sobreposição, e não uma linha da coluna: dentro dela o aviso
+                // empurrava a grade para baixo ao aparecer e a puxava de volta ao
+                // sumir -- dois saltos por aviso. Por cima, ele não mexe em nada.
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = AppSpacing.md, vertical = AppSpacing.md)
+                )
             }
         }
     }
@@ -394,9 +398,9 @@ private fun NoApisEnabledContent(
 /**
  * Carregando: esqueleto **estático**.
  *
- * O `ShimmerBox` sai daqui. Ele é a única animação infinita da app e continua
- * existindo, mas era usado justamente na tela de abertura — a primeira coisa que
- * um teste de componente do dashboard encontra, e a que trava o `waitForIdle`.
+ * O `ShimmerBox` que existia aqui foi apagado: era animação infinita na tela de
+ * abertura — a primeira coisa que um teste de componente do dashboard encontra,
+ * e a que travava o `waitForIdle`.
  */
 @Composable
 private fun LoadingContent(language: AppLanguage) {

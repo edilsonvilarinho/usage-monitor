@@ -4,9 +4,11 @@ export function AppPanel({ children, style, ...rest }) {
   return (
     <div
       style={{
-        background: 'var(--surface)',
+        background: 'linear-gradient(var(--sheen), transparent 56px), var(--surface)',
         border: '1px solid var(--border)',
+        borderColor: 'var(--border-top) var(--border) var(--border-bottom)',
         borderRadius: 'var(--r3)',
+        boxShadow: 'inset 0 1px 0 var(--highlight), var(--shadow-card)',
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,

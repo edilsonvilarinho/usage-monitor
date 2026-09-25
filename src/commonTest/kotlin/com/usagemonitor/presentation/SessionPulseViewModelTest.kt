@@ -102,6 +102,62 @@ class SessionPulseViewModelTest {
         viewModel.onDestroy()
     }
 
+    /**
+     * A sessão saudável não pisca, mas **está trabalhando**: é o que acende o
+     * arco de sessão ativa da HUD. Sai da mesma leitura dos pulsos.
+     */
+    @Test
+    fun `a healthy active session is an active target without pulsing`() = runTest {
+        val repository = FakePulseCliRepository(listOf(session("a", liveContextTokens = 10_000L)))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.refreshOnce()
+
+        assertTrue(viewModel.cliPulses.value.isEmpty())
+        assertEquals(
+            setOf(UsageTargetKey(ApiSource.ANTHROPIC, "conta2")),
+            viewModel.activeTargets.value
+        )
+        viewModel.onDestroy()
+    }
+
+    /**
+     * O índice lido acima é só do Claude CLI: uma execução do Codex nunca acendia
+     * o arco do anel dele. Ela chega pela sonda própria e soma ao conjunto.
+     */
+    @Test
+    fun `a running codex turn is an active target next to the claude sessions`() = runTest {
+        val repository = FakePulseCliRepository(listOf(session("a", liveContextTokens = 10_000L)))
+        var running = true
+        val viewModel = buildViewModel(repository, codexActivity = { Result.success(running) })
+
+        viewModel.refreshOnce()
+        assertEquals(
+            setOf(UsageTargetKey(ApiSource.ANTHROPIC, "conta2"), UsageTargetKey.forSource(ApiSource.CODEX)),
+            viewModel.activeTargets.value
+        )
+
+        running = false
+        viewModel.refreshOnce()
+        assertEquals(setOf(UsageTargetKey(ApiSource.ANTHROPIC, "conta2")), viewModel.activeTargets.value)
+        viewModel.onDestroy()
+    }
+
+    /** Uma leitura do Codex que falha não apaga o arco: o banco pode estar ocupado num instante. */
+    @Test
+    fun `a failed codex read keeps the previous verdict`() = runTest {
+        val repository = FakePulseCliRepository(emptyList())
+        var result: Result<Boolean> = Result.success(true)
+        val viewModel = buildViewModel(repository, codexActivity = { result })
+
+        viewModel.refreshOnce()
+        result = Result.failure(IllegalStateException("database is locked"))
+        viewModel.refreshOnce()
+
+        assertEquals(setOf(UsageTargetKey.forSource(ApiSource.CODEX)), viewModel.activeTargets.value)
+        viewModel.onDestroy()
+    }
+
     @Test
     fun `team pulses come from the configured accounts`() = runTest {
         val teamRepository = FakePulseTeamRepository(
@@ -384,7 +440,8 @@ class SessionPulseViewModelTest {
         breadcrumbs: com.usagemonitor.domain.repository.BreadcrumbRecorder =
             com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder,
         detectStalled: Boolean = false,
-        stallThresholdMillis: Long = 2L * 60 * 60 * 1_000
+        stallThresholdMillis: Long = 2L * 60 * 60 * 1_000,
+        codexActivity: (suspend (Long) -> Result<Boolean>)? = null
     ): SessionPulseViewModel {
         return SessionPulseViewModel(
             getCliPulses = GetActiveCliSessionPulsesUseCase(repository, clock),
@@ -398,7 +455,8 @@ class SessionPulseViewModelTest {
             dispatcher = dispatcher,
             clock = clock,
             autoStart = autoStart,
-            breadcrumbs = breadcrumbs
+            breadcrumbs = breadcrumbs,
+            codexActivity = codexActivity
         )
     }
 

@@ -3,6 +3,15 @@ package com.usagemonitor.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
+import com.usagemonitor.presentation.ui.components.AppAnimatedNumber
+import androidx.compose.material3.Text
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
+import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.components.AppExpandable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
@@ -23,6 +32,7 @@ import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -169,6 +179,142 @@ class AppStatesTest {
         }
     }
 
+    /**
+     * A barra anima a largura, mas tem de **chegar**: depois do idle, o bitmap de
+     * uma barra que foi de 20% a 70% é o mesmo de uma que nasceu em 70%. Uma mola
+     * que parasse perto do alvo, ou uma animação que nunca terminasse, apareceria
+     * aqui como pixels diferentes — ou como `waitForIdle` sem voltar.
+     */
+    @Test
+    fun `a barra animada assenta exatamente no valor novo`() {
+        val settled = renderTrack(uiScalePercent = 100, fraction = 0.7f)
+        lateinit var animated: PixelMap
+        runDesktopComposeUiTest {
+            var fraction by mutableStateOf(0.2f)
+            setContent {
+                AppTheme(isDark = true) {
+                    Box(modifier = Modifier.width(TRACK_WIDTH_DP.dp).height(40.dp)) {
+                        AppProgressTrack(fraction = fraction, tone = AppTone.CRITICAL)
+                    }
+                }
+            }
+            waitForIdle()
+            fraction = 0.7f
+            waitForIdle()
+            animated = captureToImage().toPixelMap()
+        }
+
+        assertEquals(0, countDifferencesOffCorners(settled, animated))
+    }
+
+    /**
+     * O número desliza, mas depois do idle sobra **um** nó com o valor novo: o
+     * antigo saiu da árvore. Dois nós com o mesmo papel quebrariam todo
+     * `onNodeWithText` das suítes do card.
+     */
+    @Test
+    fun `o numero animado termina com um so no no valor novo`() = runDesktopComposeUiTest {
+        var value by mutableStateOf("41%")
+        setContent {
+            AppTheme(isDark = true) {
+                AppAnimatedNumber(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        onNodeWithText("41%").assertIsDisplayed()
+        value = "68%"
+        waitForIdle()
+
+        onNodeWithText("68%").assertIsDisplayed()
+        onNodeWithText("41%").assertDoesNotExist()
+    }
+
+    /**
+     * Regressão do defeito do dashboard e do histórico: a lambda do
+     * `AnimatedContent` ignorava o argumento, e no meio da transição os **dois**
+     * slots desenhavam o estado novo. Aqui, um quadro depois da troca, o slot que
+     * sai ainda mostra o estado antigo; e depois do idle só o novo sobra.
+     */
+    @Test
+    fun `a troca de estado mantem o estado antigo no slot que sai`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        var state by mutableStateOf<Any>("carregando")
+        setContent {
+            AppTheme(isDark = true) {
+                AppStateCrossfade(state = state) { current ->
+                    Text(if (current is String) "Carregando" else "Dados: $current")
+                }
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Carregando").assertExists()
+
+        state = 42
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(AppMotion.exit.toLong() / 2)
+
+        onNodeWithText("Carregando").assertExists()
+        onNodeWithText("Dados: 42").assertExists()
+
+        mainClock.autoAdvance = true
+        waitForIdle()
+        onNodeWithText("Carregando").assertDoesNotExist()
+        onNodeWithText("Dados: 42").assertExists()
+    }
+
+    /**
+     * O bloco recolhido sai da composição depois da saída animada, como o
+     * `if (expanded)` de antes: gráfico escondido não pode continuar na árvore.
+     */
+    @Test
+    fun `o bloco recolhido sai da arvore depois de fechar`() = runDesktopComposeUiTest {
+        var expanded by mutableStateOf(false)
+        setContent {
+            AppTheme(isDark = true) {
+                AppExpandable(expanded) {
+                    Text("Detalhe avançado")
+                }
+            }
+        }
+
+        onNodeWithText("Detalhe avançado").assertDoesNotExist()
+        expanded = true
+        waitForIdle()
+        onNodeWithText("Detalhe avançado").assertIsDisplayed()
+        expanded = false
+        waitForIdle()
+        onNodeWithText("Detalhe avançado").assertDoesNotExist()
+    }
+
+    /** Com "Reduzir animações" a barra salta para o valor no primeiro quadro. */
+    @Test
+    fun `com movimento reduzido a barra troca no mesmo quadro`() {
+        val settled = renderTrack(uiScalePercent = 100, fraction = 0.7f)
+        lateinit var reduced: PixelMap
+        runDesktopComposeUiTest {
+            mainClock.autoAdvance = false
+            var fraction by mutableStateOf(0.2f)
+            setContent {
+                AppTheme(isDark = true, motion = AppMotionPolicy.Reduced) {
+                    Box(modifier = Modifier.width(TRACK_WIDTH_DP.dp).height(40.dp)) {
+                        AppProgressTrack(fraction = fraction, tone = AppTone.CRITICAL)
+                    }
+                }
+            }
+            mainClock.advanceTimeByFrame()
+            fraction = 0.7f
+            mainClock.advanceTimeByFrame()
+            mainClock.advanceTimeByFrame()
+            reduced = captureToImage().toPixelMap()
+        }
+
+        assertEquals(0, countDifferencesOffCorners(settled, reduced))
+    }
+
     private fun renderTrack(uiScalePercent: Int, fraction: Float): PixelMap {
         lateinit var pixels: PixelMap
         runDesktopComposeUiTest {
@@ -182,6 +328,27 @@ class AppStatesTest {
             pixels = captureToImage().toPixelMap()
         }
         return pixels
+    }
+
+    /**
+     * Como [countDifferences], mas sem os quatro pixels de canto do trilho. O
+     * recorte arredondado os pinta com antialiasing, e o alfa deles varia com o
+     * número de quadros compostos sobre a cena -- uma cena que animou desenhou
+     * mais quadros que a que nasceu parada. O que o teste afirma é a largura do
+     * preenchimento, e ela não passa por canto nenhum.
+     */
+    private fun countDifferencesOffCorners(a: PixelMap, b: PixelMap): Int {
+        val lastX = TRACK_WIDTH_DP - 1
+        var different = 0
+        for (y in 0 until minOf(a.height, b.height)) {
+            for (x in 0 until minOf(a.width, b.width)) {
+                val isCorner = (x == 0 || x == lastX) && (y == 0 || y == TRACK_HEIGHT_PX - 1)
+                if (!isCorner && a[x, y] != b[x, y]) {
+                    different += 1
+                }
+            }
+        }
+        return different
     }
 
     private fun countDifferences(a: PixelMap, b: PixelMap): Int {
@@ -198,5 +365,8 @@ class AppStatesTest {
 
     private companion object {
         const val TRACK_WIDTH_DP = 300
+
+        /** 4dp a escala 100: os testes que a usam renderizam sem escala. */
+        const val TRACK_HEIGHT_PX = 4
     }
 }

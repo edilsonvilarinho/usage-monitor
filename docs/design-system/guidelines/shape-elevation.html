@@ -1,4 +1,4 @@
-<!-- @dsCard group="Patterns" viewport="700x210" name="Elevation" subtitle="0 for data surfaces; 2 rarely; 8 reserved for dialog, menu and overlay" -->
+<!-- @dsCard group="Patterns" viewport="700x210" name="Elevation" subtitle="Five depth levels, two neutral shadows each; in dark the light does the work" -->
 <!DOCTYPE html>
 <html lang="pt-BR" data-app-theme="dark">
 <head>
@@ -21,11 +21,13 @@
 </head>
 <body>
 
-<div class="r" style="gap:20px">
-  <div style="text-align:center"><div class="box" style="width:150px;height:56px;border-radius:var(--r3)"><span class="k">elev 0</span></div><div class="k" style="margin-top:6px">painel de dados</div></div>
-  <div style="text-align:center"><div class="box" style="width:150px;height:56px;border-radius:var(--r3);box-shadow:var(--shadow-2)"><span class="k">elev 2</span></div><div class="k" style="margin-top:6px">tooltip, menu</div></div>
-  <div style="text-align:center"><div class="box" style="width:150px;height:56px;border-radius:var(--r4);box-shadow:var(--shadow-8)"><span class="k">elev 8</span></div><div class="k" style="margin-top:6px">janela, diálogo, menu</div></div>
+<div class="r" style="gap:16px">
+  <div style="text-align:center"><div class="box" style="width:112px;height:56px;border-radius:var(--r3)"><span class="k">flat</span></div><div class="k" style="margin-top:6px">linha, bloco</div></div>
+  <div style="text-align:center"><div class="box" style="width:112px;height:56px;border-radius:var(--r3);background:linear-gradient(var(--sheen),transparent 56px),var(--surface);border-color:var(--border-top) var(--border) var(--border-bottom);box-shadow:inset 0 1px 0 var(--highlight),var(--shadow-card)"><span class="k">card</span></div><div class="k" style="margin-top:6px">painel, card</div></div>
+  <div style="text-align:center"><div class="box" style="width:112px;height:56px;border-radius:var(--r3);box-shadow:inset 0 1px 0 var(--highlight),var(--shadow-raised);transform:translateY(-1px)"><span class="k">raised</span></div><div class="k" style="margin-top:6px">hover, tooltip</div></div>
+  <div style="text-align:center"><div class="box" style="width:112px;height:56px;border-radius:var(--r2);box-shadow:var(--shadow-overlay)"><span class="k">overlay</span></div><div class="k" style="margin-top:6px">menu</div></div>
+  <div style="text-align:center"><div class="box" style="width:112px;height:56px;border-radius:var(--r3);box-shadow:var(--shadow-dialog)"><span class="k">dialog</span></div><div class="k" style="margin-top:6px">arrasto, HUD</div></div>
 </div>
-<div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:12px;max-width:640px">Auditado 2026-09-04 (issue #223): os dois consumidores reais de <code style="border:0;background:none;padding:0;color:var(--fg)">--shadow-2</code> são <code style="border:0;background:none;padding:0;color:var(--fg)">AppTooltipSurface</code> (a bolha de tooltip e do popover de projeção de cota) e <code style="border:0;background:none;padding:0;color:var(--fg)">AppMenu</code>. Os dois já usam o token certo — a lacuna estava só na demonstração: nenhum kit renderiza um popup aberto por padrão, então o degrau nunca aparecia numa captura estática.</div>
+<div style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:12px;max-width:640px">Cada patamar são duas sombras neutras (<code style="border:0;background:none;padding:0;color:var(--fg)">AppDepth</code>). No escuro a sombra preta quase não aparece — medido: 10dp escurecem <code style="border:0;background:none;padding:0;color:var(--fg)">#131010</code> em 3/255 —, e o volume vem da luz: highlight, brilho e borda clara no topo.</div>
 </body>
 </html>

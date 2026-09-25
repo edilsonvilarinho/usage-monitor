@@ -1,5 +1,10 @@
 package com.usagemonitor.screenshots
 
+import com.usagemonitor.HUD_BALLOON_ACTIONS
+import com.usagemonitor.presentation.ui.components.CardActionButton
+import com.usagemonitor.presentation.ui.components.CardIconActionButton
+import com.usagemonitor.presentation.ui.components.RefreshGlyph
+import com.usagemonitor.presentation.ui.components.cardActionsFor
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -21,7 +26,8 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.hudWindowSize
+import com.usagemonitor.HudEdge
+import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AccountCreditUsage
@@ -34,7 +40,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.AppUpdateBanner
-import com.usagemonitor.presentation.ui.HudBar
+import com.usagemonitor.presentation.ui.HudNotch
 import com.usagemonitor.presentation.ui.TeamPresenceContent
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
@@ -488,28 +494,35 @@ private fun recordWindowModes(outputDir: File) {
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(HUD_DEMO_WIDTH)
-                                    .height(HUD_DEMO_EXPANDED_HEIGHT)
-                            ) {
-                                HudBar(
-                                    statusTone = AppTone.WARNING,
-                                    sources = ScreenshotFixtures.hudSources,
-                                    fallbackLabel = "Carregando",
-                                    expanded = true,
-                                    // A contagem da issue #185 é parte da barra, e a demo
-                                    // mostraria um desenho que o app não tem sem ela. O
-                                    // laço vai desligado: o gravador dorme em tempo real e
-                                    // um relógio andando faria cada passada produzir
-                                    // quadros diferentes.
-                                    nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
-                                    countdownDescription = "Próxima atualização automática",
-                                    nowProvider = { ScreenshotFixtures.NOW },
-                                    countdownUpdatesEnabled = false,
-                                    onOpenFull = {}
-                                )
-                            }
+                            // O notch aberto, como ele fica com o ponteiro no
+                            // primeiro anel: o balão daquela conta. Os tamanhos
+                            // são os da geometria, a mesma que dimensiona a
+                            // janela no app: sem literal à mão.
+                            HudNotch(
+                                accounts = ScreenshotFixtures.hudAccounts,
+                                edge = HudEdge.TOP,
+                                sizes = HUD_DEMO_SIZES,
+                                fallbackLabel = "Carregando",
+                                expanded = true,
+                                initialBalloonIndex = 0,
+                                // Os botões do card da conta, pela mesma regra do card
+                                // (conta do time marcada, como na captura do dashboard).
+                                accountActions = { account ->
+                                    cardActionsFor(account.targetKey, setOf("padrao")).forEach { action ->
+                                        CardActionButton(action, AppLanguage.PT, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
+                                    }
+                                    CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
+                                        RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
+                                    }
+                                },
+                                // A contagem (#185) é parte do notch. O laço vai
+                                // desligado: o gravador dorme em tempo real e um
+                                // relógio andando mudaria cada passada.
+                                nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
+                                countdownDescription = "Próxima atualização automática",
+                                nowProvider = { ScreenshotFixtures.NOW },
+                                countdownUpdatesEnabled = false
+                            )
                         }
                     }
                 }
@@ -657,22 +670,14 @@ private val DEMO_UPDATE = AppUpdateInfo(
     releasePageUrl = "https://github.com/edilsonvilarinho/usage-monitor/releases/tag/v38.2.0"
 )
 
-/**
- * A demo é medida pela **mesma** função que dimensiona a janela no app
- * (`hudWindowSize`), e não por um literal.
- *
- * Era 420dp escrito à mão, e com a coluna de reset da issue #189 a demo passaria
- * a truncar nomes que o app real não trunca — uma demo mostrando um defeito que
- * não existe. Com a geometria como fonte, a próxima coluna que entrar na linha
- * já vem contada.
- */
-private val HUD_DEMO_WIDTH = hudWindowSize(
-    sources = ScreenshotFixtures.hudSources,
+/** A demo é medida pela **mesma** geometria que dimensiona a janela no app. */
+private val HUD_DEMO_SIZES = hudNotchSizes(
+    accounts = ScreenshotFixtures.hudAccounts,
+    edge = HudEdge.TOP,
     fallbackLabel = "Carregando",
-    expanded = true,
-    showsCountdown = true
-).width
-private val HUD_DEMO_EXPANDED_HEIGHT = 76.dp
+    showsCountdown = true,
+    hasUpdateIndicator = false
+)
 
 /** Largura da janela no modo somente cards: uma coluna de cards ao lado do editor. */
 private val CARDS_ONLY_DEMO_WIDTH = 420.dp

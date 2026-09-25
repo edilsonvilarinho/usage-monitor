@@ -1,6 +1,10 @@
-/* ── Shape + elevation ───────────────────────────────────────────────────
-   Radius ceiling is 10dp. Elevation 8 is reserved for dialog, menu and
-   overlay; data surfaces sit at 0 and are separated by a 1dp border.
+/* ── Shape + depth ───────────────────────────────────────────────────────
+   Radius ceiling is 10dp (the HUD notch and capsule bars are full-round).
+   Depth is five levels (AppDepth): FLAT for rows and inner blocks, CARD for
+   panels and cards at rest, RAISED for a hovered card and tooltips, OVERLAY
+   for menus, DIALOG for a dragged card and the HUD. Always neutral — the
+   accent glow on every surface is what the August refactor removed, and it
+   does not come back. --shadow-2/--shadow-8 remain as aliases.
    ──────────────────────────────────────────────────────────────────────── */
 :root {
   --r1: 4px;   /* chip, skeleton, inline code */
@@ -15,21 +19,68 @@
   --shadow-0: none;
   --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
   --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+
+  /* Depth — two stacked shadows per level (Compose: AppDepth). Black barely
+     shows on #131010 (measured: 10dp of shadow darkens the ground by 3/255),
+     so in dark the volume comes from light: highlight, sheen, lit top border. */
+  --shadow-card:    0 1px 1px rgb(0 0 0 / .45), 0 3px 8px rgb(0 0 0 / .30);
+  --shadow-raised:  0 2px 3px rgb(0 0 0 / .45), 0 6px 14px rgb(0 0 0 / .32);
+  --shadow-overlay: 0 3px 4px rgb(0 0 0 / .45), 0 8px 20px rgb(0 0 0 / .35);
+  --shadow-dialog:  0 4px 6px rgb(0 0 0 / .45), 0 12px 28px rgb(0 0 0 / .40);
+  --highlight:      rgb(255 255 255 / .09);            /* 1dp inner top line */
+  --sheen:          color-mix(in srgb, var(--fg) 4.5%, transparent); /* top of the 56px gradient */
+  --border-top:     color-mix(in srgb, var(--fg) 22%, var(--border));
+  --border-bottom:  var(--border);
+  --hover-layer:    color-mix(in srgb, var(--fg) 6%, transparent);
+  --pressed-layer:  color-mix(in srgb, var(--fg) 10%, transparent);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-app-theme="dark"]) {
     --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
     --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+    --shadow-card:    0 1px 1px rgb(23 20 20 / .12), 0 3px 8px rgb(23 20 20 / .08);
+    --shadow-raised:  0 2px 3px rgb(23 20 20 / .12), 0 6px 14px rgb(23 20 20 / .10);
+    --shadow-overlay: 0 3px 4px rgb(23 20 20 / .12), 0 8px 20px rgb(23 20 20 / .12);
+    --shadow-dialog:  0 4px 6px rgb(23 20 20 / .12), 0 12px 28px rgb(23 20 20 / .14);
+    --highlight:      rgb(255 255 255 / .80);
+    --sheen:          rgb(255 255 255 / .60);
+    --border-top:     var(--border);
+    --border-bottom:  color-mix(in srgb, var(--fg) 12%, var(--border));
+    --hover-layer:    color-mix(in srgb, var(--fg) 4.5%, transparent);
+    --pressed-layer:  color-mix(in srgb, var(--fg) 8%, transparent);
   }
 }
 
 :root[data-app-theme="light"] {
   --shadow-2: 0 1px 2px rgb(23 20 20 / .10);
   --shadow-8: 0 8px 24px rgb(23 20 20 / .16);
+  --shadow-card:    0 1px 1px rgb(23 20 20 / .12), 0 3px 8px rgb(23 20 20 / .08);
+  --shadow-raised:  0 2px 3px rgb(23 20 20 / .12), 0 6px 14px rgb(23 20 20 / .10);
+  --shadow-overlay: 0 3px 4px rgb(23 20 20 / .12), 0 8px 20px rgb(23 20 20 / .12);
+  --shadow-dialog:  0 4px 6px rgb(23 20 20 / .12), 0 12px 28px rgb(23 20 20 / .14);
+  --highlight:      rgb(255 255 255 / .80);
+  --sheen:          rgb(255 255 255 / .60);
+  --border-top:     var(--border);
+  --border-bottom:  color-mix(in srgb, var(--fg) 12%, var(--border));
+  --hover-layer:    color-mix(in srgb, var(--fg) 4.5%, transparent);
+  --pressed-layer:  color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
 :root[data-app-theme="dark"] {
   --shadow-2: 0 1px 2px rgb(0 0 0 / .40);
   --shadow-8: 0 8px 24px rgb(0 0 0 / .45);
+  /* Depth — two stacked shadows per level (Compose: AppDepth). Black barely
+     shows on #131010 (measured: 10dp of shadow darkens the ground by 3/255),
+     so in dark the volume comes from light: highlight, sheen, lit top border. */
+  --shadow-card:    0 1px 1px rgb(0 0 0 / .45), 0 3px 8px rgb(0 0 0 / .30);
+  --shadow-raised:  0 2px 3px rgb(0 0 0 / .45), 0 6px 14px rgb(0 0 0 / .32);
+  --shadow-overlay: 0 3px 4px rgb(0 0 0 / .45), 0 8px 20px rgb(0 0 0 / .35);
+  --shadow-dialog:  0 4px 6px rgb(0 0 0 / .45), 0 12px 28px rgb(0 0 0 / .40);
+  --highlight:      rgb(255 255 255 / .09);            /* 1dp inner top line */
+  --sheen:          color-mix(in srgb, var(--fg) 4.5%, transparent); /* top of the 56px gradient */
+  --border-top:     color-mix(in srgb, var(--fg) 22%, var(--border));
+  --border-bottom:  var(--border);
+  --hover-layer:    color-mix(in srgb, var(--fg) 6%, transparent);
+  --pressed-layer:  color-mix(in srgb, var(--fg) 10%, transparent);
 }

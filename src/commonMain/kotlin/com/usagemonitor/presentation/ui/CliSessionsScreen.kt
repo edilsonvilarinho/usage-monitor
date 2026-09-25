@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppExpandable
+import com.usagemonitor.presentation.ui.components.appItemMotion
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -215,36 +218,38 @@ internal fun CliSessionsContent(
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        when (state) {
-            is CliSessionsUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
+        AppStateCrossfade(state, key = { current -> if (current is CliSessionsUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
+    when (state) {
+                is CliSessionsUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
 
-            is CliSessionsUiState.Error -> AppErrorState(state.message)
+                is CliSessionsUiState.Error -> AppErrorState(state.message)
 
-            is CliSessionsUiState.Success -> {
-                val detail = state.detail
-                if (detail == null) {
-                    CliSessionsList(
-                        state = state,
-                        language = language,
-                        onSelectRange = onSelectRange,
-                        onOpenSession = onOpenSession,
-                        onSelectView = onSelectView,
-                        onExport = onExport,
-                        onExportReport = onExportReport
-                    )
-                } else {
-                    CliSessionDetailPane(
-                        detail = detail,
-                        language = language,
-                        advancedExpanded = state.advancedExpanded,
-                        glossaryExpanded = state.glossaryExpanded,
-                        onCloseDetail = onCloseDetail,
-                        onToggleAdvanced = onToggleAdvanced,
-                        onToggleGlossary = onToggleGlossary
-                    )
+                is CliSessionsUiState.Success -> {
+                    val detail = state.detail
+                    if (detail == null) {
+                        CliSessionsList(
+                            state = state,
+                            language = language,
+                            onSelectRange = onSelectRange,
+                            onOpenSession = onOpenSession,
+                            onSelectView = onSelectView,
+                            onExport = onExport,
+                            onExportReport = onExportReport
+                        )
+                    } else {
+                        CliSessionDetailPane(
+                            detail = detail,
+                            language = language,
+                            advancedExpanded = state.advancedExpanded,
+                            glossaryExpanded = state.glossaryExpanded,
+                            onCloseDetail = onCloseDetail,
+                            onToggleAdvanced = onToggleAdvanced,
+                            onToggleGlossary = onToggleGlossary
+                        )
+                    }
                 }
-            }
-        }
+    }
+}
     }
 }
 
@@ -344,12 +349,14 @@ private fun CliSessionsList(
                 modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
             ) {
                 items(items = state.sessions, key = { session -> session.sessionId }) { session ->
-                    CliSessionRow(
-                        session = session,
-                        language = language,
-                        onOpen = { onOpenSession(session.sessionId) },
-                        stalledForMillis = state.stalledSessions[session.sessionId]
-                    )
+                    Box(modifier = appItemMotion()) {
+                        CliSessionRow(
+                            session = session,
+                            language = language,
+                            onOpen = { onOpenSession(session.sessionId) },
+                            stalledForMillis = state.stalledSessions[session.sessionId]
+                        )
+                    }
                 }
             }
 
@@ -1268,7 +1275,7 @@ internal fun AdvancedDisclosure(
             }
         }
 
-        if (expanded) {
+        AppExpandable(expanded) {
             content()
         }
     }
@@ -1595,28 +1602,28 @@ internal fun GlossaryPanel(
             )
         }
     ) {
-        if (!expanded) {
-            return@AppDataSurfaceFlush
-        }
-
-        // Cada termo é uma linha do painel: título em mono, explicação em sans.
-        // O glossário é o único lugar da tela com texto de duas ou três linhas
-        // seguidas, e monoespaçada em texto corrido é ~8% mais larga e mais
-        // lenta de ler.
-        for (term in CliSessionsGlossary.readingOrder) {
-            val entry = CliSessionsGlossary.entry(term, language)
-            AppDataRow(showDivider = term != CliSessionsGlossary.readingOrder.last()) {
-                Column {
-                    Text(
-                        text = entry.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = entry.explanation,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        AppExpandable(expanded) {
+            Column {
+                // Cada termo é uma linha do painel: título em mono, explicação em sans.
+                // O glossário é o único lugar da tela com texto de duas ou três linhas
+                // seguidas, e monoespaçada em texto corrido é ~8% mais larga e mais
+                // lenta de ler.
+                for (term in CliSessionsGlossary.readingOrder) {
+                    val entry = CliSessionsGlossary.entry(term, language)
+                    AppDataRow(showDivider = term != CliSessionsGlossary.readingOrder.last()) {
+                        Column {
+                            Text(
+                                text = entry.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = entry.explanation,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         }

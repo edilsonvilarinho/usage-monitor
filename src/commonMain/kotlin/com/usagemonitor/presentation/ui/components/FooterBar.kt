@@ -267,8 +267,13 @@ private fun FooterCompactBadge(
     }
 }
 
+/**
+ * A fileira de ações do rodapé. `internal` e não mais `private` porque tem uma
+ * segunda porta: o balão da engrenagem da barra HUD, que o compõe com
+ * `onWindowModeChange = null` — os modos vão em linhas ali, não no menu.
+ */
 @Composable
-private fun FooterActionGroup(
+internal fun FooterActionGroup(
     language: AppLanguage,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,

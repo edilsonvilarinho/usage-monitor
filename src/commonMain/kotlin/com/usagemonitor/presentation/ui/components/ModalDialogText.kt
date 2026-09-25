@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/** Corpo de confirmação limitado para manter os botões do AlertDialog visíveis. */
+/** Corpo de confirmação limitado para manter os botões do AppDialog visíveis. */
 @Composable
 internal fun ModalDialogText(
     text: String,

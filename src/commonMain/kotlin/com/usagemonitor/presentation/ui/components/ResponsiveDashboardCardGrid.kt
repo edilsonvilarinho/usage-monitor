@@ -1,21 +1,31 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector2D
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.round
+import com.usagemonitor.presentation.ui.previewCardOrder
+import com.usagemonitor.presentation.ui.theme.appSpring
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -84,48 +94,44 @@ internal fun ResponsiveDashboardCardGrid(
     val density = LocalDensity.current
     val spacingPx = with(density) { CardSpacing.roundToPx() }
     val compactThresholdPx = with(density) { CompactColumnsThreshold.roundToPx() }
-    val itemBounds = remember { mutableStateMapOf<UsageTargetKey, CardGridBounds>() }
+    // Onde cada card foi **posto** (o alvo, não a posição animada). Mapa comum e
+    // não estado: é escrito na fase de posicionamento, e como estado cada
+    // escrita pediria uma recomposição.
+    val slotBounds = remember { HashMap<UsageTargetKey, CardGridBounds>() }
+    // Posição animada de cada card. Ver [placeAnimated].
+    val placements = remember { HashMap<UsageTargetKey, Animatable<IntOffset, AnimationVector2D>>() }
+    val placementScope = rememberCoroutineScope()
+    val placementSpec = appSpring<IntOffset>(AppMotion.Springs.GENTLE, visibilityThreshold = IntOffset.VisibilityThreshold)
     var dragState by remember { mutableStateOf<CardDragState?>(null) }
     var dropTargetIndex by remember { mutableStateOf<Int?>(null) }
+
+    // Durante o arrasto a grade é disposta na ordem **de prévia**: o card
+    // arrastado já no lugar em que cairia. Os vizinhos deslizam para abrir o vão
+    // em vez de esperar o soltar, e o soltar não move mais nada — a ordem nova
+    // já era a da tela.
+    val orderedKeys = items.map { item -> item.targetKey }
+    val layoutKeys = previewCardOrder(orderedKeys, dragState?.target, dropTargetIndex)
 
     Layout(
         modifier = modifier,
         content = {
             items.forEachIndexed { index, stats ->
                 val isBeingDragged = dragState?.target == stats.targetKey
-                val isDropTarget = dropTargetIndex == index && !isBeingDragged
-                val translation = if (isBeingDragged) {
-                    dragState?.dragOffset ?: Offset.Zero
-                } else {
-                    Offset.Zero
-                }
 
                 key(stats.targetKey) {
+                    // Quais janelas o card abre: `cardActionsFor`, a mesma regra do
+                    // balão da conta na barra HUD.
+                    val actions = cardActionsFor(stats.targetKey, teamEnabledProfileIds)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .zIndex(
-                                when {
-                                    isBeingDragged -> 3f
-                                    isDropTarget -> 1f
-                                    else -> 0f
-                                }
-                            )
-                            .onGloballyPositioned { coordinates ->
-                                itemBounds[stats.targetKey] = CardGridBounds(
-                                    topLeft = coordinates.positionInParent(),
-                                    width = coordinates.size.width,
-                                    height = coordinates.size.height
-                                )
-                            }
-                            .graphicsLayer {
-                                translationX = translation.x
-                                translationY = translation.y
-                            }
+                            .layoutId(stats.targetKey)
+                            .zIndex(if (isBeingDragged) 3f else 0f)
                     ) {
                         ApiUsageCard(
                             source = stats.source,
-                            apiName = stats.profileLabel?.let { label -> "${stats.apiName} — $label" } ?: stats.apiName,
+                            apiName = stats.displayTitle(),
+                            planLabel = stats.planLabel,
                             quotas = stats.quotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,
@@ -134,7 +140,9 @@ internal fun ResponsiveDashboardCardGrid(
                             isRefreshing = stats.targetKey in refreshingTargets,
                             isMinimized = stats.targetKey in minimizedCards,
                             isBeingDragged = isBeingDragged,
-                            isDragTarget = isDropTarget,
+                            // O vão aberto pela ordem de prévia já diz onde o
+                            // card vai cair; realçar um vizinho diria outra coisa.
+                            isDragTarget = false,
                             language = language,
                             // O atraso de entrada sai do token, não de um
                             // literal: o `ScreenshotGenerator` é calibrado
@@ -142,30 +150,22 @@ internal fun ResponsiveDashboardCardGrid(
                             animationDelayMillis = index * AppMotion.stagger.toInt(),
                             onRefresh = { onRefreshCard(stats.targetKey) },
                             onOpenHistory = { onOpenHistoryCard(stats.source, stats.accountContext?.key) },
-                            onOpenCliSessions = if (stats.source == ApiSource.ANTHROPIC) {
+                            onOpenCliSessions = if (CardAction.CLI_SESSIONS in actions) {
                                 { onOpenCliSessionsCard(stats.targetKey) }
                             } else {
                                 null
                             },
-                            onOpenCodexCliSessions = if (stats.source == ApiSource.CODEX) {
+                            onOpenCodexCliSessions = if (CardAction.CODEX_CLI_SESSIONS in actions) {
                                 { onOpenCodexCliSessionsCard(stats.targetKey) }
                             } else {
                                 null
                             },
-                            onOpenTeamUsage = if (
-                                stats.source == ApiSource.ANTHROPIC &&
-                                stats.targetKey.profileId in teamEnabledProfileIds
-                            ) {
+                            onOpenTeamUsage = if (CardAction.TEAM_USAGE in actions) {
                                 { onOpenTeamUsageCard(stats.targetKey) }
                             } else {
                                 null
                             },
-                            // Mesma condição: as duas janelas leem o mesmo
-                            // servidor de time, para a mesma conta.
-                            onOpenTeamPresence = if (
-                                stats.source == ApiSource.ANTHROPIC &&
-                                stats.targetKey.profileId in teamEnabledProfileIds
-                            ) {
+                            onOpenTeamPresence = if (CardAction.TEAM_PRESENCE in actions) {
                                 { onOpenTeamPresenceCard(stats.targetKey) }
                             } else {
                                 null
@@ -175,7 +175,15 @@ internal fun ResponsiveDashboardCardGrid(
                             now = now,
                             onToggleMinimized = { onToggleCardMinimized(stats.targetKey) },
                             onDragStart = {
-                                dragState = CardDragState(target = stats.targetKey)
+                                // As caixas do alvo são **congeladas** no início:
+                                // a ordem de prévia move os vizinhos, e medir
+                                // contra caixas que andam faria o alvo trocar a
+                                // cada quadro, com o vão pulando de um lado para
+                                // o outro.
+                                dragState = CardDragState(
+                                    target = stats.targetKey,
+                                    frozenBounds = slotBounds.toMap()
+                                )
                                 dropTargetIndex = items.indexOfFirst { item -> item.targetKey == stats.targetKey }
                             },
                             onDrag = { dragAmount ->
@@ -186,14 +194,14 @@ internal fun ResponsiveDashboardCardGrid(
                                     )
                                     dragState = updatedDrag
 
-                                    val draggedBounds = itemBounds[stats.targetKey]
+                                    val draggedBounds = updatedDrag.frozenBounds[stats.targetKey]
                                     if (draggedBounds == null) {
                                         dropTargetIndex = null
                                     } else {
                                         val draggedCenter = draggedBounds.center + updatedDrag.dragOffset
                                         dropTargetIndex = resolveDropTargetIndex(
                                             orderedTargets = items.map { item -> item.targetKey },
-                                            boundsByTarget = itemBounds.mapValues { (target, bounds) ->
+                                            boundsByTarget = updatedDrag.frozenBounds.mapValues { (target, bounds) ->
                                                 CardGridSlot(
                                                     target = target,
                                                     left = bounds.topLeft.x,
@@ -211,6 +219,22 @@ internal fun ResponsiveDashboardCardGrid(
                             onDragEnd = {
                                 val activeDrag = dragState
                                 val targetIndex = dropTargetIndex
+                                // O card sai de onde o ponteiro o deixou e assenta
+                                // no vão pela mola, em vez de saltar para a vaga.
+                                // `UNDISPATCHED` faz o `snapTo` acontecer agora,
+                                // antes de o arrasto ser limpo: no quadro seguinte
+                                // a posição de partida já é a do ponteiro.
+                                val released = activeDrag?.let { drag ->
+                                    drag.frozenBounds[drag.target]?.let { bounds ->
+                                        (bounds.topLeft + drag.dragOffset).round()
+                                    }
+                                }
+                                val releasedAnimatable = activeDrag?.let { drag -> placements[drag.target] }
+                                if (released != null && releasedAnimatable != null) {
+                                    placementScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                                        releasedAnimatable.snapTo(released)
+                                    }
+                                }
                                 dragState = null
                                 dropTargetIndex = null
 
@@ -224,10 +248,13 @@ internal fun ResponsiveDashboardCardGrid(
                 }
             }
         }
-    ) { measurables, constraints ->
-        if (measurables.isEmpty()) {
+    ) { unorderedMeasurables, constraints ->
+        if (unorderedMeasurables.isEmpty()) {
             return@Layout layout(width = constraints.maxWidth, height = 0) {}
         }
+        val byKey = unorderedMeasurables.associateBy { measurable -> measurable.layoutId as UsageTargetKey }
+        val keysInOrder = layoutKeys.filter { key -> key in byKey }
+        val measurables = keysInOrder.map { key -> byKey.getValue(key) }
 
         val columns = if (constraints.maxWidth < compactThresholdPx) 1 else 2
         val totalSpacing = spacingPx * (columns - 1)
@@ -267,6 +294,8 @@ internal fun ResponsiveDashboardCardGrid(
 
         layout(width = constraints.maxWidth, height = layoutHeight) {
             var yPosition = 0
+            var flatIndex = 0
+            val activeDrag = dragState
 
             rows.forEach { row ->
                 row.placeables.forEachIndexed { columnIndex, placeable ->
@@ -275,11 +304,26 @@ internal fun ResponsiveDashboardCardGrid(
                     } else {
                         columnIndex * (itemWidth + spacingPx)
                     }
-
-                    placeable.placeRelative(
-                        x = xPosition,
-                        y = yPosition
+                    val key = keysInOrder[flatIndex]
+                    flatIndex += 1
+                    val target = IntOffset(xPosition, yPosition)
+                    slotBounds[key] = CardGridBounds(
+                        topLeft = Offset(xPosition.toFloat(), yPosition.toFloat()),
+                        width = placeable.width,
+                        height = placeable.height
                     )
+
+                    val draggedFrom = activeDrag?.takeIf { drag -> drag.target == key }
+                        ?.let { drag -> drag.frozenBounds[key] }
+                    if (activeDrag != null && draggedFrom != null) {
+                        // O arrastado segue o ponteiro a partir de onde estava
+                        // quando o arrasto começou — não da vaga de prévia.
+                        placeable.placeRelative((draggedFrom.topLeft + activeDrag.dragOffset).round())
+                    } else {
+                        placeable.placeRelative(
+                            placeAnimated(key, target, placements, placementScope, placementSpec)
+                        )
+                    }
                 }
 
                 yPosition += row.height + spacingPx
@@ -290,8 +334,33 @@ internal fun ResponsiveDashboardCardGrid(
 
 private data class CardDragState(
     val target: UsageTargetKey,
-    val dragOffset: Offset = Offset.Zero
+    val dragOffset: Offset = Offset.Zero,
+    val frozenBounds: Map<UsageTargetKey, CardGridBounds> = emptyMap()
 )
+
+/**
+ * Posição animada de um card: a primeira colocação é salto, as seguintes
+ * deslizam pela mola até a vaga nova. Cobre reordenar, minimizar um vizinho
+ * (quem está embaixo sobe) e a troca de uma para duas colunas em 720dp — que
+ * antes eram todas saltos no mesmo quadro.
+ *
+ * A leitura de `value` acontece no posicionamento, e é ela que pede o próximo
+ * posicionamento enquanto a mola anda; as larguras continuam saltando, porque
+ * medir a cada quadro custaria a grade inteira.
+ */
+private fun placeAnimated(
+    key: UsageTargetKey,
+    target: IntOffset,
+    placements: HashMap<UsageTargetKey, Animatable<IntOffset, AnimationVector2D>>,
+    scope: CoroutineScope,
+    spec: FiniteAnimationSpec<IntOffset>
+): IntOffset {
+    val animatable = placements.getOrPut(key) { Animatable(target, IntOffset.VectorConverter) }
+    if (animatable.targetValue != target) {
+        scope.launch { animatable.animateTo(target, spec) }
+    }
+    return animatable.value
+}
 
 private data class CardGridBounds(
     val topLeft: Offset,

@@ -3,6 +3,8 @@ package com.usagemonitor
 import com.russhwolf.settings.PreferencesSettings
 import java.util.UUID
 import java.util.prefs.Preferences
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -64,6 +66,47 @@ class HudWindowPreferencesTest {
             settings.putString("hudWindowX", "1046")
 
             assertNull(readPersistedHudPosition(settings))
+        }
+    }
+
+    private val screen = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(1920.dp, 1080.dp))
+
+    @Test
+    fun `placement defaults to the top edge near the right`() {
+        withTestSettings { settings ->
+            assertEquals(HudPlacement.Default, readPersistedHudPlacement(settings, screen))
+        }
+    }
+
+    @Test
+    fun `placement round trips edge and fraction`() {
+        withTestSettings { settings ->
+            persistHudPlacement(settings, HudPlacement(HudEdge.LEFT, 0.3f))
+
+            assertEquals(HudPlacement(HudEdge.LEFT, 0.3f), readPersistedHudPlacement(settings, screen))
+        }
+    }
+
+    /** Quem já tinha arrastado a pílula não perde a escolha com o desenho novo. */
+    @Test
+    fun `legacy pill position migrates once to the nearest edge`() {
+        withTestSettings { settings ->
+            persistHudPosition(settings, xDp = 1700f, yDp = 1040f)
+
+            val migrated = readPersistedHudPlacement(settings, screen)
+
+            assertEquals(HudEdge.BOTTOM, migrated.edge)
+            assertNull(readPersistedHudPosition(settings))
+            assertEquals(migrated, readPersistedHudPlacement(settings, screen))
+        }
+    }
+
+    @Test
+    fun `half written placement is ignored`() {
+        withTestSettings { settings ->
+            settings.putString("hudEdge", "RIGHT")
+
+            assertEquals(HudPlacement.Default, readPersistedHudPlacement(settings, screen))
         }
     }
 

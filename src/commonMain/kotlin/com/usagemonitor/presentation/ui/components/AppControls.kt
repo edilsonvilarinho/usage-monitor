@@ -1,5 +1,17 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.MutableTransitionState
+import kotlin.math.roundToInt
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -49,9 +61,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.VisibilityThreshold
+import com.usagemonitor.presentation.ui.theme.appSpring
+import com.usagemonitor.presentation.ui.theme.appTween
 import com.usagemonitor.presentation.ui.theme.AppChrome
-import com.usagemonitor.presentation.ui.theme.AppElevation
+import com.usagemonitor.presentation.ui.theme.AppDepth
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -113,20 +129,18 @@ fun AppButton(
     val colors = buttonColors(tone)
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    val container by animateColorAsState(
-        targetValue = if (hovered && enabled) colors.hover else colors.container,
-        animationSpec = tween(AppMotion.fast),
-        label = "appButtonContainer"
-    )
+    val container = animatedButtonContainer(colors, interactionSource, enabled, "appButtonContainer")
 
+    // Texto não encolhe na pressão: escalar uma camada com Plex Mono borra o
+    // traço durante a transição. Quem responde ao clique aqui é a camada de
+    // pressão, um degrau acima do hover.
     Row(
         modifier = modifier
             .clip(AppShapes.small)
             .background(container.copy(alpha = container.alpha * alpha))
             .border(AppBorderWidth, colors.border.copy(alpha = colors.border.alpha * alpha), AppShapes.small)
             .hoverable(interactionSource, enabled = enabled)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
             .defaultMinSize(minHeight = CONTROL_HEIGHT)
             .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -164,21 +178,17 @@ fun AppIconButton(
     val colors = buttonColors(tone)
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    val container by animateColorAsState(
-        targetValue = if (hovered && enabled) colors.hover else colors.container,
-        animationSpec = tween(AppMotion.fast),
-        label = "appIconButtonContainer"
-    )
+    val container = animatedButtonContainer(colors, interactionSource, enabled, "appIconButtonContainer")
 
     Box(
         modifier = modifier
             .size(ICON_BUTTON_SIZE)
+            .appPressScale(interactionSource, enabled)
             .clip(AppShapes.small)
             .background(container.copy(alpha = container.alpha * alpha))
             .border(AppBorderWidth, colors.border.copy(alpha = colors.border.alpha * alpha), AppShapes.small)
             .hoverable(interactionSource, enabled = enabled)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
             // `contentDescription` na semântica, e não só `onClickLabel`: o
             // rótulo do clique descreve a **ação** para o leitor de tela, mas
             // não é o que `onNodeWithContentDescription` encontra — e é assim
@@ -213,6 +223,8 @@ fun AppTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None
 ) {
     val alpha = if (enabled) 1f else DISABLED_ALPHA
+    val interactionSource = remember { MutableInteractionSource() }
+    val focusRing = animatedFocusRing(interactionSource)
     // A moldura entra por `decorationBox`, e o [modifier] do chamador fica no
     // próprio `BasicTextField`: é ele que carrega o foco e a ação de digitar.
     // Com a decoração por fora, uma `testTag` do chamador cairia num `Box` sem
@@ -220,6 +232,7 @@ fun AppTextField(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        interactionSource = interactionSource,
         modifier = modifier.defaultMinSize(minHeight = CONTROL_HEIGHT),
         enabled = enabled,
         singleLine = true,
@@ -233,7 +246,7 @@ fun AppTextField(
                 modifier = Modifier
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.background)
-                    .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                    .border(focusRing.width, focusRing.color, AppShapes.small)
                     .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -277,9 +290,12 @@ fun AppTextArea(
     enabled: Boolean = true
 ) {
     val alpha = if (enabled) 1f else DISABLED_ALPHA
+    val interactionSource = remember { MutableInteractionSource() }
+    val focusRing = animatedFocusRing(interactionSource)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        interactionSource = interactionSource,
         modifier = modifier.defaultMinSize(minHeight = TEXT_AREA_HEIGHT),
         enabled = enabled,
         singleLine = false,
@@ -292,7 +308,7 @@ fun AppTextArea(
                 modifier = Modifier
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.background)
-                    .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                    .border(focusRing.width, focusRing.color, AppShapes.small)
                     .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
                 // Topo, e não centro: texto que cresce para baixo tem de começar
                 // sempre no mesmo lugar, senão a primeira linha se move enquanto
@@ -322,9 +338,11 @@ private val TEXT_AREA_HEIGHT = 96.dp
 /**
  * Interruptor de 30 × 17.
  *
- * A transição do botão é de 120ms e **termina**: `animateDpAsState` chega ao
- * alvo e para. Nada aqui pode virar animação infinita, que travaria o
- * `waitForIdle` dos testes de componente.
+ * O botão anda por mola rápida e trilho, borda e botão mudam de cor **juntos**,
+ * no mesmo tween. Antes só o trilho e a posição animavam: borda e botão trocavam
+ * de cor no primeiro quadro, e o interruptor chegava verde de um lado enquanto o
+ * botão ainda estava no outro. Tudo termina — nada aqui pode virar animação
+ * infinita, que travaria o `waitForIdle` dos testes de componente.
  */
 @Composable
 fun AppSwitch(
@@ -341,16 +359,24 @@ fun AppSwitch(
     val alpha = if (enabled) 1f else DISABLED_ALPHA
     val knobOffset by animateDpAsState(
         targetValue = if (checked) SWITCH_WIDTH - SWITCH_KNOB - SWITCH_PADDING * 2 else 0.dp,
-        animationSpec = tween(AppMotion.fast),
+        animationSpec = appSpring(AppMotion.Springs.SNAPPY, visibilityThreshold = Dp.VisibilityThreshold),
         label = "appSwitchKnob"
     )
     val track by animateColorAsState(
         targetValue = if (checked) accent.copy(alpha = 0.30f) else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(AppMotion.fast),
+        animationSpec = appTween(AppMotion.fast),
         label = "appSwitchTrack"
     )
-    val border = if (checked) accent else MaterialTheme.colorScheme.outlineVariant
-    val knob = if (checked) accent else MaterialTheme.colorScheme.onSurfaceVariant
+    val border by animateColorAsState(
+        targetValue = if (checked) accent else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appSwitchBorder"
+    )
+    val knob by animateColorAsState(
+        targetValue = if (checked) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appSwitchKnobColor"
+    )
     val shape: Shape = RoundedCornerShape(SWITCH_HEIGHT / 2)
 
     Box(
@@ -400,27 +426,48 @@ fun AppSegmentedControl(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    Row(
+    // O fundo do segmento escolhido é um polegar só, que desliza por trás dos
+    // rótulos: trocar de "5h" para "30 dias" mostra o caminho entre os dois em
+    // vez de apagar um e acender o outro no mesmo quadro.
+    val indicator = rememberSlidingIndicatorState()
+    val span = animatedIndicatorSpan(indicator, selectedIndex)
+    val density = LocalDensity.current
+    val alpha = if (enabled) 1f else DISABLED_ALPHA
+    val thumb = MaterialTheme.colorScheme.surfaceVariant
+    Box(
         modifier = modifier
             .clip(AppShapes.small)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = alpha))
             .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
             .height(CONTROL_HEIGHT)
     ) {
-        options.forEachIndexed { index, option ->
-            if (index > 0) {
-                Box(
-                    modifier = Modifier
-                        .width(AppBorderWidth)
-                        .height(CONTROL_HEIGHT)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
+        if (span != null) {
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(span.start.roundToInt(), 0) }
+                    .width(with(density) { span.size.toDp() })
+                    .fillMaxHeight()
+                    .background(thumb.copy(alpha = thumb.alpha * alpha))
+            )
+        }
+        Row(modifier = Modifier.fillMaxHeight()) {
+            options.forEachIndexed { index, option ->
+                if (index > 0) {
+                    Box(
+                        modifier = Modifier
+                            .width(AppBorderWidth)
+                            .height(CONTROL_HEIGHT)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    )
+                }
+                AppSegmentItem(
+                    option = option,
+                    selected = index == selectedIndex,
+                    enabled = enabled,
+                    onClick = { onSelect(index) },
+                    modifier = Modifier.reportIndicatorSpan(indicator, index)
                 )
             }
-            AppSegmentItem(
-                option = option,
-                selected = index == selectedIndex,
-                enabled = enabled,
-                onClick = { onSelect(index) }
-            )
         }
     }
 }
@@ -441,21 +488,33 @@ fun AppToggleChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val container = if (selected) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val border = if (selected) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val container by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.surfaceVariant
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appToggleChipContainer"
+    )
+    val border by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appToggleChipBorder"
+    )
+    val content by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appToggleChipContent"
+    )
     val alpha = if (enabled) 1f else DISABLED_ALPHA
 
     Box(
@@ -488,21 +547,22 @@ private fun AppSegmentItem(
     option: AppSegment,
     selected: Boolean,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val alpha = if (enabled) 1f else DISABLED_ALPHA
-    val container = if (selected) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // O fundo do escolhido é o polegar deslizante do [AppSegmentedControl].
+    val content by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appSegmentContent"
+    )
 
-    val tagged = if (option.testTag != null) Modifier.testTag(option.testTag) else Modifier
+    val tagged = if (option.testTag != null) modifier.testTag(option.testTag) else modifier
     Box(
         modifier = tagged
             // Preenche a altura do controle, como os divisores já fazem. Sem isto o
@@ -510,7 +570,6 @@ private fun AppSegmentItem(
             // da borda e o canto arredondado do clip do `Row` come o último
             // segmento — que na tela se lê como botão cortado.
             .fillMaxHeight()
-            .background(container.copy(alpha = container.alpha * alpha))
             .selectable(selected = selected, enabled = enabled, onClick = onClick)
             .padding(horizontal = AppSpacing.sm),
         contentAlignment = Alignment.Center
@@ -560,6 +619,15 @@ data class AppMenuOption(
  * baixo nasceria fora dela. Popup no Compose Desktop é camada **dentro** da
  * janela, recortada pelos limites dela — a #164 pagou isso —, e por isso a
  * posição é presa à janela nos dois eixos.
+ *
+ * **Entra e sai.** A primeira versão recusava animação de entrada ("menu não é
+ * lugar de transição avulsa"), e o menu surgia e sumia num quadro — o que mais
+ * contribuía para a tela ler como sem fluidez, justo no controle que o usuário
+ * aciona para trocar a janela inteira de modo. Entrada: escala de 0,96 a 1 pela
+ * mola `EXPRESSIVE` mais fade, **a partir da borda que encosta na âncora** —
+ * menu que abre para cima cresce de baixo. Saída: só fade, em 90ms. O `Popup`
+ * continua composto até a saída terminar; antes disso ele sumia junto com o
+ * `expanded`, e não havia saída para animar.
  */
 @Composable
 fun AppMenu(
@@ -571,10 +639,19 @@ fun AppMenu(
     modifier: Modifier = Modifier,
     anchor: @Composable () -> Unit
 ) {
+    val visibility = remember { MutableTransitionState(false) }
+    visibility.targetState = expanded
+    val enterAlpha = appTween<Float>(AppMotion.fast)
+    val exitAlpha = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+    val enterScale = appSpring<Float>(AppMotion.Springs.EXPRESSIVE, visibilityThreshold = 0.001f)
+    val exitScale = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+
     Box(modifier = modifier) {
         anchor()
 
-        if (!expanded) {
+        // Fechado e parado: nada composto. Fechando, o popup fica até a saída
+        // terminar.
+        if (!visibility.currentState && !visibility.targetState) {
             return@Box
         }
 
@@ -586,9 +663,30 @@ fun AppMenu(
             onDismissRequest = onDismissRequest,
             properties = PopupProperties(focusable = true)
         ) {
+            val transition = rememberTransition(visibility, label = "appMenu")
+            val alpha by transition.animateFloat(
+                transitionSpec = { if (targetState) enterAlpha else exitAlpha },
+                label = "appMenuAlpha"
+            ) { shown -> if (shown) 1f else 0f }
+            val scale by transition.animateFloat(
+                transitionSpec = { if (targetState) enterScale else exitScale },
+                label = "appMenuScale"
+            ) { shown -> if (shown) 1f else MENU_ENTER_SCALE }
             Column(
                 modifier = Modifier
-                    .shadow(AppElevation.raised, AppShapes.small)
+                    .graphicsLayer {
+                        this.alpha = alpha
+                        scaleX = scale
+                        scaleY = scale
+                        // Cresce a partir da borda que encosta na âncora. A
+                        // posição é resolvida no layout do popup, antes deste
+                        // desenho, e por isso a leitura aqui já é a do quadro.
+                        transformOrigin = TransformOrigin(
+                            0.5f,
+                            if (positionProvider.opensUpward) 1f else 0f
+                        )
+                    }
+                    .appDepth(AppDepth.OVERLAY, AppShapes.small)
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.surface)
                     .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
@@ -679,7 +777,18 @@ private val MENU_MARK_SIZE = 12.dp
  * limites da janela nos dois eixos: popup aqui é camada dentro dela, e o que
  * passar do limite não é rolado, é recortado.
  */
+/** Escala de partida da entrada: o bastante para ler como "saiu da âncora". */
+private const val MENU_ENTER_SCALE = 0.96f
+
 private class AppMenuPositionProvider(private val gapPx: Int) : PopupPositionProvider {
+    /**
+     * Para que lado o menu abriu na última posição calculada. Campo comum, não
+     * estado: é lido no desenho do mesmo quadro, depois do layout que o escreve,
+     * e como estado ele recomporia o menu a cada posicionamento.
+     */
+    var opensUpward: Boolean = false
+        private set
+
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -690,7 +799,8 @@ private class AppMenuPositionProvider(private val gapPx: Int) : PopupPositionPro
             .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
         val above = anchorBounds.top - popupContentSize.height - gapPx
         val below = anchorBounds.bottom + gapPx
-        val y = if (above >= 0) {
+        opensUpward = above >= 0
+        val y = if (opensUpward) {
             above
         } else {
             below.coerceAtMost((windowSize.height - popupContentSize.height).coerceAtLeast(0))
@@ -710,10 +820,11 @@ private class AppMenuPositionProvider(private val gapPx: Int) : PopupPositionPro
  * Duas tooltips sobre o mesmo gráfico em alturas diferentes é o defeito que a
  * repetição produz sozinha.
  *
- * **Overlay curto: 2dp, não 8.** Oito é a elevação de diálogo e de menu, que
- * cobrem a janela; a bolha cobre um ponto do gráfico. É `tonalElevation` **e**
- * `shadowElevation` no mesmo patamar, senão o tom sobe sem a sombra acompanhar e
- * a bolha lê como bloco chapado.
+ * **Patamar [AppDepth.RAISED], não o de menu.** O menu cobre a janela; a bolha
+ * cobre um ponto do gráfico. A sombra é a do sistema ([appDepth]), em duas
+ * camadas, e não a `shadowElevation` do Material, que tem outra curva e outra
+ * cor. O `tonalElevation` fica: é ele que dá à bolha o tom um pouco acima do
+ * `surfaceVariant` que a separa do gráfico.
  *
  * Só o conteúdo é do chamador: cada bolha tem o próprio `padding` e a própria
  * largura máxima, e é por isso que isto é superfície e não contêiner.
@@ -725,12 +836,12 @@ fun AppTooltipSurface(
     content: @Composable () -> Unit
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.appDepth(AppDepth.RAISED, shape),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = AppElevation.raised,
-        shadowElevation = AppElevation.raised,
+        tonalElevation = TOOLTIP_TONAL_ELEVATION,
+        shadowElevation = 0.dp,
         border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant),
         content = content
     )
@@ -807,8 +918,88 @@ private data class ButtonColors(
     val content: Color
 )
 
+/**
+ * Repouso → hover → pressão, em tween. A pressão é a camada de pressão do
+ * [AppSurfaceLadder] somada ao hover: um degrau acima dele em qualquer tom de
+ * botão, sem uma terceira cor por tom.
+ */
+@Composable
+private fun animatedButtonContainer(
+    colors: ButtonColors,
+    interactionSource: MutableInteractionSource,
+    enabled: Boolean,
+    label: String
+): Color {
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val pressed by interactionSource.collectIsPressedAsState()
+    val ladder = AppSurfaceLadders.current
+    val target = when {
+        !enabled -> colors.container
+        pressed -> ladder.pressedLayer.compositeOver(colors.hover)
+        hovered -> colors.hover
+        else -> colors.container
+    }
+    val container by animateColorAsState(
+        targetValue = target,
+        animationSpec = appTween(AppMotion.fast),
+        label = label
+    )
+    return container
+}
+
+/**
+ * Pressão por escala, **só em superfície sem texto** — botão de ícone, ação do
+ * card, HUD. Escalar texto em Plex Mono borra o traço durante a transição, e
+ * por isso o botão com rótulo responde só com a camada. Mola `SNAPPY`: a
+ * pressão tem de acompanhar o dedo, e sem rebote para não tremer.
+ */
+@Composable
+fun Modifier.appPressScale(interactionSource: MutableInteractionSource, enabled: Boolean = true): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) PRESSED_SCALE else 1f,
+        animationSpec = appSpring(AppMotion.Springs.SNAPPY, visibilityThreshold = 0.001f),
+        label = "appPressScale"
+    )
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+private const val PRESSED_SCALE = 0.96f
+
+@Immutable
+private data class FocusRing(val width: Dp, val color: Color)
+
+/**
+ * O anel de foco que o design system já exigia e o código não tinha: 2dp em
+ * `--info`, por dentro do campo. Sem ele não havia como saber qual campo
+ * recebia a digitação num formulário de três — a aba Rede tem cinco.
+ */
+@Composable
+private fun animatedFocusRing(interactionSource: MutableInteractionSource): FocusRing {
+    val focused by interactionSource.collectIsFocusedAsState()
+    val color by animateColorAsState(
+        targetValue = if (focused) AppTone.INFO.color() else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appFocusRingColor"
+    )
+    val width by animateDpAsState(
+        targetValue = if (focused) FOCUS_RING_WIDTH else AppBorderWidth,
+        animationSpec = appTween(AppMotion.fast),
+        label = "appFocusRingWidth"
+    )
+    return FocusRing(width, color)
+}
+
+private val FOCUS_RING_WIDTH = 2.dp
+
 /** Espaço reservado para o `RowScope` de quem compõe uma barra de ações. */
 @Composable
 fun RowScope.AppSpacer() {
     Box(modifier = Modifier.weight(1f))
 }
+
+/** O tom que a bolha já tinha; a sombra saiu do Material para [appDepth]. */
+private val TOOLTIP_TONAL_ELEVATION = 2.dp

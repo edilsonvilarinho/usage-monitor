@@ -1,164 +1,80 @@
-One 20dp row per account: dot and word for its worst quota, then one dot per quota, an icon-only
-update badge when one is pending, and the countdown to the next collection — in that order, at the
-end of the first row.
+The HUD notch — the "Barra HUD" window mode (issue #164, redesigned in the depth-and-motion pass,
+balloons and handles in its third round).
+Compose: `HudNotch` inside `HudWindowHost`, its own undecorated, transparent, always-on-top window;
+the main window is hidden with its geometry intact while it is shown.
 
 ```jsx
-<AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
-  quotas: [{ text: '5h 28%', level: 'ok' }, { text: '7d 9%', level: 'crit' }] }]} countdown="02:05" />
-<AppHudBar sources={[{ label: 'INFORMATA2', statusLabel: 'Crítico', level: 'crit',
-  quotas: [{ text: '5h 28%', level: 'ok', reset: '22h59' },
-           { text: '7d 9%', level: 'crit', reset: 'Ter 21h00' }] }]} expanded countdown="02:05" />
-<AppHudBar sources={[{ label: 'Padrão', statusLabel: 'Normal', level: 'ok',
-  quotas: [{ text: '5h 12%', level: 'ok' }] }]}
-  update={{ level: 'ok', label: 'Versão 40.0.0 pronta — será aplicada ao fechar' }} countdown="02:05" />
+<AppHudBar edge="right" balloon={0} countdown="02:05" accounts={[
+  { label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', active: true,
+    detail: 'Max 20x · via Claude Code',
+    quotas: [{ short: '5h', title: 'Sessão 5h', percent: '68%', fraction: .68, level: 'warn',
+               reset: '22h59', usedLeft: '68% usado · 32% restante' }] }
+]} />
 ```
 
-Not a new risk primitive — the dot+word is `AppStatusIndicator`, and quota details reuse
-`AppStatusDot`; this panel is only the shell that carries them.
+**Shape.** Docked to a screen edge (`top`, `bottom`, `left`, `right`): flat and flush on the screen
+side, 14dp corners on the inner side, 8dp **concave shoulders** joining the two — it reads as part of
+the edge, like the hardware notch Codenotch imitates, not as a pill floating next to it. Exempt from
+the 10dp radius ceiling: it is a silhouette, not a panel. Depth `DIALOG`, top sheen, lit border.
 
-**Five content versions, four corrected after using it.** (1) A single line with the worst
-source only: with several accounts monitored, the others had no signal they existed. (2) The others
-behind a hover tooltip: the data sat behind a gesture, and the popup flickered — a popup on this
-platform is a layer *inside* the window, clipped to its bounds, so in a 24dp-tall window a bubble
-with a 180dp minimum width landed on top of its own trigger, the pointer moved onto the bubble, the
-trigger got an `Exit`, and it closed and reopened every frame. (3) The list with no consumption at
-all: quota is the provider's ceiling, and what the machine spent appeared nowhere. (4) One line per
-*source*, carrying that source's worst quota: an account with both a 5h and a 7d window still showed
-a single limit. (5) One row per *quota* plus a spend footer, always visible: ten rows on screen to
-say what fits in one. (6) One row per quota on hover: the account with a 5h and a 7d window took two
-consecutive rows repeating its own name. What stuck is one row per **account**, with one dot per
-quota. Each correction came from using it; none was anticipated.
+**The notch never grows.** Per account in the user's card order (never risk order — the first account
+used to swap by itself): an `AppUsageRing` (one arc per quota, up to three), the percentage of the
+quota in focus (worst risk, then highest percent) and the **status word — always**. Color never
+informs alone. Horizontal on top/bottom, a column on the sides, where a long word ("Sem projeção")
+wraps to two lines. **Compact** when the full strip would take more than 45% of the edge (six or
+seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and percentage under it,
+no word, which stays in the balloon and the ring description. The strip ends with the update icon (no click of its own — #225) and the
+countdown to the next collection, **once**: polling is app-wide. Each text estimate carries 1dp of
+slack for Skia's whole-pixel rounding, or the countdown breaks into "04:5" at fractional densities.
 
-**The per-quota dot without a word has an exact precedent — it is the card's own design.** There a
-dot marks each quota and one header badge carries dot *and* word for the worst; here the row's word
-plays that badge's part. Color never states anything the row has not already said in writing, and
-the word comes from the account's **worst** quota: showing "Normal" with the 7d window blown would
-be a lie.
+**Account balloon.** Hovering a ring opens, beside the notch on the inside of the screen, a balloon
+for **that account only** — Codenotch's card, not a panel of every account. Header with the provider
+mark in the source accent, the card title and the state; per quota the card's title and
+"Reinicia 22h59", an `AppProgressTrack` and **"68% usado · 32% restante"** (used truncated like the
+ring, left derived from it, "<1%" at both ends, nothing for balances); quotas of one group
+(Antigravity models, Cursor allowances) in a box under the group name; the plan and the origin of the
+reading, **"Plus · via Codex"**; and the **card's own buttons** (history, CLI sessions, team) plus a
+refresh for that account. A curved tail — Codenotch's `TooltipTail` — points at the ring; moving to
+another ring slides the balloon on the `GENTLE` spring. Enter: fade + 0.94 scale + an 8dp slide on
+`GENTLE`, all from the notch side — the `EXPRESSIVE` rebound, on top of the window growing, read as a
+tremor; exit: 90ms fade. Depth `OVERLAY`. The balloon is window content, never a popup.
 
-**The window grows interpolated, not in one jump.** Opening the list swapped 24dp for 100dp in a
-single frame and read as the bar flickering in size. One pass of the system's normal motion with the
-entry easing — a single transition, never a loop, because an endless animation stalls the component
-tests' idle wait. Dragging does **not** animate: the bar would trail behind the pointer.
+**Handles** (Codenotch's `MoveHandle` and `SettingsOrb`). Hovered, a 32dp disc past each end of the
+notch: the **hand** at the near end (top or left) moves the notch — **only the hand**: dragging the body
+moved the notch when the intent was clicking a ring, so a slip on the body just drops the click — and
+stays composed while carried, bordered in info. Both handles slide out **from inside the notch** with a
+fade and a 0.6 scale on `GENTLE`, and slide back in on exit; the **gear** at the far end opens a balloon with
+**everything the standard footer offers**: title with the countdown, the three window modes as rows
+(the footer's menu is a popup the HUD window would clip) and the footer's own action row. At rest each
+handle is a quarter arc in `outline` inside the shadow margin the resting window already has.
 
-**The chip text uses the quota label's last word** (`Claude 5h` → `5h`): the row already names the
-account, so the prefix that tells providers apart is said once, not per quota.
+**Size belongs to the geometry** (`hudNotchSizes`): the window is sized before any composition
+exists, and measuring there to feed the window would close the resize loop. Estimated from mono
+advances — `label*` is Plex Mono — and every balloon row has a fixed height, so the balloon height is
+a sum. The open area reserves the **tallest** balloon, so switching rings never resizes the window.
+The collapsed width is the max of percentage and word, so a collection that turns `9%` into `88%`
+does not resize it either.
 
-**The order is the user's card order, never the risk order.** With risk deciding, the resting line
-changed account on its own and you never knew in advance who was on it.
+**Window, measured.** A click on a transparent pixel of a transparent window is swallowed on Windows
+11 — it reaches neither the content nor the window behind. So the window is notch-thick at rest (plus
+a 16dp shadow margin on the three inner sides) and grows **in one jump** when the pointer enters,
+with the balloon entering inside it; on leave the balloon goes first and the window shrinks after it.
+The notch centre is clamped so that notch **and handles** fit, the same way at rest and open: opening
+near a corner never moves the notch. Hover is the union of body, balloon and handles.
+**Opening never moves the window's origin along the edge**: at rest it already has the open length
+there and only grows inward. A transparent window that changes origin shows one or two frames of old
+content at the new place — measured by screen capture, the notch jumped 60px and back on every enter
+and leave. The price is the two 38dp strips where the handles appear, transparent and swallowing
+clicks at rest too. At the bottom and right edges the origin still moves across (the balloon grows
+inward), and one blank frame remains there on open.
 
-**A quota with no forecast still gets its line**, with a neutral dot and a word saying so. The
-percent is measured fact and does not depend on a projection — that is the difference from the
-card's badge, which disappears without one: there the question is "what state", here it is "how much
-already". Under the badge's rule, sources that never produce a forecast would vanish from the HUD
-entirely. In the ordering, "no forecast" sorts *after* on-track: a known normal informs more than an
-unknown. Collapsing to the dot requires a forecast on every quota — with one missing, "everything is
-fine" would be a guarantee nobody gave.
+**Gestures**, one detector: a click on a ring **refreshes that account** (the ring stays pressed while
+it collects); right-click goes straight to Cards only; a drag past the touch slop frees the notch, and
+on release it docks to the **nearest edge**, saved as edge + fraction along it. Each ring declares its
+refresh action in semantics. Ways back to the full window: "Padrão" in the gear balloon, the tray
+item, Ctrl+Shift+H.
 
-**Every row carries dot AND word.** The percent beside it describes *consumption*, not risk — 40% at
-eleven in the morning can be worse than 80% ten minutes before the reset, and the word is what says
-which. Drop it and color would be informing state alone, which this system does not do.
-
-**No new formats in the row.** The percent is the card's own (truncated, never rounded). The short
-reset comes from the *same* date parts the card's line uses, just trimmed: no prefix, no timezone,
-and no day-of-month when the window is intraday. Absent means "no reset to show" — nothing is
-printed in its place, not even a dash.
-
-**The reset is drawn only while expanded, and beside its own quota.** The resting pill sits on
-screen all the time and its rectangle captures the click of whatever is behind it — the complaint
-that turned the width into a cap in the first place — so the reset is a detail on demand, and
-hovering is already the gesture that reveals the rest of the list. It rides *inside* the quota
-block rather than in a column of its own at the end of the row: the row is one per account and the
-quotas are several, so a single reset column would have to pick which quota it describes. It is
-drawn in the secondary tone with no printed separator: its neighbour is the percentage, which is
-consumption, and the tone is what tells them apart — a middle dot between them would spend width
-repeating what the tone already said.
-
-**The width cap belongs to the state, not to the component.** The resting cap was calibrated for a
-row *without* the reset column; keeping it for the expanded panel would make the new column be paid
-for by the account name, which is the mistake the earlier cap raises already refused twice. The
-expanded cap is the resting one plus three reset columns — three being the largest quota count on a
-single source.
-
-**The countdown is drawn once, on the first row.** The polling is a single loop for the whole app,
-not one per account, so repeating it on every row would claim each account has its own collection.
-It is absent from the collapsed state, where there is no text at all — hover brings the panel back,
-and the countdown with it. On the loading row it stays: that row *is* the first row, and while
-nothing has been collected "when is the next attempt" is the most useful thing the strip has to say.
-
-**The icon is what says which time this is.** There is no tooltip to lean on — a popup here is a
-layer *inside* the window, clipped to its bounds, and it would land on top of its own trigger — so a
-bare `02:05` beside the quota percentages would explain nothing. The sentence rides in the icon's
-accessible name, which is also how a screen reader reaches it.
-
-**The reference component takes the value already formatted; the Compose one ticks inside.** That is
-a deliberate split, not drift. Here the host is the window composable that builds the whole
-application graph, and a per-second state in it would recompose all of it — so the clock lives in the
-strip, with the time source and the wait injected, and an explicit switch to turn the loop off. The
-switch is not a user preference: under the component tests' clock the wait advances on its own and a
-fixed time source never lets the countdown reach zero, so the loop spins forever and the idle wait
-never returns.
-
-**The width is measured from a fixed `00:00` placeholder, never from the running clock.** This window
-is sized from its content, so measuring the live text would resize it every second. Mono type is what
-makes the placeholder honest — every value the strip prints has the same width.
-
-**No new format.** The countdown is the footer's own `mm:ss`, and the sentence behind the icon has a
-single owner shared with it: the same countdown said twice would drift apart at the first correction.
-
-**The idle state keeps one summary row.** When every source is on track, the first source remains
-visible with its status word and quota values. Hover reveals the remaining sources. A colored dot
-never replaces the status word, especially at a reduced interface scale where a dot-only window is
-too small to explain what it represents.
-
-**The panel row is not `AppDataRow`.** That primitive floors at 32dp plus 8dp of vertical padding,
-and six sources would build a ~288dp panel — a window, not a HUD. Same exception `--h-hud` already
-takes against the 28dp control floor.
-
-**Hover belongs to the whole container, never to one row.** Bound to a single line, moving the
-pointer into the panel would drop the hover and collapse the window under it.
-
-**Dragging and clicking are one gesture, split by a movement threshold.** A `clickable` stacked on a
-drag detector does not work — the click handler eats the press and the drag never starts. The click
-action is *declared* in the semantics rather than installed, so a screen reader keeps the only path
-back to the full window. The component emits drag lifecycle callbacks and no coordinates: the host
-reads the pointer's absolute screen position, because during a drag the component is moving along
-with the window and a local delta would accumulate error.
-
-**Where the panel parks is the user's choice, and it is remembered.** On release it snaps to the
-nearest edge of the monitor's *physical bounds*. The HUD may occupy the taskbar region; ordinary
-windows continue using the work area, which excludes it. The anchor always describes the full panel,
-even while the dot is what is on screen; anchoring on the dot would make the window jump every time
-a source left the on-track state.
-
-**Second vendor-identity reinforcement — proposed, not wired into Compose (issue #223).** The card
-has the 2dp `AppSourceMark` bar; this panel has none, and with several accounts from different
-providers the name alone carries no vendor signal. `source` on each row draws a 6dp `AppSourceDot`
-before the name, reusing the same vendor color map — never a new accent. It stops short of the
-Compose bar deliberately: `HUD_PILL_MAX_WIDTH`/`HUD_PANEL_MAX_WIDTH` are measured, character by
-character, against real accounts on a real machine (the 320 → 420 → 484 history is exactly that
-discipline), and this is one more column that measurement never accounted for. Wiring it needs the
-same treatment the countdown column got in issue #185 — measured against real accounts, not
-estimated from this mockup.
-
-**The update badge has no click of its own, and that is deliberate (issue #225).** The bar's `content()`
-is never composed while `hud=true`, so the standard mode's update strip — "Restart and update now" —
-was simply unreachable from here; the first normal row must remain visible so an icon-only badge
-can signal that a version is ready. The fix is display only: an icon-only badge,
-level and label already resolved by the host (same treatment as `countdown`), drawn once on the first
-row. It sits inside the same `role="button"` the whole bar already is — a short click anywhere,
-including on the badge, opens the full window, where the strip the user already knows offers the same
-restart button. Giving the badge its own action instead would make a routine click on the bar restart
-the app without warning whenever an update happened to be ready — a worse failure than the missing
-indicator. The first normal row remains visible while an update is pending, so the badge stays part
-of the HUD context.
-
-**The secondary click switches straight to Cards-only, and it is not a menu (issue #215).** The bar
-had no way to reach the other reduced chrome without first returning to Standard — every exit landed
-there. A dropdown listing all three modes is not an option here: it is a `Popup`, and a popup on this
-platform is clipped to its own window's bounds, exactly the constraint that already ruled out a
-hover tooltip for this same bar. So the right button dispatches one action, immediately, with no
-list to render — the left button already reaches Standard (from where the footer's own three-way
-menu is one click away), and the one thing missing was a direct path to the sibling reduced mode.
-Cards-only's revealed title bar has room for the real three-way menu instead, because it is a normal
-34px bar, not a 24-200px strip — it carries the same component the footer uses, so the two modes
-never diverge on labels.
+**Identification.** The provider mark (`AppProviderMark`) sits in the middle of each ring in the
+foreground color — the arcs around it already carry the risk colors. The account label is the card
+title ("Anthropic — Padrão", never just "Padrão"). Rings are 36dp so the mark fits. The tray icon
+tooltip summarises every account with its focus percentage, cut at Windows' 127 characters.

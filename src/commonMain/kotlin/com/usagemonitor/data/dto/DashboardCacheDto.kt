@@ -26,7 +26,8 @@ data class ApiUsageStatsCacheDto(
     val accountEmail: String? = null,
     val accountWorkspaceName: String? = null,
     val profileLabel: String? = null,
-    val notices: List<String> = emptyList()
+    val notices: List<String> = emptyList(),
+    val planLabel: String? = null
 )
 
 @Serializable

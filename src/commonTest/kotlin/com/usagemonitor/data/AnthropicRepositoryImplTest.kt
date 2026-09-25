@@ -44,6 +44,8 @@ class AnthropicRepositoryImplTest {
         assertEquals("Anthropic", stats.apiName)
         assertEquals("account-a", stats.accountContext?.key?.providerAccountId)
         assertTrue(stats.quotas.isNotEmpty())
+        // O plano sai do arquivo de credenciais, não do endpoint de uso.
+        assertEquals("Max 20x", stats.planLabel)
     }
 
     @Test
@@ -163,7 +165,9 @@ class AnthropicRepositoryImplTest {
                     ),
                     email = "a@example.com",
                     workspaceName = "Org A"
-                )
+                ),
+                subscriptionType = "max",
+                rateLimitTier = "default_claude_max_20x"
             )
         }
 

@@ -18,3 +18,6 @@ goes away and what does not come back.
 
 The body scrolls above 280px so the buttons never leave the viewport: a confirmation whose confirm
 button is off-screen is a dialog that cannot be answered.
+
+It is an `AppDialog` with fixed tones — the scrim fade, the card entering with fade + scale and the
+dry exit all come from there.

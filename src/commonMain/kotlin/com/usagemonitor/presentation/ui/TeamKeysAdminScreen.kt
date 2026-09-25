@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,41 +99,43 @@ internal fun TeamKeysAdminContent(
     onRetry: () -> Unit = {}
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        when (state) {
-            is TeamKeysUiState.Loading -> AppLoadingState(TeamKeysLabels.loading(language))
+        AppStateCrossfade(state) { state ->
+    when (state) {
+                is TeamKeysUiState.Loading -> AppLoadingState(TeamKeysLabels.loading(language))
 
-            is TeamKeysUiState.Error -> Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = state.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag(TEAM_KEYS_ERROR_TAG)
-                )
-                AppButton(
-                    label = TeamKeysLabels.retry(language),
-                    onClick = onRetry,
-                    tone = AppButtonTone.PRIMARY
-                )
-            }
+                is TeamKeysUiState.Error -> Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = state.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(TEAM_KEYS_ERROR_TAG)
+                    )
+                    AppButton(
+                        label = TeamKeysLabels.retry(language),
+                        onClick = onRetry,
+                        tone = AppButtonTone.PRIMARY
+                    )
+                }
 
-            is TeamKeysUiState.Success -> TeamKeysList(
-                state = state,
-                language = language,
-                onCreate = onCreate,
-                onRename = onRename,
-                onSetMaxAccounts = onSetMaxAccounts,
-                onRegenerate = onRegenerate,
-                onRevoke = onRevoke,
-                onUnclaim = onUnclaim,
-                onRemoveAccount = onRemoveAccount,
-                onUnblockAccount = onUnblockAccount,
-                onDismissError = onDismissError
-            )
-        }
+                is TeamKeysUiState.Success -> TeamKeysList(
+                    state = state,
+                    language = language,
+                    onCreate = onCreate,
+                    onRename = onRename,
+                    onSetMaxAccounts = onSetMaxAccounts,
+                    onRegenerate = onRegenerate,
+                    onRevoke = onRevoke,
+                    onUnclaim = onUnclaim,
+                    onRemoveAccount = onRemoveAccount,
+                    onUnblockAccount = onUnblockAccount,
+                    onDismissError = onDismissError
+                )
+    }
+}
     }
 }
 

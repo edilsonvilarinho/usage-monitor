@@ -1,13 +1,8 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
+import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -150,17 +145,13 @@ fun HistoryScreen(
                     onBack = onBack
                 )
 
-                AnimatedContent(
-                    targetState = state::class,
-                    transitionSpec = {
-                        (fadeIn(tween(AppMotion.normal, easing = AppMotion.enterEasing)) +
-                            slideInVertically(tween(AppMotion.slow, easing = AppMotion.enterEasing)) { it / 10 })
-                            .togetherWith(fadeOut(tween(AppMotion.fast, easing = AppMotion.exitEasing)))
-                            .using(SizeTransform(clip = false))
-                    },
+                // Mesmo defeito do dashboard: a lambda ignorava o argumento e
+                // lia o estado de fora, e os dois slots desenhavam o novo.
+                AppStateCrossfade(
+                    state = state,
                     label = "historyStateContent"
-                ) { _ ->
-                    when (val current = state) {
+                ) { current ->
+                    when (current) {
                         is HistoryUiState.Loading -> {
                             Text(
                                 text = if (language == AppLanguage.PT) "Carregando histórico..." else "Loading history...",

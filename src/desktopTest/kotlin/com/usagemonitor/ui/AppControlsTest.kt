@@ -4,6 +4,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.usagemonitor.presentation.ui.components.AppMenu
+import com.usagemonitor.presentation.ui.components.AppMenuOption
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHeightIsEqualTo
@@ -233,6 +241,74 @@ class AppControlsTest {
 
         onNodeWithTag("segment-5h").assertHeightIsEqualTo(SEGMENT_CONTROL_HEIGHT)
         onNodeWithTag("segment-total").assertHeightIsEqualTo(SEGMENT_CONTROL_HEIGHT)
+    }
+
+    /**
+     * O campo focado ganha o anel de 2dp em `--info`. Medido no bitmap da borda
+     * esquerda do campo: antes do foco é o traço neutro de 1dp; depois, outra cor
+     * e mais grosso.
+     */
+    @Test
+    fun `o campo focado desenha o anel de foco`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(300.dp).height(80.dp)) {
+                    AppTextField(
+                        value = "",
+                        onValueChange = {},
+                        modifier = Modifier.width(200.dp).testTag("field")
+                    )
+                }
+            }
+        }
+
+        val before = onRoot().captureToImage().toPixelMap()
+        onNodeWithTag("field").performClick()
+        waitForIdle()
+        val after = onRoot().captureToImage().toPixelMap()
+
+        // Segundo pixel da borda esquerda, no meio da altura: fora do anel de
+        // 1dp em repouso, dentro do anel de 2dp com foco.
+        val y = 14
+        assertTrue(before[0, y] != after[0, y], "O traço da borda não mudou de cor com o foco.")
+        assertTrue(before[1, y] != after[1, y], "O anel de foco não engrossou para 2dp.")
+    }
+
+    /**
+     * O menu tem saída animada, e por isso o `Popup` fica composto enquanto ela
+     * roda. Depois do idle ele tem de ter ido embora de verdade: um popup que
+     * ficasse composto com alfa zero seguiria capturando o clique da janela.
+     */
+    @Test
+    fun `o menu some da arvore depois da saida`() = runDesktopComposeUiTest {
+        var expanded by mutableStateOf(true)
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(400.dp).height(300.dp)) {
+                    AppMenu(
+                        expanded = expanded,
+                        options = listOf(AppMenuOption("Padrão"), AppMenuOption("Barra HUD")),
+                        selectedIndex = 0,
+                        onSelect = {},
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        Text("Âncora")
+                    }
+                }
+            }
+        }
+
+        onNodeWithText("Barra HUD").assertExists()
+
+        expanded = false
+        waitForIdle()
+
+        onNodeWithText("Barra HUD").assertDoesNotExist()
+
+        expanded = true
+        waitForIdle()
+
+        onNodeWithText("Barra HUD").assertExists()
     }
 }
 

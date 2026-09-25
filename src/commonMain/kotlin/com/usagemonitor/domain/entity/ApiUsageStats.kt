@@ -27,7 +27,11 @@ data class ApiUsageStats(
     val profileLabel: String? = null,
 
     // Avisos não fatais que a UI pode expor sem rebaixar a fonte para erro.
-    val notices: Set<ApiUsageNotice> = emptySet()
+    val notices: Set<ApiUsageNotice> = emptySet(),
+
+    // Plano da conta ("Max 20x", "ChatGPT Plus"), quando o fornecedor informa.
+    // Campo novo com default: as fontes que não sabem o plano continuam iguais.
+    val planLabel: String? = null
 )
 
 enum class ApiUsageNotice {

@@ -101,7 +101,9 @@ internal class LocalCredentialDataSource(
 
             AnthropicSession(
                 accessToken = accessToken,
-                accountContext = loadAccountContext(location)
+                accountContext = loadAccountContext(location),
+                subscriptionType = creds.claudeAiOauth.subscriptionType,
+                rateLimitTier = creds.claudeAiOauth.rateLimitTier
             )
         }
     }

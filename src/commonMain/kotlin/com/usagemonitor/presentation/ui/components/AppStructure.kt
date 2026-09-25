@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,6 +38,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import com.usagemonitor.presentation.ui.theme.AppDepth
+import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.appTween
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -156,11 +169,13 @@ fun AppToolbar(
 }
 
 /**
- * Superfície de dados: fundo de painel, borda de 1dp, raio 8, **sem sombra**.
+ * Superfície de dados: fundo de painel, borda de 1dp, raio 8, sombra
+ * [AppDepth.CARD] e o brilho do topo.
  *
  * É a substituta do card com brilho de acento. A cor da fonte, quando existe,
  * entra pelo marcador de [AppSectionHeader] — 2dp na vertical —, não como
- * gradiente sobre a superfície inteira.
+ * gradiente sobre a superfície inteira. A sombra é neutra e baixa: diz que o
+ * painel está sobre o fundo, não chama atenção para ele.
  */
 @Composable
 fun AppDataSurface(
@@ -182,9 +197,12 @@ fun AppDataSurface(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+            .appSurfaceBlock(
+                shape = shape,
+                color = MaterialTheme.colorScheme.surface,
+                depth = AppDepth.CARD,
+                sheen = true
+            )
             .padding(contentPadding),
         verticalArrangement = verticalArrangement,
         content = content
@@ -208,9 +226,12 @@ fun AppDataSurfaceFlush(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+            .appSurfaceBlock(
+                shape = shape,
+                color = MaterialTheme.colorScheme.surface,
+                depth = AppDepth.CARD,
+                sheen = true
+            )
     ) {
         if (header != null) {
             header()
@@ -320,17 +341,36 @@ fun AppSettingsNav(
                 modifier = Modifier.padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs)
             )
         }
-        items.forEachIndexed { index, item ->
-            AppSettingsNavItem(
-                label = item.label,
-                selected = index == selectedIndex,
-                onClick = { onSelect(index) },
-                modifier = if (item.testTag == null) {
-                    Modifier
-                } else {
-                    Modifier.testTag(item.testTag)
+        // O realce é um bloco só, que desliza entre as seções, desenhado atrás
+        // da coluna de itens -- mesma origem das posições que eles publicam.
+        val indicator = rememberSlidingIndicatorState()
+        val span = animatedIndicatorSpan(indicator, selectedIndex)
+        val density = LocalDensity.current
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (span != null) {
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(0, span.start.roundToInt()) }
+                        .fillMaxWidth()
+                        .height(with(density) { span.size.toDp() })
+                        .clip(AppShapes.small)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                items.forEachIndexed { index, item ->
+                    AppSettingsNavItem(
+                        label = item.label,
+                        selected = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                        modifier = if (item.testTag == null) {
+                            Modifier.reportIndicatorSpan(indicator, index, vertical = true)
+                        } else {
+                            Modifier.testTag(item.testTag).reportIndicatorSpan(indicator, index, vertical = true)
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 }
@@ -342,22 +382,22 @@ private fun AppSettingsNavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val container = if (selected) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        Color.Transparent
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // O fundo do selecionado é o bloco deslizante do [AppSettingsNav]; aqui só
+    // a cor do texto acompanha.
+    val content by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appSettingsNavContent"
+    )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(AppShapes.small)
-            .background(container)
             .selectable(selected = selected, onClick = onClick)
             .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm)
     ) {
@@ -385,20 +425,107 @@ private fun AppSettingsNavItem(
  * Não é porta para cor de acento: acento vive no marcador de 2dp e na linha do
  * gráfico.
  *
- * **Não inclui sombra.** Elevação é de janela, diálogo, menu e overlay; quem a
- * pede aqui é o card enquanto está sendo arrastado, que nesse instante é overlay
- * de fato, e pede com um `Modifier.shadow` explícito no ponto de uso.
+ * [depth] é [AppDepth.FLAT] por default: o bloco dentro de um painel não tem
+ * sombra — sombra dentro de superfície é o empilhamento de blocos de mesmo peso
+ * que a refatoração de agosto tirou. Painel e card pedem [AppDepth.CARD]. A
+ * sombra vem **antes** do recorte, senão o `clip` a cortaria junto.
+ *
+ * [sheen] liga o brilho de topo ([appSheen]); só as superfícies de primeiro
+ * nível o pedem.
  */
 @Composable
 fun Modifier.appSurfaceBlock(
     shape: Shape = AppShapes.small,
-    color: Color = MaterialTheme.colorScheme.surfaceVariant
+    color: Color = MaterialTheme.colorScheme.surfaceVariant,
+    depth: AppDepth = AppDepth.FLAT,
+    sheen: Boolean = false
 ): Modifier {
-    return this
-        .clip(shape)
-        .background(color)
-        .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+    val base = this.appDepth(depth, shape).clip(shape).background(color)
+    if (!sheen) {
+        return base.border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+    }
+    // Só a superfície de primeiro nível ganha a borda em gradiente: no bloco
+    // interno ela desenharia uma segunda luz dentro da primeira.
+    val ladder = AppSurfaceLadders.current
+    return base
+        .appSheen()
+        .border(
+            width = AppBorderWidth,
+            brush = Brush.verticalGradient(listOf(ladder.borderTop, ladder.borderBottom)),
+            shape = shape
+        )
 }
+
+/**
+ * Sombra em duas camadas de um patamar de [AppDepth].
+ *
+ * Duas `shadow` empilhadas porque o Compose 1.7 só tem sombra por elevação: a
+ * curta ([AppDepth.key]) assenta o objeto no plano e a larga
+ * ([AppDepth.ambient]) dá a distância. `clip = false` nas duas, para o conteúdo
+ * não ser recortado pela forma da sombra — quem recorta é o chamador, depois.
+ */
+@Composable
+fun Modifier.appDepth(depth: AppDepth, shape: Shape): Modifier {
+    return appDepth(key = depth.key, ambient = depth.ambient, shape = shape)
+}
+
+/**
+ * Versão por valor, para quem anima a profundidade — o card sobe no hover e
+ * flutua no arrasto, e um enum não interpola.
+ */
+@Composable
+fun Modifier.appDepth(key: Dp, ambient: Dp, shape: Shape): Modifier {
+    if (key <= 0.dp && ambient <= 0.dp) {
+        return this
+    }
+    val ladder = AppSurfaceLadders.current
+    val ambientColor = ladder.shadow.copy(alpha = ladder.ambientShadowAlpha)
+    val keyColor = ladder.shadow.copy(alpha = ladder.keyShadowAlpha)
+    return this
+        .shadow(elevation = ambient, shape = shape, clip = false, ambientColor = ambientColor, spotColor = ambientColor)
+        .shadow(elevation = key, shape = shape, clip = false, ambientColor = keyColor, spotColor = keyColor)
+}
+
+/**
+ * Brilho de topo: um gradiente vertical que some no primeiro terço e uma linha
+ * de 1dp logo abaixo da borda. É a luz batendo de cima, e é ela que faz a
+ * superfície ler como objeto no tema escuro, onde sombra preta sobre fundo
+ * quase preto mal aparece.
+ *
+ * Desenhado **por cima** do conteúdo, dentro do recorte do chamador — a linha
+ * não passa dos cantos arredondados. Por cima porque o card pinta o cabeçalho com
+ * fundo próprio, e por baixo dele o brilho não chegava à tela; em 4,5% de alfa
+ * ele não mexe no contraste do texto. A altura tem teto de [SHEEN_MAX_HEIGHT]:
+ * um terço de um card de 600dp seria um véu no meio das cotas. Neutro sempre:
+ * gradiente de acento é o que a refatoração de agosto tirou, e não volta.
+ */
+@Composable
+fun Modifier.appSheen(): Modifier {
+    val ladder = AppSurfaceLadders.current
+    return this.drawWithContent {
+        drawContent()
+        val sheenHeight = minOf(size.height / 3f, SHEEN_MAX_HEIGHT.toPx())
+        if (sheenHeight > 0f) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(ladder.sheen, Color.Transparent),
+                    startY = 0f,
+                    endY = sheenHeight
+                ),
+                size = Size(size.width, sheenHeight)
+            )
+        }
+        val line = AppBorderWidth.toPx()
+        drawRect(
+            color = ladder.highlight,
+            topLeft = Offset(0f, line),
+            size = Size(size.width, line)
+        )
+    }
+}
+
+/** Até onde o brilho de topo desce. */
+private val SHEEN_MAX_HEIGHT = 56.dp
 
 /**
  * Sub-faixa de um grupo dentro de uma lista.
@@ -574,10 +701,22 @@ fun AppDataRow(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val background = when {
-        highlighted || hovered -> MaterialTheme.colorScheme.surfaceVariant
-        else -> Color.Transparent
-    }
+    val pressed by interactionSource.collectIsPressedAsState()
+    // Realce de seleção continua sendo o degrau `surfaceVariant`; o hover e a
+    // pressão são **camadas somadas por cima**, e é isso que faz a linha dentro
+    // de um card com hover voltar a reagir -- a troca de fundo antiga dava ao
+    // card e à linha o mesmo tom.
+    val background = if (highlighted) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+    val ladder = AppSurfaceLadders.current
+    val layer by animateColorAsState(
+        targetValue = when {
+            pressed && onClick != null -> ladder.pressedLayer
+            hovered -> ladder.hoverLayer
+            else -> Color.Transparent
+        },
+        animationSpec = appTween(AppMotion.fast),
+        label = "appDataRowLayer"
+    )
     val clickable = if (onClick != null) {
         Modifier.clickable(
             interactionSource = interactionSource,
@@ -595,6 +734,7 @@ fun AppDataRow(
                 .hoverable(interactionSource)
                 .then(clickable)
                 .background(background)
+                .background(layer)
                 .defaultMinSize(minHeight = ROW_MIN_HEIGHT)
                 .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically,
@@ -737,11 +877,10 @@ fun AppMetricBlock(
                 labelTrailing()
             }
         }
-        Text(
+        AppAnimatedNumber(
             text = value,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         if (footer != null) {
@@ -788,6 +927,11 @@ fun AppDivider(modifier: Modifier = Modifier) {
  *
  * Recebe rótulos e índice: quem guarda a escolha é a tela, como em todo o resto
  * deste arquivo.
+ *
+ * O sublinhado é **um só** e desliza de uma aba para a outra
+ * ([animatedIndicatorSpan]), em vez de apagar numa e acender na outra no mesmo
+ * quadro. Ele mora num `Box` que embrulha só a fileira de abas: é a mesma origem
+ * das posições que cada aba publica.
  */
 @Composable
 fun AppTabs(
@@ -796,19 +940,39 @@ fun AppTabs(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val indicator = rememberSlidingIndicatorState()
+    val span = animatedIndicatorSpan(indicator, selectedIndex)
+    val density = LocalDensity.current
     Column(modifier = modifier) {
-        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-            tabs.forEachIndexed { index, tab ->
-                AppTabItem(
-                    tab = tab,
-                    selected = index == selectedIndex,
-                    onClick = { onSelect(index) }
+        Box {
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                tabs.forEachIndexed { index, tab ->
+                    AppTabItem(
+                        tab = tab,
+                        selected = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                        modifier = Modifier.reportIndicatorSpan(indicator, index)
+                    )
+                }
+            }
+            if (span != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset { IntOffset(span.start.roundToInt(), 0) }
+                        .width(with(density) { span.size.toDp() })
+                        .height(TAB_UNDERLINE_THICKNESS)
+                        .background(MaterialTheme.colorScheme.onSurface)
+                        .testTag(APP_TABS_INDICATOR_TEST_TAG)
                 )
             }
         }
         AppDivider()
     }
 }
+
+/** O sublinhado deslizante; os testes medem onde ele parou. */
+const val APP_TABS_INDICATOR_TEST_TAG = "appTabsIndicator"
 
 /** Uma aba: rótulo e a `testTag` que a tela usa para encontrá-la. */
 data class AppTab(
@@ -817,25 +981,28 @@ data class AppTab(
 )
 
 /**
- * O sublinhado é desenhado sob o rótulo, **não** é um `Box` abaixo dele.
- *
- * Um `Box(Modifier.fillMaxWidth())` dentro de uma `Column` filha de `Row` faz a
- * coluna inteira esticar até a largura disponível: a primeira aba cobria as
- * outras duas e todo clique caía nela. `drawBehind` mede o que o texto mede.
+ * O sublinhado **não** é filho da aba. Um `Box(Modifier.fillMaxWidth())` dentro
+ * de uma `Column` filha de `Row` faz a coluna inteira esticar até a largura
+ * disponível: a primeira aba cobria as outras duas e todo clique caía nela. Por
+ * isso ele é desenhado pelo [AppTabs], com a largura que a aba publica.
  */
 @Composable
 private fun AppTabItem(
     tab: AppTab,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val underline = if (selected) contentColor else Color.Transparent
-    val tagged = if (tab.testTag != null) Modifier.testTag(tab.testTag) else Modifier
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = appTween(AppMotion.normal),
+        label = "appTabContent"
+    )
+    val tagged = if (tab.testTag != null) modifier.testTag(tab.testTag) else modifier
 
     Text(
         text = tab.label,
@@ -844,14 +1011,6 @@ private fun AppTabItem(
         maxLines = 1,
         modifier = tagged
             .selectable(selected = selected, onClick = onClick)
-            .drawBehind {
-                val thickness = TAB_UNDERLINE_THICKNESS.toPx()
-                drawRect(
-                    color = underline,
-                    topLeft = Offset(0f, size.height - thickness),
-                    size = Size(size.width, thickness)
-                )
-            }
             .padding(horizontal = AppSpacing.xs, vertical = AppSpacing.sm)
     )
 }

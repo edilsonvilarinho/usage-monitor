@@ -14,7 +14,7 @@ export function AppSwitch({ checked = false, onChange, label, hint, disabled = f
         background: checked ? 'color-mix(in srgb, var(--ok) 30%, var(--raised))' : 'var(--raised)',
         position: 'relative',
         flex: 'none',
-        transition: 'background var(--dur-select) var(--ease)'
+        transition: 'background var(--dur-hover) var(--ease), border-color var(--dur-hover) var(--ease)'
       }}
     >
       <span
@@ -26,7 +26,7 @@ export function AppSwitch({ checked = false, onChange, label, hint, disabled = f
           height: 11,
           borderRadius: '50%',
           background: checked ? 'var(--ok)' : 'var(--muted)',
-          transition: 'left var(--dur-select) var(--ease)'
+          transition: 'left var(--spring-snappy), background var(--dur-hover) var(--ease)'
         }}
       />
     </span>

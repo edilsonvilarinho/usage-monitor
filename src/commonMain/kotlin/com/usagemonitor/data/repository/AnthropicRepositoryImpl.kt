@@ -1,5 +1,6 @@
 package com.usagemonitor.data.repository
 
+import com.usagemonitor.domain.entity.anthropicPlanLabel
 import com.usagemonitor.data.datasource.CredentialDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.datasource.AnthropicSession
@@ -77,7 +78,8 @@ class AnthropicRepositoryImpl(
         return AnthropicMapper.toUsageStats(dto).copy(
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, profile.id),
             accountContext = session.accountContext,
-            profileLabel = profile.label
+            profileLabel = profile.label,
+            planLabel = anthropicPlanLabel(session.subscriptionType, session.rateLimitTier)
         )
     }
 
