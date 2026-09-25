@@ -681,6 +681,16 @@ multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
   presente, não valor igual ao default — que fecha essa porta depois.
 - O redimensionamento acontece no commit do coletor com debounce, não no callback do slider: janela
   AWT reposicionada por pixel arrastado é inutilizável. O conteúdo, esse, escala ao vivo.
+
+**Monitores** (`ScreenLocator.kt`; issue #273): toda medida de tela lia o monitor padrão
+(`defaultScreenDevice`, `maximumWindowBounds`). As janelas com posição salva (Histórico, Sessões CLI,
+Uso e Presença do time) eram presas ao primário ao reabrir, e a principal nem guardava posição. Agora
+`workAreaForPosition` encaixa a janela na área útil do monitor que contém o retângulo salvo (a maior
+interseção), e a principal grava `windowX`/`windowY`, negativos inclusive. Sem posição, ou com o
+retângulo fora de todo monitor, vale o padrão. As funções de escolha recebem a lista de monitores e são
+puras (`ScreenLocatorTest`, com monitor à direita, à esquerda e acima). **Monitores com escalas
+diferentes só se validam em máquina real**: cada monitor tem o próprio espaço de usuário escalado e o
+app trata pixel como dp. Os testes não pegam isso.
 - O teste que prova a fiação (`AppThemeScaleTest`) mede **pixels** (`boundsInRoot`), não `Dp`: a
   conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
   100dp nos dois casos — um teste que passa sem medir nada.
@@ -747,8 +757,13 @@ janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`
 Codenotch; a regra de conteúdo vem das seis versões da barra de linhas que ele substituiu.
 **Não é valor novo em enum existente**: `hudMode` continua um booleano, exclusivo com o modo somente
 cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
-- **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos, o de fora é a
-  primeira cota da API). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
+- **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos). **A janela mais
+  longa fica por fora** (`HudAccount.rings`, issue #278): mensal, semanal, a janela curta, e saldo e
+  créditos (`REPORTED`) por dentro. Na ordem da API a 5h ficava por fora da semanal, o contrário de
+  como se lê um alvo. A seleção continua sendo as três primeiras cotas; só a ordem muda, e é estável.
+  O pulso de atenção segue o anel da cota em foco (`attentionRingIndex`), não o de fora fixo. No
+  balão cada cota leva um glifo dos anéis com o dela aceso, e a descrição do anel diz a posição em
+  palavra ("anel externo 7d 9% · anel interno 5h 28%"). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
   esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, o percentual da **cota em foco** (pior
   risco, depois maior percentual — `HudAccount.focusIndex`) e a **palavra do estado**: cor nunca
   informa sozinha. Cota sem projeção tem a trilha **tracejada**.
@@ -835,6 +850,12 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   na borda mais próxima do **centro** dele, na tela inteira (pode ficar sobre a barra de tarefas). A
   posição da pílula antiga (`hudWindowX/Y`) migra uma vez e as chaves velhas são apagadas. Estreia no
   topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.
+  - **E o monitor** (`hudScreenId`/`hudScreenBounds`, issue #273). Borda e fração eram resolvidas
+    sempre contra o monitor padrão, então o arrasto era preso a ele e o notch nunca saía do primário.
+    Agora o arrasto e o encaixe usam o monitor **sob o ponteiro** (`MouseInfo.getPointerInfo().device`),
+    e o monitor é gravado com id **e** limites, porque o Windows renumera `\\.\DISPLAYn` ao
+    reconectar. Ele é resolvido de novo a cada abertura por hover. Monitor desligado cai no padrão
+    **sem apagar** a gravação: quando ele volta, o notch volta junto.
 - **Um gesto só** (`hudPressGesture`): **clique num anel recoleta aquela conta** (decisão da rodada 3,
   como o `refreshRing` do Codenotch — o gesto entrega a posição do `down` e o notch acha o anel pela
   caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; botão

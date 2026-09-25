@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -113,6 +114,39 @@ internal fun persistHudPlacement(settings: PreferencesSettings, placement: HudPl
     }
     settings.putString(HUD_EDGE_KEY, placement.edge.name)
     settings.putString(HUD_EDGE_OFFSET_KEY, placement.offsetFraction.coerceIn(0f, 1f).toString())
+}
+
+private const val HUD_SCREEN_ID_KEY = "hudScreenId"
+private const val HUD_SCREEN_BOUNDS_KEY = "hudScreenBounds"
+
+/**
+ * Em que monitor o notch mora (issue #273). A borda e a fração de
+ * [readPersistedHudPlacement] sozinhas eram resolvidas sempre contra o monitor
+ * padrão, e o notch solto num secundário voltava ao primário. Id **e** limites:
+ * o Windows renumera os monitores ao reconectar, e é pelos limites que
+ * [resolveScreen] reencontra o mesmo monitor com outro id. Ausente — instalação
+ * anterior a esta chave, ou notch nunca solto num secundário — vale o primário.
+ */
+internal data class PersistedHudScreen(val id: String?, val bounds: ScreenWorkArea?)
+
+internal fun readPersistedHudScreen(settings: PreferencesSettings): PersistedHudScreen {
+    val id = settings.getStringOrNull(HUD_SCREEN_ID_KEY)?.takeIf { value -> value.isNotBlank() }
+    val bounds = settings.getStringOrNull(HUD_SCREEN_BOUNDS_KEY)
+        ?.split(',')
+        ?.mapNotNull { part -> part.trim().toIntOrNull() }
+        ?.takeIf { parts -> parts.size == 4 && parts[2] > 0 && parts[3] > 0 }
+        ?.let { parts -> ScreenWorkArea(parts[0].dp, parts[1].dp, DpSize(parts[2].dp, parts[3].dp)) }
+    return PersistedHudScreen(id, bounds)
+}
+
+internal fun persistHudScreen(settings: PreferencesSettings, screen: ScreenInfo) {
+    val bounds = screen.bounds
+    val values = listOf(bounds.x.value, bounds.y.value, bounds.size.width.value, bounds.size.height.value)
+    if (values.any { value -> !value.isFinite() }) {
+        return
+    }
+    settings.putString(HUD_SCREEN_ID_KEY, screen.id)
+    settings.putString(HUD_SCREEN_BOUNDS_KEY, values.joinToString(",") { value -> value.roundToInt().toString() })
 }
 
 private const val LEGACY_PILL_HALF_WIDTH_DP = 100

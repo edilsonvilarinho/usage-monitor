@@ -4,6 +4,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.WindowState
 import com.russhwolf.settings.PreferencesSettings
 import java.awt.GraphicsEnvironment
 import kotlin.math.roundToInt
@@ -11,13 +13,23 @@ import kotlin.math.roundToInt
 private const val WINDOW_WIDTH_KEY = "windowWidth"
 private const val WINDOW_HEIGHT_KEY = "windowHeight"
 private const val WINDOW_PLACEMENT_KEY = "windowPlacement"
+private const val WINDOW_X_KEY = "windowX"
+private const val WINDOW_Y_KEY = "windowY"
 private const val WINDOW_PLACEMENT_FLOATING = "FLOATING"
 private const val WINDOW_PLACEMENT_MAXIMIZED = "MAXIMIZED"
 
 internal data class PersistedMainWindowState(
     val widthDp: Int? = null,
     val heightDp: Int? = null,
-    val placement: PersistedWindowPlacement = PersistedWindowPlacement.FLOATING
+    val placement: PersistedWindowPlacement = PersistedWindowPlacement.FLOATING,
+    /**
+     * Onde a janela ficou (issue #273). A janela principal nunca guardou
+     * posição: a plataforma a punha no monitor principal a cada abertura, e quem a
+     * deixava num secundário a perdia lá. Negativo é válido — é o monitor à
+     * esquerda ou acima do principal.
+     */
+    val xDp: Int? = null,
+    val yDp: Int? = null
 ) {
     val composeWidth: Dp
         get() = widthDp?.dp ?: Dp.Unspecified
@@ -40,8 +52,23 @@ internal enum class PersistedWindowPlacement {
 internal data class MainWindowSnapshot(
     val widthDp: Float,
     val heightDp: Float,
-    val placement: WindowPlacement
+    val placement: WindowPlacement,
+    /** `null` quando a posição não é absoluta (a plataforma ainda não a escolheu). */
+    val xDp: Float? = null,
+    val yDp: Float? = null
 )
+
+/** A geometria da janela como o coletor de persistência a grava. */
+internal fun mainWindowSnapshotOf(state: WindowState): MainWindowSnapshot {
+    val position = state.position as? WindowPosition.Absolute
+    return MainWindowSnapshot(
+        widthDp = state.size.width.value,
+        heightDp = state.size.height.value,
+        placement = state.placement,
+        xDp = position?.x?.value,
+        yDp = position?.y?.value
+    )
+}
 
 internal fun readPersistedMainWindowState(settings: PreferencesSettings): PersistedMainWindowState {
     val widthDp = settings.getStringOrNull(WINDOW_WIDTH_KEY)
@@ -54,11 +81,18 @@ internal fun readPersistedMainWindowState(settings: PreferencesSettings): Persis
         WINDOW_PLACEMENT_MAXIMIZED -> PersistedWindowPlacement.MAXIMIZED
         else -> PersistedWindowPlacement.FLOATING
     }
+    // Os dois eixos ou nenhum: um herdado e o outro default poria a janela num
+    // canto que ninguém escolheu.
+    val xDp = settings.getStringOrNull(WINDOW_X_KEY)?.toIntOrNull()
+    val yDp = settings.getStringOrNull(WINDOW_Y_KEY)?.toIntOrNull()
+    val hasPosition = xDp != null && yDp != null
 
     return PersistedMainWindowState(
         widthDp = widthDp,
         heightDp = heightDp,
-        placement = placement
+        placement = placement,
+        xDp = if (hasPosition) xDp else null,
+        yDp = if (hasPosition) yDp else null
     )
 }
 
@@ -81,6 +115,13 @@ internal fun persistMainWindowState(
     }
     if (heightDp != null) {
         settings.putString(WINDOW_HEIGHT_KEY, heightDp.toString())
+    }
+    // Posição aceita negativo (monitor à esquerda); só não finito fica de fora.
+    val xDp = snapshot.xDp?.takeIf { value -> value.isFinite() }?.roundToInt()
+    val yDp = snapshot.yDp?.takeIf { value -> value.isFinite() }?.roundToInt()
+    if (xDp != null && yDp != null) {
+        settings.putString(WINDOW_X_KEY, xDp.toString())
+        settings.putString(WINDOW_Y_KEY, yDp.toString())
     }
 }
 

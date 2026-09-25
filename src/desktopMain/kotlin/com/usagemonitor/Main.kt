@@ -23,6 +23,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.isTraySupported
@@ -1037,25 +1038,14 @@ private fun runUsageMonitor(
     // o tamanho normal da janela salvo pelo usuário.
     var hudMode by remember { mutableStateOf(readPersistedHudMode(settings)) }
     LaunchedEffect(mainWindowState, settings) {
-        snapshotFlow {
-            Triple(
-                mainWindowState.isMinimized,
-                mainWindowState.size,
-                mainWindowState.placement
-            )
-        }
+        // A posição entra no instantâneo (issue #273): sem ela a janela voltava
+        // ao monitor principal a cada abertura.
+        snapshotFlow { mainWindowState.isMinimized to mainWindowSnapshotOf(mainWindowState) }
             .distinctUntilChanged()
             .debounce(250.milliseconds)
-            .collect { (isMinimized, size, placement) ->
+            .collect { (isMinimized, snapshot) ->
             isAppVisible.value = !isMinimized
-            persistMainWindowState(
-                settings = settings,
-                snapshot = MainWindowSnapshot(
-                    widthDp = size.width.value,
-                    heightDp = size.height.value,
-                    placement = placement
-                )
-            )
+            persistMainWindowState(settings = settings, snapshot = snapshot)
             }
     }
     LaunchedEffect(historyWindowState, settings) {
@@ -2764,15 +2754,22 @@ private fun rememberPersistedMainWindowState(
     workArea: ScreenWorkArea
 ) = when {
     persistedState.widthDp != null && persistedState.heightDp != null -> {
+        val desired = DpSize(width = persistedState.composeWidth, height = persistedState.composeHeight)
+        // O monitor em que a janela ficou, não o primário (issue #273).
+        val area = remember(persistedState, workArea) {
+            workAreaForPosition(persistedState.xDp?.dp, persistedState.yDp?.dp, desired, fallback = workArea)
+        }
+        val size = fitWindowSize(desired, area)
+        val x = persistedState.xDp
+        val y = persistedState.yDp
         rememberWindowState(
             placement = persistedState.composePlacement,
-            size = fitWindowSize(
-                DpSize(
-                    width = persistedState.composeWidth,
-                    height = persistedState.composeHeight
-                ),
-                workArea
-            )
+            size = size,
+            position = if (x != null && y != null) {
+                fitWindowPosition(x = x.dp, y = y.dp, size = size, workArea = area)
+            } else {
+                WindowPosition.PlatformDefault
+            }
         )
     }
 

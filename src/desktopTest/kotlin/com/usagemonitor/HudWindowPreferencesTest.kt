@@ -11,6 +11,34 @@ import kotlin.test.assertNull
 
 class HudWindowPreferencesTest {
 
+    /** Sem gravação o notch mora no monitor padrão, que é o comportamento anterior. */
+    @Test
+    fun `hud screen is absent until the notch is dropped on a monitor`() {
+        withTestSettings { settings ->
+            assertEquals(PersistedHudScreen(id = null, bounds = null), readPersistedHudScreen(settings))
+        }
+    }
+
+    /** Id **e** limites: o Windows renumera ao reconectar, os limites acham o mesmo monitor. */
+    @Test
+    fun `hud screen round trips id and bounds, negative origin included`() {
+        withTestSettings { settings ->
+            val left = ScreenWorkArea((-1280).dp, 0.dp, DpSize(1280.dp, 1024.dp))
+            persistHudScreen(settings, ScreenInfo(id = "DISPLAY3", bounds = left, workArea = left))
+
+            assertEquals(PersistedHudScreen(id = "DISPLAY3", bounds = left), readPersistedHudScreen(settings))
+        }
+    }
+
+    @Test
+    fun `hud screen bounds without measurement are not written`() {
+        withTestSettings { settings ->
+            persistHudScreen(settings, ScreenInfo(id = "x", bounds = ScreenWorkArea.Unknown, workArea = ScreenWorkArea.Unknown))
+
+            assertEquals(PersistedHudScreen(id = null, bounds = null), readPersistedHudScreen(settings))
+        }
+    }
+
     @Test
     fun `read persisted hud position is absent before the pill is ever dragged`() {
         withTestSettings { settings ->
