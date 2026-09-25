@@ -20,9 +20,13 @@ import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_MODE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
 import com.usagemonitor.presentation.ui.HudAppBalloonContent
+import com.usagemonitor.presentation.ui.HudAccountBalloonContent
+import com.usagemonitor.presentation.ui.HUD_BALLOON_RING_LEGEND_TAG_PREFIX
+import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
 import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.hudAppBalloonHeight
 import com.usagemonitor.HUD_BALLOON_WIDTH
 import androidx.compose.foundation.layout.width
@@ -100,7 +104,7 @@ class HudNotchTest {
     private val now = Instant.parse("2026-09-24T12:00:00Z")
 
     private companion object {
-        const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · 5h 28% · 7d 9%"
+        const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · anel externo 7d 9% · anel interno 5h 28%"
         const val DEEPSEEK_RING = "DeepSeek · Sem projeção · Saldo \$2.27"
         const val GEAR = "Configurações"
 
@@ -116,8 +120,8 @@ class HudNotchTest {
     private val accounts = listOf(
         account(
             "INFORMATA2", "Crítico", AppTone.CRITICAL,
-            HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "28% usado · 72% restante"),
-            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "9% usado · 91% restante")
+            HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "28% usado · 72% restante", periodType = PeriodType.INTERVAL),
+            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "9% usado · 91% restante", periodType = PeriodType.WEEKLY)
         ),
         account(
             "DeepSeek", "Sem projeção", AppTone.NEUTRAL,
@@ -906,6 +910,79 @@ class HudNotchTest {
             }
         }
         assertTrue(differs(still, working), "a órbita devia aparecer em volta do anel")
+    }
+
+    /**
+     * O arco de fora é o da semanal (issue #278), medido no **bitmap**: a ordem
+     * de `rings` está no modelo, mas quem decide qual círculo fica por fora é o
+     * desenho, e o que o usuário via era o desenho. A semanal crítica e a 5h
+     * normal têm tons diferentes; o topo de cada círculo diz qual é qual.
+     */
+    @Test
+    fun `o arco de fora e o da semanal`() = runDesktopComposeUiTest {
+        val informata = accounts.first()
+        var critical = Color.Unspecified
+        var ok = Color.Unspecified
+        setContent {
+            AppTheme(isDark = true) {
+                critical = AppTone.CRITICAL.color()
+                ok = AppTone.OK.color()
+                Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black)) {
+                    AppUsageRing(
+                        // Fração cheia: o topo de cada círculo fica pintado.
+                        arcs = informata.rings.map { quota -> AppRingArc(1f, quota.tone) },
+                        description = "anel",
+                        size = HUD_RING_SIZE,
+                        stroke = HUD_RING_STROKE,
+                        gap = HUD_RING_GAP
+                    )
+                }
+            }
+        }
+        val pixels = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+        val stroke = HUD_RING_STROKE.value * density.density
+        val gap = HUD_RING_GAP.value * density.density
+        val center = pixels.width / 2
+        val outer = pixels[center, (stroke / 2).toInt()]
+        val inner = pixels[center, (stroke + gap + stroke / 2).toInt()]
+
+        assertTrue(close(outer, critical), "arco de fora $outer devia ser o da semanal (crítica, $critical)")
+        assertTrue(close(inner, ok), "arco de dentro $inner devia ser o da 5h (normal, $ok)")
+    }
+
+    /** Cada cota do balão carrega o glifo do anel dela, e só as que viram anel. */
+    @Test
+    fun `o balao marca cada cota com a posicao do anel`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                    HudAccountBalloonContent(account = accounts.first(), language = AppLanguage.PT)
+                }
+            }
+        }
+        onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 0).assertIsDisplayed()
+        onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 1).assertIsDisplayed()
+        onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 2).assertDoesNotExist()
+    }
+
+    /** Um anel só não tem posição a apontar: o saldo do DeepSeek fica sem glifo. */
+    @Test
+    fun `conta de um anel so nao tem glifo`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                    HudAccountBalloonContent(account = accounts.last(), language = AppLanguage.PT)
+                }
+            }
+        }
+        onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 0).assertDoesNotExist()
+    }
+
+    private fun close(a: Color, b: Color): Boolean {
+        val tolerance = 0.08f
+        return kotlin.math.abs(a.red - b.red) < tolerance &&
+            kotlin.math.abs(a.green - b.green) < tolerance &&
+            kotlin.math.abs(a.blue - b.blue) < tolerance
     }
 
     private fun differs(a: PixelMap, b: PixelMap): Boolean {

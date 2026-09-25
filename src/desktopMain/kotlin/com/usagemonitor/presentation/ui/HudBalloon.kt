@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -35,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +84,12 @@ internal const val HUD_BALLOON_TEST_TAG = "hudBalloon"
 
 /** A coluna de linhas do balão de conta, cuja altura a geometria soma. */
 internal const val HUD_BALLOON_CONTENT_TEST_TAG = "hudBalloonContent"
+
+/**
+ * Prefixo do glifo de legenda de cada cota no balão, seguido da posição do anel
+ * (0 é o de fora). Cota além dos anéis não tem glifo.
+ */
+internal const val HUD_BALLOON_RING_LEGEND_TAG_PREFIX = "hudBalloonRingLegend_"
 
 /** A linha de ação da atualização no balão da engrenagem ("Reiniciar o app e atualizar →"). */
 internal const val HUD_APP_BALLOON_UPDATE_ACTION_TAG = "hudAppBalloonUpdateAction"
@@ -229,12 +237,16 @@ internal fun HudAccountBalloonContent(
             )
             AppStatusIndicator(label = account.statusLabel, tone = account.tone)
         }
+        val rings = account.rings
+        // A posição do anel de cada cota, pela identidade: duas cotas iguais em
+        // valor continuam sendo dois anéis.
+        val ringOf = { quota: HudQuota -> rings.indexOfFirst { ring -> ring === quota } }
         hudQuotaRuns(account.quotas).forEach { run ->
             val group = run.group
             if (group == null) {
                 run.quotas.forEach { quota ->
                     Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
-                    HudBalloonQuota(quota, language)
+                    HudBalloonQuota(quota, language, ringOf(quota), rings.size)
                 }
             } else {
                 Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
@@ -254,7 +266,7 @@ internal fun HudAccountBalloonContent(
                 ) {
                     run.quotas.forEachIndexed { index, quota ->
                         if (index > 0) Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
-                        HudBalloonQuota(quota, language)
+                        HudBalloonQuota(quota, language, ringOf(quota), rings.size)
                     }
                 }
             }
@@ -282,12 +294,16 @@ internal fun HudAccountBalloonContent(
 }
 
 @Composable
-private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage) {
+private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: Int, ringCount: Int) {
     Row(
         modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_QUOTA_TITLE),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Com um anel só não há qual apontar; a cota além dos anéis não tem um.
+        if (ringCount > 1 && ringIndex >= 0) {
+            HudRingLegendGlyph(position = ringIndex, count = ringCount)
+        }
         Text(
             text = quota.title,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -508,3 +524,40 @@ internal fun hudResetCaption(reset: String, language: AppLanguage): String {
 }
 
 private val BALLOON_MARK_SIZE = 14.dp
+
+/**
+ * A legenda do anel (issue #278): os mesmos anéis concêntricos do notch em
+ * miniatura, com **só** o da cota aceso. Sem ela o balão listava "Sessão 5h" e
+ * "Semanal" e nada dizia qual círculo era qual. Aceso na cor do texto, não no tom
+ * de risco: o glifo diz posição, e o estado já está na barra logo abaixo.
+ * Decorativo para a semântica — a descrição do anel já diz a posição em palavra.
+ */
+@Composable
+private fun HudRingLegendGlyph(position: Int, count: Int) {
+    val lit = MaterialTheme.colorScheme.onSurface
+    val dim = MaterialTheme.colorScheme.outlineVariant
+    Canvas(
+        modifier = Modifier
+            .size(RING_LEGEND_SIZE)
+            .testTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + position)
+    ) {
+        val stroke = RING_LEGEND_STROKE.toPx()
+        val gap = RING_LEGEND_GAP.toPx()
+        repeat(count) { index ->
+            val inset = stroke / 2 + index * (stroke + gap)
+            val radius = size.minDimension / 2 - inset
+            if (radius > 0f) {
+                drawCircle(
+                    color = if (index == position) lit else dim,
+                    radius = radius,
+                    style = Stroke(width = stroke)
+                )
+            }
+        }
+    }
+}
+
+// 14dp: com três anéis em 12 o de dentro sobrava com 0,75dp de raio, um ponto.
+private val RING_LEGEND_SIZE = 14.dp
+private val RING_LEGEND_STROKE = 1.5.dp
+private val RING_LEGEND_GAP = 0.75.dp

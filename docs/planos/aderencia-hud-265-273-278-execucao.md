@@ -35,7 +35,7 @@ funcione em mais de um monitor e mostre cada conta com cor própria. O levantame
 |---|---|---|---|---|
 | P0 | — | Plano de aderência | — | feito |
 | P1 | #274 | Deixar claro que é reiniciar o Usage Monitor | `fix/274-restart-wording` | feito (automática); olhar no app pendente |
-| P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | pendente |
+| P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | feito (automática); olhar no app pendente |
 | P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | pendente |
 | P4 | #275 | Cor por conta Claude | `feat/275-account-color` | pendente |
 | P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | pendente |
@@ -54,6 +54,7 @@ Regra comum a todos os PRs:
 |---|---|---|---|---|
 | 2026-09-25 | P0 | Claude Opus 5.5 | `gh issue view` 265, 273–278; leitura de `WindowScreenFit.kt`, `HudWindow.kt`, `HudModel.kt`, `AppUsageRing.kt`, `HudModePreferences.kt`, `AnthropicProfileRegistry.kt`, `AppAccents.kt`, `DashboardScreenWarnings.kt` e READMEs | Diagnóstico acima. Nenhum código alterado. |
 | 2026-09-25 | P1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HelpCatalogTest" --tests "…AppUpdateBannerTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest"`; depois `gradlew.bat allTests` | Primeira passada vermelha, e de propósito: o teste de encaixe novo reprovou o título em inglês "…it will be applied when Usage Monitor closes" (três linhas no balão, nas 23 escalas). Encurtado, 72 testes verdes. `allTests`: 214 classes, **2141 testes, 0 falhas** (11m36s). Pendente: olhar a faixa e o balão no `gradlew.bat run`. |
+| 2026-09-25 | P2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudModelTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest" --tests "…ComponentTest"` | 5 classes, **178 testes, 0 falhas**. Entre eles, o arco de fora medido no bitmap com o tom da semanal crítica, o glifo de legenda por cota e a descrição "anel externo 7d 9% · anel interno 5h 28%". Depois `gradlew.bat allTests`: 214 classes, **2150 testes, 0 falhas** (9m28s). Pendente: olhar o notch e o balão no `gradlew.bat run`. |
 
 ## P1 · #274 — Reiniciar o Usage Monitor, não o computador
 
@@ -91,8 +92,12 @@ Regra comum a todos os PRs:
   - `quotas`, `focusIndex` e o balão continuam na ordem do card.
 - O pulso de atenção passa do índice 0 fixo para o anel da cota em foco (`attentionIndex`). Sem isso
   ele pulsaria a semanal mesmo com a 5h crítica.
-- **Legenda no balão:** cada linha de cota ganha um glifo de 12dp com os anéis concêntricos e só o
-  anel daquela cota aceso. Ele entra na largura calculada pela geometria; a altura não muda.
+- **Legenda no balão:** cada linha de cota ganha um glifo de 14dp com os anéis concêntricos e só o
+  anel daquela cota aceso, na cor do texto (o estado já está na barra). Em 12dp, com três anéis, o de
+  dentro sobrava com 0,75dp de raio. Conta de um anel só não tem glifo, porque não há posição a
+  apontar. A altura da linha não muda.
+- `HudQuota` ganhou `periodType`, porque a posição do anel depende da janela e o modelo da HUD não a
+  guardava.
 - A descrição de acessibilidade diz a posição de cada cota: "anel externo: 7d 40% · interno: 5h 68%".
 - Testes:
   - `HudModelTest`: 5h/7d vira `rings` 7d, 5h; créditos ficam por dentro; o Antigravity é estável;

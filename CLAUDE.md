@@ -747,8 +747,13 @@ janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`
 Codenotch; a regra de conteúdo vem das seis versões da barra de linhas que ele substituiu.
 **Não é valor novo em enum existente**: `hudMode` continua um booleano, exclusivo com o modo somente
 cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
-- **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos, o de fora é a
-  primeira cota da API). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
+- **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos). **A janela mais
+  longa fica por fora** (`HudAccount.rings`, issue #278): mensal, semanal, a janela curta, e saldo e
+  créditos (`REPORTED`) por dentro. Na ordem da API a 5h ficava por fora da semanal, o contrário de
+  como se lê um alvo. A seleção continua sendo as três primeiras cotas; só a ordem muda, e é estável.
+  O pulso de atenção segue o anel da cota em foco (`attentionRingIndex`), não o de fora fixo. No
+  balão cada cota leva um glifo dos anéis com o dela aceso, e a descrição do anel diz a posição em
+  palavra ("anel externo 7d 9% · anel interno 5h 28%"). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
   esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, o percentual da **cota em foco** (pior
   risco, depois maior percentual — `HudAccount.focusIndex`) e a **palavra do estado**: cor nunca
   informa sozinha. Cota sem projeção tem a trilha **tracejada**.

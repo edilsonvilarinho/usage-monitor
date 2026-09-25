@@ -735,13 +735,7 @@ private fun HudRingItem(
         if (isHovered) currentOnHovered()
     }
     val focus = account.focus
-    val description = buildString {
-        append(account.label)
-        account.planLabel?.let { plan -> append(" ($plan)") }
-        append(" · ")
-        append(account.statusLabel)
-        account.quotas.forEach { quota -> append(" · ${quota.shortLabel} ${quota.percentText}") }
-    }
+    val description = hudRingDescription(account, language)
     val ring: @Composable () -> Unit = {
         // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
         // reconhece antes de ler o nome, que o notch recolhido nem mostra. Na
@@ -763,7 +757,8 @@ private fun HudRingItem(
                 stroke = HUD_RING_STROKE,
                 gap = HUD_RING_GAP,
                 active = account.sessionActive,
-                attention = account.needsAttention
+                attention = account.needsAttention,
+                attentionIndex = account.attentionRingIndex
             )
             AppProviderMark(
                 source = account.source,

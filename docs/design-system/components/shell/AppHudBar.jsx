@@ -36,10 +36,15 @@ export function AppHudBar({
         </span>
       ) : accounts.map((account) => {
         const focus = account.quotas[account.focus || 0] || account.quotas[0];
+        // A janela mais longa por fora (#278); estável entre janelas iguais.
+        const rank = { monthly: 3, weekly: 2, interval: 1 };
+        const rings = account.quotas.slice(0, 3).map((q, i) => ({ q, i }))
+          .sort((a, b) => (rank[b.q.period] || 0) - (rank[a.q.period] || 0) || a.i - b.i)
+          .map(({ q }) => q);
         return (
           <div key={account.label} style={{ display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center', gap: horizontal ? 6 : 0 }}>
             <AppUsageRing
-              arcs={account.quotas.map((q) => ({ fraction: q.fraction, level: q.level, forecast: q.forecast }))}
+              arcs={rings.map((q) => ({ fraction: q.fraction, level: q.level, forecast: q.forecast }))}
               active={account.active}
               label={`${account.label} · ${account.statusLabel}`}
             />

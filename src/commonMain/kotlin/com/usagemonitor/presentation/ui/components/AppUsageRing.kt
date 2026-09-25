@@ -45,8 +45,9 @@ data class AppRingArc(
 )
 
 /**
- * Anel de uso: um arco por cota, concêntricos — o de fora é a primeira cota da
- * API (a janela curta), os de dentro as seguintes.
+ * Anel de uso: um arco por cota, concêntricos — o índice 0 de [arcs] é o de
+ * fora. Quem ordena é quem chama: a HUD põe a janela mais longa por fora
+ * (`HudAccount.rings`, issue #278).
  *
  * É o desenho do Codenotch, trocado num ponto: lá é um anel por fornecedor com a
  * pior janela; aqui é um arco **por cota**, porque um anel com o percentual da
@@ -59,8 +60,8 @@ data class AppRingArc(
  * - Cada arco anda pela mola `GENTLE`, sem rebote — arco que passa do valor e
  *   volta mostra um percentual que não é verdade.
  * - [active] (sessão CLI com turno nos últimos 5 min) desenha um arco fino
- *   girando **em órbita por fora** do anel, e [attention] faz o anel de fora
- *   pulsar; os dois **só** com `AppMotionPolicy.continuous`, que é desligada em
+ *   girando **em órbita por fora** do anel, e [attention] faz pulsar o arco de
+ *   [attentionIndex] — o da cota em foco, que não é mais sempre o de fora; os dois **só** com `AppMotionPolicy.continuous`, que é desligada em
  *   testes e geradores. Sem ela o estado continua dito: o arco ativo fica parado
  *   e o pulso some, e a palavra ao lado continua lá.
  *
@@ -79,7 +80,9 @@ fun AppUsageRing(
     stroke: Dp = 3.dp,
     gap: Dp = 1.5.dp,
     active: Boolean = false,
-    attention: Boolean = false
+    attention: Boolean = false,
+    /** O arco que pulsa em [attention]; fora do intervalo, nenhum pulsa. */
+    attentionIndex: Int = 0
 ) {
     val policy = LocalAppMotionPolicy.current
     val ladder = AppSurfaceLadders.current
@@ -164,7 +167,7 @@ fun AppUsageRing(
             )
             val sweep = sweeps[index].value * 360f
             if (sweep > 0f) {
-                val alpha = if (index == 0) pulse else 1f
+                val alpha = if (index == attentionIndex) pulse else 1f
                 drawArc(
                     color = colors[index].value.copy(alpha = colors[index].value.alpha * alpha),
                     startAngle = -90f,
