@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
+import com.usagemonitor.presentation.ui.HudStripLine
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -65,6 +66,9 @@ internal val HUD_RING_TEXT_GAP = 6.dp
 internal val HUD_PERCENT_LINE = 16.dp
 internal val HUD_WORD_LINE = 14.dp
 
+/** Linha `labelSmall` de uma janela com rótulo ("7d 72%"). */
+internal val HUD_STRIP_LINE = 14.dp
+
 /** Avanço por caractere: 12sp × 0,6 da Plex Mono, e 10sp × 0,6 + o espaçamento de 0,7. */
 private const val PERCENT_ADVANCE_DP = 7.2f
 private const val WORD_ADVANCE_DP = 6.7f
@@ -100,8 +104,8 @@ internal data class HudNotchSizes(
      */
     val withHandles: DpSize = collapsed,
     /**
-     * A faixa compacta do Codenotch: por conta só o anel e o percentual
-     * embaixo, sem a palavra. Liga sozinha quando a faixa completa passa do
+     * A faixa compacta do Codenotch: por conta só o anel e a cota em foco
+     * embaixo, com a janela, sem a palavra. Liga sozinha quando a faixa completa passa do
      * comprimento que a borda comporta ([hudNotchSizes], `maxAlong`).
      */
     val compact: Boolean = false
@@ -110,13 +114,14 @@ internal data class HudNotchSizes(
 /**
  * O tamanho do notch e da área aberta.
  *
- * O notch mostra, por conta, o anel, o percentual da cota em foco e a palavra do
- * estado — a palavra porque cor nunca informa sozinha. O detalhe é o balão de
+ * O notch mostra, por conta, o anel, uma linha por anel com a janela e o
+ * percentual ([HudAccount.stripLines], #286) e a palavra do estado — a palavra
+ * porque cor nunca informa sozinha. O detalhe é o balão de
  * **uma** conta, a do anel sob o ponteiro, como no Codenotch.
  *
  * **Com contas demais para a borda, o notch fica compacto**: se a faixa completa
- * passa de [maxAlong], cada conta vira só anel e percentual embaixo — a célula do
- * Codenotch —, e a palavra sai. Com seis ou sete APIs numa tela de notebook a
+ * passa de [maxAlong], cada conta vira só anel e a cota em foco embaixo, com a
+ * janela ([HudAccount.focusLine]) — a célula do Codenotch —, e a palavra sai. Com seis ou sete APIs numa tela de notebook a
  * faixa completa atravessava a tela inteira; compacta ela mede menos da metade.
  * A palavra não some da HUD: continua no cabeçalho do balão e na descrição do
  * anel, e o tom do anel segue dizendo o estado de relance.
@@ -299,12 +304,12 @@ private fun horizontalCollapsed(
         listOf(HUD_RING_SIZE + HUD_RING_TEXT_GAP + wordWidth(fallbackLabel))
     } else {
         accounts.map { account ->
-            val percent = percentWidth(account.focus?.percentText.orEmpty())
             if (compact) {
-                // Compacta: o percentual embaixo do anel, sem a palavra.
-                maxOf(HUD_RING_SIZE, percent)
+                // Compacta: a cota em foco embaixo do anel, sem a palavra.
+                maxOf(HUD_RING_SIZE, stripLineWidth(account.focusLine))
             } else {
-                HUD_RING_SIZE + HUD_RING_TEXT_GAP + maxOf(percent, wordWidth(account.statusLabel))
+                val widestLine = account.stripLines.maxOf { line -> stripLineWidth(line) }
+                HUD_RING_SIZE + HUD_RING_TEXT_GAP + maxOf(widestLine, wordWidth(account.statusLabel))
             }
         }
     }
@@ -314,10 +319,11 @@ private fun horizontalCollapsed(
     }
     val all = items + extras
     val along = all.fold(0.dp) { sum, width -> sum + width } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    val across = if (compact) {
-        HUD_RING_SIZE + HUD_PERCENT_LINE
-    } else {
-        maxOf(HUD_RING_SIZE, HUD_PERCENT_LINE + HUD_WORD_LINE)
+    // A espessura é a da conta mais alta: com duas janelas o texto passa do anel.
+    val across = when {
+        accounts.isEmpty() -> maxOf(HUD_RING_SIZE, HUD_PERCENT_LINE + HUD_WORD_LINE)
+        compact -> accounts.maxOf { account -> HUD_RING_SIZE + stripLineHeight(account.focusLine) }
+        else -> accounts.maxOf { account -> maxOf(HUD_RING_SIZE, stripLinesHeight(account) + HUD_WORD_LINE) }
     }
     return DpSize(
         width = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2,
@@ -341,8 +347,11 @@ private fun verticalCollapsed(
         listOf(HUD_RING_SIZE + HUD_WORD_LINE * verticalWordLines(fallbackLabel))
     } else {
         accounts.map { account ->
-            val word = if (compact) 0.dp else HUD_WORD_LINE * verticalWordLines(account.statusLabel)
-            HUD_RING_SIZE + HUD_PERCENT_LINE + word
+            if (compact) {
+                HUD_RING_SIZE + stripLineHeight(account.focusLine)
+            } else {
+                HUD_RING_SIZE + stripLinesHeight(account) + HUD_WORD_LINE * verticalWordLines(account.statusLabel)
+            }
         }
     }
     val extras = buildList {
@@ -352,7 +361,9 @@ private fun verticalCollapsed(
     val all = itemHeights + extras
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
     val widestWord = words.maxOfOrNull { word -> verticalWordLineWidth(word) } ?: 0.dp
-    val widestPercent = accounts.maxOfOrNull { account -> percentWidth(account.focus?.percentText.orEmpty()) } ?: 0.dp
+    val widestPercent = accounts.maxOfOrNull { account ->
+        if (compact) stripLineWidth(account.focusLine) else account.stripLines.maxOf { line -> stripLineWidth(line) }
+    } ?: 0.dp
     val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent, charWidth(COUNTDOWN_CHARS, WORD_ADVANCE_DP))
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,
@@ -361,6 +372,21 @@ private fun verticalCollapsed(
 }
 
 internal fun percentWidth(text: String): Dp = charWidth(text.length, PERCENT_ADVANCE_DP)
+
+/**
+ * Uma linha do texto do notch (#286). Sem rótulo é o percentual de sempre, em
+ * `labelMedium`; com rótulo ("7d 72%") é `labelSmall`, que é o que deixa duas
+ * janelas caberem quase na espessura do anel.
+ */
+internal fun stripLineWidth(line: HudStripLine): Dp =
+    if (line.label == null) percentWidth(line.percentText) else wordWidth(line.text)
+
+internal fun stripLineHeight(line: HudStripLine): Dp =
+    if (line.label == null) HUD_PERCENT_LINE else HUD_STRIP_LINE
+
+/** As linhas de uma conta empilhadas, uma por anel. */
+internal fun stripLinesHeight(account: HudAccount): Dp =
+    account.stripLines.fold(0.dp) { sum, line -> sum + stripLineHeight(line) }
 
 internal fun wordWidth(text: String): Dp = charWidth(text.length, WORD_ADVANCE_DP)
 

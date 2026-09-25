@@ -33,6 +33,8 @@ import com.usagemonitor.countdownWidth
 import com.usagemonitor.HUD_COUNTDOWN_GAP
 import com.usagemonitor.HUD_COUNTDOWN_ICON
 import com.usagemonitor.percentWidth
+import com.usagemonitor.presentation.ui.HudStripLine
+import com.usagemonitor.stripLineWidth
 import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.wordWidth
@@ -57,6 +59,12 @@ class HudNotchTextFitTest {
 
     private val words = listOf("Sem projeção", "No forecast", "Crítico", "Atenção", "Carregando", "Loading", "Nenhuma API", "No APIs")
     private val percents = listOf("100%", "88%", "\$2.27")
+
+    /** As linhas com a janela (#286), em `labelSmall`: o pior caso de cada rótulo. */
+    private val stripLines = listOf(
+        HudStripLine("7d", "100%"), HudStripLine("5h", "100%"), HudStripLine("30d", "100%"),
+        HudStripLine("Créditos", "100%"), HudStripLine("5h", "<1%")
+    )
     private val countdowns = listOf(formatRefreshCountdown(59 * 60 + 59), formatRefreshCountdown(10 * 60))
 
     @Test
@@ -80,6 +88,10 @@ class HudNotchTextFitTest {
                     percents.forEach { percent ->
                         val real = drawn(percent, medium)
                         if (real > percentWidth(percent)) failures += "$scale%: \"$percent\" desenhado $real > estimado ${percentWidth(percent)}"
+                    }
+                    stripLines.forEach { line ->
+                        val real = drawn(line.text, small)
+                        if (real > stripLineWidth(line)) failures += "$scale%: linha \"${line.text}\" desenhada $real > estimada ${stripLineWidth(line)}"
                     }
                     countdowns.forEach { text ->
                         // Ícone + vão de 4dp + texto: o mesmo `Row` do `HudCountdown`.

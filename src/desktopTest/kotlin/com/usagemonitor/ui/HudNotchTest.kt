@@ -196,10 +196,28 @@ class HudNotchTest {
     fun `parado o notch mostra percentual e palavra de cada conta`() = runDesktopComposeUiTest {
         setContent { notch() }
 
-        onNodeWithText("28%").assertIsDisplayed()
+        onNodeWithText("5h 28%").assertIsDisplayed()
         onNodeWithText("Crítico").assertIsDisplayed()
         onNodeWithText("Sem projeção").assertIsDisplayed()
         onNodeWithContentDescription(INFORMATA_RING).assertExists()
+    }
+
+    /**
+     * As duas janelas com o rótulo, nas quatro bordas (#286): o número da
+     * semanal e o da 5h, e não só o da cota em foco sem dizer qual é.
+     */
+    @Test
+    fun `parado o notch mostra cada janela com o rotulo em toda borda`() {
+        for (edge in HudEdge.entries) {
+            runDesktopComposeUiTest {
+                setContent { notch(edge = edge) }
+
+                onNodeWithText("7d 9%").assertIsDisplayed()
+                onNodeWithText("5h 28%").assertIsDisplayed()
+                // Conta de cota única continua só com o número.
+                onNodeWithText("\$2.27").assertIsDisplayed()
+            }
+        }
     }
 
     /** O balão é de **uma** conta, a do anel sob o ponteiro — como no Codenotch. */

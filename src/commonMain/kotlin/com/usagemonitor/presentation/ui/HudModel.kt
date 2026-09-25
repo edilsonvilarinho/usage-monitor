@@ -101,6 +101,37 @@ data class HudAccount(
         get() = quotas.getOrNull(focusIndex)
 
     /**
+     * O texto ao lado do anel: uma linha por anel, **na ordem dos anéis** — de
+     * fora para dentro —, cada uma com a janela ("7d 72%", "5h 45%"). Era um
+     * percentual só, o da cota em foco, sem dizer a janela, e ele trocava de
+     * janela sozinho quando o risco mudava (issue #286): o mesmo lugar dizia 45%
+     * numa coleta e 72% na seguinte sem nada ter mudado no consumo.
+     *
+     * Com um anel só não há janela a distinguir, e a linha fica sem rótulo — o
+     * visual das fontes de cota única não muda.
+     */
+    val stripLines: List<HudStripLine>
+        get() {
+            val current = rings
+            if (current.size <= 1) {
+                return listOf(focusLine)
+            }
+            return current.map { quota -> HudStripLine(quota.shortLabel, quota.percentText) }
+        }
+
+    /**
+     * A cota em foco com a janela, numa linha só: a célula da faixa compacta e o
+     * tooltip da bandeja, onde não cabe uma linha por anel. Sem rótulo quando a
+     * conta tem uma cota só.
+     */
+    val focusLine: HudStripLine
+        get() {
+            val current = focus
+            val label = if (quotas.size > 1) current?.shortLabel else null
+            return HudStripLine(label, current?.percentText.orEmpty())
+        }
+
+    /**
      * O anel que pulsa em atenção: o da cota em foco, não mais o de fora fixo. Com
      * a semanal por fora, o índice 0 pulsaria a semanal com a 5h crítica. Foco
      * além dos anéis (quarta cota) cai no de fora, que é o que existia antes.
@@ -141,6 +172,14 @@ data class HudQuota(
     /** A janela da cota; decide a posição do anel. `null` conta como `REPORTED`, por dentro. */
     val periodType: PeriodType? = null
 )
+
+/** Uma linha de texto do notch: a janela (`null` sem janela a distinguir) e o percentual. */
+@Immutable
+data class HudStripLine(val label: String?, val percentText: String) {
+    /** "7d 72%", ou só "72%": é o texto que a geometria mede. */
+    val text: String
+        get() = if (label == null) percentText else "$label $percentText"
+}
 
 /** Os anéis que cabem num notch sem virarem um alvo de tiro. */
 const val MAX_HUD_RINGS = 3
@@ -339,9 +378,10 @@ internal fun hudUsedLeftText(quota: QuotaInfo, language: AppLanguage): String? {
 }
 
 /**
- * O resumo da bandeja: "Anthropic — Padrão 87% · Codex 0% · Antigravity CLI 5%",
- * uma entrada por conta com o percentual da cota em foco — o mesmo número que o
- * anel mostra. É o tooltip do ícone, como o do Codenotch: dá para ler o estado
+ * O resumo da bandeja: "Anthropic — Padrão 7d 87% · Codex 0% · Antigravity CLI 5%",
+ * uma entrada por conta com a cota em foco **e a janela dela** ([HudAccount.focusLine]).
+ * Uma entrada por janela, como o notch faz, passaria dos 127 caracteres já com
+ * três contas. É o tooltip do ícone, como o do Codenotch: dá para ler o estado
  * sem abrir nada.
  *
  * O Windows corta tooltip de bandeja em 127 caracteres; o corte aqui é explícito,
@@ -352,8 +392,7 @@ internal fun hudTraySummary(appName: String, accounts: List<HudAccount>): String
         return appName
     }
     val body = accounts.joinToString(" · ") { account ->
-        val percent = account.focus?.percentText
-        if (percent == null) account.label else "${account.label} $percent"
+        if (account.focus == null) account.label else "${account.label} ${account.focusLine.text}"
     }
     val full = "$appName — $body"
     return if (full.length <= TRAY_TOOLTIP_MAX_CHARS) full else full.take(TRAY_TOOLTIP_MAX_CHARS - 1) + "…"

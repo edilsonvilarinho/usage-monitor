@@ -780,12 +780,21 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   O pulso de atenção segue o anel da cota em foco (`attentionRingIndex`), não o de fora fixo. No
   balão cada cota leva um glifo dos anéis com o dela aceso, e a descrição do anel diz a posição em
   palavra ("anel externo 7d 9% · anel interno 5h 28%"). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
-  esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, o percentual da **cota em foco** (pior
-  risco, depois maior percentual — `HudAccount.focusIndex`) e a **palavra do estado**: cor nunca
-  informa sozinha. Cota sem projeção tem a trilha **tracejada**.
+  esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, **uma linha por anel com a janela**
+  (`HudAccount.stripLines`: "7d 72%" sobre "5h 45%", na ordem dos anéis) e a **palavra do estado**:
+  cor nunca informa sozinha. Cota sem projeção tem a trilha **tracejada**.
+  - **Era um número só, o da cota em foco, sem dizer a janela** (issue #286). O foco é o pior risco, e
+    ele troca de janela sozinho: o mesmo lugar dizia 45% numa coleta e 72% na seguinte sem nada ter
+    mudado no consumo. As linhas não mudam de lugar. A janela vai em `onSurfaceVariant` e o número em
+    `onSurface`; a cor de risco fica no arco e na palavra, senão ela informaria o estado sozinha. Conta
+    de cota única continua com o número em `labelMedium`, sem rótulo. O preço é a espessura: cada
+    janela é uma linha `labelSmall` de 14dp (`HUD_STRIP_LINE`), e o notch de cima vai de 36dp para 42dp
+    com duas e 56dp com três. **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de
+    atenção, na célula compacta e na bandeja, onde não cabe uma linha por anel. A palavra continua
+    sendo a do **pior** risco da conta: com as janelas à vista ela resume a conta, não um número.
   - **Com contas demais para a borda a faixa fica compacta** (`HudNotchSizes.compact`, E9): se a faixa
     completa passa de `HUD_MAX_ALONG_FRACTION` (45%) do comprimento da borda, cada conta vira a célula do
-    Codenotch — anel e percentual embaixo, sem a palavra. Com sete APIs numa tela de notebook a faixa
+    Codenotch — anel e a cota em foco com a janela embaixo (`focusLine`, "7d 72%"), sem a palavra. Com sete APIs numa tela de notebook a faixa
     completa atravessava a borda de cima; compacta ela cai para menos da metade. A palavra não some da
     HUD: fica no cabeçalho do balão e na descrição do anel. Com poucas contas nada muda.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
@@ -837,7 +846,7 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   escondia de quem era a conta. O **plano** ("Max 20x", "ChatGPT Plus") vem no rodapé do balão e na
   descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo.
 - **Resumo na bandeja** (`hudTraySummary`): o tooltip do ícone lista cada conta com o percentual em
-  foco — "Usage Monitor — Anthropic — Padrão 87% · Codex 0%" —, cortado com reticências nos 127
+  foco **e a janela dele** — "Usage Monitor — Anthropic — Padrão 7d 87% · Codex 0%" (#286) —, cortado com reticências nos 127
   caracteres do `szTip` do Windows.
 - **A ordem é a dos cards** (`orderedByCardOrder`, em `buildHudAccounts`), nunca a do risco: com o
   risco mandando, a primeira conta trocava sozinha. `buildHudAccounts` é função pura de `commonMain`
