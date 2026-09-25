@@ -47,8 +47,8 @@ A barra HUD é um notch colado em qualquer borda de qualquer monitor. Ela fica p
 janelas e ocupa quase nada da tela.
 
 - **Um anel por conta, um arco por cota.** O anel de fora é a janela mais longa (semanal) e o de
-  dentro a mais curta (5h). Ao lado do anel ficam o percentual da cota mais perto de acabar e a
-  palavra do estado. Cota sem projeção tem a trilha tracejada.
+  dentro a mais curta (5h). Ao lado do anel fica uma linha por janela, na mesma ordem ("7d 41%"
+  sobre "5h 68%"), e a palavra do estado. Cota sem projeção tem a trilha tracejada.
 - **Passe o ponteiro num anel** para abrir o balão daquela conta. Ele mostra cada cota com a barra,
   quanto foi usado e quanto resta, e quando ela reinicia. Mostra também o plano, de onde veio a
   leitura e os mesmos botões do card: histórico, sessões CLI e time. Um pequeno glifo ao lado de cada

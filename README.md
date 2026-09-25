@@ -44,8 +44,8 @@ The HUD strip is a notch docked to any edge of any monitor. It stays on top of o
 takes almost no screen space.
 
 - **One ring per account, one arc per quota.** The outer ring is the longest window (weekly) and the
-  inner ring the shortest (5h). Next to the ring are the percentage of the quota closest to running out
-  and the status word. A quota without a forecast has a dashed track.
+  inner ring the shortest (5h). Next to the ring, one line per window in the same order ("7d 41%"
+  over "5h 68%") and the status word. A quota without a forecast has a dashed track.
 - **Hover a ring** to open that account's balloon. It shows each quota with its bar, how much is used
   and left, and when it resets. It also shows the plan, where the reading came from, and the same
   buttons as the card: history, CLI sessions and team. A small glyph next to each quota shows which
