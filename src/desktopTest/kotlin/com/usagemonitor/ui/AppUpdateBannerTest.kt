@@ -118,8 +118,8 @@ class AppUpdateBannerTest {
             onRestartAndUpdate = { restarted = true }
         )
 
-        onNodeWithText("Versão 38.0.0 pronta — será aplicada ao fechar").assertIsDisplayed()
-        onNodeWithText("Reiniciar e atualizar agora →").assertIsDisplayed()
+        onNodeWithText("Versão 38.0.0 pronta — será aplicada ao fechar o Usage Monitor").assertIsDisplayed()
+        onNodeWithText("Reiniciar o app e atualizar →").assertIsDisplayed()
 
         onNodeWithTag(APP_UPDATE_BANNER_TAG).performClick()
         assertEquals(true, restarted)
@@ -164,8 +164,8 @@ class AppUpdateBannerTest {
             }
         }
 
-        onNodeWithText("Version 38.0.0 is ready — it will be applied on exit").assertIsDisplayed()
-        onNodeWithText("Restart and update now →").assertIsDisplayed()
+        onNodeWithText("Version 38.0.0 is ready — applies when Usage Monitor closes").assertIsDisplayed()
+        onNodeWithText("Restart app and update →").assertIsDisplayed()
     }
 
     private fun androidx.compose.ui.test.ComposeUiTest.showBanner(

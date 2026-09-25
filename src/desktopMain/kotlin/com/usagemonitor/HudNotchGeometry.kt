@@ -243,7 +243,8 @@ internal const val HUD_APP_BALLOON_MODES = 3
 
 /**
  * A frase da atualização no balão da engrenagem: duas linhas. Numa só, "Versão
- * 38.1.0 pronta — será aplicada ao fechar" saía cortada nos 240dp úteis.
+ * 38.1.0 pronta — será aplicada ao fechar o Usage Monitor" saía cortada nos 240dp
+ * úteis. `HudNotchTextFitTest` mede a frase e a ação contra estas linhas.
  */
 internal const val HUD_APP_BALLOON_UPDATE_TITLE_LINES = 2
 internal val HUD_APP_BALLOON_UPDATE_TITLE = HUD_BALLOON_FOOTER * HUD_APP_BALLOON_UPDATE_TITLE_LINES
@@ -251,7 +252,7 @@ internal val HUD_APP_BALLOON_UPDATE_TITLE = HUD_BALLOON_FOOTER * HUD_APP_BALLOON
 /**
  * A altura do balão da engrenagem: título com a contagem, os modos de janela, a
  * fileira de ações do rodapé e, quando há atualização pendente, a frase dela e —
- * com ação — a linha "Reiniciar e atualizar agora →", da altura de uma linha de modo.
+ * com ação — a linha "Reiniciar o app e atualizar →", da altura de uma linha de modo.
  */
 internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean, hasUpdateAction: Boolean = false): Dp {
     var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER +

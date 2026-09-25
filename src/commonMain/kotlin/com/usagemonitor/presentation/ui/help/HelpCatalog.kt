@@ -1,6 +1,8 @@
 package com.usagemonitor.presentation.ui.help
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.UPDATE_RESTART_ACTION_EN
+import com.usagemonitor.presentation.ui.UPDATE_RESTART_ACTION_PT
 
 /**
  * Tópicos da janela de ajuda.
@@ -106,8 +108,8 @@ object HelpCatalog {
                     "não passa — chave recusada, plano ausente, proxy ou falta de conexão.",
                 "Anthropic e Codex leem a credencial que o próprio CLI já gravou na máquina — não há " +
                     "nada a preencher.",
-                "Atrás de proxy corporativo, configure-o na aba \"Rede\" e reinicie o app: o cliente " +
-                    "HTTP é montado uma vez, no arranque.",
+                "Atrás de proxy corporativo, configure-o na aba \"Rede\" e reinicie o Usage Monitor " +
+                    "(não o computador): o cliente HTTP é montado uma vez, no arranque.",
                 "Arraste um card para reordenar a grade; o botão \"Minimizar card\" o recolhe à linha " +
                     "do título."
             ),
@@ -329,8 +331,8 @@ object HelpCatalog {
                 "Se a instalação não suportar a troca, o interruptor aparece desabilitado com o " +
                     "motivo escrito ao lado.",
                 "Com a versão baixada, a faixa no topo do dashboard — ou, na barra HUD, o balão da " +
-                    "engrenagem — oferece \"Reiniciar e atualizar " +
-                    "agora\"; sem clicar nela, a troca acontece no próximo fechamento."
+                    "engrenagem — oferece \"$UPDATE_RESTART_ACTION_PT\"; sem clicar nela, a troca " +
+                    "acontece no próximo fechamento do app."
             ),
             mediaId = "updates"
         )
@@ -355,8 +357,8 @@ object HelpCatalog {
                     "key rejected, missing plan, proxy, or no connection.",
                 "Anthropic and Codex read the credential the CLI already wrote on this machine — " +
                     "there is nothing to fill in.",
-                "Behind a corporate proxy, set it up in the \"Network\" tab and restart the app: the " +
-                    "HTTP client is built once, at startup.",
+                "Behind a corporate proxy, set it up in the \"Network\" tab and restart Usage Monitor " +
+                    "(not your computer): the HTTP client is built once, at startup.",
                 "Drag a card to reorder the grid; \"Minimize card\" collapses it to its title row."
             ),
             mediaId = "dashboard"
@@ -576,7 +578,8 @@ object HelpCatalog {
                     "written next to it.",
                 "Once the version is downloaded, the strip at the top of the dashboard — or, in the HUD " +
                     "bar, the gear balloon — offers " +
-                    "\"Restart and update now\"; without clicking it, the swap happens on the next exit."
+                    "\"$UPDATE_RESTART_ACTION_EN\"; without clicking it, the swap happens the next time " +
+                    "the app closes."
             ),
             mediaId = "updates"
         )

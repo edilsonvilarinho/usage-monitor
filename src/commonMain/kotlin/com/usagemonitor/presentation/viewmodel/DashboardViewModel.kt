@@ -170,7 +170,7 @@ class DashboardViewModel(
     private val appUpdateInstaller: AppUpdateInstaller? = null,
     private val autoUpdateEnabled: StateFlow<Boolean> = MutableStateFlow(false),
     /**
-     * Encerramento ordenado pedido pela faixa ("Reiniciar e atualizar agora").
+     * Encerramento ordenado pedido pela faixa ("Reiniciar o app e atualizar").
      * O view model não sabe fechar a aplicação; quem sabe é o `Main.kt`.
      */
     private val onRestartAndUpdateRequested: () -> Unit = {},

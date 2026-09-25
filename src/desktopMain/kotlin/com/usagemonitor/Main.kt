@@ -1626,7 +1626,7 @@ private fun runUsageMonitor(
             exitProcess(0)
         }
     }
-    // "Reiniciar e atualizar agora" reusa a mesma saída ordenada do resto do app:
+    // "Reiniciar o app e atualizar" reusa a mesma saída ordenada do resto do app:
     // um segundo caminho de encerramento seria um segundo lugar para esquecer de
     // fechar o banco.
     autoUpdate.bindRestart(shutdownApplication)

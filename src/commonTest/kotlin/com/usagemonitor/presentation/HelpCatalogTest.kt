@@ -1,6 +1,9 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.presentation.ui.updateBannerContent
+import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.help.HelpTopic
 import kotlin.test.Test
@@ -44,6 +47,40 @@ class HelpCatalogTest {
                     steps.none { step -> step.isBlank() },
                     "passo vazio para $topic em $language"
                 )
+            }
+        }
+    }
+
+    /**
+     * O passo de atualização cita o rótulo que o botão **realmente** tem. A ajuda
+     * mandava procurar "Reiniciar e atualizar agora", e trocar o rótulo sem trocar
+     * o passo manda o usuário atrás de um botão que não existe (issue #274).
+     */
+    @Test
+    fun `the updates step quotes the real restart action label`() {
+        val update = AppUpdateInfo(version = "38.0.0", releasePageUrl = "https://example.com")
+        for (language in AppLanguage.entries) {
+            val label = updateBannerContent(AppUpdateUiState.Ready(update), language).actionLabel
+            requireNotNull(label)
+            val steps = HelpCatalog.entry(HelpTopic.UPDATES, language).steps
+            assertTrue(steps.any { step -> "\"$label\"" in step }, "passo sem \"$label\" em $language")
+        }
+    }
+
+    /**
+     * "Reinicie o app" era lido como reiniciar o computador (issue #274): toda
+     * menção a reiniciar nomeia o Usage Monitor.
+     */
+    @Test
+    fun `no help text asks to restart without naming the app`() {
+        val ambiguous = listOf("reinicie o app", "restart the app", "reiniciar e atualizar agora", "restart and update now")
+        for (topic in HelpTopic.entries) {
+            for (language in AppLanguage.entries) {
+                val entry = HelpCatalog.entry(topic, language)
+                val text = (listOf(entry.summary, entry.description) + entry.steps).joinToString("\n").lowercase()
+                ambiguous.forEach { phrase ->
+                    assertTrue(phrase !in text, "\"$phrase\" em $topic ($language)")
+                }
             }
         }
     }

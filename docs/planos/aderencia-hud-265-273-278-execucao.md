@@ -1,0 +1,227 @@
+# Aderência às issues da HUD (#265, #273–#278) — execução
+
+## Contexto
+
+Sete issues abertas, quase todas em volta da barra HUD. Juntas, pedem que ela vire a porta de entrada
+do produto: modo padrão, destaque no README, anéis legíveis e sinais de sessão. Também pedem que ela
+funcione em mais de um monitor e mostre cada conta com cor própria. O levantamento no código
+(2026-09-25, base `edc1d53`) confirmou as sete e achou as causas:
+
+| Issue | Diagnóstico |
+|---|---|
+| [#273](https://github.com/edilsonvilarinho/usage-monitor/issues/273) multi-monitor | Toda medida de tela lê o **monitor primário**. `fullScreenAreaDp()` usa `defaultScreenDevice`; `availableWindowAreaDp()` e `availableWindowSizeDp()` usam `maximumWindowBounds`. As três são lidas uma vez em `Main.kt`. Na HUD, o arrasto passa por `fitWindowPosition(..., workArea = hudScreenArea)` e o encaixe por `nearestHudPlacement(area = hudScreenArea)`: o notch não consegue sair do primário. `HudPlacement` guarda só borda + fração. As janelas com posição salva (Histórico, Sessões CLI, Uso e Presença do time) são presas ao primário ao restaurar, e a janela principal nem salva posição. |
+| [#274](https://github.com/edilsonvilarinho/usage-monitor/issues/274) "reiniciar" | "reinicie o app" e "Reiniciar e atualizar agora" não dizem **o quê** reiniciar (`DashboardScreenWarnings.kt`, `NetworkSettingsSection.kt`, `HelpCatalog.kt`). Os textos de reset de cota ("Reinicia 22h59") são outro sentido e não mudam. |
+| [#275](https://github.com/edilsonvilarinho/usage-monitor/issues/275) cor por conta | Só a Anthropic tem várias contas (`UsageTargetKey` só aceita `profileId` para ela). Nenhum modelo tem campo de cor, e o acento sai da fonte (`accentColorFor`). O design system diz que o acento é a identidade do **fornecedor**. |
+| [#278](https://github.com/edilsonvilarinho/usage-monitor/issues/278) anéis | `HudAccount.rings = quotas.take(3)` segue a ordem da API, e o índice 0 é o anel de fora (`AppUsageRing`): a 5h fica por fora e a semanal por dentro. O pulso de atenção fica preso ao índice 0. |
+| [#277](https://github.com/edilsonvilarinho/usage-monitor/issues/277) HUD padrão | `readPersistedHudMode` tem default `false`. A instalação nova sobe **sem API habilitada** (`DEFAULT_ENABLED_APIS = emptySet()`). Uma HUD logo no primeiro arranque ficaria em "Carregando" para sempre, sem ter o que configurar. |
+| [#276](https://github.com/edilsonvilarinho/usage-monitor/issues/276) / [#265](https://github.com/edilsonvilarinho/usage-monitor/issues/265) README | Nenhum dos dois READMEs cita "HUD" nem "notch". Nenhum gerador de captura do README desenha a HUD; só o `HelpMediaGenerator` desenha. |
+| [#265](https://github.com/edilsonvilarinho/usage-monitor/issues/265) sinais | A HUD recebe `activeTargets` e os pulsos só para piscar botões do balão, e `stalledSessions` não chega a ela. A palavra "Atenção" já é do risco de cota e colidiria com a saúde de contexto. Não existe estado "aguardando usuário": `PENDING_REQUEST` é o pedido do usuário esperando o **modelo**, o contrário disso. |
+
+## Decisões do usuário
+
+1. **#277: a HUD vira padrão só na instalação nova, e só depois da configuração.** O app abre no modo
+   padrão e troca para a HUD **uma vez**, na primeira coleta bem-sucedida. Quem já usa o app não é
+   afetado.
+2. **#275: paleta fixa validada**, não seletor livre. Oito cores nomeadas, com uma variante clara e
+   uma escura, contraste AA medido em teste, mais a opção "Padrão", que mantém o acento da fonte.
+3. **#265 nesta rodada: README + demo da HUD e sinais de sessão na HUD.** A sondagem de integrações
+   (Cursor, Copilot) e a notarização do DMG macOS ficam para depois.
+4. **Um PR por issue**, na ordem de risco. O README fica por último, para as capturas já mostrarem
+   tudo.
+
+## Atividades
+
+| # | Issue | Atividade | Branch | Estado |
+|---|---|---|---|---|
+| P0 | — | Plano de aderência | — | feito |
+| P1 | #274 | Deixar claro que é reiniciar o Usage Monitor | `fix/274-restart-wording` | feito (automática); olhar no app pendente |
+| P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | pendente |
+| P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | pendente |
+| P4 | #275 | Cor por conta Claude | `feat/275-account-color` | pendente |
+| P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | pendente |
+| P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | pendente |
+| P7 | #276, #265 | README com a HUD em destaque, captura e GIF | `docs/276-readme-hud` | pendente |
+
+Regra comum a todos os PRs:
+- Conventional Commits em inglês com o trailer do modelo.
+- A linha do PR nos Pontos de situação, no mesmo commit da atividade.
+- Se a tela mudar, o PR também atualiza o protótipo e o `docs/design-system/`.
+- Se alguma regra mudar, atualiza o `CLAUDE.md`.
+
+## Pontos de situação
+
+| Data | Atividade | Modelo | Comando | Resultado |
+|---|---|---|---|---|
+| 2026-09-25 | P0 | Claude Opus 5.5 | `gh issue view` 265, 273–278; leitura de `WindowScreenFit.kt`, `HudWindow.kt`, `HudModel.kt`, `AppUsageRing.kt`, `HudModePreferences.kt`, `AnthropicProfileRegistry.kt`, `AppAccents.kt`, `DashboardScreenWarnings.kt` e READMEs | Diagnóstico acima. Nenhum código alterado. |
+| 2026-09-25 | P1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HelpCatalogTest" --tests "…AppUpdateBannerTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest"`; depois `gradlew.bat allTests` | Primeira passada vermelha, e de propósito: o teste de encaixe novo reprovou o título em inglês "…it will be applied when Usage Monitor closes" (três linhas no balão, nas 23 escalas). Encurtado, 72 testes verdes. `allTests`: 214 classes, **2141 testes, 0 falhas** (11m36s). Pendente: olhar a faixa e o balão no `gradlew.bat run`. |
+
+## P1 · #274 — Reiniciar o Usage Monitor, não o computador
+
+- `updateBannerContent` (Ready):
+  - ação: "Reiniciar o app e atualizar" / "Restart app and update", em
+    `UPDATE_RESTART_ACTION_PT`/`_EN`;
+  - título: "Versão X pronta — será aplicada ao fechar o Usage Monitor" / "Version X is ready —
+    applies when Usage Monitor closes".
+- **O rótulo diz "o app", e não "o Usage Monitor" como o plano previa.** Medido no desenho: a faixa
+  do modo padrão é de uma linha, e quem cede espaço é o título (`AppBanner`, issue #67). Com o nome
+  inteiro o rótulo passava de ~209dp para ~281dp, e numa janela de 400dp sobravam ~44dp de título.
+  No balão da HUD ele exigia uma segunda linha. "o app" já tira a ambiguidade, e o nome vai no
+  título. Com isso a geometria da HUD não muda.
+- **O título em inglês foi encurtado por medição.** "…it will be applied when Usage Monitor closes"
+  ocupava três linhas no balão, e a reprovação veio do teste de encaixe novo.
+- A mudança chega sozinha à faixa do modo padrão e ao balão da engrenagem da HUD, porque os dois leem
+  a mesma dona (`updateBannerContent`/`updateBannerAction`).
+- Os avisos de conectividade e de proxy 407, o aviso do Antigravity e o texto da aba Rede dizem
+  "reinicie o Usage Monitor". Onde há espaço, acrescentam "(não é preciso reiniciar o computador)".
+- `HelpCatalog` cita o rótulo novo, porque o passo da ajuda precisa apontar para o texto real do
+  botão.
+- `HudNotchTextFitTest` ganhou um caso que mede a frase (duas linhas) e a ação (uma linha) do
+  balão da engrenagem contra a geometria, nas escalas de 100% a 200% e nos dois idiomas.
+- `AppUpdateStrip.prompt.md` atualiza o exemplo.
+- Testes:
+  - atualizar `AppUpdateBannerTest` e `HudNotchTest`;
+  - novo caso em `HelpCatalogTest` afirmando que o passo cita o rótulo de `updateBannerContent`.
+
+## P2 · #278 — Semanal por fora, 5h por dentro
+
+- `HudAccount.rings` escolhe as mesmas até três cotas e as ordena **da janela mais longa para a mais
+  curta**: MONTHLY > WEEKLY > INTERVAL. REPORTED (créditos e saldo, sem janela confiável) fica mais
+  para dentro.
+  - A ordenação é estável: os dois grupos WEEKLY do Antigravity mantêm a ordem.
+  - `quotas`, `focusIndex` e o balão continuam na ordem do card.
+- O pulso de atenção passa do índice 0 fixo para o anel da cota em foco (`attentionIndex`). Sem isso
+  ele pulsaria a semanal mesmo com a 5h crítica.
+- **Legenda no balão:** cada linha de cota ganha um glifo de 12dp com os anéis concêntricos e só o
+  anel daquela cota aceso. Ele entra na largura calculada pela geometria; a altura não muda.
+- A descrição de acessibilidade diz a posição de cada cota: "anel externo: 7d 40% · interno: 5h 68%".
+- Testes:
+  - `HudModelTest`: 5h/7d vira `rings` 7d, 5h; créditos ficam por dentro; o Antigravity é estável;
+  - um teste de bitmap afirmando que o arco externo tem o tom da cota semanal;
+  - glifo e geometria no `HudNotchTest`.
+- Docs: `CLAUDE.md` (a seção HUD hoje diz "o de fora é a primeira cota da API"), o KDoc de
+  `AppUsageRing`, o design system e o protótipo.
+
+## P3 · #273 — Monitores secundários
+
+- **Novo `ScreenLocator.kt`:**
+  - lista `screenDevices` como `ScreenInfo(id, bounds, workArea)`; a área útil desconta
+    `getScreenInsets`;
+  - funções puras: `screenAt(point)`, `screenForRect(rect)` (a de maior interseção) e
+    `resolveScreen(savedId, savedBounds)` (primeiro por id, depois por bounds, por fim o primário).
+- **HUD:**
+  - `HudPlacement` ganha o monitor, gravado em `hudScreenId`/`hudScreenBounds`. O bounds existe
+    porque o Windows renumera `\\.\DISPLAYn` quando um monitor é reconectado;
+  - no arrasto, o limite vem do monitor sob o ponteiro (`MouseInfo.getPointerInfo().device`);
+  - no encaixe, `nearestHudPlacement` usa esse monitor e grava o id dele;
+  - o monitor é resolvido de novo no arranque e a cada abertura por hover. Se ele sumiu, a HUD cai
+    no primário sem apagar o que foi gravado, e volta quando ele reaparece. Posição antiga sem monitor
+    continua valendo no primário.
+- **Janelas com posição salva:** `fitWindowPosition` usa a área útil do monitor que contém o
+  retângulo salvo, e não mais a do primário. O tamanho é ajustado a esse mesmo monitor.
+- **Janela principal:**
+  - passa a salvar `windowX`/`windowY`, com coordenadas negativas permitidas (monitor à esquerda);
+  - grava só em FLOATING e fora do modo HUD, como o coletor atual;
+  - o piso de tamanho e a correção de escala usam o monitor da janela (`graphicsConfiguration`).
+- **Risco de DPI misto.** No Windows cada monitor tem o próprio espaço de usuário escalado, e o
+  código trata px como dp. Só uma medição em dois monitores reais, de preferência com escalas
+  diferentes, valida isso; ela é registrada aqui. Os testes unitários não pegam.
+- Testes:
+  - `ScreenLocatorTest`: monitor à direita, à esquerda (x negativo) e acima; id que sumiu; bounds
+    batendo com id trocado;
+  - geometria e preferências da HUD com área de origem deslocada.
+
+## P4 · #275 — Cor por conta Claude
+
+- **Enum novo `AccountAccent`**, com oito cores (Azul, Ciano, Verde, Lima, Âmbar, Laranja, Rosa,
+  Violeta), cada uma com variante clara e escura. `null` quer dizer "Padrão".
+- **Persistência:**
+  - chave `color` no nó do perfil em `AnthropicProfileRegistry`;
+  - `setColor` pelo mesmo `update()` de `setEnabled`;
+  - valor inválido lido do disco vira `null`.
+- **Configurações → Contas:**
+  - a parte expandida do perfil ganha a linha "Cor", com amostras rotuladas e marca de seleção além
+    do realce, porque cor nunca informa sozinha;
+  - a linha recolhida ganha o marcador de 2dp na cor da conta.
+- **Onde a cor aparece.** A dona única é `accountAccentFor(targetKey, …)`, que devolve a cor da conta
+  ou cai no `accentColorFor`. O mapa `profileId → AccountAccent` desce de `Main.kt` por parâmetro,
+  sem passar por `ApiUsageStats`. Ela vale para:
+  - o card: marcador de 2dp e marca do fornecedor no cabeçalho;
+  - a HUD: um marcador de 2dp sob o anel no notch e a marca no cabeçalho do balão. A marca no miolo
+    do anel **continua** na cor do texto, porque ali o acento competiria com a cor de risco dos
+    arcos;
+  - o cabeçalho do histórico aberto a partir daquela conta.
+- **Design system:** regra nova no `readme.md`. A cor da conta substitui o acento do fornecedor só
+  onde ele já aparece (marcador, marca, linha de gráfico) e nunca pinta superfície. O componente
+  `AccountColorPicker.prompt.md` e o protótipo também são atualizados.
+- Testes:
+  - `AppAccentsContrastTest` cobre as oito cores: AA 4,5:1 nas duas superfícies, a mesma matiz
+    (±30°) entre claro e escuro, e ≥ 20° de distância entre elas;
+  - `AnthropicProfileRegistryTest`: roundtrip e valor inválido;
+  - `ComponentTest`: seleção na aba Contas e cor no marcador do card (medida em bitmap);
+  - `HudNotchTest`: geometria com o marcador.
+
+## P5 · #265 — Sinais de sessão na HUD
+
+- `HudAccount` ganha dois campos, calculados por `buildHudAccounts`, que continua sendo função pura:
+  - `contextHealth`: a contagem de sessões ativas em atenção ou saturadas, tirada do pulso daquele
+    alvo;
+  - `stalled`: a contagem e a espera mais longa, tiradas de `stalledSessions` filtrado por perfil
+    (perfil nulo é o padrão).
+- O balão ganha a seção "Sessões CLI" abaixo das cotas, só quando há sinal:
+  - "Contexto: 1 saturada · 2 em atenção" (`healthTally`);
+  - "Sem resposta há 2h 10min" (`stalledLabel`).
+- Os prefixos "Contexto" e "Sem resposta" separam esses sinais da palavra de risco da cota. Um teste
+  afirma que nenhum texto da HUD diz "aguardando você" ou "aguardando usuário".
+- O notch em repouso não muda: o pulso âmbar continua sendo só do risco de cota, e a notificação de
+  sessão já sai pela bandeja. A descrição do anel leva os mesmos sinais.
+- A altura da seção entra em `hudBalloonHeight`.
+- Testes: agregação e perfil nulo no `HudModelTest`; textos PT/EN, altura e a ausência de
+  "aguardando" no `HudNotchTest`; e um passo novo no tópico HUD da ajuda.
+
+## P6 · #277 — HUD padrão na instalação nova
+
+- **Detecção**, feita no topo de `main()`, antes de qualquer gravação: é instalação nova quando
+  `hudMode` e `windowPlacement` estão ausentes e não há recibo de atualização (a mesma regra de
+  `ReleaseNotesDecision`). Nesse caso o app grava `hudDefaultPending = true`.
+- **Troca:**
+  - na primeira coleta `Success` com ao menos uma cota para a HUD, e sem janela modal aberta, o app
+    chama `setHudMode(true)` e apaga a pendência;
+  - uma notificação da bandeja, uma vez só, diz como voltar: `Ctrl+Shift+H`, o menu da bandeja ou a
+    engrenagem;
+  - a decisão é uma função pura, `hudDefaultDecision(pending, state, modalOpen)`, com teste.
+- Escolha manual de modo antes da troca apaga a pendência: a escolha do usuário vence.
+- **Proteção:** com `NoApisEnabled`, a HUD deixa de dizer "Carregando" e passa a dizer "Nenhuma API".
+  O balão da engrenagem já leva às Configurações.
+- O KDoc de `HudModePreferences` e o `CLAUDE.md` passam a registrar a razão nova do default.
+
+## P7 · #276 + #265 — README com a HUD em destaque
+
+- **Mídia com dados sintéticos:**
+  - `img/hud.png` (balão aberto) e `img/hud-rest.png` (notch recolhido), gerados pelo
+    `ScreenshotGenerator`;
+  - `img/hud.gif`, gerado pelo `SceneRecorder` a partir da cena de `recordWindowModes`.
+  - Nas capturas entram uma conta colorida e uma com sinal de sessão.
+- **`README.md` (canônico) e `README.pt-BR.md`, com a mesma estrutura:**
+  1. a HUD no topo;
+  2. um parágrafo "Barra HUD": anéis, balão, cor por conta, sinais de sessão, como alternar os modos
+     e a troca automática na instalação nova;
+  3. "Por que o Usage Monitor": HUD, custo por sessão, histórico e previsão, e time, cada um com
+     captura;
+  4. "Início rápido" com download por sistema. Os detalhes continuam nos `<details>`.
+- Rodar `generateScreenshots`, `generateTourGif` e `generateHelpMedia`, e conferir as imagens a olho.
+
+## Verificação
+
+- **Em cada PR:**
+  - teste focado (`gradlew.bat desktopTest --tests "com.usagemonitor.Hud*"`, `…ui.*`,
+    `…presentation.*`);
+  - depois `gradlew.bat allTests` e `git diff --check`;
+  - comando e resultado registrados nos Pontos de situação.
+- **Manual** (`gradlew.bat run`):
+  - P3 em dois monitores reais: arrastar a HUD ao secundário, reiniciar, desconectar e reconectar o
+    monitor; abrir o Histórico no secundário e reiniciar;
+  - P4 nos temas claro e escuro;
+  - P6 com o nó de preferências limpo, só com autorização explícita, porque apagá-lo perde as
+    preferências de quem testa.
+- Linux e macOS não estão disponíveis na máquina de desenvolvimento. Essas validações ficam como
+  "não executada", sem ser declaradas.

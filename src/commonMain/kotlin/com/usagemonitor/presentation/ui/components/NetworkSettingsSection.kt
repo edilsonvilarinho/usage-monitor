@@ -75,10 +75,12 @@ fun NetworkSettingsSection(
             Text(
                 text = if (isPt) {
                     "Necessário em rede corporativa com proxy HTTP obrigatório. As " +
-                        "alterações valem só depois de reiniciar o app."
+                        "alterações valem só depois de reiniciar o Usage Monitor (não é preciso reiniciar " +
+                        "o computador)."
                 } else {
                     "Needed on a corporate network with a mandatory HTTP proxy. " +
-                        "Changes only take effect after restarting the app."
+                        "Changes only take effect after restarting Usage Monitor (no need to restart " +
+                        "your computer)."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

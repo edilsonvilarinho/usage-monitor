@@ -47,7 +47,7 @@ fade and a 0.6 scale on `GENTLE`, and slide back in on exit; the **gear** at the
 **everything the standard footer offers**: title with the countdown, the three window modes as rows
 (the footer's menu is a popup the HUD window would clip), the footer's own action row and, with an
 update pending, its sentence on two lines plus the **same action as the standard update strip**
-("Reiniciar e atualizar agora →", "Baixar atualização →"; none while downloading) — offered here,
+("Reiniciar o app e atualizar →", "Baixar atualização →"; none while downloading) — offered here,
 where the label says what the click does, and never on the notch icon. At rest each
 handle is a quarter arc in `outline` inside the shadow margin the resting window already has.
 
