@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -143,19 +144,23 @@ internal fun rememberPersistedTeamPresenceWindowState(
     // maior volta com a barra de título fora da tela no menor, e a barra é a única
     // que esta janela `undecorated` tem (issue #72).
     val scale = uiScaleFactor(uiScalePercent)
-    val initialSize = fitWindowSize(
-        DpSize(
+    val desiredSize = DpSize(
             width = persistedState.widthDp?.dp ?: (DEFAULT_TEAM_PRESENCE_WINDOW_WIDTH_DP.dp * scale),
             height = persistedState.heightDp?.dp ?: (DEFAULT_TEAM_PRESENCE_WINDOW_HEIGHT_DP.dp * scale)
-        ),
-        workArea
     )
+    // A área útil do monitor em que a janela foi deixada, e não a do primário
+    // (issue #273): a posição salva num secundário era presa ao principal e a
+    // janela voltava para ele a cada abertura. Sem posição salva vale o primário.
+    val area = remember(persistedState, workArea) {
+        workAreaForPosition(persistedState.xDp?.dp, persistedState.yDp?.dp, desiredSize, fallback = workArea)
+    }
+    val initialSize = fitWindowSize(desiredSize, area)
     val initialPosition = if (persistedState.xDp != null && persistedState.yDp != null) {
         fitWindowPosition(
             x = persistedState.xDp.dp,
             y = persistedState.yDp.dp,
             size = initialSize,
-            workArea = workArea
+            workArea = area
         )
     } else {
         WindowPosition(Alignment.Center)

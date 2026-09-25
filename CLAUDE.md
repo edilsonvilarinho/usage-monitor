@@ -681,6 +681,16 @@ multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
   presente, não valor igual ao default — que fecha essa porta depois.
 - O redimensionamento acontece no commit do coletor com debounce, não no callback do slider: janela
   AWT reposicionada por pixel arrastado é inutilizável. O conteúdo, esse, escala ao vivo.
+
+**Monitores** (`ScreenLocator.kt`; issue #273): toda medida de tela lia o monitor padrão
+(`defaultScreenDevice`, `maximumWindowBounds`). As janelas com posição salva (Histórico, Sessões CLI,
+Uso e Presença do time) eram presas ao primário ao reabrir, e a principal nem guardava posição. Agora
+`workAreaForPosition` encaixa a janela na área útil do monitor que contém o retângulo salvo (a maior
+interseção), e a principal grava `windowX`/`windowY`, negativos inclusive. Sem posição, ou com o
+retângulo fora de todo monitor, vale o padrão. As funções de escolha recebem a lista de monitores e são
+puras (`ScreenLocatorTest`, com monitor à direita, à esquerda e acima). **Monitores com escalas
+diferentes só se validam em máquina real**: cada monitor tem o próprio espaço de usuário escalado e o
+app trata pixel como dp. Os testes não pegam isso.
 - O teste que prova a fiação (`AppThemeScaleTest`) mede **pixels** (`boundsInRoot`), não `Dp`: a
   conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
   100dp nos dois casos — um teste que passa sem medir nada.
@@ -840,6 +850,12 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   na borda mais próxima do **centro** dele, na tela inteira (pode ficar sobre a barra de tarefas). A
   posição da pílula antiga (`hudWindowX/Y`) migra uma vez e as chaves velhas são apagadas. Estreia no
   topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.
+  - **E o monitor** (`hudScreenId`/`hudScreenBounds`, issue #273). Borda e fração eram resolvidas
+    sempre contra o monitor padrão, então o arrasto era preso a ele e o notch nunca saía do primário.
+    Agora o arrasto e o encaixe usam o monitor **sob o ponteiro** (`MouseInfo.getPointerInfo().device`),
+    e o monitor é gravado com id **e** limites, porque o Windows renumera `\\.\DISPLAYn` ao
+    reconectar. Ele é resolvido de novo a cada abertura por hover. Monitor desligado cai no padrão
+    **sem apagar** a gravação: quando ele volta, o notch volta junto.
 - **Um gesto só** (`hudPressGesture`): **clique num anel recoleta aquela conta** (decisão da rodada 3,
   como o `refreshRing` do Codenotch — o gesto entrega a posição do `down` e o notch acha o anel pela
   caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; botão

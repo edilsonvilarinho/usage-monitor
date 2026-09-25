@@ -142,7 +142,12 @@ internal fun HudWindowHost(
         refreshingTargets = refreshingTargets
     )
 
-    var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, hudScreenArea)) }
+    // O monitor do notch (issue #273). Era sempre o padrão: o arrasto era preso a
+    // ele e o encaixe usava as bordas dele, e o notch não saía do primário. Agora
+    // é o monitor gravado, resolvido de novo a cada abertura por hover — um
+    // monitor reconectado volta a receber o notch sem reiniciar o app.
+    var screenArea by remember { mutableStateOf(resolveHudScreenArea(settings, hudScreenArea)) }
+    var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, screenArea)) }
     var hovered by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     // A janela no tamanho do painel aberto. Anda **antes** do conteúdo ao abrir e
@@ -159,6 +164,7 @@ internal fun HudWindowHost(
             return@LaunchedEffect
         }
         if (hovered) {
+            screenArea = resolveHudScreenArea(settings, hudScreenArea)
             windowOpen = true
             // Um quadro para a janela crescer antes de o conteúdo começar a se
             // abrir; sem ele a mola corre nos primeiros quadros dentro da janela
@@ -183,16 +189,16 @@ internal fun HudWindowHost(
         showsCountdown = nextRefreshAt != null,
         hasUpdateIndicator = updateIndicator != null,
         // Mais que isso da borda e a faixa fica compacta (anel + percentual).
-        maxAlong = (if (placement.edge.isHorizontal) hudScreenArea.size.width else hudScreenArea.size.height) /
+        maxAlong = (if (placement.edge.isHorizontal) screenArea.size.width else screenArea.size.height) /
             uiScaleFactor(uiScalePercent) * HUD_MAX_ALONG_FRACTION,
         hasUpdateAction = updateAction != null
     )
     // A geometria trabalha em dp de composição; a janela, em dp do sistema. A área
     // da tela desce à escala da composição e o resultado volta multiplicado.
     val composedArea = ScreenWorkArea(
-        x = hudScreenArea.x / scale,
-        y = hudScreenArea.y / scale,
-        size = DpSize(hudScreenArea.size.width / scale, hudScreenArea.size.height / scale)
+        x = screenArea.x / scale,
+        y = screenArea.y / scale,
+        size = DpSize(screenArea.size.width / scale, screenArea.size.height / scale)
     )
     // Aberta, a janela ganha o espaço do balão e o notch fica no mesmo ponto da
     // tela (`hudOpenWindowBounds`); quem se ajusta a um canto é o balão.
@@ -234,12 +240,13 @@ internal fun HudWindowHost(
             dragPointer = current
             // Incremental: somar o total desde o início deixaria o notch preso na
             // borda, porque o excedente de um arrasto para fora da tela nunca
-            // seria descartado. Mesma área do encaixe, a tela inteira.
+            // seria descartado. A área é a do monitor **sob o ponteiro**, a tela
+            // inteira dele: presa ao primário, o notch nunca cruzava a divisa.
             val moved = fitWindowPosition(
                 x = position.x + (current.x - previous.x).dp,
                 y = position.y + (current.y - previous.y).dp,
                 size = windowSize,
-                workArea = hudScreenArea
+                workArea = pointerScreen()?.bounds ?: screenArea
             )
             dragWindowPosition = DpOffset(moved.x, moved.y)
         }
@@ -247,13 +254,19 @@ internal fun HudWindowHost(
     val dragFinish = {
         val position = dragWindowPosition
         if (position != null) {
-            // O notch gruda na borda mais próxima do **centro** dele, e a fração
-            // ao longo dela é gravada — sobrevive a troca de resolução.
+            // O notch gruda na borda mais próxima do **centro** dele, no monitor
+            // em que foi solto, e borda, fração e monitor são gravados.
+            val target = pointerScreen()
+            val area = target?.bounds ?: screenArea
             val snapped = nearestHudPlacement(
                 centerX = position.x + windowSize.width / 2,
                 centerY = position.y + windowSize.height / 2,
-                area = hudScreenArea
+                area = area
             )
+            if (target != null) {
+                screenArea = target.bounds
+                persistHudScreen(settings, target)
+            }
             placement = snapped
             persistHudPlacement(settings, snapped)
         }
@@ -435,3 +448,18 @@ private const val HUD_COLLAPSE_DELAY_MILLIS = 150L
 
 /** A saída do balão (fade de 90ms) com folga; a janela encolhe depois dela. */
 private const val HUD_COLLAPSE_SETTLE_MILLIS = 200L
+
+/** O monitor sob o ponteiro; `null` se o AWT não souber dizer. */
+private fun pointerScreen(): ScreenInfo? =
+    runCatching { MouseInfo.getPointerInfo()?.device?.toScreenInfo() }.getOrNull()
+
+/**
+ * A tela inteira do monitor gravado para o notch; sem gravação, ou com o
+ * monitor desligado, a do padrão. O que está gravado **não é apagado** quando o
+ * monitor some: ele pode voltar.
+ */
+private fun resolveHudScreenArea(settings: PreferencesSettings, fallback: ScreenWorkArea): ScreenWorkArea {
+    val saved = readPersistedHudScreen(settings)
+    val screens = availableScreens()
+    return resolveScreen(screens, saved.id, saved.bounds)?.bounds ?: screens.firstOrNull()?.bounds ?: fallback
+}
