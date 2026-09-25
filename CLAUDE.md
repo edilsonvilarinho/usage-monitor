@@ -260,7 +260,13 @@ e [`atualizacao-automatica-linux-execucao.md`](docs/planos/atualizacao-automatic
 interruptor "Atualização automática" nas Configurações → Geral, desmarcado por padrão
 (`autoUpdateEnabled` em `PreferencesSettings`). Ligado, baixa a release em segundo plano, valida o
 SHA-256 contra o `digest` da API do GitHub (não o hash publicado no workflow, que serve só ao
-instalador inicial) e troca ao fechar o app — ou pelo botão "Reiniciar e atualizar agora".
+instalador inicial) e troca ao fechar o app — ou pelo botão "Reiniciar o app e atualizar".
+**Todo texto que manda reiniciar diz o que reinicia** (issue #274): "Reiniciar e atualizar agora"
+era lido como reiniciar o computador. Os avisos em prosa nomeiam o Usage Monitor; o **rótulo** da
+ação diz "o app" (`UPDATE_RESTART_ACTION_PT`/`_EN`), porque a faixa é de uma linha e quem cede
+espaço é o título — com o nome inteiro o rótulo ia de ~209dp a ~281dp e o título sumia numa janela
+de 400dp. A ajuda cita a constante em vez de copiar o texto, e `HudNotchTextFitTest` mede frase e
+ação contra as linhas que o balão da engrenagem reserva.
 `rememberAutoUpdateController` (`AutoUpdateController.kt`) escolhe **um** instalador por plataforma —
 `WindowsAppUpdateInstaller` ou `LinuxAppUpdateInstaller` — cada um atrás da própria flag de build
 (`AUTO_UPDATE_SHIPPED`, `LINUX_AUTO_UPDATE_SHIPPED`, **as duas em `true` desde a v38.0.1**) e de um
@@ -843,7 +849,7 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   testes o laço giraria para sempre; o balão da engrenagem a repete no título. **Atualização pendente
   é só ícone, sem clique próprio** (#225): no notch seria clique de rotina reiniciando o app. O
   balão da engrenagem traz a frase em duas linhas (numa só ela saía cortada nos 240dp) e a **mesma
-  ação da faixa** do modo padrão — "Reiniciar e atualizar agora", "Baixar atualização" —, despachada
+  ação da faixa** do modo padrão — "Reiniciar o app e atualizar", "Baixar atualização" —, despachada
   por `updateBannerAction`, dona única do `when` por estado para faixa e HUD não divergirem.
   Baixando não tem ação, como na faixa.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em

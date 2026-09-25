@@ -9,7 +9,18 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.usagemonitor.HUD_APP_BALLOON_MODE_ROW
+import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE
+import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE_LINES
+import com.usagemonitor.HUD_BALLOON_PADDING
+import com.usagemonitor.HUD_BALLOON_WIDTH
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.presentation.ui.updateBannerContent
+import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.countdownWidth
 import com.usagemonitor.HUD_COUNTDOWN_GAP
 import com.usagemonitor.HUD_COUNTDOWN_ICON
@@ -69,6 +80,60 @@ class HudNotchTextFitTest {
                         if (real > textBudget) failures += "$scale%: contagem \"$text\" desenhada $real > estimada $textBudget"
                     }
                 }
+        }
+        for (next in scales) {
+            scale = next
+            waitForIdle()
+        }
+        assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
+    }
+
+    /**
+     * A frase e a ação da atualização no balão da engrenagem cabem, inteiras, nas
+     * linhas que a geometria reserva (issue #274): a frase em duas, a ação numa. As
+     * duas passaram a dizer o que reinicia, e cortadas perderiam justamente essa
+     * parte. Foi este teste que reprovou "…it will be applied when Usage Monitor
+     * closes", três linhas no balão. Versão com três dígitos por campo é o pior
+     * caso de largura.
+     */
+    @Test
+    fun `a frase e a acao da atualizacao cabem no balao em qualquer escala`() = runDesktopComposeUiTest {
+        val failures = mutableSetOf<String>()
+        var scale by mutableStateOf(scales.first())
+        val update = AppUpdateInfo(version = "138.100.100", releasePageUrl = "https://example.com")
+        val contents = AppLanguage.entries.map { language ->
+            updateBannerContent(AppUpdateUiState.Ready(update), language)
+        }
+        setContent {
+            AppTheme(isDark = true, uiScalePercent = scale) {
+                val measurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val small = MaterialTheme.typography.labelSmall
+                val medium = MaterialTheme.typography.labelMedium
+                // A coluna do balão; a linha de ação ainda desconta 4dp de padding de cada lado.
+                val column = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2
+                fun overflow(text: String, style: TextStyle, width: Dp, lines: Int, height: Dp): String? {
+                    val result = measurer.measure(
+                        text = text,
+                        style = style,
+                        maxLines = lines,
+                        constraints = Constraints(maxWidth = with(density) { width.roundToPx() })
+                    )
+                    val drawnHeight = with(density) { result.size.height.toDp() }
+                    return when {
+                        result.hasVisualOverflow -> "\"$text\" não cabe em $lines linhas de $width"
+                        drawnHeight > height -> "\"$text\" mede $drawnHeight > $height"
+                        else -> null
+                    }
+                }
+                contents.forEach { content ->
+                    overflow(content.title, small, column, HUD_APP_BALLOON_UPDATE_TITLE_LINES, HUD_APP_BALLOON_UPDATE_TITLE)
+                        ?.let { failure -> failures += "$scale%: $failure" }
+                    val action = "${content.actionLabel} →"
+                    overflow(action, medium, column - 8.dp, 1, HUD_APP_BALLOON_MODE_ROW)
+                        ?.let { failure -> failures += "$scale%: $failure" }
+                }
+            }
         }
         for (next in scales) {
             scale = next

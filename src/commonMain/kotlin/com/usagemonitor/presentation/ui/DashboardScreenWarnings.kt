@@ -88,7 +88,7 @@ internal fun warningFor(
             DashboardWarning(
                 target = error.target,
                 title = "$label sem conexão",
-                description = "Não foi possível conectar ao servidor. Se a rede exige proxy corporativo, configure-o em Configurações > Rede e reinicie o app para aplicar.",
+                description = "Não foi possível conectar ao servidor. Se a rede exige proxy corporativo, configure-o em Configurações > Rede e reinicie o Usage Monitor para aplicar (não é preciso reiniciar o computador).",
                 actionLabel = "Tentar novamente",
                 forcesUniversalRetry = true
             )
@@ -96,7 +96,7 @@ internal fun warningFor(
             DashboardWarning(
                 target = error.target,
                 title = "$label could not connect",
-                description = "Could not connect to the server. If the network requires a corporate proxy, configure it under Settings > Network and restart the app to apply it.",
+                description = "Could not connect to the server. If the network requires a corporate proxy, configure it under Settings > Network and restart Usage Monitor to apply it (no need to restart your computer).",
                 actionLabel = "Retry",
                 forcesUniversalRetry = true
             )
@@ -108,14 +108,14 @@ internal fun warningFor(
             DashboardWarning(
                 target = error.target,
                 title = "Proxy exige autenticação",
-                description = "O proxy configurado recusou a credencial enviada (HTTP 407). Revise usuário e senha em Configurações > Rede e reinicie o app.",
+                description = "O proxy configurado recusou a credencial enviada (HTTP 407). Revise usuário e senha em Configurações > Rede e reinicie o Usage Monitor.",
                 actionLabel = null
             )
         } else {
             DashboardWarning(
                 target = error.target,
                 title = "Proxy requires authentication",
-                description = "The configured proxy rejected the sent credential (HTTP 407). Review the username and password under Settings > Network and restart the app.",
+                description = "The configured proxy rejected the sent credential (HTTP 407). Review the username and password under Settings > Network and restart Usage Monitor.",
                 actionLabel = null
             )
         }
@@ -417,6 +417,17 @@ internal fun updateBannerAction(
     }
 }
 
+/**
+ * A ação de aplicar a atualização pronta (issue #274). Diz **o que** reinicia:
+ * "Reiniciar e atualizar agora" era lido como reiniciar o computador. "o app" e
+ * não "o Usage Monitor": a faixa é de uma linha e quem cede espaço é o título, e
+ * com o nome inteiro o rótulo passava de ~209dp para ~281dp e o título sumia numa
+ * janela de 400dp. O nome do app vai no título. Constantes porque o passo da ajuda
+ * cita o rótulo, e uma cópia literal lá divergiria na primeira troca de texto.
+ */
+internal const val UPDATE_RESTART_ACTION_PT = "Reiniciar o app e atualizar"
+internal const val UPDATE_RESTART_ACTION_EN = "Restart app and update"
+
 internal fun updateBannerContent(
     state: AppUpdateUiState,
     language: AppLanguage
@@ -446,11 +457,11 @@ internal fun updateBannerContent(
 
         is AppUpdateUiState.Ready -> UpdateBannerContent(
             title = if (isPt) {
-                "Versão $version pronta — será aplicada ao fechar"
+                "Versão $version pronta — será aplicada ao fechar o Usage Monitor"
             } else {
-                "Version $version is ready — it will be applied on exit"
+                "Version $version is ready — applies when Usage Monitor closes"
             },
-            actionLabel = if (isPt) "Reiniciar e atualizar agora" else "Restart and update now",
+            actionLabel = if (isPt) UPDATE_RESTART_ACTION_PT else UPDATE_RESTART_ACTION_EN,
             tone = AppTone.OK
         )
 
@@ -546,10 +557,10 @@ private fun antigravityWarning(
         }
         AntigravityUsageFailureKind.COLLECTION_PAUSED -> if (pt) {
             "Coleta do Antigravity pausada" to
-                "O CLI não confirmou ter respondido /usage sozinho, e a próxima chamada poderia gastar cota de modelo. A coleta fica parada até o app ser reiniciado."
+                "O CLI não confirmou ter respondido /usage sozinho, e a próxima chamada poderia gastar cota de modelo. A coleta fica parada até o Usage Monitor ser reiniciado."
         } else {
             "Antigravity collection paused" to
-                "The CLI did not confirm that it answered /usage by itself, and another call could spend model quota. Collection stays paused until the app restarts."
+                "The CLI did not confirm that it answered /usage by itself, and another call could spend model quota. Collection stays paused until Usage Monitor is restarted."
         }
     }
     return DashboardWarning(

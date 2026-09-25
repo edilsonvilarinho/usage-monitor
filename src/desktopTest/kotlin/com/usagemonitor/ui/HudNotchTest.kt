@@ -107,8 +107,8 @@ class HudNotchTest {
         /** O texto e o rótulo que `updateBannerContent` dá ao estado pronto. */
         val READY_INDICATOR = HudUpdateIndicator(
             tone = AppTone.OK,
-            description = "Versão 38.1.0 pronta — será aplicada ao fechar",
-            actionLabel = "Reiniciar e atualizar agora"
+            description = "Versão 38.1.0 pronta — será aplicada ao fechar o Usage Monitor",
+            actionLabel = "Reiniciar o app e atualizar"
         )
     }
     private val countdown = "Próxima atualização automática"
@@ -702,13 +702,13 @@ class HudNotchTest {
 
     /** A mesma ação da faixa do modo padrão, no balão da engrenagem (#225). */
     @Test
-    fun `o balao da engrenagem oferece reiniciar e atualizar agora`() = runDesktopComposeUiTest {
+    fun `o balao da engrenagem oferece reiniciar o app e atualizar`() = runDesktopComposeUiTest {
         var restarts = 0
         setContent { appBalloonWithUpdate(READY_INDICATOR, onUpdateAction = { restarts += 1 }) }
 
         // A frase inteira cabe nas duas linhas: numa só ela saía cortada.
         onNodeWithText(READY_INDICATOR.description).assertIsDisplayed()
-        onNodeWithText("Reiniciar e atualizar agora →").assertIsDisplayed()
+        onNodeWithText("Reiniciar o app e atualizar →").assertIsDisplayed()
         onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).performClick()
         assertEquals(1, restarts)
     }

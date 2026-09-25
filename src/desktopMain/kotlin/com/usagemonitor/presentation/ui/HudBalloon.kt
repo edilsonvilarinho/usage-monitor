@@ -83,7 +83,7 @@ internal const val HUD_BALLOON_TEST_TAG = "hudBalloon"
 /** A coluna de linhas do balão de conta, cuja altura a geometria soma. */
 internal const val HUD_BALLOON_CONTENT_TEST_TAG = "hudBalloonContent"
 
-/** A linha de ação da atualização no balão da engrenagem ("Reiniciar e atualizar agora →"). */
+/** A linha de ação da atualização no balão da engrenagem ("Reiniciar o app e atualizar →"). */
 internal const val HUD_APP_BALLOON_UPDATE_ACTION_TAG = "hudAppBalloonUpdateAction"
 
 /**
@@ -340,7 +340,7 @@ internal const val HUD_APP_BALLOON_MODE_TAG_PREFIX = "hudAppBalloonMode_"
  * é do tamanho do balão —; a fileira de ações do rodapé, a **mesma**
  * ([actions] recebe o `FooterActionGroup`), com os mesmos ícones e descrições; e a
  * atualização pendente, quando há — a frase e, com [onUpdateAction], a **mesma**
- * ação da faixa do modo padrão ("Reiniciar e atualizar agora"). Ela mora aqui e
+ * ação da faixa do modo padrão ("Reiniciar o app e atualizar"). Ela mora aqui e
  * não no ícone do notch: o balão é aberto de propósito e o rótulo diz o que o
  * clique faz, e no notch seria clique de rotina reiniciando o app (#225).
  *
