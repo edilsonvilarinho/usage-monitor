@@ -189,6 +189,28 @@ class HudNotchGeometryTest {
         return origin.first.value to origin.second.value
     }
 
+    /**
+     * O selo do emoji (issue #287) sai do anel só no respiro que já existe: o
+     * padding do notch em cima e o vão até o texto (ou até o anel vizinho) à
+     * direita. É o que o deixa fora de `hudNotchSizes`.
+     */
+    @Test
+    fun `o selo do emoji cabe no respiro do notch sem mudar a geometria`() {
+        assertTrue(HUD_EMOJI_BADGE_OVERSHOOT <= HUD_NOTCH_PADDING_ACROSS)
+        assertTrue(HUD_EMOJI_BADGE_OVERSHOOT <= HUD_RING_TEXT_GAP)
+        assertTrue(HUD_EMOJI_BADGE_OVERSHOOT <= HUD_ITEM_GAP / 2)
+        assertTrue(HUD_EMOJI_BADGE_SIZE <= HUD_RING_SIZE / 2)
+        val plain = account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%"))
+        val withEmoji = plain.copy(accountEmoji = com.usagemonitor.presentation.ui.theme.AccountEmoji.FOX)
+        for (edge in HudEdge.entries) {
+            assertEquals(
+                hudNotchSizes(listOf(plain), edge, "", true, false),
+                hudNotchSizes(listOf(withEmoji), edge, "", true, false),
+                "$edge"
+            )
+        }
+    }
+
     /** A órbita de sessão ativa gira por fora do anel e cabe no respiro do notch e entre dois anéis. */
     @Test
     fun `a orbita de sessao ativa cabe em volta do anel`() {

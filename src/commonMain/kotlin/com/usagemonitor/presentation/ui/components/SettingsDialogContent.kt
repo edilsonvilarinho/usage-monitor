@@ -72,6 +72,7 @@ import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -136,11 +137,16 @@ data class AnthropicProfileUiModel(
     val status: AnthropicProfileUiStatus,
     val detail: String? = null,
     /** A cor escolhida para a conta (issue #275); `null` é o acento da Anthropic. */
-    val color: AccountAccent? = null
+    val color: AccountAccent? = null,
+    /** O emoji escolhido para a conta (issue #287); `null` é nenhum. */
+    val emoji: AccountEmoji? = null
 )
 
 /** Prefixo da opção de cor de um perfil, seguido do id do perfil e do nome da cor (ou `DEFAULT`). */
 const val ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX = "accountColorOption_"
+
+/** Prefixo da opção de emoji de um perfil, seguido do id do perfil e do nome do emoji (ou `NONE`). */
+const val ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX = "accountEmojiOption_"
 
 @Composable
 fun SettingsDialogContent(
@@ -210,6 +216,7 @@ fun SettingsDialogContent(
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
     onAnthropicProfileRename: (String, String) -> Unit = { _, _ -> },
     onAnthropicProfileColorChange: (String, AccountAccent?) -> Unit = { _, _ -> },
+    onAnthropicProfileEmojiChange: (String, AccountEmoji?) -> Unit = { _, _ -> },
     onAddAnthropicProfile: () -> Unit = {},
     onRemoveAnthropicProfile: (String) -> Unit = {},
     onRescanAnthropicProfiles: () -> Unit = {},
@@ -374,6 +381,7 @@ fun SettingsDialogContent(
                                 onAnthropicProfileToggle = onAnthropicProfileToggle,
                                 onAnthropicProfileRename = onAnthropicProfileRename,
                                 onAnthropicProfileColorChange = onAnthropicProfileColorChange,
+                                onAnthropicProfileEmojiChange = onAnthropicProfileEmojiChange,
                                 onAddAnthropicProfile = onAddAnthropicProfile,
                                 onRemoveAnthropicProfile = onRemoveAnthropicProfile,
                                 onRescanAnthropicProfiles = onRescanAnthropicProfiles,
@@ -935,6 +943,7 @@ private fun AnthropicAccountsTab(
     onAnthropicProfileToggle: (String, Boolean) -> Unit,
     onAnthropicProfileRename: (String, String) -> Unit,
     onAnthropicProfileColorChange: (String, AccountAccent?) -> Unit,
+    onAnthropicProfileEmojiChange: (String, AccountEmoji?) -> Unit,
     onAddAnthropicProfile: () -> Unit,
     onRemoveAnthropicProfile: (String) -> Unit,
     onRescanAnthropicProfiles: () -> Unit,
@@ -985,6 +994,7 @@ private fun AnthropicAccountsTab(
                             onToggle = onAnthropicProfileToggle,
                             onRename = onAnthropicProfileRename,
                             onColorChange = onAnthropicProfileColorChange,
+                            onEmojiChange = onAnthropicProfileEmojiChange,
                             onRemove = onRemoveAnthropicProfile,
                             onToggleExpanded = { onToggleProfileExpanded(profile.id) }
                         )
@@ -1013,6 +1023,7 @@ private fun AnthropicProfileRow(
     onToggle: (String, Boolean) -> Unit,
     onRename: (String, String) -> Unit,
     onColorChange: (String, AccountAccent?) -> Unit,
+    onEmojiChange: (String, AccountEmoji?) -> Unit,
     onRemove: (String) -> Unit,
     onToggleExpanded: () -> Unit
 ) {
@@ -1042,6 +1053,11 @@ private fun AnthropicProfileRow(
                     color = profile.color?.current ?: accentColorFor(ApiSource.ANTHROPIC, AppAccents.current),
                     height = 28.dp
                 )
+                // O emoji da conta (issue #287) antes do apelido, como no card.
+                val emoji = profile.emoji
+                if (emoji != null) {
+                    AccountEmojiGlyph(emoji = emoji, size = 18.dp)
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = profile.label,
@@ -1087,6 +1103,12 @@ private fun AnthropicProfileRow(
                             selected = profile.color,
                             language = language,
                             onSelect = { color -> onColorChange(profile.id, color) }
+                        )
+                        AccountEmojiPicker(
+                            profileId = profile.id,
+                            selected = profile.emoji,
+                            language = language,
+                            onSelect = { emoji -> onEmojiChange(profile.id, emoji) }
                         )
                         Text(
                             text = profile.path,
@@ -1151,6 +1173,59 @@ private fun AccountColorPicker(
                     onClick = { onSelect(accent) },
                     modifier = Modifier.testTag("$ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX${profileId}_${accent.name}")
                 )
+            }
+        }
+    }
+}
+
+/**
+ * O emoji da conta (issue #287): "Nenhum" mais os de [AccountEmoji], só o glifo
+ * em cada opção — o nome vai na semântica. Conjunto fixo pelo mesmo motivo da
+ * paleta de cores: cada glifo foi visto renderizado, e um campo livre traria
+ * sequências que viram quadrado vazio onde falta a fonte.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccountEmojiPicker(
+    profileId: String,
+    selected: AccountEmoji?,
+    language: AppLanguage,
+    onSelect: (AccountEmoji?) -> Unit
+) {
+    val isPt = language == AppLanguage.PT
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+        Text(
+            text = "Emoji",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+        ) {
+            val none = if (isPt) "Nenhum" else "None"
+            AppGlyphChip(
+                description = none,
+                selected = selected == null,
+                onClick = { onSelect(null) },
+                modifier = Modifier.testTag("$ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX${profileId}_NONE")
+            ) {
+                Text(
+                    text = none,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected == null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            AccountEmoji.entries.forEach { emoji ->
+                AppGlyphChip(
+                    description = emoji.label(isPt),
+                    selected = selected == emoji,
+                    onClick = { onSelect(emoji) },
+                    modifier = Modifier.testTag("$ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX${profileId}_${emoji.name}")
+                ) {
+                    AccountEmojiGlyph(emoji = emoji, size = 18.dp)
+                }
             }
         }
     }

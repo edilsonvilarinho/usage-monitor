@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -86,6 +87,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_COUNTDOWN_GAP
+import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
+import com.usagemonitor.HUD_EMOJI_BADGE_SIZE
 import com.usagemonitor.HUD_COUNTDOWN_ICON
 import com.usagemonitor.HUD_HANDLE_GAP
 import com.usagemonitor.HUD_ITEM_GAP
@@ -102,6 +105,7 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.HudNotchSizes
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
+import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
@@ -133,6 +137,9 @@ internal fun hudRefreshAccountLabel(account: HudAccount, language: AppLanguage):
 
 /** O corpo do notch, cujo tamanho a geometria afirma (`HudNotchTest`). */
 internal const val HUD_CONTENT_TEST_TAG = "hudContent"
+
+/** O selo do emoji da conta no anel (issue #287). */
+internal const val HUD_ACCOUNT_EMOJI_TEST_TAG = "hudAccountEmoji"
 
 internal const val HUD_UPDATE_INDICATOR_TAG = "hudUpdateIndicator"
 
@@ -772,6 +779,21 @@ private fun HudRingItem(
                 size = hudRingMarkSize(account.rings.size),
                 modifier = Modifier.graphicsLayer { rotationZ = markTurn }
             )
+            // O emoji da conta (issue #287), selo no canto de cima à direita do
+            // anel. Passa só `HUD_EMOJI_BADGE_OVERSHOOT` para fora dele, dentro do
+            // respiro do notch: é selo, não item, e não mexe em `hudNotchSizes`.
+            // Fica de pé em toda borda, como o texto do balão.
+            val emoji = account.accountEmoji
+            if (emoji != null) {
+                AccountEmojiGlyph(
+                    emoji = emoji,
+                    size = HUD_EMOJI_BADGE_SIZE,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = HUD_EMOJI_BADGE_OVERSHOOT, y = -HUD_EMOJI_BADGE_OVERSHOOT)
+                        .testTag(HUD_ACCOUNT_EMOJI_TEST_TAG)
+                )
+            }
         }
     }
     // Uma linha por anel, com a janela (#286); compacta, só a cota em foco. As

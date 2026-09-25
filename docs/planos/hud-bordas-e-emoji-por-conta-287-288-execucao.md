@@ -70,7 +70,7 @@ superior direito do anel** (3º print).
 | D2 | A HUD em repouso e aberta fica na **área útil** (`workArea`). O **arrasto** continua livre sobre a tela inteira (`bounds`), e o encaixe ao soltar usa a área útil. | Desfaz a decisão da #256 com a evidência que ela não tinha: a barra ganha a disputa de *topmost*. O arrasto livre continua passando por cima da barra sem prender o ponteiro. |
 | D3 | A identidade do monitor gravada (`hudScreenId`/`hudScreenBounds`) continua sendo `bounds`. | A área útil muda quando a barra é movida ou redimensionada, e com ela como chave o `resolveScreen` perderia o monitor. |
 | D4 | Barra de tarefas com ocultação automática fica fora do escopo. | Os insets dela são zero. Quando ela sobe, cobre o notch, e isso vem da escolha do usuário de ocultá-la. Vai documentado, sem ser escondido. |
-| D5 | O emoji sai de um **conjunto fixo** (enum `AccountEmoji`, ~16 opções + "Nenhum"), e não de um campo livre. | É o mesmo raciocínio da paleta fixa de cores: cada glifo é medido nas fontes de emoji dos três SOs, ocupa um grafema só e tem largura previsível. Um campo livre traria sequências ZWJ, tons de pele, bandeiras e o risco de o glifo virar quadrado vazio sem fonte. **Pendente de confirmação do usuário**, ver §5. |
+| D5 | O emoji sai de um **conjunto fixo** (enum `AccountEmoji`, 16 opções + "Nenhum"), e não de um campo livre. | É o mesmo raciocínio da paleta fixa de cores: cada glifo é medido nas fontes de emoji dos três SOs, ocupa um grafema só e tem largura previsível. Um campo livre traria sequências ZWJ, tons de pele, bandeiras e o risco de o glifo virar quadrado vazio sem fonte. *(Seguida a recomendação; o usuário mandou seguir até a conclusão.)* |
 | D6 | O emoji é gravado no nó do perfil (`emoji` em `AnthropicProfileRegistry`), pelo **nome** do enum, como a `color`. Nome desconhecido vira "Nenhum". | Renomear um valor apaga a escolha de quem o tinha, a mesma regra de `AccountAccent`. |
 | D7 | O emoji é **selo** e não muda `hudNotchSizes`: fica sobre o canto do anel de 36dp, passando no máximo 4dp para fora, dentro do respiro de 8dp do notch e do vão de 6dp até o texto. | A geometria é dona do tamanho e não mede nada. O selo não pode abrir um segundo caminho de tamanho. `HudNotchGeometryTest` afirma o limite. |
 | D8 | Superfícies: selo no anel (faixa completa **e** compacta), ao lado do título no cabeçalho do balão, na linha do perfil em Configurações → Contas e no título do card do dashboard. | A cor da #275 já ocupa esses mesmos quatro lugares. Identidade que aparece na HUD e some no card faria o usuário procurar a conta pelo emoji e não achar. A tooltip da bandeja fica de fora, porque o `szTip` tem 127 caracteres e o emoji ocupa dois UTF-16. |
@@ -120,12 +120,10 @@ Uma atividade por commit, com código, teste e documentação da mesma decisão 
   de atenção. O selo mora no canto, fora do miolo, e não pisca nem gira. Nenhum movimento contínuo
   novo.
 
-## 5. Decisões pendentes com o usuário
+## 5. Decisões que estavam pendentes
 
-1. **D5, conjunto fixo × campo livre.** A recomendação é o conjunto fixo. Com campo livre, E02 e E03
-   crescem: validação de um grafema só, medida de largura real e fallback por glifo.
-2. **D8, o emoji também no card do dashboard (E06)?** Recomendado. Pode ficar só na HUD se o
-   usuário preferir.
+O usuário mandou seguir até a conclusão das issues sem responder às duas perguntas, e as duas
+seguiram a recomendação: **conjunto fixo** (D5) e **emoji também no card** (D8).
 
 ## 6. Pontos de situação
 
@@ -137,3 +135,12 @@ Uma atividade por commit, com código, teste e documentação da mesma decisão 
 | A03 | Área útil | `resolveHudScreenArea`/`dragFinish` com `workArea`, `fullScreenAreaDp` removida; teste `o notch encosta na barra de tarefas e nao passa por baixo dela`. App real, tela 1366×768 com barra de 48px: notch de baixo parado e aberto termina em y=720, rente à barra | concluída |
 | A04 | Documentação | CLAUDE.md (Barra HUD: arrasto e área útil), nota de reversão no plano da #256. O protótipo já dizia *"o encaixe de baixo para logo acima dela"* (#164) e não muda | concluída |
 | A05 | Suíte | `gradlew.bat allTests` → BUILD SUCCESSFUL em 7m19s | concluída |
+| E01 | Spike de renderização | Sonda com `runDesktopComposeUiTest` e `captureToImage` (descartada): 22 candidatos em 22sp e em `labelLarge`, tema escuro → todos em cor, offscreen, pela Segoe UI Emoji. Lista final de 16. Linux e macOS **não foram vistos** | concluída no Windows |
+| E02 | Domínio e persistência | `AccountEmoji`, `emoji`/`setEmoji` no registro, `accountEmojisOf` no `Main`; teste `account emoji persists next to the color and clears back to none` | concluída |
+| E03 | Configurações → Contas | `AppGlyphChip` (primitiva nova, com `.prompt.md`/`.d.ts`/`.jsx` e índice do readme), `AccountEmojiPicker`, emoji antes do apelido; teste `accounts tab picks an account emoji and marks the current one` | concluída |
+| E04 | Modelo da HUD | `HudAccount.accountEmoji` por `profileId`; teste `o emoji escolhido para a conta chega a hud e so o dela` | concluída |
+| E05 | Selo no anel e no balão | `AccountEmojiGlyph` (glifo em dp), selo de 14dp a +4dp do anel; testes `o emoji da conta vira selo no canto do anel e so nela` (quatro bordas) e `o selo do emoji cabe no respiro do notch sem mudar a geometria`; o fixture principal do teste de geometria ganhou emoji | concluída |
+| E06 | Card do dashboard | emoji ao lado da marca; teste `ApiUsageCard shows the account emoji beside the provider mark` | concluída |
+| E07 | Documentação | CLAUDE.md ("Emoji por conta"), exceção no readme do design system, mockup 1b e linha do seletor no protótipo, passo na Ajuda (PT/EN) com os rótulos reais | concluída |
+| E08 | Capturas | Fixture da conta Sandbox com 🏠; `gradlew.bat generateScreenshots` → mudaram só `dashboard.png`, `hud*.png`, `hud.gif`; `gradlew.bat generateHelpMedia` → 4 demos que mostram o dashboard ou a HUD | concluída |
+| E09 | Suíte | `gradlew.bat allTests` → BUILD SUCCESSFUL em 7m22s, nenhum `<failure>` nos relatórios | concluída |

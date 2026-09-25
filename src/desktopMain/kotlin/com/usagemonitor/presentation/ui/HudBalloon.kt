@@ -66,6 +66,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudQuotaRuns
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
+import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -231,6 +232,11 @@ internal fun HudAccountBalloonContent(
                 tint = account.accountAccent?.current ?: accentColorFor(source = account.source, accents = AppAccents.current),
                 size = BALLOON_MARK_SIZE
             )
+            // O emoji da conta (issue #287) ao lado da marca, como no anel.
+            val emoji = account.accountEmoji
+            if (emoji != null) {
+                AccountEmojiGlyph(emoji = emoji, size = BALLOON_MARK_SIZE)
+            }
             Text(
                 text = account.label,
                 style = MaterialTheme.typography.titleSmall,

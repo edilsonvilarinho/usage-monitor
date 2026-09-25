@@ -183,6 +183,7 @@ import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -471,6 +472,8 @@ private fun runUsageMonitor(
     val availableTargets = remember(profileRecords) { availableUsageTargets(profileRecords) }
     // A cor de cada conta Claude (issue #275), para o card, a HUD e a bandeja.
     val accountColors = remember(profileRecords) { accountColorsOf(profileRecords) }
+    // E o emoji de cada uma (issue #287), para o card, a HUD e as Configurações.
+    val accountEmojis = remember(profileRecords) { accountEmojisOf(profileRecords) }
     val persistedCardOrder = remember(settings) {
         normalizeCardOrder(readUsageTargetCollection(settings, CARD_ORDER_KEY), availableTargets)
     }
@@ -2092,6 +2095,7 @@ private fun runUsageMonitor(
                     cliSessionPulses = cliSessionPulses,
                     teamSessionPulses = teamSessionPulses,
                     accountColors = accountColors,
+                    accountEmojis = accountEmojis,
                     showFooter = !cardsOnlyMode,
                     // Acesso rápido às três molduras (issues #187 e #215): o
                     // mesmo `val` de cima, partilhado com a faixa do modo
@@ -2293,6 +2297,7 @@ private fun runUsageMonitor(
             cliSessionPulses = cliSessionPulses,
             teamSessionPulses = teamSessionPulses,
             accountColors = accountColors,
+            accountEmojis = accountEmojis,
             onCloseRequest = { shutdownApplication() },
             activeTargets = sessionPulseViewModel.activeTargets,
             stalledSessions = sessionPulseViewModel.stalledSessions
@@ -2526,6 +2531,10 @@ private fun runUsageMonitor(
             },
             onAnthropicProfileColorChange = { profileId, color ->
                 profileRegistry.setColor(profileId, color?.name)
+                showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
+            },
+            onAnthropicProfileEmojiChange = { profileId, emoji ->
+                profileRegistry.setEmoji(profileId, emoji?.name)
                 showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
             },
             onAddAnthropicProfile = {
@@ -2902,7 +2911,8 @@ private fun buildAnthropicProfileUiModels(
             identityLabel = inspection?.accountContext?.displayLabel,
             status = status,
             detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail,
-            color = AccountAccent.fromStorage(record.color)
+            color = AccountAccent.fromStorage(record.color),
+            emoji = AccountEmoji.fromStorage(record.emoji)
         )
     }
 }
@@ -2925,6 +2935,10 @@ private fun hudDefaultNotice(language: AppLanguage): Pair<String, String> {
 /** `profileId → cor` das contas que têm cor escolhida; as demais ficam no acento da fonte. */
 private fun accountColorsOf(records: List<AnthropicProfileRecord>): Map<String, AccountAccent> =
     records.mapNotNull { record -> AccountAccent.fromStorage(record.color)?.let { color -> record.id to color } }.toMap()
+
+/** `profileId → emoji` das contas que têm emoji escolhido (issue #287). */
+private fun accountEmojisOf(records: List<AnthropicProfileRecord>): Map<String, AccountEmoji> =
+    records.mapNotNull { record -> AccountEmoji.fromStorage(record.emoji)?.let { emoji -> record.id to emoji } }.toMap()
 
 /**
  * Aplica uma mudança nas configurações de time e persiste.

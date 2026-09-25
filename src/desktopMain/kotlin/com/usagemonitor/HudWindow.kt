@@ -52,6 +52,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.nextRefreshLabel
 import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
@@ -108,6 +109,8 @@ internal fun HudWindowHost(
     teamSessionPulses: Map<UsageTargetKey, SessionPulse>,
     /** A cor escolhida por conta Claude (issue #275), por `profileId`. */
     accountColors: Map<String, AccountAccent> = emptyMap(),
+    /** O emoji escolhido por conta Claude (issue #287), por `profileId`. */
+    accountEmojis: Map<String, AccountEmoji> = emptyMap(),
     onCloseRequest: () -> Unit,
     /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
     activeTargets: StateFlow<Set<UsageTargetKey>>? = null,
@@ -149,6 +152,7 @@ internal fun HudWindowHost(
         activeTargets = active,
         refreshingTargets = refreshingTargets,
         accountColors = accountColors,
+        accountEmojis = accountEmojis,
         sessionPulses = cliSessionPulses,
         stalledSessions = stalled
     )

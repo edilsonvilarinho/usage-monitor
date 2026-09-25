@@ -654,6 +654,26 @@ Antes de desenhar um retângulo novo, procure aqui.
     usuário. Um marcador à parte mudaria `hudNotchSizes` e dividiria espaço com a órbita de sessão
     ativa. A cor chega à HUD dentro do próprio `HudAccount` (`accountAccent`), e não como parâmetro
     a mais na cadeia do notch.
+- **Emoji por conta** (`AccountEmoji` + `AccountEmojiGlyph` + `AppGlyphChip`; issue #287): a cor
+  só separa duas contas Claude para quem lembra qual tom é de qual conta. Cada perfil pode ter um de
+  dezesseis emojis em Configurações → Contas, gravado como a cor (`emoji` no nó do perfil, **nome**
+  do enum, desconhecido vira "Nenhum"). Aparece como **selo no canto de cima à direita do anel** da
+  HUD, ao lado da marca no cabeçalho do balão e do card, e antes do apelido na linha do perfil.
+  - **É conteúdo do usuário, não cromo.** A regra "sem emoji" do design system continua valendo para
+    a interface; este glifo é da natureza do apelido e o nome está sempre escrito ao lado, por isso
+    ele é decorativo na semântica.
+  - **Conjunto fixo, não campo livre**, pelo motivo da paleta: cada glifo é um code point só, com
+    apresentação de emoji por padrão, e foi visto renderizado em cor pelo Compose no Windows — na fonte
+    mono e **offscreen**, então os geradores de captura também o desenham. Campo livre traria
+    sequências ZWJ, tons de pele e bandeiras de largura imprevisível, e quadrado vazio onde falta a
+    fonte. **Linux e macOS não foram vistos**: dependem da fonte de emoji do sistema.
+  - **O selo não entra em `hudNotchSizes`.** Ele passa `HUD_EMOJI_BADGE_OVERSHOOT` (4dp) para fora do
+    anel, dentro do respiro que o notch já tem — `HudNotchGeometryTest` afirma o limite e a geometria
+    igual com e sem emoji. `AccountEmojiGlyph` mede o glifo em **dp**: em sp ele cresceria com a
+    escala de fonte do sistema e sairia da caixa que a geometria conta.
+  - Mapa paralelo ao das cores (`accountEmojis`), e não um objeto de identidade que juntasse os dois:
+    a cor já atravessava cinco assinaturas, e trocá-las todas por causa do emoji mexeria em código
+    que a issue não pede.
 
 **Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
 

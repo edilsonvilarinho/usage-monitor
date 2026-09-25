@@ -40,6 +40,15 @@ internal enum class HudEdge {
  */
 internal val HUD_RING_SIZE = 36.dp
 
+/**
+ * O selo do emoji da conta (issue #287): uma caixa no canto de cima à direita do
+ * anel, que passa [HUD_EMOJI_BADGE_OVERSHOOT] para fora dele. O excesso cabe no
+ * respiro do notch e no vão até o texto, e por isso o selo não entra na conta de
+ * [hudNotchSizes] — `HudNotchGeometryTest` afirma as duas coisas.
+ */
+internal val HUD_EMOJI_BADGE_SIZE = 14.dp
+internal val HUD_EMOJI_BADGE_OVERSHOOT = 4.dp
+
 /** Espessura de cada arco e o vão entre dois arcos concêntricos. */
 internal val HUD_RING_STROKE = 2.5.dp
 internal val HUD_RING_GAP = 1.5.dp
