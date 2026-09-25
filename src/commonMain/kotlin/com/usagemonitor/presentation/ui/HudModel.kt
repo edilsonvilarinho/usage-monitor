@@ -6,6 +6,8 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.AppLanguage
@@ -71,7 +73,13 @@ data class HudAccount(
      * marca no miolo do anel e no cabeçalho do balão — só com escolha: sem ela o
      * miolo fica na cor do texto, como antes.
      */
-    val accountAccent: AccountAccent? = null
+    val accountAccent: AccountAccent? = null,
+    /**
+     * Contexto crescendo ou saturado e sessão sem resposta nesta conta (issue
+     * #265), já em texto. Vazio é "nada a dizer": o balão não abre a seção.
+     * Dono único: [hudSessionSignals].
+     */
+    val sessionSignals: List<HudSessionSignal> = emptyList()
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
@@ -180,6 +188,7 @@ internal fun hudRingDescription(account: HudAccount, language: AppLanguage): Str
             append("${quota.shortLabel} ${quota.percentText}")
         }
         beyond.forEach { quota -> append(" · ${quota.shortLabel} ${quota.percentText}") }
+        account.sessionSignals.forEach { signal -> append(" · ${signal.text}") }
     }
 }
 
@@ -198,7 +207,11 @@ internal fun buildHudAccounts(
     activeTargets: Set<UsageTargetKey> = emptySet(),
     refreshingTargets: Set<UsageTargetKey> = emptySet(),
     /** A cor escolhida por conta Claude, por `profileId`. */
-    accountColors: Map<String, AccountAccent> = emptyMap()
+    accountColors: Map<String, AccountAccent> = emptyMap(),
+    /** Sessões ativas em atenção ou saturadas, por alvo — o mesmo pulso do botão de sessões. */
+    sessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
+    /** Sessões sem resposta desde o último pedido, de todas as contas. */
+    stalledSessions: List<StalledCliSession> = emptyList()
 ): List<HudAccount> {
     val noForecast = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
     return orderedByCardOrder(quotaRisks, cardOrder) { entry -> entry.stats.targetKey }
@@ -239,7 +252,8 @@ internal fun buildHudAccounts(
                 originLabel = hudSourceOrigin(first.stats.source, language),
                 accountKey = first.stats.accountContext?.key,
                 refreshing = target in refreshingTargets,
-                accountAccent = target.profileId?.let { profileId -> accountColors[profileId] }
+                accountAccent = target.profileId?.let { profileId -> accountColors[profileId] },
+                sessionSignals = hudSessionSignals(target, sessionPulses[target], stalledSessions, language)
             )
         }
 }

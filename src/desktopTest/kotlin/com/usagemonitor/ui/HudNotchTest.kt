@@ -22,6 +22,8 @@ import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
 import com.usagemonitor.presentation.ui.HudAppBalloonContent
 import com.usagemonitor.presentation.ui.HudAccountBalloonContent
 import com.usagemonitor.presentation.ui.HUD_BALLOON_RING_LEGEND_TAG_PREFIX
+import com.usagemonitor.presentation.ui.HUD_BALLOON_SESSION_SIGNALS_TAG
+import com.usagemonitor.presentation.ui.HudSessionSignal
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
 import com.usagemonitor.presentation.ui.components.WindowMode
@@ -104,7 +106,8 @@ class HudNotchTest {
     private val now = Instant.parse("2026-09-24T12:00:00Z")
 
     private companion object {
-        const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · anel externo 7d 9% · anel interno 5h 28%"
+        const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · anel externo 7d 9% · anel interno 5h 28% · " +
+            "Contexto saturado · 1 sessão · Sem resposta há 2h10"
         const val DEEPSEEK_RING = "DeepSeek · Sem projeção · Saldo \$2.27"
         const val GEAR = "Configurações"
 
@@ -122,6 +125,13 @@ class HudNotchTest {
             "INFORMATA2", "Crítico", AppTone.CRITICAL,
             HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "28% usado · 72% restante", periodType = PeriodType.INTERVAL),
             HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "9% usado · 91% restante", periodType = PeriodType.WEEKLY)
+        ).copy(
+            // Os sinais de sessão (#265) no fixture principal: o teste de geometria
+            // que percorre as contas passa a cobrir a seção nova do balão.
+            sessionSignals = listOf(
+                HudSessionSignal("Contexto saturado · 1 sessão", AppTone.CRITICAL),
+                HudSessionSignal("Sem resposta há 2h10", AppTone.WARNING)
+            )
         ),
         account(
             "DeepSeek", "Sem projeção", AppTone.NEUTRAL,
@@ -963,6 +973,27 @@ class HudNotchTest {
         onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 0).assertIsDisplayed()
         onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 1).assertIsDisplayed()
         onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 2).assertDoesNotExist()
+    }
+
+    /** A seção de sessões CLI aparece com os sinais da conta, e some sem eles (#265). */
+    @Test
+    fun `o balao mostra os sinais de sessao da conta`() = runDesktopComposeUiTest {
+        var shown by mutableStateOf(accounts.first())
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                    HudAccountBalloonContent(account = shown, language = AppLanguage.PT)
+                }
+            }
+        }
+        onNodeWithTag(HUD_BALLOON_SESSION_SIGNALS_TAG).assertIsDisplayed()
+        onNodeWithText("Sessões CLI").assertIsDisplayed()
+        onNodeWithText("Contexto saturado · 1 sessão").assertIsDisplayed()
+        onNodeWithText("Sem resposta há 2h10").assertIsDisplayed()
+
+        shown = accounts.first().copy(sessionSignals = emptyList())
+        waitForIdle()
+        onNodeWithTag(HUD_BALLOON_SESSION_SIGNALS_TAG).assertDoesNotExist()
     }
 
     /** Um anel só não tem posição a apontar: o saldo do DeepSeek fica sem glifo. */

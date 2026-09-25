@@ -32,8 +32,11 @@ for **that account only** — Codenotch's card, not a panel of every account. He
 mark in the source accent, the card title and the state; per quota the card's title and
 "Reinicia 22h59", an `AppProgressTrack` and **"68% usado · 32% restante"** (used truncated like the
 ring, left derived from it, "<1%" at both ends, nothing for balances); quotas of one group
-(Antigravity models, Cursor allowances) in a box under the group name; the plan and the origin of the
-reading, **"Plus · via Codex"**; and the **card's own buttons** (history, CLI sessions, team) plus a
+(Antigravity models, Cursor allowances) in a box under the group name; **"Sessões CLI"** when the
+account has CLI sessions with a growing or saturated context or no reply since the last request
+(issue #265) — one line per signal, "Contexto saturado · 1 sessão", "Sem resposta há 2h10", in the
+words of the data and never "Atenção" (the quota risk word) nor "aguardando você" (the app sees
+transcripts, not processes); the plan and the origin of the reading, **"Plus · via Codex"**; and the **card's own buttons** (history, CLI sessions, team) plus a
 refresh for that account. A curved tail — Codenotch's `TooltipTail` — points at the ring; moving to
 another ring slides the balloon on the `GENTLE` spring. Enter: fade + 0.94 scale + an 8dp slide on
 `GENTLE`, all from the notch side — the `EXPRESSIVE` rebound, on top of the window growing, read as a
