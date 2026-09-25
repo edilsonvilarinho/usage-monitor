@@ -37,7 +37,14 @@ internal data class AnthropicProfileRecord(
     val configDirectory: String,
     val enabled: Boolean,
     val origin: AnthropicProfileOrigin,
-    val hidden: Boolean = false
+    val hidden: Boolean = false,
+    /**
+     * O nome da cor escolhida para a conta (`AccountAccent.name`, issue #275), ou
+     * `null` para o acento da fonte. Texto e não o enum: a cor é apresentação, e
+     * este registro não depende da camada de UI. Nome desconhecido lido do disco
+     * vira "Padrão" na conversão, nunca erro.
+     */
+    val color: String? = null
 ) {
     val ref: AnthropicProfileRef
         get() = AnthropicProfileRef(id, label)
@@ -179,6 +186,11 @@ internal class AnthropicProfileRegistry(
 
     fun setEnabled(profileId: String, enabled: Boolean) {
         update(profileId) { record -> record.copy(enabled = enabled) }
+    }
+
+    /** `null` volta ao acento da fonte ("Padrão"). */
+    fun setColor(profileId: String, color: String?) {
+        update(profileId) { record -> record.copy(color = color?.takeIf { value -> value.isNotBlank() }) }
     }
 
     fun removeFromMonitor(profileId: String) {
@@ -331,7 +343,8 @@ internal class AnthropicProfileRegistry(
                 configDirectory = path,
                 enabled = node.getBoolean(KEY_ENABLED, false),
                 origin = origin,
-                hidden = node.getBoolean(KEY_HIDDEN, false)
+                hidden = node.getBoolean(KEY_HIDDEN, false),
+                color = node.get(KEY_COLOR, null)?.takeIf { value -> value.isNotBlank() }
             )
         }
     }
@@ -343,6 +356,12 @@ internal class AnthropicProfileRegistry(
         node.putBoolean(KEY_ENABLED, record.enabled)
         node.put(KEY_ORIGIN, record.origin.name)
         node.putBoolean(KEY_HIDDEN, record.hidden)
+        val color = record.color
+        if (color == null) {
+            node.remove(KEY_COLOR)
+        } else {
+            node.put(KEY_COLOR, color)
+        }
         runCatching { node.flush() }
     }
 
@@ -381,6 +400,7 @@ internal class AnthropicProfileRegistry(
         const val KEY_ENABLED = "enabled"
         const val KEY_ORIGIN = "origin"
         const val KEY_HIDDEN = "hidden"
+        const val KEY_COLOR = "color"
         val LABEL_AUTOSAVE_DEBOUNCE = 300.milliseconds
     }
 }

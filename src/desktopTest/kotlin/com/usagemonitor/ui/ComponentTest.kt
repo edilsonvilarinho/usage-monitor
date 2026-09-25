@@ -62,6 +62,13 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
+import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AppAccents
+import com.usagemonitor.presentation.ui.components.ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX
+import com.usagemonitor.presentation.ui.components.accountAccentColor
+import androidx.compose.ui.test.assertIsNotSelected
+import com.usagemonitor.domain.entity.UsageTargetKey
+import androidx.compose.ui.graphics.Color
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_TAG
 import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_HINT_TAG
@@ -2944,6 +2951,80 @@ class ComponentTest {
 
         // Expandido após clicar em "Editar": campo de edição do apelido aparece.
         onNodeWithText("Label").performScrollTo().assertIsDisplayed()
+    }
+
+    /**
+     * A cor da conta (issue #275) é escolhida na parte expandida do perfil, entre
+     * "Padrão" e as oito da paleta, e a escolha corrente fica marcada.
+     */
+    @Test
+    fun `accounts tab picks an account color and marks the current one`() = runDesktopComposeUiTest {
+        val picked = mutableListOf<Pair<String, AccountAccent?>>()
+        setContent {
+            AppTheme(isDark = true) {
+                var color by remember { mutableStateOf<AccountAccent?>(null) }
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    anthropicProfiles = listOf(
+                        AnthropicProfileUiModel(
+                            id = "work",
+                            label = "Trabalho",
+                            path = "C:\\Users\\test\\.claude-work",
+                            enabled = true,
+                            removable = true,
+                            identityLabel = "work@example.com",
+                            status = AnthropicProfileUiStatus.READY,
+                            color = color
+                        )
+                    ),
+                    expandedProfileId = "work",
+                    onAnthropicProfileColorChange = { profileId, accent ->
+                        picked += profileId to accent
+                        color = accent
+                    },
+                    initialTab = SettingsTab.ACCOUNTS
+                )
+            }
+        }
+
+        onNodeWithTag(ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX + "work_DEFAULT").performScrollTo().assertIsSelected()
+        onNodeWithTag(ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX + "work_VIOLET").performScrollTo().performClick()
+        waitForIdle()
+
+        assertEquals(listOf<Pair<String, AccountAccent?>>("work" to AccountAccent.VIOLET), picked)
+        onNodeWithTag(ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX + "work_VIOLET").assertIsSelected()
+        onNodeWithTag(ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX + "work_DEFAULT").assertIsNotSelected()
+        onNodeWithText("Violeta").assertExists()
+    }
+
+    /** A dona única da cor: escolha da conta vence o acento da fonte, e sem escolha fica o da fonte. */
+    @Test
+    fun `account accent uses the chosen color and falls back to the source accent`() = runDesktopComposeUiTest {
+        val work = UsageTargetKey(ApiSource.ANTHROPIC, "work")
+        val personal = UsageTargetKey(ApiSource.ANTHROPIC, "personal")
+        val codex = UsageTargetKey.forSource(ApiSource.CODEX)
+        val colors = mapOf("work" to AccountAccent.ROSE)
+        var resolved = emptyList<Color>()
+        var expected = emptyList<Color>()
+        setContent {
+            AppTheme(isDark = true) {
+                resolved = listOf(
+                    accountAccentColor(work, colors),
+                    accountAccentColor(personal, colors),
+                    accountAccentColor(codex, colors)
+                )
+                expected = listOf(AccountAccent.ROSE.dark, AppAccents.current.anthropic, AppAccents.current.codex)
+            }
+        }
+        waitForIdle()
+        assertEquals(expected, resolved)
     }
 
     @Test

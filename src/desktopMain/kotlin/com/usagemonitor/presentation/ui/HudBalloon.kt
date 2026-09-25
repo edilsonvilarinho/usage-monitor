@@ -224,7 +224,8 @@ internal fun HudAccountBalloonContent(
         ) {
             AppProviderMark(
                 source = account.source,
-                tint = accentColorFor(source = account.source, accents = AppAccents.current),
+                // A cor da conta quando há (issue #275), o acento da fonte quando não.
+                tint = account.accountAccent?.current ?: accentColorFor(source = account.source, accents = AppAccents.current),
                 size = BALLOON_MARK_SIZE
             )
             Text(
