@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -775,7 +774,7 @@ private fun ApiKeyDialog(
     val isChecking = checkState.status == ApiKeyCheckStatus.CHECKING
     val hasCandidateKey = apiKey.isNotBlank() || hasStoredKey
 
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -871,8 +870,6 @@ private fun ApiKeyDialog(
                 }
             }
         },
-        shape = AppShapes.large,
-        containerColor = MaterialTheme.colorScheme.surface,
         confirmButton = {
             AppButton(
                 label = if (isPt) "Salvar" else "Save",
@@ -888,7 +885,7 @@ private fun ApiKeyDialog(
             )
         },
         dismissButton = {
-            // As duas ações secundárias moram no mesmo slot para o `AlertDialog`
+            // As duas ações secundárias moram no mesmo slot para o `AppDialog`
             // as manter na fileira do rodapé, à esquerda do `PRIMARY`. Remover é
             // `GHOST` e não `DANGER`: `PRIMARY` é uma por tela e o realce forte
             // aqui é do "Salvar", que é o que o diálogo propõe.

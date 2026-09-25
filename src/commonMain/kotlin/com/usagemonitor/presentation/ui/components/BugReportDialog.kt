@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 const val BUG_REPORT_DESCRIPTION_TEST_TAG = "bugReportDescription"
@@ -67,7 +65,7 @@ fun BugReportDialog(
     val isPt = language == AppLanguage.PT
     val canSubmit = description.isNotBlank()
 
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         modifier = modifier,
         title = {
@@ -182,8 +180,6 @@ fun BugReportDialog(
                 }
             }
         },
-        shape = AppShapes.large,
-        containerColor = MaterialTheme.colorScheme.surface,
         confirmButton = {
             AppButton(
                 label = if (isPt) "Salvar arquivo" else "Save file",
