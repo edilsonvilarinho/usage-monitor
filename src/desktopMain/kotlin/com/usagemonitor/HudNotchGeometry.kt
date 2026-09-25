@@ -434,13 +434,35 @@ internal fun hudWindowBounds(
     }
 }
 
-/** A janela parada: só o notch, com o centro preso como o da aberta. */
+/**
+ * A janela parada: a espessura do notch e, ao longo da borda, **o comprimento da
+ * aberta**, com o centro preso como o dela.
+ *
+ * É o que deixa a origem da janela no mesmo ponto ao abrir e ao fechar. Janela
+ * transparente que muda de origem mostra um ou dois quadros do conteúdo antigo
+ * no lugar novo — medido no Windows 11: o notch pulava 60px e voltava, com o
+ * redimensionamento do Compose, com `setBounds` numa chamada só e com ele antes
+ * do estado. Crescendo só para dentro da tela, nenhum quadro fora do lugar. O
+ * preço são as duas faixas transparentes onde as alças aparecem, que engolem
+ * clique também parado (C11).
+ *
+ * Em cima e à esquerda a origem não muda; embaixo e à direita a janela aberta
+ * sobe o balão para dentro da tela e a origem anda na espessura — ali ainda sobra
+ * um quadro em branco ao abrir.
+ */
 internal fun hudRestWindowBounds(
     edge: HudEdge,
     offsetFraction: Float,
     sizes: HudNotchSizes,
     area: ScreenWorkArea
-): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.collapsed, area, reserveAlong = sizes.handlesAlong(edge))
+): HudWindowBounds {
+    val content = if (edge.isHorizontal) {
+        DpSize(sizes.expanded.width, sizes.collapsed.height)
+    } else {
+        DpSize(sizes.collapsed.width, sizes.expanded.height)
+    }
+    return hudWindowBounds(edge, offsetFraction, content, area, reserveAlong = sizes.handlesAlong(edge))
+}
 
 /**
  * A janela aberta, com o notch **no mesmo ponto da tela** em que estava parado.

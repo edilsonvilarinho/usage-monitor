@@ -10,7 +10,8 @@
    No overshoot on data: bars, rings and numbers use GENTLE (critically
    damped). A bar that passes 88% before settling shows a value that is not
    true. EXPRESSIVE (one short rebound) is only for surfaces that carry no
-   number — the HUD unfolding, the menu entering.
+   number — the menu entering. The HUD used it too, and on top of the window
+   growing the rebound read as a tremor.
 
    Continuous animation (spinning arc of an active session, attention pulse,
    refresh glyph) exists only behind AppMotionPolicy.continuous, which is OFF

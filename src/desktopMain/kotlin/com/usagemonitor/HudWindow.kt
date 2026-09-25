@@ -75,6 +75,11 @@ import kotlinx.datetime.Clock
  * enquanto o ponteiro está no notch. Ao entrar, a janela cresce **de uma vez** —
  * a área nova é transparente, o salto não se vê — e o balão entra dentro dela; ao
  * sair, o balão some e só depois a janela encolhe. O notch não anda na tela.
+ *
+ * Cresce **só para dentro da tela**: a janela parada já tem o comprimento da
+ * aberta ao longo da borda (`hudRestWindowBounds`). Mudar a origem de uma janela
+ * transparente mostra um quadro do conteúdo antigo no lugar novo — era o pisca ao
+ * passar o ponteiro.
  */
 @Composable
 internal fun HudWindowHost(

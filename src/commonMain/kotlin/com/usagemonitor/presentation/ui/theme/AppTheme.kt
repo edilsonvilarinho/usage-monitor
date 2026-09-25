@@ -49,8 +49,9 @@ import androidx.compose.ui.unit.sp
  * **Sem overshoot em dado.** Barra, anel e número usam [Springs.GENTLE], que é
  * criticamente amortecida: uma barra que passa de 88% antes de voltar mostra, por
  * alguns quadros, um valor que não é verdade. A mola com rebote
- * ([Springs.EXPRESSIVE]) fica para superfícies que não carregam número — o
- * desdobrar da HUD e a entrada do menu.
+ * ([Springs.EXPRESSIVE]) fica para superfícies que não carregam número — a
+ * entrada do menu. A HUD a usava nas alças e no balão, e somado à janela
+ * crescendo o rebote lia como tremor.
  *
  * **Animação contínua só atrás de [AppMotionPolicy.continuous].** Animação sem
  * fim trava o `waitForIdle` dos testes de componente, e por isso a política

@@ -140,7 +140,7 @@ crossfading from the neutral stroke).
 
 **Motion.** 120ms hover/focus · 180ms selection · 240ms expand/collapse · 90ms exit. **Tween
 for color and opacity, spring for position, size and scale** (`AppMotion.Springs`: `GENTLE` for
-data and surfaces, `SNAPPY` for selection and press, `EXPRESSIVE` only for the HUD and the menu).
+data and surfaces, `SNAPPY` for selection and press, `EXPRESSIVE` only for the menu — its rebound read as a tremor in the HUD).
 A spring keeps its velocity when the target changes mid-flight — the fixed-length tweens stopped
 dry and restarted from zero, which is what made the app read as stiff. **No overshoot on data**:
 bars, rings and numbers settle without rebounding past the value. Every transition is finite.

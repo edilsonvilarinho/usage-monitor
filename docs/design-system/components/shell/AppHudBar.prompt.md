@@ -35,12 +35,15 @@ ring, left derived from it, "<1%" at both ends, nothing for balances); quotas of
 (Antigravity models, Cursor allowances) in a box under the group name; the plan and the origin of the
 reading, **"Plus · via Codex"**; and the **card's own buttons** (history, CLI sessions, team) plus a
 refresh for that account. A curved tail — Codenotch's `TooltipTail` — points at the ring; moving to
-another ring slides the balloon on the `GENTLE` spring. Enter: fade + 0.96 scale on `EXPRESSIVE` from
-the notch side; exit: 90ms fade. Depth `OVERLAY`. The balloon is window content, never a popup.
+another ring slides the balloon on the `GENTLE` spring. Enter: fade + 0.94 scale + an 8dp slide on
+`GENTLE`, all from the notch side — the `EXPRESSIVE` rebound, on top of the window growing, read as a
+tremor; exit: 90ms fade. Depth `OVERLAY`. The balloon is window content, never a popup.
 
 **Handles** (Codenotch's `MoveHandle` and `SettingsOrb`). Hovered, a 32dp disc past each end of the
-notch: the **hand** at the near end (top or left) moves the notch — drag it, or the notch itself — and
-stays composed while carried, bordered in info; the **gear** at the far end opens a balloon with
+notch: the **hand** at the near end (top or left) moves the notch — **only the hand**: dragging the body
+moved the notch when the intent was clicking a ring, so a slip on the body just drops the click — and
+stays composed while carried, bordered in info. Both handles slide out **from inside the notch** with a
+fade and a 0.6 scale on `GENTLE`, and slide back in on exit; the **gear** at the far end opens a balloon with
 **everything the standard footer offers**: title with the countdown, the three window modes as rows
 (the footer's menu is a popup the HUD window would clip) and the footer's own action row. At rest each
 handle is a quarter arc in `outline` inside the shadow margin the resting window already has.
@@ -53,11 +56,17 @@ The collapsed width is the max of percentage and word, so a collection that turn
 does not resize it either.
 
 **Window, measured.** A click on a transparent pixel of a transparent window is swallowed on Windows
-11 — it reaches neither the content nor the window behind. So the window is notch-sized at rest (plus
+11 — it reaches neither the content nor the window behind. So the window is notch-thick at rest (plus
 a 16dp shadow margin on the three inner sides) and grows **in one jump** when the pointer enters,
 with the balloon entering inside it; on leave the balloon goes first and the window shrinks after it.
 The notch centre is clamped so that notch **and handles** fit, the same way at rest and open: opening
 near a corner never moves the notch. Hover is the union of body, balloon and handles.
+**Opening never moves the window's origin along the edge**: at rest it already has the open length
+there and only grows inward. A transparent window that changes origin shows one or two frames of old
+content at the new place — measured by screen capture, the notch jumped 60px and back on every enter
+and leave. The price is the two 38dp strips where the handles appear, transparent and swallowing
+clicks at rest too. At the bottom and right edges the origin still moves across (the balloon grows
+inward), and one blank frame remains there on open.
 
 **Gestures**, one detector: a click on a ring **refreshes that account** (the ring stays pressed while
 it collects); right-click goes straight to Cards only; a drag past the touch slop frees the notch, and

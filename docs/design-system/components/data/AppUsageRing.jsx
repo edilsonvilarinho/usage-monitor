@@ -4,12 +4,13 @@ const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info
 
 // Anel de uso: um arco por cota, concêntricos — o de fora é a primeira cota da
 // API (a janela curta). Cota sem projeção tem a trilha tracejada. `active`
-// desenha o arco fino de sessão ativa por dentro. O kit é estático: no Compose
-// o arco ativo gira e o de fora pulsa em atenção só com a política contínua.
+// desenha o arco fino de sessão ativa em órbita por fora, sem roubar o miolo.
+// O kit é estático: no Compose o arco ativo gira e o de fora pulsa em atenção
+// só com a política contínua.
 export function AppUsageRing({ arcs = [], size = 28, stroke = 3, gap = 1.5, active = false, label, style }) {
   const rings = arcs.slice(0, 3);
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label} style={{ flex: 'none', ...style }}>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label} overflow="visible" style={{ flex: 'none', overflow: 'visible', ...style }}>
       {rings.map((arc, index) => {
         const r = size / 2 - stroke / 2 - index * (stroke + gap);
         if (r <= 0) return null;
@@ -26,8 +27,7 @@ export function AppUsageRing({ arcs = [], size = 28, stroke = 3, gap = 1.5, acti
         );
       })}
       {active ? (() => {
-        const r = size / 2 - stroke / 2 - rings.length * (stroke + gap) - gap;
-        if (r <= 0) return null;
+        const r = size / 2 + gap + (stroke * 0.6) / 2;
         const c = 2 * Math.PI * r;
         return (
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--info)" strokeWidth={stroke * 0.6}

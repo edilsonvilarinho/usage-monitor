@@ -30,6 +30,11 @@ import com.usagemonitor.presentation.ui.HUD_GEAR_HANDLE_TAG
 import com.usagemonitor.presentation.ui.HUD_MOVE_HANDLE_TAG
 import com.usagemonitor.presentation.ui.hudBalloonBoxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.testTag
+import com.usagemonitor.HUD_RING_GAP
+import com.usagemonitor.HUD_RING_SIZE
+import com.usagemonitor.HUD_RING_STROKE
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -337,8 +342,12 @@ class HudNotchTest {
         onNodeWithText("botões de DeepSeek").assertIsDisplayed()
     }
 
+    /**
+     * Só a mão move: arrastar pelo corpo não tira o notch do lugar, e o ponteiro
+     * que escorregou além do limiar também não recoleta a conta do anel.
+     */
     @Test
-    fun `arrastar o notch nao atualiza nada`() = runDesktopComposeUiTest {
+    fun `arrastar pelo corpo nao move nem atualiza`() = runDesktopComposeUiTest {
         var clicks = 0
         val events = mutableListOf<String>()
         setContent {
@@ -359,18 +368,16 @@ class HudNotchTest {
         waitForIdle()
 
         assertEquals(0, clicks)
-        assertEquals("start", events.first())
-        assertEquals("end", events.last())
-        assertTrue(events.contains("move"), "esperava movimento em $events")
+        assertTrue(events.isEmpty(), "esperava nenhum evento de arrasto, veio $events")
     }
 
     /** O arrasto sobrevive à recomposição que ele mesmo provoca na janela da HUD. */
     @Test
     fun `o arrasto sobrevive a recomposicao a cada movimento`() = runDesktopComposeUiTest {
         var moves by mutableStateOf(0)
-        setContent { notch(fallbackLabel = "movimentos $moves", onDragMove = { moves += 1 }) }
+        setContent { notch(expanded = true, fallbackLabel = "movimentos $moves", onDragMove = { moves += 1 }) }
 
-        val target = onNodeWithContentDescription(HUD_NOTCH_DESCRIPTION)
+        val target = onNodeWithTag(HUD_MOVE_HANDLE_TAG)
         target.performMouseInput {
             moveTo(center)
             press()
@@ -772,7 +779,8 @@ class HudNotchTest {
                         // Fundo opaco: sobre transparente o antialiasing acumula
                         // alfa a cada quadro composto, e dois instantes diferem
                         // mesmo parados (o mesmo artefato do teste da barra).
-                        Box(modifier = Modifier.background(Color.Black)) {
+                        // A caixa em volta: a órbita gira fora dos limites do anel.
+                        Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black).padding(6.dp)) {
                             AppUsageRing(
                                 arcs = listOf(AppRingArc(0.3f, AppTone.OK)),
                                 description = "anel",
@@ -782,9 +790,9 @@ class HudNotchTest {
                     }
                 }
                 mainClock.advanceTimeBy(400)
-                first = onNodeWithContentDescription("anel").captureToImage().toPixelMap()
+                first = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
                 mainClock.advanceTimeBy(350)
-                second = onNodeWithContentDescription("anel").captureToImage().toPixelMap()
+                second = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
             }
             return first to second
         }
@@ -795,6 +803,47 @@ class HudNotchTest {
         assertTrue(!differs(staticA, staticB), "sem a política o arco devia ficar parado")
     }
 
+    /**
+     * A órbita de sessão ativa gira **por fora** do anel: o miolo fica igual com
+     * ela e sem ela, e é isso que mantém a marca do fornecedor do mesmo tamanho
+     * que a das contas paradas. Fora do anel ela aparece.
+     */
+    @Test
+    fun `a sessao ativa nao encolhe o miolo do anel`() = runDesktopComposeUiTest {
+        var active by mutableStateOf(false)
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black).padding(6.dp)) {
+                    AppUsageRing(
+                        arcs = listOf(AppRingArc(0.3f, AppTone.OK), AppRingArc(0.6f, AppTone.OK)),
+                        description = "anel",
+                        size = HUD_RING_SIZE,
+                        stroke = HUD_RING_STROKE,
+                        gap = HUD_RING_GAP,
+                        active = active
+                    )
+                }
+            }
+        }
+        val still = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+        active = true
+        waitForIdle()
+        val working = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+
+        // O miolo: o quadrado inscrito no arco de dentro, com a moldura de 6dp.
+        val frame = 6.dp.value * density.density
+        val ring = HUD_RING_SIZE.value * density.density
+        val inner = (HUD_RING_STROKE.value + HUD_RING_GAP.value) * 2 * density.density
+        val from = (frame + inner + 1).toInt()
+        val to = (frame + ring - inner - 1).toInt()
+        for (y in from until to) {
+            for (x in from until to) {
+                assertEquals(still[x, y], working[x, y], "miolo mudou em ($x, $y)")
+            }
+        }
+        assertTrue(differs(still, working), "a órbita devia aparecer em volta do anel")
+    }
+
     private fun differs(a: PixelMap, b: PixelMap): Boolean {
         for (y in 0 until minOf(a.height, b.height)) {
             for (x in 0 until minOf(a.width, b.width)) {
@@ -803,6 +852,8 @@ class HudNotchTest {
         }
         return false
     }
+
+    private val RING_FRAME = "ringFrame"
 
     /** Põe o ponteiro no anel da conta, achado pela frase inteira da semântica dele. */
     private fun ComposeUiTest.hoverRing(description: String) {

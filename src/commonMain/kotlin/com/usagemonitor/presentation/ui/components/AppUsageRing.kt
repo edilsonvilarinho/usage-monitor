@@ -59,10 +59,16 @@ data class AppRingArc(
  * - Cada arco anda pela mola `GENTLE`, sem rebote — arco que passa do valor e
  *   volta mostra um percentual que não é verdade.
  * - [active] (sessão CLI com turno nos últimos 5 min) desenha um arco fino
- *   girando por dentro, e [attention] faz o anel de fora pulsar; os dois **só**
- *   com `AppMotionPolicy.continuous`, que é desligada em testes e geradores. Sem
- *   ela o estado continua dito: o arco ativo fica parado e o pulso some, e a
- *   palavra ao lado continua lá.
+ *   girando **em órbita por fora** do anel, e [attention] faz o anel de fora
+ *   pulsar; os dois **só** com `AppMotionPolicy.continuous`, que é desligada em
+ *   testes e geradores. Sem ela o estado continua dito: o arco ativo fica parado
+ *   e o pulso some, e a palavra ao lado continua lá.
+ *
+ * A órbita passa [appUsageRingOrbitReach] além de [size], fora dos limites do
+ * `Canvas`: quem põe o anel na tela deixa esse espaço livre em volta. Ela morava
+ * por dentro do último arco de cota, e o miolo que sobrava para a marca do
+ * fornecedor caía quase à metade — a conta trabalhando era justamente a que
+ * ficava com o ícone menor.
  */
 @Composable
 fun AppUsageRing(
@@ -171,22 +177,21 @@ fun AppUsageRing(
             }
         }
         if (active) {
-            // O arco de sessão ativa mora por dentro do último anel de cota, fino,
-            // no tom de informação — não é consumo, é "alguém está trabalhando".
-            val used = arcs.size.coerceIn(1, MAX_RING_ARCS)
-            val inset = strokePx / 2 + used * (strokePx + gapPx) + gapPx
-            val diameter = this.size.minDimension - inset * 2
-            if (diameter > 0f) {
-                drawArc(
-                    color = activeColor,
-                    startAngle = spin,
-                    sweepAngle = ACTIVE_ARC_SWEEP,
-                    useCenter = false,
-                    topLeft = Offset(inset, inset),
-                    size = Size(diameter, diameter),
-                    style = Stroke(width = strokePx * 0.6f, cap = StrokeCap.Round)
-                )
-            }
+            // O arco de sessão ativa orbita por fora do anel de cota, fino, no
+            // tom de informação — não é consumo, é "alguém está trabalhando". Por
+            // fora ele não disputa o miolo com a marca do fornecedor.
+            val orbitStroke = strokePx * ACTIVE_ARC_STROKE_FRACTION
+            val outset = gapPx + orbitStroke / 2
+            val diameter = this.size.minDimension + outset * 2
+            drawArc(
+                color = activeColor,
+                startAngle = spin,
+                sweepAngle = ACTIVE_ARC_SWEEP,
+                useCenter = false,
+                topLeft = Offset(-outset, -outset),
+                size = Size(diameter, diameter),
+                style = Stroke(width = orbitStroke, cap = StrokeCap.Round)
+            )
         }
     }
 }
@@ -194,7 +199,11 @@ fun AppUsageRing(
 /** Os anéis concêntricos que cabem em 28dp sem virar alvo de tiro. */
 const val MAX_RING_ARCS = 3
 
+/** Quanto a órbita de sessão ativa passa da borda do anel, de cada lado. */
+fun appUsageRingOrbitReach(stroke: Dp, gap: Dp): Dp = gap + stroke * ACTIVE_ARC_STROKE_FRACTION
+
 private const val RING_TRACK_WEIGHT = 1.6f
 private const val RING_SPIN_MILLIS = 1_400
 private const val RING_PULSE_MILLIS = 900
 private const val ACTIVE_ARC_SWEEP = 90f
+private const val ACTIVE_ARC_STROKE_FRACTION = 0.6f

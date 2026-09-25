@@ -532,8 +532,9 @@ curta assenta, a larga dá distância. Painel e card em `CARD`, card com hover e
 **Motion** (`AppMotion.Springs` + `AppMotionPolicy` + `appSpring`/`appTween`; plano
 [`profundidade-movimento-hud-notch-execucao.md`](docs/planos/profundidade-movimento-hud-notch-execucao.md)):
 tween para cor e opacidade, **mola** para posição, tamanho e escala. Três molas e só três —
-`GENTLE` (dado e superfície), `SNAPPY` (seleção e pressão) e `EXPRESSIVE` (só HUD e menu, o único
-com rebote). **Sem overshoot em dado**: barra, anel e número passando do valor mostram, por alguns
+`GENTLE` (dado e superfície), `SNAPPY` (seleção e pressão) e `EXPRESSIVE` (só o menu, o único
+com rebote — a HUD o usava nas alças e no balão, e somado à janela crescendo o rebote lia como
+tremor). **Sem overshoot em dado**: barra, anel e número passando do valor mostram, por alguns
 quadros, um percentual que não é verdade.
 - **`AppMotionPolicy` nasce `Static` em `AppTheme`** — transições finitas ligadas, animação contínua
   desligada. É isso que mantém `ScreenshotGenerator`, `HelpMediaGenerator`, `TourGifGenerator` e todo
@@ -729,11 +730,13 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   o mesmo `CardActionButton`; o balão acrescenta "atualizar só esta conta". As ações moram em
   `AppShellActions`, montadas **uma vez** em `main()` e consumidas pelo `DashboardScreen` e pelo host.
 - **Alças nas pontas** (`HudHandles.kt`), o `MoveHandle` e o `SettingsOrb` do Codenotch: com o notch
-  aberto, a **mão** (ponta de perto) move — arrastar por ela, ou pelo corpo — e a **engrenagem** (ponta
+  aberto, a **mão** (ponta de perto) move — **só ela**: arrastando pelo corpo o notch saía do lugar
+  quando a intenção era clicar num anel — e a **engrenagem** (ponta
   de longe) abre o balão com **tudo o que o rodapé oferece**: contagem, os três modos de janela em
   linhas (o menu do rodapé é `Popup` e seria recortado pela janela) e o próprio `FooterActionGroup`.
   Paradas, as alças são um arco de um quarto na margem de sombra que a janela já tem — nenhuma área
   nova engolindo clique. Carregando, a mão **fica na composição**: tirá-la cancelaria o gesto.
+  As alças e o balão entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`.
 - **Identificação, como no Codenotch e no ai-usagebar**: a **marca do fornecedor** (`AppProviderMark`)
   no miolo de cada anel, na cor do texto — em volta dela os arcos já carregam a cor de risco —, e no
   cabeçalho do balão no acento da fonte. O rótulo da conta é o **título do card**
@@ -751,13 +754,22 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   para o topo e levada às outras bordas refletindo/girando os pontos, de controle inclusive.
   Profundidade `DIALOG`, brilho de topo, borda com luz.
 - **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
-  `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela tem o tamanho do notch parado mais a margem
-  de sombra de 16dp nos três lados de dentro, e só cresce quando o ponteiro entra: **de uma vez** (a
-  área nova é transparente, o salto não se vê), com o balão entrando **dentro** dela; ao sair, o balão
+  `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela parada tem a espessura do notch mais a margem
+  de sombra de 16dp, e só cresce quando o ponteiro entra: **de uma vez** (a área nova é transparente,
+  o salto não se vê), com o balão entrando **dentro** dela; ao sair, o balão
   some (150ms de espera contra o `Exit` de um quadro na divisa) e a janela encolhe **depois** (200ms).
   **Nenhum redimensionamento AWT por quadro** — era o tranco da barra anterior, que interpolava a
   janela. O hover é a **união** de corpo, balão e alças: o caminho do anel ao balão passa pela cauda,
   que é opaca e do balão.
+  - **A origem da janela não muda ao abrir** (`hudRestWindowBounds`, E11): parada ela já tem, ao longo
+    da borda, o comprimento da aberta, e cresce só para dentro da tela. Janela transparente que muda de
+    origem mostra um ou dois quadros do conteúdo antigo no lugar novo — medido no Windows 11 com
+    captura de tela: o notch pulava 60px e voltava a cada entrada e saída do ponteiro, com o
+    redimensionamento do Compose (tamanho e posição em duas chamadas AWT), com `setBounds` numa chamada
+    só e com ele aplicado antes do estado. Com a origem fixa, nenhum quadro fora do lugar. O preço são
+    as duas faixas de 38dp onde as alças aparecem, transparentes e engolindo clique também paradas.
+    Embaixo e à direita a origem ainda anda na espessura (o balão cresce para dentro), e ali sobra um
+    quadro em branco ao abrir.
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
   estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número
@@ -784,8 +796,9 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
 - **Um gesto só** (`hudPressGesture`): **clique num anel recoleta aquela conta** (decisão da rodada 3,
   como o `refreshRing` do Codenotch — o gesto entrega a posição do `down` e o notch acha o anel pela
   caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; botão
-  direito vai direto a "Somente cards" (sem popup — seria recortado dentro desta janela); arrasto além
-  do limiar move. A ação de cada anel é **declarada** na semântica, não instalada por `clickable`, que
+  direito vai direto a "Somente cards" (sem popup — seria recortado dentro desta janela). No corpo o
+  gesto é `draggable = false`: passar do limiar só desiste do clique, e **mover é só pela mão**, que usa o
+  mesmo gesto com arrasto. A ação de cada anel é **declarada** na semântica, não instalada por `clickable`, que
   consumiria o `down`. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
   `MouseInfo`, incremental. Saídas para a janela padrão: "Padrão" no balão da engrenagem, bandeja,
   `Ctrl+Shift+H`; "Abrir" da bandeja e a segunda instância saem da HUD antes de ativar a janela.
@@ -794,10 +807,15 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   testes o laço giraria para sempre; o balão da engrenagem a repete no título. **Atualização pendente
   é só ícone, sem clique próprio** (#225): a frase está no balão da engrenagem e o reinício é
   oferecido na janela padrão.
-- **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira por
-  dentro do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
+- **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
+  órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
   fica parado e o pulso some; a palavra continua dizendo o estado.
+  - **A órbita é por fora para a marca não encolher** (E11). Por dentro do último arco de cota ela
+    comia o miolo, e a marca da conta trabalhando caía de 14dp para 8dp — justo a conta que merecia
+    atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3dp) além dos 36dp do anel,
+    fora dos limites do `Canvas`, e cabe no respiro de 8dp do notch e na metade do vão de 12dp entre
+    anéis — `HudNotchGeometryTest` afirma as duas coisas.
   - **O Codex tem sonda própria** (`LocalCodexActivityDataSource`, E10): o índice de sessões é só do
     Claude CLI, e uma execução do Codex nunca acendia o arco. Primeiro o estado do **app desktop**,
     `thread_turns.status = 'inProgress'` em `~/.codex/thread_history_1.sqlite`, vivo com item nos

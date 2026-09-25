@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -98,6 +99,42 @@ class HudNotchGeometryTest {
                 assertTrue(open.notchCenterInWindow + handlesHalf <= openAlong, "$edge em $fraction: engrenagem fora")
             }
         }
+    }
+
+    /**
+     * Janela transparente que muda de origem mostra um quadro do conteúdo antigo
+     * no lugar novo — o notch pulava ao passar o ponteiro. Parada e aberta, ela
+     * tem o mesmo começo e o mesmo comprimento ao longo da borda; em cima e à
+     * esquerda a origem inteira fica, e a janela só cresce para dentro da tela.
+     */
+    @Test
+    fun `abrir nao muda a origem da janela ao longo da borda`() {
+        val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
+        for (edge in HudEdge.entries) {
+            for (fraction in listOf(0f, 0.02f, 0.5f, 0.82f, 1f)) {
+                val sizes = hudNotchSizes(accounts, edge, "", true, false)
+                val rest = hudRestWindowBounds(edge, fraction, sizes, screen)
+                val open = hudOpenWindowBounds(edge, fraction, sizes, screen)
+                if (edge.isHorizontal) {
+                    assertEquals(rest.x, open.x, "$edge em $fraction: começo")
+                    assertEquals(rest.size.width, open.size.width, "$edge em $fraction: comprimento")
+                } else {
+                    assertEquals(rest.y, open.y, "$edge em $fraction: começo")
+                    assertEquals(rest.size.height, open.size.height, "$edge em $fraction: comprimento")
+                }
+                if (edge == HudEdge.TOP || edge == HudEdge.LEFT) {
+                    assertEquals(rest.x to rest.y, open.x to open.y, "$edge em $fraction: origem")
+                }
+            }
+        }
+    }
+
+    /** A órbita de sessão ativa gira por fora do anel e cabe no respiro do notch e entre dois anéis. */
+    @Test
+    fun `a orbita de sessao ativa cabe em volta do anel`() {
+        val reach = appUsageRingOrbitReach(HUD_RING_STROKE, HUD_RING_GAP)
+        assertTrue(reach <= HUD_NOTCH_PADDING_ACROSS, "passa do respiro do notch")
+        assertTrue(reach * 2 <= HUD_ITEM_GAP, "encosta no anel vizinho")
     }
 
     @Test

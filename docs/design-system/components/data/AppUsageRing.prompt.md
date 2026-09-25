@@ -18,9 +18,14 @@ A quota without a forecast has a **dashed** track: no color can suggest a verdic
 
 **Motion.** Each arc follows the `GENTLE` spring — no rebound past the value. Two continuous signals,
 both only behind `AppMotionPolicy.continuous` (off in tests and capture generators): a thin `--info`
-arc spinning inside the rings while a CLI session had a turn in the last 5 minutes (labelled "sessão
+arc orbiting **outside** the rings while a CLI session had a turn in the last 5 minutes (labelled "sessão
 ativa", not "processing": the app sees transcripts, not processes), and the outer arc pulsing while
 the account is at Attention or worse. Without the policy the active arc stays drawn, still; the pulse
 disappears and the word still says it.
+
+**The orbit sits outside so the mark never shrinks.** Inside the last quota arc it ate the core, and the
+provider mark of the account that was working dropped from 14dp to 8dp. It reaches `gap + 0.6 × stroke`
+past the ring box (3dp at the HUD's 36dp), outside the canvas bounds: whoever places the ring leaves
+that much free around it — the notch's 8dp padding and half its 12dp item gap do.
 
 Track: `--pressed-layer`. Stroke 3dp, gap 1.5dp, 28dp box.

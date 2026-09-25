@@ -291,7 +291,7 @@ object HelpCatalog {
                     "barra HUD.",
                 "O menu do ícone da bandeja tem as duas entradas — é o caminho de volta quando a " +
                     "janela está coberta por outra.",
-                "Na barra HUD, arraste pela mão da ponta do notch (ou pelo próprio notch) e solte " +
+                "Na barra HUD, arraste pela mão da ponta do notch (só ela move) e solte " +
                     "perto de qualquer borda — em cima, embaixo ou nas laterais: ele gruda na mais " +
                     "próxima e fica ali na próxima abertura."
             ),
@@ -538,7 +538,7 @@ object HelpCatalog {
                     "the HUD strip.",
                 "The tray icon menu carries both entries — that is the way back when the window is " +
                     "covered by another one.",
-                "On the HUD strip, drag the hand at the end of the notch (or the notch itself) and " +
+                "On the HUD strip, drag the hand at the end of the notch (only the hand moves it) and " +
                     "drop it near any edge — top, bottom or the sides: it docks to the nearest one " +
                     "and stays there next time."
             ),

@@ -63,9 +63,10 @@ internal fun hudMoveHandleDescription(language: AppLanguage): String =
  * existia, e ninguém o descobria. Uma mão e não setas, como no Codenotch: o
  * gesto é carregar, não empurrar.
  *
- * O arrasto é o mesmo [hudPressGesture] do corpo do notch, com o clique vazio:
- * é o host quem lê o ponteiro na tela. Carregando, o disco ganha a borda de
- * informação — está na mão, não oferecido.
+ * É o **único** jeito de mover: o corpo do notch usa o mesmo [hudPressGesture]
+ * sem arrasto, e a mão o usa com o clique vazio — é o host quem lê o ponteiro na
+ * tela. Carregando, o disco ganha a borda de informação — está na mão, não
+ * oferecido.
  */
 @Composable
 internal fun HudMoveHandle(

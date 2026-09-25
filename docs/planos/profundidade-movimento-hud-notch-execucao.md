@@ -78,6 +78,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | E8 | Verificação | feito (automática); manual pendente |
 | E9 | Faixa compacta com contas demais para a borda | feito |
 | E10 | Indicador de execução do Codex | feito |
+| E11 | Pisca ao passar o ponteiro, ícone menor na sessão ativa e mover só pela mão | feito |
 
 ## Pontos de situação
 
@@ -113,6 +114,7 @@ engrenagem**, e **clicar num anel atualiza aquela conta**, como no Codenotch.
 | 2026-09-24 | E8 | Claude Opus 5.5 | `gradlew.bat allTests` | Verde: 2111 testes, 0 falhas (eram 2088). Verificação manual pendente: a sessão de debug aberta no IntelliJ roda o código de antes desta rodada e não foi encerrada. |
 | 2026-09-24 | E9 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "com.usagemonitor.Hud*" --tests "com.usagemonitor.ui.Hud*"` | Verde: 32 casos do notch (compacta sem a palavra na faixa e com ela no balão; costura de tamanho compacta nas 4 bordas com a contagem inteira) e 15 de geometria (sete contas compactam nas 4 bordas, duas não, carregando nunca). A primeira versão do teste exigia o mesmo encolhimento em pé e deitada e reprovou a lateral: em pé só sai a linha da palavra. |
 | 2026-09-24 | E10 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "*LocalCodexActivityDataSourceTest*" --tests "*SessionPulseViewModelTest*"` | Verde: 6 casos da sonda (turno do app vivo com o rollout parado, turno preso depois de queda, rollout recente do CLI, rollout antigo, máquina sem Codex, segundos × milissegundos) e 19 do view model, 2 novos (o Codex soma a activeTargets; leitura que falha mantém o veredito). |
+| 2026-09-24 | E11 | Claude Opus 5.5 | spike descartável `HudResizeSpikeTest` (captura de tela em laço) + `gradlew.bat allTests` | Spike: origem mudando mostra o notch fora do lugar em 1–2 quadros nos três modos de redimensionar; origem fixa, nenhum. Suíte verde: 2126 testes, 0 falhas, com três casos novos (arrastar pelo corpo não move nem atualiza; a sessão ativa não encolhe o miolo do anel; abrir não muda a origem da janela ao longo da borda) e um de geometria (a órbita cabe em volta do anel). Verificação manual no app pendente. |
 
 ## C1 · Tokens de motion e política
 
@@ -557,3 +559,31 @@ antes desta rodada, com o código anterior, e ela não foi encerrada. Com ela re
   entra em `activeTargets` ao lado das contas do Claude, e leitura que falha mantém o veredito anterior.
 - A sonda descartável contra o `~/.codex` real, rodada minutos depois, deu `false` — e o turno já estava
   `completed` na tabela, coerente com a regra.
+
+## E11 · Pisca ao abrir, ícone da sessão ativa e mover só pela mão
+
+- Três relatos do usuário com a HUD no topo: o notch **pisca** ao passar o ponteiro e as alças surgem
+  sem transição; a marca da conta com sessão ativa fica **menor** que as outras; e o notch **move
+  arrastando pelo corpo**, com o cursor de mover sobre a faixa inteira.
+- **O pisca é a janela mudando de origem, e foi medido.** Spike descartável (`HudResizeSpikeTest`, não
+  commitado): uma `ComposeWindow` transparente com um retângulo num ponto fixo da tela, alternando
+  entre a janela parada e a aberta, e `Robot.createScreenCapture` de uma linha em laço por 400ms a cada
+  troca. Com a origem mudando, o retângulo aparece fora do lugar em todos os modos — tamanho e posição
+  pelo `WindowState` (o que o app fazia; o Compose aplica os dois em chamadas AWT separadas), `setBounds`
+  numa chamada só num `SideEffect`, e `setBounds` antes do estado: `660 → 600`, `540 → 600`, e quadros
+  cortados (`600-779`). Com a origem **fixa** e a janela crescendo só para dentro da tela, nenhum quadro
+  fora do lugar nos dois modos. Na borda de baixo (a janela cresce para cima e a origem anda) sobra um
+  quadro sem o retângulo.
+- `hudRestWindowBounds`: a janela parada tem, ao longo da borda, o comprimento da aberta. Em cima e à
+  esquerda a origem não muda mais; embaixo e à direita só a espessura anda. O preço são as duas faixas
+  de 38dp onde as alças aparecem, transparentes e engolindo clique também paradas.
+- **Entrada suave**: alças deslizam 14dp de dentro do notch com fade e escala 0,6 → 1 pela mola
+  `GENTLE`, e voltam para dentro na saída; o balão entra com fade, escala 0,94 e 8dp de deslizamento a
+  partir do notch, também `GENTLE`. A `EXPRESSIVE` saiu da HUD — o rebote somado à janela crescendo
+  lia como tremor — e fica só no menu.
+- **Ícone**: o arco de sessão ativa morava por dentro do último arco de cota e o miolo da marca caía
+  de 14dp para 8dp. Agora ele orbita **por fora** do anel, `appUsageRingOrbitReach` (3dp) além dos 36dp,
+  fora dos limites do `Canvas`; cabe no respiro de 8dp do notch e na metade do vão de 12dp entre anéis.
+  `hudRingMarkSize` deixou de receber `active`.
+- **Mover só pela mão**: `hudPressGesture(draggable = false)` no corpo — passar do limiar desiste do
+  clique em vez de arrastar — e o cursor de mover saiu do corpo. Texto da ajuda (PT/EN) acompanhou.

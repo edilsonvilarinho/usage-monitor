@@ -83,11 +83,11 @@ export function Hud() {
         geometria intacta. O notch não cresce: o detalhe é o balão de uma conta, a do anel sob o
         ponteiro. Clique em pixel transparente é engolido no Windows (medido), então a janela só
         tem o tamanho da área aberta enquanto o ponteiro está no notch: cresce de uma vez ao
-        entrar e encolhe depois de o balão sair, sem mover o notch. A mão move (solte perto de
+        entrar e encolhe depois de o balão sair, sem mover o notch. Só a mão move (solte perto de
         qualquer borda: ele gruda na mais próxima, gravado como borda + fração); a engrenagem abre
         as ações do rodapé. Clique num anel atualiza aquela conta; botão direito vai direto a
         "Somente cards"; "Padrão" na engrenagem, Ctrl+Shift+H e a bandeja voltam à janela. O arco
-        fino de sessão ativa gira e o anel de fora pulsa em atenção só com a animação contínua
+        fino de sessão ativa gira em órbita por fora do anel e o anel de fora pulsa em atenção só com a animação contínua
         ligada — nunca em testes nem capturas.
       </span>
     </div>

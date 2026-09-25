@@ -1,6 +1,11 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideIn
+import androidx.compose.animation.slideOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.fadeIn
@@ -43,11 +48,9 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
@@ -74,6 +77,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -110,7 +115,6 @@ import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import com.usagemonitor.presentation.ui.theme.appSpring
 import com.usagemonitor.presentation.ui.theme.appTween
-import java.awt.Cursor
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -281,13 +285,14 @@ internal fun HudNotch(
                     .border(1.dp, ladder.borderTop, shape)
                     .hoverable(notchHover)
                     .onPlaced { coordinates -> ringItemBounds.body = coordinates }
-                    // O cursor de mover continua sobre o corpo: arrastar por ele move,
-                    // além da mão.
-                    .pointerHoverIcon(PointerIcon(Cursor(Cursor.MOVE_CURSOR)))
+                    // Só a mão move. Arrastando pelo corpo o notch saía do lugar
+                    // quando a intenção era clicar num anel, e o cursor de mover
+                    // sobre a faixa inteira dizia que ela toda era alça.
                     .hudPressGesture(
-                        onDragStart = onDragStart,
-                        onDragMove = onDragMove,
-                        onDragEnd = onDragEnd,
+                        draggable = false,
+                        onDragStart = {},
+                        onDragMove = {},
+                        onDragEnd = {},
                         // Clique num anel recoleta aquela conta; fora dos anéis
                         // (contagem, margem) não faz nada. Abrir a janela padrão
                         // ficou com a engrenagem, a bandeja e `Ctrl+Shift+H`.
@@ -343,8 +348,8 @@ internal fun HudNotch(
             AnimatedVisibility(
                 visible = showHandles,
                 modifier = Modifier.layoutId(HudNotchPart.MOVE),
-                enter = handleEnter(),
-                exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
+                enter = handleEnter(edge, atStart = true),
+                exit = handleExit(edge, atStart = true)
             ) {
                 HudMoveHandle(
                     language = language,
@@ -358,8 +363,8 @@ internal fun HudNotch(
             AnimatedVisibility(
                 visible = showHandles,
                 modifier = Modifier.layoutId(HudNotchPart.GEAR),
-                enter = handleEnter(),
-                exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
+                enter = handleEnter(edge, atStart = false),
+                exit = handleExit(edge, atStart = false)
             ) {
                 HudGearHandle(
                     description = gearDescription,
@@ -388,12 +393,7 @@ internal fun HudNotch(
             AnimatedVisibility(
                 visible = open && shownIndex != null,
                 modifier = Modifier.layoutId(HudNotchPart.BALLOON),
-                enter = fadeIn(appTween(AppMotion.normal, AppMotion.emphasizedEasing)) +
-                    scaleIn(
-                        appSpring<Float>(AppMotion.Springs.EXPRESSIVE),
-                        initialScale = BALLOON_ENTER_SCALE,
-                        transformOrigin = balloonOrigin(edge)
-                    ),
+                enter = balloonEnter(edge),
                 exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
             ) {
                 val index = lastShown ?: 0
@@ -461,25 +461,30 @@ internal fun HudNotch(
 
         layout(width, height) {
             // (ao longo, a partir da borda da tela) → posição na caixa de cada borda.
-            fun Placeable.placeAt(along: Int, across: Int) {
+            fun Placeable.placeAt(along: Int, across: Int, zIndex: Float = 0f) {
                 val acrossSize = if (edge.isHorizontal) this.height else this.width
                 when (edge) {
-                    HudEdge.TOP -> place(along, across)
-                    HudEdge.BOTTOM -> place(along, height - across - acrossSize)
-                    HudEdge.LEFT -> place(across, along)
-                    HudEdge.RIGHT -> place(width - across - acrossSize, along)
+                    HudEdge.TOP -> place(along, across, zIndex)
+                    HudEdge.BOTTOM -> place(along, height - across - acrossSize, zIndex)
+                    HudEdge.LEFT -> place(across, along, zIndex)
+                    HudEdge.RIGHT -> place(width - across - acrossSize, along, zIndex)
                 }
             }
             notch.placeAt(notchStart, 0)
             val notchEnd = notchStart + notchAlong
             extras[HudNotchPart.HINT_START]?.let { hint -> hint.placeAt(notchStart - hint.alongSize(edge), 0) }
             extras[HudNotchPart.HINT_END]?.let { hint -> hint.placeAt(notchEnd, 0) }
-            // As alças centradas na espessura do notch, uma além de cada ponta.
+            // As alças centradas na espessura do notch, uma além de cada ponta, e
+            // por baixo dele: entrando, elas saem de trás do notch.
             extras[HudNotchPart.MOVE]?.let { handle ->
-                handle.placeAt(notchStart - handleGap - handle.alongSize(edge), (notchAcross - handle.acrossSize(edge)) / 2)
+                handle.placeAt(
+                    notchStart - handleGap - handle.alongSize(edge),
+                    (notchAcross - handle.acrossSize(edge)) / 2,
+                    HANDLE_Z_INDEX
+                )
             }
             extras[HudNotchPart.GEAR]?.let { handle ->
-                handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2)
+                handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2, HANDLE_Z_INDEX)
             }
             if (balloon != null) {
                 when (edge) {
@@ -510,12 +515,81 @@ private fun Placeable.alongSize(edge: HudEdge): Int = if (edge.isHorizontal) wid
 
 private fun Placeable.acrossSize(edge: HudEdge): Int = if (edge.isHorizontal) height else width
 
-/** As alças entram depois de a janela crescer, pela mola com rebote, como os discos do Codenotch. */
+/**
+ * As alças saem **de dentro do notch**: deslizam da ponta para fora crescendo e
+ * clareando juntas, pela mola `GENTLE`. Com o rebote da `EXPRESSIVE` e o disco
+ * aparecendo já no lugar, a entrada lia como tremor ao passar o ponteiro.
+ */
 @Composable
-private fun handleEnter() = fadeIn(appTween(AppMotion.normal, AppMotion.emphasizedEasing)) +
-    scaleIn(appSpring<Float>(AppMotion.Springs.EXPRESSIVE), initialScale = HANDLE_ENTER_SCALE)
+private fun handleEnter(edge: HudEdge, atStart: Boolean): EnterTransition {
+    val slide = with(LocalDensity.current) { HANDLE_SLIDE.roundToPx() }
+    return fadeIn(appTween(AppMotion.slow, AppMotion.emphasizedEasing)) +
+        scaleIn(
+            appSpring(AppMotion.Springs.GENTLE),
+            initialScale = HANDLE_ENTER_SCALE,
+            transformOrigin = handleOrigin(edge, atStart)
+        ) +
+        slideIn(appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = IntOffset.VisibilityThreshold)) {
+            towardNotch(edge, atStart, slide)
+        }
+}
 
-private const val HANDLE_ENTER_SCALE = 0.86f
+/** A saída volta para dentro do notch, curta: o que sai já não interessa. */
+@Composable
+private fun handleExit(edge: HudEdge, atStart: Boolean): ExitTransition {
+    val slide = with(LocalDensity.current) { HANDLE_SLIDE.roundToPx() }
+    return fadeOut(appTween(AppMotion.fast, AppMotion.exitEasing)) +
+        scaleOut(
+            appTween(AppMotion.fast, AppMotion.exitEasing),
+            targetScale = HANDLE_ENTER_SCALE,
+            transformOrigin = handleOrigin(edge, atStart)
+        ) +
+        slideOut(appTween(AppMotion.fast, AppMotion.exitEasing)) { towardNotch(edge, atStart, slide) }
+}
+
+/** O deslocamento de uma alça em direção ao notch: a da ponta de perto anda para a frente, a outra para trás. */
+private fun towardNotch(edge: HudEdge, atStart: Boolean, distance: Int): IntOffset {
+    val along = if (atStart) distance else -distance
+    return if (edge.isHorizontal) IntOffset(along, 0) else IntOffset(0, along)
+}
+
+/** A alça cresce do lado que encosta no notch. */
+private fun handleOrigin(edge: HudEdge, atStart: Boolean): TransformOrigin {
+    val side = if (atStart) 1f else 0f
+    return if (edge.isHorizontal) TransformOrigin(side, 0.5f) else TransformOrigin(0.5f, side)
+}
+
+private const val HANDLE_ENTER_SCALE = 0.6f
+private val HANDLE_SLIDE = 14.dp
+
+/** Abaixo do notch: a alça que desliza de dentro dele sai de trás, não por cima. */
+private const val HANDLE_Z_INDEX = -1f
+
+/**
+ * O balão desce do notch: fade, escala a partir do lado do notch e um
+ * deslizamento curto, todos pela mola `GENTLE` — sem o rebote, que somado ao
+ * balão trocando de conta fazia a abertura tremer.
+ */
+@Composable
+private fun balloonEnter(edge: HudEdge): EnterTransition {
+    val slide = with(LocalDensity.current) { BALLOON_SLIDE.roundToPx() }
+    return fadeIn(appTween(AppMotion.slow, AppMotion.emphasizedEasing)) +
+        scaleIn(
+            appSpring(AppMotion.Springs.GENTLE),
+            initialScale = BALLOON_ENTER_SCALE,
+            transformOrigin = balloonOrigin(edge)
+        ) +
+        slideIn(appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = IntOffset.VisibilityThreshold)) {
+            when (edge) {
+                HudEdge.TOP -> IntOffset(0, -slide)
+                HudEdge.BOTTOM -> IntOffset(0, slide)
+                HudEdge.LEFT -> IntOffset(-slide, 0)
+                HudEdge.RIGHT -> IntOffset(slide, 0)
+            }
+        }
+}
+
+private val BALLOON_SLIDE = 8.dp
 
 /** O arco parado volta depois de as alças saírem, não por cima delas. */
 private const val HINT_RETURN_DELAY_MS = 120
@@ -537,7 +611,7 @@ private fun balloonOrigin(edge: HudEdge): TransformOrigin = when (edge) {
     HudEdge.RIGHT -> TransformOrigin(1f, 0.5f)
 }
 
-private const val BALLOON_ENTER_SCALE = 0.96f
+private const val BALLOON_ENTER_SCALE = 0.94f
 
 /** O anel "pressionado" enquanto a conta recoleta. */
 private const val RING_REFRESH_SCALE = 0.9f
@@ -689,7 +763,7 @@ private fun HudRingItem(
             AppProviderMark(
                 source = account.source,
                 tint = MaterialTheme.colorScheme.onSurface,
-                size = hudRingMarkSize(account.rings.size, account.sessionActive),
+                size = hudRingMarkSize(account.rings.size),
                 modifier = Modifier.graphicsLayer { rotationZ = markTurn }
             )
         }
@@ -736,13 +810,14 @@ private fun HudRingItem(
 
 /**
  * A marca cabe no miolo que os arcos deixam livre: cada arco come um traço e um
- * vão de cada lado, e o arco de sessão ativa, quando há, mais um pouco. 70% do
- * miolo deixa ar entre a marca e o arco de dentro.
+ * vão de cada lado. 70% do miolo deixa ar entre a marca e o arco de dentro.
+ *
+ * A sessão ativa não entra na conta: a órbita dela gira por fora do anel. Quando
+ * ela morava por dentro, a marca da conta trabalhando caía de 14dp para 8dp.
  */
-private fun hudRingMarkSize(arcs: Int, active: Boolean): Dp {
+internal fun hudRingMarkSize(arcs: Int): Dp {
     val used = (HUD_RING_STROKE + HUD_RING_GAP) * 2 * arcs.coerceIn(1, 3)
-    val activeInset = if (active) (HUD_RING_GAP + HUD_RING_STROKE) * 2 else 0.dp
-    return ((HUD_RING_SIZE - used - activeInset) * 0.7f).coerceAtLeast(6.dp)
+    return ((HUD_RING_SIZE - used) * 0.7f).coerceAtLeast(6.dp)
 }
 
 /**
@@ -870,13 +945,17 @@ internal fun HudCountdown(
 }
 
 /**
- * Um gesto só para as três ações do notch: mover, abrir a janela completa e — com
- * o botão direito, #215 — trocar direto para "Somente cards". O que separa clique
- * de arrasto é o limiar de deslocamento; o botão direito é decidido no próprio
- * `down` e nunca vira arrasto. Nenhuma coordenada sai daqui.
+ * Um gesto só para as ações do notch: mover (só pela mão), clicar num anel e —
+ * com o botão direito, #215 — trocar direto para "Somente cards". O que separa
+ * clique de arrasto é o limiar de deslocamento; o botão direito é decidido no
+ * próprio `down` e nunca vira arrasto. Nenhuma coordenada sai daqui.
+ *
+ * Sem [draggable], passar do limiar só desiste do clique: o ponteiro que
+ * escorregou não recoleta a conta, e o `move` não é consumido.
  */
 @Composable
 internal fun Modifier.hudPressGesture(
+    draggable: Boolean = true,
     onDragStart: () -> Unit,
     onDragMove: () -> Unit,
     onDragEnd: () -> Unit,
@@ -919,18 +998,26 @@ internal fun Modifier.hudPressGesture(
 
             var travelled = 0f
             var dragging = false
+            var slipped = false
             while (true) {
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
                     ?: break
                 if (!change.pressed) {
-                    if (dragging) currentDragEnd() else currentClick(down.position)
+                    when {
+                        dragging -> currentDragEnd()
+                        !slipped -> currentClick(down.position)
+                    }
                     break
                 }
                 travelled += change.positionChange().getDistance()
-                if (!dragging && travelled > viewConfiguration.touchSlop) {
-                    dragging = true
-                    currentDragStart()
+                if (!dragging && !slipped && travelled > viewConfiguration.touchSlop) {
+                    if (draggable) {
+                        dragging = true
+                        currentDragStart()
+                    } else {
+                        slipped = true
+                    }
                 }
                 if (dragging) {
                     change.consume()
