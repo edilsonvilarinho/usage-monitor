@@ -294,8 +294,14 @@ object HelpCatalog {
                 "O menu do ícone da bandeja tem as duas entradas — é o caminho de volta quando a " +
                     "janela está coberta por outra.",
                 "Na barra HUD, arraste pela mão da ponta do notch (só ela move) e solte " +
-                    "perto de qualquer borda — em cima, embaixo ou nas laterais: ele gruda na mais " +
-                    "próxima e fica ali na próxima abertura."
+                    "perto de qualquer borda, de qualquer monitor — em cima, embaixo ou nas " +
+                    "laterais: ele gruda na mais próxima e fica ali na próxima abertura.",
+                // Leitura, não ativação: fica no fim da lista, e a descrição mantém
+                // o tamanho que deixa "Como ativar" acima da dobra.
+                "Para ler os anéis: o de fora é a janela mais longa (a semanal) e o de dentro a " +
+                    "mais curta (a de 5h). No balão, o glifo ao lado de cada cota acende o anel dela.",
+                "Sessões do Claude Code com o contexto crescendo ou saturado, ou sem resposta " +
+                    "desde o último pedido, aparecem na seção \"Sessões CLI\" do balão da conta."
             ),
             mediaId = "window-modes"
         )
@@ -542,8 +548,13 @@ object HelpCatalog {
                 "The tray icon menu carries both entries — that is the way back when the window is " +
                     "covered by another one.",
                 "On the HUD strip, drag the hand at the end of the notch (only the hand moves it) and " +
-                    "drop it near any edge — top, bottom or the sides: it docks to the nearest one " +
-                    "and stays there next time."
+                    "drop it near any edge of any monitor — top, bottom or the sides: it docks to " +
+                    "the nearest one and stays there next time.",
+                "To read the rings: the outer one is the longest window (the weekly one) and the " +
+                    "inner one the shortest (the 5h one). In the balloon, the glyph next to each " +
+                    "quota lights its ring.",
+                "Claude Code sessions with a growing or saturated context, or with no reply since " +
+                    "the last request, show up in the \"CLI sessions\" section of the account's balloon."
             ),
             mediaId = "window-modes"
         )

@@ -91,6 +91,9 @@ internal const val HUD_BALLOON_CONTENT_TEST_TAG = "hudBalloonContent"
  */
 internal const val HUD_BALLOON_RING_LEGEND_TAG_PREFIX = "hudBalloonRingLegend_"
 
+/** A seção de sinais de sessão CLI do balão de uma conta (issue #265). */
+internal const val HUD_BALLOON_SESSION_SIGNALS_TAG = "hudBalloonSessionSignals"
+
 /** A linha de ação da atualização no balão da engrenagem ("Reiniciar o app e atualizar →"). */
 internal const val HUD_APP_BALLOON_UPDATE_ACTION_TAG = "hudAppBalloonUpdateAction"
 
@@ -269,6 +272,31 @@ internal fun HudAccountBalloonContent(
                         if (index > 0) Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
                         HudBalloonQuota(quota, language, ringOf(quota), rings.size)
                     }
+                }
+            }
+        }
+        // Sinais de sessão CLI (issue #265), depois das cotas: são da conta, mas
+        // não são cota, e a palavra do cabeçalho continua sendo só do risco dela.
+        if (account.sessionSignals.isNotEmpty()) {
+            Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+            Column(modifier = Modifier.fillMaxWidth().testTag(HUD_BALLOON_SESSION_SIGNALS_TAG)) {
+                Text(
+                    text = if (language == AppLanguage.PT) "Sessões CLI" else "CLI sessions",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.height(HUD_BALLOON_GROUP_HEADER)
+                )
+                account.sessionSignals.forEach { signal ->
+                    // Tom e palavra juntos: o texto diz o sinal, a cor só reforça.
+                    Text(
+                        text = signal.text,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = signal.tone.color(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.height(HUD_BALLOON_FOOTER)
+                    )
                 }
             }
         }

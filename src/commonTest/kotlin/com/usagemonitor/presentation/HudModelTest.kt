@@ -205,6 +205,27 @@ class HudModelTest {
         assertEquals(listOf(null, AccountAccent.VIOLET, null), accounts.map { account -> account.accountAccent })
     }
 
+    /** Os sinais de sessão (#265) chegam por alvo e entram na descrição do anel. */
+    @Test
+    fun `os sinais de sessao da conta chegam a hud e a descricao`() {
+        val now = HUD_NOW
+        val entries = listOf(
+            entry(SANDBOX, "Sessão 5h", used = 10, risk = null, profileLabel = "Sandbox"),
+            entry(CODEX, "Codex 5h", used = 10, risk = null)
+        )
+        val pulses = mapOf(
+            SANDBOX to com.usagemonitor.domain.entity.SessionPulse(
+                listOf(com.usagemonitor.domain.entity.ActiveSessionAlert("s", com.usagemonitor.domain.entity.CliSessionHealth.SATURATED, now))
+            )
+        )
+
+        val accounts = buildHudAccounts(entries, listOf(SANDBOX, CODEX), AppLanguage.PT, now, sessionPulses = pulses)
+
+        assertEquals(listOf("Contexto saturado · 1 sessão"), accounts.first().sessionSignals.map { signal -> signal.text })
+        assertTrue(accounts.last().sessionSignals.isEmpty())
+        assertTrue(hudRingDescription(accounts.first(), AppLanguage.PT).endsWith("· Contexto saturado · 1 sessão"))
+    }
+
     @Test
     fun `a fracao do anel e presa a uma volta`() {
         val entries = listOf(entry(CODEX, "Codex 5h", used = 140, risk = UsageRiskLevel.WILL_EXCEED))

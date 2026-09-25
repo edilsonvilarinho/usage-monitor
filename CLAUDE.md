@@ -798,6 +798,15 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
   (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
   mola `GENTLE` com crossfade do conteúdo.
+- **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): a seção
+  "Sessões CLI", entre as cotas e o rodapé, só quando há o que dizer. Uma linha por sinal: contexto
+  saturado, contexto crescendo (as duas contagens saem do mesmo `SessionPulse` que faz o botão de
+  sessões piscar) e sem resposta (`stalledSessions`, que antes só ia para a bandeja). O texto usa as
+  palavras do dado — "Contexto saturado · 1 sessão", "Sem resposta há 2h10" — e **nunca** "Atenção",
+  que é a palavra do risco de cota, nem "aguardando você": a sessão sem resposta é o pedido do
+  usuário esperando o modelo, o contrário disso, e há teste afirmando as duas proibições. Sessão sem
+  resposta **com perfil nulo não acende conta nenhuma**, pelo mesmo motivo de sempre: conta nula não
+  é "todas as contas". O notch em repouso não muda — o pulso âmbar continua sendo só do risco de cota.
 - **Os botões do card têm dona única** (`cardActionsFor`): histórico sempre, sessões CLI na Anthropic,
   sessões Codex CLI no Codex, uso e presença do time na conta marcada. A barra do card e o balão compõem
   o mesmo `CardActionButton`; o balão acrescenta "atualizar só esta conta". As ações moram em
