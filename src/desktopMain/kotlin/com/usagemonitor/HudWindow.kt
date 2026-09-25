@@ -52,6 +52,7 @@ import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
+import com.usagemonitor.presentation.ui.updateBannerAction
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
@@ -121,7 +122,16 @@ internal fun HudWindowHost(
     // notch com o mesmo texto e tom de `updateBannerContent` (#225).
     val updateIndicator = appUpdateState?.let { state ->
         val content = updateBannerContent(state = state, language = language)
-        HudUpdateIndicator(tone = content.tone, description = content.title)
+        HudUpdateIndicator(tone = content.tone, description = content.title, actionLabel = content.actionLabel)
+    }
+    // A mesma ação da faixa, oferecida no balão da engrenagem — nunca no ícone do
+    // notch, onde seria clique de rotina reiniciando o app.
+    val updateAction = appUpdateState?.let { state ->
+        updateBannerAction(
+            state = state,
+            onOpenRelease = { viewModel.openUpdateReleasePage() },
+            onRestartAndUpdate = { viewModel.restartAndUpdateNow() }
+        )
     }
     val accounts = buildHudAccounts(
         quotaRisks = quotaRisks,
@@ -174,7 +184,8 @@ internal fun HudWindowHost(
         hasUpdateIndicator = updateIndicator != null,
         // Mais que isso da borda e a faixa fica compacta (anel + percentual).
         maxAlong = (if (placement.edge.isHorizontal) hudScreenArea.size.width else hudScreenArea.size.height) /
-            uiScaleFactor(uiScalePercent) * HUD_MAX_ALONG_FRACTION
+            uiScaleFactor(uiScalePercent) * HUD_MAX_ALONG_FRACTION,
+        hasUpdateAction = updateAction != null
     )
     // A geometria trabalha em dp de composição; a janela, em dp do sistema. A área
     // da tela desce à escala da composição e o resultado volta multiplicado.
@@ -332,6 +343,7 @@ internal fun HudWindowHost(
                                 }
                             },
                             updateIndicator = updateIndicator,
+                            onUpdateAction = updateAction,
                             onWindowModeChange = actions.changeWindowMode,
                             actions = {
                                 FooterActionGroup(
@@ -355,7 +367,10 @@ internal fun HudWindowHost(
                             }
                         )
                     },
-                    appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = updateIndicator != null),
+                    appBalloonHeight = hudAppBalloonHeight(
+                        hasUpdateIndicator = updateIndicator != null,
+                        hasUpdateAction = updateAction != null
+                    ),
                     gearDescription = hudGearDescription(language),
                     modifier = Modifier.fillMaxSize()
                 )

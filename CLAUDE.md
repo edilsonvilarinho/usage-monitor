@@ -841,8 +841,11 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
 - **Contagem até a próxima coleta uma vez só, no fim da faixa** (#185): o polling é do app inteiro. O
   tique mora no composable e tem o interruptor `countdownUpdatesEnabled`, porque sob o relógio dos
   testes o laço giraria para sempre; o balão da engrenagem a repete no título. **Atualização pendente
-  é só ícone, sem clique próprio** (#225): a frase está no balão da engrenagem e o reinício é
-  oferecido na janela padrão.
+  é só ícone, sem clique próprio** (#225): no notch seria clique de rotina reiniciando o app. O
+  balão da engrenagem traz a frase em duas linhas (numa só ela saía cortada nos 240dp) e a **mesma
+  ação da faixa** do modo padrão — "Reiniciar e atualizar agora", "Baixar atualização" —, despachada
+  por `updateBannerAction`, dona única do `when` por estado para faixa e HUD não divergirem.
+  Baixando não tem ação, como na faixa.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco

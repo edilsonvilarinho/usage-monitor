@@ -365,17 +365,11 @@ internal fun AppUpdateBanner(
     modifier: Modifier = Modifier
 ) {
     val content = updateBannerContent(state = state, language = language)
-
-    // O despacho da ação mora junto dos rótulos que a descrevem: separá-los
-    // deixaria a tela decidindo o que "a ação da faixa" significa em cada estado.
-    val action: (() -> Unit)? = when (state) {
-        is AppUpdateUiState.Available -> onOpenRelease
-        is AppUpdateUiState.Ready -> onRestartAndUpdate
-        is AppUpdateUiState.Failed -> onOpenRelease
-        // Baixando não tem ação: uma faixa clicável sem rótulo de ação seria um
-        // alvo de clique invisível.
-        is AppUpdateUiState.Downloading -> null
-    }
+    val action = updateBannerAction(
+        state = state,
+        onOpenRelease = onOpenRelease,
+        onRestartAndUpdate = onRestartAndUpdate
+    )
 
     // É o [AppBanner] do sistema, não um `Surface` próprio: mesma superfície,
     // mesma borda de 1dp, mesmo marcador de 2dp à esquerda — o marcador que ele
@@ -401,6 +395,26 @@ internal fun AppUpdateBanner(
             }
         }
     )
+}
+
+/**
+ * O que a ação da atualização faz em cada estado. O despacho mora junto dos
+ * rótulos de [updateBannerContent] e tem uma dona só: a faixa do modo padrão e o
+ * balão da engrenagem da HUD oferecem a mesma ação, e dois `when` divergiriam.
+ */
+internal fun updateBannerAction(
+    state: AppUpdateUiState,
+    onOpenRelease: () -> Unit,
+    onRestartAndUpdate: () -> Unit
+): (() -> Unit)? {
+    return when (state) {
+        is AppUpdateUiState.Available -> onOpenRelease
+        is AppUpdateUiState.Ready -> onRestartAndUpdate
+        is AppUpdateUiState.Failed -> onOpenRelease
+        // Baixando não tem ação: um alvo clicável sem rótulo de ação seria um
+        // alvo de clique invisível.
+        is AppUpdateUiState.Downloading -> null
+    }
 }
 
 internal fun updateBannerContent(

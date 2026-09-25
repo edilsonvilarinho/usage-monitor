@@ -133,10 +133,15 @@ internal const val HUD_CONTENT_TEST_TAG = "hudContent"
 
 internal const val HUD_UPDATE_INDICATOR_TAG = "hudUpdateIndicator"
 
-/** Atualização pendente: só ícone, a frase inteira na semântica (issue #225). */
+/**
+ * Atualização pendente: no notch só ícone, a frase inteira na semântica (issue
+ * #225). [actionLabel] é o rótulo da ação da faixa do modo padrão, oferecida no
+ * balão da engrenagem — nunca no ícone, onde seria clique de rotina.
+ */
 internal data class HudUpdateIndicator(
     val tone: AppTone,
-    val description: String
+    val description: String,
+    val actionLabel: String? = null
 )
 
 /**

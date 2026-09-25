@@ -49,6 +49,8 @@ export interface AppHudBarProps {
   countdown?: string;
   /** Pending update sentence; the icon has no click of its own. */
   update?: string;
+  /** The update strip's action label, offered in the gear balloon only (none while downloading). */
+  updateAction?: string;
   /** Glyphs of the card's buttons shown in an account balloon (refresh is always last). */
   actions?: string[];
   style?: CSSProperties;
