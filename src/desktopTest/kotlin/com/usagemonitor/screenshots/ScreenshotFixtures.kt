@@ -38,6 +38,7 @@ import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudSessionSignal
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
@@ -766,12 +767,17 @@ internal object ScreenshotFixtures {
             status = AnthropicProfileUiStatus.READY,
             // A cor por conta (#275): a segunda conta Claude em violeta, a
             // primeira no azul da Anthropic — é assim que as duas se separam.
-            color = AccountAccent.VIOLET
+            color = AccountAccent.VIOLET,
+            // E o emoji (#287): a casa na conta pessoal, no selo do anel.
+            emoji = AccountEmoji.HOUSE
         )
     )
 
     /** As cores por conta das capturas, pela mesma chave do app (`profileId`). */
     val accountColors: Map<String, AccountAccent> = mapOf(SECONDARY_PROFILE_ID to AccountAccent.VIOLET)
+
+    /** Os emojis por conta das capturas (#287), pela mesma chave. */
+    val accountEmojis: Map<String, AccountEmoji> = mapOf(SECONDARY_PROFILE_ID to AccountEmoji.HOUSE)
 
     val teamSettings = TeamIntegrationSettings(
         enabled = true,
@@ -829,7 +835,8 @@ internal object ScreenshotFixtures {
             ),
             focusIndex = 0,
             originLabel = "via Claude Code",
-            accountAccent = AccountAccent.VIOLET
+            accountAccent = AccountAccent.VIOLET,
+            accountEmoji = AccountEmoji.HOUSE
         ),
         // Sem reset: o saldo pré-pago não expira, e a linha dele sai só com o
         // percentual — é o "caso item tenha" da #189.

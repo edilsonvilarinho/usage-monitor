@@ -55,6 +55,7 @@ import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
@@ -121,6 +122,8 @@ fun DashboardScreen(
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     /** A cor escolhida por conta Claude (issue #275), por `profileId`. */
     accountColors: Map<String, AccountAccent> = emptyMap(),
+    /** O emoji escolhido por conta Claude (issue #287), por `profileId`. */
+    accountEmojis: Map<String, AccountEmoji> = emptyMap(),
     /** `null` esconde o botão de todas as contas — só quem administra o recebe. */
     onOpenAdminOverview: (() -> Unit)? = null,
     /**
@@ -319,6 +322,7 @@ fun DashboardScreen(
                                     cliSessionPulses = cliSessionPulses,
                                     teamSessionPulses = teamSessionPulses,
                                     accountColors = accountColors,
+                                    accountEmojis = accountEmojis,
                                     onRetryTarget = { target -> viewModel.refresh(target) },
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -490,6 +494,7 @@ private fun SuccessContent(
     cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     accountColors: Map<String, AccountAccent> = emptyMap(),
+    accountEmojis: Map<String, AccountEmoji> = emptyMap(),
     onRetryTarget: (UsageTargetKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -566,6 +571,7 @@ private fun SuccessContent(
                 cliSessionPulses = cliSessionPulses,
                 teamSessionPulses = teamSessionPulses,
                 accountColors = accountColors,
+                accountEmojis = accountEmojis,
                 now = now,
                 // 12/8 e não 16/12: numa janela estreita — que é como o app
                 // costuma ficar — a margem antiga comia largura que o card usa

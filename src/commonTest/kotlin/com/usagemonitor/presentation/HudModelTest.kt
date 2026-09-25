@@ -22,6 +22,7 @@ import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.hudUsedLeftText
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
 import kotlinx.datetime.Instant
 import kotlin.test.Test
@@ -205,6 +206,29 @@ class HudModelTest {
         )
 
         assertEquals(listOf(null, AccountAccent.VIOLET, null), accounts.map { account -> account.accountAccent })
+    }
+
+    /** O emoji da conta (issue #287) chega à HUD por `profileId`, como a cor; sem escolha, nenhum. */
+    @Test
+    fun `o emoji escolhido para a conta chega a hud e so o dela`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 10, risk = null),
+            entry(SANDBOX, "Sessão 5h", used = 10, risk = null),
+            entry(CODEX, "Codex 5h", used = 10, risk = null)
+        )
+
+        val accounts = buildHudAccounts(
+            entries,
+            listOf(PADRAO, SANDBOX, CODEX),
+            AppLanguage.PT,
+            HUD_NOW,
+            accountEmojis = mapOf("padrao" to AccountEmoji.BRIEFCASE, "sandbox" to AccountEmoji.HOUSE)
+        )
+
+        assertEquals(
+            listOf(AccountEmoji.BRIEFCASE, AccountEmoji.HOUSE, null),
+            accounts.map { account -> account.accountEmoji }
+        )
     }
 
     /** Os sinais de sessão (#265) chegam por alvo e entram na descrição do anel. */

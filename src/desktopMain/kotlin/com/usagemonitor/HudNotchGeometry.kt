@@ -40,6 +40,15 @@ internal enum class HudEdge {
  */
 internal val HUD_RING_SIZE = 36.dp
 
+/**
+ * O selo do emoji da conta (issue #287): uma caixa no canto de cima à direita do
+ * anel, que passa [HUD_EMOJI_BADGE_OVERSHOOT] para fora dele. O excesso cabe no
+ * respiro do notch e no vão até o texto, e por isso o selo não entra na conta de
+ * [hudNotchSizes] — `HudNotchGeometryTest` afirma as duas coisas.
+ */
+internal val HUD_EMOJI_BADGE_SIZE = 14.dp
+internal val HUD_EMOJI_BADGE_OVERSHOOT = 4.dp
+
 /** Espessura de cada arco e o vão entre dois arcos concêntricos. */
 internal val HUD_RING_STROKE = 2.5.dp
 internal val HUD_RING_GAP = 1.5.dp
@@ -522,6 +531,23 @@ internal fun hudOpenWindowBounds(
     sizes: HudNotchSizes,
     area: ScreenWorkArea
 ): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.expanded, area, reserveAlong = sizes.handlesAlong(edge))
+
+/**
+ * A janela durante o arrasto: o notch com as alças, simétrica ao longo da borda,
+ * **com o notch no mesmo ponto da tela** em que estava aberto ou parado.
+ *
+ * É daqui que o arrasto parte (issue #288). Ele começava da origem da janela
+ * aberta — só dá para pegar a mão com o notch aberto — e só encolhia o tamanho.
+ * Em cima e à esquerda as duas origens coincidem; embaixo e à direita a aberta
+ * fica recuada pelo balão, e o notch saltava 274dp para longe do ponteiro e
+ * seguia o arrasto inteiro com esse vão.
+ */
+internal fun hudDragWindowBounds(
+    edge: HudEdge,
+    offsetFraction: Float,
+    sizes: HudNotchSizes,
+    area: ScreenWorkArea
+): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.withHandles, area)
 
 private fun HudNotchSizes.handlesAlong(edge: HudEdge): Dp = if (edge.isHorizontal) withHandles.width else withHandles.height
 

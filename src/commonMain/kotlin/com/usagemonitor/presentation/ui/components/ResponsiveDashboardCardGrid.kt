@@ -39,6 +39,7 @@ import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.CardGridSlot
 import com.usagemonitor.presentation.ui.resolveDropTargetIndex
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -90,6 +91,8 @@ internal fun ResponsiveDashboardCardGrid(
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     /** A cor escolhida por conta Claude (issue #275), por `profileId`. */
     accountColors: Map<String, AccountAccent> = emptyMap(),
+    /** O emoji escolhido por conta Claude (issue #287), por `profileId`. */
+    accountEmojis: Map<String, AccountEmoji> = emptyMap(),
     /** Instante contra o qual o vencimento das janelas de cota é medido. */
     now: Instant,
     modifier: Modifier = Modifier
@@ -136,6 +139,7 @@ internal fun ResponsiveDashboardCardGrid(
                             apiName = stats.displayTitle(),
                             planLabel = stats.planLabel,
                             accent = accountAccentColor(stats.targetKey, accountColors),
+                            emoji = stats.targetKey.profileId?.let { profileId -> accountEmojis[profileId] },
                             quotas = stats.quotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,

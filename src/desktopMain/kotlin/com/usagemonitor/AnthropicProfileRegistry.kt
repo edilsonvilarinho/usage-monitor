@@ -44,7 +44,12 @@ internal data class AnthropicProfileRecord(
      * este registro não depende da camada de UI. Nome desconhecido lido do disco
      * vira "Padrão" na conversão, nunca erro.
      */
-    val color: String? = null
+    val color: String? = null,
+    /**
+     * O nome do emoji escolhido para a conta (`AccountEmoji.name`, issue #287), ou
+     * `null` para nenhum. Texto pelo mesmo motivo da [color].
+     */
+    val emoji: String? = null
 ) {
     val ref: AnthropicProfileRef
         get() = AnthropicProfileRef(id, label)
@@ -191,6 +196,11 @@ internal class AnthropicProfileRegistry(
     /** `null` volta ao acento da fonte ("Padrão"). */
     fun setColor(profileId: String, color: String?) {
         update(profileId) { record -> record.copy(color = color?.takeIf { value -> value.isNotBlank() }) }
+    }
+
+    /** `null` tira o emoji da conta. */
+    fun setEmoji(profileId: String, emoji: String?) {
+        update(profileId) { record -> record.copy(emoji = emoji?.takeIf { value -> value.isNotBlank() }) }
     }
 
     fun removeFromMonitor(profileId: String) {
@@ -344,7 +354,8 @@ internal class AnthropicProfileRegistry(
                 enabled = node.getBoolean(KEY_ENABLED, false),
                 origin = origin,
                 hidden = node.getBoolean(KEY_HIDDEN, false),
-                color = node.get(KEY_COLOR, null)?.takeIf { value -> value.isNotBlank() }
+                color = node.get(KEY_COLOR, null)?.takeIf { value -> value.isNotBlank() },
+                emoji = node.get(KEY_EMOJI, null)?.takeIf { value -> value.isNotBlank() }
             )
         }
     }
@@ -361,6 +372,12 @@ internal class AnthropicProfileRegistry(
             node.remove(KEY_COLOR)
         } else {
             node.put(KEY_COLOR, color)
+        }
+        val emoji = record.emoji
+        if (emoji == null) {
+            node.remove(KEY_EMOJI)
+        } else {
+            node.put(KEY_EMOJI, emoji)
         }
         runCatching { node.flush() }
     }
@@ -401,6 +418,7 @@ internal class AnthropicProfileRegistry(
         const val KEY_ORIGIN = "origin"
         const val KEY_HIDDEN = "hidden"
         const val KEY_COLOR = "color"
+        const val KEY_EMOJI = "emoji"
         val LABEL_AUTOSAVE_DEBOUNCE = 300.milliseconds
     }
 }

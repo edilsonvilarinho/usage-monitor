@@ -654,6 +654,26 @@ Antes de desenhar um retângulo novo, procure aqui.
     usuário. Um marcador à parte mudaria `hudNotchSizes` e dividiria espaço com a órbita de sessão
     ativa. A cor chega à HUD dentro do próprio `HudAccount` (`accountAccent`), e não como parâmetro
     a mais na cadeia do notch.
+- **Emoji por conta** (`AccountEmoji` + `AccountEmojiGlyph` + `AppGlyphChip`; issue #287): a cor
+  só separa duas contas Claude para quem lembra qual tom é de qual conta. Cada perfil pode ter um de
+  dezesseis emojis em Configurações → Contas, gravado como a cor (`emoji` no nó do perfil, **nome**
+  do enum, desconhecido vira "Nenhum"). Aparece como **selo no canto de cima à direita do anel** da
+  HUD, ao lado da marca no cabeçalho do balão e do card, e antes do apelido na linha do perfil.
+  - **É conteúdo do usuário, não cromo.** A regra "sem emoji" do design system continua valendo para
+    a interface; este glifo é da natureza do apelido e o nome está sempre escrito ao lado, por isso
+    ele é decorativo na semântica.
+  - **Conjunto fixo, não campo livre**, pelo motivo da paleta: cada glifo é um code point só, com
+    apresentação de emoji por padrão, e foi visto renderizado em cor pelo Compose no Windows — na fonte
+    mono e **offscreen**, então os geradores de captura também o desenham. Campo livre traria
+    sequências ZWJ, tons de pele e bandeiras de largura imprevisível, e quadrado vazio onde falta a
+    fonte. **Linux e macOS não foram vistos**: dependem da fonte de emoji do sistema.
+  - **O selo não entra em `hudNotchSizes`.** Ele passa `HUD_EMOJI_BADGE_OVERSHOOT` (4dp) para fora do
+    anel, dentro do respiro que o notch já tem — `HudNotchGeometryTest` afirma o limite e a geometria
+    igual com e sem emoji. `AccountEmojiGlyph` mede o glifo em **dp**: em sp ele cresceria com a
+    escala de fonte do sistema e sairia da caixa que a geometria conta.
+  - Mapa paralelo ao das cores (`accountEmojis`), e não um objeto de identidade que juntasse os dois:
+    a cor já atravessava cinco assinaturas, e trocá-las todas por causa do emoji mexeria em código
+    que a issue não pede.
 
 **Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
 
@@ -890,11 +910,26 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
     `hudRestWindowBounds`/`hudOpenWindowBounds`): com o mesmo recorte nos dois estados o notch não anda
     na tela ao abrir perto de um canto, e as alças nunca ficam fora da tela. Durante o arrasto a janela
     é `withHandles`, simétrica, e o centro dela continua sendo o do notch.
+  - **O arrasto parte de `hudDragWindowBounds` e mede pela janela de arrasto, nunca por `windowSize`**
+    (issue #288). Só dá para pegar a mão com o notch aberto, e o gesto guarda os lambdas da composição
+    em que começou: com `windowSize` ali, o primeiro passo prendia à tela uma janela da **largura do
+    balão** e a empurrava 274dp para dentro — só embaixo e à direita, onde a janela aberta é recuada —,
+    e como o passo é incremental o vão seguia o arrasto inteiro; o encaixe lia o centro dessa mesma
+    largura errada e soltava o notch na borda errada. Medido com o app real e ponteiro sintético: antes
+    a mão ficava ~270px ao lado do ponteiro, depois fica sob ele. `HudNotchGeometryTest` afirma o notch
+    no mesmo ponto parado, aberto e no começo do arrasto, nas quatro bordas.
 - **Posição é borda + fração** (`HudPlacement`, chaves `hudEdge`/`hudEdgeOffset`): sobrevive a troca
   de resolução e de monitor. Arrastar solta o notch da borda; ao soltar, `nearestHudPlacement` o gruda
-  na borda mais próxima do **centro** dele, na tela inteira (pode ficar sobre a barra de tarefas). A
+  na borda mais próxima do **centro** dele. A
   posição da pílula antiga (`hudWindowX/Y`) migra uma vez e as chaves velhas são apagadas. Estreia no
   topo em 82%, onde a pílula nascia, e não no centro, onde fica o título de janela maximizada.
+  - **Parado, aberto e encaixado o notch mora na área útil, fora da barra de tarefas** (issue #288).
+    A #256 o deixava ocupar a faixa da barra, mas no Windows ela também é *topmost* e volta para cima
+    de toda janela *topmost* a cada clique, hover ou notificação: o `alwaysOnTop` perde essa disputa,
+    e o notch de baixo ficava meio coberto. Só o **arrasto** continua livre sobre a tela inteira. O
+    monitor segue identificado pelos limites **inteiros**, que não mudam quando a barra é movida.
+    Barra com ocultação automática não reserva área útil e continua podendo cobrir o notch quando
+    sobe — escolha de quem a oculta.
   - **E o monitor** (`hudScreenId`/`hudScreenBounds`, issue #273). Borda e fração eram resolvidas
     sempre contra o monitor padrão, então o arrasto era preso a ele e o notch nunca saía do primário.
     Agora o arrasto e o encaixe usam o monitor **sob o ponteiro** (`MouseInfo.getPointerInfo().device`),

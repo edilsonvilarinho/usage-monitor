@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import androidx.compose.ui.unit.IntSize
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import androidx.compose.animation.core.LinearEasing
@@ -139,6 +140,9 @@ internal fun observedActivityValueTag(modelName: String, label: String): String 
 /** Âncora de teste da barra da cota expandida; não altera a semântica visual. */
 fun quotaProgressTrackTag(label: String): String = "$QUOTA_PROGRESS_TRACK_TAG_PREFIX$label"
 
+/** O emoji da conta no cabeçalho do card (issue #287). */
+const val API_USAGE_CARD_EMOJI_TAG = "apiUsageCardEmoji"
+
 fun apiUsageCardTag(apiName: String): String = "$API_USAGE_CARD_TAG_PREFIX$apiName"
 
 /** Opacidade do número de uma janela já vencida — o dado é real, mas velho. */
@@ -165,6 +169,8 @@ fun ApiUsageCard(
      * é o acento da fonte. Vale só onde o acento já aparece: o marcador e a marca.
      */
     accent: Color? = null,
+    /** O emoji da conta (issue #287), ao lado da marca do fornecedor; `null` é nenhum. */
+    emoji: AccountEmoji? = null,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary> = emptyMap(),
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
@@ -380,6 +386,16 @@ fun ApiUsageCard(
                             tint = accent ?: accentColorFor(source = source, accents = AppAccents.current),
                             size = PROVIDER_MARK_SIZE
                         )
+                        // O emoji da conta (issue #287): o mesmo selo do anel da
+                        // HUD. A identidade não pode existir num lugar e sumir no
+                        // outro.
+                        if (emoji != null) {
+                            AccountEmojiGlyph(
+                                emoji = emoji,
+                                size = PROVIDER_MARK_SIZE,
+                                modifier = Modifier.testTag(API_USAGE_CARD_EMOJI_TAG)
+                            )
+                        }
                         // Título e conta na mesma coluna, como o `.ptitle`/`.psub`
                         // do protótipo. A conta era uma linha de largura cheia
                         // abaixo do cabeçalho inteiro, alinhada à borda do card e

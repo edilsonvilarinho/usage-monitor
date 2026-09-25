@@ -129,6 +129,88 @@ class HudNotchGeometryTest {
         }
     }
 
+    /**
+     * Issue #288: o arrasto começava da origem da janela aberta com o tamanho da
+     * de arrasto, e embaixo e à direita o notch saltava o tamanho do balão para
+     * longe do ponteiro. O notch tem de estar no mesmo ponto nos três estados.
+     */
+    @Test
+    fun `comecar o arrasto nao tira o notch do lugar em nenhuma borda`() {
+        val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
+        for (edge in HudEdge.entries) {
+            for (fraction in listOf(0f, 0.02f, 0.5f, 0.82f, 1f)) {
+                val sizes = hudNotchSizes(accounts, edge, "", true, false)
+                val drag = hudDragWindowBounds(edge, fraction, sizes, screen)
+                val atDrag = notchOrigin(edge, drag, sizes)
+                assertEquals(notchOrigin(edge, hudOpenWindowBounds(edge, fraction, sizes, screen), sizes), atDrag, "$edge em $fraction: aberta")
+                assertEquals(notchOrigin(edge, hudRestWindowBounds(edge, fraction, sizes, screen), sizes), atDrag, "$edge em $fraction: parada")
+                // Simétrica: o centro da janela é o do notch, que é o que o encaixe lê.
+                val along = if (edge.isHorizontal) drag.size.width else drag.size.height
+                assertEquals(along / 2, drag.notchCenterInWindow, "$edge em $fraction: centro")
+            }
+        }
+    }
+
+    /**
+     * Issue #288: o notch mora na área útil. Com a barra de tarefas embaixo o
+     * notch de baixo encosta nela, e não passa por baixo; com a barra em cima ou
+     * à esquerda, a origem deslocada é respeitada.
+     */
+    @Test
+    fun `o notch encosta na barra de tarefas e nao passa por baixo dela`() {
+        val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
+        val taskbarBottom = ScreenWorkArea(0.dp, 0.dp, DpSize(1920.dp, 1032.dp))
+        val bottomSizes = hudNotchSizes(accounts, HudEdge.BOTTOM, "", true, false)
+        for (bounds in listOf(
+            hudRestWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom),
+            hudOpenWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom),
+            hudDragWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom)
+        )) {
+            assertEquals(1032.dp, bounds.y + bounds.size.height)
+        }
+
+        val taskbarTopLeft = ScreenWorkArea(48.dp, 40.dp, DpSize(1872.dp, 1040.dp))
+        val top = hudRestWindowBounds(HudEdge.TOP, 0.5f, hudNotchSizes(accounts, HudEdge.TOP, "", true, false), taskbarTopLeft)
+        assertEquals(40.dp, top.y)
+        val left = hudRestWindowBounds(HudEdge.LEFT, 0.5f, hudNotchSizes(accounts, HudEdge.LEFT, "", true, false), taskbarTopLeft)
+        assertEquals(48.dp, left.x)
+    }
+
+    /** O canto de cima à esquerda do notch na tela, como `HudNotch` o posiciona na janela. */
+    private fun notchOrigin(edge: HudEdge, bounds: HudWindowBounds, sizes: HudNotchSizes): Pair<Float, Float> {
+        val notch = sizes.collapsed
+        val alongStart = bounds.notchCenterInWindow - (if (edge.isHorizontal) notch.width else notch.height) / 2
+        val origin = when (edge) {
+            HudEdge.TOP -> bounds.x + alongStart to bounds.y
+            HudEdge.BOTTOM -> bounds.x + alongStart to bounds.y + bounds.size.height - notch.height
+            HudEdge.LEFT -> bounds.x to bounds.y + alongStart
+            HudEdge.RIGHT -> bounds.x + bounds.size.width - notch.width to bounds.y + alongStart
+        }
+        return origin.first.value to origin.second.value
+    }
+
+    /**
+     * O selo do emoji (issue #287) sai do anel só no respiro que já existe: o
+     * padding do notch em cima e o vão até o texto (ou até o anel vizinho) à
+     * direita. É o que o deixa fora de `hudNotchSizes`.
+     */
+    @Test
+    fun `o selo do emoji cabe no respiro do notch sem mudar a geometria`() {
+        assertTrue(HUD_EMOJI_BADGE_OVERSHOOT <= HUD_NOTCH_PADDING_ACROSS)
+        assertTrue(HUD_EMOJI_BADGE_OVERSHOOT <= HUD_RING_TEXT_GAP)
+        assertTrue(HUD_EMOJI_BADGE_OVERSHOOT <= HUD_ITEM_GAP / 2)
+        assertTrue(HUD_EMOJI_BADGE_SIZE <= HUD_RING_SIZE / 2)
+        val plain = account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%"))
+        val withEmoji = plain.copy(accountEmoji = com.usagemonitor.presentation.ui.theme.AccountEmoji.FOX)
+        for (edge in HudEdge.entries) {
+            assertEquals(
+                hudNotchSizes(listOf(plain), edge, "", true, false),
+                hudNotchSizes(listOf(withEmoji), edge, "", true, false),
+                "$edge"
+            )
+        }
+    }
+
     /** A órbita de sessão ativa gira por fora do anel e cabe no respiro do notch e entre dois anéis. */
     @Test
     fun `a orbita de sessao ativa cabe em volta do anel`() {

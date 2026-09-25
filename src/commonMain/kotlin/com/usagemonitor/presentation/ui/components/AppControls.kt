@@ -611,6 +611,62 @@ fun AppSwatchChip(
 }
 
 private val SWATCH_SIZE = 10.dp
+
+/**
+ * Opção de glifo: um emoji (ou uma palavra curta) em vez de amostra e rótulo,
+ * **uma** escolha entre várias (issue #287, o emoji de cada conta Claude).
+ *
+ * O contrato é o de [AppSwatchChip] — `selectable` com `Role.RadioButton`, marca
+ * além do realce e o espaço da marca reservado em todas —, sem o rótulo: o glifo
+ * é o conteúdo, e dezesseis opções com nome escrito tomariam três linhas da aba.
+ * O nome vai em [description], que é a semântica da opção: é por ele que leitor
+ * de tela e testes chegam a ela.
+ */
+@Composable
+fun AppGlyphChip(
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    glyph: @Composable () -> Unit
+) {
+    val container by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+        animationSpec = appTween(AppMotion.normal),
+        label = "appGlyphChipContainer"
+    )
+    val border by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = appTween(AppMotion.normal),
+        label = "appGlyphChipBorder"
+    )
+    val content = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = modifier
+            .clip(AppShapes.small)
+            .background(container)
+            .border(AppBorderWidth, border, AppShapes.small)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .semantics { contentDescription = description }
+            .defaultMinSize(minHeight = CONTROL_HEIGHT)
+            .padding(horizontal = AppSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        glyph()
+        Box(modifier = Modifier.width(SWATCH_MARK_WIDTH), contentAlignment = Alignment.Center) {
+            if (selected) {
+                Text(
+                    text = "✓",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = content,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
 private val SWATCH_MARK_WIDTH = 10.dp
 
 /** Uma opção do controle segmentado. */

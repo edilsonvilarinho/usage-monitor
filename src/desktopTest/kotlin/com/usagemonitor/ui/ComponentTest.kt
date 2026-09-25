@@ -63,6 +63,10 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import com.usagemonitor.presentation.ui.components.ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_EMOJI_TAG
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.components.ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.accountAccentColor
@@ -225,6 +229,34 @@ class ComponentTest {
         plan = null
         waitForIdle()
         onNodeWithTag(API_USAGE_CARD_PLAN_TAG).assertDoesNotExist()
+    }
+
+    /** O emoji da conta (issue #287) sai ao lado da marca, e o título continua achável pelo texto. */
+    @Test
+    fun `ApiUsageCard shows the account emoji beside the provider mark`() = runDesktopComposeUiTest {
+        var emoji by mutableStateOf<AccountEmoji?>(AccountEmoji.FOX)
+        setContent {
+            AppTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic — Trabalho",
+                    quotas = emptyList(),
+                    emoji = emoji,
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    onRefresh = {},
+                    onOpenHistory = {},
+                    animationDelayMillis = 0
+                )
+            }
+        }
+
+        onNodeWithTag(API_USAGE_CARD_EMOJI_TAG, useUnmergedTree = true).assertExists()
+        onNodeWithText("Anthropic — Trabalho").assertIsDisplayed()
+        emoji = null
+        waitForIdle()
+        onNodeWithTag(API_USAGE_CARD_EMOJI_TAG, useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -3002,6 +3034,60 @@ class ComponentTest {
         onNodeWithTag(ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX + "work_VIOLET").assertIsSelected()
         onNodeWithTag(ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX + "work_DEFAULT").assertIsNotSelected()
         onNodeWithText("Violeta").assertExists()
+    }
+
+    /**
+     * O emoji da conta (issue #287) é escolhido na parte expandida do perfil,
+     * entre "Nenhum" e os do conjunto fixo, cada opção nomeada na semântica; a
+     * escolha corrente fica marcada e aparece na linha do perfil.
+     */
+    @Test
+    fun `accounts tab picks an account emoji and marks the current one`() = runDesktopComposeUiTest {
+        val picked = mutableListOf<Pair<String, AccountEmoji?>>()
+        setContent {
+            AppTheme(isDark = true) {
+                var emoji by remember { mutableStateOf<AccountEmoji?>(null) }
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    anthropicProfiles = listOf(
+                        AnthropicProfileUiModel(
+                            id = "work",
+                            label = "Trabalho",
+                            path = "C:\\Users\\test\\.claude-work",
+                            enabled = true,
+                            removable = true,
+                            identityLabel = "work@example.com",
+                            status = AnthropicProfileUiStatus.READY,
+                            emoji = emoji
+                        )
+                    ),
+                    expandedProfileId = "work",
+                    onAnthropicProfileEmojiChange = { profileId, chosen ->
+                        picked += profileId to chosen
+                        emoji = chosen
+                    },
+                    initialTab = SettingsTab.ACCOUNTS
+                )
+            }
+        }
+
+        onNodeWithTag(ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX + "work_NONE").performScrollTo().assertIsSelected()
+        onNodeWithTag(ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX + "work_BRIEFCASE")
+            .performScrollTo()
+            .assertContentDescriptionEquals("Maleta")
+            .performClick()
+        waitForIdle()
+
+        assertEquals(listOf<Pair<String, AccountEmoji?>>("work" to AccountEmoji.BRIEFCASE), picked)
+        onNodeWithTag(ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX + "work_BRIEFCASE").assertIsSelected()
+        onNodeWithTag(ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX + "work_NONE").assertIsNotSelected()
     }
 
     /** A dona única da cor: escolha da conta vence o acento da fonte, e sem escolha fica o da fonte. */

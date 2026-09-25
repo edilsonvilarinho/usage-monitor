@@ -24,3 +24,10 @@ ocupe a região da barra de tarefas.
 - Janelas normais continuam limitadas por `maximumWindowBounds`.
 - A confirmação efetiva de sobreposição depende do gerenciador de janelas de cada sistema; não será
   declarada como validada sem teste real.
+
+## Revisão posterior — issue #288
+
+A decisão de deixar a HUD ocupar a faixa da barra de tarefas foi **revertida** na #288: a barra do
+Windows também é *topmost* e volta para cima do notch a cada clique nela, e a HUD ficava meio
+coberta. O notch parado e encaixado voltou à área útil; só o arrasto continua livre sobre a tela
+inteira. Ver `hud-bordas-e-emoji-por-conta-287-288-execucao.md`.

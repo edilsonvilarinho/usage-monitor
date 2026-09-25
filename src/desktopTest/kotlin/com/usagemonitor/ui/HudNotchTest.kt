@@ -1,5 +1,9 @@
 package com.usagemonitor.ui
 
+import androidx.compose.ui.test.onAllNodesWithTag
+import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
+import com.usagemonitor.presentation.ui.HUD_ACCOUNT_EMOJI_TEST_TAG
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.ComposeUiTest
@@ -126,6 +130,10 @@ class HudNotchTest {
             HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "28% usado · 72% restante", periodType = PeriodType.INTERVAL),
             HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "9% usado · 91% restante", periodType = PeriodType.WEEKLY)
         ).copy(
+            // O emoji da conta (#287) no fixture principal: o teste de geometria
+            // que percorre as quatro bordas afirma que o selo não muda o notch
+            // nem o cabeçalho do balão.
+            accountEmoji = AccountEmoji.FOX,
             // Os sinais de sessão (#265) no fixture principal: o teste de geometria
             // que percorre as contas passa a cobrir a seção nova do balão.
             sessionSignals = listOf(
@@ -339,6 +347,31 @@ class HudNotchTest {
                     // Aberto, o notch continua do mesmo tamanho e no mesmo lugar.
                     assertEquals(notchBounds, onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot(), "$edge: o notch mudou")
                 }
+            }
+        }
+    }
+
+    /**
+     * O emoji da conta (issue #287) é selo no canto de cima à direita do anel, só
+     * na conta que o tem, e passa no máximo `HUD_EMOJI_BADGE_OVERSHOOT` para fora
+     * do anel — em toda borda, porque o selo não gira.
+     */
+    @Test
+    fun `o emoji da conta vira selo no canto do anel e so nela`() {
+        for (edge in HudEdge.entries) {
+            runDesktopComposeUiTest {
+                setContent { notch(edge = edge) }
+                val badges = onAllNodesWithTag(HUD_ACCOUNT_EMOJI_TEST_TAG, useUnmergedTree = true).fetchSemanticsNodes()
+                assertEquals(1, badges.size, "$edge: um selo, o da conta com emoji")
+                val badge = onNodeWithTag(HUD_ACCOUNT_EMOJI_TEST_TAG, useUnmergedTree = true).getUnclippedBoundsInRoot()
+                val ring = onNodeWithContentDescription(INFORMATA_RING, useUnmergedTree = true).getUnclippedBoundsInRoot()
+                assertEquals(ring.right + HUD_EMOJI_BADGE_OVERSHOOT, badge.right, "$edge: direita do selo")
+                assertEquals(ring.top - HUD_EMOJI_BADGE_OVERSHOOT, badge.top, "$edge: topo do selo")
+                val notch = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
+                assertTrue(
+                    badge.left >= notch.left && badge.right <= notch.right && badge.top >= notch.top && badge.bottom <= notch.bottom,
+                    "$edge: o selo sai do notch ($badge em $notch)"
+                )
             }
         }
     }

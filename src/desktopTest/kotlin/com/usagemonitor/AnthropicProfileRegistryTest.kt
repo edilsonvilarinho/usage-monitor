@@ -107,6 +107,26 @@ class AnthropicProfileRegistryTest {
         assertEquals(null, newRegistry().profiles.value.first { it.id == "default" }.color)
     }
 
+    /** O emoji da conta (issue #287) sobrevive como a cor, e ao lado dela: um não apaga o outro. */
+    @Test
+    fun `account emoji persists next to the color and clears back to none`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        val registry = newRegistry()
+
+        registry.setColor("default", "VIOLET")
+        registry.setEmoji("default", "FOX")
+        registry.rescan()
+        val reopened = newRegistry().profiles.value.first { it.id == "default" }
+        assertEquals("FOX", reopened.emoji)
+        assertEquals("VIOLET", reopened.color)
+
+        newRegistry().setEmoji("default", null)
+        val cleared = newRegistry().profiles.value.first { it.id == "default" }
+        assertEquals(null, cleared.emoji)
+        assertEquals("VIOLET", cleared.color)
+    }
+
     @Test
     fun `updateLabel persists an empty value instead of reverting to the previous label`() {
         val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }

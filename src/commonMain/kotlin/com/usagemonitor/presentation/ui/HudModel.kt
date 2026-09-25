@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.displayTitle
 import com.usagemonitor.presentation.ui.components.expandedQuotaTitle
@@ -74,6 +75,11 @@ data class HudAccount(
      * miolo fica na cor do texto, como antes.
      */
     val accountAccent: AccountAccent? = null,
+    /**
+     * O emoji que o usuário deu à conta (issue #287); `null` é nenhum. Vira selo
+     * no canto do anel e fica ao lado do título do balão.
+     */
+    val accountEmoji: AccountEmoji? = null,
     /**
      * Contexto crescendo ou saturado e sessão sem resposta nesta conta (issue
      * #265), já em texto. Vazio é "nada a dizer": o balão não abre a seção.
@@ -273,6 +279,8 @@ internal fun buildHudAccounts(
     refreshingTargets: Set<UsageTargetKey> = emptySet(),
     /** A cor escolhida por conta Claude, por `profileId`. */
     accountColors: Map<String, AccountAccent> = emptyMap(),
+    /** O emoji escolhido por conta Claude, por `profileId`. */
+    accountEmojis: Map<String, AccountEmoji> = emptyMap(),
     /** Sessões ativas em atenção ou saturadas, por alvo — o mesmo pulso do botão de sessões. */
     sessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     /** Sessões sem resposta desde o último pedido, de todas as contas. */
@@ -318,6 +326,7 @@ internal fun buildHudAccounts(
                 accountKey = first.stats.accountContext?.key,
                 refreshing = target in refreshingTargets,
                 accountAccent = target.profileId?.let { profileId -> accountColors[profileId] },
+                accountEmoji = target.profileId?.let { profileId -> accountEmojis[profileId] },
                 sessionSignals = hudSessionSignals(target, sessionPulses[target], stalledSessions, language)
             )
         }

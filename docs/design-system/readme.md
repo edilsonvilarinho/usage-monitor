@@ -50,7 +50,8 @@ an unqualified number invites a wrong decision.
 in the status bar and it was cut: with one source in error the green would lie. Source failure
 belongs to a banner.
 
-**No emoji, anywhere.** No exclamation marks. No marketing adjectives. Tone examples:
+**No emoji in the interface's own words** — the one exception is the account emoji the user picks
+(below). No exclamation marks. No marketing adjectives. Tone examples:
 
 - Empty: "Nenhum turno nesta janela."
 - Partial failure: "Anthropic — Padrão · Limite de requisições atingido. Aguarde antes de tentar de novo."
@@ -104,6 +105,17 @@ marker. It never tints a surface. In the HUD notch the provider mark at the core
 the text colour **unless the user picked a colour**. With two Claude accounts the core is the only
 spot of the collapsed notch that says which is which, and there the choice is the user's. "Default"
 (no choice) is the vendor accent. It is picked with `AppSwatchChip`.
+
+**Account emoji** (issue #287). Colour only separates two Claude accounts for someone who remembers
+which tone is which. Each account may also take one of sixteen fixed emoji (`AccountEmoji`), shown
+as a 14dp badge at the top-right corner of its HUD ring, beside the provider mark in the card header
+and the balloon header, and before the label in the Accounts row. **It is user content, not chrome**
+— the same nature as the account label, so the "no emoji" rule does not reach it. The set is fixed
+for the same reason the palette is: every glyph is one code point with default emoji presentation,
+seen rendered in colour by Compose, where a free field would bring ZWJ sequences, skin tones and
+flags of unpredictable width that turn into an empty box where the font is missing. The badge
+overshoots the ring by 4dp into space the notch already has, so it never changes the notch geometry.
+It is decorative for semantics: the name is always written beside it. Picked with `AppGlyphChip`.
 
 **Type.** Two families. **IBM Plex Mono** for titles, labels, numbers, tables and window chrome
 (tabular alignment); **IBM Plex Sans** for explanatory prose only. Weights 400/500/600. Six sizes:
@@ -191,7 +203,8 @@ Every glyph button carries its meaning in `aria-label` / `contentDescription` �
 semaphore explanation lives ("1 sessão ativa agora pede atenção: …"), and it is what the Compose
 component tests observe. A text button would have nowhere to put it.
 
-**Emoji are never used.** Unicode marks are used as icons, deliberately and only from the list above.
+**Emoji are never used as icons.** Unicode marks are used as icons, deliberately and only from the
+list above. The account emoji is identification the user chose, not an icon (see "Account emoji").
 
 **Provider marks — the one exception** (`AppProviderMark`). Identification is not a control: the
 Claude asterisk, the OpenAI knot, the Cursor cube and the others are small monochrome SVG paths
@@ -216,7 +229,7 @@ invented here.
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
-| `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip |
+| `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip · AppGlyphChip |
 | `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing |
 | `components/feedback/` | AppBanner · AppDialog · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |

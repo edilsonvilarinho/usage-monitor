@@ -202,6 +202,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
                     teamEnabledProfileIds = setOf("default"),
                     // A segunda conta Claude na cor dela (#275).
                     accountColors = ScreenshotFixtures.accountColors,
+                    accountEmojis = ScreenshotFixtures.accountEmojis,
                     now = ScreenshotFixtures.NOW,
                     modifier = Modifier.fillMaxWidth()
                 )

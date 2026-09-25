@@ -300,6 +300,9 @@ object HelpCatalog {
                 // o tamanho que deixa "Como ativar" acima da dobra.
                 "Para ler os anéis: o de fora é a janela mais longa (a semanal) e o de dentro a " +
                     "mais curta (a de 5h). No balão, o glifo ao lado de cada cota acende o anel dela.",
+                "Para distinguir duas contas Claude: em Configurações → \"Contas\", clique em " +
+                    "\"Editar\" no perfil e escolha a \"Cor\" e o \"Emoji\" — o emoji fica no canto " +
+                    "do anel e ao lado do nome no balão e no card.",
                 "Sessões do Claude Code com o contexto crescendo ou saturado, ou sem resposta " +
                     "desde o último pedido, aparecem na seção \"Sessões CLI\" do balão da conta.",
                 "Numa instalação nova o app abre na janela padrão, para a configuração, e passa " +
@@ -556,6 +559,9 @@ object HelpCatalog {
                 "To read the rings: the outer one is the longest window (the weekly one) and the " +
                     "inner one the shortest (the 5h one). In the balloon, the glyph next to each " +
                     "quota lights its ring.",
+                "To tell two Claude accounts apart: in Settings → \"Accounts\", click \"Edit\" on " +
+                    "the profile and pick the \"Color\" and the \"Emoji\" — the emoji sits at the " +
+                    "corner of the ring and next to the name in the balloon and on the card.",
                 "Claude Code sessions with a growing or saturated context, or with no reply since " +
                     "the last request, show up in the \"CLI sessions\" section of the account's balloon.",
                 "On a fresh install the app opens in the standard window, for setup, and moves to " +
