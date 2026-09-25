@@ -53,6 +53,19 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Instant
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import com.usagemonitor.HUD_BALLOON_ACTIONS
+import com.usagemonitor.HudEdge
+import com.usagemonitor.hudNotchSizes
+import com.usagemonitor.presentation.ui.HudNotch
+import com.usagemonitor.presentation.ui.components.CardActionButton
+import com.usagemonitor.presentation.ui.components.CardIconActionButton
+import com.usagemonitor.presentation.ui.components.RefreshGlyph
+import com.usagemonitor.presentation.ui.components.cardActionsFor
 import kotlin.time.Duration.Companion.seconds
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
@@ -96,6 +109,8 @@ fun main(args: Array<String>) {
     val generator = ScreenshotGenerator(outputDir)
 
     generator.dashboard()
+    generator.hud()
+    generator.hudRest()
     generator.newIntegrations()
     generator.history()
     generator.settings()
@@ -109,6 +124,7 @@ fun main(args: Array<String>) {
     generator.presence(isDark = true)
     generator.presence(isDark = false)
     generator.presenceAccounts()
+    recordHudGif(outputDir)
 
     println("Capturas geradas em ${outputDir.absolutePath}")
 }
@@ -184,6 +200,8 @@ private class ScreenshotGenerator(private val outputDir: File) {
                     onToggleCardMinimized = {},
                     onOpenHistoryCard = { _, _ -> },
                     teamEnabledProfileIds = setOf("default"),
+                    // A segunda conta Claude na cor dela (#275).
+                    accountColors = ScreenshotFixtures.accountColors,
                     now = ScreenshotFixtures.NOW,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -200,6 +218,20 @@ private class ScreenshotGenerator(private val outputDir: File) {
                 countdownUpdatesEnabled = false
             )
         }
+    }
+
+    /**
+     * A barra HUD aberta sobre o primeiro anel, para o topo do README (#276): o
+     * notch colado na borda de cima e o balão da conta, com a semanal por fora
+     * (#278), a seção de sessões (#265) e a segunda conta na cor dela (#275).
+     */
+    fun hud() = capture("hud", widthDp = HUD_SHOT_WIDTH_DP, heightDp = HUD_SHOT_OPEN_HEIGHT_DP) {
+        HudShot(expanded = true, balloonIndex = 0)
+    }
+
+    /** O notch parado: é o que fica na tela o dia inteiro. */
+    fun hudRest() = capture("hud-rest", widthDp = HUD_SHOT_WIDTH_DP, heightDp = 64) {
+        HudShot(expanded = false, balloonIndex = 0)
     }
 
     fun newIntegrations() = capture("new-integrations", widthDp = 1_040, heightDp = 570) {
@@ -495,6 +527,85 @@ internal fun fixedHistoryViewModel(): HistoryViewModel {
     }
 
     return viewModel
+}
+
+/** Largura das capturas da HUD: o notch de três contas com folga para o balão. */
+private const val HUD_SHOT_WIDTH_DP = 900
+
+/** O balão mais alto das contas de exemplo termina em ~316dp; o resto seria fundo vazio. */
+private const val HUD_SHOT_OPEN_HEIGHT_DP = 332
+
+private val HUD_SHOT_SIZES = hudNotchSizes(
+    accounts = ScreenshotFixtures.hudAccounts,
+    edge = HudEdge.TOP,
+    fallbackLabel = "Carregando",
+    showsCountdown = true,
+    hasUpdateIndicator = false
+)
+
+/**
+ * O notch colado na borda de cima, com os tamanhos da geometria — a mesma que
+ * dimensiona a janela no app, sem literal à mão — e os botões do card da conta.
+ * `key` no balão: `initialBalloonIndex` só vale na primeira composição, e o GIF
+ * troca de conta.
+ */
+@Composable
+private fun HudShot(expanded: Boolean, balloonIndex: Int) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        key(balloonIndex) {
+            HudNotch(
+                accounts = ScreenshotFixtures.hudAccounts,
+                edge = HudEdge.TOP,
+                sizes = HUD_SHOT_SIZES,
+                fallbackLabel = "Carregando",
+                expanded = expanded,
+                initialBalloonIndex = balloonIndex,
+                accountActions = { account ->
+                    cardActionsFor(account.targetKey, setOf("padrao")).forEach { action ->
+                        CardActionButton(action, AppLanguage.PT, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
+                    }
+                    CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
+                        RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
+                    }
+                },
+                nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
+                countdownDescription = "Próxima atualização automática",
+                nowProvider = { ScreenshotFixtures.NOW },
+                countdownUpdatesEnabled = false
+            )
+        }
+    }
+}
+
+/**
+ * `img/hud.gif`, a demonstração curta do topo do README (#276): o notch parado, o
+ * balão da primeira conta, o da segunda e o notch de novo. Mesmo motor do tour
+ * (`SceneRecorder`), e sem ponteiro: o que se vê é a HUD, não um gesto.
+ */
+private fun recordHudGif(outputDir: File) {
+    var expanded by mutableStateOf(false)
+    var balloon by mutableStateOf(0)
+    val recorder = SceneRecorder(widthDp = HUD_SHOT_WIDTH_DP, heightDp = HUD_SHOT_OPEN_HEIGHT_DP)
+    try {
+        recorder.setContent { HudShot(expanded = expanded, balloonIndex = balloon) }
+        recorder.animate(300) {}
+        recorder.hold(1_400)
+        expanded = true
+        recorder.animate(500) {}
+        recorder.hold(2_600)
+        balloon = 1
+        recorder.animate(500) {}
+        recorder.hold(2_200)
+        expanded = false
+        recorder.animate(400) {}
+        recorder.hold(900)
+
+        val file = File(outputDir, "hud.gif")
+        GifEncoder.write(file, recorder.frames)
+        println("  ${file.name} (${recorder.frames.size} quadros, %.0f KB)".format(file.length() / 1_024.0))
+    } finally {
+        recorder.close()
+    }
 }
 
 private fun Instant.plusSeconds(seconds: Long): Instant =

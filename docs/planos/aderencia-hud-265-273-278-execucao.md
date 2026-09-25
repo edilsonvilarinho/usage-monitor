@@ -35,12 +35,12 @@ funcione em mais de um monitor e mostre cada conta com cor própria. O levantame
 |---|---|---|---|---|
 | P0 | — | Plano de aderência | — | feito |
 | P1 | #274 | Deixar claro que é reiniciar o Usage Monitor | `fix/274-restart-wording` | feito (automática); olhar no app pendente |
-| P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | feito (automática); olhar no app pendente |
+| P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | feito; conferido no app |
 | P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | feito (automática); dois monitores reais não executada |
 | P4 | #275 | Cor por conta Claude | `feat/275-account-color` | feito (automática); olhar no app pendente |
-| P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | feito (automática); olhar no app pendente |
-| P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | feito (automática); instalação limpa real não executada |
-| P7 | #276, #265 | README com a HUD em destaque, captura e GIF | `docs/276-readme-hud` | pendente |
+| P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | feito; conferido no app |
+| P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | feito; instalação limpa simulada no app (notificação não confirmada) |
+| P7 | #276, #265 | README com a HUD em destaque, captura e GIF | `docs/276-readme-hud` | feito |
 
 Regra comum a todos os PRs:
 - Conventional Commits em inglês com o trailer do modelo.
@@ -59,6 +59,8 @@ Regra comum a todos os PRs:
 | 2026-09-25 | P4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…AppAccentsContrastTest" --tests "…HudModelTest" --tests "…AnthropicProfileRegistryTest" --tests "…ComponentTest" --tests "…HudNotch*"` | Primeira passada: erro de compilação no teste (inferência de `listOf` contra `Pair<String, AccountAccent?>`). Corrigido: 6 classes, **180 testes, 0 falhas**, cobrindo as 16 variantes AA, a matiz e a distância entre cores, a ida e volta no registro, a escolha na aba Contas e a dona única `accountAccentColor`. Depois `gradlew.bat allTests`: 215 classes, **2172 testes, 0 falhas**. |
 | 2026-09-25 | P5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudSessionSignalsTest" --tests "…HudModelTest" --tests "…HelpCatalogTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest"` | Verde na primeira passada de compilação. A primeira versão do teste esperava "2h 10min", mas o app formata "2h10" (`formatActiveTime`), e o teste foi corrigido para o formato real antes de rodar. Focado: 6 classes, **97 testes, 0 falhas**. `allTests` **vermelho na primeira passada**: `HelpContentTest > shows the selected topic with its description and activation steps` — a descrição do tópico Modos de janela, com as frases novas sobre os anéis e as sessões, empurrou "Como ativar" para baixo da dobra, que é o que o teste guarda. As frases viraram passos no fim da lista, e a descrição voltou ao tamanho de antes. Segunda passada: 216 classes, **2181 testes, 0 falhas**. |
 | 2026-09-25 | P6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudModePreferencesTest" --tests "…HudModelTest" --tests "…HelpCatalogTest" --tests "…HudNotch*"` | Verde na primeira passada: 5 classes, **82 testes, 0 falhas** — instalação nova, instalação existente, recibo de atualização, pendência apagada, a decisão pura, "Nenhuma API" nos dois idiomas e na varredura de encaixe. `allTests` antes do rebase: 1 falha, o mesmo `HelpContentTest` do P5, porque a frase da instalação nova também alongava a descrição. Depois de rebasear sobre a pilha mesclada, a frase virou o último passo do tópico e a suíte deu 216 classes, **2187 testes, 0 falhas**. |
+| 2026-09-25 | P7 | Claude Opus 5.5 | `gradlew.bat generateScreenshots generateHelpMedia generateTourGif`; depois `gradlew.bat desktopTest --tests "…HelpMediaResourcesTest" --tests "…HelpMediaPlayerTest" --tests "…HelpContentTest" --tests "…HudNotch*" --tests "…ComponentTest"` | 16 capturas, `img/hud.gif` (29 quadros, 64 KB), 12 demos da ajuda e o tour regenerados. Conferidos a olho: `hud.png`, `hud-rest.png` e `dashboard.png`. Na primeira geração, `hud.png` e `hud-rest.png` sobravam altura e foram regerados. Testes focados: **149 testes em 4 classes, mais 8 nas 2 classes da mídia da ajuda, 0 falhas**. Mudança só de documentação, fixtures e mídia: sem `allTests`. |
+| 2026-09-25 | Verificação no app | Claude Opus 5.5 | `gradlew.bat run` no worktree do P7 (a pilha inteira), com captura de tela por PowerShell; depois instalação limpa simulada: backup com `reg export`, app instalado fechado sem forçar, chave `com.usagemonitor` apagada e recriada só com `enabled/Apis=CODEX`, recibo `update-receipt.properties` fora do lugar, `gradlew.bat run`; no fim `reg import` do backup, recibo de volta e app instalado reaberto | **HUD real** (borda direita, contas reais): no Codex a semanal fica por fora e a janela curta por dentro; o balão da Anthropic mostra os glifos de legenda, "Semanal 70%" crítica no anel de fora e a seção **Sessões CLI — Contexto saturado · 1 sessão**, com dado real. **Instalação limpa:** o registro de arranque mostra `window-shown` (janela padrão primeiro); depois o registro tem `hud/Mode=true` e nenhum `hud/Default/Pending`, e o notch aparece no topo em 82%. A notificação da bandeja **não apareceu na captura**, e por isso não é afirmada aqui. Preferências e recibo restaurados; o app instalado voltou na HUD da borda direita. **Não verificado:** a faixa de atualização e o balão da engrenagem com atualização pendente (nenhuma atualização disponível), a cor por conta ao vivo (esta máquina tem uma conta Claude só) e os dois monitores (a máquina tem um só). A primeira leitura da instalação limpa foi descartada: o processo anterior ainda regravava o cache de preferências do Java ao sair, e a restauração passou a esperar o processo terminar. |
 
 ## P1 · #274 — Reiniciar o Usage Monitor, não o computador
 
@@ -253,6 +255,20 @@ Regra comum a todos os PRs:
      captura;
   4. "Início rápido" com download por sistema. Os detalhes continuam nos `<details>`.
 - Rodar `generateScreenshots`, `generateTourGif` e `generateHelpMedia`, e conferir as imagens a olho.
+- **Como ficou:**
+  - O `img/hud.gif` sai do próprio `ScreenshotGenerator`, pelo `SceneRecorder`: notch parado, balão da
+    primeira conta, da segunda e notch de novo. Não há tarefa Gradle nova. A troca de conta recria o
+    notch com `key`, porque `initialBalloonIndex` só vale na primeira composição.
+  - Os fixtures da HUD ganharam um sinal de sessão na primeira conta e a cor violeta na segunda. O
+    dashboard da captura recebe `accountColors`, então as duas contas Claude aparecem com cores
+    diferentes.
+  - **O olho pegou dois ajustes:** a primeira captura aberta tinha 430dp de altura, e o balão mais
+    alto termina em ~316dp, o que deixava um terço de fundo vazio. O notch parado tinha 110dp para
+    52dp de conteúdo. As alturas caíram para 332dp e 64dp.
+  - **Risco anotado, sem correção neste PR:** o violeta de conta (268°) fica na mesma matiz do acento
+    do DeepSeek (270°). A regra de distância de 20° vale **entre** as cores de conta e **entre** os
+    acentos de fonte, não de uma lista para a outra. Quem separa as duas é o título, como já separa
+    OpenCode Zen e Go.
 
 ## Verificação
 
