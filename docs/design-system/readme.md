@@ -94,6 +94,17 @@ it is the vendor of no other source. Lime at ~90° sits 36° from `--kilo` (54°
 (130°). Both keep their hue in the light variant (`#7C1D87`, `#477915`) and are checked by
 `AppAccentsContrastTest` like the other seven.
 
+**Account colour** (issue #275). Several Claude accounts on one PC all wore `--anthropic`, and only
+the title told them apart. Each account may take one of eight fixed colours (`AccountAccent`: blue,
+cyan, green, lime, amber, orange, rose, violet), each with a dark and a light variant under the same
+rules as the vendor accents: AA 4.5:1 on both surfaces, hue kept within 30° across themes, ≥20°
+between colours. **The account colour replaces the vendor accent only where the accent already
+appears**: the card's 2px marker and provider mark, the HUD balloon header and the Accounts row
+marker. It never tints a surface. In the HUD notch the provider mark at the core of the ring stays in
+the text colour **unless the user picked a colour**. With two Claude accounts the core is the only
+spot of the collapsed notch that says which is which, and there the choice is the user's. "Default"
+(no choice) is the vendor accent. It is picked with `AppSwatchChip`.
+
 **Type.** Two families. **IBM Plex Mono** for titles, labels, numbers, tables and window chrome
 (tabular alignment); **IBM Plex Sans** for explanatory prose only. Weights 400/500/600. Six sizes:
 10 · 12 · 14 · 16 · 20 · 28. Every number is `tabular-nums`; money and token counts right-align.
@@ -205,7 +216,7 @@ invented here.
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
-| `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl |
+| `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip |
 | `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing |
 | `components/feedback/` | AppBanner · AppDialog · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |

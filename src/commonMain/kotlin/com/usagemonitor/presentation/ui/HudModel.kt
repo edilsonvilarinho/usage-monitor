@@ -12,6 +12,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.displayTitle
 import com.usagemonitor.presentation.ui.components.expandedQuotaTitle
@@ -64,7 +65,13 @@ data class HudAccount(
     /** A conta do provedor, que o histórico filtra; `null` quando a fonte não a identifica. */
     val accountKey: UsageAccountKey? = null,
     /** Coleta desta conta em andamento: o anel fica pressionado até ela voltar. */
-    val refreshing: Boolean = false
+    val refreshing: Boolean = false,
+    /**
+     * A cor que o usuário deu à conta (issue #275); `null` é "Padrão". Tinge a
+     * marca no miolo do anel e no cabeçalho do balão — só com escolha: sem ela o
+     * miolo fica na cor do texto, como antes.
+     */
+    val accountAccent: AccountAccent? = null
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
@@ -189,7 +196,9 @@ internal fun buildHudAccounts(
     language: AppLanguage,
     now: Instant,
     activeTargets: Set<UsageTargetKey> = emptySet(),
-    refreshingTargets: Set<UsageTargetKey> = emptySet()
+    refreshingTargets: Set<UsageTargetKey> = emptySet(),
+    /** A cor escolhida por conta Claude, por `profileId`. */
+    accountColors: Map<String, AccountAccent> = emptyMap()
 ): List<HudAccount> {
     val noForecast = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
     return orderedByCardOrder(quotaRisks, cardOrder) { entry -> entry.stats.targetKey }
@@ -229,7 +238,8 @@ internal fun buildHudAccounts(
                 planLabel = first.stats.planLabel,
                 originLabel = hudSourceOrigin(first.stats.source, language),
                 accountKey = first.stats.accountContext?.key,
-                refreshing = target in refreshingTargets
+                refreshing = target in refreshingTargets,
+                accountAccent = target.profileId?.let { profileId -> accountColors[profileId] }
             )
         }
 }

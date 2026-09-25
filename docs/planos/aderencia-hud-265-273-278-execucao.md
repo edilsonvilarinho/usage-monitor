@@ -37,7 +37,7 @@ funcione em mais de um monitor e mostre cada conta com cor própria. O levantame
 | P1 | #274 | Deixar claro que é reiniciar o Usage Monitor | `fix/274-restart-wording` | feito (automática); olhar no app pendente |
 | P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | feito (automática); olhar no app pendente |
 | P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | feito (automática); dois monitores reais não executada |
-| P4 | #275 | Cor por conta Claude | `feat/275-account-color` | pendente |
+| P4 | #275 | Cor por conta Claude | `feat/275-account-color` | feito (automática); olhar no app pendente |
 | P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | pendente |
 | P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | pendente |
 | P7 | #276, #265 | README com a HUD em destaque, captura e GIF | `docs/276-readme-hud` | pendente |
@@ -56,6 +56,7 @@ Regra comum a todos os PRs:
 | 2026-09-25 | P1 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HelpCatalogTest" --tests "…AppUpdateBannerTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest"`; depois `gradlew.bat allTests` | Primeira passada vermelha, e de propósito: o teste de encaixe novo reprovou o título em inglês "…it will be applied when Usage Monitor closes" (três linhas no balão, nas 23 escalas). Encurtado, 72 testes verdes. `allTests`: 214 classes, **2141 testes, 0 falhas** (11m36s). Pendente: olhar a faixa e o balão no `gradlew.bat run`. |
 | 2026-09-25 | P2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudModelTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest" --tests "…ComponentTest"` | 5 classes, **178 testes, 0 falhas**. Entre eles, o arco de fora medido no bitmap com o tom da semanal crítica, o glifo de legenda por cota e a descrição "anel externo 7d 9% · anel interno 5h 28%". Depois `gradlew.bat allTests`: 214 classes, **2150 testes, 0 falhas** (9m28s). Pendente: olhar o notch e o balão no `gradlew.bat run`. |
 | 2026-09-25 | P3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…ScreenLocatorTest" --tests "…MainWindowPreferencesTest" --tests "…HudWindowPreferencesTest" --tests "…WindowScreenFitTest" --tests "…HudNotchGeometryTest"` | Primeira passada: erro de compilação (`GraphicsDevice.idString` não existe em Kotlin, o getter Java é `getIDstring()`). Corrigido: 5 classes, **61 testes, 0 falhas**, com monitor à direita, à esquerda (x negativo), acima e renumerado. **Validação em dois monitores reais não executada**: esta máquina tem um só (`\\.\DISPLAY1`, 1366×768). Depois `gradlew.bat allTests`: 215 classes, **2164 testes, 0 falhas**. |
+| 2026-09-25 | P4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…AppAccentsContrastTest" --tests "…HudModelTest" --tests "…AnthropicProfileRegistryTest" --tests "…ComponentTest" --tests "…HudNotch*"` | Primeira passada: erro de compilação no teste (inferência de `listOf` contra `Pair<String, AccountAccent?>`). Corrigido: 6 classes, **180 testes, 0 falhas**, cobrindo as 16 variantes AA, a matiz e a distância entre cores, a ida e volta no registro, a escolha na aba Contas e a dona única `accountAccentColor`. Depois `gradlew.bat allTests`: 215 classes, **2172 testes, 0 falhas**. |
 
 ## P1 · #274 — Reiniciar o Usage Monitor, não o computador
 
@@ -168,6 +169,21 @@ Regra comum a todos os PRs:
   - `AnthropicProfileRegistryTest`: roundtrip e valor inválido;
   - `ComponentTest`: seleção na aba Contas e cor no marcador do card (medida em bitmap);
   - `HudNotchTest`: geometria com o marcador.
+- **Como ficou, e os desvios com o motivo:**
+  - Paleta medida antes de entrar: escura com contraste ≥ 7:1 contra `#1B1818`, clara com ≥ 5,2:1
+    contra `#FFFCFC`. Matizes 22° (laranja), 45° (âmbar), 88° (lima), 140° (verde), 188° (ciano),
+    218° (azul), 268° (violeta) e 335° (rosa).
+  - A dona única se chama `accountAccentColor`.
+  - **Na HUD, o marcador de 2dp sob o anel virou a marca do miolo tingida, só com escolha.** O
+    marcador mudaria `hudNotchSizes` e dividiria espaço com a órbita de sessão ativa. Sem escolha, o
+    miolo continua na cor do texto. Por isso não há teste de geometria do marcador.
+  - **O cabeçalho do Histórico não usa a cor.** A janela é aberta por `UsageAccountKey`, a conta do
+    provedor, e não pelo perfil local que guarda a cor. Ligá-los pede uma ponte perfil ↔ conta que
+    hoje não existe ali.
+  - O marcador do card não foi medido em bitmap: o teste afirma a cor que `accountAccentColor`
+    entrega ao card, e o card já usa esse valor nos dois lugares.
+  - A primitiva é `AppSwatchChip` (`components/forms/`), e o seletor é a composição dela na aba
+    Contas, em vez de um `AccountColorPicker.prompt.md`.
 
 ## P5 · #265 — Sinais de sessão na HUD
 

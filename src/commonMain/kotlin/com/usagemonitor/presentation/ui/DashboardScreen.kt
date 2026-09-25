@@ -54,6 +54,7 @@ import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UiApiError
@@ -118,6 +119,8 @@ fun DashboardScreen(
      */
     cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
+    /** A cor escolhida por conta Claude (issue #275), por `profileId`. */
+    accountColors: Map<String, AccountAccent> = emptyMap(),
     /** `null` esconde o botão de todas as contas — só quem administra o recebe. */
     onOpenAdminOverview: (() -> Unit)? = null,
     /**
@@ -315,6 +318,7 @@ fun DashboardScreen(
                                     teamEnabledProfileIds = teamEnabledProfileIds,
                                     cliSessionPulses = cliSessionPulses,
                                     teamSessionPulses = teamSessionPulses,
+                                    accountColors = accountColors,
                                     onRetryTarget = { target -> viewModel.refresh(target) },
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -485,6 +489,7 @@ private fun SuccessContent(
     teamEnabledProfileIds: Set<String> = emptySet(),
     cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
+    accountColors: Map<String, AccountAccent> = emptyMap(),
     onRetryTarget: (UsageTargetKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -560,6 +565,7 @@ private fun SuccessContent(
                 teamEnabledProfileIds = teamEnabledProfileIds,
                 cliSessionPulses = cliSessionPulses,
                 teamSessionPulses = teamSessionPulses,
+                accountColors = accountColors,
                 now = now,
                 // 12/8 e não 16/12: numa janela estreita — que é como o app
                 // costuma ficar — a margem antiga comia largura que o card usa

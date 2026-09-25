@@ -22,6 +22,8 @@ import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.seriesKey
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AppAccents
 
 internal data class ObservedUsageModelSummary(
@@ -177,6 +179,22 @@ internal fun accentColorFor(
         ApiSource.CURSOR -> accents.cursor
         ApiSource.ANTIGRAVITY -> accents.gemini
     }
+}
+
+/**
+ * O acento de um alvo: a cor que o usuário deu à conta (issue #275) ou, sem
+ * escolha, o acento da fonte. Dono único para o card, a HUD e as Configurações —
+ * três cópias divergiriam na conta sem perfil. Só a Anthropic tem perfil, e o
+ * mapa é por `profileId`.
+ */
+@Composable
+@ReadOnlyComposable
+internal fun accountAccentColor(
+    targetKey: UsageTargetKey,
+    accountColors: Map<String, AccountAccent>
+): Color {
+    val chosen = targetKey.profileId?.let { profileId -> accountColors[profileId] }
+    return chosen?.current ?: accentColorFor(source = targetKey.source, accents = AppAccents.current)
 }
 
 internal fun refreshActionLabel(isRefreshing: Boolean, language: AppLanguage): String {

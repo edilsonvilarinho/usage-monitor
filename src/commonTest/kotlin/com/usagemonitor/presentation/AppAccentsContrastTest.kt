@@ -1,11 +1,13 @@
 package com.usagemonitor.presentation
 
 import androidx.compose.ui.graphics.Color
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.darkAppAccents
 import com.usagemonitor.presentation.ui.theme.lightAppAccents
 import kotlin.math.pow
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -81,6 +83,50 @@ class AppAccentsContrastTest {
                 }
             }
         }
+    }
+
+    // ── Cor por conta (issue #275) ────────────────────────────────────────────
+
+    /** A cor da conta vira marcador, marca e texto: mesma régua dos acentos de fonte. */
+    @Test
+    fun `toda cor de conta passa em AA nos dois temas`() {
+        for (accent in AccountAccent.entries) {
+            val dark = contrastRatio(accent.dark, darkSurface)
+            val light = contrastRatio(accent.light, lightSurface)
+            assertTrue(dark >= minimumRatio, "A cor ${accent.name} escura dá ${(dark * 100).toInt() / 100.0}:1.")
+            assertTrue(light >= minimumRatio, "A cor ${accent.name} clara dá ${(light * 100).toInt() / 100.0}:1.")
+        }
+    }
+
+    /** Trocar de tema não pode trocar a cor da conta: violeta continua violeta. */
+    @Test
+    fun `a cor de conta clara preserva a matiz da escura`() {
+        for (accent in AccountAccent.entries) {
+            val delta = hueDistanceDegrees(hue(accent.dark), hue(accent.light))
+            assertTrue(delta <= 30.0, "A cor ${accent.name} muda ${delta.toInt()}° de matiz entre os temas.")
+        }
+    }
+
+    /** Duas contas com cores vizinhas demais seriam a mesma cor para quem olha. */
+    @Test
+    fun `as cores de conta permanecem distinguiveis entre si`() {
+        val entries = AccountAccent.entries
+        for (variant in listOf<(AccountAccent) -> Color>({ it.dark }, { it.light })) {
+            for (i in entries.indices) {
+                for (j in i + 1 until entries.size) {
+                    val delta = hueDistanceDegrees(hue(variant(entries[i])), hue(variant(entries[j])))
+                    assertTrue(delta >= 20.0, "${entries[i].name} e ${entries[j].name} estão a ${delta.toInt()}°.")
+                }
+            }
+        }
+    }
+
+    /** O nome é o que vai para o disco; nome desconhecido é "Padrão", nunca erro. */
+    @Test
+    fun `a cor de conta volta do disco pelo nome e o desconhecido e padrao`() {
+        assertEquals(AccountAccent.VIOLET, AccountAccent.fromStorage("VIOLET"))
+        assertEquals(null, AccountAccent.fromStorage("MAGENTA"))
+        assertEquals(null, AccountAccent.fromStorage(null))
     }
 
     private fun assertPaletteReadable(palette: AppAccents, surface: Color, themeName: String) {
