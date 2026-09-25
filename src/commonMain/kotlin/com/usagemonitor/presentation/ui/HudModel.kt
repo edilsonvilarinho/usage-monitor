@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CursorQuotaLabels
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
@@ -70,15 +71,30 @@ data class HudAccount(
         get() = listOfNotNull(planLabel, originLabel).joinToString(" · ").ifEmpty { null }
 
     /**
-     * Os anéis concêntricos: até [MAX_HUD_RINGS] cotas, de fora para dentro na
-     * ordem da API. OpenCode Go é o maior caso real (três janelas); cota além
-     * disso só aparece no painel aberto.
+     * Os anéis concêntricos: as mesmas até [MAX_HUD_RINGS] primeiras cotas, **de
+     * fora para dentro da janela mais longa para a mais curta** (issue #278). Na
+     * ordem da API a 5h ficava por fora e a semanal por dentro, o contrário do que
+     * se lê num alvo: o anel maior é o período maior. Saldo e créditos
+     * (`REPORTED`, sem janela confiável) ficam por dentro. A ordenação é estável:
+     * os dois grupos semanais do Antigravity mantêm a ordem do card. OpenCode Go é
+     * o maior caso real (três janelas); cota além disso só aparece no balão.
      */
     val rings: List<HudQuota>
-        get() = quotas.take(MAX_HUD_RINGS)
+        get() = quotas.take(MAX_HUD_RINGS).sortedByDescending { quota -> ringRank(quota.periodType) }
 
     val focus: HudQuota?
         get() = quotas.getOrNull(focusIndex)
+
+    /**
+     * O anel que pulsa em atenção: o da cota em foco, não mais o de fora fixo. Com
+     * a semanal por fora, o índice 0 pulsaria a semanal com a 5h crítica. Foco
+     * além dos anéis (quarta cota) cai no de fora, que é o que existia antes.
+     */
+    val attentionRingIndex: Int
+        get() {
+            val current = focus ?: return 0
+            return rings.indexOfFirst { ring -> ring === current }.takeIf { index -> index >= 0 } ?: 0
+        }
 
     /** Atenção ou pior: é o que acende o pulso âmbar do anel. */
     val needsAttention: Boolean
@@ -106,11 +122,59 @@ data class HudQuota(
     /** Grupo de modelos (Antigravity) ou franquia (Cursor); as cotas dele ficam numa caixa. */
     val group: String? = null,
     /** "87% usado · 13% restante"; `null` onde não há teto (saldo, atividade observada). */
-    val usedLeftText: String? = null
+    val usedLeftText: String? = null,
+    /** A janela da cota; decide a posição do anel. `null` conta como `REPORTED`, por dentro. */
+    val periodType: PeriodType? = null
 )
 
 /** Os anéis que cabem num notch sem virarem um alvo de tiro. */
 const val MAX_HUD_RINGS = 3
+
+/** Maior é mais para fora: o período mais longo é o anel maior. */
+private fun ringRank(periodType: PeriodType?): Int = when (periodType) {
+    PeriodType.MONTHLY -> 3
+    PeriodType.WEEKLY -> 2
+    PeriodType.INTERVAL -> 1
+    PeriodType.REPORTED, null -> 0
+}
+
+/**
+ * A posição do anel dita em palavra, de fora para dentro: "externo", "do meio",
+ * "interno". Com um anel só não há posição a dizer — `null`.
+ */
+internal fun hudRingPositionLabel(index: Int, count: Int, language: AppLanguage): String? {
+    if (count <= 1 || index !in 0 until count) {
+        return null
+    }
+    val pt = language == AppLanguage.PT
+    return when (index) {
+        0 -> if (pt) "anel externo" else "outer ring"
+        count - 1 -> if (pt) "anel interno" else "inner ring"
+        else -> if (pt) "anel do meio" else "middle ring"
+    }
+}
+
+/**
+ * A descrição de acessibilidade do anel: conta, plano, estado e **cada anel com
+ * a posição**, de fora para dentro — "anel externo 7d 9% · anel interno 5h 28%".
+ * Cota além dos anéis entra depois, sem posição.
+ */
+internal fun hudRingDescription(account: HudAccount, language: AppLanguage): String {
+    val rings = account.rings
+    val beyond = account.quotas.filter { quota -> rings.none { ring -> ring === quota } }
+    return buildString {
+        append(account.label)
+        account.planLabel?.let { plan -> append(" ($plan)") }
+        append(" · ")
+        append(account.statusLabel)
+        rings.forEachIndexed { index, quota ->
+            append(" · ")
+            hudRingPositionLabel(index, rings.size, language)?.let { position -> append("$position ") }
+            append("${quota.shortLabel} ${quota.percentText}")
+        }
+        beyond.forEach { quota -> append(" · ${quota.shortLabel} ${quota.percentText}") }
+    }
+}
 
 /**
  * As contas da HUD, **na ordem dos cards** que o usuário arrastou, uma por alvo.
@@ -143,7 +207,8 @@ internal fun buildHudAccounts(
                     hasForecast = entry.risk != null,
                     title = hudQuotaTitle(entry.quota, language),
                     group = quotaGroupOf(entry.quota),
-                    usedLeftText = hudUsedLeftText(entry.quota, language)
+                    usedLeftText = hudUsedLeftText(entry.quota, language),
+                    periodType = entry.quota.periodType
                 )
             }
             val focusIndex = entries.indices.maxWithOrNull(

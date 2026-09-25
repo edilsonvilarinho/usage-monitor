@@ -13,6 +13,8 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.MAX_HUD_RINGS
 import com.usagemonitor.presentation.ui.TRAY_TOOLTIP_MAX_CHARS
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudRingDescription
+import com.usagemonitor.presentation.ui.hudRingPositionLabel
 import com.usagemonitor.presentation.ui.hudSourceOrigin
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.hudUsedLeftText
@@ -96,6 +98,90 @@ class HudModelTest {
 
         assertEquals(MAX_HUD_RINGS, account.rings.size)
         assertEquals(4, account.quotas.size)
+    }
+
+    // ------------------------------------------------------------ ordem dos anéis (#278)
+
+    /** O anel maior é o período maior: a semanal por fora, a 5h por dentro. */
+    @Test
+    fun `a semanal fica por fora e a 5h por dentro`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 28, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Sessão 7d", used = 9, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.WEEKLY)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(listOf("7d", "5h"), account.rings.map { ring -> ring.shortLabel })
+        // O balão e o card continuam na ordem da API.
+        assertEquals(listOf("5h", "7d"), account.quotas.map { quota -> quota.shortLabel })
+    }
+
+    @Test
+    fun `mensal por fora de semanal e de 5h, creditos por dentro`() {
+        val entries = listOf(
+            entry(PADRAO, "Rolling 5h", used = 10, risk = null, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Créditos", used = 20, risk = null, period = PeriodType.REPORTED),
+            entry(PADRAO, "Mensal 30d", used = 30, risk = null, period = PeriodType.MONTHLY)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(listOf("30d", "5h", "Créditos"), account.rings.map { ring -> ring.shortLabel })
+    }
+
+    /** Dois grupos semanais (Antigravity) mantêm a ordem do card entre si. */
+    @Test
+    fun `janelas iguais mantem a ordem do card`() {
+        val entries = listOf(
+            entry(SANDBOX, "Gemini 7d", used = 10, risk = null, period = PeriodType.WEEKLY),
+            entry(SANDBOX, "Claude 7d", used = 20, risk = null, period = PeriodType.WEEKLY)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(listOf("10%", "20%"), account.rings.map { ring -> ring.percentText })
+    }
+
+    /** Com a semanal por fora, pulsar o índice 0 pulsaria a semanal com a 5h crítica. */
+    @Test
+    fun `o anel que pulsa e o da cota em foco`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 90, risk = UsageRiskLevel.WILL_EXCEED, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Sessão 7d", used = 30, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.WEEKLY)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals("5h", account.rings[account.attentionRingIndex].shortLabel)
+        assertEquals(1, account.attentionRingIndex)
+    }
+
+    @Test
+    fun `a descricao do anel diz a posicao de cada cota`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 28, risk = UsageRiskLevel.WILL_EXCEED, period = PeriodType.INTERVAL, profileLabel = "Padrão"),
+            entry(PADRAO, "Sessão 7d", used = 9, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.WEEKLY, profileLabel = "Padrão")
+        )
+        val pt = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+        val en = buildHudAccounts(entries, emptyList(), AppLanguage.EN, HUD_NOW).single()
+
+        assertEquals(
+            "ANTHROPIC — Padrão · Crítico · anel externo 7d 9% · anel interno 5h 28%",
+            hudRingDescription(pt, AppLanguage.PT)
+        )
+        assertEquals(
+            "ANTHROPIC — Padrão · Critical · outer ring 7d 9% · inner ring 5h 28%",
+            hudRingDescription(en, AppLanguage.EN)
+        )
+    }
+
+    @Test
+    fun `um anel so nao tem posicao e o do meio so existe com tres`() {
+        assertEquals(null, hudRingPositionLabel(0, 1, AppLanguage.PT))
+        assertEquals("anel do meio", hudRingPositionLabel(1, 3, AppLanguage.PT))
+        assertEquals("middle ring", hudRingPositionLabel(1, 3, AppLanguage.EN))
+        assertEquals("anel interno", hudRingPositionLabel(2, 3, AppLanguage.PT))
     }
 
     @Test
@@ -218,14 +304,15 @@ class HudModelTest {
         used: Int,
         risk: UsageRiskLevel?,
         profileLabel: String? = null,
-        plan: String? = null
+        plan: String? = null,
+        period: PeriodType = PeriodType.INTERVAL
     ): HudQuotaEntry {
         val quota = QuotaInfo(
             label = label,
             used = used.toLong(),
             total = 100L,
             periodEndAt = HUD_NOW + 2.hours,
-            periodType = PeriodType.INTERVAL,
+            periodType = period,
             unit = UsageUnit.PERCENTAGE
         )
         val stats = ApiUsageStats(
