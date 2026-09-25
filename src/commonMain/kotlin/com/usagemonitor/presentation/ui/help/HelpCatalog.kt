@@ -301,7 +301,10 @@ object HelpCatalog {
                 "Para ler os anéis: o de fora é a janela mais longa (a semanal) e o de dentro a " +
                     "mais curta (a de 5h). No balão, o glifo ao lado de cada cota acende o anel dela.",
                 "Sessões do Claude Code com o contexto crescendo ou saturado, ou sem resposta " +
-                    "desde o último pedido, aparecem na seção \"Sessões CLI\" do balão da conta."
+                    "desde o último pedido, aparecem na seção \"Sessões CLI\" do balão da conta.",
+                "Numa instalação nova o app abre na janela padrão, para a configuração, e passa " +
+                    "sozinho para a barra HUD na primeira coleta; qualquer modo escolhido antes " +
+                    "disso vale no lugar."
             ),
             mediaId = "window-modes"
         )
@@ -554,7 +557,10 @@ object HelpCatalog {
                     "inner one the shortest (the 5h one). In the balloon, the glyph next to each " +
                     "quota lights its ring.",
                 "Claude Code sessions with a growing or saturated context, or with no reply since " +
-                    "the last request, show up in the \"CLI sessions\" section of the account's balloon."
+                    "the last request, show up in the \"CLI sessions\" section of the account's balloon.",
+                "On a fresh install the app opens in the standard window, for setup, and moves to " +
+                    "the HUD strip by itself on the first collection; any mode picked before that " +
+                    "wins instead."
             ),
             mediaId = "window-modes"
         )

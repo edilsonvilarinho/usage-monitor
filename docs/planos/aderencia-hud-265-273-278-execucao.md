@@ -39,7 +39,7 @@ funcione em mais de um monitor e mostre cada conta com cor própria. O levantame
 | P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | feito (automática); dois monitores reais não executada |
 | P4 | #275 | Cor por conta Claude | `feat/275-account-color` | feito (automática); olhar no app pendente |
 | P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | feito (automática); olhar no app pendente |
-| P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | pendente |
+| P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | feito (automática); instalação limpa real não executada |
 | P7 | #276, #265 | README com a HUD em destaque, captura e GIF | `docs/276-readme-hud` | pendente |
 
 Regra comum a todos os PRs:
@@ -58,6 +58,7 @@ Regra comum a todos os PRs:
 | 2026-09-25 | P3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…ScreenLocatorTest" --tests "…MainWindowPreferencesTest" --tests "…HudWindowPreferencesTest" --tests "…WindowScreenFitTest" --tests "…HudNotchGeometryTest"` | Primeira passada: erro de compilação (`GraphicsDevice.idString` não existe em Kotlin, o getter Java é `getIDstring()`). Corrigido: 5 classes, **61 testes, 0 falhas**, com monitor à direita, à esquerda (x negativo), acima e renumerado. **Validação em dois monitores reais não executada**: esta máquina tem um só (`\\.\DISPLAY1`, 1366×768). Depois `gradlew.bat allTests`: 215 classes, **2164 testes, 0 falhas**. |
 | 2026-09-25 | P4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…AppAccentsContrastTest" --tests "…HudModelTest" --tests "…AnthropicProfileRegistryTest" --tests "…ComponentTest" --tests "…HudNotch*"` | Primeira passada: erro de compilação no teste (inferência de `listOf` contra `Pair<String, AccountAccent?>`). Corrigido: 6 classes, **180 testes, 0 falhas**, cobrindo as 16 variantes AA, a matiz e a distância entre cores, a ida e volta no registro, a escolha na aba Contas e a dona única `accountAccentColor`. Depois `gradlew.bat allTests`: 215 classes, **2172 testes, 0 falhas**. |
 | 2026-09-25 | P5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudSessionSignalsTest" --tests "…HudModelTest" --tests "…HelpCatalogTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest"` | Verde na primeira passada de compilação. A primeira versão do teste esperava "2h 10min", mas o app formata "2h10" (`formatActiveTime`), e o teste foi corrigido para o formato real antes de rodar. Focado: 6 classes, **97 testes, 0 falhas**. `allTests` **vermelho na primeira passada**: `HelpContentTest > shows the selected topic with its description and activation steps` — a descrição do tópico Modos de janela, com as frases novas sobre os anéis e as sessões, empurrou "Como ativar" para baixo da dobra, que é o que o teste guarda. As frases viraram passos no fim da lista, e a descrição voltou ao tamanho de antes. Segunda passada: 216 classes, **2181 testes, 0 falhas**. |
+| 2026-09-25 | P6 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudModePreferencesTest" --tests "…HudModelTest" --tests "…HelpCatalogTest" --tests "…HudNotch*"` | Verde na primeira passada: 5 classes, **82 testes, 0 falhas** — instalação nova, instalação existente, recibo de atualização, pendência apagada, a decisão pura, "Nenhuma API" nos dois idiomas e na varredura de encaixe. `allTests` antes do rebase: 1 falha, o mesmo `HelpContentTest` do P5, porque a frase da instalação nova também alongava a descrição. Depois de rebasear sobre a pilha mesclada, a frase virou o último passo do tópico e a suíte deu 216 classes, **2187 testes, 0 falhas**. |
 
 ## P1 · #274 — Reiniciar o Usage Monitor, não o computador
 
@@ -226,6 +227,16 @@ Regra comum a todos os PRs:
 - **Proteção:** com `NoApisEnabled`, a HUD deixa de dizer "Carregando" e passa a dizer "Nenhuma API".
   O balão da engrenagem já leva às Configurações.
 - O KDoc de `HudModePreferences` e o `CLAUDE.md` passam a registrar a razão nova do default.
+- **Como ficou:**
+  - A decisão pura se chama `hudDefaultShouldSwitch(pending, hasHudAccounts, modalOpen)`: "ao menos
+    uma conta" é a lista de cotas da HUD não vazia.
+  - **A troca mora no bloco da bandeja**, e não solta em `main()`. A notificação é da bandeja, e a
+    bandeja é um dos caminhos de volta; sem ela o app não troca sozinho.
+  - O texto da notificação fica numa função fora de `main()`, que está no limite do backend JVM.
+  - "Nenhuma API" sai de `hudFallbackLabel`, com teste, e entra na varredura de encaixe.
+  - A instalação limpa **real** (nó de preferências vazio no registro) não foi executada. Ela apagaria
+    as preferências desta máquina, e isso pede autorização. A regra é coberta pelos testes de
+    preferência com nós isolados.
 
 ## P7 · #276 + #265 — README com a HUD em destaque
 
