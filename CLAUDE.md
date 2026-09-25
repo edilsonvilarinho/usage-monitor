@@ -638,6 +638,22 @@ Antes de desenhar um retângulo novo, procure aqui.
   continua Unicode. Decorativa para a semântica: o nome está sempre escrito ao lado. `when`
   exaustivo sobre `ApiSource`: fonte nova sem marca não compila, e `AppProviderMarkTest` pega o SVG
   que perdeu um caractere na cópia (o parser devolveria caminho vazio, sem erro).
+- **Cor por conta** (`AccountAccent` + `accountAccentColor` + `AppSwatchChip`; issue #275): várias
+  contas Claude no mesmo PC vestiam o mesmo azul, e só o título as separava. Cada perfil pode
+  escolher uma de oito cores em Configurações → Contas. **Paleta fixa, não seletor livre**: cada cor
+  tem variante clara e escura, e `AppAccentsContrastTest` mede as dezesseis pela régua dos acentos
+  de fonte. A escolha mora no nó do perfil (`color` em `AnthropicProfileRegistry`), como **nome** do
+  enum. Nome desconhecido vira "Padrão"; renomear um valor apaga a escolha de quem o tinha.
+  **Enum novo**, e não valor em `AppAccents`, que é a identidade do fornecedor.
+  - **A cor substitui o acento só onde ele já aparece**: marcador de 2dp e marca do card, cabeçalho
+    do balão da HUD e marcador da linha do perfil. Nunca pinta superfície. `accountAccentColor` é a
+    dona única, e sem escolha devolve o acento da fonte.
+  - **No miolo do anel da HUD a marca só ganha cor com escolha.** Sem escolha continua na cor do
+    texto, pela razão de sempre (o acento competiria com a cor de risco dos arcos). Com duas contas
+    Claude o miolo é o único ponto do notch recolhido que diz qual é qual, e ali a escolha é do
+    usuário. Um marcador à parte mudaria `hudNotchSizes` e dividiria espaço com a órbita de sessão
+    ativa. A cor chega à HUD dentro do próprio `HudAccount` (`accountAccent`), e não como parâmetro
+    a mais na cadeia do notch.
 
 **Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
 
@@ -782,6 +798,26 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
   (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
   mola `GENTLE` com crossfade do conteúdo.
+- **HUD padrão na instalação nova** (`markHudDefaultPendingOnFreshInstall` + `hudDefaultShouldSwitch`;
+  issue #277). **Não é o default da leitura**: `readPersistedHudMode` continua `false`, e quem já usa o
+  app nunca é arrastado para a HUD. Instalação nova é `hudMode` e `windowPlacement` ausentes e nenhum
+  recibo de atualização (a regra de `ReleaseNotesDecision`), lida **antes** de o coletor da janela
+  gravar qualquer coisa. Nesse caso o app grava o modo padrão e marca `hudDefaultPending`. A troca sai
+  na primeira coleta com alguma conta e **sem janela modal aberta**: na primeira execução quem está
+  aberta é Configurações, e a instalação nova sobe sem API habilitada — abrir direto no notch mostraria
+  "Carregando" para sempre. Ela manda uma notificação, uma vez só, com os três caminhos de volta.
+  **Mora no bloco da bandeja**, porque a bandeja é um desses caminhos: sem ela o app não troca
+  sozinho. Qualquer escolha de modo antes da troca apaga a pendência, porque a escolha do usuário
+  vence. E sem API habilitada o notch diz "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`).
+- **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): a seção
+  "Sessões CLI", entre as cotas e o rodapé, só quando há o que dizer. Uma linha por sinal: contexto
+  saturado, contexto crescendo (as duas contagens saem do mesmo `SessionPulse` que faz o botão de
+  sessões piscar) e sem resposta (`stalledSessions`, que antes só ia para a bandeja). O texto usa as
+  palavras do dado — "Contexto saturado · 1 sessão", "Sem resposta há 2h10" — e **nunca** "Atenção",
+  que é a palavra do risco de cota, nem "aguardando você": a sessão sem resposta é o pedido do
+  usuário esperando o modelo, o contrário disso, e há teste afirmando as duas proibições. Sessão sem
+  resposta **com perfil nulo não acende conta nenhuma**, pelo mesmo motivo de sempre: conta nula não
+  é "todas as contas". O notch em repouso não muda — o pulso âmbar continua sendo só do risco de cota.
 - **Os botões do card têm dona única** (`cardActionsFor`): histórico sempre, sessões CLI na Anthropic,
   sessões Codex CLI no Codex, uso e presença do time na conta marcada. A barra do card e o balão compõem
   o mesmo `CardActionButton`; o balão acrescenta "atualizar só esta conta". As ações moram em

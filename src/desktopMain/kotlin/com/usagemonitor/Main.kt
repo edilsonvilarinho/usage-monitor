@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudDefaultShouldSwitch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -181,6 +182,7 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.WindowMode
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -198,6 +200,7 @@ import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import com.usagemonitor.update.ensureLinuxMenuIconCurrent
 import com.usagemonitor.update.isEnabled
 import com.usagemonitor.update.UpdateAckChannel
+import com.usagemonitor.update.readUpdateReceipt
 import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.updateAckTokenFromEnv
 import com.usagemonitor.update.rememberReleaseNotesController
@@ -466,6 +469,8 @@ private fun runUsageMonitor(
     val enabledAnthropicProfiles = remember { MutableStateFlow(profileResolution.enabledProfiles) }
     enabledAnthropicProfiles.value = profileResolution.enabledProfiles
     val availableTargets = remember(profileRecords) { availableUsageTargets(profileRecords) }
+    // A cor de cada conta Claude (issue #275), para o card, a HUD e a bandeja.
+    val accountColors = remember(profileRecords) { accountColorsOf(profileRecords) }
     val persistedCardOrder = remember(settings) {
         normalizeCardOrder(readUsageTargetCollection(settings, CARD_ORDER_KEY), availableTargets)
     }
@@ -1036,6 +1041,12 @@ private fun runUsageMonitor(
     // junto de `cardsOnlyMode` (bem mais adiante): aquele coletor precisa
     // saber se está em modo HUD para não gravar a faixa de 24dp como se fosse
     // o tamanho normal da janela salvo pelo usuário.
+    // HUD padrão na instalação nova (issue #277): lido antes de qualquer
+    // gravação, porque o coletor abaixo grava `windowPlacement` e daí em diante
+    // toda execução parece antiga. A troca em si sai na primeira coleta.
+    var hudDefaultPending by remember {
+        mutableStateOf(markHudDefaultPendingOnFreshInstall(settings, hasUpdateReceipt = readUpdateReceipt() != null))
+    }
     var hudMode by remember { mutableStateOf(readPersistedHudMode(settings)) }
     LaunchedEffect(mainWindowState, settings) {
         // A posição entra no instantâneo (issue #273): sem ela a janela voltava
@@ -1209,8 +1220,18 @@ private fun runUsageMonitor(
         }
         hudMode = enabled
         persistHudMode(settings, enabled)
+        // Qualquer escolha de modo encerra a troca pendente da instalação nova —
+        // inclusive a própria troca, que passa por aqui.
+        if (hudDefaultPending) {
+            hudDefaultPending = false
+            clearHudDefaultPending(settings)
+        }
     }
     val setCardsOnlyMode: (Boolean) -> Unit = { enabled ->
+        if (hudDefaultPending) {
+            hudDefaultPending = false
+            clearHudDefaultPending(settings)
+        }
         if (enabled) {
             hudMode = false
             persistHudMode(settings, false)
@@ -1660,6 +1681,18 @@ private fun runUsageMonitor(
         // 0%" —, como o do Codenotch: dá para ler o estado sem abrir janela.
         // Mesmas contas e mesma ordem da HUD (`buildHudAccounts`).
         val trayQuotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
+        // A troca para a HUD na instalação nova (issue #277) mora aqui: a bandeja
+        // é um dos caminhos de volta, e sem ela o app não troca sozinho.
+        val anyModalOpen = isSettingsDialogOpen || isHelpDialogOpen || historyDialogSource != null ||
+            isCliSessionsOpen || isCodexCliSessionsOpen || isTeamUsageOpen || isTeamPresenceOpen || isTeamKeysOpen
+        val switchToHudByDefault = hudDefaultShouldSwitch(hudDefaultPending, trayQuotaRisks.isNotEmpty(), anyModalOpen)
+        LaunchedEffect(switchToHudByDefault) {
+            if (switchToHudByDefault) {
+                setHudMode(true)
+                val notice = hudDefaultNotice(language)
+                trayState.sendNotification(Notification(notice.first, notice.second, Notification.Type.Info))
+            }
+        }
         val trayTooltip = hudTraySummary(
             appName = "Usage Monitor",
             accounts = buildHudAccounts(trayQuotaRisks, cardOrder, language, Clock.System.now())
@@ -2061,6 +2094,7 @@ private fun runUsageMonitor(
                     },
                     cliSessionPulses = cliSessionPulses,
                     teamSessionPulses = teamSessionPulses,
+                    accountColors = accountColors,
                     showFooter = !cardsOnlyMode,
                     // Acesso rápido às três molduras (issues #187 e #215): o
                     // mesmo `val` de cima, partilhado com a faixa do modo
@@ -2261,8 +2295,10 @@ private fun runUsageMonitor(
             teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),
             cliSessionPulses = cliSessionPulses,
             teamSessionPulses = teamSessionPulses,
+            accountColors = accountColors,
             onCloseRequest = { shutdownApplication() },
-            activeTargets = sessionPulseViewModel.activeTargets
+            activeTargets = sessionPulseViewModel.activeTargets,
+            stalledSessions = sessionPulseViewModel.stalledSessions
         )
     }
 
@@ -2490,6 +2526,10 @@ private fun runUsageMonitor(
                 showSettingsToast(
                     SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILE_LABEL)
                 )
+            },
+            onAnthropicProfileColorChange = { profileId, color ->
+                profileRegistry.setColor(profileId, color?.name)
+                showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
             },
             onAddAnthropicProfile = {
                 val selectedDirectory = chooseAnthropicConfigDirectory()
@@ -2864,10 +2904,30 @@ private fun buildAnthropicProfileUiModels(
             removable = record.id != DEFAULT_ANTHROPIC_PROFILE_ID,
             identityLabel = inspection?.accountContext?.displayLabel,
             status = status,
-            detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail
+            detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail,
+            color = AccountAccent.fromStorage(record.color)
         )
     }
 }
+
+/**
+ * O aviso da troca para a HUD (issue #277): o que aconteceu e os três caminhos
+ * de volta que existem mesmo com a janela escondida. Uma vez só — a troca não se
+ * repete, porque a pendência é apagada nela.
+ */
+private fun hudDefaultNotice(language: AppLanguage): Pair<String, String> {
+    return if (language == AppLanguage.PT) {
+        "Usage Monitor agora na barra HUD" to
+            "Para voltar à janela padrão: Ctrl+Shift+H, o menu da bandeja ou a engrenagem na ponta do notch."
+    } else {
+        "Usage Monitor is now on the HUD strip" to
+            "To go back to the standard window: Ctrl+Shift+H, the tray menu or the gear at the end of the notch."
+    }
+}
+
+/** `profileId → cor` das contas que têm cor escolhida; as demais ficam no acento da fonte. */
+private fun accountColorsOf(records: List<AnthropicProfileRecord>): Map<String, AccountAccent> =
+    records.mapNotNull { record -> AccountAccent.fromStorage(record.color)?.let { color -> record.id to color } }.toMap()
 
 /**
  * Aplica uma mudança nas configurações de time e persiste.

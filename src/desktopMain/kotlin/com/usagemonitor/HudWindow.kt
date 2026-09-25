@@ -41,14 +41,17 @@ import com.usagemonitor.presentation.ui.components.RefreshGlyph
 import com.usagemonitor.presentation.ui.components.cardActionsFor
 import com.usagemonitor.presentation.ui.components.refreshActionLabel
 import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.launch
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudFallbackLabel
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.nextRefreshLabel
 import com.usagemonitor.presentation.ui.components.toneFor
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
@@ -103,9 +106,13 @@ internal fun HudWindowHost(
     teamEnabledProfileIds: Set<String>,
     cliSessionPulses: Map<UsageTargetKey, SessionPulse>,
     teamSessionPulses: Map<UsageTargetKey, SessionPulse>,
+    /** A cor escolhida por conta Claude (issue #275), por `profileId`. */
+    accountColors: Map<String, AccountAccent> = emptyMap(),
     onCloseRequest: () -> Unit,
     /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
-    activeTargets: StateFlow<Set<UsageTargetKey>>? = null
+    activeTargets: StateFlow<Set<UsageTargetKey>>? = null,
+    /** Sessões sem resposta desde o último pedido; viram sinal no balão da conta (#265). */
+    stalledSessions: StateFlow<List<StalledCliSession>>? = null
 ) {
     val snapshot by usageAlertViewModel.worstSnapshot.collectAsState()
     val quotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
@@ -115,9 +122,10 @@ internal fun HudWindowHost(
     val refreshingTargets by viewModel.refreshingTargets.collectAsState()
     val exportScope = rememberCoroutineScope()
     val active = activeTargets?.collectAsState()?.value.orEmpty()
+    val stalled = stalledSessions?.collectAsState()?.value.orEmpty()
 
     val fallbackTone = snapshot?.let { worst -> toneFor(worst.risk.level) } ?: AppTone.NEUTRAL
-    val fallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
+    val fallbackLabel = hudFallbackLabel(dashboardState is UiState.NoApisEnabled, language)
     // A faixa de atualização do modo padrão não existe aqui; o indicador ocupa o
     // notch com o mesmo texto e tom de `updateBannerContent` (#225).
     val updateIndicator = appUpdateState?.let { state ->
@@ -139,7 +147,10 @@ internal fun HudWindowHost(
         language = language,
         now = Clock.System.now(),
         activeTargets = active,
-        refreshingTargets = refreshingTargets
+        refreshingTargets = refreshingTargets,
+        accountColors = accountColors,
+        sessionPulses = cliSessionPulses,
+        stalledSessions = stalled
     )
 
     // O monitor do notch (issue #273). Era sempre o padrão: o arrasto era preso a

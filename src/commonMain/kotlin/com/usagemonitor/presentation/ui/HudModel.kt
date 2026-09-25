@@ -6,12 +6,15 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.displayTitle
 import com.usagemonitor.presentation.ui.components.expandedQuotaTitle
@@ -64,7 +67,19 @@ data class HudAccount(
     /** A conta do provedor, que o histórico filtra; `null` quando a fonte não a identifica. */
     val accountKey: UsageAccountKey? = null,
     /** Coleta desta conta em andamento: o anel fica pressionado até ela voltar. */
-    val refreshing: Boolean = false
+    val refreshing: Boolean = false,
+    /**
+     * A cor que o usuário deu à conta (issue #275); `null` é "Padrão". Tinge a
+     * marca no miolo do anel e no cabeçalho do balão — só com escolha: sem ela o
+     * miolo fica na cor do texto, como antes.
+     */
+    val accountAccent: AccountAccent? = null,
+    /**
+     * Contexto crescendo ou saturado e sessão sem resposta nesta conta (issue
+     * #265), já em texto. Vazio é "nada a dizer": o balão não abre a seção.
+     * Dono único: [hudSessionSignals].
+     */
+    val sessionSignals: List<HudSessionSignal> = emptyList()
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
@@ -130,6 +145,32 @@ data class HudQuota(
 /** Os anéis que cabem num notch sem virarem um alvo de tiro. */
 const val MAX_HUD_RINGS = 3
 
+/**
+ * A troca automática para a HUD na instalação nova (issue #277): pendente, com
+ * ao menos uma conta para o notch mostrar e **sem janela modal aberta**. Na
+ * primeira execução quem está aberta costuma ser Configurações, e esconder a
+ * janela principal no meio da configuração tiraria o chão de quem configura.
+ * Sem conta nenhuma o notch diria "Carregando" para sempre.
+ */
+internal fun hudDefaultShouldSwitch(pending: Boolean, hasHudAccounts: Boolean, modalOpen: Boolean): Boolean {
+    return pending && hasHudAccounts && !modalOpen
+}
+
+/**
+ * A palavra do notch sem conta. "Carregando" é o estado de quem ainda vai ter
+ * dado; sem API habilitada nenhuma coleta vem, e a palavra mentiria para sempre.
+ * A saída — as Configurações — está no balão da engrenagem.
+ */
+internal fun hudFallbackLabel(noApisEnabled: Boolean, language: AppLanguage): String {
+    val pt = language == AppLanguage.PT
+    return when {
+        noApisEnabled && pt -> "Nenhuma API"
+        noApisEnabled -> "No APIs"
+        pt -> "Carregando"
+        else -> "Loading"
+    }
+}
+
 /** Maior é mais para fora: o período mais longo é o anel maior. */
 private fun ringRank(periodType: PeriodType?): Int = when (periodType) {
     PeriodType.MONTHLY -> 3
@@ -173,6 +214,7 @@ internal fun hudRingDescription(account: HudAccount, language: AppLanguage): Str
             append("${quota.shortLabel} ${quota.percentText}")
         }
         beyond.forEach { quota -> append(" · ${quota.shortLabel} ${quota.percentText}") }
+        account.sessionSignals.forEach { signal -> append(" · ${signal.text}") }
     }
 }
 
@@ -189,7 +231,13 @@ internal fun buildHudAccounts(
     language: AppLanguage,
     now: Instant,
     activeTargets: Set<UsageTargetKey> = emptySet(),
-    refreshingTargets: Set<UsageTargetKey> = emptySet()
+    refreshingTargets: Set<UsageTargetKey> = emptySet(),
+    /** A cor escolhida por conta Claude, por `profileId`. */
+    accountColors: Map<String, AccountAccent> = emptyMap(),
+    /** Sessões ativas em atenção ou saturadas, por alvo — o mesmo pulso do botão de sessões. */
+    sessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
+    /** Sessões sem resposta desde o último pedido, de todas as contas. */
+    stalledSessions: List<StalledCliSession> = emptyList()
 ): List<HudAccount> {
     val noForecast = if (language == AppLanguage.PT) "Sem projeção" else "No forecast"
     return orderedByCardOrder(quotaRisks, cardOrder) { entry -> entry.stats.targetKey }
@@ -229,7 +277,9 @@ internal fun buildHudAccounts(
                 planLabel = first.stats.planLabel,
                 originLabel = hudSourceOrigin(first.stats.source, language),
                 accountKey = first.stats.accountContext?.key,
-                refreshing = target in refreshingTargets
+                refreshing = target in refreshingTargets,
+                accountAccent = target.profileId?.let { profileId -> accountColors[profileId] },
+                sessionSignals = hudSessionSignals(target, sessionPulses[target], stalledSessions, language)
             )
         }
 }

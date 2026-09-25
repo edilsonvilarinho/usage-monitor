@@ -71,6 +71,8 @@ import com.usagemonitor.domain.entity.UI_SCALE_STEP_PERCENT
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
@@ -132,8 +134,13 @@ data class AnthropicProfileUiModel(
     val removable: Boolean,
     val identityLabel: String?,
     val status: AnthropicProfileUiStatus,
-    val detail: String? = null
+    val detail: String? = null,
+    /** A cor escolhida para a conta (issue #275); `null` é o acento da Anthropic. */
+    val color: AccountAccent? = null
 )
+
+/** Prefixo da opção de cor de um perfil, seguido do id do perfil e do nome da cor (ou `DEFAULT`). */
+const val ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX = "accountColorOption_"
 
 @Composable
 fun SettingsDialogContent(
@@ -202,6 +209,7 @@ fun SettingsDialogContent(
     anthropicProfiles: List<AnthropicProfileUiModel> = emptyList(),
     onAnthropicProfileToggle: (String, Boolean) -> Unit = { _, _ -> },
     onAnthropicProfileRename: (String, String) -> Unit = { _, _ -> },
+    onAnthropicProfileColorChange: (String, AccountAccent?) -> Unit = { _, _ -> },
     onAddAnthropicProfile: () -> Unit = {},
     onRemoveAnthropicProfile: (String) -> Unit = {},
     onRescanAnthropicProfiles: () -> Unit = {},
@@ -365,6 +373,7 @@ fun SettingsDialogContent(
                                 expandedProfileId = expandedProfileId,
                                 onAnthropicProfileToggle = onAnthropicProfileToggle,
                                 onAnthropicProfileRename = onAnthropicProfileRename,
+                                onAnthropicProfileColorChange = onAnthropicProfileColorChange,
                                 onAddAnthropicProfile = onAddAnthropicProfile,
                                 onRemoveAnthropicProfile = onRemoveAnthropicProfile,
                                 onRescanAnthropicProfiles = onRescanAnthropicProfiles,
@@ -925,6 +934,7 @@ private fun AnthropicAccountsTab(
     expandedProfileId: String?,
     onAnthropicProfileToggle: (String, Boolean) -> Unit,
     onAnthropicProfileRename: (String, String) -> Unit,
+    onAnthropicProfileColorChange: (String, AccountAccent?) -> Unit,
     onAddAnthropicProfile: () -> Unit,
     onRemoveAnthropicProfile: (String) -> Unit,
     onRescanAnthropicProfiles: () -> Unit,
@@ -974,6 +984,7 @@ private fun AnthropicAccountsTab(
                             expanded = profile.id == expandedProfileId,
                             onToggle = onAnthropicProfileToggle,
                             onRename = onAnthropicProfileRename,
+                            onColorChange = onAnthropicProfileColorChange,
                             onRemove = onRemoveAnthropicProfile,
                             onToggleExpanded = { onToggleProfileExpanded(profile.id) }
                         )
@@ -1001,6 +1012,7 @@ private fun AnthropicProfileRow(
     expanded: Boolean,
     onToggle: (String, Boolean) -> Unit,
     onRename: (String, String) -> Unit,
+    onColorChange: (String, AccountAccent?) -> Unit,
     onRemove: (String) -> Unit,
     onToggleExpanded: () -> Unit
 ) {
@@ -1024,6 +1036,12 @@ private fun AnthropicProfileRow(
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             AppDataRow(showDivider = false, horizontalPadding = 0.dp) {
+                // O marcador de 2dp na cor da conta — o mesmo do card, que é onde
+                // a cor escolhida aparece. Sem cor própria, o acento da Anthropic.
+                AppSourceMarker(
+                    color = profile.color?.current ?: accentColorFor(ApiSource.ANTHROPIC, AppAccents.current),
+                    height = 28.dp
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = profile.label,
@@ -1064,6 +1082,12 @@ private fun AnthropicProfileRow(
                             label = if (language == AppLanguage.PT) "Apelido" else "Label",
                             onCommit = { newLabel -> onRename(profile.id, newLabel) }
                         )
+                        AccountColorPicker(
+                            profileId = profile.id,
+                            selected = profile.color,
+                            language = language,
+                            onSelect = { color -> onColorChange(profile.id, color) }
+                        )
                         Text(
                             text = profile.path,
                             style = MaterialTheme.typography.labelSmall,
@@ -1082,6 +1106,51 @@ private fun AnthropicProfileRow(
                             )
                         }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * A cor da conta (issue #275): "Padrão" mais as oito de [AccountAccent], em
+ * amostras rotuladas. Paleta fixa e não seletor livre — cada cor tem variante
+ * clara e escura com contraste medido, e é ela que o card e a HUD pintam no
+ * marcador e na marca do fornecedor.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccountColorPicker(
+    profileId: String,
+    selected: AccountAccent?,
+    language: AppLanguage,
+    onSelect: (AccountAccent?) -> Unit
+) {
+    val isPt = language == AppLanguage.PT
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+        Text(
+            text = if (isPt) "Cor" else "Color",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+        ) {
+            AppSwatchChip(
+                label = if (isPt) "Padrão" else "Default",
+                swatch = null,
+                selected = selected == null,
+                onClick = { onSelect(null) },
+                modifier = Modifier.testTag("$ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX${profileId}_DEFAULT")
+            )
+            AccountAccent.entries.forEach { accent ->
+                AppSwatchChip(
+                    label = accent.label(isPt),
+                    swatch = accent.current,
+                    selected = selected == accent,
+                    onClick = { onSelect(accent) },
+                    modifier = Modifier.testTag("$ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX${profileId}_${accent.name}")
+                )
             }
         }
     }

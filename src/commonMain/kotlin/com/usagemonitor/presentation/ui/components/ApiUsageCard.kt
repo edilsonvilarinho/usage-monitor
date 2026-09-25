@@ -160,6 +160,11 @@ fun ApiUsageCard(
     notices: Set<ApiUsageNotice> = emptySet(),
     /** Plano da conta ("Max 20x"); `null` quando o fornecedor não informa. */
     planLabel: String? = null,
+    /**
+     * A cor da conta (issue #275), já resolvida por `accountAccentColor`; `null`
+     * é o acento da fonte. Vale só onde o acento já aparece: o marcador e a marca.
+     */
+    accent: Color? = null,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary> = emptyMap(),
     showUsageDetails: Boolean,
     isRefreshing: Boolean,
@@ -363,7 +368,7 @@ fun ApiUsageCard(
                         // dashboard virava quatro retângulos coloridos disputando
                         // a atenção que os números deviam ter.
                         AppSourceMarker(
-                            color = accentColorFor(source = source, accents = AppAccents.current),
+                            color = accent ?: accentColorFor(source = source, accents = AppAccents.current),
                             height = if (accountContext == null) 18.dp else 28.dp
                         )
                         // A marca do fornecedor, no acento da fonte: reconhecer o
@@ -372,7 +377,7 @@ fun ApiUsageCard(
                         // alinhamento vertical da grade; a marca é a do olho.
                         AppProviderMark(
                             source = source,
-                            tint = accentColorFor(source = source, accents = AppAccents.current),
+                            tint = accent ?: accentColorFor(source = source, accents = AppAccents.current),
                             size = PROVIDER_MARK_SIZE
                         )
                         // Título e conta na mesma coluna, como o `.ptitle`/`.psub`

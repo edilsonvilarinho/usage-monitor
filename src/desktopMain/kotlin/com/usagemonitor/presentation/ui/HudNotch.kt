@@ -740,7 +740,11 @@ private fun HudRingItem(
         // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
         // reconhece antes de ler o nome, que o notch recolhido nem mostra. Na
         // cor do texto e não no acento — em volta dela já estão os arcos, e o
-        // acento ali competiria com a cor de risco deles.
+        // acento ali competiria com a cor de risco deles. **Exceção: a cor que o
+        // usuário deu à conta** (issue #275). Com duas contas Claude, o miolo é
+        // o único ponto do notch recolhido que diz qual é qual, e ali a escolha
+        // é dele — um marcador à parte mudaria a geometria e dividiria espaço
+        // com a órbita de sessão ativa.
         Box(
             modifier = Modifier
                 .onGloballyPositioned(onPlaced)
@@ -762,7 +766,7 @@ private fun HudRingItem(
             )
             AppProviderMark(
                 source = account.source,
-                tint = MaterialTheme.colorScheme.onSurface,
+                tint = account.accountAccent?.current ?: MaterialTheme.colorScheme.onSurface,
                 size = hudRingMarkSize(account.rings.size),
                 modifier = Modifier.graphicsLayer { rotationZ = markTurn }
             )

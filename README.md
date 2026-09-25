@@ -10,7 +10,7 @@
 
 English · [Português (Brasil)](README.pt-BR.md)
 
-![Usage Monitor tour](img/tour.gif)
+![The HUD strip: one ring per account, one arc per quota, docked to the top of the screen](img/hud.gif)
 
 Usage Monitor watches eleven integrations at once — Claude Code, Codex, MiniMax, DeepSeek, OpenCode
 Zen Free, OpenCode Go, Kilo Free, OpenRouter, Gemini CLI, Cursor and Antigravity CLI — and shows
@@ -21,8 +21,69 @@ forecasts, and can push aggregated usage to a team server you host yourself.
 It is a desktop app for Windows, Linux and macOS. It reads credentials you already have; it never
 sends prompt or response content anywhere.
 
+## Quick start
+
+1. **Download** the installer for your system from the
+   [latest release](https://github.com/edilsonvilarinho/usage-monitor/releases/latest):
+   - Windows: `UsageMonitor-Setup-X.Y.Z.exe`
+   - Linux: `install-usage-monitor_X.Y.Z_linux_x64.sh` (or the `.deb` / `.rpm`)
+   - macOS: the `.dmg` for Apple silicon or Intel
+
+   [Installation](#installation) has the details for each system.
+2. **Open it.** Claude Code and Codex are found on their own. Turn on the integrations you use in
+   **Settings > APIs**.
+3. **Keep working.** After the first collection a fresh install moves to the **HUD strip**, a small
+   notch docked to the top of the screen. Hover a ring to see details. `Ctrl+Shift+H` brings the full
+   window back.
+
+## The HUD strip
+
+![The HUD strip open over the first account: rings, quotas, CLI sessions and the card's buttons](img/hud.png)
+
+The HUD strip is a notch docked to any edge of any monitor. It stays on top of other windows and
+takes almost no screen space.
+
+- **One ring per account, one arc per quota.** The outer ring is the longest window (weekly) and the
+  inner ring the shortest (5h). Next to the ring are the percentage of the quota closest to running out
+  and the status word. A quota without a forecast has a dashed track.
+- **Hover a ring** to open that account's balloon. It shows each quota with its bar, how much is used
+  and left, and when it resets. It also shows the plan, where the reading came from, and the same
+  buttons as the card: history, CLI sessions and team. A small glyph next to each quota shows which
+  ring is which. Click a ring to refresh that account.
+- **CLI session signals.** The balloon lists Claude Code sessions whose context is growing or
+  saturated, and sessions with no reply since the last request, for that account only.
+- **One colour per Claude account.** Pick it in **Settings > Accounts**. The colour appears on the
+  cards and in the HUD, so two accounts on the same PC are easy to tell apart.
+- A thin arc orbits the ring while a Claude Code or Codex session was active in the last 5 minutes.
+- **Switching modes.** You can switch between the standard window, cards only and the HUD strip from
+  any of these:
+  - the footer menu
+  - the gear at the end of the notch
+  - the tray menu
+  - `Ctrl+Shift+H` (HUD strip) or `Ctrl+Shift+M` (cards only)
+
+  Drag the hand at the end of the notch to move it. It snaps to the nearest edge of the monitor you
+  drop it on.
+
+![The resting notch](img/hud-rest.png)
+
+## Why Usage Monitor
+
+- **Quotas at a glance.** The HUD strip shows every account's windows without opening a window. The
+  tray alerts you when a quota crosses 75/90/100%.
+- **Cost per session.** Your local Claude Code transcripts are broken down by session, project,
+  branch and model, with estimated cost and a context health verdict. See
+  [the sessions screen](#screenshots).
+- **History and forecast.** Local history shows trends and a projection of when a quota runs out,
+  and compares each period with the previous one.
+- **Team view.** An optional self-hosted server aggregates one account across machines, with a
+  30-day trend and live presence.
+
 ## Features
 
+- **HUD strip and window modes** — the notch described above, plus a cards-only window with no title
+  bar or footer. A fresh install moves to the HUD strip after its first collection. Anyone already
+  using the app keeps the mode they had.
 - **Unified dashboard** — one card per source, auto-refresh every 10 minutes, manual refresh per
   integration, reorderable and collapsible cards. If one source fails the others keep working.
 - **Claude Code session costs** — one row per session, read from local transcripts, with estimated
@@ -66,6 +127,8 @@ Full endpoints, credential paths and per-integration limits:
 [`docs/integrations.md`](docs/integrations.md).
 
 ## Screenshots
+
+![Usage Monitor tour](img/tour.gif)
 
 ![Dashboard](img/dashboard.png)
 

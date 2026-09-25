@@ -13,12 +13,15 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.MAX_HUD_RINGS
 import com.usagemonitor.presentation.ui.TRAY_TOOLTIP_MAX_CHARS
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudDefaultShouldSwitch
+import com.usagemonitor.presentation.ui.hudFallbackLabel
 import com.usagemonitor.presentation.ui.hudRingDescription
 import com.usagemonitor.presentation.ui.hudRingPositionLabel
 import com.usagemonitor.presentation.ui.hudSourceOrigin
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.hudUsedLeftText
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
 import kotlinx.datetime.Instant
 import kotlin.test.Test
@@ -182,6 +185,64 @@ class HudModelTest {
         assertEquals("anel do meio", hudRingPositionLabel(1, 3, AppLanguage.PT))
         assertEquals("middle ring", hudRingPositionLabel(1, 3, AppLanguage.EN))
         assertEquals("anel interno", hudRingPositionLabel(2, 3, AppLanguage.PT))
+    }
+
+    /** A cor da conta (issue #275) chega à HUD por `profileId`; sem escolha, nenhuma. */
+    @Test
+    fun `a cor escolhida para a conta chega a hud e so a dela`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 10, risk = null),
+            entry(SANDBOX, "Sessão 5h", used = 10, risk = null),
+            entry(CODEX, "Codex 5h", used = 10, risk = null)
+        )
+
+        val accounts = buildHudAccounts(
+            entries,
+            listOf(PADRAO, SANDBOX, CODEX),
+            AppLanguage.PT,
+            HUD_NOW,
+            accountColors = mapOf("sandbox" to AccountAccent.VIOLET)
+        )
+
+        assertEquals(listOf(null, AccountAccent.VIOLET, null), accounts.map { account -> account.accountAccent })
+    }
+
+    /** Os sinais de sessão (#265) chegam por alvo e entram na descrição do anel. */
+    @Test
+    fun `os sinais de sessao da conta chegam a hud e a descricao`() {
+        val now = HUD_NOW
+        val entries = listOf(
+            entry(SANDBOX, "Sessão 5h", used = 10, risk = null, profileLabel = "Sandbox"),
+            entry(CODEX, "Codex 5h", used = 10, risk = null)
+        )
+        val pulses = mapOf(
+            SANDBOX to com.usagemonitor.domain.entity.SessionPulse(
+                listOf(com.usagemonitor.domain.entity.ActiveSessionAlert("s", com.usagemonitor.domain.entity.CliSessionHealth.SATURATED, now))
+            )
+        )
+
+        val accounts = buildHudAccounts(entries, listOf(SANDBOX, CODEX), AppLanguage.PT, now, sessionPulses = pulses)
+
+        assertEquals(listOf("Contexto saturado · 1 sessão"), accounts.first().sessionSignals.map { signal -> signal.text })
+        assertTrue(accounts.last().sessionSignals.isEmpty())
+        assertTrue(hudRingDescription(accounts.first(), AppLanguage.PT).endsWith("· Contexto saturado · 1 sessão"))
+    }
+
+    /** Instalação nova (#277): troca só com conta para mostrar e sem modal aberto. */
+    @Test
+    fun `a troca para a hud espera conta e nenhuma janela modal`() {
+        assertTrue(hudDefaultShouldSwitch(pending = true, hasHudAccounts = true, modalOpen = false))
+        assertFalse(hudDefaultShouldSwitch(pending = true, hasHudAccounts = false, modalOpen = false))
+        assertFalse(hudDefaultShouldSwitch(pending = true, hasHudAccounts = true, modalOpen = true))
+        assertFalse(hudDefaultShouldSwitch(pending = false, hasHudAccounts = true, modalOpen = false))
+    }
+
+    /** Sem API habilitada o notch não pode prometer "Carregando" para sempre. */
+    @Test
+    fun `sem api habilitada o notch diz isso em vez de carregando`() {
+        assertEquals("Nenhuma API", hudFallbackLabel(noApisEnabled = true, language = AppLanguage.PT))
+        assertEquals("No APIs", hudFallbackLabel(noApisEnabled = true, language = AppLanguage.EN))
+        assertEquals("Carregando", hudFallbackLabel(noApisEnabled = false, language = AppLanguage.PT))
     }
 
     @Test
