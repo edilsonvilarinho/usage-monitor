@@ -36,6 +36,8 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.HudSessionSignal
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
@@ -761,9 +763,15 @@ internal object ScreenshotFixtures {
             enabled = true,
             removable = true,
             identityLabel = "$SECONDARY_EMAIL — Example Org (Sandbox)",
-            status = AnthropicProfileUiStatus.READY
+            status = AnthropicProfileUiStatus.READY,
+            // A cor por conta (#275): a segunda conta Claude em violeta, a
+            // primeira no azul da Anthropic — é assim que as duas se separam.
+            color = AccountAccent.VIOLET
         )
     )
+
+    /** As cores por conta das capturas, pela mesma chave do app (`profileId`). */
+    val accountColors: Map<String, AccountAccent> = mapOf(SECONDARY_PROFILE_ID to AccountAccent.VIOLET)
 
     val teamSettings = TeamIntegrationSettings(
         enabled = true,
@@ -806,7 +814,9 @@ internal object ScreenshotFixtures {
             focusIndex = 0,
             sessionActive = true,
             planLabel = "Max 20x",
-            originLabel = "via Claude Code"
+            originLabel = "via Claude Code",
+            // Um sinal de sessão CLI (#265), para o balão mostrar a seção.
+            sessionSignals = listOf(HudSessionSignal("Contexto crescendo · 1 sessão", AppTone.WARNING))
         ),
         HudAccount(
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "sandbox"),
@@ -818,7 +828,8 @@ internal object ScreenshotFixtures {
                 HudQuota("7d", "7%", 0.07f, AppTone.OK, resetText = "Qui 9h00", hasForecast = true, title = "Semanal", usedLeftText = "7% usado · 93% restante", periodType = PeriodType.WEEKLY)
             ),
             focusIndex = 0,
-            originLabel = "via Claude Code"
+            originLabel = "via Claude Code",
+            accountAccent = AccountAccent.VIOLET
         ),
         // Sem reset: o saldo pré-pago não expira, e a linha dele sai só com o
         // percentual — é o "caso item tenha" da #189.

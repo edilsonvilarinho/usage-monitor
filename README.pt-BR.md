@@ -13,7 +13,7 @@
 > O [README em inglês](README.md) é o documento canônico. Esta tradução pode atrasar em relação a
 > ele; em caso de divergência, vale o inglês.
 
-![Tour da aplicação](img/tour.gif)
+![A barra HUD: um anel por conta, um arco por cota, colada no topo da tela](img/hud.gif)
 
 O Usage Monitor acompanha onze integrações ao mesmo tempo — Claude Code, Codex, MiniMax, DeepSeek,
 OpenCode Zen Free, OpenCode Go, Kilo Free, OpenRouter, Gemini CLI, Cursor e Antigravity CLI — e mostra
@@ -24,8 +24,70 @@ previsão, e pode enviar o consumo agregado para um servidor de time que você m
 É uma aplicação desktop para Windows, Linux e macOS. Ela lê credenciais que você já tem, e nunca
 envia conteúdo de prompt ou de resposta para lugar nenhum.
 
+## Início rápido
+
+1. **Baixe** o instalador do seu sistema na
+   [última release](https://github.com/edilsonvilarinho/usage-monitor/releases/latest):
+   - Windows: `UsageMonitor-Setup-X.Y.Z.exe`
+   - Linux: `install-usage-monitor_X.Y.Z_linux_x64.sh` (ou o `.deb` / `.rpm`)
+   - macOS: o `.dmg` para Apple silicon ou para Intel
+
+   Os detalhes de cada sistema estão em [Instalação](#instalação).
+2. **Abra.** Claude Code e Codex são encontrados sozinhos. Ligue as integrações que você usa em
+   **Configurações > APIs**.
+3. **Continue trabalhando.** Depois da primeira coleta, uma instalação nova passa para a **barra HUD**,
+   um pequeno notch colado no topo da tela. Passe o ponteiro num anel para ver os detalhes.
+   `Ctrl+Shift+H` traz a janela completa de volta.
+
+## A barra HUD
+
+![A barra HUD aberta sobre a primeira conta: anéis, cotas, sessões CLI e os botões do card](img/hud.png)
+
+A barra HUD é um notch colado em qualquer borda de qualquer monitor. Ela fica por cima das outras
+janelas e ocupa quase nada da tela.
+
+- **Um anel por conta, um arco por cota.** O anel de fora é a janela mais longa (semanal) e o de
+  dentro a mais curta (5h). Ao lado do anel ficam o percentual da cota mais perto de acabar e a
+  palavra do estado. Cota sem projeção tem a trilha tracejada.
+- **Passe o ponteiro num anel** para abrir o balão daquela conta. Ele mostra cada cota com a barra,
+  quanto foi usado e quanto resta, e quando ela reinicia. Mostra também o plano, de onde veio a
+  leitura e os mesmos botões do card: histórico, sessões CLI e time. Um pequeno glifo ao lado de cada
+  cota diz qual anel é qual. Clique num anel para atualizar aquela conta.
+- **Sinais de sessão CLI.** O balão lista as sessões do Claude Code com o contexto crescendo ou
+  saturado, e as sessões sem resposta desde o último pedido, só da conta dele.
+- **Uma cor por conta Claude.** Escolha em **Configurações > Contas**. A cor aparece nos cards e na
+  HUD, e assim duas contas no mesmo PC se distinguem de relance.
+- Um arco fino gira em volta do anel enquanto houve uma sessão do Claude Code ou do Codex ativa nos
+  últimos 5 minutos.
+- **Trocar de modo.** Você alterna entre a janela padrão, somente os cards e a barra HUD por
+  qualquer um destes caminhos:
+  - o menu do rodapé
+  - a engrenagem na ponta do notch
+  - o menu da bandeja
+  - `Ctrl+Shift+H` (barra HUD) ou `Ctrl+Shift+M` (somente cards)
+
+  Para mover o notch, arraste pela mão na ponta dele. Ele gruda na borda mais próxima do monitor em
+  que você o soltar.
+
+![O notch em repouso](img/hud-rest.png)
+
+## Por que o Usage Monitor
+
+- **Cotas num relance.** A barra HUD mostra as janelas de todas as contas sem abrir janela nenhuma.
+  A bandeja avisa quando uma cota cruza 75/90/100%.
+- **Custo por sessão.** Os transcripts locais do Claude Code são abertos por sessão, projeto, branch
+  e modelo, com custo estimado e um veredito de saúde do contexto. Veja
+  [a tela de sessões](#telas).
+- **Histórico e previsão.** O histórico local mostra a tendência e a projeção de quando a cota
+  acaba, e compara cada período com o anterior.
+- **Visão de time.** Um servidor opcional, hospedado por você, junta a mesma conta de várias
+  máquinas, com tendência de 30 dias e presença ao vivo.
+
 ## Recursos
 
+- **Barra HUD e modos de janela** — o notch descrito acima, mais a janela só com os cards, sem barra
+  de título e sem rodapé. Uma instalação nova passa para a barra HUD depois da primeira coleta. Quem
+  já usa o app continua no modo que tinha.
 - **Dashboard unificado** — um card por fonte, refresh automático a cada 10 minutos, refresh manual
   por integração, cards reordenáveis e minimizáveis. Se uma fonte falhar, as outras continuam.
 - **Custo das sessões do Claude Code** — uma linha por sessão, lida dos transcripts locais, com custo
@@ -70,6 +132,8 @@ Endpoints completos, caminhos de credencial e limites de cada integração:
 [`docs/integrations.md`](docs/integrations.md) (em inglês).
 
 ## Telas
+
+![Tour da aplicação](img/tour.gif)
 
 ![Dashboard](img/dashboard.png)
 
