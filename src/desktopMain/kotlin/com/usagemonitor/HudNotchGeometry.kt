@@ -131,7 +131,9 @@ internal fun hudNotchSizes(
     showsCountdown: Boolean,
     hasUpdateIndicator: Boolean,
     /** O comprimento que a faixa completa pode ter antes de virar compacta. */
-    maxAlong: Dp = Dp.Infinity
+    maxAlong: Dp = Dp.Infinity,
+    /** A atualização pendente tem ação no balão da engrenagem (todo estado menos baixando). */
+    hasUpdateAction: Boolean = false
 ): HudNotchSizes {
     val full = if (edge.isHorizontal) {
         horizontalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = false)
@@ -154,7 +156,7 @@ internal fun hudNotchSizes(
     // O balão da engrenagem existe mesmo sem conta nenhuma: é a saída do modo.
     val tallest = maxOf(
         accounts.maxOfOrNull { account -> hudBalloonHeight(account) } ?: 0.dp,
-        hudAppBalloonHeight(hasUpdateIndicator)
+        hudAppBalloonHeight(hasUpdateIndicator, hasUpdateAction)
     )
     // O balão não gira com a borda: é texto, e fica sempre de pé.
     val balloon = DpSize(HUD_BALLOON_WIDTH, tallest)
@@ -240,15 +242,26 @@ internal val HUD_APP_BALLOON_ACTIONS = HUD_BALLOON_ACTIONS
 internal const val HUD_APP_BALLOON_MODES = 3
 
 /**
- * A altura do balão da engrenagem: título com a contagem, os modos de janela, a
- * fileira de ações do rodapé e, quando há atualização pendente, a linha dela.
+ * A frase da atualização no balão da engrenagem: duas linhas. Numa só, "Versão
+ * 38.1.0 pronta — será aplicada ao fechar" saía cortada nos 240dp úteis.
  */
-internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean): Dp {
+internal const val HUD_APP_BALLOON_UPDATE_TITLE_LINES = 2
+internal val HUD_APP_BALLOON_UPDATE_TITLE = HUD_BALLOON_FOOTER * HUD_APP_BALLOON_UPDATE_TITLE_LINES
+
+/**
+ * A altura do balão da engrenagem: título com a contagem, os modos de janela, a
+ * fileira de ações do rodapé e, quando há atualização pendente, a frase dela e —
+ * com ação — a linha "Reiniciar e atualizar agora →", da altura de uma linha de modo.
+ */
+internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean, hasUpdateAction: Boolean = false): Dp {
     var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER +
         HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_CAPTION + HUD_APP_BALLOON_MODE_ROW * HUD_APP_BALLOON_MODES +
         HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS
     if (hasUpdateIndicator) {
-        height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
+        height += HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_UPDATE_TITLE
+        if (hasUpdateAction) {
+            height += HUD_APP_BALLOON_MODE_ROW
+        }
     }
     return height
 }

@@ -178,6 +178,20 @@ class HudNotchGeometryTest {
         assertEquals(sizes.collapsed.width + (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2, sizes.withHandles.width)
     }
 
+    /** A ação da atualização é uma linha a mais no balão da engrenagem, e a janela aberta a reserva. */
+    @Test
+    fun `a acao da atualizacao cresce o balao da engrenagem`() {
+        val indicatorOnly = hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", showsCountdown = true, hasUpdateIndicator = true)
+        val withAction = hudNotchSizes(
+            emptyList(), HudEdge.TOP, "Carregando", showsCountdown = true, hasUpdateIndicator = true, hasUpdateAction = true
+        )
+        assertEquals(hudAppBalloonHeight(hasUpdateIndicator = true, hasUpdateAction = true), withAction.balloon.height)
+        assertTrue(withAction.balloon.height > indicatorOnly.balloon.height)
+        assertTrue(withAction.expanded.height > indicatorOnly.expanded.height)
+        // Parado nada muda: a ação só existe no balão.
+        assertEquals(indicatorOnly.collapsed, withAction.collapsed)
+    }
+
     @Test
     fun `a palavra longa quebra em duas linhas so na coluna vertical`() {
         assertEquals(2, verticalWordLines("Sem projeção"))

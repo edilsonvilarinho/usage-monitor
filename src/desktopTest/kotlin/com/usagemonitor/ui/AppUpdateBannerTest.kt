@@ -14,11 +14,13 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.AppUpdateBanner
+import com.usagemonitor.presentation.ui.updateBannerAction
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * Os quatro estados da faixa, desenhados fora do `DashboardScreen`: a faixa é
@@ -32,6 +34,29 @@ class AppUpdateBannerTest {
         version = "38.0.0",
         releasePageUrl = "https://github.com/edilsonvilarinho/usage-monitor/releases/tag/v38.0.0"
     )
+
+    /**
+     * A ação por estado tem dona única: a faixa e o balão da engrenagem da HUD a
+     * leem daqui, e divergir entre os dois seria o mesmo clique fazendo coisas
+     * diferentes conforme o modo de janela.
+     */
+    @Test
+    fun `the action dispatch is the same function for the banner and the hud`() {
+        val calls = mutableListOf<String>()
+        val openRelease = { calls += "open"; Unit }
+        val restart = { calls += "restart"; Unit }
+        val states = listOf(
+            AppUpdateUiState.Available(update),
+            AppUpdateUiState.Downloading(update, percent = 42),
+            AppUpdateUiState.Ready(update),
+            AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD)
+        )
+
+        states.forEach { state -> updateBannerAction(state, openRelease, restart)?.invoke() }
+
+        assertEquals(listOf("open", "restart", "open"), calls)
+        assertNull(updateBannerAction(AppUpdateUiState.Downloading(update, percent = 42), openRelease, restart))
+    }
 
     @Test
     fun `available offers the manual download`() = runDesktopComposeUiTest {
