@@ -4,7 +4,8 @@ const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info
 
 // O notch da HUD (Compose: `HudNotch`). Colado numa borda da tela: reto e rente
 // nela, cantos redondos do lado de dentro e ombros côncavos ligando os dois.
-// O notch não cresce: por conta, anel + percentual em foco + palavra. Com o
+// O notch não cresce: por conta, anel + uma linha por anel com a janela
+// ("7d 72%", "5h 45%", #286) + palavra. Com o
 // ponteiro em cima aparecem as alças (mão e engrenagem) e, ao lado, o balão de
 // UMA conta — a do anel sob o ponteiro — ou o da engrenagem.
 export function AppHudBar({
@@ -35,7 +36,6 @@ export function AppHudBar({
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--muted)' }} />{fallbackLabel}
         </span>
       ) : accounts.map((account) => {
-        const focus = account.quotas[account.focus || 0] || account.quotas[0];
         // A janela mais longa por fora (#278); estável entre janelas iguais.
         const rank = { monthly: 3, weekly: 2, interval: 1 };
         const rings = account.quotas.slice(0, 3).map((q, i) => ({ q, i }))
@@ -49,7 +49,13 @@ export function AppHudBar({
               label={`${account.label} · ${account.statusLabel}`}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: horizontal ? 'flex-start' : 'center' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--fg)' }}>{focus && focus.percent}</span>
+              {rings.length <= 1 ? (
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--fg)' }}>{rings[0] && rings[0].percent}</span>
+              ) : rings.map((q) => (
+                <span key={q.short} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', letterSpacing: '.07em', color: 'var(--fg)' }}>
+                  <span style={{ color: 'var(--muted)' }}>{q.short}</span> {q.percent}
+                </span>
+              ))}
               <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', letterSpacing: '.07em', color: LEVELS[account.level] || LEVELS.off, textAlign: 'center', maxWidth: horizontal ? 'none' : 56 }}>{account.statusLabel}</span>
             </div>
           </div>

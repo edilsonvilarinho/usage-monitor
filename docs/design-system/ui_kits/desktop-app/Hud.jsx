@@ -1,7 +1,7 @@
 const { AppHudBar } = DS;
 
-// Uma conta por anel, um arco por cota. A palavra é a da pior cota, e o
-// percentual ao lado é o da cota em foco (pior risco, depois maior percentual).
+// Uma conta por anel, um arco por cota. A palavra é a da pior cota, e ao lado
+// vai uma linha por anel com a janela, de fora para dentro ("7d 41%", "5h 68%").
 // `reset` só aparece no balão; o saldo pré-pago não tem e nada é impresso.
 const ACCOUNTS = [
   {
@@ -53,7 +53,7 @@ export function Hud() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', alignItems: 'flex-start' }}>
       <Caption>barra HUD · notch colado numa borda, um anel por conta</Caption>
 
-      <Caption>1 · parado no topo — anel, percentual em foco e a palavra de cada conta</Caption>
+      <Caption>1 · parado no topo — anel, uma linha por janela e a palavra de cada conta</Caption>
       <Screen>
         <AppHudBar accounts={ACCOUNTS} countdown="02:05" />
       </Screen>

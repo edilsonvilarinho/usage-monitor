@@ -273,7 +273,7 @@ object HelpCatalog {
                 "cards; a faixa de título volta enquanto o ponteiro está sobre o topo da janela. A " +
                 "barra HUD vai mais longe: esconde a janela e deixa um notch colado numa borda da " +
                 "tela, sempre no topo das outras, com um anel por conta — um arco por cota —, o " +
-                "percentual e a palavra do estado. Com o ponteiro sobre um anel abre-se o balão " +
+                "percentual de cada janela (7d, 5h) e a palavra do estado. Com o ponteiro sobre um anel abre-se o balão " +
                 "daquela conta: cada cota com a barra, quanto foi usado e quanto resta e a hora " +
                 "em que ela reinicia, o plano e de onde veio a leitura, e os mesmos botões do " +
                 "card. Clicar num anel atualiza aquela conta. Nas pontas do notch ficam a mão, " +
@@ -530,7 +530,7 @@ object HelpCatalog {
                 "grid; the title strip comes back while the pointer is over the top of the window. " +
                 "The HUD strip goes further: it hides the window and leaves a notch docked to a " +
                 "screen edge, always above other windows, with one ring per account — one arc per " +
-                "quota —, the percentage and the status word. Hovering a ring opens that " +
+                "quota —, each window's percentage (7d, 5h) and the status word. Hovering a ring opens that " +
                 "account's balloon: each quota with its bar, how much is used and left and when " +
                 "it resets, the plan and where the reading came from, and the card's own buttons. " +
                 "Clicking a ring refreshes that account. At the ends of the notch sit the hand, " +

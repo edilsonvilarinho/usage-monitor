@@ -73,7 +73,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -734,7 +737,6 @@ private fun HudRingItem(
     LaunchedEffect(isHovered) {
         if (isHovered) currentOnHovered()
     }
-    val focus = account.focus
     val description = hudRingDescription(account, language)
     val ring: @Composable () -> Unit = {
         // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
@@ -772,13 +774,14 @@ private fun HudRingItem(
             )
         }
     }
-    val percent: @Composable () -> Unit = {
-        Text(
-            text = focus?.percentText.orEmpty(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1
-        )
+    // Uma linha por anel, com a janela (#286); compacta, só a cota em foco. As
+    // linhas são desenhadas no tamanho que `stripLineWidth`/`stripLineHeight`
+    // medem — a costura com a geometria.
+    val lines: @Composable () -> Unit = {
+        val stripLines = if (compact) listOf(account.focusLine) else account.stripLines
+        Column(horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start) {
+            stripLines.forEach { line -> HudStripLineText(line) }
+        }
     }
     val word: @Composable () -> Unit = {
         Text(
@@ -792,7 +795,7 @@ private fun HudRingItem(
     if (vertical || compact) {
         Column(modifier = itemModifier.hoverable(hover), horizontalAlignment = Alignment.CenterHorizontally) {
             ring()
-            percent()
+            lines()
             // Compacto, a palavra fica no balão e na descrição do anel: com
             // contas demais ela é o que fazia a faixa atravessar a tela.
             if (!compact) word()
@@ -805,11 +808,40 @@ private fun HudRingItem(
         ) {
             ring()
             Column {
-                percent()
+                lines()
                 word()
             }
         }
     }
+}
+
+/**
+ * "7d 72%": a janela no tom secundário e o número no do texto. A cor do risco
+ * fica no arco e na palavra — aqui ela diria o estado só pela cor. Sem rótulo é
+ * o percentual de sempre, em `labelMedium`.
+ */
+@Composable
+private fun HudStripLineText(line: HudStripLine) {
+    val label = line.label
+    if (label == null) {
+        Text(
+            text = line.percentText,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
+        return
+    }
+    Text(
+        text = buildAnnotatedString {
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(label) }
+            append(" ")
+            append(line.percentText)
+        },
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = 1
+    )
 }
 
 /**

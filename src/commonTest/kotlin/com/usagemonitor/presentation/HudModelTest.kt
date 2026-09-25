@@ -290,6 +290,78 @@ class HudModelTest {
         assertEquals("Usage Monitor", hudTraySummary("Usage Monitor", emptyList()))
     }
 
+    /** Com duas janelas a bandeja diz de qual é o número (#286). */
+    @Test
+    fun `o resumo da bandeja diz a janela da cota em foco`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 45, risk = UsageRiskLevel.AT_RISK, profileLabel = "Padrão"),
+            entry(PADRAO, "Sessão 7d", used = 72, risk = UsageRiskLevel.WILL_EXCEED, period = PeriodType.WEEKLY)
+        )
+        val accounts = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW)
+
+        assertEquals("Usage Monitor — ANTHROPIC — Padrão 7d 72%", hudTraySummary("Usage Monitor", accounts))
+    }
+
+    // ------------------------------------------------------------ linhas do notch (#286)
+
+    /** Uma linha por anel, na ordem dos anéis, e não o número da cota em foco. */
+    @Test
+    fun `o notch mostra cada janela com o rotulo, na ordem dos aneis`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 45, risk = UsageRiskLevel.AT_RISK, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Sessão 7d", used = 72, risk = UsageRiskLevel.WILL_EXCEED, period = PeriodType.WEEKLY)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(listOf("7d 72%", "5h 45%"), account.stripLines.map { line -> line.text })
+        assertEquals("7d 72%", account.focusLine.text)
+    }
+
+    /** O foco pode mudar de janela; as linhas não mudam de lugar. */
+    @Test
+    fun `as linhas nao trocam de lugar quando o foco muda de janela`() {
+        val calm = listOf(
+            entry(PADRAO, "Sessão 5h", used = 80, risk = UsageRiskLevel.AT_RISK, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Sessão 7d", used = 30, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.WEEKLY)
+        )
+        val hot = listOf(
+            entry(PADRAO, "Sessão 5h", used = 10, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Sessão 7d", used = 90, risk = UsageRiskLevel.WILL_EXCEED, period = PeriodType.WEEKLY)
+        )
+
+        val before = buildHudAccounts(calm, emptyList(), AppLanguage.PT, HUD_NOW).single()
+        val after = buildHudAccounts(hot, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals("5h", before.focusLine.label)
+        assertEquals("7d", after.focusLine.label)
+        assertEquals(listOf("7d", "5h"), before.stripLines.map { line -> line.label })
+        assertEquals(listOf("7d", "5h"), after.stripLines.map { line -> line.label })
+    }
+
+    /** Sem janela a distinguir, o notch continua como antes: só o número. */
+    @Test
+    fun `conta de cota unica fica sem rotulo`() {
+        val account = buildHudAccounts(listOf(entry(CODEX, "Codex 5h", used = 30, risk = null)), emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(listOf("30%"), account.stripLines.map { line -> line.text })
+        assertEquals(null, account.focusLine.label)
+    }
+
+    @Test
+    fun `tres janelas dao tres linhas e a quarta cota fica so no balao`() {
+        val entries = listOf(
+            entry(SANDBOX, "Rolling 5h", used = 10, risk = null, period = PeriodType.INTERVAL),
+            entry(SANDBOX, "Semanal 7d", used = 20, risk = null, period = PeriodType.WEEKLY),
+            entry(SANDBOX, "Mensal 30d", used = 30, risk = null, period = PeriodType.MONTHLY),
+            entry(SANDBOX, "Extra 1d", used = 40, risk = null, period = PeriodType.INTERVAL)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(listOf("30d 30%", "7d 20%", "5h 10%"), account.stripLines.map { line -> line.text })
+    }
+
     /** O Windows corta o tooltip da bandeja em 127 caracteres; o corte é nosso. */
     @Test
     fun `o resumo da bandeja respeita o limite do windows`() {

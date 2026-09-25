@@ -18,12 +18,15 @@ the edge, like the hardware notch Codenotch imitates, not as a pill floating nex
 the 10dp radius ceiling: it is a silhouette, not a panel. Depth `DIALOG`, top sheen, lit border.
 
 **The notch never grows.** Per account in the user's card order (never risk order — the first account
-used to swap by itself): an `AppUsageRing` (one arc per quota, up to three), the percentage of the
-quota in focus (worst risk, then highest percent) and the **status word — always**. Color never
+used to swap by itself): an `AppUsageRing` (one arc per quota, up to three), **one line per ring with
+the window and its percentage** — `7d 72%` over `5h 45%`, outer ring first, `labelSmall` with the
+window in `onSurfaceVariant` — and the **status word — always**. A single-quota account keeps the bare
+`labelMedium` percentage. It used to be one number, the quota in focus (worst risk), with no window:
+the same spot read 45% on one poll and 72% on the next without anything changing (#286). Color never
 informs alone. Horizontal on top/bottom, a column on the sides, where a long word ("Sem projeção")
 wraps to two lines. **Compact** when the full strip would take more than 45% of the edge (six or
-seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and percentage under it,
-no word, which stays in the balloon and the ring description. The strip ends with the update icon (no click of its own — #225) and the
+seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and the focus quota with its
+window under it (`7d 72%`), no word, which stays in the balloon and the ring description. The strip ends with the update icon (no click of its own — #225) and the
 countdown to the next collection, **once**: polling is app-wide. Each text estimate carries 1dp of
 slack for Skia's whole-pixel rounding, or the countdown breaks into "04:5" at fractional densities.
 
@@ -58,8 +61,9 @@ handle is a quarter arc in `outline` inside the shadow margin the resting window
 exists, and measuring there to feed the window would close the resize loop. Estimated from mono
 advances — `label*` is Plex Mono — and every balloon row has a fixed height, so the balloon height is
 a sum. The open area reserves the **tallest** balloon, so switching rings never resizes the window.
-The collapsed width is the max of percentage and word, so a collection that turns `9%` into `88%`
-does not resize it either.
+The collapsed width is the max of the widest line and the word, so a collection that turns `9%` into
+`88%` does not resize it either. Each window adds a 14dp line to the text column: the top-edge content is
+36dp with one window (the ring decides), 42dp with two and 56dp with three.
 
 **Window, measured.** A click on a transparent pixel of a transparent window is swallowed on Windows
 11 — it reaches neither the content nor the window behind. So the window is notch-thick at rest (plus
@@ -83,4 +87,5 @@ item, Ctrl+Shift+H.
 **Identification.** The provider mark (`AppProviderMark`) sits in the middle of each ring in the
 foreground color — the arcs around it already carry the risk colors. The account label is the card
 title ("Anthropic — Padrão", never just "Padrão"). Rings are 36dp so the mark fits. The tray icon
-tooltip summarises every account with its focus percentage, cut at Windows' 127 characters.
+tooltip summarises every account with its focus percentage **and its window** ("7d 72%"), cut at
+Windows' 127 characters — one entry per window would overflow with three accounts.

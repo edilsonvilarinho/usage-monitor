@@ -240,6 +240,40 @@ class HudNotchGeometryTest {
         assertEquals(0.25f, right.offsetFraction)
     }
 
+    /**
+     * Uma linha por janela (#286): o notch engrossa só o que as linhas pedem.
+     * Com uma cota a espessura é a do anel, como antes.
+     */
+    @Test
+    fun `cada janela a mais engrossa o notch de cima em uma linha`() {
+        val quotas = listOf("5h" to "88%", "7d" to "9%", "30d" to "40%")
+        val thickness = (1..3).map { count ->
+            val sizes = hudNotchSizes(listOf(account("Padrão", "Ok", quotas.take(count))), HudEdge.TOP, "Carregando", false, false)
+            sizes.collapsed.height - HUD_NOTCH_PADDING_ACROSS * 2
+        }
+
+        assertEquals(listOf(HUD_RING_SIZE, HUD_STRIP_LINE * 2 + HUD_WORD_LINE, HUD_STRIP_LINE * 3 + HUD_WORD_LINE), thickness)
+    }
+
+    @Test
+    fun `na borda lateral as linhas somam na altura e a mais larga decide a coluna`() {
+        val one = hudNotchSizes(listOf(account("Padrão", "Ok", listOf("5h" to "88%"))), HudEdge.RIGHT, "Carregando", false, false)
+        val two = hudNotchSizes(listOf(account("Padrão", "Ok", listOf("5h" to "88%", "7d" to "100%"))), HudEdge.RIGHT, "Carregando", false, false)
+
+        assertEquals(HUD_STRIP_LINE * 2 - HUD_PERCENT_LINE, two.collapsed.height - one.collapsed.height)
+        assertEquals(maxOf(HUD_RING_SIZE, wordWidth("7d 100%")), two.collapsed.width - HUD_NOTCH_PADDING_ACROSS * 2)
+    }
+
+    /** Compacta, a célula é a cota em foco com a janela — não uma linha por anel. */
+    @Test
+    fun `compacta a celula mede so a linha em foco`() {
+        val accounts = (1..7).map { index -> account("Conta $index", "Ok", listOf("5h" to "88%", "7d" to "9%")) }
+        val sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false, false, maxAlong = 300.dp)
+
+        assertTrue(sizes.compact)
+        assertEquals(HUD_RING_SIZE + HUD_STRIP_LINE, sizes.collapsed.height - HUD_NOTCH_PADDING_ACROSS * 2)
+    }
+
     @Test
     fun `tela sem medida devolve a posicao de estreia`() {
         assertEquals(HudPlacement.Default, nearestHudPlacement(100.dp, 100.dp, ScreenWorkArea.Unknown))
