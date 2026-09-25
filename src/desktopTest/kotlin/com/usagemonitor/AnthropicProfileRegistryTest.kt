@@ -89,6 +89,24 @@ class AnthropicProfileRegistryTest {
         assertNotNull(registry.profiles.value.firstOrNull { it.id == work.id })
     }
 
+    /** A cor da conta (issue #275) sobrevive a um registro novo e à redetecção. */
+    @Test
+    fun `account color persists across registries and rescans and clears back to default`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        val registry = newRegistry()
+
+        registry.setColor("default", "VIOLET")
+        registry.rescan()
+        assertEquals("VIOLET", registry.profiles.value.first { it.id == "default" }.color)
+
+        val reopened = newRegistry()
+        assertEquals("VIOLET", reopened.profiles.value.first { it.id == "default" }.color)
+
+        reopened.setColor("default", null)
+        assertEquals(null, newRegistry().profiles.value.first { it.id == "default" }.color)
+    }
+
     @Test
     fun `updateLabel persists an empty value instead of reverting to the previous label`() {
         val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }

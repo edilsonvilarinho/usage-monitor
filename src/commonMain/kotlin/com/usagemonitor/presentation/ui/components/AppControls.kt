@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -535,6 +536,82 @@ fun AppToggleChip(
         )
     }
 }
+
+/**
+ * Opção de cor: amostra redonda e rótulo, **uma** escolha entre várias (issue
+ * #275, a cor de cada conta Claude).
+ *
+ * Não é [AppToggleChip]: aquele liga ou desliga uma restrição, este escolhe uma
+ * entre N — é `selectable` com `Role.RadioButton`, que é o que `assertIsSelected`
+ * observa. A opção escolhida carrega **marca além do realce**, com o espaço da
+ * marca reservado em todas: cor nunca informa sozinha, e sem a reserva o rótulo
+ * andaria para o lado a cada troca. [swatch] nulo é a opção "Padrão", desenhada
+ * como anel vazio — não há cor própria a mostrar.
+ */
+@Composable
+fun AppSwatchChip(
+    label: String,
+    swatch: Color?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val container by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+        animationSpec = appTween(AppMotion.normal),
+        label = "appSwatchChipContainer"
+    )
+    val border by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = appTween(AppMotion.normal),
+        label = "appSwatchChipBorder"
+    )
+    val content = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    val ring = MaterialTheme.colorScheme.outline
+    Row(
+        modifier = modifier
+            .clip(AppShapes.small)
+            .background(container)
+            .border(AppBorderWidth, border, AppShapes.small)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .defaultMinSize(minHeight = CONTROL_HEIGHT)
+            .padding(horizontal = AppSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(SWATCH_SIZE)
+                .clip(CircleShape)
+                .then(
+                    if (swatch != null) {
+                        Modifier.background(swatch)
+                    } else {
+                        Modifier.border(AppBorderWidth, ring, CircleShape)
+                    }
+                )
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = content,
+            maxLines = 1
+        )
+        Box(modifier = Modifier.width(SWATCH_MARK_WIDTH), contentAlignment = Alignment.Center) {
+            if (selected) {
+                Text(
+                    text = "✓",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = content,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+private val SWATCH_SIZE = 10.dp
+private val SWATCH_MARK_WIDTH = 10.dp
 
 /** Uma opção do controle segmentado. */
 data class AppSegment(

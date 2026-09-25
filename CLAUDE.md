@@ -638,6 +638,22 @@ Antes de desenhar um retângulo novo, procure aqui.
   continua Unicode. Decorativa para a semântica: o nome está sempre escrito ao lado. `when`
   exaustivo sobre `ApiSource`: fonte nova sem marca não compila, e `AppProviderMarkTest` pega o SVG
   que perdeu um caractere na cópia (o parser devolveria caminho vazio, sem erro).
+- **Cor por conta** (`AccountAccent` + `accountAccentColor` + `AppSwatchChip`; issue #275): várias
+  contas Claude no mesmo PC vestiam o mesmo azul, e só o título as separava. Cada perfil pode
+  escolher uma de oito cores em Configurações → Contas. **Paleta fixa, não seletor livre**: cada cor
+  tem variante clara e escura, e `AppAccentsContrastTest` mede as dezesseis pela régua dos acentos
+  de fonte. A escolha mora no nó do perfil (`color` em `AnthropicProfileRegistry`), como **nome** do
+  enum. Nome desconhecido vira "Padrão"; renomear um valor apaga a escolha de quem o tinha.
+  **Enum novo**, e não valor em `AppAccents`, que é a identidade do fornecedor.
+  - **A cor substitui o acento só onde ele já aparece**: marcador de 2dp e marca do card, cabeçalho
+    do balão da HUD e marcador da linha do perfil. Nunca pinta superfície. `accountAccentColor` é a
+    dona única, e sem escolha devolve o acento da fonte.
+  - **No miolo do anel da HUD a marca só ganha cor com escolha.** Sem escolha continua na cor do
+    texto, pela razão de sempre (o acento competiria com a cor de risco dos arcos). Com duas contas
+    Claude o miolo é o único ponto do notch recolhido que diz qual é qual, e ali a escolha é do
+    usuário. Um marcador à parte mudaria `hudNotchSizes` e dividiria espaço com a órbita de sessão
+    ativa. A cor chega à HUD dentro do próprio `HudAccount` (`accountAccent`), e não como parâmetro
+    a mais na cadeia do notch.
 
 **Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
 

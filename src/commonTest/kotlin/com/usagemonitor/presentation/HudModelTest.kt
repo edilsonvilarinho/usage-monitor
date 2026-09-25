@@ -19,6 +19,7 @@ import com.usagemonitor.presentation.ui.hudSourceOrigin
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.hudUsedLeftText
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
 import kotlinx.datetime.Instant
 import kotlin.test.Test
@@ -182,6 +183,26 @@ class HudModelTest {
         assertEquals("anel do meio", hudRingPositionLabel(1, 3, AppLanguage.PT))
         assertEquals("middle ring", hudRingPositionLabel(1, 3, AppLanguage.EN))
         assertEquals("anel interno", hudRingPositionLabel(2, 3, AppLanguage.PT))
+    }
+
+    /** A cor da conta (issue #275) chega à HUD por `profileId`; sem escolha, nenhuma. */
+    @Test
+    fun `a cor escolhida para a conta chega a hud e so a dela`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 10, risk = null),
+            entry(SANDBOX, "Sessão 5h", used = 10, risk = null),
+            entry(CODEX, "Codex 5h", used = 10, risk = null)
+        )
+
+        val accounts = buildHudAccounts(
+            entries,
+            listOf(PADRAO, SANDBOX, CODEX),
+            AppLanguage.PT,
+            HUD_NOW,
+            accountColors = mapOf("sandbox" to AccountAccent.VIOLET)
+        )
+
+        assertEquals(listOf(null, AccountAccent.VIOLET, null), accounts.map { account -> account.accountAccent })
     }
 
     @Test

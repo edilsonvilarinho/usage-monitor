@@ -181,6 +181,7 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.WindowMode
+import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -466,6 +467,8 @@ private fun runUsageMonitor(
     val enabledAnthropicProfiles = remember { MutableStateFlow(profileResolution.enabledProfiles) }
     enabledAnthropicProfiles.value = profileResolution.enabledProfiles
     val availableTargets = remember(profileRecords) { availableUsageTargets(profileRecords) }
+    // A cor de cada conta Claude (issue #275), para o card, a HUD e a bandeja.
+    val accountColors = remember(profileRecords) { accountColorsOf(profileRecords) }
     val persistedCardOrder = remember(settings) {
         normalizeCardOrder(readUsageTargetCollection(settings, CARD_ORDER_KEY), availableTargets)
     }
@@ -2061,6 +2064,7 @@ private fun runUsageMonitor(
                     },
                     cliSessionPulses = cliSessionPulses,
                     teamSessionPulses = teamSessionPulses,
+                    accountColors = accountColors,
                     showFooter = !cardsOnlyMode,
                     // Acesso rápido às três molduras (issues #187 e #215): o
                     // mesmo `val` de cima, partilhado com a faixa do modo
@@ -2261,6 +2265,7 @@ private fun runUsageMonitor(
             teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),
             cliSessionPulses = cliSessionPulses,
             teamSessionPulses = teamSessionPulses,
+            accountColors = accountColors,
             onCloseRequest = { shutdownApplication() },
             activeTargets = sessionPulseViewModel.activeTargets
         )
@@ -2490,6 +2495,10 @@ private fun runUsageMonitor(
                 showSettingsToast(
                     SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILE_LABEL)
                 )
+            },
+            onAnthropicProfileColorChange = { profileId, color ->
+                profileRegistry.setColor(profileId, color?.name)
+                showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
             },
             onAddAnthropicProfile = {
                 val selectedDirectory = chooseAnthropicConfigDirectory()
@@ -2864,10 +2873,15 @@ private fun buildAnthropicProfileUiModels(
             removable = record.id != DEFAULT_ANTHROPIC_PROFILE_ID,
             identityLabel = inspection?.accountContext?.displayLabel,
             status = status,
-            detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail
+            detail = if (duplicate) "Já monitorada por outro perfil habilitado" else inspection?.detail,
+            color = AccountAccent.fromStorage(record.color)
         )
     }
 }
+
+/** `profileId → cor` das contas que têm cor escolhida; as demais ficam no acento da fonte. */
+private fun accountColorsOf(records: List<AnthropicProfileRecord>): Map<String, AccountAccent> =
+    records.mapNotNull { record -> AccountAccent.fromStorage(record.color)?.let { color -> record.id to color } }.toMap()
 
 /**
  * Aplica uma mudança nas configurações de time e persiste.
